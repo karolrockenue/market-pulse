@@ -1,4 +1,4 @@
-// script.js (Updated to handle granularity controls)
+// script.js (Updated for default dates and column rename)
 
 // A global variable to store the user's current granularity selection
 let currentGranularity = "daily";
@@ -41,11 +41,7 @@ const DATASET_7_MAP = {
     type: "currency",
   },
   // Occupancy Category
-  occupancy: {
-    name: "Occupancy (Direct)",
-    category: "Occupancy",
-    type: "percent",
-  },
+  occupancy: { name: "Occupancy", category: "Occupancy", type: "percent" }, // MODIFIED: Renamed from "Occupancy (Direct)"
   mfd_occupancy: {
     name: "Adjusted Occupancy",
     category: "Occupancy",
@@ -65,15 +61,38 @@ const DATASET_7_MAP = {
   },
 };
 
-// Runs when the page loads to get the hotel's details.
+// Runs when the page loads
 document.addEventListener("DOMContentLoaded", () => {
-  fetchHotelDetails();
+  // NEW: Set default dates
+  const startDateInput = document.getElementById("master-start-date");
+  const endDateInput = document.getElementById("master-end-date");
+
+  if (startDateInput && endDateInput) {
+    const today = new Date();
+    const nextMonth = new Date();
+    nextMonth.setMonth(today.getMonth() + 1);
+
+    // Helper to format date as YYYY-MM-DD
+    const formatDate = (date) => {
+      const d = new Date(date);
+      let month = "" + (d.getMonth() + 1);
+      let day = "" + d.getDate();
+      const year = d.getFullYear();
+
+      if (month.length < 2) month = "0" + month;
+      if (day.length < 2) day = "0" + day;
+
+      return [year, month, day].join("-");
+    };
+
+    startDateInput.value = formatDate(today);
+    endDateInput.value = formatDate(nextMonth);
+  }
 });
 
-// NEW: Function to handle the granularity toggle buttons
+// Function to handle the granularity toggle buttons
 function setGranularity(granularity) {
   currentGranularity = granularity;
-  // Update the active class on buttons for visual feedback
   document.getElementById("view-daily").classList.remove("active");
   document.getElementById("view-weekly").classList.remove("active");
   document.getElementById("view-monthly").classList.remove("active");
@@ -82,9 +101,9 @@ function setGranularity(granularity) {
 
 // Fetches and displays the hotel's static information
 async function fetchHotelDetails() {
-  const detailsContainer = document.getElementById("hotel-details-card");
-  if (!detailsContainer) return;
-  detailsContainer.innerHTML = "<h2>Loading Hotel Details...</h2>";
+  const detailsCard = document.getElementById("hotel-details-card");
+  if (!detailsCard) return;
+  detailsCard.innerHTML = "<p>Loading Hotel Details...</p>";
   try {
     const response = await fetch("/api/hotel-details");
     const result = await response.json();
@@ -132,31 +151,30 @@ async function fetchHotelDetails() {
     detailsMap.forEach((item) => {
       const value = item.getValue(hotelData);
       if (value) {
-        tableRows += `<tr><td style="font-weight: 500;">${item.label}</td><td>${value}</td></tr>`;
+        tableRows += `<tr><td style="font-weight: 500; padding: 8px 16px;">${item.label}</td><td style="padding: 8px 16px;">${value}</td></tr>`;
       }
     });
-    detailsContainer.innerHTML = `
-      <div style="background-color: #f8f9fa; padding: 12px 16px; font-weight: 600; border-bottom: 1px solid #e2e8f0;">Property Information</div>
-      <table><tbody>${tableRows}</tbody></table>
+    detailsCard.innerHTML = `
+      <div style="background-color: var(--slate-50); padding: 12px 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-500); border-bottom: 1px solid var(--slate-200);">Property Information</div>
+      <table style="width: 100%;"><tbody>${tableRows}</tbody></table>
     `;
   } catch (error) {
     console.error("Error fetching hotel details:", error);
-    detailsContainer.innerHTML = `<h2>Error Loading Hotel Details</h2><p>${error.message}</p>`;
+    detailsCard.innerHTML = `<p style="color: red; padding: 16px;">Error Loading Hotel Details: ${error.message}</p>`;
   }
 }
 
-// Fetches data from the Live Cloudbeds API (uses its own date range)
+// Fetches data from the Live Cloudbeds API
 async function loadAllMetrics() {
   const statusEl = document.getElementById("status");
   const resultsContainer = document.getElementById("results-container");
   statusEl.textContent = "Loading from Live API...";
   resultsContainer.innerHTML = "";
   try {
-    // Note: Live API call uses master start date, but calculates its own end date
     const startDate =
       document.getElementById("master-start-date").value ||
       new Date().toISOString().split("T")[0];
-    const numDays = 7; // Live API is always a 7-day lookahead for simplicity
+    const numDays = 7;
     const startDateObjUTC = new Date(startDate + "T00:00:00Z");
     const endDateObjUTC = new Date(startDateObjUTC);
     endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
@@ -209,7 +227,7 @@ async function loadAllMetrics() {
   }
 }
 
-// MODIFIED: This is now the master function for loading all database data
+// Master function for loading all database data
 async function loadAllDbData() {
   const startDate = document.getElementById("master-start-date").value;
   const endDate = document.getElementById("master-end-date").value;
@@ -219,14 +237,13 @@ async function loadAllDbData() {
     return;
   }
 
-  // Promise.all runs both requests in parallel for better performance
   await Promise.all([
     loadMetricsFromDB(startDate, endDate, currentGranularity),
     loadCompetitorMetrics(startDate, endDate, currentGranularity),
   ]);
 }
 
-// MODIFIED: This function now accepts parameters
+// Fetches data for YOUR HOTEL from the database
 async function loadMetricsFromDB(startDate, endDate, granularity) {
   const statusEl = document.getElementById("db-status");
   const resultsContainer = document.getElementById("db-results-container");
@@ -251,7 +268,7 @@ async function loadMetricsFromDB(startDate, endDate, granularity) {
   }
 }
 
-// MODIFIED: This function now accepts parameters
+// Fetches data for COMPETITORS from the database
 async function loadCompetitorMetrics(startDate, endDate, granularity) {
   const statusEl = document.getElementById("competitor-status");
   const resultsContainer = document.getElementById(
@@ -278,8 +295,7 @@ async function loadCompetitorMetrics(startDate, endDate, granularity) {
   }
 }
 
-// --- Helper functions for processing and rendering below (no major changes needed for them yet) ---
-// (The rendering functions will need updates in the next step to handle the new data format)
+// --- Helper functions for processing and rendering below ---
 
 function processApiDataForTable(data) {
   const aggregatedData = {};
