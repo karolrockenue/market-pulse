@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "daily-refresh.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/daily-refresh", "dest": "/daily-refresh.js" },
+    { "src": "/(.*)", "dest": "/server.js" }
+  ],
+  "crons": [
+    {
+      "path": "/api/daily-refresh",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}
