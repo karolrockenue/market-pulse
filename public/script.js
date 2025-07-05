@@ -1,4 +1,4 @@
-// script.js (Updated to use master date controls)
+// script.js (Updated to display market averages)
 
 // A complete map of all fields available in Dataset 7, based on our discovery.
 const DATASET_7_MAP = {
@@ -132,7 +132,7 @@ async function fetchHotelDetails() {
   }
 }
 
-// --- MODIFIED to read from master controls ---
+// Fetches data from the Live Cloudbeds API
 async function loadAllMetrics() {
   const statusEl = document.getElementById("status");
   const resultsContainer = document.getElementById("results-container");
@@ -269,7 +269,7 @@ function render7DayTable(processedData) {
   resultsContainer.appendChild(card);
 }
 
-// --- MODIFIED to read from master controls ---
+// Fetches data for YOUR HOTEL from the database
 async function loadMetricsFromDB() {
   const statusEl = document.getElementById("db-status");
   const resultsContainer = document.getElementById("db-results-container");
@@ -337,7 +337,7 @@ function renderDBMetricsTable(dbData) {
   resultsContainer.appendChild(card);
 }
 
-// --- MODIFIED to read from master controls ---
+// Fetches data for COMPETITORS from the database
 async function loadCompetitorMetrics() {
   const statusEl = document.getElementById("competitor-status");
   const resultsContainer = document.getElementById(
@@ -369,6 +369,7 @@ async function loadCompetitorMetrics() {
   }
 }
 
+// --- MODIFIED to render the new aggregated market data ---
 function renderCompetitorMetricsTable(dbData) {
   const resultsContainer = document.getElementById(
     "competitor-results-container"
@@ -376,38 +377,49 @@ function renderCompetitorMetricsTable(dbData) {
   resultsContainer.innerHTML = "";
   const card = document.createElement("div");
   card.className = "table-wrapper";
+
+  // These are the new column names from our API (e.g., 'market_adr')
   const dbColumns = [
-    "hotel_id",
-    "adr",
-    "occupancy_direct",
-    "revpar",
-    "rooms_sold",
-    "capacity_count",
+    "market_adr",
+    "market_occupancy",
+    "market_revpar",
+    "market_rooms_sold",
+    "market_capacity",
   ];
-  const columnToMapKey = { occupancy_direct: "occupancy" };
-  let tableHeader = "<tr><th>Date</th><th>Hotel ID</th>";
-  dbColumns.slice(1).forEach((colName) => {
-    const mapKey = columnToMapKey[colName] || colName;
-    const metricInfo = DATASET_7_MAP[mapKey];
-    tableHeader += `<th>${
-      metricInfo ? metricInfo.name : colName.replace(/_/g, " ")
-    }</th>`;
+
+  // A map to make the headers look nice
+  const headerMap = {
+    market_adr: "Market ADR",
+    market_occupancy: "Market Occupancy",
+    market_revpar: "Market RevPAR",
+    market_rooms_sold: "Market Rooms Sold",
+    market_capacity: "Market Capacity",
+  };
+
+  let tableHeader = "<tr><th>Date</th>";
+  dbColumns.forEach((colName) => {
+    tableHeader += `<th>${headerMap[colName] || colName}</th>`;
   });
   tableHeader += "</tr>";
 
   let tableRows = "";
   dbData.forEach((row) => {
     const stayDate = row.stay_date.substring(0, 10);
-    tableRows += `<tr><td>${stayDate}</td><td>${row.hotel_id}</td>`;
-    dbColumns.slice(1).forEach((colName) => {
-      const mapKey = columnToMapKey[colName] || colName;
-      const metricInfo = DATASET_7_MAP[mapKey] || { type: "number" };
-      tableRows += `<td>${formatValue(row[colName], metricInfo.type)}</td>`;
+    tableRows += `<tr><td>${stayDate}</td>`;
+    dbColumns.forEach((colName) => {
+      // Determine format type based on column name
+      let formatType = "number";
+      if (colName.includes("adr") || colName.includes("revpar")) {
+        formatType = "currency";
+      } else if (colName.includes("occupancy")) {
+        formatType = "percent";
+      }
+      tableRows += `<td>${formatValue(row[colName], formatType)}</td>`;
     });
     tableRows += "</tr>";
   });
 
-  card.innerHTML = `<table class="competitor-table"><thead>${tableHeader}</thead><tbody>${tableRows}</tbody></table>`;
+  card.innerHTML = `<table><thead>${tableHeader}</thead><tbody>${tableRows}</tbody></table>`;
   resultsContainer.appendChild(card);
 }
 
@@ -418,7 +430,7 @@ function formatValue(value, type) {
   if (isNaN(num)) return value;
   switch (type) {
     case "currency":
-      return `$${num.toFixed(2)}`;
+      return `£${num.toFixed(2)}`; // Changed to GBP
     case "percent":
       return `${(num * 100).toFixed(1)}%`;
     case "number":
@@ -426,4 +438,11 @@ function formatValue(value, type) {
     default:
       return value;
   }
+}
+
+// --- NEW FUNCTION to trigger both DB loads at once ---
+async function loadAllDbData() {
+  // This function calls both DB loading functions at the same time.
+  // Promise.all runs them in parallel for efficiency.
+  await Promise.all([loadMetricsFromDB(), loadCompetitorMetrics()]);
 }

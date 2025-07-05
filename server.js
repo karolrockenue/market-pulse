@@ -1,4 +1,4 @@
-// server.js (Updated to split 'Us' vs 'Them' and fix timezone bug)
+// server.js (Updated to calculate market averages)
 require("dotenv").config();
 const express = require("express");
 const fetch = (...args) =>
@@ -83,14 +83,12 @@ app.get("/api/hotel-details", async (req, res) => {
   }
 });
 
-// --- MODIFIED ENDPOINT: Fetches data for OUR hotel ONLY ---
+// Endpoint for fetching OUR hotel's metrics from DB (no changes)
 app.get("/api/metrics-from-db", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-
-    // --- FIX: Corrected date handling to avoid timezone bugs ---
     const { startDate, days } = req.query;
     const finalStartDate = startDate || new Date().toISOString().split("T")[0];
     const numDays = parseInt(days, 10) || 7;
@@ -98,7 +96,6 @@ app.get("/api/metrics-from-db", async (req, res) => {
     const endDateObjUTC = new Date(startDateObjUTC);
     endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
     const finalEndDate = endDateObjUTC.toISOString().split("T")[0];
-    // --- END FIX ---
 
     const query = `
       SELECT
@@ -124,14 +121,12 @@ app.get("/api/metrics-from-db", async (req, res) => {
   }
 });
 
-// --- NEW ENDPOINT: Fetches data for ALL COMPETITORS ---
+// --- MODIFIED ENDPOINT: Now calculates market averages ---
 app.get("/api/competitor-metrics", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-
-    // --- FIX: Corrected date handling to avoid timezone bugs ---
     const { startDate, days } = req.query;
     const finalStartDate = startDate || new Date().toISOString().split("T")[0];
     const numDays = parseInt(days, 10) || 7;
@@ -139,16 +134,20 @@ app.get("/api/competitor-metrics", async (req, res) => {
     const endDateObjUTC = new Date(startDateObjUTC);
     endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
     const finalEndDate = endDateObjUTC.toISOString().split("T")[0];
-    // --- END FIX ---
 
+    // --- The SQL query is now using AVG() and SUM() with a GROUP BY clause ---
     const query = `
       SELECT
-        hotel_id,
         TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
-        adr, occupancy_direct, revpar, rooms_sold, capacity_count
+        AVG(adr) AS market_adr,
+        AVG(occupancy_direct) AS market_occupancy,
+        AVG(revpar) AS market_revpar,
+        SUM(rooms_sold) AS market_rooms_sold,
+        SUM(capacity_count) AS market_capacity
       FROM daily_metrics_snapshots
       WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
-      ORDER BY stay_date, hotel_id ASC;
+      GROUP BY stay_date
+      ORDER BY stay_date ASC;
     `;
     const result = await client.query(query, [
       ourHotelId,

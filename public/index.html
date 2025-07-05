@@ -17,7 +17,7 @@
         padding: 24px;
       }
       .container {
-        max-width: 1600px; /* Increased width for wider tables */
+        max-width: 1600px;
         margin: 0 auto;
       }
       header {
@@ -115,7 +115,7 @@
       .competitor-table th:nth-child(2),
       .competitor-table td:nth-child(2) {
         position: sticky;
-        left: 120px; /* Adjust based on first column width */
+        left: 120px;
         background-color: #f8f9fa;
       }
       .competitor-table tr:hover td:nth-child(2) {
@@ -154,7 +154,6 @@
         min-width: 0;
       }
 
-      /* --- NEW STYLES FOR MASTER CONTROLS --- */
       .master-controls-wrapper {
         background-color: white;
         padding: 16px 24px;
@@ -168,7 +167,6 @@
         border: none;
         padding-bottom: 16px;
       }
-      /* --- END NEW STYLES --- */
     </style>
   </head>
   <body>
@@ -179,7 +177,7 @@
       </header>
       <div id="hotel-details-card"></div>
 
-      <!-- NEW: Master Controls Section -->
+      <!-- Master Controls Section -->
       <div class="master-controls-wrapper">
         <h2>Master Date Controls</h2>
         <div class="controls">
@@ -187,6 +185,8 @@
           <input type="date" id="master-start-date" />
           <label for="master-num-days">Number of Days:</label>
           <input type="number" id="master-num-days" value="7" min="1" />
+          <!-- THIS IS THE NEW COMBINED BUTTON -->
+          <button onclick="loadAllDbData()">Load Database Data</button>
         </div>
       </div>
       <!-- END: Master Controls Section -->
@@ -207,13 +207,8 @@
         <!-- Left Column: Your Hotel -->
         <div class="comparison-column">
           <h2>Your Hotel's Forecast (from Database)</h2>
-          <div class="controls">
-            <button onclick="loadMetricsFromDB()">
-              Load Your Hotel Metrics (DB)
-            </button>
-          </div>
           <div id="db-status" class="status-message">
-            Click button to load data.
+            Click 'Load Database Data' above to populate.
           </div>
           <div id="db-results-container"></div>
         </div>
@@ -221,13 +216,8 @@
         <!-- Right Column: Competitor Market -->
         <div class="comparison-column">
           <h2>Competitor Market Data (from Database)</h2>
-          <div class="controls">
-            <button onclick="loadCompetitorMetrics()">
-              Load Competitor Metrics (DB)
-            </button>
-          </div>
           <div id="competitor-status" class="status-message">
-            Click button to load data.
+            Click 'Load Database Data' above to populate.
           </div>
           <div id="competitor-results-container"></div>
         </div>
