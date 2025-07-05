@@ -1,11 +1,13 @@
 {
   "version": 2,
-  "builds": [{ "src": "server.js", "use": "@vercel/node" }],
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "daily-refresh.js", "use": "@vercel/node" }
+  ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "server.js"
-    }
+    { "src": "/api/daily-refresh", "dest": "/daily-refresh.js" },
+    { "src": "/(.*\\.(js|css|png|jpg|svg|html|txt))", "dest": "/public/$1" },
+    { "src": "/(.*)", "dest": "/server.js" }
   ],
   "crons": [
     {
