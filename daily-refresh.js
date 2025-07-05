@@ -1,73 +1,13 @@
 // daily-refresh.js
 // MODIFIED TO RUN ON VERCEL AS A SERVERLESS FUNCTION
-
-// daily-refresh.js
-// MODIFIED TO RUN ON VERCEL AS A SERVERLESS FUNCTION
+// AND TO USE THE SHARED CONSTANTS FILE
 
 import dotenv from "dotenv";
 dotenv.config();
 import fetch from "node-fetch";
 import pg from "pg";
 const { Client } = pg;
-
-// --- DATA MAP (Identical to the other script) ---
-const DATASET_7_MAP = {
-  adr: { name: "ADR", category: "Booking", type: "currency" },
-  revpar: { name: "RevPAR", category: "Booking", type: "currency" },
-  adults_count: { name: "Adults", category: "Booking", type: "number" },
-  children_count: { name: "Children", category: "Booking", type: "number" },
-  room_guest_count: {
-    name: "Room Guest Count",
-    category: "Booking",
-    type: "number",
-  },
-  total_revenue: {
-    name: "Total Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  room_revenue: {
-    name: "Total Room Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  non_room_revenue: {
-    name: "Total Other Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  additional_room_revenue: {
-    name: "Other Room Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  room_rate: { name: "Room Rate", category: "Finance", type: "currency" },
-  misc_income: { name: "Misc. Income", category: "Finance", type: "currency" },
-  room_fees: { name: "Total Fees", category: "Finance", type: "currency" },
-  room_taxes: { name: "Total Taxes", category: "Finance", type: "currency" },
-  occupancy: {
-    name: "Occupancy (Direct)",
-    category: "Occupancy",
-    type: "percent",
-  },
-  mfd_occupancy: {
-    name: "Adjusted Occupancy",
-    category: "Occupancy",
-    type: "percent",
-  },
-  rooms_sold: { name: "Rooms Sold", category: "Occupancy", type: "number" },
-  capacity_count: { name: "Capacity", category: "Occupancy", type: "number" },
-  blocked_room_count: {
-    name: "Blocked Rooms",
-    category: "Occupancy",
-    type: "number",
-  },
-  out_of_service_count: {
-    name: "Out of Service Rooms",
-    category: "Occupancy",
-    type: "number",
-  },
-};
+import { DATASET_7_MAP } from "./public/constants.js";
 
 // --- AUTHENTICATION (Identical to the other script) ---
 async function getCloudbedsAccessToken() {
@@ -262,8 +202,8 @@ async function runIngestion() {
           adults_count = EXCLUDED.adults_count,
           children_count = EXCLUDED.children_count,
           room_guest_count = EXCLUDED.room_guest_count,
-blocked_rooms_count = EXCLUDED.blocked_rooms_count,
-out_of_service_rooms_count = EXCLUDED.out_of_service_rooms_count;
+          blocked_rooms_count = EXCLUDED.blocked_rooms_count,
+          out_of_service_rooms_count = EXCLUDED.out_of_service_rooms_count;
       `;
 
       const values = [

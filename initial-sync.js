@@ -1,70 +1,12 @@
 // initial-sync.js
-// A special script to be run ONCE when a new hotel is onboarded.
-// It fetches 365 days of historical data AND 365 days of future data.
+// MODIFIED to use the shared constants file and modern ESM imports.
 
-require("dotenv").config();
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const { Client } = require("pg");
-
-// --- DATA MAP (Identical to the other script) ---
-const DATASET_7_MAP = {
-  adr: { name: "ADR", category: "Booking", type: "currency" },
-  revpar: { name: "RevPAR", category: "Booking", type: "currency" },
-  adults_count: { name: "Adults", category: "Booking", type: "number" },
-  children_count: { name: "Children", category: "Booking", type: "number" },
-  room_guest_count: {
-    name: "Room Guest Count",
-    category: "Booking",
-    type: "number",
-  },
-  total_revenue: {
-    name: "Total Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  room_revenue: {
-    name: "Total Room Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  non_room_revenue: {
-    name: "Total Other Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  additional_room_revenue: {
-    name: "Other Room Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  room_rate: { name: "Room Rate", category: "Finance", type: "currency" },
-  misc_income: { name: "Misc. Income", category: "Finance", type: "currency" },
-  room_fees: { name: "Total Fees", category: "Finance", type: "currency" },
-  room_taxes: { name: "Total Taxes", category: "Finance", type: "currency" },
-  occupancy: {
-    name: "Occupancy (Direct)",
-    category: "Occupancy",
-    type: "percent",
-  },
-  mfd_occupancy: {
-    name: "Adjusted Occupancy",
-    category: "Occupancy",
-    type: "percent",
-  },
-  rooms_sold: { name: "Rooms Sold", category: "Occupancy", type: "number" },
-  capacity_count: { name: "Capacity", category: "Occupancy", type: "number" },
-  blocked_room_count: {
-    name: "Blocked Rooms",
-    category: "Occupancy",
-    type: "number",
-  },
-  out_of_service_count: {
-    name: "Out of Service Rooms",
-    category: "Occupancy",
-    type: "number",
-  },
-};
+import dotenv from "dotenv";
+dotenv.config();
+import fetch from "node-fetch";
+import pg from "pg";
+const { Client } = pg;
+import { DATASET_7_MAP } from "./public/constants.js";
 
 // --- AUTHENTICATION (Identical to the other script) ---
 async function getCloudbedsAccessToken() {

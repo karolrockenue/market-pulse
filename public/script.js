@@ -1,96 +1,51 @@
-// script.js (Updated for default dates and column rename)
+import { DATASET_7_MAP } from "./constants.js";
 
-// A global variable to store the user's current granularity selection
 let currentGranularity = "daily";
-
-// A complete map of all fields available in Dataset 7, based on our discovery.
-const DATASET_7_MAP = {
-  // Booking Category
-  adr: { name: "ADR", category: "Booking", type: "currency" },
-  revpar: { name: "RevPAR", category: "Booking", type: "currency" },
-  adults_count: { name: "Adults", category: "Booking", type: "number" },
-  children_count: { name: "Children", category: "Booking", type: "number" },
-  room_guest_count: {
-    name: "Room Guest Count",
-    category: "Booking",
-    type: "number",
-  },
-  // Finance Category
-  total_revenue: {
-    name: "Total Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  room_revenue: {
-    name: "Total Room Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  room_rate: { name: "Room Rate", category: "Finance", type: "currency" },
-  misc_income: { name: "Misc. Income", category: "Finance", type: "currency" },
-  room_taxes: { name: "Total Taxes", category: "Finance", type: "currency" },
-  room_fees: { name: "Total Fees", category: "Finance", type: "currency" },
-  additional_room_revenue: {
-    name: "Other Room Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  non_room_revenue: {
-    name: "Total Other Revenue",
-    category: "Finance",
-    type: "currency",
-  },
-  // Occupancy Category
-  occupancy: { name: "Occupancy", category: "Occupancy", type: "percent" }, // MODIFIED: Renamed from "Occupancy (Direct)"
-  mfd_occupancy: {
-    name: "Adjusted Occupancy",
-    category: "Occupancy",
-    type: "percent",
-  },
-  rooms_sold: { name: "Rooms Sold", category: "Occupancy", type: "number" },
-  capacity_count: { name: "Capacity", category: "Occupancy", type: "number" },
-  blocked_room_count: {
-    name: "Blocked Rooms",
-    category: "Occupancy",
-    type: "number",
-  },
-  out_of_service_count: {
-    name: "Out of Service Rooms",
-    category: "Occupancy",
-    type: "number",
-  },
-};
+let hotelCurrencySymbol = "$"; // Default value
 
 // Runs when the page loads
 document.addEventListener("DOMContentLoaded", () => {
-  // NEW: Set default dates
+  // Set default dates
   const startDateInput = document.getElementById("master-start-date");
   const endDateInput = document.getElementById("master-end-date");
-
   if (startDateInput && endDateInput) {
     const today = new Date();
     const nextMonth = new Date();
     nextMonth.setMonth(today.getMonth() + 1);
-
-    // Helper to format date as YYYY-MM-DD
     const formatDate = (date) => {
       const d = new Date(date);
       let month = "" + (d.getMonth() + 1);
       let day = "" + d.getDate();
       const year = d.getFullYear();
-
       if (month.length < 2) month = "0" + month;
       if (day.length < 2) day = "0" + day;
-
       return [year, month, day].join("-");
     };
-
     startDateInput.value = formatDate(today);
     endDateInput.value = formatDate(nextMonth);
   }
+
+  // Attach Event Listeners
+  document
+    .getElementById("btn-fetch-details")
+    ?.addEventListener("click", fetchHotelDetails);
+  document
+    .getElementById("btn-load-live")
+    ?.addEventListener("click", loadAllMetrics);
+  document
+    .getElementById("btn-load-db")
+    ?.addEventListener("click", loadAllDbData);
+  document
+    .getElementById("view-daily")
+    ?.addEventListener("click", () => setGranularity("daily"));
+  document
+    .getElementById("view-weekly")
+    ?.addEventListener("click", () => setGranularity("weekly"));
+  document
+    .getElementById("view-monthly")
+    ?.addEventListener("click", () => setGranularity("monthly"));
 });
 
-// Function to handle the granularity toggle buttons
 function setGranularity(granularity) {
   currentGranularity = granularity;
   document.getElementById("view-daily").classList.remove("active");
@@ -99,7 +54,6 @@ function setGranularity(granularity) {
   document.getElementById(`view-${granularity}`).classList.add("active");
 }
 
-// Fetches and displays the hotel's static information
 async function fetchHotelDetails() {
   const detailsCard = document.getElementById("hotel-details-card");
   if (!detailsCard) return;
@@ -111,6 +65,7 @@ async function fetchHotelDetails() {
       throw new Error(result.message || "Failed to fetch hotel details");
     }
     const hotelData = result.data;
+    // RESTORED: Full list of hotel details
     const detailsMap = [
       { label: "Property Name", getValue: (d) => d.propertyName },
       { label: "Property Type", getValue: (d) => d.propertyType },
@@ -164,7 +119,7 @@ async function fetchHotelDetails() {
   }
 }
 
-// Fetches data from the Live Cloudbeds API
+// RESTORED: This function was previously missing
 async function loadAllMetrics() {
   const statusEl = document.getElementById("status");
   const resultsContainer = document.getElementById("results-container");
@@ -227,23 +182,17 @@ async function loadAllMetrics() {
   }
 }
 
-// Master function for loading all database data
 async function loadAllDbData() {
   const startDate = document.getElementById("master-start-date").value;
   const endDate = document.getElementById("master-end-date").value;
-
   if (!startDate || !endDate) {
     alert("Please select both a Start Date and an End Date.");
     return;
   }
-
-  await Promise.all([
-    loadMetricsFromDB(startDate, endDate, currentGranularity),
-    loadCompetitorMetrics(startDate, endDate, currentGranularity),
-  ]);
+  await loadMetricsFromDB(startDate, endDate, currentGranularity);
+  await loadCompetitorMetrics(startDate, endDate, currentGranularity);
 }
 
-// Fetches data for YOUR HOTEL from the database
 async function loadMetricsFromDB(startDate, endDate, granularity) {
   const statusEl = document.getElementById("db-status");
   const resultsContainer = document.getElementById("db-results-container");
@@ -255,12 +204,13 @@ async function loadMetricsFromDB(startDate, endDate, granularity) {
     const data = await response.json();
     if (!response.ok)
       throw new Error(data.message || "An unknown error occurred.");
-    if (!data || data.length === 0) {
+    if (!data || !data.metrics || data.metrics.length === 0) {
       statusEl.textContent =
-        "Request successful, but no data was returned from the database for the selected range.";
+        "Request successful, but no data was returned for the database for the selected range.";
       return;
     }
-    renderDBMetricsTable(data, granularity);
+    hotelCurrencySymbol = data.currencySymbol;
+    renderDBMetricsTable(data.metrics, granularity);
     statusEl.textContent = `Displaying ${granularity} data for your hotel.`;
   } catch (error) {
     statusEl.textContent = `Error: ${error.message}`;
@@ -268,7 +218,6 @@ async function loadMetricsFromDB(startDate, endDate, granularity) {
   }
 }
 
-// Fetches data for COMPETITORS from the database
 async function loadCompetitorMetrics(startDate, endDate, granularity) {
   const statusEl = document.getElementById("competitor-status");
   const resultsContainer = document.getElementById(
@@ -295,8 +244,7 @@ async function loadCompetitorMetrics(startDate, endDate, granularity) {
   }
 }
 
-// --- Helper functions for processing and rendering below ---
-
+// RESTORED: This function was previously missing
 function processApiDataForTable(data) {
   const aggregatedData = {};
   for (let i = 0; i < data.index.length; i++) {
@@ -331,6 +279,7 @@ function processApiDataForTable(data) {
   return aggregatedData;
 }
 
+// RESTORED: This function was previously missing
 function render7DayTable(processedData) {
   const resultsContainer = document.getElementById("results-container");
   resultsContainer.innerHTML = "";
@@ -384,11 +333,9 @@ function renderDBMetricsTable(dbData, granularity) {
     "total_revenue",
   ];
   const columnToMapKey = { occupancy_direct: "occupancy" };
-
   let dateHeader = "Date";
   if (granularity === "weekly") dateHeader = "Week Starting";
   if (granularity === "monthly") dateHeader = "Month";
-
   let tableHeader = `<tr><th>${dateHeader}</th>`;
   dbColumns.forEach((colName) => {
     const mapKey = columnToMapKey[colName] || colName;
@@ -420,7 +367,6 @@ function renderCompetitorMetricsTable(dbData, granularity) {
   resultsContainer.innerHTML = "";
   const card = document.createElement("div");
   card.className = "table-wrapper";
-
   const dbColumns = [
     "market_adr",
     "market_occupancy",
@@ -435,17 +381,14 @@ function renderCompetitorMetricsTable(dbData, granularity) {
     market_rooms_sold: "Market Rooms Sold",
     market_capacity: "Market Capacity",
   };
-
   let dateHeader = "Date";
   if (granularity === "weekly") dateHeader = "Week Starting";
   if (granularity === "monthly") dateHeader = "Month";
-
   let tableHeader = `<tr><th>${dateHeader}</th>`;
   dbColumns.forEach((colName) => {
     tableHeader += `<th>${headerMap[colName] || colName}</th>`;
   });
   tableHeader += "</tr>";
-
   let tableRows = "";
   dbData.forEach((row) => {
     const period = (row.period || row.stay_date).substring(0, 10);
@@ -461,7 +404,6 @@ function renderCompetitorMetricsTable(dbData, granularity) {
     });
     tableRows += "</tr>";
   });
-
   card.innerHTML = `<table><thead>${tableHeader}</thead><tbody>${tableRows}</tbody></table>`;
   resultsContainer.appendChild(card);
 }
@@ -472,7 +414,7 @@ function formatValue(value, type) {
   if (isNaN(num)) return value;
   switch (type) {
     case "currency":
-      return `£${num.toFixed(2)}`;
+      return `${hotelCurrencySymbol}${num.toFixed(2)}`;
     case "percent":
       return `${(num * 100).toFixed(1)}%`;
     case "number":

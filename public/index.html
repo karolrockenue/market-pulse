@@ -236,13 +236,13 @@
       </header>
 
       <div id="hotel-info-container">
-        <button onclick="fetchHotelDetails()">Show Property Information</button>
+        <button id="btn-fetch-details">Show Property Information</button>
         <div id="hotel-details-card"></div>
       </div>
 
       <h2>Live API Forecast (Daily Only)</h2>
       <div class="controls">
-        <button onclick="loadAllMetrics()">Load Live API Metrics</button>
+        <button id="btn-load-live">Load Live API Metrics</button>
       </div>
       <div id="status" class="status-message"></div>
       <div id="results-container"></div>
@@ -255,21 +255,11 @@
           <label for="master-end-date">End Date:</label>
           <input type="date" id="master-end-date" />
           <div class="toggle-group" style="margin-left: 24px">
-            <button
-              id="view-daily"
-              class="active"
-              onclick="setGranularity('daily')"
-            >
-              Daily
-            </button>
-            <button id="view-weekly" onclick="setGranularity('weekly')">
-              Weekly
-            </button>
-            <button id="view-monthly" onclick="setGranularity('monthly')">
-              Monthly
-            </button>
+            <button id="view-daily" class="active">Daily</button>
+            <button id="view-weekly">Weekly</button>
+            <button id="view-monthly">Monthly</button>
           </div>
-          <button onclick="loadAllDbData()" class="load-db-button">
+          <button id="btn-load-db" class="load-db-button">
             Load Database Data
           </button>
         </div>
@@ -294,6 +284,6 @@
         </div>
       </div>
     </div>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
   </body>
 </html>
