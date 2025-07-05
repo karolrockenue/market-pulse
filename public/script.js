@@ -71,9 +71,15 @@ async function fetchHotelDetailsFromDB() {
       );
     }
 
+    // UPDATED: Set the dynamic header title using the correct property name
+    const titleElement = document.getElementById("your-hotel-title");
+    if (titleElement && hotelData.property_name) {
+      titleElement.textContent = `${hotelData.property_name} Data`;
+    }
+
     // Helper to convert snake_case to Title Case for labels
     const formatLabel = (key) => {
-      if (key === "hotel_id") return null; // Exclude the ID field from display
+      if (key === "hotel_id" || key === "location") return null; // Exclude internal fields
       return key
         .replace(/_/g, " ")
         .replace(
@@ -266,7 +272,6 @@ async function loadMetricsFromDB(startDate, endDate, granularity) {
   }
 }
 
-// UPDATED: Now handles and displays total capacity
 async function loadCompetitorMetrics(startDate, endDate, granularity) {
   const statusEl = document.getElementById("competitor-status");
   const countInfoEl = document.getElementById("competitor-count-info");

@@ -93,7 +93,7 @@
         background-color: var(--indigo-500);
       }
       .status-message {
-        margin-top: 16px;
+        margin-top: 0; /* Removed top margin to be controlled by parent */
         font-style: italic;
         color: var(--slate-500);
       }
@@ -160,6 +160,12 @@
       .comparison-column h2 {
         margin-top: 16px;
       }
+      .info-box {
+        min-height: 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
       .master-controls-wrapper {
         background-color: white;
         padding: 24px;
@@ -206,7 +212,6 @@
       }
       #hotel-details-card,
       #db-hotel-details-card {
-        /* Apply styles to both cards */
         background-color: white;
         border-radius: 12px;
         margin-top: 16px;
@@ -216,8 +221,7 @@
       }
       #hotel-details-card table,
       #db-hotel-details-card table {
-        /* Apply styles to both tables */
-        width: auto; /* Allow table to fit content */
+        width: auto;
       }
       #hotel-details-card table td,
       #db-hotel-details-card table td {
@@ -240,7 +244,6 @@
         <p>A complete snapshot of all available metrics for today's date.</p>
       </header>
 
-      <!-- Section for DB-loaded hotel info -->
       <div id="db-hotel-info-container">
         <h2>Property Information (from Database)</h2>
         <div id="db-hotel-details-card"></div>
@@ -248,7 +251,6 @@
 
       <hr style="margin-top: 40px; margin-bottom: 0" />
 
-      <!-- Section for API-loaded info, now for manual override -->
       <div id="hotel-info-container">
         <h2>Property Information (Live API Refresh)</h2>
         <button id="btn-fetch-details">
@@ -288,23 +290,23 @@
 
       <div class="comparison-container">
         <div class="comparison-column">
-          <h2>Your Hotel's Forecast</h2>
-          <div id="db-status" class="status-message">
-            Click 'Load Database Data' above to populate.
+          <!-- UPDATED: Added ID to this h2 tag -->
+          <h2 id="your-hotel-title">Your Hotel's Forecast</h2>
+          <div class="info-box">
+            <div id="db-status" class="status-message">
+              Click 'Load Database Data' above to populate.
+            </div>
           </div>
           <div id="db-results-container"></div>
         </div>
         <div class="comparison-column">
           <h2>Competitor Market Data</h2>
-          <div id="competitor-status" class="status-message">
-            Click 'Load Database Data' above to populate.
+          <div class="info-box">
+            <div id="competitor-status" class="status-message">
+              Click 'Load Database Data' above to populate.
+            </div>
+            <div id="competitor-count-info" class="status-message"></div>
           </div>
-          <!-- NEW: Placeholder for competitor count -->
-          <div
-            id="competitor-count-info"
-            class="status-message"
-            style="margin-top: 0; margin-bottom: 16px"
-          ></div>
           <div id="competitor-results-container"></div>
         </div>
       </div>

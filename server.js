@@ -99,11 +99,11 @@ app.get("/api/hotel-details-from-db", async (req, res) => {
       .status(500)
       .json({ error: "Failed to fetch hotel details from database" });
   } finally {
-    await client.end();
+    if (client) await client.end();
   }
 });
 
-// Endpoint to get metrics and currency symbol from the database
+// Endpoint to get metrics from DB
 app.get("/api/metrics-from-db", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
@@ -131,7 +131,12 @@ app.get("/api/metrics-from-db", async (req, res) => {
       metricsQuery = `
         SELECT
             TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
-            adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue
+            adr,
+            occupancy_direct,
+            (adr * occupancy_direct) AS revpar,
+            rooms_sold,
+            capacity_count,
+            total_revenue
         FROM daily_metrics_snapshots
         WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
         ORDER BY stay_date ASC;`;
@@ -141,7 +146,7 @@ app.get("/api/metrics-from-db", async (req, res) => {
             TO_CHAR(${timeGroup}, 'YYYY-MM-DD') AS period,
             AVG(adr) as adr,
             AVG(occupancy_direct) as occupancy_direct,
-            AVG(revpar) as revpar,
+            (SUM(total_revenue) / NULLIF(SUM(capacity_count), 0)) as revpar,
             SUM(rooms_sold) as rooms_sold,
             SUM(capacity_count) as capacity_count,
             SUM(total_revenue) as total_revenue
@@ -164,11 +169,11 @@ app.get("/api/metrics-from-db", async (req, res) => {
     console.error("Error in /api/metrics-from-db:", error);
     res.status(500).json({ error: "Failed to fetch metrics from database" });
   } finally {
-    await client.end();
+    if (client) await client.end();
   }
 });
 
-// UPDATED: Endpoint for competitor metrics now includes competitor count and total capacity
+// Endpoint for competitor metrics now includes competitor count and total capacity
 app.get("/api/competitor-metrics", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
@@ -186,8 +191,7 @@ app.get("/api/competitor-metrics", async (req, res) => {
     const countResult = await client.query(countQuery, [ourHotelId]);
     const competitorCount = parseInt(countResult.rows[0].count, 10);
 
-    // NEW: Query to get total room capacity of the competitor set.
-    // This gets the most recent capacity_count for each competitor hotel and sums them.
+    // Query to get total room capacity of the competitor set.
     const capacityQuery = `
         SELECT SUM(t.capacity_count) as total_capacity
         FROM (
@@ -236,7 +240,7 @@ app.get("/api/competitor-metrics", async (req, res) => {
     }
     const result = await client.query(query, [ourHotelId, startDate, endDate]);
 
-    // UPDATED: Return metrics, count, and total capacity
+    // Return metrics, count, and total capacity
     res.json({
       metrics: result.rows,
       competitorCount: competitorCount,
@@ -248,7 +252,7 @@ app.get("/api/competitor-metrics", async (req, res) => {
       .status(500)
       .json({ error: "Failed to fetch competitor metrics from database" });
   } finally {
-    await client.end();
+    if (client) await client.end();
   }
 });
 
