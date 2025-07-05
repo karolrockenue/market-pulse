@@ -12,40 +12,59 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Inter & Manrope -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700&display=swap"
       rel="stylesheet"
     />
 
     <style>
+      :root {
+        --bg-primary: #f7f8fc;
+        --bg-secondary: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --accent-primary: #4f46e5;
+        --accent-secondary: #f97316;
+        --highlight-color: #eef2ff;
+        --font-sans: "Inter", sans-serif;
+        --font-data: "Manrope", sans-serif;
+      }
       body {
-        font-family: "Inter", sans-serif;
-        background-color: #f7f8fc; /* A slightly cooler off-white */
-        color: #1a202c; /* Darker gray for better contrast */
+        font-family: var(--font-sans);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
       }
       .sidebar {
-        background-color: #ffffff;
+        background-color: var(--bg-secondary);
+        border-right: 1px solid var(--border-color);
       }
-      .main-content {
-        background-color: #f7f8fc;
+      .header {
+        background-color: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
       }
       .kpi-card {
-        transition: all 0.3s ease;
-        border: 1px solid #e2e8f0;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
       }
       .kpi-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05),
-          0 8px 10px -6px rgba(0, 0, 0, 0.05);
-        border-color: #cbd5e1;
+        transform: translateY(-4px);
+        border-color: var(--accent-primary);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      }
+      .kpi-card.active {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 2px var(--accent-primary);
       }
       .table-container {
-        overflow-y: auto;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
       }
-      /* Custom scrollbar for a cleaner look */
       .table-container::-webkit-scrollbar {
         width: 6px;
       }
@@ -59,104 +78,117 @@
       .table-container::-webkit-scrollbar-thumb:hover {
         background: #a0aec0;
       }
-      .metric-toggle-btn.active {
-        background-color: #4f46e5; /* Indigo */
-        color: white;
+
+      .date-picker {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+      }
+      .brand-text {
+        color: var(--accent-primary);
+      }
+      .font-data {
+        font-family: var(--font-data);
+        font-variant-numeric: tabular-nums;
+      }
+      /* NEW: Style for synchronized table row highlighting */
+      tr.highlight {
+        background-color: var(--highlight-color);
       }
     </style>
   </head>
   <body class="antialiased">
-    <div class="flex h-screen bg-gray-100">
+    <div class="flex min-h-screen">
       <!-- Sidebar -->
-      <aside
-        class="sidebar w-64 flex-shrink-0 border-r border-gray-200 flex flex-col"
-      >
-        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+      <aside class="sidebar w-64 flex-shrink-0 flex flex-col">
+        <div
+          class="h-16 flex items-center px-6 border-b border-[var(--border-color)]"
+        >
           <svg
-            class="h-8 w-auto text-indigo-600"
+            class="h-8 w-auto brand-text"
             viewBox="0 0 24 24"
-            fill="currentColor"
-            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <path
-              d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-            ></path>
+            <line x1="12" y1="20" x2="12" y2="10"></line>
+            <line x1="18" y1="20" x2="18" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="16"></line>
           </svg>
-          <span class="ml-3 text-lg font-semibold text-gray-800"
-            >Market Pulse</span
-          >
+          <span class="ml-3 text-lg font-bold text-gray-800">Market Pulse</span>
         </div>
-        <nav class="flex-1 px-4 py-4 space-y-2">
+        <nav class="flex-1 px-4 py-4 space-y-1">
           <a
             href="#"
-            class="flex items-center px-4 py-2 text-gray-700 bg-gray-200 rounded-lg"
+            class="flex items-center px-4 py-2.5 text-sm font-medium bg-indigo-50 text-indigo-700 rounded-lg"
           >
             <svg
-              class="h-6 w-6"
-              fill="none"
+              class="h-5 w-5 mr-3"
               viewBox="0 0 24 24"
+              fill="none"
               stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
               <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 6h16M4 12h16M4 18h7"
+                d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
               ></path>
             </svg>
-            <span class="ml-3">Dashboard</span>
+            Dashboard
           </a>
           <a
             href="#"
-            class="flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg"
           >
             <svg
-              class="h-6 w-6"
-              fill="none"
+              class="h-5 w-5 mr-3"
               viewBox="0 0 24 24"
+              fill="none"
               stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
               <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
               ></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            <span class="ml-3">Reports</span>
+            Reports
           </a>
           <a
             href="#"
-            class="flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg"
           >
             <svg
-              class="h-6 w-6"
-              fill="none"
+              class="h-5 w-5 mr-3"
               viewBox="0 0 24 24"
+              fill="none"
               stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
+              <circle cx="12" cy="12" r="3"></circle>
               <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              ></path>
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
               ></path>
             </svg>
-            <span class="ml-3">Settings</span>
+            Settings
           </a>
         </nav>
       </aside>
 
       <!-- Main Content -->
-      <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 flex flex-col">
         <header
-          class="h-16 flex items-center justify-between px-8 border-b border-gray-200 bg-white"
+          class="header h-16 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-10"
         >
           <h1 class="text-xl font-semibold text-gray-800">Dashboard</h1>
           <div class="flex items-center">
@@ -169,60 +201,44 @@
           </div>
         </header>
 
-        <main class="flex-1 overflow-x-hidden overflow-y-auto p-8">
+        <main class="flex-1 p-8">
           <!-- Global Controls -->
           <div
-            class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-wrap items-center gap-4"
+            class="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-color)] mb-8 flex flex-wrap items-center gap-4"
           >
             <div class="flex items-center gap-2">
               <svg
                 class="h-5 w-5 text-gray-400"
-                fill="none"
                 viewBox="0 0 24 24"
+                fill="none"
                 stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                ></path>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
               </svg>
-              <span class="font-semibold text-gray-700 text-sm"
+              <span class="font-semibold text-gray-600 text-sm"
                 >Date Range:</span
               >
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button
-                class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition"
-              >
-                Next 7 Days
-              </button>
-              <button
-                class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-full"
-              >
-                Next 30 Days
-              </button>
-              <button
-                class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 transition"
-              >
-                Last 30 Days
-              </button>
             </div>
             <div class="flex items-center gap-3 ml-auto">
               <input
                 type="date"
-                class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2"
+                class="date-picker text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2"
                 value="2025-07-03"
               />
               <span class="text-gray-400">-</span>
               <input
                 type="date"
-                class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2"
+                class="date-picker text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2"
                 value="2025-08-01"
               />
               <button
-                class="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
+                class="px-5 py-2 text-sm font-semibold text-white bg-[var(--accent-primary)] rounded-lg hover:bg-indigo-500 transition"
               >
                 Run
               </button>
@@ -233,49 +249,79 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Left Panel: Your Hotel -->
             <div
-              class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-6"
+              class="bg-[var(--bg-secondary)] p-6 rounded-xl border border-[var(--border-color)] flex flex-col gap-6"
             >
-              <h2 class="text-xl font-semibold text-indigo-700">Your Hotel</h2>
+              <h2 class="text-xl font-semibold text-gray-800">Your Hotel</h2>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="kpi-card p-4 rounded-lg">
+                <div
+                  id="kpi-occupancy"
+                  class="kpi-card p-4 rounded-lg active"
+                  data-metric="occupancy"
+                >
                   <p class="text-sm text-gray-500">Occupancy</p>
-                  <p class="text-2xl font-bold text-gray-800">82.5%</p>
+                  <p class="text-2xl font-bold text-gray-800 font-data">
+                    82.5%
+                  </p>
                 </div>
-                <div class="kpi-card p-4 rounded-lg">
+                <div
+                  id="kpi-adr"
+                  class="kpi-card p-4 rounded-lg"
+                  data-metric="adr"
+                >
                   <p class="text-sm text-gray-500">ADR</p>
-                  <p class="text-2xl font-bold text-gray-800">$189.50</p>
+                  <p class="text-2xl font-bold text-gray-800 font-data">
+                    $189.50
+                  </p>
                 </div>
-                <div class="kpi-card p-4 rounded-lg">
+                <div
+                  id="kpi-revpar"
+                  class="kpi-card p-4 rounded-lg"
+                  data-metric="revpar"
+                >
                   <p class="text-sm text-gray-500">RevPAR</p>
-                  <p class="text-2xl font-bold text-gray-800">$156.34</p>
+                  <p class="text-2xl font-bold text-gray-800 font-data">
+                    $156.34
+                  </p>
                 </div>
               </div>
+              <h3
+                id="your-hotel-chart-title"
+                class="text-lg font-semibold text-gray-700 -mb-2"
+              >
+                Occupancy Trend
+              </h3>
               <div class="h-72"><canvas id="yourHotelChart"></canvas></div>
-              <div class="h-80 table-container border rounded-lg">
-                <table class="w-full text-sm">
+              <div class="table-container rounded-lg">
+                <table class="w-full text-sm text-gray-600">
                   <thead class="bg-gray-50 sticky top-0">
-                    <tr class="text-left text-gray-600">
+                    <tr class="text-left text-gray-500">
                       <th class="px-4 py-2 font-semibold">Date</th>
-                      <th class="px-4 py-2 font-semibold">Occ.</th>
                       <th class="px-4 py-2 font-semibold">ADR</th>
-                      <th class="px-4 py-2 font-semibold">Sold</th>
+                      <th class="px-4 py-2 font-semibold">Occupancy</th>
+                      <th class="px-4 py-2 font-semibold">RevPAR</th>
                     </tr>
                   </thead>
-                  <tbody id="yourHotelTableBody" class="divide-y"></tbody>
+                  <tbody
+                    id="yourHotelTableBody"
+                    class="divide-y divide-[var(--border-color)]"
+                  ></tbody>
                 </table>
               </div>
             </div>
 
             <!-- Right Panel: The Market -->
             <div
-              class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-6"
+              class="bg-[var(--bg-secondary)] p-6 rounded-xl border border-[var(--border-color)] flex flex-col gap-6"
             >
-              <h2 class="text-xl font-semibold text-teal-600">The Market</h2>
+              <h2 class="text-xl font-semibold text-gray-800">The Market</h2>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="kpi-card p-4 rounded-lg">
+                <div
+                  class="kpi-card p-4 rounded-lg active"
+                  data-metric="occupancy"
+                >
                   <p class="text-sm text-gray-500">Market Occ.</p>
                   <p
-                    class="text-2xl font-bold text-gray-800 flex items-baseline gap-2"
+                    class="text-2xl font-bold text-gray-800 flex items-baseline gap-2 font-data"
                   >
                     78.2%
                     <span class="text-sm font-medium text-green-600"
@@ -283,10 +329,10 @@
                     >
                   </p>
                 </div>
-                <div class="kpi-card p-4 rounded-lg">
+                <div class="kpi-card p-4 rounded-lg" data-metric="adr">
                   <p class="text-sm text-gray-500">Market ADR</p>
                   <p
-                    class="text-2xl font-bold text-gray-800 flex items-baseline gap-2"
+                    class="text-2xl font-bold text-gray-800 flex items-baseline gap-2 font-data"
                   >
                     $175.20
                     <span class="text-sm font-medium text-green-600"
@@ -294,28 +340,41 @@
                     >
                   </p>
                 </div>
-                <div class="kpi-card p-4 rounded-lg">
+                <div class="kpi-card p-4 rounded-lg" data-metric="revpar">
                   <p class="text-sm text-gray-500">Market RevPAR</p>
                   <p
-                    class="text-2xl font-bold text-gray-800 flex items-baseline gap-2"
+                    class="text-2xl font-bold text-gray-800 flex items-baseline gap-2 font-data"
                   >
                     $137.00
                     <span class="text-sm font-medium text-red-600">-$2.10</span>
                   </p>
                 </div>
               </div>
+              <h3
+                id="market-chart-title"
+                class="text-lg font-semibold text-gray-700 -mb-2"
+              >
+                Occupancy Trend
+              </h3>
               <div class="h-72"><canvas id="marketChart"></canvas></div>
-              <div class="h-80 table-container border rounded-lg">
-                <table class="w-full text-sm">
+              <div class="table-container rounded-lg">
+                <table class="w-full text-sm text-gray-600">
                   <thead class="bg-gray-50 sticky top-0">
-                    <tr class="text-left text-gray-600">
+                    <tr
+                      id="market-table-header"
+                      class="text-left text-gray-500"
+                    >
                       <th class="px-4 py-2 font-semibold">Date</th>
-                      <th class="px-4 py-2 font-semibold">Your Occ.</th>
-                      <th class="px-4 py-2 font-semibold">Mkt Occ.</th>
-                      <th class="px-4 py-2 font-semibold">Index</th>
+                      <th class="px-4 py-2 font-semibold">Market ADR</th>
+                      <th class="px-4 py-2 font-semibold">Market Occ.</th>
+                      <th class="px-4 py-2 font-semibold">Market RevPAR</th>
+                      <th class="px-4 py-2 font-semibold">RevPAR Delta</th>
                     </tr>
                   </thead>
-                  <tbody id="marketTableBody" class="divide-y"></tbody>
+                  <tbody
+                    id="marketTableBody"
+                    class="divide-y divide-[var(--border-color)]"
+                  ></tbody>
                 </table>
               </div>
             </div>
@@ -325,6 +384,44 @@
     </div>
 
     <script>
+      // --- GLOBAL STATE & CONFIG ---
+      let yourHotelChart = null;
+      let marketChart = null;
+      let yourHotelMetrics = [];
+      let marketMetrics = [];
+      let activeMetric = "occupancy";
+
+      const metricConfig = {
+        occupancy: { label: "Occupancy", format: "percent" },
+        adr: { label: "ADR", format: "currency" },
+        revpar: { label: "RevPAR", format: "currency" },
+      };
+
+      // --- CHART SYNC LOGIC ---
+      const crosshairSync = (event, activeElements, chart) => {
+        const sourceChart = chart;
+        const otherChart =
+          sourceChart.canvas.id === "yourHotelChart"
+            ? marketChart
+            : yourHotelChart;
+        if (event.type === "mouseout") {
+          if (yourHotelChart)
+            yourHotelChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          if (marketChart)
+            marketChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          yourHotelChart.update();
+          marketChart.update();
+          return;
+        }
+        if (!activeElements.length || !otherChart) return;
+        const index = activeElements[0].index;
+        otherChart.tooltip.setActiveElements(
+          otherChart.data.datasets.map((d, i) => ({ datasetIndex: i, index })),
+          event
+        );
+        otherChart.update();
+      };
+
       // --- FAKE DATA GENERATION ---
       function generateFakeData(numDays) {
         const data = [];
@@ -335,133 +432,307 @@
           const yourOcc = 0.75 + Math.random() * 0.2;
           const yourAdr = 180 + Math.random() * 40;
           const marketOcc = 0.7 + Math.random() * 0.15;
+          const marketAdr = 170 + Math.random() * 30;
           data.push({
             date: date.toISOString().split("T")[0],
             your: {
               occupancy: yourOcc,
               adr: yourAdr,
-              roomsSold: Math.floor(yourOcc * 50),
+              revpar: yourOcc * yourAdr,
             },
-            market: { occupancy: marketOcc },
+            market: {
+              occupancy: marketOcc,
+              adr: marketAdr,
+              revpar: marketOcc * marketAdr,
+            },
           });
         }
         return data;
       }
       const fakeData = generateFakeData(30);
+      yourHotelMetrics = fakeData.map((d) => ({
+        ...d.your,
+        stay_date: d.date,
+      }));
+      marketMetrics = fakeData.map((d) => ({ ...d.market, stay_date: d.date }));
 
-      // --- RENDER TABLES ---
+      // --- DYNAMIC RENDERING LOGIC ---
+      function setActiveMetric(metric) {
+        activeMetric = metric;
+        document.querySelectorAll(".kpi-card").forEach((card) => {
+          card.classList.remove("active");
+        });
+        document
+          .querySelectorAll(`.kpi-card[data-metric="${metric}"]`)
+          .forEach((card) => {
+            card.classList.add("active");
+          });
+
+        const chartTitle = `${metricConfig[activeMetric].label} Trend`;
+        document.getElementById("your-hotel-chart-title").textContent =
+          chartTitle;
+        document.getElementById("market-chart-title").textContent = chartTitle;
+
+        updateCharts();
+        renderTables();
+      }
+
+      function updateCharts() {
+        const newYourData = yourHotelMetrics.map((d) =>
+          activeMetric === "occupancy" ? d[activeMetric] * 100 : d[activeMetric]
+        );
+        const newMarketData = marketMetrics.map((d) =>
+          activeMetric === "occupancy" ? d[activeMetric] * 100 : d[activeMetric]
+        );
+
+        if (yourHotelChart) {
+          yourHotelChart.data.datasets[0].data = newYourData;
+          yourHotelChart.data.datasets[0].label =
+            metricConfig[activeMetric].label;
+          yourHotelChart.options.scales.y = getYAxisOptions(activeMetric);
+          yourHotelChart.update();
+        }
+        if (marketChart) {
+          marketChart.data.datasets[0].data = newYourData;
+          marketChart.data.datasets[1].data = newMarketData;
+          marketChart.data.datasets[0].label = `Your ${metricConfig[activeMetric].label}`;
+          marketChart.data.datasets[1].label = `Market ${metricConfig[activeMetric].label}`;
+          marketChart.options.scales.y = getYAxisOptions(activeMetric);
+          marketChart.update();
+        }
+      }
+
       function renderTables() {
         const yourTable = document.getElementById("yourHotelTableBody");
         const marketTable = document.getElementById("marketTableBody");
+        const marketHeader = document.getElementById("market-table-header");
         yourTable.innerHTML = "";
         marketTable.innerHTML = "";
-        fakeData.forEach((day) => {
-          const yourRow = document.createElement("tr");
-          yourRow.innerHTML = `<td class="px-4 py-3 whitespace-nowrap">${
-            day.date
-          }</td><td class="px-4 py-3">${(day.your.occupancy * 100).toFixed(
-            1
-          )}%</td><td class="px-4 py-3">$${day.your.adr.toFixed(
-            2
-          )}</td><td class="px-4 py-3">${day.your.roomsSold}</td>`;
-          yourTable.appendChild(yourRow);
-          const marketRow = document.createElement("tr");
-          const occIndex = Math.round(
-            (day.your.occupancy / day.market.occupancy) * 100
+
+        yourHotelMetrics.forEach((day) => {
+          const row = document.createElement("tr");
+          row.dataset.date = day.stay_date; // Add data-date for sync
+          row.innerHTML = `
+            <td class="px-4 py-3 whitespace-nowrap font-data">${
+              day.stay_date
+            }</td>
+            <td class="px-4 py-3 font-data">$${day.adr.toFixed(2)}</td>
+            <td class="px-4 py-3 font-data">${(day.occupancy * 100).toFixed(
+              1
+            )}%</td>
+            <td class="px-4 py-3 font-data">$${day.revpar.toFixed(2)}</td>
+          `;
+          yourTable.appendChild(row);
+        });
+
+        marketHeader.innerHTML = `
+            <th class="px-4 py-2 font-semibold">Date</th>
+            <th class="px-4 py-2 font-semibold">Market ADR</th>
+            <th class="px-4 py-2 font-semibold">Market Occ.</th>
+            <th class="px-4 py-2 font-semibold">Market RevPAR</th>
+            <th class="px-4 py-2 font-semibold">${metricConfig[activeMetric].label} Delta</th>
+        `;
+
+        marketMetrics.forEach((marketDay) => {
+          const yourDay = yourHotelMetrics.find(
+            (d) => d.stay_date === marketDay.stay_date
           );
-          marketRow.innerHTML = `<td class="px-4 py-3 whitespace-nowrap">${
-            day.date
-          }</td><td class="px-4 py-3">${(day.your.occupancy * 100).toFixed(
-            1
-          )}%</td><td class="px-4 py-3">${(day.market.occupancy * 100).toFixed(
-            1
-          )}%</td><td class="px-4 py-3 font-semibold ${
-            occIndex >= 100 ? "text-green-600" : "text-red-600"
-          }">${occIndex}</td>`;
-          marketTable.appendChild(marketRow);
+          const row = document.createElement("tr");
+          row.dataset.date = marketDay.stay_date; // Add data-date for sync
+          let deltaCell = '<td class="px-4 py-3 font-data">-</td>';
+
+          if (yourDay) {
+            const delta = yourDay[activeMetric] - marketDay[activeMetric];
+            const deltaColor = delta >= 0 ? "text-green-600" : "text-red-600";
+            const deltaSign = delta >= 0 ? "+" : "";
+
+            let formattedDelta;
+            if (metricConfig[activeMetric].format === "currency") {
+              formattedDelta = `${deltaSign}$${Math.abs(delta).toFixed(2)}`;
+            } else {
+              formattedDelta = `${deltaSign}${(Math.abs(delta) * 100).toFixed(
+                1
+              )}pts`;
+            }
+            deltaCell = `<td class="px-4 py-3 font-semibold font-data ${deltaColor}">${formattedDelta}</td>`;
+          }
+
+          row.innerHTML = `
+                <td class="px-4 py-3 whitespace-nowrap font-data">${
+                  marketDay.stay_date
+                }</td>
+                <td class="px-4 py-3 font-data">$${marketDay.adr.toFixed(
+                  2
+                )}</td>
+                <td class="px-4 py-3 font-data">${(
+                  marketDay.occupancy * 100
+                ).toFixed(1)}%</td>
+                <td class="px-4 py-3 font-data">$${marketDay.revpar.toFixed(
+                  2
+                )}</td>
+                ${deltaCell}
+            `;
+          marketTable.appendChild(row);
+        });
+        addTableSyncEventListeners(); // Add listeners after rows are created
+      }
+
+      // NEW: Functions for synchronized table row highlighting
+      function addTableSyncEventListeners() {
+        const rows = document.querySelectorAll(
+          "#yourHotelTableBody tr, #marketTableBody tr"
+        );
+        rows.forEach((row) => {
+          row.addEventListener("mouseover", handleRowMouseover);
+          row.addEventListener("mouseout", handleRowMouseout);
         });
       }
 
-      // --- RENDER CHARTS ---
-      const chartConfig = {
-        type: "line",
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          tension: 0.4,
-          scales: {
-            x: {
-              type: "time",
-              time: { unit: "day" },
-              grid: { display: false },
-              ticks: { font: { size: 10 } },
-            },
-            y: { ticks: { font: { size: 10 } } },
-          },
-          plugins: { legend: { display: false } },
-          interaction: { intersect: false, mode: "index" },
-        },
-      };
+      function handleRowMouseover(event) {
+        const date = event.currentTarget.dataset.date;
+        if (!date) return;
+        document.querySelectorAll(`tr[data-date="${date}"]`).forEach((row) => {
+          row.classList.add("highlight");
+        });
+      }
 
-      function renderYourHotelChart() {
-        const ctx = document.getElementById("yourHotelChart").getContext("2d");
-        const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-        gradient.addColorStop(0, "rgba(79, 70, 229, 0.2)");
-        gradient.addColorStop(1, "rgba(79, 70, 229, 0)");
-        new Chart(ctx, {
-          ...chartConfig,
+      function handleRowMouseout() {
+        document.querySelectorAll("tr.highlight").forEach((row) => {
+          row.classList.remove("highlight");
+        });
+      }
+
+      // --- RENDER CHARTS (LIGHT THEME) ---
+      Chart.defaults.color = "#64748b";
+      Chart.defaults.borderColor = "#e2e8f0";
+
+      function getYAxisOptions(metric) {
+        const baseOptions = { grid: { color: "#e2e8f0" } };
+        if (metric === "occupancy") {
+          return {
+            ...baseOptions,
+            min: 0,
+            max: 100,
+            ticks: {
+              stepSize: 10,
+              callback: (value) => value + "%",
+            },
+          };
+        }
+        return {
+          ...baseOptions,
+          ticks: {
+            callback: (value) => "$" + value,
+          },
+        };
+      }
+
+      function getChartConfig() {
+        return {
+          type: "line",
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            tension: 0.3,
+            onHover: crosshairSync,
+            scales: {
+              x: {
+                type: "time",
+                time: { unit: "day" },
+                grid: { display: false },
+              },
+              y: getYAxisOptions(activeMetric),
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: "#1e293b",
+                titleColor: "#f7f8fc",
+                bodyColor: "#e2e8f0",
+                borderColor: "#334155",
+                borderWidth: 1,
+                padding: 10,
+                displayColors: false,
+              },
+            },
+            interaction: { intersect: false, mode: "index" },
+          },
+        };
+      }
+
+      function renderInitialCharts() {
+        const yourCtx = document
+          .getElementById("yourHotelChart")
+          .getContext("2d");
+        yourHotelChart = new Chart(yourCtx, {
+          ...getChartConfig(),
           data: {
             labels: fakeData.map((d) => d.date),
             datasets: [
               {
-                label: "Occupancy",
-                data: fakeData.map((d) => d.your.occupancy * 100),
+                label: metricConfig[activeMetric].label,
+                data: yourHotelMetrics.map((d) =>
+                  activeMetric === "occupancy"
+                    ? d[activeMetric] * 100
+                    : d[activeMetric]
+                ),
                 borderColor: "#4f46e5",
-                backgroundColor: gradient,
-                fill: true,
+                borderWidth: 2,
+                fill: false,
                 pointRadius: 0,
-                pointHoverRadius: 5,
-                pointHitRadius: 10,
               },
             ],
           },
         });
-      }
 
-      function renderMarketChart() {
-        const ctx = document.getElementById("marketChart").getContext("2d");
-        new Chart(ctx, {
-          ...chartConfig,
+        const marketCtx = document
+          .getElementById("marketChart")
+          .getContext("2d");
+        const marketChartConfig = getChartConfig();
+        marketChart = new Chart(marketCtx, {
+          ...marketChartConfig,
           data: {
             labels: fakeData.map((d) => d.date),
             datasets: [
               {
-                label: "Your Hotel",
-                data: fakeData.map((d) => d.your.occupancy * 100),
+                label: `Your ${metricConfig[activeMetric].label}`,
+                data: yourHotelMetrics.map((d) =>
+                  activeMetric === "occupancy"
+                    ? d[activeMetric] * 100
+                    : d[activeMetric]
+                ),
                 borderColor: "#4f46e5",
+                borderWidth: 2,
                 pointRadius: 0,
+                fill: {
+                  target: 1,
+                  above: "rgba(74, 222, 128, 0.05)", // Very subtle green
+                  below: "rgba(248, 113, 113, 0.05)",
+                },
               },
               {
-                label: "The Market",
-                data: fakeData.map((d) => d.market.occupancy * 100),
-                borderColor: "#0d9488",
-                borderDash: [3, 3],
+                label: `Market ${metricConfig[activeMetric].label}`,
+                data: marketMetrics.map((d) =>
+                  activeMetric === "occupancy"
+                    ? d[activeMetric] * 100
+                    : d[activeMetric]
+                ),
+                borderColor: "#f97316",
+                borderWidth: 2,
+                borderDash: [5, 5],
                 pointRadius: 0,
               },
             ],
           },
           options: {
-            ...chartConfig.options,
+            ...marketChartConfig.options,
             plugins: {
+              ...marketChartConfig.options.plugins,
               legend: {
                 display: true,
                 position: "top",
                 align: "end",
-                labels: {
-                  usePointStyle: true,
-                  boxWidth: 6,
-                  font: { size: 12 },
-                },
+                labels: { usePointStyle: true, boxWidth: 8, padding: 20 },
               },
             },
           },
@@ -471,8 +742,13 @@
       // --- INITIALIZE ---
       document.addEventListener("DOMContentLoaded", () => {
         renderTables();
-        renderYourHotelChart();
-        renderMarketChart();
+        renderInitialCharts();
+
+        document.querySelectorAll(".kpi-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            setActiveMetric(card.dataset.metric);
+          });
+        });
       });
     </script>
   </body>
