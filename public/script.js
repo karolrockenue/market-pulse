@@ -1,4 +1,4 @@
-// script.js (Updated to handle competitor data)
+// script.js (Updated to use master date controls)
 
 // A complete map of all fields available in Dataset 7, based on our discovery.
 const DATASET_7_MAP = {
@@ -79,7 +79,6 @@ async function fetchHotelDetails() {
       throw new Error(result.message || "Failed to fetch hotel details");
     }
     const hotelData = result.data;
-    // --- CORRECTION: Restored the full list of hotel details ---
     const detailsMap = [
       { label: "Property Name", getValue: (d) => d.propertyName },
       { label: "Property Type", getValue: (d) => d.propertyType },
@@ -116,7 +115,6 @@ async function fetchHotelDetails() {
         getValue: (d) => d.propertyAddress?.propertyLongitude,
       },
     ];
-    // --- END CORRECTION ---
     let tableRows = "";
     detailsMap.forEach((item) => {
       const value = item.getValue(hotelData);
@@ -134,26 +132,22 @@ async function fetchHotelDetails() {
   }
 }
 
-// Fetches data from the Live Cloudbeds API
+// --- MODIFIED to read from master controls ---
 async function loadAllMetrics() {
   const statusEl = document.getElementById("status");
   const resultsContainer = document.getElementById("results-container");
   statusEl.textContent = "Loading from Live API...";
   resultsContainer.innerHTML = "";
   try {
-    // --- FIX: Simplified and corrected date handling to avoid timezone bugs ---
     const startDate =
-      document.getElementById("api-start-date").value ||
+      document.getElementById("master-start-date").value ||
       new Date().toISOString().split("T")[0];
     const numDays =
-      parseInt(document.getElementById("api-num-days").value, 10) || 7;
-
-    // Create a date object parsed as UTC to avoid local timezone shifts
+      parseInt(document.getElementById("master-num-days").value, 10) || 7;
     const startDateObjUTC = new Date(startDate + "T00:00:00Z");
     const endDateObjUTC = new Date(startDateObjUTC);
     endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
     const endDate = endDateObjUTC.toISOString().split("T")[0];
-    // --- END FIX ---
 
     const columnsToRequest = Object.keys(DATASET_7_MAP)
       .filter((key) =>
@@ -275,17 +269,18 @@ function render7DayTable(processedData) {
   resultsContainer.appendChild(card);
 }
 
-// Fetches data for YOUR HOTEL from the database
+// --- MODIFIED to read from master controls ---
 async function loadMetricsFromDB() {
   const statusEl = document.getElementById("db-status");
   const resultsContainer = document.getElementById("db-results-container");
   statusEl.textContent = "Loading your hotel's data from database...";
   resultsContainer.innerHTML = "";
   try {
-    const startDateInput = document.getElementById("db-start-date").value;
+    const startDate =
+      document.getElementById("master-start-date").value ||
+      new Date().toISOString().split("T")[0];
     const numDays =
-      parseInt(document.getElementById("db-num-days").value, 10) || 7;
-    const startDate = startDateInput || new Date().toISOString().split("T")[0];
+      parseInt(document.getElementById("master-num-days").value, 10) || 7;
     const apiUrl = `/api/metrics-from-db?startDate=${startDate}&days=${numDays}`;
     const response = await fetch(apiUrl);
     const data = await response.json();
@@ -342,7 +337,7 @@ function renderDBMetricsTable(dbData) {
   resultsContainer.appendChild(card);
 }
 
-// --- NEW FUNCTION: Fetches data for COMPETITORS from the database ---
+// --- MODIFIED to read from master controls ---
 async function loadCompetitorMetrics() {
   const statusEl = document.getElementById("competitor-status");
   const resultsContainer = document.getElementById(
@@ -351,10 +346,11 @@ async function loadCompetitorMetrics() {
   statusEl.textContent = "Loading competitor data from database...";
   resultsContainer.innerHTML = "";
   try {
-    const startDateInput = document.getElementById("comp-start-date").value;
+    const startDate =
+      document.getElementById("master-start-date").value ||
+      new Date().toISOString().split("T")[0];
     const numDays =
-      parseInt(document.getElementById("comp-num-days").value, 10) || 7;
-    const startDate = startDateInput || new Date().toISOString().split("T")[0];
+      parseInt(document.getElementById("master-num-days").value, 10) || 7;
     const apiUrl = `/api/competitor-metrics?startDate=${startDate}&days=${numDays}`;
     const response = await fetch(apiUrl);
     const data = await response.json();
@@ -373,7 +369,6 @@ async function loadCompetitorMetrics() {
   }
 }
 
-// --- NEW FUNCTION: Renders the competitor data table ---
 function renderCompetitorMetricsTable(dbData) {
   const resultsContainer = document.getElementById(
     "competitor-results-container"
@@ -381,7 +376,6 @@ function renderCompetitorMetricsTable(dbData) {
   resultsContainer.innerHTML = "";
   const card = document.createElement("div");
   card.className = "table-wrapper";
-  // Add hotel_id to the columns to display
   const dbColumns = [
     "hotel_id",
     "adr",
@@ -391,9 +385,8 @@ function renderCompetitorMetricsTable(dbData) {
     "capacity_count",
   ];
   const columnToMapKey = { occupancy_direct: "occupancy" };
-  let tableHeader = "<tr><th>Date</th><th>Hotel ID</th>"; // Add Hotel ID header
+  let tableHeader = "<tr><th>Date</th><th>Hotel ID</th>";
   dbColumns.slice(1).forEach((colName) => {
-    // Slice to skip hotel_id which is already added
     const mapKey = columnToMapKey[colName] || colName;
     const metricInfo = DATASET_7_MAP[mapKey];
     tableHeader += `<th>${
@@ -405,7 +398,6 @@ function renderCompetitorMetricsTable(dbData) {
   let tableRows = "";
   dbData.forEach((row) => {
     const stayDate = row.stay_date.substring(0, 10);
-    // Add hotel_id to the row
     tableRows += `<tr><td>${stayDate}</td><td>${row.hotel_id}</td>`;
     dbColumns.slice(1).forEach((colName) => {
       const mapKey = columnToMapKey[colName] || colName;
@@ -415,7 +407,6 @@ function renderCompetitorMetricsTable(dbData) {
     tableRows += "</tr>";
   });
 
-  // Add the 'competitor-table' class for specific styling
   card.innerHTML = `<table class="competitor-table"><thead>${tableHeader}</thead><tbody>${tableRows}</tbody></table>`;
   resultsContainer.appendChild(card);
 }
