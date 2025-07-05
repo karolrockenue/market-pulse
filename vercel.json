@@ -5,9 +5,18 @@
     { "src": "daily-refresh.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/daily-refresh", "dest": "/daily-refresh.js" },
-    { "src": "/(.*\\.(js|css|png|jpg|svg|html|txt))", "dest": "/public/$1" },
-    { "src": "/(.*)", "dest": "/server.js" }
+    {
+      "src": "/api/daily-refresh",
+      "dest": "daily-refresh.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
   ],
   "crons": [
     {
