@@ -5,12 +5,15 @@ let hotelCurrencySymbol = "$"; // Default value
 
 // Runs when the page loads
 document.addEventListener("DOMContentLoaded", () => {
+  // Fetch hotel details from the database on page load
+  fetchHotelDetailsFromDB();
+
   // Set default dates
   const startDateInput = document.getElementById("master-start-date");
   const endDateInput = document.getElementById("master-end-date");
   if (startDateInput && endDateInput) {
     const today = new Date();
-    const nextMonth = new Date(); // Typo fixed here
+    const nextMonth = new Date();
     nextMonth.setMonth(today.getMonth() + 1);
     const formatDate = (date) => {
       const d = new Date(date);
@@ -28,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Attach Event Listeners
   document
     .getElementById("btn-fetch-details")
-    ?.addEventListener("click", fetchHotelDetails);
+    ?.addEventListener("click", fetchHotelDetails); // This now fetches from LIVE API
   document
     .getElementById("btn-load-live")
     ?.addEventListener("click", loadAllMetrics);
@@ -54,10 +57,56 @@ function setGranularity(granularity) {
   document.getElementById(`view-${granularity}`).classList.add("active");
 }
 
+// Fetches and renders all hotel details from the database dynamically
+async function fetchHotelDetailsFromDB() {
+  const detailsCard = document.getElementById("db-hotel-details-card");
+  if (!detailsCard) return;
+  detailsCard.innerHTML = "<p>Loading Property Details from Database...</p>";
+  try {
+    const response = await fetch("/api/hotel-details-from-db");
+    const hotelData = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        hotelData.error || "Failed to fetch hotel details from DB"
+      );
+    }
+
+    // Helper to convert snake_case to Title Case for labels
+    const formatLabel = (key) => {
+      if (key === "hotel_id") return null; // Exclude the ID field from display
+      return key
+        .replace(/_/g, " ")
+        .replace(
+          /\w\S*/g,
+          (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+        );
+    };
+
+    let tableRows = "";
+    // Dynamically create a row for every piece of data returned from the DB
+    for (const key in hotelData) {
+      const label = formatLabel(key);
+      const value = hotelData[key];
+      if (label && value !== null && value !== undefined) {
+        tableRows += `<tr><td style="font-weight: 500; padding: 8px 16px;">${label}</td><td style="padding: 8px 16px;">${value}</td></tr>`;
+      }
+    }
+
+    detailsCard.innerHTML = `
+          <div style="background-color: var(--slate-50); padding: 12px 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-500); border-bottom: 1px solid var(--slate-200);">Property Information</div>
+          <table style="width: 100%;"><tbody>${tableRows}</tbody></table>
+        `;
+  } catch (error) {
+    console.error("Error fetching hotel details from DB:", error);
+    detailsCard.innerHTML = `<p style="color: red; padding: 16px;">Error: ${error.message}</p>`;
+  }
+}
+
+// Fetches details from the LIVE API on button click
 async function fetchHotelDetails() {
   const detailsCard = document.getElementById("hotel-details-card");
   if (!detailsCard) return;
-  detailsCard.innerHTML = "<p>Loading Hotel Details...</p>";
+  detailsCard.innerHTML = "<p>Loading Live Hotel Details from API...</p>";
   try {
     const response = await fetch("/api/hotel-details");
     const result = await response.json();
@@ -101,6 +150,7 @@ async function fetchHotelDetails() {
         getValue: (d) => d.propertyAddress?.propertyLongitude,
       },
     ];
+    // This is a different data structure, so we need a different renderer
     let tableRows = "";
     detailsMap.forEach((item) => {
       const value = item.getValue(hotelData);
@@ -109,7 +159,7 @@ async function fetchHotelDetails() {
       }
     });
     detailsCard.innerHTML = `
-      <div style="background-color: var(--slate-50); padding: 12px 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-500); border-bottom: 1px solid var(--slate-200);">Property Information</div>
+      <div style="background-color: var(--slate-50); padding: 12px 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-500); border-bottom: 1px solid var(--slate-200);">Live Property Information</div>
       <table style="width: 100%;"><tbody>${tableRows}</tbody></table>
     `;
   } catch (error) {
@@ -216,25 +266,43 @@ async function loadMetricsFromDB(startDate, endDate, granularity) {
   }
 }
 
+// UPDATED: Now handles and displays total capacity
 async function loadCompetitorMetrics(startDate, endDate, granularity) {
   const statusEl = document.getElementById("competitor-status");
+  const countInfoEl = document.getElementById("competitor-count-info");
   const resultsContainer = document.getElementById(
     "competitor-results-container"
   );
   statusEl.textContent = "Loading competitor data from database...";
+  countInfoEl.textContent = ""; // Clear previous count
   resultsContainer.innerHTML = "";
   try {
     const apiUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
     const response = await fetch(apiUrl);
-    const data = await response.json();
+    const data = await response.json(); // data is now { metrics: [], competitorCount: X, totalCapacity: Y }
     if (!response.ok)
-      throw new Error(data.message || "An unknown error occurred.");
-    if (!data || data.length === 0) {
+      throw new Error(data.error || "An unknown error occurred.");
+
+    // Display the competitor count and total capacity
+    if (data.competitorCount > 0) {
+      let infoText = `Based on a competitive set of ${data.competitorCount} hotels`;
+      if (data.totalCapacity > 0) {
+        infoText += `, with a total of ${data.totalCapacity} rooms.`;
+      } else {
+        infoText += ".";
+      }
+      countInfoEl.textContent = infoText;
+    } else {
+      countInfoEl.textContent = `No competitor hotels found in the database.`;
+    }
+
+    if (!data.metrics || data.metrics.length === 0) {
       statusEl.textContent =
         "Request successful, but no competitor data was returned for the selected range.";
       return;
     }
-    renderCompetitorMetricsTable(data, granularity);
+
+    renderCompetitorMetricsTable(data.metrics, granularity);
     statusEl.textContent = `Displaying ${granularity} data for the market.`;
   } catch (error) {
     statusEl.textContent = `Error: ${error.message}`;

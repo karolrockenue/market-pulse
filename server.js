@@ -62,7 +62,7 @@ app.post("/api/explore", async (req, res) => {
   }
 });
 
-// Endpoint to get hotel details from Cloudbeds API
+// Endpoint to get hotel details from Cloudbeds API (MANUAL)
 app.get("/api/hotel-details", async (req, res) => {
   try {
     const accessToken = await getCloudbedsAccessToken();
@@ -78,6 +78,28 @@ app.get("/api/hotel-details", async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to fetch hotel details", message: error.message });
+  }
+});
+
+// Endpoint to get hotel details from the database (DEFAULT)
+app.get("/api/hotel-details-from-db", async (req, res) => {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
+  try {
+    await client.connect();
+    const query = "SELECT * FROM hotels WHERE hotel_id = $1";
+    const result = await client.query(query, [ourHotelId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Hotel not found in database." });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error in /api/hotel-details-from-db:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch hotel details from database" });
+  } finally {
+    await client.end();
   }
 });
 
@@ -146,7 +168,7 @@ app.get("/api/metrics-from-db", async (req, res) => {
   }
 });
 
-// Endpoint for competitor metrics
+// UPDATED: Endpoint for competitor metrics now includes competitor count and total capacity
 app.get("/api/competitor-metrics", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
@@ -158,11 +180,33 @@ app.get("/api/competitor-metrics", async (req, res) => {
         .status(400)
         .json({ error: "startDate and endDate are required." });
     }
+
+    // Query to count competitor hotels
+    const countQuery = "SELECT COUNT(*) FROM hotels WHERE hotel_id != $1";
+    const countResult = await client.query(countQuery, [ourHotelId]);
+    const competitorCount = parseInt(countResult.rows[0].count, 10);
+
+    // NEW: Query to get total room capacity of the competitor set.
+    // This gets the most recent capacity_count for each competitor hotel and sums them.
+    const capacityQuery = `
+        SELECT SUM(t.capacity_count) as total_capacity
+        FROM (
+            SELECT DISTINCT ON (hotel_id) hotel_id, capacity_count
+            FROM daily_metrics_snapshots
+            WHERE hotel_id != $1
+            ORDER BY hotel_id, stay_date DESC
+        ) t;
+    `;
+    const capacityResult = await client.query(capacityQuery, [ourHotelId]);
+    const totalCapacity =
+      parseInt(capacityResult.rows[0].total_capacity, 10) || 0;
+
     let query;
     let sqlGranularity = "day";
     if (granularity === "weekly") sqlGranularity = "week";
     if (granularity === "monthly") sqlGranularity = "month";
     const timeGroup = `DATE_TRUNC('${sqlGranularity}', stay_date)`;
+
     if (granularity === "daily") {
       query = `
         SELECT
@@ -191,7 +235,13 @@ app.get("/api/competitor-metrics", async (req, res) => {
         ORDER BY ${timeGroup} ASC;`;
     }
     const result = await client.query(query, [ourHotelId, startDate, endDate]);
-    res.json(result.rows);
+
+    // UPDATED: Return metrics, count, and total capacity
+    res.json({
+      metrics: result.rows,
+      competitorCount: competitorCount,
+      totalCapacity: totalCapacity,
+    });
   } catch (error) {
     console.error("Error in /api/competitor-metrics:", error);
     res

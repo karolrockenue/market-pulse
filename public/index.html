@@ -204,7 +204,9 @@
       #hotel-info-container {
         margin-bottom: 24px;
       }
-      #hotel-details-card {
+      #hotel-details-card,
+      #db-hotel-details-card {
+        /* Apply styles to both cards */
         background-color: white;
         border-radius: 12px;
         margin-top: 16px;
@@ -212,12 +214,15 @@
         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
         overflow: hidden;
       }
-      #hotel-details-card table td {
+      #hotel-details-card table,
+      #db-hotel-details-card table {
+        /* Apply styles to both tables */
+        width: auto; /* Allow table to fit content */
+      }
+      #hotel-details-card table td,
+      #db-hotel-details-card table td {
         white-space: normal;
         border: none;
-      }
-      #hotel-details-card table {
-        width: auto; /* Allow table to fit content */
       }
       .load-db-button {
         background-color: var(--green-600);
@@ -235,10 +240,24 @@
         <p>A complete snapshot of all available metrics for today's date.</p>
       </header>
 
+      <!-- Section for DB-loaded hotel info -->
+      <div id="db-hotel-info-container">
+        <h2>Property Information (from Database)</h2>
+        <div id="db-hotel-details-card"></div>
+      </div>
+
+      <hr style="margin-top: 40px; margin-bottom: 0" />
+
+      <!-- Section for API-loaded info, now for manual override -->
       <div id="hotel-info-container">
-        <button id="btn-fetch-details">Show Property Information</button>
+        <h2>Property Information (Live API Refresh)</h2>
+        <button id="btn-fetch-details">
+          Refresh Property Information from Live API
+        </button>
         <div id="hotel-details-card"></div>
       </div>
+
+      <hr style="margin-top: 40px; margin-bottom: 0" />
 
       <h2>Live API Forecast (Daily Only)</h2>
       <div class="controls">
@@ -280,6 +299,12 @@
           <div id="competitor-status" class="status-message">
             Click 'Load Database Data' above to populate.
           </div>
+          <!-- NEW: Placeholder for competitor count -->
+          <div
+            id="competitor-count-info"
+            class="status-message"
+            style="margin-top: 0; margin-bottom: 16px"
+          ></div>
           <div id="competitor-results-container"></div>
         </div>
       </div>
