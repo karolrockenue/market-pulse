@@ -1,4 +1,4 @@
-// server.js (Final Corrected Version)
+// server.js (Updated to split 'Us' vs 'Them' and fix timezone bug)
 require("dotenv").config();
 const express = require("express");
 const fetch = (...args) =>
@@ -9,7 +9,7 @@ const { Client } = require("pg");
 const app = express();
 app.use(express.json());
 
-// --- API ROUTES ARE NOW DEFINED FIRST ---
+// --- API ROUTES ---
 
 // Helper function for Cloudbeds API authentication
 async function getCloudbedsAccessToken() {
@@ -33,7 +33,7 @@ async function getCloudbedsAccessToken() {
   return tokenData.access_token;
 }
 
-// Endpoint for the live API dashboard query
+// Endpoint for the live API dashboard query (no changes)
 app.post("/api/explore", async (req, res) => {
   try {
     const accessToken = await getCloudbedsAccessToken();
@@ -64,7 +64,7 @@ app.post("/api/explore", async (req, res) => {
   }
 });
 
-// Endpoint to get hotel details from Cloudbeds API
+// Endpoint to get hotel details from Cloudbeds API (no changes)
 app.get("/api/hotel-details", async (req, res) => {
   try {
     const accessToken = await getCloudbedsAccessToken();
@@ -83,21 +83,23 @@ app.get("/api/hotel-details", async (req, res) => {
   }
 });
 
-// Endpoint to get metrics from our own database
+// --- MODIFIED ENDPOINT: Fetches data for OUR hotel ONLY ---
 app.get("/api/metrics-from-db", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
 
-    // Use today's date for a dynamic 7-day forecast
-    const today = new Date();
-    const futureDate = new Date();
-    futureDate.setDate(today.getDate() + 7);
+    // --- FIX: Corrected date handling to avoid timezone bugs ---
+    const { startDate, days } = req.query;
+    const finalStartDate = startDate || new Date().toISOString().split("T")[0];
+    const numDays = parseInt(days, 10) || 7;
+    const startDateObjUTC = new Date(finalStartDate + "T00:00:00Z");
+    const endDateObjUTC = new Date(startDateObjUTC);
+    endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
+    const finalEndDate = endDateObjUTC.toISOString().split("T")[0];
+    // --- END FIX ---
 
-    const startDate = today.toISOString().split("T")[0];
-    const endDate = futureDate.toISOString().split("T")[0];
-
-    // --- FIX #2: FORMAT THE DATE DIRECTLY IN THE SQL QUERY ---
     const query = `
       SELECT
         TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
@@ -106,10 +108,14 @@ app.get("/api/metrics-from-db", async (req, res) => {
         taxes_total, fees_total, misc_income, adults_count, children_count,
         room_guest_count, blocked_rooms_count, out_of_service_rooms_count
       FROM daily_metrics_snapshots
-      WHERE stay_date >= $1 AND stay_date <= $2
+      WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
       ORDER BY stay_date ASC;
     `;
-    const result = await client.query(query, [startDate, endDate]);
+    const result = await client.query(query, [
+      ourHotelId,
+      finalStartDate,
+      finalEndDate,
+    ]);
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch metrics from database" });
@@ -118,11 +124,50 @@ app.get("/api/metrics-from-db", async (req, res) => {
   }
 });
 
-// --- STATIC AND FALLBACK ROUTES ARE NOW LAST ---
+// --- NEW ENDPOINT: Fetches data for ALL COMPETITORS ---
+app.get("/api/competitor-metrics", async (req, res) => {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
+  try {
+    await client.connect();
+
+    // --- FIX: Corrected date handling to avoid timezone bugs ---
+    const { startDate, days } = req.query;
+    const finalStartDate = startDate || new Date().toISOString().split("T")[0];
+    const numDays = parseInt(days, 10) || 7;
+    const startDateObjUTC = new Date(finalStartDate + "T00:00:00Z");
+    const endDateObjUTC = new Date(startDateObjUTC);
+    endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
+    const finalEndDate = endDateObjUTC.toISOString().split("T")[0];
+    // --- END FIX ---
+
+    const query = `
+      SELECT
+        hotel_id,
+        TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
+        adr, occupancy_direct, revpar, rooms_sold, capacity_count
+      FROM daily_metrics_snapshots
+      WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
+      ORDER BY stay_date, hotel_id ASC;
+    `;
+    const result = await client.query(query, [
+      ourHotelId,
+      finalStartDate,
+      finalEndDate,
+    ]);
+    res.json(result.rows);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to fetch competitor metrics from database" });
+  } finally {
+    await client.end();
+  }
+});
+
+// --- STATIC AND FALLBACK ROUTES ---
 const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
-
-// This route ensures the root URL serves index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });

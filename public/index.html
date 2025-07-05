@@ -17,7 +17,7 @@
         padding: 24px;
       }
       .container {
-        max-width: 1200px; /* Increased width for a wider table */
+        max-width: 1400px; /* Increased width for wider tables */
         margin: 0 auto;
       }
       header {
@@ -30,37 +30,48 @@
         font-weight: 600;
         color: #1a202c;
       }
+      h2 {
+        margin-top: 40px;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 8px;
+      }
       p {
         color: #718096;
       }
       .controls {
         display: flex;
-        justify-content: space-between;
+        gap: 16px;
         align-items: center;
-        margin-bottom: 24px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+      .controls label {
+        font-weight: 500;
+      }
+      .controls input {
+        padding: 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      .controls input[type="number"] {
+        width: 70px;
       }
       button {
         background-color: #4f46e5;
         color: white;
         font-weight: 500;
-        padding: 12px 24px;
+        padding: 10px 20px;
         border: none;
         border-radius: 8px;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 14px;
         transition: background-color 0.2s;
       }
       button:hover {
         background-color: #4338ca;
       }
-      #search-input {
-        padding: 12px 16px;
-        font-size: 16px;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        width: 300px;
-      }
-      #status {
+      .status-message {
         margin-top: 16px;
         font-style: italic;
         color: #718096;
@@ -68,7 +79,7 @@
       .table-wrapper {
         margin-top: 24px;
         width: 100%;
-        overflow-x: auto; /* Allows horizontal scrolling on small screens */
+        overflow-x: auto;
         background-color: white;
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
@@ -77,11 +88,11 @@
       table {
         width: 100%;
         border-collapse: collapse;
-        white-space: nowrap; /* Prevents text wrapping in cells */
+        white-space: nowrap;
       }
       th,
       td {
-        padding: 14px 18px; /* Increased padding */
+        padding: 14px 18px;
         border-bottom: 1px solid #e2e8f0;
         text-align: left;
         vertical-align: middle;
@@ -89,40 +100,48 @@
       th {
         background-color: #f8f9fa;
         font-weight: 600;
-        position: sticky; /* Makes header sticky during vertical scroll */
+        position: sticky;
         top: 0;
         z-index: 1;
       }
       td:first-child,
       th:first-child {
         font-weight: 600;
-        position: sticky; /* Makes the first column (Date) sticky */
+        position: sticky;
         left: 0;
         background-color: #f8f9fa;
+        z-index: 2;
       }
+      /* Make second column sticky for competitor table */
+      .competitor-table th:nth-child(2),
+      .competitor-table td:nth-child(2) {
+        position: sticky;
+        left: 120px; /* Adjust based on first column width */
+        background-color: #f8f9fa;
+      }
+      .competitor-table tr:hover td:nth-child(2) {
+        background-color: #f7f8fc;
+      }
+
       tr:last-child td {
         border-bottom: none;
       }
       tr:hover td {
         background-color: #f7f8fc;
       }
-      .metric-value {
-        text-align: right;
-        font-weight: 500;
-        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
-          monospace;
-      }
-      /* Styles for the hotel details section */
       #hotel-details-card {
         background-color: white;
-        padding: 24px;
         border-radius: 12px;
         margin-bottom: 24px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
           0 2px 4px -1px rgba(0, 0, 0, 0.06);
       }
+      #hotel-details-card table {
+        padding: 0;
+      }
       #hotel-details-card table td {
         white-space: normal;
+        border: none;
       }
     </style>
   </head>
@@ -132,40 +151,52 @@
         <h1>Cloudbeds Daily Metrics</h1>
         <p>A complete snapshot of all available metrics for today's date.</p>
       </header>
-
       <div id="hotel-details-card"></div>
 
+      <!-- Live API Section -->
+      <h2>Live API Forecast</h2>
       <div class="controls">
-        <button onclick="loadAllMetrics()">
-          Load 7-Day Metrics (from Live API)
-        </button>
-        <button onclick="loadMetricsFromDB()">
-          Load 7-Day Metrics (from DB)
-        </button>
-        <input
-          type="text"
-          id="search-input"
-          placeholder="Search by date..."
-          onkeyup="filterTable()"
-        />
+        <label for="api-start-date">Start Date:</label>
+        <input type="date" id="api-start-date" />
+        <label for="api-num-days">Days:</label>
+        <input type="number" id="api-num-days" value="7" min="1" />
+        <button onclick="loadAllMetrics()">Load Metrics (Live API)</button>
       </div>
-
-      <div id="status"></div>
-
+      <div id="status" class="status-message"></div>
       <div id="results-container"></div>
-      <hr style="margin-top: 40px; margin-bottom: 40px" />
 
-      <h2>7-Day Forecast (from Database)</h2>
-      <div
-        id="db-status"
-        style="margin-top: 16px; font-style: italic; color: #718096"
-      >
-        Click button above to load data.
+      <!-- Your Hotel (DB) Section -->
+      <h2>Your Hotel's Forecast (from Database)</h2>
+      <div class="controls">
+        <label for="db-start-date">Start Date:</label>
+        <input type="date" id="db-start-date" />
+        <label for="db-num-days">Days:</label>
+        <input type="number" id="db-num-days" value="7" min="1" />
+        <button onclick="loadMetricsFromDB()">
+          Load Your Hotel Metrics (DB)
+        </button>
       </div>
-
+      <div id="db-status" class="status-message">
+        Click button to load data.
+      </div>
       <div id="db-results-container"></div>
-    </div>
 
+      <!-- NEW: Competitor Market (DB) Section -->
+      <h2>Competitor Market Data (from Database)</h2>
+      <div class="controls">
+        <label for="comp-start-date">Start Date:</label>
+        <input type="date" id="comp-start-date" />
+        <label for="comp-num-days">Days:</label>
+        <input type="number" id="comp-num-days" value="7" min="1" />
+        <button onclick="loadCompetitorMetrics()">
+          Load Competitor Metrics (DB)
+        </button>
+      </div>
+      <div id="competitor-status" class="status-message">
+        Click button to load data.
+      </div>
+      <div id="competitor-results-container"></div>
+    </div>
     <script src="script.js"></script>
   </body>
 </html>
