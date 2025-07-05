@@ -6,12 +6,7 @@
   ],
   "routes": [
     { "src": "/api/daily-refresh", "dest": "/daily-refresh.js" },
-
-    {
-      "src": "/([^/]+\\.[a-zA-Z0-9]+)",
-      "dest": "/public/$1"
-    },
-
+    { "src": "/(.*\\.(js|css|png|jpg|svg|html|txt))", "dest": "/public/$1" },
     { "src": "/(.*)", "dest": "/server.js" }
   ],
   "crons": [
