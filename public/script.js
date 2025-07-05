@@ -1,4 +1,7 @@
-// script.js (Updated to display market averages)
+// script.js (Updated to handle granularity controls)
+
+// A global variable to store the user's current granularity selection
+let currentGranularity = "daily";
 
 // A complete map of all fields available in Dataset 7, based on our discovery.
 const DATASET_7_MAP = {
@@ -67,6 +70,16 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchHotelDetails();
 });
 
+// NEW: Function to handle the granularity toggle buttons
+function setGranularity(granularity) {
+  currentGranularity = granularity;
+  // Update the active class on buttons for visual feedback
+  document.getElementById("view-daily").classList.remove("active");
+  document.getElementById("view-weekly").classList.remove("active");
+  document.getElementById("view-monthly").classList.remove("active");
+  document.getElementById(`view-${granularity}`).classList.add("active");
+}
+
 // Fetches and displays the hotel's static information
 async function fetchHotelDetails() {
   const detailsContainer = document.getElementById("hotel-details-card");
@@ -132,18 +145,18 @@ async function fetchHotelDetails() {
   }
 }
 
-// Fetches data from the Live Cloudbeds API
+// Fetches data from the Live Cloudbeds API (uses its own date range)
 async function loadAllMetrics() {
   const statusEl = document.getElementById("status");
   const resultsContainer = document.getElementById("results-container");
   statusEl.textContent = "Loading from Live API...";
   resultsContainer.innerHTML = "";
   try {
+    // Note: Live API call uses master start date, but calculates its own end date
     const startDate =
       document.getElementById("master-start-date").value ||
       new Date().toISOString().split("T")[0];
-    const numDays =
-      parseInt(document.getElementById("master-num-days").value, 10) || 7;
+    const numDays = 7; // Live API is always a 7-day lookahead for simplicity
     const startDateObjUTC = new Date(startDate + "T00:00:00Z");
     const endDateObjUTC = new Date(startDateObjUTC);
     endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
@@ -195,6 +208,78 @@ async function loadAllMetrics() {
     console.error("Failed to load metrics:", error);
   }
 }
+
+// MODIFIED: This is now the master function for loading all database data
+async function loadAllDbData() {
+  const startDate = document.getElementById("master-start-date").value;
+  const endDate = document.getElementById("master-end-date").value;
+
+  if (!startDate || !endDate) {
+    alert("Please select both a Start Date and an End Date.");
+    return;
+  }
+
+  // Promise.all runs both requests in parallel for better performance
+  await Promise.all([
+    loadMetricsFromDB(startDate, endDate, currentGranularity),
+    loadCompetitorMetrics(startDate, endDate, currentGranularity),
+  ]);
+}
+
+// MODIFIED: This function now accepts parameters
+async function loadMetricsFromDB(startDate, endDate, granularity) {
+  const statusEl = document.getElementById("db-status");
+  const resultsContainer = document.getElementById("db-results-container");
+  statusEl.textContent = "Loading your hotel's data from database...";
+  resultsContainer.innerHTML = "";
+  try {
+    const apiUrl = `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    if (!response.ok)
+      throw new Error(data.message || "An unknown error occurred.");
+    if (!data || data.length === 0) {
+      statusEl.textContent =
+        "Request successful, but no data was returned from the database for the selected range.";
+      return;
+    }
+    renderDBMetricsTable(data, granularity);
+    statusEl.textContent = `Displaying ${granularity} data for your hotel.`;
+  } catch (error) {
+    statusEl.textContent = `Error: ${error.message}`;
+    console.error("Failed to load metrics from DB:", error);
+  }
+}
+
+// MODIFIED: This function now accepts parameters
+async function loadCompetitorMetrics(startDate, endDate, granularity) {
+  const statusEl = document.getElementById("competitor-status");
+  const resultsContainer = document.getElementById(
+    "competitor-results-container"
+  );
+  statusEl.textContent = "Loading competitor data from database...";
+  resultsContainer.innerHTML = "";
+  try {
+    const apiUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    if (!response.ok)
+      throw new Error(data.message || "An unknown error occurred.");
+    if (!data || data.length === 0) {
+      statusEl.textContent =
+        "Request successful, but no competitor data was returned for the selected range.";
+      return;
+    }
+    renderCompetitorMetricsTable(data, granularity);
+    statusEl.textContent = `Displaying ${granularity} data for the market.`;
+  } catch (error) {
+    statusEl.textContent = `Error: ${error.message}`;
+    console.error("Failed to load competitor metrics from DB:", error);
+  }
+}
+
+// --- Helper functions for processing and rendering below (no major changes needed for them yet) ---
+// (The rendering functions will need updates in the next step to handle the new data format)
 
 function processApiDataForTable(data) {
   const aggregatedData = {};
@@ -269,37 +354,7 @@ function render7DayTable(processedData) {
   resultsContainer.appendChild(card);
 }
 
-// Fetches data for YOUR HOTEL from the database
-async function loadMetricsFromDB() {
-  const statusEl = document.getElementById("db-status");
-  const resultsContainer = document.getElementById("db-results-container");
-  statusEl.textContent = "Loading your hotel's data from database...";
-  resultsContainer.innerHTML = "";
-  try {
-    const startDate =
-      document.getElementById("master-start-date").value ||
-      new Date().toISOString().split("T")[0];
-    const numDays =
-      parseInt(document.getElementById("master-num-days").value, 10) || 7;
-    const apiUrl = `/api/metrics-from-db?startDate=${startDate}&days=${numDays}`;
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-    if (!response.ok)
-      throw new Error(data.message || "An unknown error occurred.");
-    if (!data || data.length === 0) {
-      statusEl.textContent =
-        "Request successful, but no data was returned from the database for the selected range.";
-      return;
-    }
-    renderDBMetricsTable(data);
-    statusEl.textContent = `Displaying ${numDays}-day forecast for your hotel, starting ${startDate}.`;
-  } catch (error) {
-    statusEl.textContent = `Error: ${error.message}`;
-    console.error("Failed to load metrics from DB:", error);
-  }
-}
-
-function renderDBMetricsTable(dbData) {
+function renderDBMetricsTable(dbData, granularity) {
   const resultsContainer = document.getElementById("db-results-container");
   resultsContainer.innerHTML = "";
   const card = document.createElement("div");
@@ -313,7 +368,12 @@ function renderDBMetricsTable(dbData) {
     "total_revenue",
   ];
   const columnToMapKey = { occupancy_direct: "occupancy" };
-  let tableHeader = "<tr><th>Date</th>";
+
+  let dateHeader = "Date";
+  if (granularity === "weekly") dateHeader = "Week Starting";
+  if (granularity === "monthly") dateHeader = "Month";
+
+  let tableHeader = `<tr><th>${dateHeader}</th>`;
   dbColumns.forEach((colName) => {
     const mapKey = columnToMapKey[colName] || colName;
     const metricInfo = DATASET_7_MAP[mapKey];
@@ -324,8 +384,8 @@ function renderDBMetricsTable(dbData) {
   tableHeader += "</tr>";
   let tableRows = "";
   dbData.forEach((row) => {
-    const stayDate = row.stay_date.substring(0, 10);
-    tableRows += `<tr><td>${stayDate}</td>`;
+    const period = (row.period || row.stay_date).substring(0, 10);
+    tableRows += `<tr><td>${period}</td>`;
     dbColumns.forEach((colName) => {
       const mapKey = columnToMapKey[colName] || colName;
       const metricInfo = DATASET_7_MAP[mapKey] || { type: "number" };
@@ -337,40 +397,7 @@ function renderDBMetricsTable(dbData) {
   resultsContainer.appendChild(card);
 }
 
-// Fetches data for COMPETITORS from the database
-async function loadCompetitorMetrics() {
-  const statusEl = document.getElementById("competitor-status");
-  const resultsContainer = document.getElementById(
-    "competitor-results-container"
-  );
-  statusEl.textContent = "Loading competitor data from database...";
-  resultsContainer.innerHTML = "";
-  try {
-    const startDate =
-      document.getElementById("master-start-date").value ||
-      new Date().toISOString().split("T")[0];
-    const numDays =
-      parseInt(document.getElementById("master-num-days").value, 10) || 7;
-    const apiUrl = `/api/competitor-metrics?startDate=${startDate}&days=${numDays}`;
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-    if (!response.ok)
-      throw new Error(data.message || "An unknown error occurred.");
-    if (!data || data.length === 0) {
-      statusEl.textContent =
-        "Request successful, but no competitor data was returned for the selected range.";
-      return;
-    }
-    renderCompetitorMetricsTable(data);
-    statusEl.textContent = `Displaying ${numDays}-day forecast for the competitor market, starting ${startDate}.`;
-  } catch (error) {
-    statusEl.textContent = `Error: ${error.message}`;
-    console.error("Failed to load competitor metrics from DB:", error);
-  }
-}
-
-// --- MODIFIED to render the new aggregated market data ---
-function renderCompetitorMetricsTable(dbData) {
+function renderCompetitorMetricsTable(dbData, granularity) {
   const resultsContainer = document.getElementById(
     "competitor-results-container"
   );
@@ -378,7 +405,6 @@ function renderCompetitorMetricsTable(dbData) {
   const card = document.createElement("div");
   card.className = "table-wrapper";
 
-  // These are the new column names from our API (e.g., 'market_adr')
   const dbColumns = [
     "market_adr",
     "market_occupancy",
@@ -386,8 +412,6 @@ function renderCompetitorMetricsTable(dbData) {
     "market_rooms_sold",
     "market_capacity",
   ];
-
-  // A map to make the headers look nice
   const headerMap = {
     market_adr: "Market ADR",
     market_occupancy: "Market Occupancy",
@@ -396,7 +420,11 @@ function renderCompetitorMetricsTable(dbData) {
     market_capacity: "Market Capacity",
   };
 
-  let tableHeader = "<tr><th>Date</th>";
+  let dateHeader = "Date";
+  if (granularity === "weekly") dateHeader = "Week Starting";
+  if (granularity === "monthly") dateHeader = "Month";
+
+  let tableHeader = `<tr><th>${dateHeader}</th>`;
   dbColumns.forEach((colName) => {
     tableHeader += `<th>${headerMap[colName] || colName}</th>`;
   });
@@ -404,10 +432,9 @@ function renderCompetitorMetricsTable(dbData) {
 
   let tableRows = "";
   dbData.forEach((row) => {
-    const stayDate = row.stay_date.substring(0, 10);
-    tableRows += `<tr><td>${stayDate}</td>`;
+    const period = (row.period || row.stay_date).substring(0, 10);
+    tableRows += `<tr><td>${period}</td>`;
     dbColumns.forEach((colName) => {
-      // Determine format type based on column name
       let formatType = "number";
       if (colName.includes("adr") || colName.includes("revpar")) {
         formatType = "currency";
@@ -423,14 +450,13 @@ function renderCompetitorMetricsTable(dbData) {
   resultsContainer.appendChild(card);
 }
 
-// Helper function for formatting values
 function formatValue(value, type) {
   if (value === null || value === undefined || value === "") return "-";
   const num = parseFloat(value);
   if (isNaN(num)) return value;
   switch (type) {
     case "currency":
-      return `£${num.toFixed(2)}`; // Changed to GBP
+      return `£${num.toFixed(2)}`;
     case "percent":
       return `${(num * 100).toFixed(1)}%`;
     case "number":
@@ -438,11 +464,4 @@ function formatValue(value, type) {
     default:
       return value;
   }
-}
-
-// --- NEW FUNCTION to trigger both DB loads at once ---
-async function loadAllDbData() {
-  // This function calls both DB loading functions at the same time.
-  // Promise.all runs them in parallel for efficiency.
-  await Promise.all([loadMetricsFromDB(), loadCompetitorMetrics()]);
 }

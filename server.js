@@ -1,4 +1,4 @@
-// server.js (Updated to calculate market averages)
+// server.js (Updated to handle granularity correctly)
 require("dotenv").config();
 const express = require("express");
 const fetch = (...args) =>
@@ -83,79 +83,120 @@ app.get("/api/hotel-details", async (req, res) => {
   }
 });
 
-// Endpoint for fetching OUR hotel's metrics from DB (no changes)
+// --- MODIFIED ENDPOINT: Now handles granularity for OUR hotel ---
 app.get("/api/metrics-from-db", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-    const { startDate, days } = req.query;
-    const finalStartDate = startDate || new Date().toISOString().split("T")[0];
-    const numDays = parseInt(days, 10) || 7;
-    const startDateObjUTC = new Date(finalStartDate + "T00:00:00Z");
-    const endDateObjUTC = new Date(startDateObjUTC);
-    endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
-    const finalEndDate = endDateObjUTC.toISOString().split("T")[0];
 
-    const query = `
-      SELECT
-        TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
-        adr, occupancy_direct, revpar, rooms_sold, capacity_count,
-        total_revenue, total_room_revenue, total_other_revenue, room_rate_total,
-        taxes_total, fees_total, misc_income, adults_count, children_count,
-        room_guest_count, blocked_rooms_count, out_of_service_rooms_count
-      FROM daily_metrics_snapshots
-      WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
-      ORDER BY stay_date ASC;
-    `;
-    const result = await client.query(query, [
-      ourHotelId,
-      finalStartDate,
-      finalEndDate,
-    ]);
+    const { startDate, endDate, granularity = "daily" } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "startDate and endDate are required." });
+    }
+
+    let query;
+    // --- FIX: Sanitize granularity input for SQL ---
+    let sqlGranularity = "day"; // A safe default
+    if (granularity === "weekly") sqlGranularity = "week";
+    if (granularity === "monthly") sqlGranularity = "month";
+
+    const timeGroup = `DATE_TRUNC('${sqlGranularity}', stay_date)`;
+
+    if (granularity === "daily") {
+      query = `
+            SELECT
+                TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
+                adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue
+            FROM daily_metrics_snapshots
+            WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+            ORDER BY stay_date ASC;
+        `;
+    } else {
+      query = `
+            SELECT
+                TO_CHAR(${timeGroup}, 'YYYY-MM-DD') AS period,
+                AVG(adr) as adr,
+                AVG(occupancy_direct) as occupancy_direct,
+                AVG(revpar) as revpar,
+                SUM(rooms_sold) as rooms_sold,
+                SUM(capacity_count) as capacity_count,
+                SUM(total_revenue) as total_revenue
+            FROM daily_metrics_snapshots
+            WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+            GROUP BY ${timeGroup}
+            ORDER BY ${timeGroup} ASC;
+        `;
+    }
+
+    const result = await client.query(query, [ourHotelId, startDate, endDate]);
     res.json(result.rows);
   } catch (error) {
+    console.error("Error in /api/metrics-from-db:", error);
     res.status(500).json({ error: "Failed to fetch metrics from database" });
   } finally {
     await client.end();
   }
 });
 
-// --- MODIFIED ENDPOINT: Now calculates market averages ---
+// --- MODIFIED ENDPOINT: Now handles granularity for COMPETITORS ---
 app.get("/api/competitor-metrics", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-    const { startDate, days } = req.query;
-    const finalStartDate = startDate || new Date().toISOString().split("T")[0];
-    const numDays = parseInt(days, 10) || 7;
-    const startDateObjUTC = new Date(finalStartDate + "T00:00:00Z");
-    const endDateObjUTC = new Date(startDateObjUTC);
-    endDateObjUTC.setDate(startDateObjUTC.getDate() + (numDays - 1));
-    const finalEndDate = endDateObjUTC.toISOString().split("T")[0];
 
-    // --- The SQL query is now using AVG() and SUM() with a GROUP BY clause ---
-    const query = `
-      SELECT
-        TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
-        AVG(adr) AS market_adr,
-        AVG(occupancy_direct) AS market_occupancy,
-        AVG(revpar) AS market_revpar,
-        SUM(rooms_sold) AS market_rooms_sold,
-        SUM(capacity_count) AS market_capacity
-      FROM daily_metrics_snapshots
-      WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
-      GROUP BY stay_date
-      ORDER BY stay_date ASC;
-    `;
-    const result = await client.query(query, [
-      ourHotelId,
-      finalStartDate,
-      finalEndDate,
-    ]);
+    const { startDate, endDate, granularity = "daily" } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "startDate and endDate are required." });
+    }
+
+    let query;
+    // --- FIX: Sanitize granularity input for SQL ---
+    let sqlGranularity = "day"; // A safe default
+    if (granularity === "weekly") sqlGranularity = "week";
+    if (granularity === "monthly") sqlGranularity = "month";
+
+    const timeGroup = `DATE_TRUNC('${sqlGranularity}', stay_date)`;
+
+    if (granularity === "daily") {
+      query = `
+            SELECT
+                TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
+                AVG(adr) AS market_adr,
+                AVG(occupancy_direct) AS market_occupancy,
+                AVG(revpar) AS market_revpar,
+                SUM(rooms_sold) AS market_rooms_sold,
+                SUM(capacity_count) AS market_capacity
+            FROM daily_metrics_snapshots
+            WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
+            GROUP BY stay_date
+            ORDER BY stay_date ASC;
+        `;
+    } else {
+      query = `
+            SELECT
+                TO_CHAR(${timeGroup}, 'YYYY-MM-DD') AS period,
+                AVG(adr) AS market_adr,
+                AVG(occupancy_direct) AS market_occupancy,
+                AVG(revpar) AS market_revpar,
+                SUM(rooms_sold) AS market_rooms_sold,
+                SUM(capacity_count) AS market_capacity
+            FROM daily_metrics_snapshots
+            WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
+            GROUP BY ${timeGroup}
+            ORDER BY ${timeGroup} ASC;
+        `;
+    }
+
+    const result = await client.query(query, [ourHotelId, startDate, endDate]);
     res.json(result.rows);
   } catch (error) {
+    console.error("Error in /api/competitor-metrics:", error);
     res
       .status(500)
       .json({ error: "Failed to fetch competitor metrics from database" });
