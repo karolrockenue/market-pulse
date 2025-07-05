@@ -1,4 +1,4 @@
-// server.js (Updated to handle granularity and correct currency)
+// server.js
 require("dotenv").config();
 const express = require("express");
 const fetch = (...args) =>
@@ -8,8 +8,6 @@ const { Client } = require("pg");
 
 const app = express();
 app.use(express.json());
-
-// --- API ROUTES ---
 
 // Helper function for Cloudbeds API authentication
 async function getCloudbedsAccessToken() {
@@ -33,7 +31,7 @@ async function getCloudbedsAccessToken() {
   return tokenData.access_token;
 }
 
-// Endpoint for the live API dashboard query (no changes)
+// Endpoint for the live API dashboard query
 app.post("/api/explore", async (req, res) => {
   try {
     const accessToken = await getCloudbedsAccessToken();
@@ -64,7 +62,7 @@ app.post("/api/explore", async (req, res) => {
   }
 });
 
-// Endpoint to get hotel details from Cloudbeds API (no changes)
+// Endpoint to get hotel details from Cloudbeds API
 app.get("/api/hotel-details", async (req, res) => {
   try {
     const accessToken = await getCloudbedsAccessToken();
@@ -83,13 +81,12 @@ app.get("/api/hotel-details", async (req, res) => {
   }
 });
 
-// --- REFACTORED ENDPOINT: Returns metrics AND currency symbol ---
+// Endpoint to get metrics and currency symbol from the database
 app.get("/api/metrics-from-db", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-
     const { startDate, endDate, granularity = "daily" } = req.query;
     if (!startDate || !endDate) {
       return res
@@ -97,13 +94,11 @@ app.get("/api/metrics-from-db", async (req, res) => {
         .json({ error: "startDate and endDate are required." });
     }
 
-    // --- NEW: Query for the currency symbol ---
     const currencyQuery =
       "SELECT currency_symbol FROM hotels WHERE hotel_id = $1";
     const currencyResult = await client.query(currencyQuery, [ourHotelId]);
-    const currencySymbol = currencyResult.rows[0]?.currency_symbol || "$"; // Default to '$' if not found
+    const currencySymbol = currencyResult.rows[0]?.currency_symbol || "$";
 
-    // --- Existing metrics query logic ---
     let metricsQuery;
     let sqlGranularity = "day";
     if (granularity === "weekly") sqlGranularity = "week";
@@ -117,8 +112,7 @@ app.get("/api/metrics-from-db", async (req, res) => {
             adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue
         FROM daily_metrics_snapshots
         WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
-        ORDER BY stay_date ASC;
-      `;
+        ORDER BY stay_date ASC;`;
     } else {
       metricsQuery = `
         SELECT
@@ -132,17 +126,14 @@ app.get("/api/metrics-from-db", async (req, res) => {
         FROM daily_metrics_snapshots
         WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
         GROUP BY ${timeGroup}
-        ORDER BY ${timeGroup} ASC;
-      `;
+        ORDER BY ${timeGroup} ASC;`;
     }
-
     const metricsResult = await client.query(metricsQuery, [
       ourHotelId,
       startDate,
       endDate,
     ]);
 
-    // --- NEW: Return a structured object ---
     res.json({
       metrics: metricsResult.rows,
       currencySymbol: currencySymbol,
@@ -155,7 +146,7 @@ app.get("/api/metrics-from-db", async (req, res) => {
   }
 });
 
-// Endpoint for competitors (no currency change needed here)
+// Endpoint for competitor metrics
 app.get("/api/competitor-metrics", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
@@ -184,8 +175,7 @@ app.get("/api/competitor-metrics", async (req, res) => {
         FROM daily_metrics_snapshots
         WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
         GROUP BY stay_date
-        ORDER BY stay_date ASC;
-      `;
+        ORDER BY stay_date ASC;`;
     } else {
       query = `
         SELECT
@@ -198,8 +188,7 @@ app.get("/api/competitor-metrics", async (req, res) => {
         FROM daily_metrics_snapshots
         WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
         GROUP BY ${timeGroup}
-        ORDER BY ${timeGroup} ASC;
-      `;
+        ORDER BY ${timeGroup} ASC;`;
     }
     const result = await client.query(query, [ourHotelId, startDate, endDate]);
     res.json(result.rows);
@@ -213,14 +202,13 @@ app.get("/api/competitor-metrics", async (req, res) => {
   }
 });
 
-// --- STATIC AND FALLBACK ROUTES ---
+// Static and fallback routes
 const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
 app.get("/", (req, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
 
-// --- SERVER LISTENING LOGIC ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

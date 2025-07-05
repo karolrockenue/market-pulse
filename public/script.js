@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const endDateInput = document.getElementById("master-end-date");
   if (startDateInput && endDateInput) {
     const today = new Date();
-    const nextMonth = new Date();
+    const nextMonth = new Date(); // Typo fixed here
     nextMonth.setMonth(today.getMonth() + 1);
     const formatDate = (date) => {
       const d = new Date(date);
@@ -65,7 +65,6 @@ async function fetchHotelDetails() {
       throw new Error(result.message || "Failed to fetch hotel details");
     }
     const hotelData = result.data;
-    // RESTORED: Full list of hotel details
     const detailsMap = [
       { label: "Property Name", getValue: (d) => d.propertyName },
       { label: "Property Type", getValue: (d) => d.propertyType },
@@ -119,7 +118,6 @@ async function fetchHotelDetails() {
   }
 }
 
-// RESTORED: This function was previously missing
 async function loadAllMetrics() {
   const statusEl = document.getElementById("status");
   const resultsContainer = document.getElementById("results-container");
@@ -244,7 +242,6 @@ async function loadCompetitorMetrics(startDate, endDate, granularity) {
   }
 }
 
-// RESTORED: This function was previously missing
 function processApiDataForTable(data) {
   const aggregatedData = {};
   for (let i = 0; i < data.index.length; i++) {
@@ -279,7 +276,6 @@ function processApiDataForTable(data) {
   return aggregatedData;
 }
 
-// RESTORED: This function was previously missing
 function render7DayTable(processedData) {
   const resultsContainer = document.getElementById("results-container");
   resultsContainer.innerHTML = "";
