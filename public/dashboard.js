@@ -368,8 +368,8 @@ function renderChart() {
           fill: isDaily
             ? {
                 target: 1,
-                above: "rgba(74, 222, 128, 0.05)",
-                below: "rgba(248, 113, 113, 0.05)",
+                above: "rgba(250, 195, 95, 0.1)", // Lighter Gold
+                below: "rgba(60, 69, 91, 0.1)", // Lighter Navy
               }
             : false,
         },
