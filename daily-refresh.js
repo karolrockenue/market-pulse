@@ -58,18 +58,19 @@ module.exports = async (request, response) => {
 
     // Construct the correct payload for the Data Insights API
     const insightsPayload = {
-      property_ids: [parseInt(CLOUDBEDS_PROPERTY_ID)], // <-- FIX 1: Added property_ids
+      property_ids: [parseInt(CLOUDBEDS_PROPERTY_ID)],
       dataset_id: 7,
       filters: {
         and: [
           {
             cdf: { column: "stay_date" },
-            operator: "equals", // <-- FIX 2: Changed "equal" to "equals"
+            operator: "equals",
             value: dateForAPI,
           },
         ],
       },
       columns: columnsToRequest,
+      group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }], // <-- THE FINAL FIX
       settings: { details: true, totals: false },
     };
 
