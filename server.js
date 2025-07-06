@@ -103,7 +103,7 @@ app.get("/api/hotel-details-from-db", async (req, res) => {
   }
 });
 
-// --- NEW: Endpoint to get the last successful cron job run time ---
+// Endpoint to get the last successful cron job run time
 app.get("/api/last-refresh-time", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
@@ -114,7 +114,6 @@ app.get("/api/last-refresh-time", async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Last refresh time not found." });
     }
-    // The value is stored as JSONB, so we access the timestamp property
     const timestamp = result.rows[0].value.timestamp;
     res.json({ last_successful_run: timestamp });
   } catch (error) {
@@ -124,7 +123,62 @@ app.get("/api/last-refresh-time", async (req, res) => {
     if (client) await client.end();
   }
 });
-// --- END NEW ---
+
+// Endpoint for period-wide KPI summary
+app.get("/api/kpi-summary", async (req, res) => {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
+  try {
+    await client.connect();
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "startDate and endDate are required." });
+    }
+
+    // MODIFIED: Added ::NUMERIC cast to all division operations to ensure floating point math
+    const kpiQuery = `
+      SELECT
+        -- Your Hotel KPIs
+        (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END), 0)) AS your_adr,
+        (SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_occupancy,
+        (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_revpar,
+        -- Market KPIs
+        (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END), 0)) AS market_adr,
+        (SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_occupancy,
+        (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_revpar
+      FROM daily_metrics_snapshots
+      WHERE stay_date >= $2 AND stay_date <= $3;
+    `;
+
+    const result = await client.query(kpiQuery, [
+      ourHotelId,
+      startDate,
+      endDate,
+    ]);
+
+    const kpis = result.rows[0];
+
+    res.json({
+      yourHotel: {
+        occupancy: kpis.your_occupancy,
+        adr: kpis.your_adr,
+        revpar: kpis.your_revpar,
+      },
+      market: {
+        occupancy: kpis.market_occupancy,
+        adr: kpis.market_adr,
+        revpar: kpis.market_revpar,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /api/kpi-summary:", error);
+    res.status(500).json({ error: "Failed to fetch KPI summary" });
+  } finally {
+    if (client) await client.end();
+  }
+});
 
 // Endpoint to get metrics from DB
 app.get("/api/metrics-from-db", async (req, res) => {
@@ -156,7 +210,7 @@ app.get("/api/metrics-from-db", async (req, res) => {
             TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
             adr,
             occupancy_direct,
-            (adr * occupancy_direct) AS revpar,
+            revpar,
             rooms_sold,
             capacity_count,
             total_revenue
@@ -167,9 +221,9 @@ app.get("/api/metrics-from-db", async (req, res) => {
       metricsQuery = `
         SELECT
             TO_CHAR(${timeGroup}, 'YYYY-MM-DD') AS period,
-            AVG(adr) as adr,
-            AVG(occupancy_direct) as occupancy_direct,
-            (SUM(total_revenue) / NULLIF(SUM(capacity_count), 0)) as revpar,
+            (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) as adr,
+            (SUM(rooms_sold)::NUMERIC / NULLIF(SUM(capacity_count), 0)) as occupancy_direct,
+            (SUM(total_revenue)::NUMERIC / NULLIF(SUM(capacity_count), 0)) as revpar,
             SUM(rooms_sold) as rooms_sold,
             SUM(capacity_count) as capacity_count,
             SUM(total_revenue) as total_revenue
@@ -196,7 +250,7 @@ app.get("/api/metrics-from-db", async (req, res) => {
   }
 });
 
-// Endpoint for competitor metrics now includes competitor count and total capacity
+// Endpoint for competitor metrics
 app.get("/api/competitor-metrics", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
@@ -209,12 +263,10 @@ app.get("/api/competitor-metrics", async (req, res) => {
         .json({ error: "startDate and endDate are required." });
     }
 
-    // Query to count competitor hotels
     const countQuery = "SELECT COUNT(*) FROM hotels WHERE hotel_id != $1";
     const countResult = await client.query(countQuery, [ourHotelId]);
     const competitorCount = parseInt(countResult.rows[0].count, 10);
 
-    // Query to get total room capacity of the competitor set.
     const capacityQuery = `
         SELECT SUM(t.capacity_count) as total_capacity
         FROM (
@@ -251,9 +303,9 @@ app.get("/api/competitor-metrics", async (req, res) => {
       query = `
         SELECT
             TO_CHAR(${timeGroup}, 'YYYY-MM-DD') AS period,
-            AVG(adr) AS market_adr,
-            AVG(occupancy_direct) AS market_occupancy,
-            AVG(revpar) AS market_revpar,
+            (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) AS market_adr,
+            (SUM(rooms_sold)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS market_occupancy,
+            (SUM(total_revenue)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS market_revpar,
             SUM(rooms_sold) AS market_rooms_sold,
             SUM(capacity_count) AS market_capacity
         FROM daily_metrics_snapshots
@@ -263,7 +315,6 @@ app.get("/api/competitor-metrics", async (req, res) => {
     }
     const result = await client.query(query, [ourHotelId, startDate, endDate]);
 
-    // Return metrics, count, and total capacity
     res.json({
       metrics: result.rows,
       competitorCount: competitorCount,

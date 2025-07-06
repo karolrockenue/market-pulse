@@ -4,6 +4,8 @@ let yourHotelMetrics = [];
 let marketMetrics = [];
 let activeMetric = "occupancy";
 let currentGranularity = "daily";
+let hotelName = "Your Hotel"; // Default name
+let isInitialLoad = true; // Flag to handle the initial loading screen
 
 const metricConfig = {
   occupancy: { label: "Occupancy", format: "percent" },
@@ -13,57 +15,48 @@ const metricConfig = {
 
 const chartColors = { primary: "#FAC35F", secondary: "#3C455B" };
 
-// --- FAKE DATA GENERATION (To be replaced) ---
-function generateFakeData(granularity, period) {
-  let data = [];
-  const today = new Date("2025-07-03");
-  if (granularity === "daily") {
-    for (let i = 0; i < period; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const yourOcc = 0.75 + Math.random() * 0.2;
-      const yourAdr = 180 + Math.random() * 40;
-      const marketOcc = 0.7 + Math.random() * 0.15;
-      const marketAdr = 170 + Math.random() * 30;
-      data.push({
-        date: date.toISOString().split("T")[0],
-        your: {
-          occupancy: yourOcc,
-          adr: yourAdr,
-          revpar: yourOcc * yourAdr,
-        },
-        market: {
-          occupancy: marketOcc,
-          adr: marketAdr,
-          revpar: marketOcc * marketAdr,
-        },
-      });
+// --- DATA PROCESSING ---
+function processAndMergeData(yourData, marketData) {
+  const dataMap = new Map();
+
+  yourData.forEach((row) => {
+    const date = (row.stay_date || row.period).substring(0, 10);
+    if (!dataMap.has(date)) {
+      dataMap.set(date, { date: date, your: {}, market: {} });
     }
-  } else {
-    // monthly
-    for (let i = 0; i < period; i++) {
-      const date = new Date(today);
-      date.setMonth(today.getMonth() + i);
-      const yourOcc = 0.6 + Math.random() * 0.3;
-      const yourAdr = 150 + Math.random() * 60;
-      const marketOcc = 0.55 + Math.random() * 0.25;
-      const marketAdr = 140 + Math.random() * 50;
-      data.push({
-        date: date.toISOString().substring(0, 7),
-        your: {
-          occupancy: yourOcc,
-          adr: yourAdr,
-          revpar: yourOcc * yourAdr,
-        },
-        market: {
-          occupancy: marketOcc,
-          adr: marketAdr,
-          revpar: marketOcc * marketAdr,
-        },
-      });
+    const entry = dataMap.get(date);
+    entry.your = {
+      occupancy: parseFloat(row.occupancy_direct) || 0,
+      adr: parseFloat(row.adr) || 0,
+      revpar: parseFloat(row.revpar) || 0,
+    };
+  });
+
+  marketData.forEach((row) => {
+    const date = (row.stay_date || row.period).substring(0, 10);
+    if (!dataMap.has(date)) {
+      dataMap.set(date, { date: date, your: {}, market: {} });
     }
-  }
-  return data;
+    const entry = dataMap.get(date);
+    entry.market = {
+      occupancy: parseFloat(row.market_occupancy) || 0,
+      adr: parseFloat(row.market_adr) || 0,
+      revpar: parseFloat(row.market_revpar) || 0,
+    };
+  });
+
+  const mergedData = Array.from(dataMap.values());
+
+  mergedData.forEach((entry) => {
+    if (Object.keys(entry.your).length === 0) {
+      entry.your = { occupancy: 0, adr: 0, revpar: 0 };
+    }
+    if (Object.keys(entry.market).length === 0) {
+      entry.market = { occupancy: 0, adr: 0, revpar: 0 };
+    }
+  });
+
+  return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
 // --- DYNAMIC RENDERING LOGIC ---
@@ -75,7 +68,58 @@ function setActiveMetric(metric) {
   document
     .querySelector(`.kpi-card[data-metric="${metric}"]`)
     .classList.add("active");
-  renderDashboard();
+
+  renderTables();
+  renderChart();
+}
+
+function renderKpiCards(kpiData) {
+  if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
+    ["occupancy", "adr", "revpar"].forEach((metric) => {
+      document.getElementById(`kpi-${metric}-your`).textContent = "-";
+      document.getElementById(`kpi-${metric}-market`).textContent = "-";
+      document.getElementById(`kpi-${metric}-delta`).textContent = "";
+    });
+    return;
+  }
+
+  const { yourHotel, market } = kpiData;
+
+  ["occupancy", "adr", "revpar"].forEach((metric) => {
+    const yourValue = yourHotel[metric];
+    const marketValue = market[metric];
+    const delta = yourValue - marketValue;
+
+    document.getElementById(`kpi-${metric}-your`).textContent = formatValue(
+      yourValue,
+      metricConfig[metric].format
+    );
+    document.getElementById(`kpi-${metric}-market`).textContent = formatValue(
+      marketValue,
+      metricConfig[metric].format
+    );
+
+    const deltaEl = document.getElementById(`kpi-${metric}-delta`);
+    if (isNaN(delta)) {
+      deltaEl.textContent = "";
+      return;
+    }
+
+    const deltaSign = delta >= 0 ? "+" : "";
+    let formattedDelta;
+    if (metricConfig[metric].format === "percent") {
+      formattedDelta = `${deltaSign}${(Math.abs(delta) * 100).toFixed(1)}pts`;
+    } else {
+      formattedDelta = `${deltaSign}${formatValue(
+        Math.abs(delta),
+        "currency"
+      )}`;
+    }
+    deltaEl.textContent = formattedDelta;
+    deltaEl.className = `text-sm font-bold font-data ${
+      delta >= 0 ? "text-green-600" : "text-red-600"
+    }`;
+  });
 }
 
 function formatValue(value, type) {
@@ -100,52 +144,7 @@ function formatDateLabel(dateString, granularity) {
   if (granularity === "weekly") {
     return `Week of ${date.toLocaleDateString("en-GB", { timeZone: "UTC" })}`;
   }
-  // Daily
   return date.toLocaleDateString("en-GB", { timeZone: "UTC" });
-}
-
-function renderKpiCards() {
-  ["occupancy", "adr", "revpar"].forEach((metric) => {
-    if (yourHotelMetrics.length === 0) {
-      document.getElementById(`kpi-${metric}-your`).textContent = "-";
-      document.getElementById(`kpi-${metric}-market`).textContent = "-";
-      document.getElementById(`kpi-${metric}-delta`).textContent = "";
-      return;
-    }
-
-    const yourAvg =
-      yourHotelMetrics.reduce((sum, item) => sum + item.your[metric], 0) /
-      yourHotelMetrics.length;
-    const marketAvg =
-      marketMetrics.reduce((sum, item) => sum + item.market[metric], 0) /
-      marketMetrics.length;
-    const delta = yourAvg - marketAvg;
-
-    document.getElementById(`kpi-${metric}-your`).textContent = formatValue(
-      yourAvg,
-      metricConfig[metric].format
-    );
-    document.getElementById(`kpi-${metric}-market`).textContent = formatValue(
-      marketAvg,
-      metricConfig[metric].format
-    );
-
-    const deltaEl = document.getElementById(`kpi-${metric}-delta`);
-    const deltaSign = delta >= 0 ? "+" : "";
-    let formattedDelta;
-    if (metricConfig[metric].format === "percent") {
-      formattedDelta = `${deltaSign}${(Math.abs(delta) * 100).toFixed(1)}pts`;
-    } else {
-      formattedDelta = `${deltaSign}${formatValue(
-        Math.abs(delta),
-        "currency"
-      )}`;
-    }
-    deltaEl.textContent = formattedDelta;
-    deltaEl.className = `text-sm font-bold font-data ${
-      delta >= 0 ? "text-green-600" : "text-red-600"
-    }`;
-  });
 }
 
 function renderTables() {
@@ -173,7 +172,7 @@ function renderTables() {
   `;
 
   if (yourHotelMetrics.length === 0) {
-    return; // Don't render rows if there's no data
+    return;
   }
 
   yourHotelMetrics.forEach((day, index) => {
@@ -232,7 +231,6 @@ function renderTables() {
   addTableSyncEventListeners();
 }
 
-// --- Enhanced Sync Logic ---
 function handleRowMouseover(event) {
   const date = event.currentTarget.dataset.date;
   if (!date || !comparisonChart) return;
@@ -287,7 +285,6 @@ function syncChartAndTables(event, activeElements, chart) {
   }
 }
 
-// --- RENDER CHARTS ---
 Chart.defaults.color = "#64748b";
 Chart.defaults.borderColor = "#e2e8f0";
 
@@ -328,7 +325,14 @@ function renderChart() {
     comparisonChart.destroy();
   }
   const ctx = document.getElementById("comparisonChart").getContext("2d");
-  const isDaily = currentGranularity === "daily";
+
+  const isSingleDataPoint = yourHotelMetrics.length === 1;
+  const chartType = isSingleDataPoint
+    ? "bar"
+    : currentGranularity === "daily"
+    ? "line"
+    : "bar";
+  const isLineChart = chartType === "line";
 
   const labels = yourHotelMetrics.map((d) =>
     formatDateLabel(d.date, currentGranularity)
@@ -350,36 +354,36 @@ function renderChart() {
 
   document.getElementById(
     "comparison-chart-title"
-  ).textContent = `${metricConfig[activeMetric].label} Trend`;
+  ).textContent = `${metricConfig[activeMetric].label} for ${hotelName} vs The Market`;
 
   const config = {
-    type: isDaily ? "line" : "bar",
+    type: chartType,
     data: {
       labels: labels,
       datasets: [
         {
           label: `Your Hotel`,
           data: yourData,
-          backgroundColor: isDaily ? "transparent" : chartColors.primary,
+          backgroundColor: isLineChart ? "transparent" : chartColors.primary,
           borderColor: chartColors.primary,
-          borderWidth: isDaily ? 2.5 : 1,
+          borderWidth: isLineChart ? 2.5 : 1,
           pointRadius: 0,
           tension: 0.3,
-          fill: isDaily
+          fill: isLineChart
             ? {
                 target: 1,
-                above: "rgba(250, 195, 95, 0.1)", // Lighter Gold
-                below: "rgba(60, 69, 91, 0.1)", // Lighter Navy
+                above: "rgba(250, 195, 95, 0.1)",
+                below: "rgba(60, 69, 91, 0.1)",
               }
             : false,
         },
         {
           label: `The Market`,
           data: marketData,
-          backgroundColor: isDaily ? "transparent" : chartColors.secondary,
+          backgroundColor: isLineChart ? "transparent" : chartColors.secondary,
           borderColor: chartColors.secondary,
-          borderWidth: isDaily ? 2 : 1,
-          borderDash: isDaily ? [5, 5] : [],
+          borderWidth: isLineChart ? 2 : 1,
+          borderDash: isLineChart ? [5, 5] : [],
           pointRadius: 0,
         },
       ],
@@ -422,55 +426,104 @@ function renderChart() {
   });
 }
 
-function renderDashboard() {
-  renderKpiCards();
-  renderTables();
-  renderChart();
-}
-
 // --- DATA LOADING ---
-function loadAndRenderFakeData(granularity, period) {
-  currentGranularity = granularity;
-  const data = generateFakeData(granularity, period);
-  yourHotelMetrics = data;
-  marketMetrics = data;
+async function loadDataFromAPI(startDate, endDate, granularity) {
+  const runBtn = document.getElementById("run-btn");
+  const loadingOverlay = document.getElementById("loading-overlay");
+  const contentWrapper = document.getElementById("dashboard-content-wrapper");
 
-  document
-    .querySelectorAll("#test-buttons .control-btn[data-period]")
-    .forEach((btn) => btn.classList.remove("active"));
-  const activeButton = document.querySelector(
-    `#test-buttons .control-btn[data-granularity="${granularity}"][data-period="${period}"]`
-  );
-  if (activeButton) {
-    activeButton.classList.add("active");
+  // Only show the button spinner for non-initial loads
+  if (!isInitialLoad) {
+    const originalBtnText = runBtn.innerHTML;
+    runBtn.disabled = true;
+    runBtn.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Loading...
+      `;
+    // Restore button in the finally block for this case
+    setTimeout(() => {
+      runBtn.disabled = false;
+      runBtn.innerHTML = originalBtnText;
+    }, 500);
   }
 
-  renderDashboard();
+  try {
+    const yourHotelUrl = `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
+    const marketUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
+    const kpiUrl = `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}`;
+
+    const [yourHotelResponse, marketResponse, kpiResponse] = await Promise.all([
+      fetch(yourHotelUrl),
+      fetch(marketUrl),
+      fetch(kpiUrl),
+    ]);
+
+    if (!yourHotelResponse.ok || !marketResponse.ok || !kpiResponse.ok) {
+      throw new Error("Failed to fetch data from one or more API endpoints.");
+    }
+
+    const yourHotelData = await yourHotelResponse.json();
+    const marketData = await marketResponse.json();
+    const kpiData = await kpiResponse.json();
+
+    renderKpiCards(kpiData);
+
+    const processedData = processAndMergeData(
+      yourHotelData.metrics,
+      marketData.metrics
+    );
+    yourHotelMetrics = processedData;
+    marketMetrics = processedData;
+
+    renderTables();
+    renderChart();
+  } catch (error) {
+    console.error("Error loading data:", error);
+    alert(`An error occurred while loading data: ${error.message}`);
+  } finally {
+    if (isInitialLoad) {
+      loadingOverlay.style.opacity = "0";
+      contentWrapper.style.opacity = "1";
+      setTimeout(() => {
+        loadingOverlay.classList.add("hidden");
+      }, 500); // Wait for fade out to complete before hiding
+      isInitialLoad = false;
+    }
+  }
 }
 
-async function loadDataFromAPI(startDate, endDate, granularity) {
-  console.log("Fetching data with parameters:", {
-    startDate,
-    endDate,
-    granularity,
-  });
-  alert("API connection not implemented yet. Using fake data for now.");
-  loadAndRenderFakeData(granularity, 30);
+async function fetchAndSetDisplayNames() {
+  try {
+    const response = await fetch("/api/hotel-details-from-db");
+    if (!response.ok) throw new Error("Failed to fetch hotel details");
+    const hotelData = await response.json();
+    hotelName = hotelData.property_name || "Your Hotel";
+
+    document.getElementById("your-hotel-table-title").textContent = hotelName;
+    document.getElementById("your-hotel-subtitle").textContent =
+      "Displaying data for your property";
+  } catch (error) {
+    console.error("Could not set dynamic hotel name:", error);
+    document.getElementById("your-hotel-table-title").textContent =
+      "Your Hotel";
+    document.getElementById("your-hotel-subtitle").textContent =
+      "Displaying data for your property";
+  }
 }
 
-// --- NEW: Function to fetch and display the last refresh time ---
 async function fetchAndDisplayLastRefreshTime() {
   const timestampEl = document.getElementById("data-timestamp");
   try {
     const response = await fetch("/api/last-refresh-time");
     if (!response.ok) {
-      // If the endpoint fails (e.g., 404), just use the current time as a fallback
       throw new Error("Could not fetch refresh time.");
     }
     const data = await response.json();
     const lastRefreshDate = new Date(data.last_successful_run);
 
-    // Format for Poland's timezone
     const formattedDate = lastRefreshDate.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "long",
@@ -487,7 +540,6 @@ async function fetchAndDisplayLastRefreshTime() {
     timestampEl.textContent = `Data updated on ${formattedDate} at ${formattedTime}`;
   } catch (error) {
     console.error("Failed to display last refresh time:", error);
-    // Fallback to current time if there's an error
     const now = new Date();
     const formattedDate = now.toLocaleDateString("en-GB", {
       day: "numeric",
@@ -503,9 +555,25 @@ async function fetchAndDisplayLastRefreshTime() {
   }
 }
 
+function formatDateForInput(date) {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 // --- INITIALIZE ---
-document.addEventListener("DOMContentLoaded", () => {
-  // Dropdown click handling
+document.addEventListener("DOMContentLoaded", async () => {
+  const startDateInput = document.getElementById("start-date");
+  const endDateInput = document.getElementById("end-date");
+  const runBtn = document.getElementById("run-btn");
+  const loadingOverlay = document.getElementById("loading-overlay");
+
+  loadingOverlay.classList.remove("hidden"); // Show loader immediately
+
+  await fetchAndSetDisplayNames();
+  await fetchAndDisplayLastRefreshTime();
+
   function setupDropdowns() {
     document.querySelectorAll(".dropdown > button").forEach((button) => {
       button.addEventListener("click", (event) => {
@@ -533,58 +601,94 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   setupDropdowns();
 
-  // Set default dates
-  const startDateInput = document.getElementById("start-date");
-  const endDateInput = document.getElementById("end-date");
-  const today = new Date();
-  const nextMonth = new Date();
-  nextMonth.setDate(today.getDate() + 30);
-  startDateInput.value = today.toISOString().split("T")[0];
-  endDateInput.value = nextMonth.toISOString().split("T")[0];
+  document.querySelectorAll("[data-preset]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const preset = btn.dataset.preset;
+      const today = new Date();
+      let startDate, endDate;
 
-  // Preset buttons now call the fake data loader
-  document
-    .querySelectorAll("#test-buttons .control-btn[data-period]")
-    .forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const granularity = btn.dataset.granularity;
-        const period = parseInt(btn.dataset.period, 10);
-        loadAndRenderFakeData(granularity, period);
-      });
+      if (preset === "current-month") {
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      } else if (preset === "next-month") {
+        startDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      } else {
+        // this-year
+        startDate = new Date(today.getFullYear(), 0, 1);
+        endDate = new Date(today.getFullYear(), 11, 31);
+      }
+
+      startDateInput.value = formatDateForInput(startDate);
+      endDateInput.value = formatDateForInput(endDate);
+
+      document
+        .querySelectorAll("[data-preset]")
+        .forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+
+      if (preset === "this-year") {
+        currentGranularity = "monthly";
+      } else {
+        currentGranularity = "daily";
+      }
+      document
+        .querySelectorAll("[data-granularity-toggle]")
+        .forEach((g) => g.classList.remove("active"));
+      document
+        .querySelector(`[data-granularity-toggle="${currentGranularity}"]`)
+        .classList.add("active");
+
+      loadDataFromAPI(
+        startDateInput.value,
+        endDateInput.value,
+        currentGranularity
+      );
     });
+  });
 
-  // Granularity toggles
   document.querySelectorAll("[data-granularity-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.classList.contains("active")) return;
+
       document
         .querySelectorAll("[data-granularity-toggle]")
         .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentGranularity = btn.dataset.granularityToggle;
+
+      loadDataFromAPI(
+        startDateInput.value,
+        endDateInput.value,
+        currentGranularity
+      );
     });
   });
 
-  // Main "Run" button
-  document.getElementById("run-btn").addEventListener("click", () => {
-    const startDate = startDateInput.value;
-    const endDate = endDateInput.value;
-    loadDataFromAPI(startDate, endDate, currentGranularity);
+  runBtn.addEventListener("click", () => {
+    loadDataFromAPI(
+      startDateInput.value,
+      endDateInput.value,
+      currentGranularity
+    );
   });
 
-  // KPI card clicks
+  [startDateInput, endDateInput].forEach((input) => {
+    input.addEventListener("change", () => {
+      document
+        .querySelectorAll("[data-preset]")
+        .forEach((p) => p.classList.remove("active"));
+    });
+  });
+
   document.querySelectorAll(".kpi-card").forEach((card) => {
     card.addEventListener("click", () => setActiveMetric(card.dataset.metric));
   });
 
-  // --- MODIFIED: Fetch last refresh time and remove static text ---
-  fetchAndDisplayLastRefreshTime();
-
-  document.getElementById("your-hotel-subtitle").textContent =
-    "Displaying data for Rockenue Partner Account";
   document.getElementById("market-subtitle").textContent =
     "Based on a competitive set of 5 hotels, with a total of 450 rooms in London";
 
-  // Initial dashboard load with fake data
-  loadAndRenderFakeData("daily", 30);
+  // --- Initial Load ---
+  document.querySelector('[data-preset="current-month"]').click();
   setActiveMetric("occupancy");
 });
