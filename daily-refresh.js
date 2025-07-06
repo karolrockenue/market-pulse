@@ -29,11 +29,6 @@ async function getCloudbedsAccessToken() {
 
 // Main handler for the Vercel Serverless Function
 export default async function handler(request, response) {
-  // Optional: Add a secret to verify the cron job call for security
-  // if (request.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return response.status(401).send('Unauthorized');
-  // }
-
   console.log("Starting daily data refresh job...");
   const client = new Client({ connectionString: process.env.DATABASE_URL });
 
@@ -46,15 +41,47 @@ export default async function handler(request, response) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dateToFetch = yesterday.toISOString().split("T")[0];
+    const dateForAPI = `${dateToFetch}T00:00:00.000Z`;
 
     console.log(`Fetching data for date: ${dateToFetch}`);
 
-    // This is a hypothetical API call based on the project's needs.
-    // You might need to adjust the endpoint or payload based on the actual Cloudbeds API.
+    // Define the columns we need from the Data Insights API
+    const columnsToRequest = [
+      "adr",
+      "occupancy_direct",
+      "revpar",
+      "rooms_sold",
+      "capacity_count",
+      "total_revenue",
+    ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
+
+    // Construct the correct payload for the Data Insights API
+    const insightsPayload = {
+      dataset_id: 7,
+      filters: {
+        and: [
+          {
+            cdf: { column: "stay_date" },
+            operator: "equal",
+            value: dateForAPI,
+          },
+        ],
+      },
+      columns: columnsToRequest,
+      settings: { details: true, totals: false },
+    };
+
+    // Use the correct Data Insights API endpoint
     const apiResponse = await fetch(
-      `https://api.cloudbeds.com/api/v1.1/getDailyFinancials?propertyID=${CLOUDBEDS_PROPERTY_ID}&date=${dateToFetch}`,
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-PROPERTY-ID": CLOUDBEDS_PROPERTY_ID,
+        },
+        body: JSON.stringify(insightsPayload),
       }
     );
 
@@ -66,7 +93,7 @@ export default async function handler(request, response) {
     }
 
     const apiData = await apiResponse.json();
-    if (!apiData.success || !apiData.data || apiData.data.length === 0) {
+    if (!apiData.records || Object.keys(apiData.records).length === 0) {
       console.log(
         "API returned success but with no data to process for the date."
       );
@@ -75,7 +102,7 @@ export default async function handler(request, response) {
         .json({ status: "Success", message: "No data to process." });
     }
 
-    const metricsToInsert = apiData.data[0]; // Assuming the API returns an array with one object for the day
+    const metricsToInsert = apiData.records;
 
     // --- Step 2: Connect to the database and insert/update data ---
     console.log("Connecting to database...");
@@ -99,12 +126,14 @@ export default async function handler(request, response) {
     const values = [
       CLOUDBEDS_PROPERTY_ID,
       dateToFetch,
-      metricsToInsert.adr,
-      metricsToInsert.occupancy_direct,
-      metricsToInsert.revpar,
-      metricsToInsert.rooms_sold,
-      metricsToInsert.capacity_count,
-      metricsToInsert.total_revenue,
+      metricsToInsert.adr ? metricsToInsert.adr[0] : 0,
+      metricsToInsert.occupancy_direct
+        ? metricsToInsert.occupancy_direct[0]
+        : 0,
+      metricsToInsert.revpar ? metricsToInsert.revpar[0] : 0,
+      metricsToInsert.rooms_sold ? metricsToInsert.rooms_sold[0] : 0,
+      metricsToInsert.capacity_count ? metricsToInsert.capacity_count[0] : 0,
+      metricsToInsert.total_revenue ? metricsToInsert.total_revenue[0] : 0,
     ];
 
     await client.query(insertQuery, values);
