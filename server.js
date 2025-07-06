@@ -103,6 +103,29 @@ app.get("/api/hotel-details-from-db", async (req, res) => {
   }
 });
 
+// --- NEW: Endpoint to get the last successful cron job run time ---
+app.get("/api/last-refresh-time", async (req, res) => {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  try {
+    await client.connect();
+    const query =
+      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'";
+    const result = await client.query(query);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Last refresh time not found." });
+    }
+    // The value is stored as JSONB, so we access the timestamp property
+    const timestamp = result.rows[0].value.timestamp;
+    res.json({ last_successful_run: timestamp });
+  } catch (error) {
+    console.error("Error in /api/last-refresh-time:", error);
+    res.status(500).json({ error: "Failed to fetch last refresh time" });
+  } finally {
+    if (client) await client.end();
+  }
+});
+// --- END NEW ---
+
 // Endpoint to get metrics from DB
 app.get("/api/metrics-from-db", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });

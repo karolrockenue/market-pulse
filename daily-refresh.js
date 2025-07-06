@@ -162,7 +162,6 @@ module.exports = async (request, response) => {
     }
 
     const apiData = await apiResponse.json();
-    // MODIFIED: Use the new robust aggregation function
     const processedData = aggregateForecastData(apiData);
     const datesToUpdate = Object.keys(processedData);
 
@@ -209,6 +208,20 @@ module.exports = async (request, response) => {
     }
 
     console.log("Database forecast update complete.");
+
+    // --- NEW: Record the successful run timestamp ---
+    const updateTimestampQuery = `
+      INSERT INTO system_state (key, value)
+      VALUES ('last_successful_refresh', $1)
+      ON CONFLICT (key) DO UPDATE SET
+        value = EXCLUDED.value;
+    `;
+    const timestampValue = JSON.stringify({
+      timestamp: new Date().toISOString(),
+    });
+    await client.query(updateTimestampQuery, [timestampValue]);
+    console.log("Successfully updated the last refresh timestamp.");
+    // --- END NEW ---
 
     response
       .status(200)
