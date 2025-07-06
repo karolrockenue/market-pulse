@@ -27,29 +27,47 @@ async function getCloudbedsAccessToken() {
   return tokenData.access_token;
 }
 
-// NEW: Helper function to ensure we only save valid numbers to the DB
+// Helper function to ensure we only save valid numbers to the DB
 const sanitizeMetric = (metric) => {
   const num = parseFloat(metric);
   return isNaN(num) ? 0 : num;
 };
 
+// NEW: Helper function to process the multi-day response from the API
+function processApiData(data) {
+  const processed = {};
+  if (!data.index || !data.records) return processed;
+
+  for (let i = 0; i < data.index.length; i++) {
+    const date = data.index[i][0].split("T")[0];
+    processed[date] = {};
+    for (const metric in data.records) {
+      processed[date][metric] = data.records[metric][i];
+    }
+  }
+  return processed;
+}
+
 // Main handler for the Vercel Serverless Function
 module.exports = async (request, response) => {
-  console.log("Starting daily data refresh job...");
+  // MODIFIED: Updated log message for new functionality
+  console.log("Starting daily FORECAST refresh job...");
   const client = new Client({ connectionString: process.env.DATABASE_URL });
 
   try {
-    // --- Step 1: Fetch latest metrics from Cloudbeds for yesterday ---
+    // --- Step 1: Fetch latest metrics from Cloudbeds for the next 365 days ---
     console.log("Fetching access token...");
     const accessToken = await getCloudbedsAccessToken();
     const { CLOUDBEDS_PROPERTY_ID } = process.env;
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateToFetch = yesterday.toISOString().split("T")[0];
-    const dateForAPI = `${dateToFetch}T00:00:00.000Z`;
+    // MODIFIED: Calculate date range from today to +365 days
+    const today = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + 365);
+    const startDate = today.toISOString().split("T")[0];
+    const endDate = futureDate.toISOString().split("T")[0];
 
-    console.log(`Fetching data for date: ${dateToFetch}`);
+    console.log(`Fetching forecast data from ${startDate} to ${endDate}`);
 
     const columnsToRequest = [
       "adr",
@@ -60,6 +78,7 @@ module.exports = async (request, response) => {
       "total_revenue",
     ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
+    // MODIFIED: Update payload to fetch a date range
     const insightsPayload = {
       property_ids: [parseInt(CLOUDBEDS_PROPERTY_ID)],
       dataset_id: 7,
@@ -67,8 +86,13 @@ module.exports = async (request, response) => {
         and: [
           {
             cdf: { column: "stay_date" },
-            operator: "equals",
-            value: dateForAPI,
+            operator: "greater_than_or_equal",
+            value: `${startDate}T00:00:00.000Z`,
+          },
+          {
+            cdf: { column: "stay_date" },
+            operator: "less_than_or_equal",
+            value: `${endDate}T00:00:00.000Z`,
           },
         ],
       },
@@ -98,19 +122,20 @@ module.exports = async (request, response) => {
     }
 
     const apiData = await apiResponse.json();
-    if (!apiData.records || Object.keys(apiData.records).length === 0) {
-      console.log(
-        "API returned success but with no data to process for the date."
-      );
+    const processedData = processApiData(apiData);
+    const datesToUpdate = Object.keys(processedData);
+
+    if (datesToUpdate.length === 0) {
+      console.log("API returned success but with no data to process.");
       return response
         .status(200)
         .json({ status: "Success", message: "No data to process." });
     }
 
-    const metricsToInsert = apiData.records;
-
-    // --- Step 2: Connect to the database and insert/update data ---
-    console.log("Connecting to database...");
+    // --- Step 2: Connect to the database and loop through each day to update it ---
+    console.log(
+      `Connecting to database to update/insert ${datesToUpdate.length} records...`
+    );
     await client.connect();
 
     const insertQuery = `
@@ -128,23 +153,27 @@ module.exports = async (request, response) => {
         total_revenue = EXCLUDED.total_revenue;
     `;
 
-    // Use the sanitizeMetric function on all incoming data
-    const values = [
-      CLOUDBEDS_PROPERTY_ID,
-      dateToFetch,
-      sanitizeMetric(metricsToInsert.adr?.[0]),
-      sanitizeMetric(metricsToInsert.occupancy?.[0]),
-      sanitizeMetric(metricsToInsert.revpar?.[0]),
-      sanitizeMetric(metricsToInsert.rooms_sold?.[0]),
-      sanitizeMetric(metricsToInsert.capacity_count?.[0]),
-      sanitizeMetric(metricsToInsert.total_revenue?.[0]),
-    ];
+    // MODIFIED: Loop through each day returned from the API and run the query
+    for (const date of datesToUpdate) {
+      const metrics = processedData[date];
+      const values = [
+        CLOUDBEDS_PROPERTY_ID,
+        date,
+        sanitizeMetric(metrics.adr),
+        sanitizeMetric(metrics.occupancy),
+        sanitizeMetric(metrics.revpar),
+        sanitizeMetric(metrics.rooms_sold),
+        sanitizeMetric(metrics.capacity_count),
+        sanitizeMetric(metrics.total_revenue),
+      ];
+      await client.query(insertQuery, values);
+    }
 
-    await client.query(insertQuery, values);
+    console.log("Database forecast update complete.");
 
-    console.log("Database insertion/update complete.");
-
-    response.status(200).json({ status: "Success", recordsInserted: 1 });
+    response
+      .status(200)
+      .json({ status: "Success", recordsUpdated: datesToUpdate.length });
   } catch (error) {
     console.error("CRON JOB FAILED:", error);
     response.status(500).json({ status: "Failure", error: error.message });
