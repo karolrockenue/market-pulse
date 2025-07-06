@@ -429,14 +429,12 @@ function renderDashboard() {
 }
 
 // --- DATA LOADING ---
-// RENAMED: This function now clearly handles fake data for presets/initial load
 function loadAndRenderFakeData(granularity, period) {
   currentGranularity = granularity;
   const data = generateFakeData(granularity, period);
   yourHotelMetrics = data;
   marketMetrics = data;
 
-  // Update active state on preset buttons
   document
     .querySelectorAll("#test-buttons .control-btn[data-period]")
     .forEach((btn) => btn.classList.remove("active"));
@@ -450,16 +448,59 @@ function loadAndRenderFakeData(granularity, period) {
   renderDashboard();
 }
 
-// This function will be built out in the next steps
 async function loadDataFromAPI(startDate, endDate, granularity) {
   console.log("Fetching data with parameters:", {
     startDate,
     endDate,
     granularity,
   });
-  // In the next step, we will add fetch calls here.
   alert("API connection not implemented yet. Using fake data for now.");
-  loadAndRenderFakeData(granularity, 30); // Fallback to fake data
+  loadAndRenderFakeData(granularity, 30);
+}
+
+// --- NEW: Function to fetch and display the last refresh time ---
+async function fetchAndDisplayLastRefreshTime() {
+  const timestampEl = document.getElementById("data-timestamp");
+  try {
+    const response = await fetch("/api/last-refresh-time");
+    if (!response.ok) {
+      // If the endpoint fails (e.g., 404), just use the current time as a fallback
+      throw new Error("Could not fetch refresh time.");
+    }
+    const data = await response.json();
+    const lastRefreshDate = new Date(data.last_successful_run);
+
+    // Format for Poland's timezone
+    const formattedDate = lastRefreshDate.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "Europe/Warsaw",
+    });
+    const formattedTime = lastRefreshDate.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Europe/Warsaw",
+    });
+
+    timestampEl.textContent = `Data updated on ${formattedDate} at ${formattedTime}`;
+  } catch (error) {
+    console.error("Failed to display last refresh time:", error);
+    // Fallback to current time if there's an error
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const formattedTime = now.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    timestampEl.textContent = `Displaying real-time view as of ${formattedDate} at ${formattedTime}`;
+  }
 }
 
 // --- INITIALIZE ---
@@ -535,28 +576,15 @@ document.addEventListener("DOMContentLoaded", () => {
     card.addEventListener("click", () => setActiveMetric(card.dataset.metric));
   });
 
-  // Set static text
+  // --- MODIFIED: Fetch last refresh time and remove static text ---
+  fetchAndDisplayLastRefreshTime();
+
   document.getElementById("your-hotel-subtitle").textContent =
     "Displaying data for Rockenue Partner Account";
   document.getElementById("market-subtitle").textContent =
     "Based on a competitive set of 5 hotels, with a total of 450 rooms in London";
-  const now = new Date();
-  const formattedDate = now.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const formattedTime = now.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  document.getElementById(
-    "data-timestamp"
-  ).textContent = `Data updated on ${formattedDate} at ${formattedTime}`;
 
-  // --- MODIFIED: Initial dashboard load ---
-  // Load a default 30-day view on page start to ensure the dashboard is not empty
+  // Initial dashboard load with fake data
   loadAndRenderFakeData("daily", 30);
   setActiveMetric("occupancy");
 });
