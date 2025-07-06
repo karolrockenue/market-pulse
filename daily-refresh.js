@@ -1,5 +1,5 @@
-import fetch from "node-fetch";
-import { Client } from "pg";
+const fetch = require("node-fetch");
+const { Client } = require("pg");
 
 // Helper function to get a fresh Cloudbeds Access Token
 async function getCloudbedsAccessToken() {
@@ -28,7 +28,7 @@ async function getCloudbedsAccessToken() {
 }
 
 // Main handler for the Vercel Serverless Function
-export default async function handler(request, response) {
+module.exports = async (request, response) => {
   console.log("Starting daily data refresh job...");
   const client = new Client({ connectionString: process.env.DATABASE_URL });
 
@@ -150,4 +150,4 @@ export default async function handler(request, response) {
       console.log("Database connection closed.");
     }
   }
-}
+};
