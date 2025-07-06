@@ -27,6 +27,12 @@ async function getCloudbedsAccessToken() {
   return tokenData.access_token;
 }
 
+// NEW: Helper function to ensure we only save valid numbers to the DB
+const sanitizeMetric = (metric) => {
+  const num = parseFloat(metric);
+  return isNaN(num) ? 0 : num;
+};
+
 // Main handler for the Vercel Serverless Function
 module.exports = async (request, response) => {
   console.log("Starting daily data refresh job...");
@@ -45,18 +51,15 @@ module.exports = async (request, response) => {
 
     console.log(`Fetching data for date: ${dateToFetch}`);
 
-    // Define the columns we need from the Data Insights API
-    // Define the columns we need from the Data Insights API
     const columnsToRequest = [
       "adr",
-      "occupancy", // <-- Corrected from "occupancy_direct"
+      "occupancy",
       "revpar",
       "rooms_sold",
       "capacity_count",
       "total_revenue",
     ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
-    // Construct the correct payload for the Data Insights API
     const insightsPayload = {
       property_ids: [parseInt(CLOUDBEDS_PROPERTY_ID)],
       dataset_id: 7,
@@ -70,11 +73,10 @@ module.exports = async (request, response) => {
         ],
       },
       columns: columnsToRequest,
-      group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }], // <-- THE FINAL FIX
+      group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
       settings: { details: true, totals: false },
     };
 
-    // Use the correct Data Insights API endpoint
     const apiResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
       {
@@ -113,7 +115,7 @@ module.exports = async (request, response) => {
 
     const insertQuery = `
       INSERT INTO daily_metrics_snapshots (
-          hotel_id, stay_date, adr, occupancy_direct, revpar, 
+          hotel_id, stay_date, adr, occupancy_direct, revpar,
           rooms_sold, capacity_count, total_revenue
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -126,15 +128,16 @@ module.exports = async (request, response) => {
         total_revenue = EXCLUDED.total_revenue;
     `;
 
+    // Use the sanitizeMetric function on all incoming data
     const values = [
       CLOUDBEDS_PROPERTY_ID,
       dateToFetch,
-      metricsToInsert.adr ? metricsToInsert.adr[0] : 0,
-      metricsToInsert.occupancy ? metricsToInsert.occupancy[0] : 0, // <-- Corrected from metricsToInsert.occupancy_direct
-      metricsToInsert.revpar ? metricsToInsert.revpar[0] : 0,
-      metricsToInsert.rooms_sold ? metricsToInsert.rooms_sold[0] : 0,
-      metricsToInsert.capacity_count ? metricsToInsert.capacity_count[0] : 0,
-      metricsToInsert.total_revenue ? metricsToInsert.total_revenue[0] : 0,
+      sanitizeMetric(metricsToInsert.adr?.[0]),
+      sanitizeMetric(metricsToInsert.occupancy?.[0]),
+      sanitizeMetric(metricsToInsert.revpar?.[0]),
+      sanitizeMetric(metricsToInsert.rooms_sold?.[0]),
+      sanitizeMetric(metricsToInsert.capacity_count?.[0]),
+      sanitizeMetric(metricsToInsert.total_revenue?.[0]),
     ];
 
     await client.query(insertQuery, values);
