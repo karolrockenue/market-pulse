@@ -46,9 +46,10 @@ module.exports = async (request, response) => {
     console.log(`Fetching data for date: ${dateToFetch}`);
 
     // Define the columns we need from the Data Insights API
+    // Define the columns we need from the Data Insights API
     const columnsToRequest = [
       "adr",
-      "occupancy_direct",
+      "occupancy", // <-- Corrected from "occupancy_direct"
       "revpar",
       "rooms_sold",
       "capacity_count",
@@ -128,9 +129,7 @@ module.exports = async (request, response) => {
       CLOUDBEDS_PROPERTY_ID,
       dateToFetch,
       metricsToInsert.adr ? metricsToInsert.adr[0] : 0,
-      metricsToInsert.occupancy_direct
-        ? metricsToInsert.occupancy_direct[0]
-        : 0,
+      metricsToInsert.occupancy ? metricsToInsert.occupancy[0] : 0, // <-- Corrected from metricsToInsert.occupancy_direct
       metricsToInsert.revpar ? metricsToInsert.revpar[0] : 0,
       metricsToInsert.rooms_sold ? metricsToInsert.rooms_sold[0] : 0,
       metricsToInsert.capacity_count ? metricsToInsert.capacity_count[0] : 0,
