@@ -33,34 +33,75 @@ const sanitizeMetric = (metric) => {
   return isNaN(num) ? 0 : num;
 };
 
-// NEW: Helper function to process the multi-day response from the API
-function processApiData(data) {
-  const processed = {};
-  if (!data.index || !data.records) return processed;
+// NEW: Robust aggregation logic adapted from initial-sync.js
+function aggregateForecastData(data) {
+  const aggregated = {};
+  if (!data.index || !data.records) return aggregated;
 
+  // Aggregate the raw data by SUMMING all records for each day
   for (let i = 0; i < data.index.length; i++) {
     const date = data.index[i][0].split("T")[0];
-    processed[date] = {};
-    for (const metric in data.records) {
-      processed[date][metric] = data.records[metric][i];
+
+    // Initialize the object for the date ONLY if it's the first time we see it
+    if (!aggregated[date]) {
+      aggregated[date] = {
+        rooms_sold: 0,
+        capacity_count: 0,
+        total_revenue: 0,
+        // This is a temporary sum to correctly calculate the final weighted ADR
+        total_revenue_for_adr: 0,
+      };
     }
+
+    // Sum the core metrics
+    const roomsSoldForRow = sanitizeMetric(data.records.rooms_sold?.[i]);
+    aggregated[date].rooms_sold += roomsSoldForRow;
+    aggregated[date].capacity_count += sanitizeMetric(
+      data.records.capacity_count?.[i]
+    );
+    aggregated[date].total_revenue += sanitizeMetric(
+      data.records.total_revenue?.[i]
+    );
+    // To calculate a correct weighted ADR, we need to sum the (ADR * Rooms Sold) for each row
+    aggregated[date].total_revenue_for_adr +=
+      sanitizeMetric(data.records.adr?.[i]) * roomsSoldForRow;
   }
-  return processed;
+
+  // Perform final calculations on the aggregated data for each day
+  for (const date in aggregated) {
+    const dayData = aggregated[date];
+
+    // Calculate the final weighted ADR
+    if (dayData.rooms_sold > 0) {
+      dayData.adr = dayData.total_revenue_for_adr / dayData.rooms_sold;
+    } else {
+      dayData.adr = 0;
+    }
+
+    // Calculate Occupancy
+    if (dayData.capacity_count > 0) {
+      dayData.occupancy = dayData.rooms_sold / dayData.capacity_count;
+    } else {
+      dayData.occupancy = 0;
+    }
+
+    // Calculate RevPAR from the newly calculated metrics
+    dayData.revpar = dayData.adr * dayData.occupancy;
+  }
+
+  return aggregated;
 }
 
 // Main handler for the Vercel Serverless Function
 module.exports = async (request, response) => {
-  // MODIFIED: Updated log message for new functionality
   console.log("Starting daily FORECAST refresh job...");
   const client = new Client({ connectionString: process.env.DATABASE_URL });
 
   try {
-    // --- Step 1: Fetch latest metrics from Cloudbeds for the next 365 days ---
     console.log("Fetching access token...");
     const accessToken = await getCloudbedsAccessToken();
     const { CLOUDBEDS_PROPERTY_ID } = process.env;
 
-    // MODIFIED: Calculate date range from today to +365 days
     const today = new Date();
     const futureDate = new Date();
     futureDate.setDate(today.getDate() + 365);
@@ -78,7 +119,6 @@ module.exports = async (request, response) => {
       "total_revenue",
     ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
-    // MODIFIED: Update payload to fetch a date range
     const insightsPayload = {
       property_ids: [parseInt(CLOUDBEDS_PROPERTY_ID)],
       dataset_id: 7,
@@ -122,7 +162,8 @@ module.exports = async (request, response) => {
     }
 
     const apiData = await apiResponse.json();
-    const processedData = processApiData(apiData);
+    // MODIFIED: Use the new robust aggregation function
+    const processedData = aggregateForecastData(apiData);
     const datesToUpdate = Object.keys(processedData);
 
     if (datesToUpdate.length === 0) {
@@ -132,7 +173,6 @@ module.exports = async (request, response) => {
         .json({ status: "Success", message: "No data to process." });
     }
 
-    // --- Step 2: Connect to the database and loop through each day to update it ---
     console.log(
       `Connecting to database to update/insert ${datesToUpdate.length} records...`
     );
@@ -153,7 +193,6 @@ module.exports = async (request, response) => {
         total_revenue = EXCLUDED.total_revenue;
     `;
 
-    // MODIFIED: Loop through each day returned from the API and run the query
     for (const date of datesToUpdate) {
       const metrics = processedData[date];
       const values = [
