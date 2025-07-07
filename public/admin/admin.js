@@ -55,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const endpointTestResultsEl = document.getElementById(
       "endpoint-test-results"
     );
+    const hotelsTableBody = document.getElementById("hotels-table-body");
 
     const fetchLastRefreshTime = async () => {
       try {
@@ -68,6 +69,34 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (error) {
         lastRefreshTimeEl.textContent = "Never";
         lastRefreshTimeEl.classList.add("text-yellow-600");
+      }
+    };
+
+    // NEW: Function to fetch and render all hotels
+    const fetchAndRenderHotels = async () => {
+      try {
+        const response = await fetch("/api/get-all-hotels");
+        if (!response.ok) throw new Error("Failed to fetch hotels.");
+        const hotels = await response.json();
+
+        hotelsTableBody.innerHTML = ""; // Clear existing rows
+        if (hotels.length === 0) {
+          hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No hotels found in the database.</td></tr>`;
+          return;
+        }
+
+        hotels.forEach((hotel) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
+                    <td class="px-4 py-3 font-medium text-gray-800">${hotel.property_name}</td>
+                    <td class="px-4 py-3 text-gray-600">${hotel.property_type}</td>
+                    <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
+                `;
+          hotelsTableBody.appendChild(row);
+        });
+      } catch (error) {
+        hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-600">${error.message}</td></tr>`;
       }
     };
 
@@ -111,7 +140,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    // NEW: Logic for endpoint health check
     runEndpointTestsBtn.addEventListener("click", async () => {
       runEndpointTestsBtn.disabled = true;
       runEndpointTestsBtn.textContent = "Testing...";
@@ -183,5 +211,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     fetchLastRefreshTime();
+    fetchAndRenderHotels(); // Call the new function on load
   }
 });

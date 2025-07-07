@@ -15,7 +15,7 @@ const metricConfig = {
 
 const chartColors = { primary: "#FAC35F", secondary: "#3C455B" };
 
-// --- NEW: Error Handling UI Functions ---
+// --- Error Handling UI Functions ---
 function showError(message) {
   const errorNotification = document.getElementById("error-notification");
   const errorMessage = document.getElementById("error-message");
@@ -29,7 +29,6 @@ function hideError() {
   const errorNotification = document.getElementById("error-notification");
   if (errorNotification) {
     errorNotification.classList.add("translate-x-full");
-    // Optional: fully hide after transition
     setTimeout(() => errorNotification.classList.add("hidden"), 300);
   }
 }
@@ -190,7 +189,11 @@ function renderTables() {
       <th class="px-4 py-2 font-semibold">${metricConfig[activeMetric].label} Delta</th>
   `;
 
+  // MODIFIED: Handle no data state for tables
   if (yourHotelMetrics.length === 0) {
+    const placeholderRow = `<tr><td colspan="5" class="text-center p-8 text-gray-500">No data to display for this period</td></tr>`;
+    yourTable.innerHTML = placeholderRow;
+    marketTable.innerHTML = placeholderRow;
     return;
   }
 
@@ -340,9 +343,24 @@ function getYAxisOptions(metric, dataMin, dataMax) {
 }
 
 function renderChart() {
+  const chartContainer = document.getElementById("chart-container");
+  const noDataOverlay = document.getElementById("no-data-overlay");
+
   if (comparisonChart) {
     comparisonChart.destroy();
+    comparisonChart = null;
   }
+
+  // MODIFIED: Handle no data state for the chart
+  if (yourHotelMetrics.length === 0) {
+    chartContainer.classList.add("hidden");
+    noDataOverlay.classList.remove("hidden");
+    return;
+  } else {
+    chartContainer.classList.remove("hidden");
+    noDataOverlay.classList.add("hidden");
+  }
+
   const ctx = document.getElementById("comparisonChart").getContext("2d");
 
   const isSingleDataPoint = yourHotelMetrics.length === 1;
@@ -432,7 +450,6 @@ function renderChart() {
           borderWidth: 1,
           padding: 10,
           displayColors: false,
-          // MODIFIED: Added callbacks for custom formatting
           callbacks: {
             label: function (context) {
               let label = context.dataset.label || "";
@@ -444,7 +461,6 @@ function renderChart() {
                 if (activeMetric === "occupancy") {
                   label += value.toFixed(1) + "%";
                 } else {
-                  // adr or revpar
                   label += "$" + value.toFixed(2);
                 }
               }
@@ -466,26 +482,15 @@ function renderChart() {
 
 // --- DATA LOADING ---
 async function loadDataFromAPI(startDate, endDate, granularity) {
-  const runBtn = document.getElementById("run-btn");
+  const dataDisplayWrapper = document.getElementById("data-display-wrapper");
   const loadingOverlay = document.getElementById("loading-overlay");
   const contentWrapper = document.getElementById("dashboard-content-wrapper");
 
-  hideError(); // Hide previous errors on a new data load attempt
+  hideError();
 
+  // MODIFIED: Apply loading styles
   if (!isInitialLoad) {
-    const originalBtnText = runBtn.innerHTML;
-    runBtn.disabled = true;
-    runBtn.innerHTML = `
-        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        Loading...
-      `;
-    setTimeout(() => {
-      runBtn.disabled = false;
-      runBtn.innerHTML = originalBtnText;
-    }, 500);
+    dataDisplayWrapper.classList.add("loading");
   }
 
   try {
@@ -537,6 +542,9 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
         loadingOverlay.classList.add("hidden");
       }, 500);
       isInitialLoad = false;
+    } else {
+      // MODIFIED: Remove loading styles
+      dataDisplayWrapper.classList.remove("loading");
     }
   }
 }

@@ -57,7 +57,6 @@ app.get("/api/initial-sync", async (req, res) => {
   await initialSyncHandler(req, res);
 });
 
-// NEW: Endpoint Health Check System
 app.get("/api/run-endpoint-tests", async (req, res) => {
   const endpointsToTest = [
     { name: "Cloudbeds Connection", url: "/api/test-cloudbeds", method: "GET" },
@@ -107,6 +106,23 @@ app.get("/api/run-endpoint-tests", async (req, res) => {
     }
   }
   res.json(results);
+});
+
+// NEW: Endpoint to get all hotels for the admin panel
+app.get("/api/get-all-hotels", async (req, res) => {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  try {
+    await client.connect();
+    const result = await client.query(
+      "SELECT hotel_id, property_name, property_type, city FROM hotels ORDER BY hotel_id"
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("ERROR FETCHING ALL HOTELS:", error);
+    res.status(500).json({ error: "Failed to fetch hotel list." });
+  } finally {
+    if (client) await client.end();
+  }
 });
 
 // --- Health Check Endpoints ---
