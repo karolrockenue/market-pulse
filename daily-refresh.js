@@ -1,4 +1,6 @@
-const fetch = require("node-fetch");
+// UPDATED: This robust import handles module system ambiguity.
+const _fetch = require("node-fetch");
+const fetch = _fetch.default || _fetch;
 const { Client } = require("pg");
 
 // Helper function to get a fresh Cloudbeds Access Token
@@ -209,7 +211,6 @@ module.exports = async (request, response) => {
 
     console.log("Database forecast update complete.");
 
-    // --- NEW: Record the successful run timestamp ---
     const updateTimestampQuery = `
       INSERT INTO system_state (key, value)
       VALUES ('last_successful_refresh', $1)
@@ -221,7 +222,6 @@ module.exports = async (request, response) => {
     });
     await client.query(updateTimestampQuery, [timestampValue]);
     console.log("Successfully updated the last refresh timestamp.");
-    // --- END NEW ---
 
     response
       .status(200)
