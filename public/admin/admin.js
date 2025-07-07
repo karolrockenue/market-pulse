@@ -1,4 +1,4 @@
-import { DATASET_7_MAP } from "./constants.js";
+import { DATASET_7_MAP } from "../constants.js";
 
 let currentGranularity = "daily";
 let hotelCurrencySymbol = "$"; // Default value
