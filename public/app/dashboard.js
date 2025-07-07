@@ -15,6 +15,25 @@ const metricConfig = {
 
 const chartColors = { primary: "#FAC35F", secondary: "#3C455B" };
 
+// --- NEW: Error Handling UI Functions ---
+function showError(message) {
+  const errorNotification = document.getElementById("error-notification");
+  const errorMessage = document.getElementById("error-message");
+  if (errorNotification && errorMessage) {
+    errorMessage.textContent = message;
+    errorNotification.classList.remove("hidden", "translate-x-full");
+  }
+}
+
+function hideError() {
+  const errorNotification = document.getElementById("error-notification");
+  if (errorNotification) {
+    errorNotification.classList.add("translate-x-full");
+    // Optional: fully hide after transition
+    setTimeout(() => errorNotification.classList.add("hidden"), 300);
+  }
+}
+
 // --- DATA PROCESSING ---
 function processAndMergeData(yourData, marketData) {
   const dataMap = new Map();
@@ -413,6 +432,25 @@ function renderChart() {
           borderWidth: 1,
           padding: 10,
           displayColors: false,
+          // MODIFIED: Added callbacks for custom formatting
+          callbacks: {
+            label: function (context) {
+              let label = context.dataset.label || "";
+              if (label) {
+                label += ": ";
+              }
+              if (context.parsed.y !== null) {
+                const value = context.parsed.y;
+                if (activeMetric === "occupancy") {
+                  label += value.toFixed(1) + "%";
+                } else {
+                  // adr or revpar
+                  label += "$" + value.toFixed(2);
+                }
+              }
+              return label;
+            },
+          },
         },
       },
       interaction: { intersect: false, mode: "index" },
@@ -432,7 +470,8 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
   const loadingOverlay = document.getElementById("loading-overlay");
   const contentWrapper = document.getElementById("dashboard-content-wrapper");
 
-  // Only show the button spinner for non-initial loads
+  hideError(); // Hide previous errors on a new data load attempt
+
   if (!isInitialLoad) {
     const originalBtnText = runBtn.innerHTML;
     runBtn.disabled = true;
@@ -443,7 +482,6 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
         </svg>
         Loading...
       `;
-    // Restore button in the finally block for this case
     setTimeout(() => {
       runBtn.disabled = false;
       runBtn.innerHTML = originalBtnText;
@@ -478,18 +516,26 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
     yourHotelMetrics = processedData;
     marketMetrics = processedData;
 
+    const marketSubtitleEl = document.getElementById("market-subtitle");
+    if (marketData.competitorCount > 0 && marketData.totalCapacity > 0) {
+      marketSubtitleEl.textContent = `Based on a competitive set of ${marketData.competitorCount} hotels, with a total of ${marketData.totalCapacity} rooms in your market.`;
+    } else {
+      marketSubtitleEl.textContent =
+        "No competitor data available for this period.";
+    }
+
     renderTables();
     renderChart();
   } catch (error) {
     console.error("Error loading data:", error);
-    alert(`An error occurred while loading data: ${error.message}`);
+    showError(`Could not load dashboard data. ${error.message}`);
   } finally {
     if (isInitialLoad) {
       loadingOverlay.style.opacity = "0";
       contentWrapper.style.opacity = "1";
       setTimeout(() => {
         loadingOverlay.classList.add("hidden");
-      }, 500); // Wait for fade out to complete before hiding
+      }, 500);
       isInitialLoad = false;
     }
   }
@@ -568,8 +614,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const endDateInput = document.getElementById("end-date");
   const runBtn = document.getElementById("run-btn");
   const loadingOverlay = document.getElementById("loading-overlay");
+  const closeErrorBtn = document.getElementById("close-error-btn");
 
-  loadingOverlay.classList.remove("hidden"); // Show loader immediately
+  if (closeErrorBtn) {
+    closeErrorBtn.addEventListener("click", hideError);
+  }
+
+  loadingOverlay.classList.remove("hidden");
 
   await fetchAndSetDisplayNames();
   await fetchAndDisplayLastRefreshTime();
@@ -614,7 +665,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         startDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
         endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
       } else {
-        // this-year
         startDate = new Date(today.getFullYear(), 0, 1);
         endDate = new Date(today.getFullYear(), 11, 31);
       }
@@ -684,9 +734,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll(".kpi-card").forEach((card) => {
     card.addEventListener("click", () => setActiveMetric(card.dataset.metric));
   });
-
-  document.getElementById("market-subtitle").textContent =
-    "Based on a competitive set of 5 hotels, with a total of 450 rooms in London";
 
   // --- Initial Load ---
   document.querySelector('[data-preset="current-month"]').click();

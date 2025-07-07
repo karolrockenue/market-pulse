@@ -165,11 +165,12 @@
     </style>
   </head>
   <body class="antialiased">
-    <div class="flex min-h-screen">
-      <!-- Sidebar -->
-      <aside class="sidebar w-64 flex-shrink-0 flex flex-col">
+    <!-- MODIFIED: Changed flex-direction for responsive layout -->
+    <div class="flex flex-col lg:flex-row min-h-screen">
+      <!-- MODIFIED: Adjusted width for responsive layout -->
+      <aside class="sidebar w-full lg:w-64 lg:flex-shrink-0 flex flex-col">
         <div
-          class="h-16 flex items-center px-6 border-b border-[var(--border-color)]"
+          class="h-16 flex items-center px-6 border-b lg:border-b-0 border-r-0 lg:border-r border-[var(--border-color)]"
         >
           <svg
             class="h-8 w-auto brand-text"
@@ -237,12 +238,15 @@
 
       <!-- Main Content -->
       <div class="flex-1 flex flex-col">
-        <!-- Redesigned Header -->
+        <!-- MODIFIED: Header adjusted for responsive layout -->
         <header
-          class="header h-16 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-20"
+          class="header h-auto md:h-16 flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 flex-shrink-0 sticky top-0 z-20"
         >
-          <h1 class="text-xl font-semibold text-gray-800">Dashboard</h1>
-          <div class="flex items-center gap-6">
+          <h1 class="text-xl font-semibold text-gray-800 mb-4 md:mb-0">
+            Dashboard
+          </h1>
+          <!-- MODIFIED: Added flex-wrap for smaller screens -->
+          <div class="flex items-center flex-wrap gap-4 md:gap-6">
             <!-- Data Freshness -->
             <div class="flex items-center gap-2">
               <div class="relative flex h-3 w-3">
@@ -340,7 +344,30 @@
           </div>
         </header>
 
-        <main class="flex-1 p-8 relative">
+        <main class="flex-1 p-4 md:p-8 relative">
+          <!-- Error Notification Bar -->
+          <div
+            id="error-notification"
+            class="hidden fixed top-20 right-8 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center transition-transform duration-300 transform translate-x-full"
+          >
+            <svg
+              class="fill-current h-6 w-6 text-red-500 mr-4"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+            >
+              <path
+                d="M12.432 0c1.34 0 2.01 1.29 1.207 2.468L7.12 12.03a.998.998 0 01-1.414.001L.293 6.468A1.5 1.5 0 012.414 4.5L6.414 8.5l4.293-4.293a1 1 0 011.414 0z"
+              />
+            </svg>
+            <span id="error-message" class="font-medium"></span>
+            <button
+              id="close-error-btn"
+              class="ml-6 font-bold text-xl text-red-700 hover:text-red-900"
+            >
+              &times;
+            </button>
+          </div>
+
           <div
             id="loading-overlay"
             class="absolute inset-0 bg-white/70 z-30 flex items-center justify-center"
@@ -438,6 +465,7 @@
             </div>
 
             <!-- KPI Cards -->
+            <!-- MODIFIED: This grid is already responsive, no changes needed -->
             <div
               id="kpi-card-container"
               class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
@@ -540,6 +568,7 @@
             </div>
 
             <!-- Data Tables -->
+            <!-- MODIFIED: This grid is already responsive, no changes needed -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div>
                 <div class="flex justify-between items-center mb-4">
@@ -552,7 +581,7 @@
                   id="your-hotel-subtitle"
                   class="text-sm text-gray-500 -mt-2 mb-4"
                 ></p>
-                <div class="table-container rounded-lg">
+                <div class="table-container rounded-lg overflow-x-auto">
                   <table class="w-full text-sm text-gray-600">
                     <thead class="bg-gray-50 sticky top-0">
                       <tr
@@ -575,7 +604,7 @@
                   id="market-subtitle"
                   class="text-sm text-gray-500 -mt-2 mb-4"
                 ></p>
-                <div class="table-container rounded-lg">
+                <div class="table-container rounded-lg overflow-x-auto">
                   <table class="w-full text-sm text-gray-600">
                     <thead class="bg-gray-50 sticky top-0">
                       <tr
