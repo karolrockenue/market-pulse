@@ -3,106 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Panel | Market Pulse</title>
-
-    <!-- Tailwind CSS for styling -->
+    <title>Market Pulse - Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Google Fonts: Inter & Manrope -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-
     <style>
-      :root {
-        --bg-primary: #f7f8fc;
-        --bg-secondary: #ffffff;
-        --text-primary: #1e293b;
-        --text-secondary: #64748b;
-        --border-color: #e2e8f0;
-        --accent-primary: #60a5fa;
-        --highlight-color: #eff6ff;
-        --font-sans: "Inter", sans-serif;
-        --font-data: "Manrope", sans-serif;
-      }
       body {
-        font-family: var(--font-sans);
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
-      }
-      .sidebar {
-        background-color: var(--bg-secondary);
-        border-right: 1px solid var(--border-color);
-      }
-      .header {
-        background-color: var(--bg-secondary);
-        border-bottom: 1px solid var(--border-color);
-      }
-      .brand-text {
-        color: var(--accent-primary);
-      }
-      .font-data {
-        font-family: var(--font-data);
-      }
-      .login-wrapper {
-        max-width: 420px;
-        margin: 5rem auto;
-        padding: 3rem;
-        background-color: var(--bg-secondary);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-color);
-      }
-      .action-btn {
-        background-color: #f97316; /* Orange */
-      }
-      .action-btn:hover {
-        background-color: #ea580c;
-      }
-      .action-btn:disabled {
-        background-color: #94a3b8;
-        cursor: not-allowed;
-      }
-      .health-btn {
-        background-color: #6366f1; /* Indigo */
-      }
-      .health-btn:hover {
-        background-color: #4f46e5;
-      }
-      .sync-btn {
-        background-color: #ef4444; /* Red */
-      }
-      .sync-btn:hover {
-        background-color: #dc2626;
-      }
-      .status-dot {
-        height: 10px;
-        width: 10px;
-        border-radius: 50%;
-        display: inline-block;
-      }
-      .status-dot.grey {
-        background-color: #94a3b8;
-      }
-      .status-dot.green {
-        background-color: #22c55e;
-      }
-      .status-dot.red {
-        background-color: #ef4444;
+        font-family: "Inter", sans-serif;
+        background-color: #f7f8fc;
       }
     </style>
   </head>
   <body class="antialiased">
     <div class="flex min-h-screen">
       <!-- Sidebar -->
-      <aside class="sidebar w-64 flex-shrink-0 flex flex-col">
-        <div
-          class="h-16 flex items-center px-6 border-b border-[var(--border-color)]"
-        >
+      <aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r">
+        <div class="h-16 flex items-center px-6 border-b">
           <svg
-            class="h-8 w-auto brand-text"
+            class="h-8 w-auto text-blue-500"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -117,7 +39,6 @@
           <span class="ml-3 text-lg font-bold text-gray-800">Market Pulse</span>
         </div>
         <nav class="flex-1 px-4 py-4 space-y-1">
-          <!-- Dashboard Link (Inactive) -->
           <a
             href="/app/"
             class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
@@ -137,7 +58,6 @@
             </svg>
             Dashboard
           </a>
-          <!-- Admin Link (Active) -->
           <a
             href="/admin/"
             class="flex items-center px-4 py-2.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-lg"
@@ -167,173 +87,165 @@
 
       <!-- Main Content -->
       <div class="flex-1 flex flex-col">
-        <!-- Header -->
-        <header
-          class="header h-16 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-20"
-        >
+        <header class="bg-white h-16 flex items-center justify-between px-8">
           <h1 class="text-xl font-semibold text-gray-800">Admin Panel</h1>
         </header>
 
-        <!-- Main content area for admin tools -->
         <main class="flex-1 p-8">
-          <!-- Login Form Container -->
-          <div id="login-container" class="login-wrapper">
-            <h2 class="text-2xl font-bold text-center text-slate-800">
-              Admin Login
-            </h2>
-            <form id="login-form" class="mt-6">
-              <input
-                type="password"
-                id="password-input"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                placeholder="Enter password"
-                required
-              />
-              <button
-                type="submit"
-                class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              >
-                Login
-              </button>
-            </form>
-            <p
-              id="login-error"
-              class="mt-4 text-center text-sm text-red-600"
-              style="display: none"
+          <!-- Login Form -->
+          <div id="login-form" class="max-w-md mx-auto mt-10">
+            <div
+              class="bg-white p-8 rounded-xl border border-gray-200 shadow-sm"
             >
-              Incorrect password.
-            </p>
+              <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
+                Admin Access
+              </h2>
+              <div class="space-y-4">
+                <div>
+                  <label
+                    for="password"
+                    class="text-sm font-medium text-gray-700"
+                    >Password</label
+                  >
+                  <input
+                    type="password"
+                    id="password"
+                    class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <button
+                  id="login-btn"
+                  class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Log In
+                </button>
+                <p
+                  id="login-error"
+                  class="text-sm text-red-600 text-center"
+                ></p>
+              </div>
+            </div>
           </div>
 
-          <!-- Main Admin Content (initially hidden) -->
-          <div id="main-content" class="space-y-8" style="display: none">
-            <!-- System Health Section -->
-            <div
-              class="bg-white p-6 rounded-xl border border-[var(--border-color)]"
-            >
-              <h2
-                class="text-lg font-semibold text-slate-800 border-b pb-4 mb-4"
-              >
+          <!-- Admin Content (hidden by default) -->
+          <div id="admin-content" class="hidden space-y-8">
+            <!-- System Health -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">
                 System Health
-              </h2>
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Last Refresh Status -->
-                <div class="flex items-center gap-4">
-                  <span class="status-dot grey" id="last-refresh-dot"></span>
-                  <div>
-                    <p class="font-medium text-slate-700">
-                      Last Successful Refresh
-                    </p>
-                    <p id="last-refresh-status" class="text-sm text-slate-500">
-                      Checking...
-                    </p>
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Last Refresh -->
+                <div>
+                  <h4 class="text-sm font-medium text-gray-500">
+                    Last Data Refresh
+                  </h4>
+                  <p
+                    id="last-refresh-time"
+                    class="text-2xl font-bold text-gray-800 mt-1"
+                  >
+                    Loading...
+                  </p>
+                </div>
+                <!-- Cloudbeds API -->
+                <div>
+                  <h4 class="text-sm font-medium text-gray-500">
+                    Cloudbeds API Status
+                  </h4>
+                  <div class="flex items-center mt-2">
+                    <button
+                      id="test-cloudbeds-btn"
+                      class="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    >
+                      Test Connection
+                    </button>
+                    <p
+                      id="cloudbeds-status"
+                      class="ml-4 text-sm font-semibold"
+                    ></p>
                   </div>
                 </div>
-                <!-- Cloudbeds API Status -->
-                <div class="flex items-center gap-4">
-                  <span class="status-dot grey" id="cloudbeds-api-dot"></span>
-                  <div>
-                    <p class="font-medium text-slate-700">Cloudbeds API</p>
-                    <p id="cloudbeds-api-status" class="text-sm text-slate-500">
-                      Untested
-                    </p>
+                <!-- Database -->
+                <div>
+                  <h4 class="text-sm font-medium text-gray-500">
+                    Database Status
+                  </h4>
+                  <div class="flex items-center mt-2">
+                    <button
+                      id="test-db-btn"
+                      class="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    >
+                      Test Connection
+                    </button>
+                    <p id="db-status" class="ml-4 text-sm font-semibold"></p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Manual Action Triggers -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                Manual Action Triggers
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 class="font-semibold text-gray-700">
+                    Daily Forecast Refresh
+                  </h4>
+                  <p class="text-sm text-gray-500 mt-1 mb-3">
+                    Manually run the job that updates the next 365 days of
+                    forecast data.
+                  </p>
                   <button
-                    id="btn-test-cloudbeds"
-                    class="health-btn ml-auto text-sm font-semibold rounded-md py-1.5 px-3"
+                    id="run-daily-refresh-btn"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition"
                   >
-                    Test
+                    Run Job
                   </button>
                 </div>
-                <!-- Database Status -->
-                <div class="flex items-center gap-4">
-                  <span class="status-dot grey" id="database-dot"></span>
-                  <div>
-                    <p class="font-medium text-slate-700">
-                      Database Connection
-                    </p>
-                    <p id="database-status" class="text-sm text-slate-500">
-                      Untested
-                    </p>
-                  </div>
+                <div>
+                  <h4 class="font-semibold text-gray-700">
+                    Full Initial Data Sync
+                  </h4>
+                  <p class="text-sm text-gray-500 mt-1 mb-3">
+                    Wipe and re-sync all historical and forecast data. Use with
+                    caution.
+                  </p>
                   <button
-                    id="btn-test-database"
-                    class="health-btn ml-auto text-sm font-semibold rounded-md py-1.5 px-3"
+                    id="run-initial-sync-btn"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition"
                   >
-                    Test
+                    Run Full Sync
                   </button>
                 </div>
               </div>
             </div>
 
-            <!-- Manual Actions Section -->
-            <div
-              class="bg-white p-6 rounded-xl border border-[var(--border-color)]"
-            >
-              <h2
-                class="text-lg font-semibold text-slate-800 border-b pb-4 mb-4"
+            <!-- NEW: API Endpoint Health Check -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                API Endpoint Health Check
+              </h3>
+              <p class="text-sm text-gray-500 mb-4">
+                Click the button to run a live test against all critical API
+                endpoints. This will verify they are running and responding
+                correctly.
+              </p>
+              <button
+                id="run-endpoint-tests-btn"
+                class="px-4 py-2 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition"
               >
-                Manual Actions
-              </h2>
-              <div class="space-y-6">
-                <!-- Daily Refresh Action -->
-                <div class="flex items-center justify-between gap-6">
-                  <div>
-                    <p class="font-medium text-slate-700">
-                      Run Daily Forecast Refresh
-                    </p>
-                    <p class="text-sm text-slate-500">
-                      Manually triggers the cron job that updates the next 365
-                      days of forecast data.
-                    </p>
-                  </div>
-                  <div class="flex items-center gap-4 flex-shrink-0">
-                    <p
-                      id="daily-refresh-status"
-                      class="text-sm italic text-slate-500 w-48 text-right"
-                    ></p>
-                    <button
-                      id="btn-run-daily-refresh"
-                      class="action-btn text-sm font-semibold rounded-md py-2 px-4"
-                    >
-                      Run Job
-                    </button>
-                  </div>
-                </div>
-                <!-- Initial Sync Action -->
-                <div
-                  class="flex items-center justify-between gap-6 border-t pt-6"
-                >
-                  <div>
-                    <p class="font-medium text-slate-700">
-                      Run Full Initial Data Sync
-                    </p>
-                    <p class="text-sm text-slate-500">
-                      <span class="font-bold text-red-600">Warning:</span> This
-                      is a destructive action that re-fetches the last and next
-                      365 days of data, overwriting existing records.
-                    </p>
-                  </div>
-                  <div class="flex items-center gap-4 flex-shrink-0">
-                    <p
-                      id="initial-sync-status"
-                      class="text-sm italic text-slate-500 w-48 text-right"
-                    ></p>
-                    <button
-                      id="btn-run-initial-sync"
-                      class="sync-btn text-sm font-semibold rounded-md py-2 px-4"
-                    >
-                      Run Full Sync
-                    </button>
-                  </div>
-                </div>
+                Run Endpoint Tests
+              </button>
+              <div id="endpoint-test-results" class="mt-6">
+                <!-- Results will be injected here by JavaScript -->
               </div>
             </div>
           </div>
         </main>
       </div>
     </div>
-
     <script src="admin.js" type="module"></script>
   </body>
 </html>

@@ -1,15 +1,20 @@
+import { DATASET_7_MAP } from "../constants.js";
+
 document.addEventListener("DOMContentLoaded", () => {
-  const loginContainer = document.getElementById("login-container");
-  const mainContent = document.getElementById("main-content");
   const loginForm = document.getElementById("login-form");
-  const passwordInput = document.getElementById("password-input");
+  const adminContent = document.getElementById("admin-content");
+  const passwordInput = document.getElementById("password");
+  const loginBtn = document.getElementById("login-btn");
   const loginError = document.getElementById("login-error");
 
-  // Handle the login form submission
-  loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    loginError.style.display = "none";
+  // Check if user is already logged in from a previous session
+  if (sessionStorage.getItem("isAdminAuthenticated") === "true") {
+    showAdminContent();
+  }
+
+  loginBtn.addEventListener("click", async () => {
     const password = passwordInput.value;
+    loginError.textContent = "";
 
     try {
       const response = await fetch("/api/admin-login", {
@@ -19,183 +24,164 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       if (response.ok) {
-        loginContainer.style.display = "none";
-        mainContent.style.display = "block";
-        initializeAdminPanel();
+        sessionStorage.setItem("isAdminAuthenticated", "true");
+        showAdminContent();
       } else {
-        loginError.style.display = "block";
-        passwordInput.value = "";
-        passwordInput.focus();
+        const data = await response.json();
+        loginError.textContent = data.error || "Invalid password.";
       }
     } catch (error) {
       loginError.textContent = "An error occurred. Please try again.";
-      loginError.style.display = "block";
     }
   });
 
-  // This function contains all the code to set up the admin panel after login
+  function showAdminContent() {
+    loginForm.classList.add("hidden");
+    adminContent.classList.remove("hidden");
+    initializeAdminPanel();
+  }
+
   function initializeAdminPanel() {
-    // --- Element Selectors ---
-    const lastRefreshDot = document.getElementById("last-refresh-dot");
-    const lastRefreshStatus = document.getElementById("last-refresh-status");
-    const cloudbedsApiDot = document.getElementById("cloudbeds-api-dot");
-    const cloudbedsApiStatus = document.getElementById("cloudbeds-api-status");
-    const databaseDot = document.getElementById("database-dot");
-    const databaseStatus = document.getElementById("database-status");
-    const btnTestCloudbeds = document.getElementById("btn-test-cloudbeds");
-    const btnTestDatabase = document.getElementById("btn-test-database");
-    const btnRunDailyRefresh = document.getElementById("btn-run-daily-refresh");
-    const dailyRefreshStatus = document.getElementById("daily-refresh-status");
-    const btnRunInitialSync = document.getElementById("btn-run-initial-sync");
-    const initialSyncStatus = document.getElementById("initial-sync-status");
+    const lastRefreshTimeEl = document.getElementById("last-refresh-time");
+    const testCloudbedsBtn = document.getElementById("test-cloudbeds-btn");
+    const cloudbedsStatusEl = document.getElementById("cloudbeds-status");
+    const testDbBtn = document.getElementById("test-db-btn");
+    const dbStatusEl = document.getElementById("db-status");
+    const runDailyRefreshBtn = document.getElementById("run-daily-refresh-btn");
+    const runInitialSyncBtn = document.getElementById("run-initial-sync-btn");
+    const runEndpointTestsBtn = document.getElementById(
+      "run-endpoint-tests-btn"
+    );
+    const endpointTestResultsEl = document.getElementById(
+      "endpoint-test-results"
+    );
 
-    // --- Helper function to update status UI ---
-    const updateStatus = (dotEl, statusEl, success, message) => {
-      dotEl.className = `status-dot ${success ? "green" : "red"}`;
-      statusEl.textContent = message;
-    };
-
-    // --- Health Check Functions ---
-    async function checkLastRefresh() {
+    const fetchLastRefreshTime = async () => {
       try {
         const response = await fetch("/api/last-refresh-time");
-        if (!response.ok) throw new Error("Could not fetch refresh time.");
+        if (!response.ok) throw new Error("Not found");
         const data = await response.json();
-        const lastRefreshDate = new Date(data.last_successful_run);
-        const now = new Date();
-        const diffHours = (now - lastRefreshDate) / (1000 * 60 * 60);
-
-        const formattedTime = lastRefreshDate.toLocaleTimeString("en-GB", {
-          hour: "2-digit",
-          minute: "2-digit",
+        const date = new Date(data.last_successful_run);
+        lastRefreshTimeEl.textContent = date.toLocaleString("en-GB", {
           timeZone: "Europe/Warsaw",
         });
-        const formattedDate = lastRefreshDate.toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          timeZone: "Europe/Warsaw",
-        });
-
-        updateStatus(
-          lastRefreshDot,
-          lastRefreshStatus,
-          diffHours <= 26,
-          `Last run: ${formattedDate} at ${formattedTime}`
-        );
       } catch (error) {
-        updateStatus(
-          lastRefreshDot,
-          lastRefreshStatus,
-          false,
-          "Never or failed"
-        );
+        lastRefreshTimeEl.textContent = "Never";
+        lastRefreshTimeEl.classList.add("text-yellow-600");
       }
-    }
+    };
 
-    async function testCloudbeds() {
-      updateStatus(cloudbedsApiDot, cloudbedsApiStatus, null, "Testing...");
-      btnTestCloudbeds.disabled = true;
+    const testConnection = async (url, statusEl) => {
+      statusEl.textContent = "Testing...";
+      statusEl.className = "ml-4 text-sm font-semibold text-gray-500";
       try {
-        const response = await fetch("/api/test-cloudbeds");
-        if (!response.ok) throw new Error("API test failed");
-        updateStatus(
-          cloudbedsApiDot,
-          cloudbedsApiStatus,
-          true,
-          "Connection OK"
-        );
+        const response = await fetch(url);
+        if (response.ok) {
+          statusEl.textContent = "✅ Connected";
+          statusEl.className = "ml-4 text-sm font-semibold text-green-600";
+        } else {
+          const data = await response.json();
+          statusEl.textContent = `❌ Error: ${response.status}`;
+          statusEl.className = "ml-4 text-sm font-semibold text-red-600";
+        }
       } catch (error) {
-        updateStatus(
-          cloudbedsApiDot,
-          cloudbedsApiStatus,
-          false,
-          "Connection Failed"
-        );
-      } finally {
-        btnTestCloudbeds.disabled = false;
+        statusEl.textContent = "❌ Failed";
+        statusEl.className = "ml-4 text-sm font-semibold text-red-600";
       }
-    }
+    };
 
-    async function testDatabase() {
-      updateStatus(databaseDot, databaseStatus, null, "Testing...");
-      btnTestDatabase.disabled = true;
+    const runJob = async (url, btn) => {
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Running...";
       try {
-        const response = await fetch("/api/test-database");
-        if (!response.ok) throw new Error("DB test failed");
-        updateStatus(databaseDot, databaseStatus, true, "Connection OK");
+        const response = await fetch(url);
+        if (response.ok) {
+          alert("Job completed successfully!");
+          fetchLastRefreshTime(); // Refresh the timestamp
+        } else {
+          const data = await response.json();
+          alert(`Job failed: ${data.error || "Unknown error"}`);
+        }
       } catch (error) {
-        updateStatus(databaseDot, databaseStatus, false, "Connection Failed");
+        alert(`Job failed to start: ${error.message}`);
       } finally {
-        btnTestDatabase.disabled = false;
+        btn.disabled = false;
+        btn.textContent = originalText;
       }
-    }
+    };
 
-    // --- Manual Action Functions ---
-    async function runDailyRefresh() {
-      btnRunDailyRefresh.disabled = true;
-      btnRunDailyRefresh.textContent = "Running...";
-      dailyRefreshStatus.textContent = "Job started...";
-      dailyRefreshStatus.className =
-        "text-sm italic text-slate-500 w-48 text-right";
+    // NEW: Logic for endpoint health check
+    runEndpointTestsBtn.addEventListener("click", async () => {
+      runEndpointTestsBtn.disabled = true;
+      runEndpointTestsBtn.textContent = "Testing...";
+      endpointTestResultsEl.innerHTML = `<div class="text-center p-4 text-gray-500">Running tests, please wait...</div>`;
 
       try {
-        const response = await fetch("/api/daily-refresh");
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Unknown error");
-        dailyRefreshStatus.textContent = `Success: ${
-          result.recordsUpdated || 0
-        } records updated.`;
-        dailyRefreshStatus.classList.add("text-green-600");
-        checkLastRefresh(); // Re-check the status after a successful run
+        const response = await fetch("/api/run-endpoint-tests");
+        const results = await response.json();
+        renderTestResults(results);
       } catch (error) {
-        dailyRefreshStatus.textContent = `Error: ${error.message}`;
-        dailyRefreshStatus.classList.add("text-red-600");
+        endpointTestResultsEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> Could not run the test suite. ${error.message}</div>`;
       } finally {
-        btnRunDailyRefresh.disabled = false;
-        btnRunDailyRefresh.textContent = "Run Job";
+        runEndpointTestsBtn.disabled = false;
+        runEndpointTestsBtn.textContent = "Run Endpoint Tests";
       }
+    });
+
+    function renderTestResults(results) {
+      let tableHTML = `
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr class="border-b">
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+        `;
+      results.forEach((result) => {
+        const statusClass = result.ok
+          ? "bg-green-100 text-green-800"
+          : "bg-red-100 text-red-800";
+        const statusIcon = result.ok ? "✅" : "❌";
+        const statusText = result.ok ? "OK" : "FAIL";
+        tableHTML += `
+                <tr>
+                    <td class="px-4 py-3 font-medium text-gray-700">${result.name}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">
+                            ${statusIcon} ${statusText}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td>
+                </tr>
+            `;
+      });
+      tableHTML += `</tbody></table>`;
+      endpointTestResultsEl.innerHTML = tableHTML;
     }
 
-    async function runInitialSync() {
+    testCloudbedsBtn.addEventListener("click", () =>
+      testConnection("/api/test-cloudbeds", cloudbedsStatusEl)
+    );
+    testDbBtn.addEventListener("click", () =>
+      testConnection("/api/test-database", dbStatusEl)
+    );
+    runDailyRefreshBtn.addEventListener("click", () =>
+      runJob("/api/daily-refresh", runDailyRefreshBtn)
+    );
+    runInitialSyncBtn.addEventListener("click", () => {
       if (
-        !confirm(
-          "WARNING: This is a destructive action that will re-fetch and overwrite two years of data. Are you sure you want to continue?"
+        confirm(
+          "Are you sure you want to run a full data sync? This can take several minutes and will overwrite existing data."
         )
       ) {
-        return;
+        runJob("/api/initial-sync", runInitialSyncBtn);
       }
-      btnRunInitialSync.disabled = true;
-      btnRunInitialSync.textContent = "Syncing...";
-      initialSyncStatus.textContent =
-        "Sync started. This will take several minutes...";
-      initialSyncStatus.className =
-        "text-sm italic text-slate-500 w-48 text-right";
+    });
 
-      try {
-        const response = await fetch("/api/initial-sync");
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Unknown error");
-        initialSyncStatus.textContent = `Success: ${
-          result.recordsUpdated || 0
-        } records synced.`;
-        initialSyncStatus.classList.add("text-green-600");
-      } catch (error) {
-        initialSyncStatus.textContent = `Error: ${error.message}`;
-        initialSyncStatus.classList.add("text-red-600");
-      } finally {
-        btnRunInitialSync.disabled = false;
-        btnRunInitialSync.textContent = "Run Full Sync";
-      }
-    }
-
-    // --- Attach Event Listeners ---
-    btnTestCloudbeds.addEventListener("click", testCloudbeds);
-    btnTestDatabase.addEventListener("click", testDatabase);
-    btnRunDailyRefresh.addEventListener("click", runDailyRefresh);
-    btnRunInitialSync.addEventListener("click", runInitialSync);
-
-    // --- Initial Load ---
-    checkLastRefresh();
+    fetchLastRefreshTime();
   }
 });

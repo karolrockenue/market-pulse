@@ -57,6 +57,58 @@ app.get("/api/initial-sync", async (req, res) => {
   await initialSyncHandler(req, res);
 });
 
+// NEW: Endpoint Health Check System
+app.get("/api/run-endpoint-tests", async (req, res) => {
+  const endpointsToTest = [
+    { name: "Cloudbeds Connection", url: "/api/test-cloudbeds", method: "GET" },
+    { name: "Database Connection", url: "/api/test-database", method: "GET" },
+    { name: "Get Hotel Name", url: "/api/get-hotel-name", method: "GET" },
+    { name: "Get Refresh Time", url: "/api/last-refresh-time", method: "GET" },
+    {
+      name: "KPI Summary",
+      url: "/api/kpi-summary?startDate=2025-07-01&endDate=2025-07-07",
+      method: "GET",
+    },
+    {
+      name: "Your Hotel Metrics",
+      url: "/api/metrics-from-db?startDate=2025-07-01&endDate=2025-07-07&granularity=daily",
+      method: "GET",
+    },
+    {
+      name: "Market Metrics",
+      url: "/api/competitor-metrics?startDate=2025-07-01&endDate=2025-07-07&granularity=daily",
+      method: "GET",
+    },
+  ];
+
+  const results = [];
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+  for (const endpoint of endpointsToTest) {
+    try {
+      const response = await fetch(baseUrl + endpoint.url, {
+        method: endpoint.method,
+      });
+      results.push({
+        name: endpoint.name,
+        url: endpoint.url,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+    } catch (error) {
+      results.push({
+        name: endpoint.name,
+        url: endpoint.url,
+        status: "N/A",
+        statusText: error.message,
+        ok: false,
+      });
+    }
+  }
+  res.json(results);
+});
+
 // --- Health Check Endpoints ---
 app.get("/api/test-cloudbeds", async (req, res) => {
   try {
@@ -85,7 +137,6 @@ app.get("/api/test-database", async (req, res) => {
 });
 
 // --- Main Application Endpoints ---
-// CORRECTED: Renamed this endpoint to match the frontend request
 app.get("/api/get-hotel-name", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
@@ -100,7 +151,7 @@ app.get("/api/get-hotel-name", async (req, res) => {
 
     res.json({ hotelName: result.rows[0].property_name });
   } catch (error) {
-    console.error("ERROR FETCHING HOTEL NAME:", error); // Add this line
+    console.error("ERROR FETCHING HOTEL NAME:", error);
     res.status(500).json({ error: "Failed to fetch hotel details" });
   } finally {
     if (client) await client.end();
