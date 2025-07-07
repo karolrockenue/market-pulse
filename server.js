@@ -91,15 +91,16 @@ app.get("/api/get-hotel-name", async (req, res) => {
   const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-    const query = "SELECT name FROM hotels WHERE hotel_id = $1";
+    const query = "SELECT property_name FROM hotels WHERE hotel_id = $1";
     const result = await client.query(query, [ourHotelId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Hotel name not found." });
     }
 
-    res.json({ hotelName: result.rows[0].name });
+    res.json({ hotelName: result.rows[0].property_name });
   } catch (error) {
+    console.error("ERROR FETCHING HOTEL NAME:", error); // Add this line
     res.status(500).json({ error: "Failed to fetch hotel details" });
   } finally {
     if (client) await client.end();

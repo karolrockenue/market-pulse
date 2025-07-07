@@ -497,10 +497,10 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
 
 async function fetchAndSetDisplayNames() {
   try {
-    const response = await fetch("/api/hotel-details-from-db");
+    const response = await fetch("/api/get-hotel-name");
     if (!response.ok) throw new Error("Failed to fetch hotel details");
     const hotelData = await response.json();
-    hotelName = hotelData.property_name || "Your Hotel";
+    hotelName = hotelData.hotelName || "Your Hotel";
 
     document.getElementById("your-hotel-table-title").textContent = hotelName;
     document.getElementById("your-hotel-subtitle").textContent =
