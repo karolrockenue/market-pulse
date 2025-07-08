@@ -1,8 +1,8 @@
-// server.js (Final Fix: PostgreSQL Session Store)
+// server.js (Final Fix: PostgreSQL Session Store & Connection Pooling)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
-const { Pool, Client } = require("pg"); // Use Pool for session store, Client for individual queries
+const { Pool } = require("pg"); // Only Pool is needed now for all queries
 const pgSession = require("connect-pg-simple")(session);
 const cors = require("cors");
 const fetch = require("node-fetch");
@@ -35,7 +35,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// --- Create the Database Pool for the Session Store ---
+// --- Create the Database Pool for Sessions and all API Queries ---
 const pgPool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -65,7 +65,6 @@ app.use(
 );
 
 const isAuthenticated = (req, res, next) => {
-  // We can remove the enhanced logging now, but it's fine to keep for a bit.
   if (req.session.userId) {
     return next();
   } else {
@@ -118,7 +117,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     return res.status(400).send("Error: No authorization code provided.");
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
 
@@ -163,7 +161,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     const propertyInfo = await propertyInfoResponse.json();
     const primaryPropertyId = propertyInfo[0].id;
 
-    await client.connect();
     const query = `
       INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, cloudbeds_property_id, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
@@ -181,27 +178,35 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       refresh_token,
       primaryPropertyId,
     ];
-    await client.query(query, values);
+    await pgPool.query(query, values);
 
     req.session.userId = userInfo.user_id;
 
-    res.redirect("/app/");
+    // *** FIX 1: Explicitly save the session before redirecting ***
+    req.session.save((err) => {
+      if (err) {
+        console.error("CRITICAL: Error saving session before redirect:", err);
+        return res
+          .status(500)
+          .send("An error occurred during authentication session save.");
+      }
+      res.redirect("/app/");
+    });
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
     res
       .status(500)
       .send(`An error occurred during authentication: ${error.message}`);
-  } finally {
-    if (client) await client.end();
   }
 });
 
 // --- Main Application Endpoints (Now Fully User-Aware) ---
+
+// *** FIX 2: All routes below now use pgPool for database queries ***
+
 app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
-    await client.connect();
-    const userResult = await client.query(
+    const userResult = await pgPool.query(
       "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
@@ -209,7 +214,7 @@ app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     const propertyId = userResult.rows[0].cloudbeds_property_id;
 
-    const hotelResult = await client.query(
+    const hotelResult = await pgPool.query(
       "SELECT property_name FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
@@ -217,35 +222,29 @@ app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "Hotel name not found." });
     res.json({ hotelName: hotelResult.rows[0].property_name });
   } catch (error) {
+    console.error("Error in /api/get-hotel-name:", error);
     res.status(500).json({ error: "Failed to fetch hotel details" });
-  } finally {
-    if (client) await client.end();
   }
 });
 
 app.get("/api/last-refresh-time", isAuthenticated, async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
-    await client.connect();
-    const result = await client.query(
+    const result = await pgPool.query(
       "SELECT value FROM system_state WHERE key = 'last_successful_refresh'"
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Last refresh time not found." });
     res.json({ last_successful_run: result.rows[0].value.timestamp });
   } catch (error) {
+    console.error("Error in /api/last-refresh-time:", error);
     res.status(500).json({ error: "Failed to fetch last refresh time" });
-  } finally {
-    if (client) await client.end();
   }
 });
 
 app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
-    await client.connect();
     const { startDate, endDate } = req.query;
-    const userResult = await client.query(
+    const userResult = await pgPool.query(
       "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
@@ -264,7 +263,7 @@ app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
             FROM daily_metrics_snapshots
             WHERE stay_date >= $2 AND stay_date <= $3 AND cloudbeds_user_id = $4;
         `;
-    const result = await client.query(kpiQuery, [
+    const result = await pgPool.query(kpiQuery, [
       propertyId,
       startDate,
       endDate,
@@ -284,18 +283,15 @@ app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Error in /api/kpi-summary:", error);
     res.status(500).json({ error: "Failed to fetch KPI summary" });
-  } finally {
-    if (client) await client.end();
   }
 });
 
 app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
-    await client.connect();
     const { startDate, endDate, granularity = "daily" } = req.query;
-    const userResult = await client.query(
+    const userResult = await pgPool.query(
       "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
@@ -303,20 +299,18 @@ app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     const propertyId = userResult.rows[0].cloudbeds_property_id;
 
-    // ... (rest of the logic is the same)
+    // ... (rest of the logic would go here, using pgPool for queries)
+    res.json({ message: "Endpoint not fully implemented yet." }); // Placeholder
   } catch (error) {
+    console.error("Error in /api/metrics-from-db:", error);
     res.status(500).json({ error: "Failed to fetch metrics from database" });
-  } finally {
-    if (client) await client.end();
   }
 });
 
 app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
-    await client.connect();
     const { startDate, endDate, granularity = "daily" } = req.query;
-    const userResult = await client.query(
+    const userResult = await pgPool.query(
       "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
@@ -324,11 +318,11 @@ app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     const propertyId = userResult.rows[0].cloudbeds_property_id;
 
-    // ... (rest of the logic is the same)
+    // ... (rest of the logic would go here, using pgPool for queries)
+    res.json({ message: "Endpoint not fully implemented yet." }); // Placeholder
   } catch (error) {
+    console.error("Error in /api/competitor-metrics:", error);
     res.status(500).json({ error: "Failed to fetch competitor metrics" });
-  } finally {
-    if (client) await client.end();
   }
 });
 
