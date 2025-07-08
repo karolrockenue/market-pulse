@@ -39,11 +39,16 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
-    // MODIFIED: Set cookie to be secure for production HTTPS
     cookie: {
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
+      // --- FINAL FIX IS HERE ---
+      // Set the domain for the cookie to be valid on all subdomains
+      domain:
+        process.env.VERCEL_ENV === "production"
+          ? ".market-pulse.io"
+          : undefined,
     },
   })
 );
