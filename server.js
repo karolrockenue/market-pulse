@@ -1,4 +1,4 @@
-// server.js (Production URL Fix)
+// server.js (Redirect Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -55,7 +55,6 @@ const isAuthenticated = (req, res, next) => {
 app.get("/api/auth/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
 
-  // MODIFIED: Explicitly set the redirect URI based on the environment.
   const isProduction = process.env.VERCEL_ENV === "production";
   const redirectUri = isProduction
     ? "https://market-pulse.io/api/auth/cloudbeds/callback"
@@ -88,7 +87,7 @@ app.get("/api/auth/cloudbeds", (req, res) => {
   });
 
   const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
-  console.log(`Redirecting to: ${authorizationUrl}`); // Added for debugging
+  console.log(`Redirecting to: ${authorizationUrl}`);
   res.redirect(authorizationUrl);
 });
 
@@ -102,7 +101,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
 
-    // MODIFIED: Ensure the redirect URI in the token exchange matches the environment.
     const isProduction = process.env.VERCEL_ENV === "production";
     const redirectUri = isProduction
       ? "https://market-pulse.io/api/auth/cloudbeds/callback"
@@ -184,7 +182,8 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     req.session.userId = userInfo.user_id;
     console.log(`✅ Session created for user ${req.session.userId}.`);
 
-    res.redirect("/app");
+    // MODIFIED: Added a trailing slash to the redirect.
+    res.redirect("/app/");
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
     res
