@@ -42,7 +42,7 @@ app.use(
     cookie: {
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "none",
       domain:
         process.env.VERCEL_ENV === "production"
           ? ".market-pulse.io"
