@@ -533,11 +533,13 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
 
-app.get("/app/", (req, res) => {
+// Protect the app and admin pages.
+// Users must be authenticated to even load these pages.
+app.get("/app/", isAuthenticated, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-app.get("/admin/", (req, res) => {
+app.get("/admin/", isAuthenticated, (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
