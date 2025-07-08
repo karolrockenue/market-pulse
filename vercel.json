@@ -27,13 +27,3 @@
     }
   ]
 }
-
-
-{
-  "crons": [
-    {
-      "path": "/api/daily-refresh",
-      "schedule": "0 4 * * *"
-    }
-  ]
-}
