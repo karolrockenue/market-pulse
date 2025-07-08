@@ -1,4 +1,4 @@
-// server.js (Final CORS Fix)
+// server.js (Production Session Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -13,14 +13,15 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
-// MODIFIED: Updated CORS options to handle www and non-www domains.
+// MODIFIED: Trust the Vercel proxy to handle secure connections
+app.set("trust proxy", 1);
+
 const allowedOrigins = [
   "https://market-pulse.io",
   "https://www.market-pulse.io",
 ];
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg =
@@ -38,7 +39,12 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false }, // In production with HTTPS, you might set this to true
+    // MODIFIED: Set cookie to be secure for production HTTPS
+    cookie: {
+      secure: process.env.VERCEL_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
+    },
   })
 );
 
