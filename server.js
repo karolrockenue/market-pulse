@@ -1,4 +1,4 @@
-// server.js (Fully Multi-Tenant)
+// server.js (Fully Multi-Tenant) Something something
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
