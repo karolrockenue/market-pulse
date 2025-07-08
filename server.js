@@ -1,4 +1,4 @@
-// server.js (Final Version with All Endpoints Implemented)
+// server.js (with debugging added)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -7,9 +7,8 @@ const pgSession = require("connect-pg-simple")(session);
 const cors = require("cors");
 const fetch = require("node-fetch");
 const path = require("path");
-
-const dailyRefreshHandler = require("./daily-refresh.js");
-const initialSyncHandler = require("./initial-sync.js");
+const dailyRefreshHandler = require("./api/daily-refresh.js");
+const initialSyncHandler = require("./api/initial-sync.js");
 
 const app = express();
 app.use(express.json());
@@ -20,6 +19,9 @@ const allowedOrigins = [
   "https://market-pulse.io",
   "https://www.market-pulse.io",
 ];
+if (process.env.VERCEL_ENV !== "production") {
+  allowedOrigins.push("http://localhost:3000");
+}
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -51,7 +53,7 @@ app.use(
     cookie: {
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
-      sameSite: "none",
+      sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
       domain:
         process.env.VERCEL_ENV === "production"
           ? ".market-pulse.io"
@@ -60,21 +62,33 @@ app.use(
     },
   })
 );
-// Add this block to server.js
+
+const isProduction = process.env.VERCEL_ENV === "production";
+if (!isProduction) {
+  console.log("🛠️  Development login endpoint enabled at /api/dev-login");
+  app.post("/api/dev-login", (req, res) => {
+    const { userId } = req.body;
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ error: "A userId is required in the request body." });
+    }
+    req.session.userId = userId;
+    res
+      .status(200)
+      .json({ message: `Session successfully created for user: ${userId}` });
+  });
+}
 
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
-
   if (!adminPassword) {
     return res
       .status(500)
       .json({ error: "Admin password not configured on server." });
   }
-
   if (password === adminPassword) {
-    // Note: We are not creating a full session here,
-    // the admin panel uses sessionStorage on the frontend.
     res.status(200).json({ success: true });
   } else {
     res.status(401).json({ error: "Invalid password." });
@@ -91,17 +105,14 @@ const isAuthenticated = (req, res, next) => {
 
 app.get("/api/auth/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
-
   const isProduction = process.env.VERCEL_ENV === "production";
   const redirectUri = isProduction
     ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
     : process.env.CLOUDBEDS_REDIRECT_URI;
-
   if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
     console.error("OAuth environment variables not set!");
     return res.status(500).send("Server configuration error.");
   }
-
   const scopes = [
     "read:user",
     "read:hotel",
@@ -115,14 +126,12 @@ app.get("/api/auth/cloudbeds", (req, res) => {
     "read:dataInsightsOccupancy",
     "read:dataInsightsReservations",
   ].join(" ");
-
   const params = new URLSearchParams({
     client_id: CLOUDBEDS_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "code",
     scope: scopes,
   });
-
   const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
   res.redirect(authorizationUrl);
 });
@@ -132,14 +141,12 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   if (!code) {
     return res.status(400).send("Error: No authorization code provided.");
   }
-
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
     const isProduction = process.env.VERCEL_ENV === "production";
     const redirectUri = isProduction
       ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
       : process.env.CLOUDBEDS_REDIRECT_URI;
-
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLOUDBEDS_CLIENT_ID,
@@ -153,49 +160,65 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     );
     const tokenData = await tokenResponse.json();
     if (!tokenData.access_token) {
-      console.error("Token exchange failed:", tokenData);
       throw new Error("Failed to get access token from Cloudbeds.");
     }
     const { access_token, refresh_token } = tokenData;
-
     const userInfoResponse = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const userInfo = await userInfoResponse.json();
-
     const propertyInfoResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
       {
         headers: {
           Authorization: `Bearer ${access_token}`,
+          "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
         },
       }
     );
     const propertyInfo = await propertyInfoResponse.json();
-    const primaryPropertyId = propertyInfo[0].id;
 
-    const query = `
-            INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, cloudbeds_property_id, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-            ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
-                email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-                access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
-                cloudbeds_property_id = EXCLUDED.cloudbeds_property_id, status = 'active';
-        `;
-    const values = [
+    // ADD THIS LINE TO DEBUG
+    console.log(
+      "DEBUG: Received propertyInfo from Cloudbeds:",
+      JSON.stringify(propertyInfo, null, 2)
+    );
+
+    const userQuery = `
+      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'active')
+      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+          email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+          access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, status = 'active';
+    `;
+    await pgPool.query(userQuery, [
       userInfo.user_id,
       userInfo.email,
       userInfo.first_name,
       userInfo.last_name,
       access_token,
       refresh_token,
-      primaryPropertyId,
-    ];
-    await pgPool.query(query, values);
+    ]);
 
+    const properties = Array.isArray(propertyInfo)
+      ? propertyInfo
+      : [propertyInfo];
+    if (!properties || properties.length === 0 || !properties[0]) {
+      throw new Error("No properties found for this user account.");
+    }
+
+    for (const property of properties) {
+      if (property && property.id) {
+        const insertQuery = `
+            INSERT INTO user_properties (user_id, property_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, property_id) DO NOTHING;
+        `;
+        await pgPool.query(insertQuery, [userInfo.user_id, property.id]);
+      }
+    }
     req.session.userId = userInfo.user_id;
-
     req.session.save((err) => {
       if (err) {
         console.error("CRITICAL: Error saving session before redirect:", err);
@@ -213,22 +236,28 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   }
 });
 
+// ... (rest of the file is unchanged)
+
 app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
   try {
-    const userResult = await pgPool.query(
-      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+    const { propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
     );
-    if (userResult.rows.length === 0)
-      return res.status(404).json({ error: "User not found." });
-    const propertyId = userResult.rows[0].cloudbeds_property_id;
-
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
     const hotelResult = await pgPool.query(
       "SELECT property_name FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
-    if (hotelResult.rows.length === 0)
+    if (hotelResult.rows.length === 0) {
       return res.status(404).json({ error: "Hotel name not found." });
+    }
     res.json({ hotelName: hotelResult.rows[0].property_name });
   } catch (error) {
     console.error("Error in /api/get-hotel-name:", error);
@@ -250,17 +279,25 @@ app.get("/api/last-refresh-time", isAuthenticated, async (req, res) => {
   }
 });
 
+const getPeriod = (granularity) => {
+  if (granularity === "monthly") return "date_trunc('month', stay_date)";
+  if (granularity === "weekly") return "date_trunc('week', stay_date)";
+  return "stay_date";
+};
+
 app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    const userResult = await pgPool.query(
-      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+    const { startDate, endDate, propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
     );
-    if (userResult.rows.length === 0)
-      return res.status(404).json({ error: "User not found." });
-    const propertyId = userResult.rows[0].cloudbeds_property_id;
-
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
     const kpiQuery = `
         SELECT
             (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END), 0)) AS your_adr,
@@ -297,40 +334,25 @@ app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
   }
 });
 
-// --- NEWLY IMPLEMENTED ENDPOINTS ---
-
-const getPeriod = (granularity) => {
-  if (granularity === "monthly") return "date_trunc('month', stay_date)";
-  if (granularity === "weekly") return "date_trunc('week', stay_date)";
-  return "stay_date";
-};
-
 app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
   try {
-    const { startDate, endDate, granularity = "daily" } = req.query;
-    const userResult = await pgPool.query(
-      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
     );
-    if (userResult.rows.length === 0)
-      return res.status(404).json({ error: "User not found." });
-    const propertyId = userResult.rows[0].cloudbeds_property_id;
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
     const period = getPeriod(granularity);
-
     const query = `
-      SELECT
-        ${period} as period,
-        AVG(adr) as adr,
-        AVG(occupancy_direct) as occupancy_direct,
-        AVG(revpar) as revpar
-      FROM daily_metrics_snapshots
-      WHERE
-        hotel_id = $1 AND
-        cloudbeds_user_id = $2 AND
-        stay_date >= $3 AND
-        stay_date <= $4
-      GROUP BY period
-      ORDER BY period ASC;
+        SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
+        FROM daily_metrics_snapshots
+        WHERE hotel_id = $1 AND cloudbeds_user_id = $2 AND stay_date >= $3 AND stay_date <= $4
+        GROUP BY period ORDER BY period ASC;
     `;
     const result = await pgPool.query(query, [
       propertyId,
@@ -347,44 +369,48 @@ app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
 
 app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
   try {
-    const { startDate, endDate, granularity = "daily" } = req.query;
-    const userResult = await pgPool.query(
-      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
     );
-    if (userResult.rows.length === 0)
-      return res.status(404).json({ error: "User not found." });
-    const propertyId = userResult.rows[0].cloudbeds_property_id;
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const hotelRatingResult = await pgPool.query(
+      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (
+      hotelRatingResult.rows.length === 0 ||
+      !hotelRatingResult.rows[0].star_rating
+    ) {
+      return res.json({ metrics: [], competitorCount: 0 });
+    }
+    const starRating = hotelRatingResult.rows[0].star_rating;
     const period = getPeriod(granularity);
-
     const query = `
       SELECT
-        ${period} as period,
-        AVG(adr) as market_adr,
-        AVG(occupancy_direct) as market_occupancy,
-        AVG(revpar) as market_revpar,
-        COUNT(DISTINCT hotel_id) as competitor_count,
-        SUM(capacity_count) as total_capacity
-      FROM daily_metrics_snapshots
-      WHERE
-        hotel_id != $1 AND
-        cloudbeds_user_id = $2 AND
-        stay_date >= $3 AND
-        stay_date <= $4
-      GROUP BY period
-      ORDER BY period ASC;
+        ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON dms.hotel_id = h.hotel_id
+      WHERE dms.hotel_id != $1 AND dms.cloudbeds_user_id = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4 AND h.star_rating = $5
+      GROUP BY period ORDER BY period ASC;
     `;
     const result = await pgPool.query(query, [
       propertyId,
       req.session.userId,
       startDate,
       endDate,
+      starRating,
     ]);
     const competitorCountResult = await pgPool.query(
-      "SELECT COUNT(DISTINCT hotel_id) FROM daily_metrics_snapshots WHERE hotel_id != $1",
-      [propertyId]
+      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE star_rating = $1 AND hotel_id != $2",
+      [starRating, propertyId]
     );
-
     res.json({
       metrics: result.rows,
       competitorCount: competitorCountResult.rows[0]?.count || 0,
@@ -394,11 +420,24 @@ app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch competitor metrics" });
   }
 });
-// Add this entire block to server.js before the static routes
 
-// --- ADMIN PANEL API ENDPOINTS ---
+app.get("/api/my-properties", isAuthenticated, async (req, res) => {
+  try {
+    const query = `
+      SELECT up.property_id, h.property_name
+      FROM user_properties up
+      JOIN hotels h ON up.property_id = h.hotel_id
+      WHERE up.user_id = $1
+      ORDER BY h.property_name;
+    `;
+    const result = await pgPool.query(query, [req.session.userId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/my-properties:", error);
+    res.status(500).json({ error: "Failed to fetch user properties." });
+  }
+});
 
-// An endpoint to test the Cloudbeds API connection using an existing token
 app.get("/api/test-cloudbeds", isAuthenticated, async (req, res) => {
   try {
     const user = await pgPool.query(
@@ -408,14 +447,10 @@ app.get("/api/test-cloudbeds", isAuthenticated, async (req, res) => {
     if (user.rows.length === 0)
       return res.status(404).json({ error: "User or token not found." });
     const accessToken = user.rows[0].access_token;
-
     const response = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-
     if (response.ok) {
       res.status(200).json({ success: true, status: response.status });
     } else {
@@ -428,11 +463,10 @@ app.get("/api/test-cloudbeds", isAuthenticated, async (req, res) => {
   }
 });
 
-// An endpoint to test the PostgreSQL database connection
 app.get("/api/test-database", isAuthenticated, async (req, res) => {
   try {
     const client = await pgPool.connect();
-    await client.query("SELECT 1"); // Simple query to check connection
+    await client.query("SELECT 1");
     client.release();
     res
       .status(200)
@@ -444,11 +478,10 @@ app.get("/api/test-database", isAuthenticated, async (req, res) => {
   }
 });
 
-// An endpoint to fetch all hotels from the database for the admin table
 app.get("/api/get-all-hotels", isAuthenticated, async (req, res) => {
   try {
     const result = await pgPool.query(
-      "SELECT hotel_id, property_name, property_type, city FROM hotels ORDER BY property_name"
+      "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -456,15 +489,7 @@ app.get("/api/get-all-hotels", isAuthenticated, async (req, res) => {
   }
 });
 
-// An endpoint to manually trigger the daily refresh cron job
-app.get("/api/daily-refresh", isAuthenticated, dailyRefreshHandler);
-
-// An endpoint to manually trigger the initial sync job
-app.get("/api/initial-sync", isAuthenticated, initialSyncHandler);
-
-// An endpoint to run all the tests and return a consolidated result
 app.get("/api/run-endpoint-tests", isAuthenticated, async (req, res) => {
-  // This is a simplified test runner. In a real app, this might be more complex.
   const results = [];
   const endpoints = [
     {
@@ -481,21 +506,22 @@ app.get("/api/run-endpoint-tests", isAuthenticated, async (req, res) => {
     },
     { name: "Get Hotel Name", path: "/api/get-hotel-name" },
   ];
-
   for (const endpoint of endpoints) {
-    // To test authenticated endpoints, we need to simulate a fetch call from the server to itself.
-    // For simplicity here, we'll just confirm the route exists, but a full test would involve more.
-    // This is a basic check.
     results.push({
       name: endpoint.name,
-      ok: true, // Assuming if the route exists, it's "ok" for this basic test.
+      ok: true,
       status: 200,
       statusText: "OK (Route exists)",
     });
   }
   res.status(200).json(results);
 });
-// --- Static and fallback routes  ---
+
+if (process.env.VERCEL_ENV !== "production") {
+  app.get("/api/daily-refresh", isAuthenticated, dailyRefreshHandler);
+  app.get("/api/initial-sync", isAuthenticated, initialSyncHandler);
+}
+
 const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
 
@@ -505,6 +531,10 @@ app.get("/", (req, res) => {
 
 app.get("/app/", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
+});
+
+app.get("/admin/", (req, res) => {
+  res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
