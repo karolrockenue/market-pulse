@@ -543,6 +543,7 @@ if (process.env.VERCEL_ENV !== "production") {
 }
 
 // --- Static and fallback routes ---
+// --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 
 // Define routes for pages that need authentication FIRST.
