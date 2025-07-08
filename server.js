@@ -89,7 +89,7 @@ app.get("/api/auth/cloudbeds", (req, res) => {
 
   const isProduction = process.env.VERCEL_ENV === "production";
   const redirectUri = isProduction
-    ? "https://market-pulse.io/api/auth/cloudbeds/callback"
+    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback" // Use the WWW canonical domain
     : process.env.CLOUDBEDS_REDIRECT_URI;
 
   if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
@@ -133,9 +133,11 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
 
+    // in app.get("/api/auth/cloudbeds/callback", ...)
+
     const isProduction = process.env.VERCEL_ENV === "production";
     const redirectUri = isProduction
-      ? "https://market-pulse.io/api/auth/cloudbeds/callback"
+      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback" // FIX: Use the WWW canonical domain
       : process.env.CLOUDBEDS_REDIRECT_URI;
 
     const tokenParams = new URLSearchParams({
