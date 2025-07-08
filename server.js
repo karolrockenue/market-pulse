@@ -526,21 +526,28 @@ if (process.env.VERCEL_ENV !== "production") {
   app.get("/api/initial-sync", isAuthenticated, initialSyncHandler);
 }
 
+// --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
-app.use(express.static(publicPath));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(publicPath, "index.html"));
-});
-
-// Protect the app and admin pages.
-// Users must be authenticated to even load these pages.
+// Define routes for pages that need authentication FIRST.
 app.get("/app/", isAuthenticated, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
 app.get("/admin/", isAuthenticated, (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
+});
+
+// Now, serve all static assets like CSS, JS, and images.
+app.use(express.static(publicPath));
+
+// Finally, define public page routes like the homepage and login page.
+app.get("/", (req, res) => {
+  res.sendFile(path.join(publicPath, "index.html"));
+});
+
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(publicPath, "login.html"));
 });
 
 const PORT = process.env.PORT || 3000;
