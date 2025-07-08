@@ -60,6 +60,26 @@ app.use(
     },
   })
 );
+// Add this block to server.js
+
+app.post("/api/admin-login", (req, res) => {
+  const { password } = req.body;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    return res
+      .status(500)
+      .json({ error: "Admin password not configured on server." });
+  }
+
+  if (password === adminPassword) {
+    // Note: We are not creating a full session here,
+    // the admin panel uses sessionStorage on the frontend.
+    res.status(200).json({ success: true });
+  } else {
+    res.status(401).json({ error: "Invalid password." });
+  }
+});
 
 const isAuthenticated = (req, res, next) => {
   if (req.session.userId) {
