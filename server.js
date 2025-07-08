@@ -1,4 +1,4 @@
-// server.js (Production Session Fix)
+// server.js (Production Session Fix with Enhanced Logging)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -13,7 +13,7 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
-// MODIFIED: Trust the Vercel proxy to handle secure connections
+// Trust the Vercel proxy to handle secure connections
 app.set("trust proxy", 1);
 
 const allowedOrigins = [
@@ -43,8 +43,6 @@ app.use(
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
-      // --- FINAL FIX IS HERE ---
-      // Set the domain for the cookie to be valid on all subdomains
       domain:
         process.env.VERCEL_ENV === "production"
           ? ".market-pulse.io"
@@ -75,10 +73,22 @@ async function getCloudbedsAccessToken() {
   return tokenData.access_token;
 }
 
+// MODIFIED: Enhanced isAuthenticated middleware for debugging
 const isAuthenticated = (req, res, next) => {
+  console.log("\n--- Checking Authentication for API endpoint ---");
+  console.log("  Request Path:", req.path);
+  console.log("  Request Origin:", req.headers.origin);
+  console.log("  Request Cookies:", req.headers.cookie);
+  console.log("  Session ID:", req.sessionID);
+  console.log("  Session User ID found?:", req.session.userId);
+
   if (req.session.userId) {
+    console.log("  ✅ AUTHENTICATION SUCCESS: Access Granted.");
     return next();
   } else {
+    console.error(
+      "  ❌ AUTHENTICATION FAILED: No userId found in session. Access Denied."
+    );
     return res.status(401).json({ error: "Unauthorized. Please log in." });
   }
 };
@@ -89,7 +99,7 @@ app.get("/api/auth/cloudbeds", (req, res) => {
 
   const isProduction = process.env.VERCEL_ENV === "production";
   const redirectUri = isProduction
-    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback" // Use the WWW canonical domain
+    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
     : process.env.CLOUDBEDS_REDIRECT_URI;
 
   if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
@@ -133,11 +143,9 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
 
-    // in app.get("/api/auth/cloudbeds/callback", ...)
-
     const isProduction = process.env.VERCEL_ENV === "production";
     const redirectUri = isProduction
-      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback" // FIX: Use the WWW canonical domain
+      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
       : process.env.CLOUDBEDS_REDIRECT_URI;
 
     const tokenParams = new URLSearchParams({
@@ -214,7 +222,12 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     console.log(`✅ User ${userInfo.user_id} saved to database.`);
 
     req.session.userId = userInfo.user_id;
-    console.log(`✅ Session created for user ${req.session.userId}.`);
+
+    // MODIFIED: Added enhanced logging upon session creation
+    console.log("\n--- SESSION CREATED ---");
+    console.log(`  Saved User ID to session: ${req.session.userId}`);
+    console.log(`  Session ID on Creation: ${req.session.ID}`);
+    console.log("  Full session object:", req.session);
 
     res.redirect("/app/");
   } catch (error) {
