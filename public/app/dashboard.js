@@ -508,7 +508,7 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
 
     const yourHotelData = await yourHotelResponse.json();
     const marketData = await marketResponse.json();
-    const kpiData = await kpiResponse.json();
+    //const kpiData = await kpiResponse.json();//
 
     renderKpiCards(kpiData);
 
