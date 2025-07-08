@@ -1,4 +1,4 @@
-// server.js (with Enhanced Logging)
+// server.js (Production Ready)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -7,25 +7,8 @@ const pgSession = require("connect-pg-simple")(session);
 const cors = require("cors");
 const fetch = require("node-fetch");
 const path = require("path");
-const dailyRefreshHandler = require("./api/daily-refresh.js");
-const initialSyncHandler = require("./api/initial-sync.js");
 
 const app = express();
-
-// --- NEW: REQUEST LOGGER MIDDLEWARE ---
-// This will run for EVERY request and log details to the terminal.
-app.use((req, res, next) => {
-  console.log("-----------------------------------------------------");
-  console.log(
-    `[${new Date().toLocaleTimeString()}] INCOMING REQUEST: ${req.method} ${
-      req.originalUrl
-    }`
-  );
-  // We need to log session details *after* the session middleware has run.
-  // This initial log just shows the request path.
-  next();
-});
-
 app.use(express.json());
 app.set("trust proxy", 1);
 
@@ -75,46 +58,12 @@ app.use(
   })
 );
 
-// --- AUTHENTICATION MIDDLEWARE with LOGGING ---
-
-// Middleware for API routes
 const requireApiLogin = (req, res, next) => {
-  console.log(`[API AUTH CHECK] Path: ${req.originalUrl}`);
   if (!req.session.userId) {
-    console.log("[API AUTH CHECK] FAILED. Sending 401.");
     return res.status(401).json({ error: "Unauthorized" });
   }
-  console.log("[API AUTH CHECK] PASSED.");
   next();
 };
-
-// Middleware for pages
-const requirePageLogin = (req, res, next) => {
-  console.log(`[PAGE AUTH CHECK] Path: ${req.originalUrl}`);
-  if (!req.session.userId) {
-    console.log("[PAGE AUTH CHECK] FAILED. Redirecting to /login.");
-    return res.redirect("/login");
-  }
-  console.log("[PAGE AUTH CHECK] PASSED.");
-  next();
-};
-
-const isProduction = process.env.VERCEL_ENV === "production";
-if (!isProduction) {
-  console.log("🛠️  Development login endpoint enabled at /api/dev-login");
-  app.post("/api/dev-login", (req, res) => {
-    const { userId } = req.body;
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ error: "A userId is required in the request body." });
-    }
-    req.session.userId = userId;
-    res
-      .status(200)
-      .json({ message: `Session successfully created for user: ${userId}` });
-  });
-}
 
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
@@ -209,12 +158,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       }
     );
     const propertyInfo = await propertyInfoResponse.json();
-
-    console.log(
-      "DEBUG: Received propertyInfo from Cloudbeds:",
-      JSON.stringify(propertyInfo, null, 2)
-    );
-
     const userQuery = `
       INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
       VALUES ($1, $2, $3, $4, $5, $6, 'active')
@@ -537,16 +480,14 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
   res.status(200).json(results);
 });
 
-if (process.env.VERCEL_ENV !== "production") {
-  app.get("/api/daily-refresh", requireApiLogin, dailyRefreshHandler);
-  app.get("/api/initial-sync", requireApiLogin, initialSyncHandler);
-}
-
-// --- Static and fallback routes ---
 // --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 
-// Define routes for pages that need authentication FIRST.
+// This is the correct production order:
+// 1. Define protected page routes.
+// 2. Serve static assets.
+// 3. Define public fallback routes.
+
 app.get("/app/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
@@ -555,10 +496,8 @@ app.get("/admin/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
-// Now, serve all static assets like CSS, JS, and images.
 app.use(express.static(publicPath));
 
-// Finally, define public page routes like the homepage and login page.
 app.get("/", (req, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
