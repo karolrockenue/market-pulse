@@ -98,8 +98,12 @@ app.post("/api/admin-login", (req, res) => {
 const isAuthenticated = (req, res, next) => {
   if (req.session.userId) {
     return next();
+  }
+  // For API calls, send 401. For browser pages, redirect to login.
+  if (req.headers.accept.includes("html")) {
+    res.redirect("/login");
   } else {
-    return res.status(401).json({ error: "Unauthorized. Please log in." });
+    res.status(401).json({ error: "Unauthorized" });
   }
 };
 
