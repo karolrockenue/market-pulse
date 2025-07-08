@@ -1,7 +1,8 @@
-// server.js (Routing Fix)
+// server.js (CORS Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
+const cors = require("cors"); // Import cors
 const fetch = require("node-fetch");
 const path = require("path");
 const { Client } = require("pg");
@@ -12,12 +13,19 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
+// MODIFIED: Configure and use CORS middleware
+const corsOptions = {
+  origin: "https://market-pulse.io", // Your frontend URL
+  credentials: true, // Allow cookies to be sent
+};
+app.use(cors(corsOptions));
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false },
+    cookie: { secure: false }, // In production with HTTPS, you might set this to true
   })
 );
 
@@ -484,7 +492,6 @@ app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
-// MODIFIED: Added a trailing slash to the route handler.
 app.get("/app/", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
