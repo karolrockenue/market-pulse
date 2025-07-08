@@ -1,12 +1,11 @@
-console.log("Dashboard Deployment Test: Tuesday 7:37 PM");
 // --- GLOBAL STATE & CONFIG ---
 let comparisonChart = null;
 let yourHotelMetrics = [];
 let marketMetrics = [];
 let activeMetric = "occupancy";
 let currentGranularity = "daily";
-let hotelName = "Your Hotel"; // Default name
-let isInitialLoad = true; // Flag to handle the initial loading screen
+let hotelName = "Your Hotel";
+let isInitialLoad = true;
 
 const metricConfig = {
   occupancy: { label: "Occupancy", format: "percent" },
@@ -15,6 +14,57 @@ const metricConfig = {
 };
 
 const chartColors = { primary: "#FAC35F", secondary: "#3C455B" };
+
+async function populatePropertySwitcher() {
+  const switcherBtn = document.getElementById("hotel-btn");
+  const currentNameEl = document.getElementById("current-property-name");
+  const dropdownEl = document.getElementById("hotel-dropdown");
+
+  try {
+    const response = await fetch("/api/my-properties", {
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Could not fetch properties.");
+
+    const properties = await response.json();
+    dropdownEl.innerHTML = "";
+
+    if (properties.length === 0) {
+      currentNameEl.textContent = "No Properties Found";
+      switcherBtn.disabled = true;
+      return;
+    }
+
+    let activeProperty = properties[0];
+    currentNameEl.textContent = activeProperty.property_name;
+    window.currentPropertyId = activeProperty.property_id;
+
+    properties.forEach((property) => {
+      const link = document.createElement("a");
+      link.href = "#";
+      link.className =
+        "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100";
+      link.textContent = property.property_name;
+      link.dataset.propertyId = property.property_id;
+
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.currentPropertyId = property.property_id;
+        currentNameEl.textContent = property.property_name;
+        dropdownEl.classList.remove("show");
+
+        const startDate = document.getElementById("start-date").value;
+        const endDate = document.getElementById("end-date").value;
+        loadDataFromAPI(startDate, endDate, currentGranularity);
+      });
+      dropdownEl.appendChild(link);
+    });
+  } catch (error) {
+    console.error("Failed to populate property switcher:", error);
+    currentNameEl.textContent = "Error";
+    switcherBtn.disabled = true;
+  }
+}
 
 // --- Error Handling UI Functions ---
 function showError(message) {
@@ -87,7 +137,6 @@ function setActiveMetric(metric) {
   document
     .querySelector(`.kpi-card[data-metric="${metric}"]`)
     .classList.add("active");
-
   renderTables();
   renderChart();
 }
@@ -323,10 +372,7 @@ function getYAxisOptions(metric, dataMin, dataMax) {
       ...baseOptions,
       min: suggestedMin,
       max: suggestedMax,
-      ticks: {
-        stepSize: 10,
-        callback: (value) => value + "%",
-      },
+      ticks: { stepSize: 10, callback: (value) => value + "%" },
     };
   }
 
@@ -429,9 +475,7 @@ function renderChart() {
       maintainAspectRatio: false,
       onHover: syncChartAndTables,
       scales: {
-        x: {
-          grid: { display: false },
-        },
+        x: { grid: { display: false } },
         y: getYAxisOptions(activeMetric, dataMin, dataMax),
       },
       plugins: {
@@ -486,17 +530,15 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
   const contentWrapper = document.getElementById("dashboard-content-wrapper");
 
   hideError();
-
   if (!isInitialLoad) {
     dataDisplayWrapper.classList.add("loading");
   }
 
   try {
-    const yourHotelUrl = `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
-    const marketUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
-    const kpiUrl = `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}`;
+    const yourHotelUrl = `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${window.currentPropertyId}`;
+    const marketUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${window.currentPropertyId}`;
+    const kpiUrl = `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}&propertyId=${window.currentPropertyId}`;
 
-    // MODIFIED: Added { credentials: 'include' } to all fetch calls
     const [yourHotelResponse, marketResponse, kpiResponse] = await Promise.all([
       fetch(yourHotelUrl, { credentials: "include" }),
       fetch(marketUrl, { credentials: "include" }),
@@ -511,8 +553,10 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
     const marketData = await marketResponse.json();
     const kpiData = await kpiResponse.json();
 
-    renderKpiCards(kpiData);
+    // Now that we have data, we can update the main hotel name display
+    await fetchAndSetDisplayNames();
 
+    renderKpiCards(kpiData);
     const processedData = processAndMergeData(
       yourHotelData.metrics,
       marketData.metrics
@@ -521,11 +565,11 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
     marketMetrics = processedData;
 
     const marketSubtitleEl = document.getElementById("market-subtitle");
-    if (marketData.competitorCount > 0 && marketData.totalCapacity > 0) {
-      marketSubtitleEl.textContent = `Based on a competitive set of ${marketData.competitorCount} hotels, with a total of ${marketData.totalCapacity} rooms in your market.`;
+    if (marketData.competitorCount > 0) {
+      marketSubtitleEl.textContent = `Based on a competitive set of ${marketData.competitorCount} hotels of a similar standard.`;
     } else {
       marketSubtitleEl.textContent =
-        "No competitor data available for this period.";
+        "No competitor data available for this period or standard.";
     }
 
     renderTables();
@@ -549,30 +593,24 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
 
 async function fetchAndSetDisplayNames() {
   try {
-    // MODIFIED: Added { credentials: 'include' }
-    const response = await fetch("/api/get-hotel-name", {
-      credentials: "include",
-    });
+    const response = await fetch(
+      `/api/get-hotel-name?propertyId=${window.currentPropertyId}`,
+      { credentials: "include" }
+    );
     if (!response.ok) throw new Error("Failed to fetch hotel details");
     const hotelData = await response.json();
     hotelName = hotelData.hotelName || "Your Hotel";
-
     document.getElementById("your-hotel-table-title").textContent = hotelName;
-    document.getElementById("your-hotel-subtitle").textContent =
-      "Displaying data for your property";
   } catch (error) {
     console.error("Could not set dynamic hotel name:", error);
     document.getElementById("your-hotel-table-title").textContent =
       "Your Hotel";
-    document.getElementById("your-hotel-subtitle").textContent =
-      "Displaying data for your property";
   }
 }
 
 async function fetchAndDisplayLastRefreshTime() {
   const timestampEl = document.getElementById("data-timestamp");
   try {
-    // MODIFIED: Added { credentials: 'include' }
     const response = await fetch("/api/last-refresh-time", {
       credentials: "include",
     });
@@ -581,7 +619,6 @@ async function fetchAndDisplayLastRefreshTime() {
     }
     const data = await response.json();
     const lastRefreshDate = new Date(data.last_successful_run);
-
     const formattedDate = lastRefreshDate.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "long",
@@ -594,7 +631,6 @@ async function fetchAndDisplayLastRefreshTime() {
       hour12: false,
       timeZone: "Europe/Warsaw",
     });
-
     timestampEl.textContent = `Data updated on ${formattedDate} at ${formattedTime}`;
   } catch (error) {
     console.error("Failed to display last refresh time:", error);
@@ -632,9 +668,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeErrorBtn.addEventListener("click", hideError);
   }
 
-  loadingOverlay.classList.remove("hidden");
+  await populatePropertySwitcher();
 
-  await fetchAndSetDisplayNames();
+  if (!window.currentPropertyId) {
+    showError("Could not load properties. Dashboard cannot be initialized.");
+    loadingOverlay.style.opacity = "0";
+    setTimeout(() => {
+      loadingOverlay.classList.add("hidden");
+    }, 500);
+    return;
+  }
+
   await fetchAndDisplayLastRefreshTime();
 
   function setupDropdowns() {
@@ -712,13 +756,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-granularity-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.classList.contains("active")) return;
-
       document
         .querySelectorAll("[data-granularity-toggle]")
         .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentGranularity = btn.dataset.granularityToggle;
-
       loadDataFromAPI(
         startDateInput.value,
         endDateInput.value,
@@ -747,7 +789,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     card.addEventListener("click", () => setActiveMetric(card.dataset.metric));
   });
 
-  // --- Initial Load ---
   document.querySelector('[data-preset="current-month"]').click();
   setActiveMetric("occupancy");
 });
