@@ -1,4 +1,4 @@
-// server.js (Fully Multi-Tenant) Something something
+// server.js (Production URL Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -53,9 +53,15 @@ const isAuthenticated = (req, res, next) => {
 
 // --- V2.0 OAuth Endpoints ---
 app.get("/api/auth/cloudbeds", (req, res) => {
-  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_REDIRECT_URI } = process.env;
+  const { CLOUDBEDS_CLIENT_ID } = process.env;
 
-  if (!CLOUDBEDS_CLIENT_ID || !CLOUDBEDS_REDIRECT_URI) {
+  // MODIFIED: Explicitly set the redirect URI based on the environment.
+  const isProduction = process.env.VERCEL_ENV === "production";
+  const redirectUri = isProduction
+    ? "https://market-pulse.io/api/auth/cloudbeds/callback"
+    : process.env.CLOUDBEDS_REDIRECT_URI;
+
+  if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
     console.error("OAuth environment variables not set!");
     return res.status(500).send("Server configuration error.");
   }
@@ -76,13 +82,13 @@ app.get("/api/auth/cloudbeds", (req, res) => {
 
   const params = new URLSearchParams({
     client_id: CLOUDBEDS_CLIENT_ID,
-    redirect_uri: CLOUDBEDS_REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: scopes,
   });
 
   const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
-
+  console.log(`Redirecting to: ${authorizationUrl}`); // Added for debugging
   res.redirect(authorizationUrl);
 });
 
@@ -94,17 +100,19 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
-    const {
-      CLOUDBEDS_CLIENT_ID,
-      CLOUDBEDS_CLIENT_SECRET,
-      CLOUDBEDS_REDIRECT_URI,
-    } = process.env;
+    const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+
+    // MODIFIED: Ensure the redirect URI in the token exchange matches the environment.
+    const isProduction = process.env.VERCEL_ENV === "production";
+    const redirectUri = isProduction
+      ? "https://market-pulse.io/api/auth/cloudbeds/callback"
+      : process.env.CLOUDBEDS_REDIRECT_URI;
 
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLOUDBEDS_CLIENT_ID,
       client_secret: CLOUDBEDS_CLIENT_SECRET,
-      redirect_uri: CLOUDBEDS_REDIRECT_URI,
+      redirect_uri: redirectUri,
       code: code,
     });
     const tokenResponse = await fetch(
@@ -212,102 +220,7 @@ app.get("/api/initial-sync", async (req, res) => {
   await initialSyncHandler(req, res);
 });
 
-app.get("/api/run-endpoint-tests", async (req, res) => {
-  const endpointsToTest = [
-    { name: "Cloudbeds Connection", url: "/api/test-cloudbeds", method: "GET" },
-    { name: "Database Connection", url: "/api/test-database", method: "GET" },
-    { name: "Get Hotel Name", url: "/api/get-hotel-name", method: "GET" },
-    { name: "Get Refresh Time", url: "/api/last-refresh-time", method: "GET" },
-    {
-      name: "KPI Summary",
-      url: "/api/kpi-summary?startDate=2025-07-01&endDate=2025-07-07",
-      method: "GET",
-    },
-    {
-      name: "Your Hotel Metrics",
-      url: "/api/metrics-from-db?startDate=2025-07-01&endDate=2025-07-07&granularity=daily",
-      method: "GET",
-    },
-    {
-      name: "Market Metrics",
-      url: "/api/competitor-metrics?startDate=2025-07-01&endDate=2025-07-07&granularity=daily",
-      method: "GET",
-    },
-  ];
-
-  const results = [];
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-  for (const endpoint of endpointsToTest) {
-    try {
-      const response = await fetch(baseUrl + endpoint.url, {
-        method: endpoint.method,
-      });
-      results.push({
-        name: endpoint.name,
-        url: endpoint.url,
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-    } catch (error) {
-      results.push({
-        name: endpoint.name,
-        url: endpoint.url,
-        status: "N/A",
-        statusText: error.message,
-        ok: false,
-      });
-    }
-  }
-  res.json(results);
-});
-
-app.get("/api/get-all-hotels", async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
-  try {
-    await client.connect();
-    const result = await client.query(
-      "SELECT hotel_id, property_name, property_type, city FROM hotels ORDER BY hotel_id"
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error("ERROR FETCHING ALL HOTELS:", error);
-    res.status(500).json({ error: "Failed to fetch hotel list." });
-  } finally {
-    if (client) await client.end();
-  }
-});
-
-// --- Health Check Endpoints ---
-app.get("/api/test-cloudbeds", async (req, res) => {
-  try {
-    await getCloudbedsAccessToken();
-    res
-      .status(200)
-      .json({ success: true, message: "Cloudbeds API connection successful." });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-app.get("/api/test-database", async (req, res) => {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
-  try {
-    await client.connect();
-    await client.query("SELECT NOW()");
-    res
-      .status(200)
-      .json({ success: true, message: "Database connection successful." });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  } finally {
-    if (client) await client.end();
-  }
-});
-
 // --- Main Application Endpoints (Now Fully User-Aware) ---
-// MODIFIED: Task 3.3 - All endpoints now use the logged-in user's ID.
 app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
@@ -521,7 +434,6 @@ app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
     if (granularity === "monthly") sqlGranularity = "month";
     const timeGroup = `DATE_TRUNC('${sqlGranularity}', stay_date)`;
 
-    // NOTE: Competitor metrics are not user-specific, but we filter by the user's property_id to exclude it.
     const baseWhereClause = `hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3`;
 
     if (granularity === "daily") {
