@@ -1,4 +1,4 @@
-// server.js (Redirect Fix)
+// server.js (Routing Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -182,7 +182,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     req.session.userId = userInfo.user_id;
     console.log(`✅ Session created for user ${req.session.userId}.`);
 
-    // MODIFIED: Added a trailing slash to the redirect.
     res.redirect("/app/");
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
@@ -481,15 +480,16 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
 
-app.get("/admin", (req, res) => {
+app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
-app.get("/app", (req, res) => {
+// MODIFIED: Added a trailing slash to the route handler.
+app.get("/app/", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-app.get("/app/reports", (req, res) => {
+app.get("/app/reports/", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
 
