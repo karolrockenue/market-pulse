@@ -11,6 +11,7 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
+// --- V1 Authentication (to be phased out) ---
 async function getCloudbedsAccessToken() {
   const {
     CLOUDBEDS_CLIENT_ID,
@@ -31,6 +32,73 @@ async function getCloudbedsAccessToken() {
   if (!tokenData.access_token) throw new Error("Authentication failed");
   return tokenData.access_token;
 }
+
+// --- V2.0 OAuth Endpoints ---
+app.get("/api/auth/cloudbeds", (req, res) => {
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_REDIRECT_URI } = process.env;
+
+  if (!CLOUDBEDS_CLIENT_ID || !CLOUDBEDS_REDIRECT_URI) {
+    console.error("OAuth environment variables not set!");
+    return res.status(500).send("Server configuration error.");
+  }
+
+  // Reverted to the minimal working scope combination
+  const scopes = ["read:user", "read:hotel"];
+
+  const params = new URLSearchParams({
+    client_id: CLOUDBEDS_CLIENT_ID,
+    redirect_uri: CLOUDBEDS_REDIRECT_URI,
+    response_type: "code",
+    scope: scopes.join(" "),
+  });
+
+  const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+
+  res.redirect(authorizationUrl);
+});
+
+// Reverted to the last fully working callback logic
+app.get("/api/auth/cloudbeds/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) {
+    return res.status(400).send("Error: No authorization code provided.");
+  }
+
+  try {
+    const {
+      CLOUDBEDS_CLIENT_ID,
+      CLOUDBEDS_CLIENT_SECRET,
+      CLOUDBEDS_REDIRECT_URI,
+    } = process.env;
+
+    // 1. Exchange the code for an access token
+    const tokenParams = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: CLOUDBEDS_CLIENT_ID,
+      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      redirect_uri: CLOUDBEDS_REDIRECT_URI,
+      code: code,
+    });
+    const tokenResponse = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      { method: "POST", body: tokenParams }
+    );
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.access_token) {
+      console.error("Token exchange failed:", tokenData);
+      throw new Error("Failed to get access token from Cloudbeds.");
+    }
+
+    console.log("✅ Access token received successfully.");
+
+    // 2. Immediately redirect to the dashboard
+    // This bypasses the failing user/property detail fetch step.
+    res.redirect("/app");
+  } catch (error) {
+    console.error("CRITICAL ERROR in OAuth callback:", error);
+    res.status(500).send("An error occurred during authentication.");
+  }
+});
 
 // --- Admin Panel Endpoints ---
 app.post("/api/admin-login", (req, res) => {
@@ -108,7 +176,6 @@ app.get("/api/run-endpoint-tests", async (req, res) => {
   res.json(results);
 });
 
-// NEW: Endpoint to get all hotels for the admin panel
 app.get("/api/get-all-hotels", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
@@ -361,10 +428,22 @@ app.get("/api/competitor-metrics", async (req, res) => {
   }
 });
 
-// Static and fallback routes
+// --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
-app.get("/*", (req, res) => {
+
+// Serve the main marketing page for the root URL
+app.get("/", (req, res) => {
+  res.sendFile(path.join(publicPath, "index.html"));
+});
+
+// Serve the admin panel's HTML for any /admin path
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(publicPath, "admin", "index.html"));
+});
+
+// Serve the main application's HTML for any /app path.
+app.get("/app", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 

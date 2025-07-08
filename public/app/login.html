@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Market Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f7f8fc;
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div
+      class="flex flex-col items-center justify-center min-h-screen bg-gray-50"
+    >
+      <div class="max-w-md w-full text-center">
+        <svg
+          class="h-12 w-auto text-blue-500 mx-auto"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="12" y1="20" x2="12" y2="10"></line>
+          <line x1="18" y1="20" x2="18" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="16"></line>
+        </svg>
+        <h1 class="mt-4 text-3xl font-bold text-gray-900">
+          Welcome to Market Pulse
+        </h1>
+        <p class="mt-2 text-base text-gray-600">
+          Connect your Cloudbeds account to get started.
+        </p>
+      </div>
+
+      <div class="mt-8">
+        <a
+          href="/api/auth/cloudbeds"
+          class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-lg"
+        >
+          <img
+            src="https://i.ibb.co/bF0b1g3/cb-logo-white.png"
+            alt="Cloudbeds Logo"
+            class="h-6 w-auto mr-3"
+          />
+          Connect to Cloudbeds
+        </a>
+      </div>
+
+      <p class="mt-8 text-sm text-gray-500">
+        You will be redirected to Cloudbeds to securely authorize access.
+      </p>
+    </div>
+  </body>
+</html>
