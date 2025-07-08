@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reports - Market Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-primary: #f7f8fc;
+        --bg-secondary: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --accent-primary: #60a5fa; /* Tailwind blue-400 - This color is fixed for UI elements */
+        --highlight-color: #eff6ff; /* Tailwind blue-50 */
+        --font-sans: "Inter", sans-serif;
+        --font-data: "Manrope", sans-serif;
+      }
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      .font-data {
+        font-family: var(--font-data);
+        font-variant-numeric: tabular-nums;
+      }
+      .control-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        transition: all 0.2s;
+        background-color: var(--bg-secondary);
+      }
+      .control-btn:hover {
+        background-color: #f1f5f9;
+        border-color: #94a3b8;
+      }
+      .control-btn.active {
+        background-color: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
+      }
+      .tooltip-container {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .tooltip-container .tooltip-text {
+        visibility: hidden;
+        width: 240px;
+        background-color: #1e293b;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 150%;
+        left: 50%;
+        margin-left: -120px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .tooltip-container .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1e293b transparent transparent transparent;
+      }
+      .tooltip-container:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div class="flex min-h-screen">
+      <aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r">
+        <div class="h-16 flex items-center px-6 border-b">
+          <svg
+            class="h-8 w-auto text-blue-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="12" y1="20" x2="12" y2="10"></line>
+            <line x1="18" y1="20" x2="18" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="16"></line>
+          </svg>
+          <span class="ml-3 text-lg font-bold text-gray-800">Market Pulse</span>
+        </div>
+        <nav class="flex-1 px-4 py-4 space-y-1">
+          <a
+            href="/app/"
+            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
+          >
+            <svg
+              class="h-5 w-5 mr-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+              ></path>
+            </svg>
+            Dashboard
+          </a>
+          <a
+            href="/app/reports/"
+            class="flex items-center px-4 py-2.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-lg"
+          >
+            <svg
+              class="h-5 w-5 mr-3"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 3v18h18" />
+              <path d="m19 9-5 5-4-4-3 3" />
+            </svg>
+            Reports
+          </a>
+          <a
+            href="/admin/"
+            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
+          >
+            <svg
+              class="h-5 w-5 mr-3"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+              ></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            Admin Panel
+          </a>
+        </nav>
+      </aside>
+
+      <div class="flex-1 flex flex-col">
+        <header class="bg-white h-16 flex items-center justify-between px-8">
+          <h1 class="text-xl font-semibold text-gray-800">
+            Advanced Reporting
+          </h1>
+        </header>
+
+        <main class="flex-1 p-8 space-y-6">
+          <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div class="flex items-center space-x-2">
+                <svg
+                  class="h-5 w-5 text-gray-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <label class="text-sm font-medium text-gray-700"
+                  >Date Range</label
+                >
+              </div>
+              <div class="flex items-center space-x-2">
+                <input
+                  type="date"
+                  id="start-date"
+                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                />
+                <span class="text-gray-500">-</span>
+                <input
+                  type="date"
+                  id="end-date"
+                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            <hr class="border-dashed" />
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div class="flex items-center space-x-4">
+                <label class="text-xs font-bold text-gray-400 uppercase"
+                  >Display</label
+                >
+                <div id="granularity-group" class="flex items-center space-x-2">
+                  <button data-granularity="daily" class="control-btn active">
+                    Daily
+                  </button>
+                  <button data-granularity="weekly" class="control-btn">
+                    Weekly
+                  </button>
+                  <button data-granularity="monthly" class="control-btn">
+                    Monthly
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center space-x-4">
+                <label class="text-xs font-bold text-gray-400 uppercase"
+                  >Presets</label
+                >
+                <div class="flex items-center space-x-2">
+                  <button
+                    data-preset="current-month"
+                    class="control-btn active"
+                  >
+                    Current Month
+                  </button>
+                  <button data-preset="next-month" class="control-btn">
+                    Next Month
+                  </button>
+                  <button data-preset="this-year" class="control-btn">
+                    This Year
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-gray-200">
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-gray-800">Options</h3>
+              <div class="flex items-center space-x-6">
+                <label class="flex items-center">
+                  <input
+                    id="display-totals-checkbox"
+                    type="checkbox"
+                    checked
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  /><span class="ml-3 text-sm text-gray-600"
+                    >Display <strong>Totals</strong></span
+                  ></label
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-2">
+              <div class="p-6">
+                <h3 class="font-semibold text-gray-800 mb-2">Hotel Metrics</h3>
+                <p class="text-sm text-gray-500 mb-6">
+                  Select the core metrics for your property.
+                </p>
+                <div class="grid grid-cols-2 gap-x-6">
+                  <div class="space-y-4">
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        checked
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >Occupancy</span
+                      ></label
+                    >
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        checked
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >ADR</span
+                      ></label
+                    >
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >RevPAR</span
+                      ></label
+                    >
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        checked
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >Total Revenue</span
+                      ></label
+                    >
+                  </div>
+                  <div class="space-y-4">
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        checked
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >Rooms Sold</span
+                      ></label
+                    >
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >Rooms Unsold</span
+                      ></label
+                    >
+                    <label class="flex items-center"
+                      ><input
+                        type="checkbox"
+                        checked
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      /><span class="ml-3 text-sm text-gray-600"
+                        >Total Rooms</span
+                      ></label
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="p-6 border-t md:border-t-0 md:border-l border-gray-200 flex flex-col"
+              >
+                <div>
+                  <h3 class="font-semibold text-gray-800 mb-2">
+                    Market Metrics
+                  </h3>
+                  <p class="text-sm text-gray-500 mb-6">
+                    Select market data to compare against.
+                  </p>
+                  <div class="grid grid-cols-2 gap-x-6">
+                    <div class="space-y-4">
+                      <label class="flex items-center"
+                        ><input
+                          type="checkbox"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        /><span class="ml-3 text-sm text-gray-600"
+                          >Market Occupancy</span
+                        ></label
+                      >
+                      <label class="flex items-center"
+                        ><input
+                          type="checkbox"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        /><span class="ml-3 text-sm text-gray-600"
+                          >Market ADR</span
+                        ></label
+                      >
+                    </div>
+                    <div class="space-y-4">
+                      <label class="flex items-center">
+                        <input
+                          type="checkbox"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span class="ml-3 text-sm text-gray-600"
+                          >Market Revenue (Adjusted for Size)</span
+                        >
+                        <div class="tooltip-container">
+                          <svg
+                            class="h-4 w-4 ml-1.5 text-gray-400 cursor-pointer"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fill-rule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                              clip-rule="evenodd"
+                            />
+                          </svg>
+                          <span class="tooltip-text"
+                            >This metric calculates the market's total revenue,
+                            normalized to match your hotel's room capacity. It
+                            estimates what the market's revenue would be if it
+                            were the same size as your hotel.</span
+                          >
+                        </div>
+                      </label>
+                      <label class="flex items-center">
+                        <input
+                          type="checkbox"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span class="ml-3 text-sm text-gray-600"
+                          >Market RevPAR (Adjusted for Size)</span
+                        >
+                        <div class="tooltip-container">
+                          <svg
+                            class="h-4 w-4 ml-1.5 text-gray-400 cursor-pointer"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fill-rule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                              clip-rule="evenodd"
+                            />
+                          </svg>
+                          <span class="tooltip-text"
+                            >This metric calculates the market's RevPAR,
+                            normalized to match your hotel's room capacity,
+                            providing a more accurate 'like-for-like'
+                            comparison.</span
+                          >
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-auto pt-6 text-right">
+                  <button id="generate-report-btn" class="control-btn active">
+                    Generate Report
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="report-results-container" class="mt-8"></div>
+        </main>
+      </div>
+    </div>
+    <script src="/app/reports.js" type="module"></script>
+  </body>
+</html>

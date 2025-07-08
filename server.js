@@ -42,14 +42,25 @@ app.get("/api/auth/cloudbeds", (req, res) => {
     return res.status(500).send("Server configuration error.");
   }
 
-  // Reverted to the minimal working scope combination
-  const scopes = ["read:user", "read:hotel"];
+  const scopes = [
+    "read:user",
+    "read:hotel",
+    "read:guest",
+    "read:reservation",
+    "read:room",
+    "read:rate",
+    "read:currency",
+    "read:taxesAndFees",
+    "read:dataInsightsGuests",
+    "read:dataInsightsOccupancy",
+    "read:dataInsightsReservations",
+  ].join(" ");
 
   const params = new URLSearchParams({
     client_id: CLOUDBEDS_CLIENT_ID,
     redirect_uri: CLOUDBEDS_REDIRECT_URI,
     response_type: "code",
-    scope: scopes.join(" "),
+    scope: scopes,
   });
 
   const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
@@ -57,13 +68,14 @@ app.get("/api/auth/cloudbeds", (req, res) => {
   res.redirect(authorizationUrl);
 });
 
-// Reverted to the last fully working callback logic
+// FINAL VERSION: Corrected the property_id column name in the SQL query.
 app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) {
     return res.status(400).send("Error: No authorization code provided.");
   }
 
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
     const {
       CLOUDBEDS_CLIENT_ID,
@@ -88,15 +100,78 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       console.error("Token exchange failed:", tokenData);
       throw new Error("Failed to get access token from Cloudbeds.");
     }
-
     console.log("✅ Access token received successfully.");
+    const { access_token, refresh_token } = tokenData;
 
-    // 2. Immediately redirect to the dashboard
-    // This bypasses the failing user/property detail fetch step.
+    // 2. Fetch user details from /userinfo
+    const userInfoResponse = await fetch(
+      "https://api.cloudbeds.com/api/v1.3/userinfo",
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    if (!userInfoResponse.ok) {
+      throw new Error("Failed to fetch from /userinfo endpoint.");
+    }
+    const userInfo = await userInfoResponse.json();
+    console.log("✅ Successfully fetched user info.");
+
+    // 3. Fetch property details from the newly discovered endpoint
+    const propertyInfoResponse = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+        },
+      }
+    );
+    if (!propertyInfoResponse.ok) {
+      throw new Error("Failed to fetch property info from /me/properties.");
+    }
+    const propertyInfo = await propertyInfoResponse.json();
+
+    // 4. Extract the primary property ID from the response array
+    if (!propertyInfo || propertyInfo.length === 0) {
+      throw new Error("User has no properties assigned to their account.");
+    }
+    const primaryPropertyId = propertyInfo[0].id;
+    console.log(`✅ Successfully fetched property ID: ${primaryPropertyId}`);
+
+    // 5. Save the complete user record to the database
+    await client.connect();
+    // MODIFIED: Corrected property_id to cloudbeds_property_id
+    const query = `
+      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, cloudbeds_property_id, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+        email = EXCLUDED.email,
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        access_token = EXCLUDED.access_token,
+        refresh_token = EXCLUDED.refresh_token,
+        cloudbeds_property_id = EXCLUDED.cloudbeds_property_id,
+        status = 'active';
+    `;
+    const values = [
+      userInfo.user_id,
+      userInfo.email,
+      userInfo.first_name,
+      userInfo.last_name,
+      access_token,
+      refresh_token,
+      primaryPropertyId,
+    ];
+    await client.query(query, values);
+    console.log(`✅ User ${userInfo.user_id} saved to database.`);
+
+    // 6. Redirect to the app
     res.redirect("/app");
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
-    res.status(500).send("An error occurred during authentication.");
+    res
+      .status(500)
+      .send(`An error occurred during authentication: ${error.message}`);
+  } finally {
+    if (client) await client.end();
   }
 });
 
@@ -445,6 +520,11 @@ app.get("/admin", (req, res) => {
 // Serve the main application's HTML for any /app path.
 app.get("/app", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
+});
+
+// Serve the reports page
+app.get("/app/reports", (req, res) => {
+  res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
 
 const PORT = process.env.PORT || 3000;
