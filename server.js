@@ -1,6 +1,7 @@
-// server.js
+// server.js (Fully Multi-Tenant)
 require("dotenv").config();
 const express = require("express");
+const session = require("express-session");
 const fetch = require("node-fetch");
 const path = require("path");
 const { Client } = require("pg");
@@ -10,6 +11,15 @@ const initialSyncHandler = require("./initial-sync.js");
 
 const app = express();
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false },
+  })
+);
 
 // --- V1 Authentication (to be phased out) ---
 async function getCloudbedsAccessToken() {
@@ -32,6 +42,14 @@ async function getCloudbedsAccessToken() {
   if (!tokenData.access_token) throw new Error("Authentication failed");
   return tokenData.access_token;
 }
+
+const isAuthenticated = (req, res, next) => {
+  if (req.session.userId) {
+    return next();
+  } else {
+    return res.status(401).json({ error: "Unauthorized. Please log in." });
+  }
+};
 
 // --- V2.0 OAuth Endpoints ---
 app.get("/api/auth/cloudbeds", (req, res) => {
@@ -68,7 +86,6 @@ app.get("/api/auth/cloudbeds", (req, res) => {
   res.redirect(authorizationUrl);
 });
 
-// FINAL VERSION: Corrected the property_id column name in the SQL query.
 app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) {
@@ -83,7 +100,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       CLOUDBEDS_REDIRECT_URI,
     } = process.env;
 
-    // 1. Exchange the code for an access token
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLOUDBEDS_CLIENT_ID,
@@ -103,7 +119,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     console.log("✅ Access token received successfully.");
     const { access_token, refresh_token } = tokenData;
 
-    // 2. Fetch user details from /userinfo
     const userInfoResponse = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
       { headers: { Authorization: `Bearer ${access_token}` } }
@@ -114,7 +129,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     const userInfo = await userInfoResponse.json();
     console.log("✅ Successfully fetched user info.");
 
-    // 3. Fetch property details from the newly discovered endpoint
     const propertyInfoResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
       {
@@ -128,17 +142,13 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       throw new Error("Failed to fetch property info from /me/properties.");
     }
     const propertyInfo = await propertyInfoResponse.json();
-
-    // 4. Extract the primary property ID from the response array
     if (!propertyInfo || propertyInfo.length === 0) {
       throw new Error("User has no properties assigned to their account.");
     }
     const primaryPropertyId = propertyInfo[0].id;
     console.log(`✅ Successfully fetched property ID: ${primaryPropertyId}`);
 
-    // 5. Save the complete user record to the database
     await client.connect();
-    // MODIFIED: Corrected property_id to cloudbeds_property_id
     const query = `
       INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, cloudbeds_property_id, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
@@ -163,7 +173,9 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     await client.query(query, values);
     console.log(`✅ User ${userInfo.user_id} saved to database.`);
 
-    // 6. Redirect to the app
+    req.session.userId = userInfo.user_id;
+    console.log(`✅ Session created for user ${req.session.userId}.`);
+
     res.redirect("/app");
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
@@ -283,7 +295,7 @@ app.get("/api/test-database", async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
     await client.connect();
-    await client.query("SELECT NOW()"); // Simple query to test connection
+    await client.query("SELECT NOW()");
     res
       .status(200)
       .json({ success: true, message: "Database connection successful." });
@@ -294,20 +306,29 @@ app.get("/api/test-database", async (req, res) => {
   }
 });
 
-// --- Main Application Endpoints ---
-app.get("/api/get-hotel-name", async (req, res) => {
+// --- Main Application Endpoints (Now Fully User-Aware) ---
+// MODIFIED: Task 3.3 - All endpoints now use the logged-in user's ID.
+app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
-    const query = "SELECT property_name FROM hotels WHERE hotel_id = $1";
-    const result = await client.query(query, [ourHotelId]);
+    const userResult = await client.query(
+      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const propertyId = userResult.rows[0].cloudbeds_property_id;
 
-    if (result.rows.length === 0) {
+    const hotelResult = await client.query(
+      "SELECT property_name FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (hotelResult.rows.length === 0) {
       return res.status(404).json({ error: "Hotel name not found." });
     }
-
-    res.json({ hotelName: result.rows[0].property_name });
+    res.json({ hotelName: hotelResult.rows[0].property_name });
   } catch (error) {
     console.error("ERROR FETCHING HOTEL NAME:", error);
     res.status(500).json({ error: "Failed to fetch hotel details" });
@@ -316,18 +337,17 @@ app.get("/api/get-hotel-name", async (req, res) => {
   }
 });
 
-app.get("/api/last-refresh-time", async (req, res) => {
+app.get("/api/last-refresh-time", isAuthenticated, async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   try {
     await client.connect();
-    const query =
-      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'";
-    const result = await client.query(query);
+    const result = await client.query(
+      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'"
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Last refresh time not found." });
     }
-    const timestamp = result.rows[0].value.timestamp;
-    res.json({ last_successful_run: timestamp });
+    res.json({ last_successful_run: result.rows[0].value.timestamp });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch last refresh time" });
   } finally {
@@ -335,9 +355,8 @@ app.get("/api/last-refresh-time", async (req, res) => {
   }
 });
 
-app.get("/api/kpi-summary", async (req, res) => {
+app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
     const { startDate, endDate } = req.query;
@@ -346,6 +365,16 @@ app.get("/api/kpi-summary", async (req, res) => {
         .status(400)
         .json({ error: "startDate and endDate are required." });
     }
+
+    const userResult = await client.query(
+      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const propertyId = userResult.rows[0].cloudbeds_property_id;
+
     const kpiQuery = `
       SELECT
         (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END), 0)) AS your_adr,
@@ -355,12 +384,13 @@ app.get("/api/kpi-summary", async (req, res) => {
         (SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_occupancy,
         (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_revpar
       FROM daily_metrics_snapshots
-      WHERE stay_date >= $2 AND stay_date <= $3;
+      WHERE stay_date >= $2 AND stay_date <= $3 AND cloudbeds_user_id = $4;
     `;
     const result = await client.query(kpiQuery, [
-      ourHotelId,
+      propertyId,
       startDate,
       endDate,
+      req.session.userId,
     ]);
     const kpis = result.rows[0];
     res.json({
@@ -382,9 +412,8 @@ app.get("/api/kpi-summary", async (req, res) => {
   }
 });
 
-app.get("/api/metrics-from-db", async (req, res) => {
+app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
     const { startDate, endDate, granularity = "daily" } = req.query;
@@ -393,22 +422,36 @@ app.get("/api/metrics-from-db", async (req, res) => {
         .status(400)
         .json({ error: "startDate and endDate are required." });
     }
+
+    const userResult = await client.query(
+      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const propertyId = userResult.rows[0].cloudbeds_property_id;
+
     const currencyQuery =
       "SELECT currency_symbol FROM hotels WHERE hotel_id = $1";
-    const currencyResult = await client.query(currencyQuery, [ourHotelId]);
+    const currencyResult = await client.query(currencyQuery, [propertyId]);
     const currencySymbol = currencyResult.rows[0]?.currency_symbol || "$";
+
     let metricsQuery;
     let sqlGranularity = "day";
     if (granularity === "weekly") sqlGranularity = "week";
     if (granularity === "monthly") sqlGranularity = "month";
     const timeGroup = `DATE_TRUNC('${sqlGranularity}', stay_date)`;
+
+    const baseWhereClause = `hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3 AND cloudbeds_user_id = $4`;
+
     if (granularity === "daily") {
       metricsQuery = `
         SELECT
             TO_CHAR(stay_date, 'YYYY-MM-DD') AS stay_date,
             adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue
         FROM daily_metrics_snapshots
-        WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+        WHERE ${baseWhereClause}
         ORDER BY stay_date ASC;`;
     } else {
       metricsQuery = `
@@ -421,13 +464,14 @@ app.get("/api/metrics-from-db", async (req, res) => {
             SUM(capacity_count) as capacity_count,
             SUM(total_revenue) as total_revenue
         FROM daily_metrics_snapshots
-        WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+        WHERE ${baseWhereClause}
         GROUP BY ${timeGroup} ORDER BY ${timeGroup} ASC;`;
     }
     const metricsResult = await client.query(metricsQuery, [
-      ourHotelId,
+      propertyId,
       startDate,
       endDate,
+      req.session.userId,
     ]);
     res.json({ metrics: metricsResult.rows, currencySymbol: currencySymbol });
   } catch (error) {
@@ -437,9 +481,8 @@ app.get("/api/metrics-from-db", async (req, res) => {
   }
 });
 
-app.get("/api/competitor-metrics", async (req, res) => {
+app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  const ourHotelId = parseInt(process.env.CLOUDBEDS_PROPERTY_ID, 10);
   try {
     await client.connect();
     const { startDate, endDate, granularity = "daily" } = req.query;
@@ -448,23 +491,39 @@ app.get("/api/competitor-metrics", async (req, res) => {
         .status(400)
         .json({ error: "startDate and endDate are required." });
     }
+
+    const userResult = await client.query(
+      "SELECT cloudbeds_property_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const propertyId = userResult.rows[0].cloudbeds_property_id;
+
     const countQuery = "SELECT COUNT(*) FROM hotels WHERE hotel_id != $1";
-    const countResult = await client.query(countQuery, [ourHotelId]);
+    const countResult = await client.query(countQuery, [propertyId]);
     const competitorCount = parseInt(countResult.rows[0].count, 10);
+
     const capacityQuery = `
         SELECT SUM(t.capacity_count) as total_capacity FROM (
             SELECT DISTINCT ON (hotel_id) hotel_id, capacity_count
             FROM daily_metrics_snapshots
             WHERE hotel_id != $1 ORDER BY hotel_id, stay_date DESC
         ) t;`;
-    const capacityResult = await client.query(capacityQuery, [ourHotelId]);
+    const capacityResult = await client.query(capacityQuery, [propertyId]);
     const totalCapacity =
       parseInt(capacityResult.rows[0].total_capacity, 10) || 0;
+
     let query;
     let sqlGranularity = "day";
     if (granularity === "weekly") sqlGranularity = "week";
     if (granularity === "monthly") sqlGranularity = "month";
     const timeGroup = `DATE_TRUNC('${sqlGranularity}', stay_date)`;
+
+    // NOTE: Competitor metrics are not user-specific, but we filter by the user's property_id to exclude it.
+    const baseWhereClause = `hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3`;
+
     if (granularity === "daily") {
       query = `
         SELECT
@@ -473,7 +532,7 @@ app.get("/api/competitor-metrics", async (req, res) => {
             AVG(revpar) AS market_revpar, SUM(rooms_sold) AS market_rooms_sold,
             SUM(capacity_count) AS market_capacity
         FROM daily_metrics_snapshots
-        WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
+        WHERE ${baseWhereClause}
         GROUP BY stay_date ORDER BY stay_date ASC;`;
     } else {
       query = `
@@ -485,10 +544,10 @@ app.get("/api/competitor-metrics", async (req, res) => {
             SUM(rooms_sold) AS market_rooms_sold,
             SUM(capacity_count) AS market_capacity
         FROM daily_metrics_snapshots
-        WHERE hotel_id != $1 AND stay_date >= $2 AND stay_date <= $3
+        WHERE ${baseWhereClause}
         GROUP BY ${timeGroup} ORDER BY ${timeGroup} ASC;`;
     }
-    const result = await client.query(query, [ourHotelId, startDate, endDate]);
+    const result = await client.query(query, [propertyId, startDate, endDate]);
     res.json({
       metrics: result.rows,
       competitorCount: competitorCount,
@@ -507,22 +566,18 @@ app.get("/api/competitor-metrics", async (req, res) => {
 const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
 
-// Serve the main marketing page for the root URL
 app.get("/", (req, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
 
-// Serve the admin panel's HTML for any /admin path
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
-// Serve the main application's HTML for any /app path.
 app.get("/app", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-// Serve the reports page
 app.get("/app/reports", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });

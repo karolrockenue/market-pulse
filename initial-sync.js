@@ -1,10 +1,8 @@
-// initial-sync.js
-// MODIFIED: Refactored to handle API pagination and ensure full data sync.
-
+// initial-sync.js (Multi-User Refactor)
 const fetch = require("node-fetch").default || require("node-fetch");
 const { Client } = require("pg");
 
-// Self-contained constants to prevent module errors.
+// --- Self-contained constants to prevent module errors ---
 const DATASET_7_MAP = {
   adr: { name: "ADR", category: "Booking", type: "currency" },
   revpar: { name: "RevPAR", category: "Booking", type: "currency" },
@@ -59,34 +57,34 @@ const DATASET_7_MAP = {
   },
 };
 
-// --- AUTHENTICATION ---
-async function getCloudbedsAccessToken() {
-  const {
-    CLOUDBEDS_CLIENT_ID,
-    CLOUDBEDS_CLIENT_SECRET,
-    CLOUDBEDS_REFRESH_TOKEN,
-  } = process.env;
+// --- AUTHENTICATION (User-Specific) ---
+async function getCloudbedsAccessToken(refreshToken) {
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+  if (!refreshToken) {
+    throw new Error("Cannot get access token without a refresh token.");
+  }
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: CLOUDBEDS_CLIENT_ID,
     client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: CLOUDBEDS_REFRESH_TOKEN,
+    refresh_token: refreshToken,
   });
-  const tokenResponse = await fetch(
+  const response = await fetch(
     "https://hotels.cloudbeds.com/api/v1.1/access_token",
     { method: "POST", body: params }
   );
-  const tokenData = await tokenResponse.json();
-  if (!tokenData.access_token) throw new Error("Authentication failed");
+  const tokenData = await response.json();
+  if (!tokenData.access_token) {
+    console.error("Token refresh failed for a user:", tokenData);
+    return null;
+  }
   return tokenData.access_token;
 }
 
 // --- DATA PROCESSING ---
-// MODIFIED: This function now processes the complete, aggregated data set.
 function processApiDataForTable(allData) {
   const aggregatedData = {};
   if (!allData || allData.length === 0) {
-    console.log("No data records to process.");
     return aggregatedData;
   }
 
@@ -132,156 +130,190 @@ function processApiDataForTable(allData) {
 
 // --- MAIN HANDLER ---
 module.exports = async (request, response) => {
-  console.log("Starting INITIAL SYNC for new hotel...");
+  console.log("Starting INITIAL SYNC for ALL USERS...");
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  let recordsUpdated = 0;
+  let totalRecordsUpdated = 0;
 
   try {
-    console.log("Authenticating...");
-    const accessToken = await getCloudbedsAccessToken();
-    console.log("✅ Authentication successful.");
+    await client.connect();
 
-    const today = new Date();
-    const pastDate = new Date();
-    const futureDate = new Date();
-    pastDate.setDate(today.getDate() - 365);
-    futureDate.setDate(today.getDate() + 365);
-    const startDate = pastDate.toISOString().split("T")[0];
-    const endDate = futureDate.toISOString().split("T")[0];
-    console.log(
-      `Fetching historical and forecast data from ${startDate} to ${endDate}`
+    // MODIFIED: Fetch all active users.
+    console.log("Fetching list of active users...");
+    const usersResult = await client.query(
+      "SELECT cloudbeds_user_id, cloudbeds_property_id, refresh_token FROM users WHERE status = 'active'"
     );
+    const activeUsers = usersResult.rows;
+    console.log(`Found ${activeUsers.length} active user(s) to process.`);
 
-    const columnsToRequest = Object.keys(DATASET_7_MAP)
-      .filter((column) => {
-        const type = DATASET_7_MAP[column].type;
-        return [
-          "currency",
-          "number",
-          "percent",
-          "DynamicCurrency",
-          "DynamicPercentage",
-        ].includes(type);
-      })
-      .map((column) => ({ cdf: { column }, metrics: ["sum", "mean"] }));
-
-    const initialInsightsPayload = {
-      property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
-      dataset_id: 7,
-      filters: {
-        and: [
-          {
-            cdf: { column: "stay_date" },
-            operator: "greater_than_or_equal",
-            value: `${startDate}T00:00:00.000Z`,
-          },
-          {
-            cdf: { column: "stay_date" },
-            operator: "less_than_or_equal",
-            value: `${endDate}T00:00:00.000Z`,
-          },
-        ],
-      },
-      columns: columnsToRequest,
-      group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
-      settings: { details: true, totals: false },
-    };
-
-    // NEW: Logic to handle pagination
-    let allApiData = [];
-    let nextToken = null;
-    let pageNum = 1;
-
-    console.log("Fetching data from Cloudbeds Insights API...");
-    do {
-      console.log(`Fetching page ${pageNum}...`);
-      const insightsPayload = { ...initialInsightsPayload };
-      if (nextToken) {
-        insightsPayload.nextToken = nextToken; // Add token for subsequent requests
-      }
-
-      const apiResponse = await fetch(
-        "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-            "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
-          },
-          body: JSON.stringify(insightsPayload),
-        }
+    // MODIFIED: Loop through each active user.
+    for (const user of activeUsers) {
+      console.log(
+        `--- Syncing initial data for user: ${user.cloudbeds_user_id} ---`
       );
+      try {
+        // MODIFIED: Get user-specific access token.
+        const accessToken = await getCloudbedsAccessToken(user.refresh_token);
+        if (!accessToken) {
+          console.log(
+            `Skipping user ${user.cloudbeds_user_id} due to auth failure.`
+          );
+          continue;
+        }
 
-      const responseText = await apiResponse.text();
-      if (!apiResponse.ok)
-        throw new Error(
-          `Cloudbeds API responded with ${apiResponse.status}: ${responseText}`
+        const today = new Date();
+        const pastDate = new Date();
+        const futureDate = new Date();
+        pastDate.setDate(today.getDate() - 365);
+        futureDate.setDate(today.getDate() + 365);
+        const startDate = pastDate.toISOString().split("T")[0];
+        const endDate = futureDate.toISOString().split("T")[0];
+        console.log(
+          `Date range for user ${user.cloudbeds_user_id}: ${startDate} to ${endDate}`
         );
 
-      const pageData = JSON.parse(responseText);
-      allApiData.push(pageData);
+        const columnsToRequest = Object.keys(DATASET_7_MAP)
+          .filter((column) => {
+            const type = DATASET_7_MAP[column].type;
+            return ["currency", "number", "percent"].includes(type);
+          })
+          .map((column) => ({ cdf: { column }, metrics: ["sum", "mean"] }));
 
-      // Check for and set the token for the next page. Assumes token is at 'nextToken'.
-      nextToken = pageData.nextToken || null;
-      pageNum++;
-    } while (nextToken);
-    console.log(`✅ All ${pageNum - 1} pages fetched successfully.`);
+        const initialInsightsPayload = {
+          // MODIFIED: Use user's property ID.
+          property_ids: [parseInt(user.cloudbeds_property_id, 10)],
+          dataset_id: 7,
+          filters: {
+            and: [
+              {
+                cdf: { column: "stay_date" },
+                operator: "greater_than_or_equal",
+                value: `${startDate}T00:00:00.000Z`,
+              },
+              {
+                cdf: { column: "stay_date" },
+                operator: "less_than_or_equal",
+                value: `${endDate}T00:00:00.000Z`,
+              },
+            ],
+          },
+          columns: columnsToRequest,
+          group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
+          settings: { details: true, totals: false },
+        };
 
-    console.log("Processing all aggregated data...");
-    const processedData = processApiDataForTable(allApiData);
-    console.log("✅ Data processed successfully.");
+        let allApiData = [];
+        let nextToken = null;
+        let pageNum = 1;
 
-    await client.connect();
-    console.log("Preparing to insert data into the database...");
-    const datesToUpdate = Object.keys(processedData);
-    recordsUpdated = datesToUpdate.length;
+        console.log(
+          `Fetching paginated data for user ${user.cloudbeds_user_id}...`
+        );
+        do {
+          const insightsPayload = { ...initialInsightsPayload };
+          if (nextToken) {
+            insightsPayload.nextToken = nextToken;
+          }
 
-    for (const date of datesToUpdate) {
-      const metrics = processedData[date];
-      const query = `
-        INSERT INTO daily_metrics_snapshots (
-          snapshot_taken_date, stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count,
-          total_revenue, total_room_revenue, total_other_revenue, room_rate_total, taxes_total, fees_total, misc_income,
-          adults_count, children_count, room_guest_count, blocked_rooms_count, out_of_service_rooms_count
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        ON CONFLICT (stay_date, hotel_id) DO UPDATE SET
-          adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
-          capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue, total_room_revenue = EXCLUDED.total_room_revenue,
-          total_other_revenue = EXCLUDED.total_other_revenue, room_rate_total = EXCLUDED.room_rate_total, taxes_total = EXCLUDED.taxes_total,
-          fees_total = EXCLUDED.fees_total, misc_income = EXCLUDED.misc_income, adults_count = EXCLUDED.adults_count,
-          children_count = EXCLUDED.children_count, room_guest_count = EXCLUDED.room_guest_count,
-          blocked_rooms_count = EXCLUDED.blocked_rooms_count, out_of_service_rooms_count = EXCLUDED.out_of_service_rooms_count;
-      `;
-      const values = [
-        new Date(),
-        date,
-        process.env.CLOUDBEDS_PROPERTY_ID,
-        metrics.adr,
-        metrics.occupancy,
-        metrics.revpar,
-        metrics.rooms_sold,
-        metrics.capacity_count,
-        metrics.total_revenue,
-        metrics.room_revenue,
-        metrics.non_room_revenue,
-        metrics.room_rate,
-        metrics.room_taxes,
-        metrics.room_fees,
-        metrics.misc_income,
-        metrics.adults_count,
-        metrics.children_count,
-        metrics.room_guest_count,
-        metrics.blocked_room_count,
-        metrics.out_of_service_count,
-      ];
-      await client.query(query, values);
+          const apiResponse = await fetch(
+            "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+                // MODIFIED: Use user's property ID in header.
+                "X-PROPERTY-ID": user.cloudbeds_property_id,
+              },
+              body: JSON.stringify(insightsPayload),
+            }
+          );
+
+          const responseText = await apiResponse.text();
+          if (!apiResponse.ok)
+            throw new Error(
+              `API Error for user ${user.cloudbeds_user_id}: ${apiResponse.status}: ${responseText}`
+            );
+
+          const pageData = JSON.parse(responseText);
+          allApiData.push(pageData);
+          nextToken = pageData.nextToken || null;
+          console.log(
+            `Fetched page ${pageNum} for user ${user.cloudbeds_user_id}.`
+          );
+          pageNum++;
+        } while (nextToken);
+        console.log(
+          `✅ All ${pageNum - 1} pages fetched for user ${
+            user.cloudbeds_user_id
+          }.`
+        );
+
+        const processedData = processApiDataForTable(allApiData);
+        const datesToUpdate = Object.keys(processedData);
+
+        if (datesToUpdate.length > 0) {
+          console.log(
+            `Inserting/updating ${datesToUpdate.length} records for user ${user.cloudbeds_user_id}...`
+          );
+          for (const date of datesToUpdate) {
+            const metrics = processedData[date];
+            // MODIFIED: Include user's ID in the INSERT query.
+            const query = `
+                    INSERT INTO daily_metrics_snapshots (
+                        snapshot_taken_date, stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count,
+                        total_revenue, total_room_revenue, total_other_revenue, room_rate_total, taxes_total, fees_total, misc_income,
+                        adults_count, children_count, room_guest_count, blocked_rooms_count, out_of_service_rooms_count, cloudbeds_user_id
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                    ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+                        adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+                        capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue, total_room_revenue = EXCLUDED.total_room_revenue,
+                        total_other_revenue = EXCLUDED.total_other_revenue, room_rate_total = EXCLUDED.room_rate_total, taxes_total = EXCLUDED.taxes_total,
+                        fees_total = EXCLUDED.fees_total, misc_income = EXCLUDED.misc_income, adults_count = EXCLUDED.adults_count,
+                        children_count = EXCLUDED.children_count, room_guest_count = EXCLUDED.room_guest_count,
+                        blocked_rooms_count = EXCLUDED.blocked_rooms_count, out_of_service_rooms_count = EXCLUDED.out_of_service_rooms_count;
+                `;
+            const values = [
+              new Date(),
+              date,
+              user.cloudbeds_property_id,
+              metrics.adr,
+              metrics.occupancy,
+              metrics.revpar,
+              metrics.rooms_sold,
+              metrics.capacity_count,
+              metrics.total_revenue,
+              metrics.room_revenue,
+              metrics.non_room_revenue,
+              metrics.room_rate,
+              metrics.room_taxes,
+              metrics.room_fees,
+              metrics.misc_income,
+              metrics.adults_count,
+              metrics.children_count,
+              metrics.room_guest_count,
+              metrics.blocked_room_count,
+              metrics.out_of_service_count,
+              user.cloudbeds_user_id,
+            ];
+            await client.query(query, values);
+          }
+          totalRecordsUpdated += datesToUpdate.length;
+        }
+        console.log(
+          `--- User ${user.cloudbeds_user_id} synced successfully. ---`
+        );
+      } catch (userError) {
+        console.error(
+          `Failed to sync user ${user.cloudbeds_user_id}. Error:`,
+          userError.message
+        );
+      }
     }
 
-    console.log("✅ Database operations complete.");
+    console.log("✅ Initial sync job complete for all users.");
     response
       .status(200)
-      .json({ success: true, recordsUpdated: recordsUpdated });
+      .json({ success: true, totalRecordsUpdated: totalRecordsUpdated });
   } catch (error) {
     console.error(
       "❌ A critical error occurred during the initial sync:",
