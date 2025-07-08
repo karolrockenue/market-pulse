@@ -1,4 +1,4 @@
-// server.js (Production Session Fix - WWW Canonical)
+// server.js (Production Session Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -13,21 +13,15 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
-// Trust the Vercel proxy to handle secure connections
+// MODIFIED: Trust the Vercel proxy to handle secure connections
 app.set("trust proxy", 1);
 
-// --- START PRODUCTION FIX ---
-// Since Vercel redirects to 'www', we will treat it as the canonical origin.
-const allowedOrigins = ["https://www.market-pulse.io"];
-
-if (process.env.VERCEL_ENV !== "production") {
-  // Allow localhost for development
-  allowedOrigins.push("http://localhost:3000");
-}
-
+const allowedOrigins = [
+  "https://market-pulse.io",
+  "https://www.market-pulse.io",
+];
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg =
@@ -49,7 +43,8 @@ app.use(
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
-      // Set the domain for the cookie to be valid on the canonical www subdomain and its parent
+      // --- FINAL FIX IS HERE ---
+      // Set the domain for the cookie to be valid on all subdomains
       domain:
         process.env.VERCEL_ENV === "production"
           ? ".market-pulse.io"
@@ -93,11 +88,9 @@ app.get("/api/auth/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
 
   const isProduction = process.env.VERCEL_ENV === "production";
-  // The redirect URI MUST match the canonical domain.
   const redirectUri = isProduction
-    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+    ? "https://market-pulse.io/api/auth/cloudbeds/callback"
     : process.env.CLOUDBEDS_REDIRECT_URI;
-  // --- END PRODUCTION FIX ---
 
   if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
     console.error("OAuth environment variables not set!");
@@ -141,9 +134,8 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
 
     const isProduction = process.env.VERCEL_ENV === "production";
-    // The redirect URI MUST match the canonical domain.
     const redirectUri = isProduction
-      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+      ? "https://market-pulse.io/api/auth/cloudbeds/callback"
       : process.env.CLOUDBEDS_REDIRECT_URI;
 
     const tokenParams = new URLSearchParams({
