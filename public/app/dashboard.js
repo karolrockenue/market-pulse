@@ -189,7 +189,6 @@ function renderTables() {
       <th class="px-4 py-2 font-semibold">${metricConfig[activeMetric].label} Delta</th>
   `;
 
-  // MODIFIED: Handle no data state for tables
   if (yourHotelMetrics.length === 0) {
     const placeholderRow = `<tr><td colspan="5" class="text-center p-8 text-gray-500">No data to display for this period</td></tr>`;
     yourTable.innerHTML = placeholderRow;
@@ -351,7 +350,6 @@ function renderChart() {
     comparisonChart = null;
   }
 
-  // MODIFIED: Handle no data state for the chart
   if (yourHotelMetrics.length === 0) {
     chartContainer.classList.add("hidden");
     noDataOverlay.classList.remove("hidden");
@@ -488,7 +486,6 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
 
   hideError();
 
-  // MODIFIED: Apply loading styles
   if (!isInitialLoad) {
     dataDisplayWrapper.classList.add("loading");
   }
@@ -498,10 +495,11 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
     const marketUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`;
     const kpiUrl = `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}`;
 
+    // MODIFIED: Added { credentials: 'include' } to all fetch calls
     const [yourHotelResponse, marketResponse, kpiResponse] = await Promise.all([
-      fetch(yourHotelUrl),
-      fetch(marketUrl),
-      fetch(kpiUrl),
+      fetch(yourHotelUrl, { credentials: "include" }),
+      fetch(marketUrl, { credentials: "include" }),
+      fetch(kpiUrl, { credentials: "include" }),
     ]);
 
     if (!yourHotelResponse.ok || !marketResponse.ok || !kpiResponse.ok) {
@@ -543,7 +541,6 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
       }, 500);
       isInitialLoad = false;
     } else {
-      // MODIFIED: Remove loading styles
       dataDisplayWrapper.classList.remove("loading");
     }
   }
@@ -551,7 +548,10 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
 
 async function fetchAndSetDisplayNames() {
   try {
-    const response = await fetch("/api/get-hotel-name");
+    // MODIFIED: Added { credentials: 'include' }
+    const response = await fetch("/api/get-hotel-name", {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch hotel details");
     const hotelData = await response.json();
     hotelName = hotelData.hotelName || "Your Hotel";
@@ -571,7 +571,10 @@ async function fetchAndSetDisplayNames() {
 async function fetchAndDisplayLastRefreshTime() {
   const timestampEl = document.getElementById("data-timestamp");
   try {
-    const response = await fetch("/api/last-refresh-time");
+    // MODIFIED: Added { credentials: 'include' }
+    const response = await fetch("/api/last-refresh-time", {
+      credentials: "include",
+    });
     if (!response.ok) {
       throw new Error("Could not fetch refresh time.");
     }
