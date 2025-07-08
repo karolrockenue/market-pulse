@@ -169,7 +169,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       {
         headers: {
           Authorization: `Bearer ${access_token}`,
-          "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
         },
       }
     );
