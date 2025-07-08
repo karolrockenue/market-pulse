@@ -1,3 +1,4 @@
+console.log("Dashboard Deployment Test: Tuesday 7:37 PM");
 // --- GLOBAL STATE & CONFIG ---
 let comparisonChart = null;
 let yourHotelMetrics = [];
