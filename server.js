@@ -1,8 +1,8 @@
-// server.js (CORS Fix)
+// server.js (Final CORS Fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
-const cors = require("cors"); // Import cors
+const cors = require("cors");
 const fetch = require("node-fetch");
 const path = require("path");
 const { Client } = require("pg");
@@ -13,10 +13,23 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
-// MODIFIED: Configure and use CORS middleware
+// MODIFIED: Updated CORS options to handle www and non-www domains.
+const allowedOrigins = [
+  "https://market-pulse.io",
+  "https://www.market-pulse.io",
+];
 const corsOptions = {
-  origin: "https://market-pulse.io", // Your frontend URL
-  credentials: true, // Allow cookies to be sent
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg =
+        "The CORS policy for this site does not allow access from the specified Origin.";
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
 };
 app.use(cors(corsOptions));
 
