@@ -1,8 +1,8 @@
-// server.js (Final Fix: PostgreSQL Session Store & Connection Pooling)
+// server.js (Final Version with All Endpoints Implemented)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
-const { Pool } = require("pg"); // Only Pool is needed now for all queries
+const { Pool } = require("pg");
 const pgSession = require("connect-pg-simple")(session);
 const cors = require("cors");
 const fetch = require("node-fetch");
@@ -14,7 +14,6 @@ const initialSyncHandler = require("./initial-sync.js");
 const app = express();
 app.use(express.json());
 
-// Trust the Vercel proxy to handle secure connections
 app.set("trust proxy", 1);
 
 const allowedOrigins = [
@@ -35,22 +34,20 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// --- Create the Database Pool for Sessions and all API Queries ---
 const pgPool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// --- Configure the Persistent Session Store ---
 app.use(
   session({
     store: new pgSession({
-      pool: pgPool, // Connection pool
-      tableName: "user_sessions", // Use a custom table name
-      createTableIfMissing: true, // Automatically create the table
+      pool: pgPool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
     }),
     secret: process.env.SESSION_SECRET,
     resave: false,
-    saveUninitialized: false, // Best practice for login sessions
+    saveUninitialized: false,
     cookie: {
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
@@ -59,7 +56,7 @@ app.use(
         process.env.VERCEL_ENV === "production"
           ? ".market-pulse.io"
           : undefined,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     },
   })
 );
@@ -72,7 +69,6 @@ const isAuthenticated = (req, res, next) => {
   }
 };
 
-// --- V2.0 OAuth Endpoints ---
 app.get("/api/auth/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
 
@@ -119,7 +115,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-
     const isProduction = process.env.VERCEL_ENV === "production";
     const redirectUri = isProduction
       ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
@@ -162,13 +157,13 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     const primaryPropertyId = propertyInfo[0].id;
 
     const query = `
-      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, cloudbeds_property_id, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
-        email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-        access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
-        cloudbeds_property_id = EXCLUDED.cloudbeds_property_id, status = 'active';
-    `;
+            INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, cloudbeds_property_id, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+            ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+                email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+                access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
+                cloudbeds_property_id = EXCLUDED.cloudbeds_property_id, status = 'active';
+        `;
     const values = [
       userInfo.user_id,
       userInfo.email,
@@ -182,7 +177,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 
     req.session.userId = userInfo.user_id;
 
-    // *** FIX 1: Explicitly save the session before redirecting ***
     req.session.save((err) => {
       if (err) {
         console.error("CRITICAL: Error saving session before redirect:", err);
@@ -199,10 +193,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       .send(`An error occurred during authentication: ${error.message}`);
   }
 });
-
-// --- Main Application Endpoints (Now Fully User-Aware) ---
-
-// *** FIX 2: All routes below now use pgPool for database queries ***
 
 app.get("/api/get-hotel-name", isAuthenticated, async (req, res) => {
   try {
@@ -253,16 +243,16 @@ app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
     const propertyId = userResult.rows[0].cloudbeds_property_id;
 
     const kpiQuery = `
-            SELECT
-                (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END), 0)) AS your_adr,
-                (SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_occupancy,
-                (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_revpar,
-                (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END), 0)) AS market_adr,
-                (SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_occupancy,
-                (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_revpar
-            FROM daily_metrics_snapshots
-            WHERE stay_date >= $2 AND stay_date <= $3 AND cloudbeds_user_id = $4;
-        `;
+        SELECT
+            (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END), 0)) AS your_adr,
+            (SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_occupancy,
+            (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_revpar,
+            (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END), 0)) AS market_adr,
+            (SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_occupancy,
+            (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_revpar
+        FROM daily_metrics_snapshots
+        WHERE stay_date >= $2 AND stay_date <= $3 AND cloudbeds_user_id = $4;
+    `;
     const result = await pgPool.query(kpiQuery, [
       propertyId,
       startDate,
@@ -288,6 +278,14 @@ app.get("/api/kpi-summary", isAuthenticated, async (req, res) => {
   }
 });
 
+// --- NEWLY IMPLEMENTED ENDPOINTS ---
+
+const getPeriod = (granularity) => {
+  if (granularity === "monthly") return "date_trunc('month', stay_date)";
+  if (granularity === "weekly") return "date_trunc('week', stay_date)";
+  return "stay_date";
+};
+
 app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily" } = req.query;
@@ -298,9 +296,30 @@ app.get("/api/metrics-from-db", isAuthenticated, async (req, res) => {
     if (userResult.rows.length === 0)
       return res.status(404).json({ error: "User not found." });
     const propertyId = userResult.rows[0].cloudbeds_property_id;
+    const period = getPeriod(granularity);
 
-    // ... (rest of the logic would go here, using pgPool for queries)
-    res.json({ message: "Endpoint not fully implemented yet." }); // Placeholder
+    const query = `
+      SELECT
+        ${period} as period,
+        AVG(adr) as adr,
+        AVG(occupancy_direct) as occupancy_direct,
+        AVG(revpar) as revpar
+      FROM daily_metrics_snapshots
+      WHERE
+        hotel_id = $1 AND
+        cloudbeds_user_id = $2 AND
+        stay_date >= $3 AND
+        stay_date <= $4
+      GROUP BY period
+      ORDER BY period ASC;
+    `;
+    const result = await pgPool.query(query, [
+      propertyId,
+      req.session.userId,
+      startDate,
+      endDate,
+    ]);
+    res.json({ metrics: result.rows });
   } catch (error) {
     console.error("Error in /api/metrics-from-db:", error);
     res.status(500).json({ error: "Failed to fetch metrics from database" });
@@ -317,9 +336,40 @@ app.get("/api/competitor-metrics", isAuthenticated, async (req, res) => {
     if (userResult.rows.length === 0)
       return res.status(404).json({ error: "User not found." });
     const propertyId = userResult.rows[0].cloudbeds_property_id;
+    const period = getPeriod(granularity);
 
-    // ... (rest of the logic would go here, using pgPool for queries)
-    res.json({ message: "Endpoint not fully implemented yet." }); // Placeholder
+    const query = `
+      SELECT
+        ${period} as period,
+        AVG(adr) as market_adr,
+        AVG(occupancy_direct) as market_occupancy,
+        AVG(revpar) as market_revpar,
+        COUNT(DISTINCT hotel_id) as competitor_count,
+        SUM(capacity_count) as total_capacity
+      FROM daily_metrics_snapshots
+      WHERE
+        hotel_id != $1 AND
+        cloudbeds_user_id = $2 AND
+        stay_date >= $3 AND
+        stay_date <= $4
+      GROUP BY period
+      ORDER BY period ASC;
+    `;
+    const result = await pgPool.query(query, [
+      propertyId,
+      req.session.userId,
+      startDate,
+      endDate,
+    ]);
+    const competitorCountResult = await pgPool.query(
+      "SELECT COUNT(DISTINCT hotel_id) FROM daily_metrics_snapshots WHERE hotel_id != $1",
+      [propertyId]
+    );
+
+    res.json({
+      metrics: result.rows,
+      competitorCount: competitorCountResult.rows[0]?.count || 0,
+    });
   } catch (error) {
     console.error("Error in /api/competitor-metrics:", error);
     res.status(500).json({ error: "Failed to fetch competitor metrics" });
