@@ -7,23 +7,10 @@
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
-    {
-      "src": "/api/daily-refresh",
-      "dest": "/api/daily-refresh.js"
-    },
-    {
-      "src": "/api/initial-sync",
-      "dest": "/api/initial-sync.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "server.js"
-    }
+    { "src": "/api/daily-refresh", "dest": "/api/daily-refresh.js" },
+    { "src": "/api/initial-sync", "dest": "/api/initial-sync.js" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "server.js" }
   ],
-  "crons": [
-    {
-      "path": "/api/daily-refresh",
-      "schedule": "0 4 * * *"
-    }
-  ]
+  "crons": [{ "path": "/api/daily-refresh", "schedule": "0 4 * * *" }]
 }
