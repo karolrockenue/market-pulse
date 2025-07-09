@@ -3,8 +3,7 @@
   "builds": [
     { "src": "server.js", "use": "@vercel/node" },
     { "src": "api/daily-refresh.js", "use": "@vercel/node" },
-    { "src": "api/initial-sync.js", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
+    { "src": "api/initial-sync.js", "use": "@vercel/node" }
   ],
   "routes": [
     {
