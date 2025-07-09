@@ -2,43 +2,81 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Redirecting to Market Pulse</title>
-
-    <!-- This meta tag instantly redirects the user to the /app/ directory -->
-
-    <!-- A canonical link is good practice for search engines -->
-    <link rel="canonical" href="/app/" />
-
-    <!-- Basic styling for the fallback message -->
-    <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif;
-        background-color: #f7f8fc;
-        color: #1e293b;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-      }
-      .container {
-        text-align: center;
-        padding: 2rem;
-      }
-      a {
-        color: #3b82f6;
-      }
-    </style>
+    <title>Login - Market Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
-    <div class="container">
-      <p>Redirecting you to the Market Pulse dashboard...</p>
-      <p>
-        If you are not redirected automatically,
-        <a href="/app/">please click here</a>.
+  <body class="bg-gray-50 flex items-center justify-center min-h-screen">
+    <div class="max-w-md w-full text-center p-8 bg-white shadow-md rounded-lg">
+      <h1 class="text-2xl font-bold text-gray-800 mb-2">
+        Sign In to Market Pulse
+      </h1>
+      <p class="text-gray-600 mb-6">
+        Enter your email to receive a secure login link.
       </p>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <input
+            type="email"
+            id="email-input"
+            required
+            placeholder="Enter your email"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <button
+          type="submit"
+          id="submit-btn"
+          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          Send Login Link
+        </button>
+      </form>
+      <div id="message-container" class="mt-4 text-sm"></div>
     </div>
+
+    <script>
+      const loginForm = document.getElementById("login-form");
+      const emailInput = document.getElementById("email-input");
+      const submitBtn = document.getElementById("submit-btn");
+      const messageContainer = document.getElementById("message-container");
+
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = emailInput.value;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending...";
+        messageContainer.textContent = "";
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+
+          if (response.ok) {
+            messageContainer.className = "text-sm text-green-600";
+            messageContainer.textContent =
+              "Success! Please check your email for a login link.";
+            loginForm.reset();
+          } else if (response.status === 404) {
+            messageContainer.className =
+              "text-sm text-yellow-700 p-3 bg-yellow-50 rounded-md";
+            messageContainer.innerHTML =
+              'This email is not associated with an account. To get started, please find and connect the Market Pulse app from within the <a href="https://www.cloudbeds.com/marketplace/" target="_blank" class="font-bold underline">Cloudbeds Marketplace</a>.';
+          } else {
+            throw new Error("An unexpected error occurred.");
+          }
+        } catch (error) {
+          messageContainer.className = "text-sm text-red-600";
+          messageContainer.textContent =
+            "Failed to send login link. Please try again.";
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Send Login Link";
+        }
+      });
+    </script>
   </body>
 </html>
