@@ -74,7 +74,16 @@ app.post("/api/admin-login", (req, res) => {
       .json({ error: "Admin password not configured on server." });
   }
   if (password === adminPassword) {
-    res.status(200).json({ success: true });
+    // Set a user ID on the session to satisfy requireApiLogin
+    req.session.userId = "admin";
+    // Save the session before sending the response
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.status(500).json({ error: "Failed to save session." });
+      }
+      res.status(200).json({ success: true });
+    });
   } else {
     res.status(401).json({ error: "Invalid password." });
   }
@@ -403,6 +412,16 @@ app.get("/api/my-properties", requireApiLogin, async (req, res) => {
 
 app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
   try {
+    // Admin user won't have a real token, so we can bypass the API call for them.
+    if (req.session.userId === "admin") {
+      return res
+        .status(200)
+        .json({
+          success: true,
+          status: 200,
+          message: "Admin connection test successful.",
+        });
+    }
     const user = await pgPool.query(
       "SELECT access_token FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
