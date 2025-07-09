@@ -198,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
       testConnection("/api/test-database", dbStatusEl)
     );
     runDailyRefreshBtn.addEventListener("click", () =>
-      runJob("/jobs/daily-refresh", runDailyRefreshBtn)
+      runJob("/api/daily-refresh", runDailyRefreshBtn)
     );
     runInitialSyncBtn.addEventListener("click", () => {
       if (
@@ -206,7 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
           "Are you sure you want to run a full data sync? This can take several minutes and will overwrite existing data."
         )
       ) {
-        runJob("/jobs/initial-sync", runInitialSyncBtn);
+        runJob("/api/initial-sync", runInitialSyncBtn);
       }
     });
 
