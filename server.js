@@ -636,6 +636,7 @@ app.get("/app/", requirePageLogin, (req, res) => {
 });
 
 // Serve reports page with protection
+// Serve reports page with protection
 app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
