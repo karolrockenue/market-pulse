@@ -75,7 +75,7 @@ const requireApiLogin = (req, res, next) => {
 
 const requirePageLogin = (req, res, next) => {
   if (!req.session.userId) {
-    return res.redirect("/login");
+    return res.redirect("/signin");
   }
   next();
 };
@@ -614,10 +614,10 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
 
 // --- Static and fallback routes ---
 app.get("/", (req, res) => {
-  res.redirect("/login");
+  res.redirect("/signin");
 });
 
-app.get("/login", (req, res) => {
+app.get("/signin", (req, res) => {
   res.sendFile(path.join(publicPath, "login.html"));
 });
 
