@@ -69,6 +69,13 @@ const requireApiLogin = (req, res, next) => {
   next();
 };
 
+const requirePageLogin = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.redirect("/login");
+  }
+  next();
+};
+
 // --- NEW MAGIC LINK AUTH ---
 app.post("/api/auth/login", async (req, res) => {
   const { email } = req.body;
@@ -602,29 +609,40 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
 });
 
 // --- Static and fallback routes ---
+// --- Static and fallback routes ---
+// --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 
-// **FIXED**: Removed the erroneous 'requirePageLogin' from these routes
-app.get("/app/", (req, res) => {
-  res.sendFile(path.join(publicPath, "app", "index.html"));
-});
-
-app.get("/admin/", (req, res) => {
-  res.sendFile(path.join(publicPath, "admin", "index.html"));
-});
-
-// This route serves static files from the 'public' directory
+// Serve static files like CSS, and JS from the 'public' directory
 app.use(express.static(publicPath));
 
-// Fallback for the root URL
+// Define page routes
 app.get("/", (req, res) => {
-  res.sendFile(path.join(publicPath, "index.html")); // This should likely redirect to /login or /app
+  res.redirect("/login");
 });
 
 app.get("/login", (req, res) => {
   res.sendFile(path.join(publicPath, "login.html"));
 });
 
+app.get("/app", requirePageLogin, (req, res) => {
+  res.redirect("/app/");
+});
+app.get("/app/", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "app", "index.html"));
+});
+
+// Serve reports page with protection
+app.get("/app/reports.html", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "app", "reports.html"));
+});
+
+app.get("/admin", requirePageLogin, (req, res) => {
+  res.redirect("/admin/");
+});
+app.get("/admin/", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "admin", "index.html"));
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
