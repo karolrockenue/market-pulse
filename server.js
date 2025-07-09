@@ -1,4 +1,4 @@
-// server.js (Production Ready - with all latest updates)
+// server.js (Production Ready - with all latest updates and final fix)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -36,6 +36,10 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
+
+// **CORRECTED LOCATION**: Serves static files (JS, CSS, images) from the 'public' directory
+const publicPath = path.join(process.cwd(), "public");
+app.use(express.static(publicPath));
 
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -609,14 +613,6 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
 });
 
 // --- Static and fallback routes ---
-// --- Static and fallback routes ---
-// --- Static and fallback routes ---
-const publicPath = path.join(process.cwd(), "public");
-
-// Serve static files like CSS, and JS from the 'public' directory
-app.use(express.static(publicPath));
-
-// Define page routes
 app.get("/", (req, res) => {
   res.redirect("/login");
 });
