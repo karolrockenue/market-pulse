@@ -144,7 +144,20 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
     }
 
     const validToken = tokenResult.rows[0];
-    req.session.userId = validToken.user_id;
+    const internalUserId = validToken.user_id;
+
+    // New Step: Use the internal ID to look up the correct cloudbeds_user_id
+    const userResult = await pgPool.query(
+      "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
+      [internalUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).send("Could not find a matching user account.");
+    }
+    
+    // Set the session to the CORRECT (Cloudbeds) ID
+    req.session.userId = userResult.rows[0].cloudbeds_user_id;
 
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
@@ -157,11 +170,9 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
       }
       res.redirect("/app/");
     });
-  } catch (error) {
-    console.error("Error during magic link callback:", error);
-    res.status(500).send("An internal server error occurred.");
-  }
-});
+} catch (error) {
+    // ...
+}
 
 // --- ADMIN & CLOUDBEDS OAUTH ---
 app.post("/api/admin-login", (req, res) => {
