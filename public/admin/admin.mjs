@@ -1,4 +1,4 @@
-import { DATASET_7_MAP } from "../constants.js";
+import { DATASET_7_MAP } from "../constants.mjs";
 
 document.addEventListener("DOMContentLoaded", () => {
   const loginForm = document.getElementById("login-form");
