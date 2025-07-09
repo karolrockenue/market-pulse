@@ -531,11 +531,11 @@ const publicPath = path.join(process.cwd(), "public");
 // 2. Serve static assets.
 // 3. Define public fallback routes.
 
-app.get("/app/", requirePageLogin, (req, res) => {
+app.get("/app/", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-app.get("/admin/", requirePageLogin, (req, res) => {
+app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
