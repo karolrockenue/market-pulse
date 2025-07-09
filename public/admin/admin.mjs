@@ -56,9 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "endpoint-test-results"
     );
     const hotelsTableBody = document.getElementById("hotels-table-body");
-    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
-    const discoveryStatusEl = document.getElementById("discovery-status");
-    const discoveryResultsEl = document.getElementById("discovery-results");
 
     const fetchLastRefreshTime = async () => {
       try {
@@ -210,111 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
         runJob("/api/initial-sync", runInitialSyncBtn);
       }
     });
-
-    const runApiDiscovery = async () => {
-      discoveryStatusEl.textContent = "Running discovery...";
-      discoveryResultsEl.innerHTML = "";
-      runApiDiscoveryBtn.disabled = true;
-      runApiDiscoveryBtn.textContent = "Discovering...";
-
-      try {
-        // 1. Get the API context (token and propertyId) ONCE
-        discoveryStatusEl.textContent = "Getting API context...";
-        const contextResponse = await fetch("/api/get-discovery-context");
-        const context = await contextResponse.json();
-        if (!contextResponse.ok) {
-          throw new Error(context.error || "Could not get API context.");
-        }
-        const { accessToken, propertyId } = context;
-
-        // 2. Get all available datasets using the context
-        discoveryStatusEl.textContent = "Fetching datasets...";
-        const datasetsResponse = await fetch("/api/get-all-datasets", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "X-PROPERTY-ID": propertyId,
-          },
-        });
-        const datasets = await datasetsResponse.json();
-        if (!datasetsResponse.ok) {
-          throw new Error(datasets.error || "Could not fetch datasets.");
-        }
-
-        discoveryStatusEl.textContent = `Found ${datasets.length} datasets. Fetching fields...`;
-
-        for (const dataset of datasets) {
-          const datasetDiv = document.createElement("div");
-          datasetDiv.className = "mb-6";
-          let content = `<h3 class="text-lg font-bold text-gray-700">Dataset ${dataset.id}: ${dataset.name}</h3>`;
-
-          // 3. Check for multi-levels, REUSING the context
-          const mlResponse = await fetch(
-            `/api/datasets/${dataset.id}/multi-levels`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "X-PROPERTY-ID": propertyId,
-              },
-            }
-          );
-          const multiLevels = await mlResponse.json();
-
-          if (multiLevels && multiLevels.length > 0) {
-            content += `<p class="text-xs text-gray-500 italic">Nested Dataset</p>`;
-            for (const ml of multiLevels) {
-              // 4. Fetch fields, REUSING the context
-              const fieldsResponse = await fetch(
-                `/api/datasets/${dataset.id}/fields?ml_id=${ml.id}`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    "X-PROPERTY-ID": propertyId,
-                  },
-                }
-              );
-              const fields = await fieldsResponse.json();
-              content += `<h4 class="font-semibold mt-2">Fields for Multi-Level: ${ml.name}</h4>`;
-              const pre = document.createElement("pre");
-              pre.className =
-                "bg-gray-900 text-white text-xs p-3 rounded-md mt-1";
-              pre.textContent = JSON.stringify(fields, null, 2);
-              content += pre.outerHTML;
-            }
-          } else {
-            // 4. Fetch fields for flat datasets, REUSING the context
-            content += `<p class="text-xs text-gray-500 italic">Flat Dataset</p>`;
-            const fieldsResponse = await fetch(
-              `/api/datasets/${dataset.id}/fields`,
-              {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "X-PROPERTY-ID": propertyId,
-                },
-              }
-            );
-            const fields = await fieldsResponse.json();
-            const pre = document.createElement("pre");
-            pre.className =
-              "bg-gray-900 text-white text-xs p-3 rounded-md mt-1";
-            pre.textContent = JSON.stringify(fields, null, 2);
-            content += pre.outerHTML;
-          }
-          datasetDiv.innerHTML = content;
-          discoveryResultsEl.appendChild(datasetDiv);
-        }
-        discoveryStatusEl.textContent =
-          "✅ Discovery Complete! Results are shown below.";
-      } catch (error) {
-        discoveryStatusEl.textContent = `❌ Error during discovery: ${error.message}`;
-        console.error("Discovery Error:", error);
-      } finally {
-        runApiDiscoveryBtn.disabled = false;
-        runApiDiscoveryBtn.textContent = "Discover API Endpoints";
-      }
-    };
-
-    // Attaching the event listener only ONCE
-    runApiDiscoveryBtn.addEventListener("click", runApiDiscovery);
 
     fetchLastRefreshTime();
     fetchAndRenderHotels();

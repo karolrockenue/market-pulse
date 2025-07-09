@@ -1,4 +1,4 @@
-// server.js (Production Ready - with API Explorer Fix)
+// server.js (Production Ready - with Logout and UX Fixes)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -76,7 +76,7 @@ const requirePageLogin = (req, res, next) => {
   next();
 };
 
-// --- AUTHENTICATION ROUTES ---
+// --- NEW MAGIC LINK & LOGOUT AUTH ---
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -85,8 +85,10 @@ app.post("/api/auth/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
+    // The cookie domain must match what was used to set it.
     const cookieDomain =
       process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
+    // Clear the cookie from the browser
     res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
     res.status(200).json({ message: "Logged out successfully" });
   });
@@ -97,21 +99,26 @@ app.post("/api/auth/login", async (req, res) => {
   if (!email) {
     return res.status(400).json({ error: "Email is required." });
   }
+
   try {
     const userResult = await pgPool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
+
     if (userResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: "User not found." });
     }
+
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date(Date.now() + 15 * 60 * 1000);
+    const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minute expiry
+
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
       [token, user.user_id, expires_at]
     );
+
     const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
     const msg = {
       to: user.email,
@@ -119,7 +126,9 @@ app.post("/api/auth/login", async (req, res) => {
       subject: "Your Market Pulse Login Link",
       html: `<p>Hello ${user.first_name},</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}">Log in to Market Pulse</a></p>`,
     };
+
     await sgMail.send(msg);
+
     res.status(200).json({ success: true, message: "Login link sent." });
   } catch (error) {
     console.error("Error during magic link login:", error);
@@ -132,11 +141,13 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
   }
+
   try {
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
     );
+
     if (tokenResult.rows.length === 0) {
       return res
         .status(400)
@@ -144,19 +155,25 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
           "Login link is invalid or has expired. Please request a new one."
         );
     }
+
     const validToken = tokenResult.rows[0];
     const internalUserId = validToken.user_id;
+
     const userResult = await pgPool.query(
       "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
       [internalUserId]
     );
+
     if (userResult.rows.length === 0) {
       return res.status(404).send("Could not find a matching user account.");
     }
+
     req.session.userId = userResult.rows[0].cloudbeds_user_id;
+
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);
+
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
@@ -170,6 +187,7 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   }
 });
 
+// --- ADMIN & CLOUDBEDS OAUTH ---
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -198,6 +216,7 @@ app.get("/api/auth/cloudbeds", (req, res) => {
   const redirectUri = isProduction
     ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
     : process.env.CLOUDBEDS_REDIRECT_URI;
+
   if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
     return res.status(500).send("Server configuration error.");
   }
@@ -214,21 +233,22 @@ app.get("/api/auth/cloudbeds", (req, res) => {
     "read:dataInsightsOccupancy",
     "read:dataInsightsReservations",
   ].join(" ");
+
   const params = new URLSearchParams({
     client_id: CLOUDBEDS_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "code",
     scope: scopes,
   });
-  res.redirect(
-    `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`
-  );
+  const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+  res.redirect(authorizationUrl);
 });
 
 app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   const { code } = req.query;
-  if (!code)
+  if (!code) {
     return res.status(400).send("Error: No authorization code provided.");
+  }
   try {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
     const isProduction = process.env.VERCEL_ENV === "production";
@@ -247,11 +267,10 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       { method: "POST", body: tokenParams }
     );
     const tokenData = await tokenResponse.json();
-    if (!tokenData.access_token)
+    if (!tokenData.access_token) {
       throw new Error("Failed to get access token from Cloudbeds.");
-
+    }
     const { access_token, refresh_token } = tokenData;
-
     const userInfoResponse = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
       { headers: { Authorization: `Bearer ${access_token}` } }
@@ -264,47 +283,53 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     );
     const propertyInfo = await propertyInfoResponse.json();
 
-    await pgPool.query(
-      `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'active')
-       ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
-       email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-       access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, status = 'active';`,
-      [
-        userInfo.user_id,
-        userInfo.email,
-        userInfo.first_name,
-        userInfo.last_name,
-        access_token,
-        refresh_token,
-      ]
-    );
-
+    const userQuery = `
+      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'active')
+      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+          email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+          access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, status = 'active';
+    `;
+    await pgPool.query(userQuery, [
+      userInfo.user_id,
+      userInfo.email,
+      userInfo.first_name,
+      userInfo.last_name,
+      access_token,
+      refresh_token,
+    ]);
     const properties = Array.isArray(propertyInfo)
       ? propertyInfo
       : [propertyInfo];
-    if (!properties || properties.length === 0 || !properties[0])
+    if (!properties || properties.length === 0 || !properties[0]) {
       throw new Error("No properties found for this user account.");
-
+    }
     for (const property of properties) {
       if (property && property.id) {
-        await pgPool.query(
-          `INSERT INTO hotels (hotel_id, property_name, city, star_rating) VALUES ($1, $2, $3, 2) ON CONFLICT (hotel_id) DO NOTHING;`,
-          [property.id, property.name, property.city]
-        );
-        await pgPool.query(
-          `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`,
-          [userInfo.user_id, property.id]
-        );
+        const hotelInsertQuery = `
+          INSERT INTO hotels (hotel_id, property_name, city, star_rating)
+          VALUES ($1, $2, $3, 2)
+          ON CONFLICT (hotel_id) DO NOTHING;
+        `;
+        await pgPool.query(hotelInsertQuery, [
+          property.id,
+          property.name,
+          property.city,
+        ]);
+        const userPropertyLinkQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
+        await pgPool.query(userPropertyLinkQuery, [
+          userInfo.user_id,
+          property.id,
+        ]);
       }
     }
-
     req.session.userId = userInfo.user_id;
     req.session.save((err) => {
-      if (err)
+      if (err) {
         return res
           .status(500)
           .send("An error occurred during authentication session save.");
+      }
       res.redirect("/app/");
     });
   } catch (error) {
@@ -326,7 +351,7 @@ app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [req.session.userId, propertyId]
     );
-    if (accessCheck.rows.length === 0 && req.session.userId !== "admin") {
+    if (accessCheck.rows.length === 0) {
       return res.status(403).json({ error: "Access denied to this property." });
     }
     const hotelResult = await pgPool.query(
@@ -373,7 +398,7 @@ app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [req.session.userId, propertyId]
     );
-    if (accessCheck.rows.length === 0 && req.session.userId !== "admin") {
+    if (accessCheck.rows.length === 0) {
       return res.status(403).json({ error: "Access denied to this property." });
     }
     const hotelRatingResult = await pgPool.query(
@@ -435,7 +460,7 @@ app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [req.session.userId, propertyId]
     );
-    if (accessCheck.rows.length === 0 && req.session.userId !== "admin") {
+    if (accessCheck.rows.length === 0) {
       return res.status(403).json({ error: "Access denied to this property." });
     }
     const period = getPeriod(granularity);
@@ -463,7 +488,7 @@ app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [req.session.userId, propertyId]
     );
-    if (accessCheck.rows.length === 0 && req.session.userId !== "admin") {
+    if (accessCheck.rows.length === 0) {
       return res.status(403).json({ error: "Access denied to this property." });
     }
     const hotelRatingResult = await pgPool.query(
@@ -606,154 +631,6 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
     });
   }
   res.status(200).json(results);
-});
-
-// --- API DISCOVERY PROXY WITH SERVER-SIDE CACHING ---
-
-// In-memory cache for the API discovery context
-let apiDiscoveryContextCache = {
-  token: null,
-  propertyId: null,
-  expiresAt: null,
-};
-
-// Helper function to get a valid token and property ID, using a cache
-const getApiContextWithCache = async () => {
-  const now = new Date();
-  // If cache is still valid (e.g., within 4 minutes), return it.
-  if (
-    apiDiscoveryContextCache.token &&
-    apiDiscoveryContextCache.expiresAt > now
-  ) {
-    return {
-      accessToken: apiDiscoveryContextCache.token,
-      propertyId: apiDiscoveryContextCache.propertyId,
-    };
-  }
-
-  // If cache is invalid, fetch a new context
-  const userResult = await pgPool.query(
-    "SELECT cloudbeds_user_id, refresh_token FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1"
-  );
-  if (userResult.rows.length === 0) {
-    throw new Error(
-      "No active user with a refresh token found for API discovery."
-    );
-  }
-  const { cloudbeds_user_id, refresh_token } = userResult.rows[0];
-
-  const propertyResult = await pgPool.query(
-    "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
-    [cloudbeds_user_id]
-  );
-  if (propertyResult.rows.length === 0) {
-    throw new Error(
-      "No property associated with the user found for API discovery."
-    );
-  }
-  const propertyId = propertyResult.rows[0].property_id;
-
-  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-  const params = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: CLOUDBEDS_CLIENT_ID,
-    client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: refresh_token,
-  });
-
-  const response = await fetch(
-    "https://hotels.cloudbeds.com/api/v1.1/access_token",
-    { method: "POST", body: params }
-  );
-  const tokenData = await response.json();
-  if (!tokenData.access_token) {
-    throw new Error("Could not refresh access token for API discovery.");
-  }
-
-  // Store the new context in the cache with a 4-minute expiry
-  apiDiscoveryContextCache = {
-    token: tokenData.access_token,
-    propertyId: propertyId,
-    expiresAt: new Date(now.getTime() + 4 * 60 * 1000),
-  };
-
-  return { accessToken: tokenData.access_token, propertyId: propertyId };
-};
-
-// All discovery routes now use the cached helper
-app.get("/api/get-all-datasets", requireApiLogin, async (req, res) => {
-  try {
-    const { accessToken, propertyId } = await getApiContextWithCache();
-    const apiResponse = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/datasets",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "X-PROPERTY-ID": propertyId,
-        },
-      }
-    );
-    const data = await apiResponse.json();
-    if (!apiResponse.ok)
-      throw new Error(data.message || "Failed to fetch datasets.");
-    res.status(200).json(data);
-  } catch (error) {
-    console.error("Error in /api/get-all-datasets:", error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/datasets/:id/multi-levels", requireApiLogin, async (req, res) => {
-  try {
-    const { accessToken, propertyId } = await getApiContextWithCache();
-    const apiResponse = await fetch(
-      `https://api.cloudbeds.com/datainsights/v1.1/datasets/${req.params.id}/multi-levels`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "X-PROPERTY-ID": propertyId,
-        },
-      }
-    );
-    const data = await apiResponse.json();
-    // It's okay for this to return an error if a dataset has no multi-levels, so we check for specific error messages.
-    if (
-      !apiResponse.ok &&
-      data.message !== "No multi-levels per dataset found."
-    ) {
-      throw new Error(data.message || "Failed to fetch multi-levels.");
-    }
-    // If no multi-levels, return an empty array to the frontend.
-    res
-      .status(200)
-      .json(data.message === "No multi-levels per dataset found." ? [] : data);
-  } catch (error) {
-    console.error("Error in /api/datasets/:id/multi-levels:", error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/datasets/:id/fields", requireApiLogin, async (req, res) => {
-  try {
-    const { accessToken, propertyId } = await getApiContextWithCache();
-    const mlId = req.query.ml_id;
-    const url = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${
-      req.params.id
-    }/fields${mlId ? `?ml_id=${mlId}` : ""}`;
-    const apiResponse = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "X-PROPERTY-ID": propertyId,
-      },
-    });
-    const data = await apiResponse.json();
-    if (!apiResponse.ok)
-      throw new Error(data.message || "Failed to fetch fields.");
-    res.status(200).json(data);
-  } catch (error) {
-    console.error("Error in /api/datasets/:id/fields:", error.message);
-    res.status(500).json({ error: error.message });
-  }
 });
 
 // --- Static and fallback routes (Middleware order is corrected here) ---
