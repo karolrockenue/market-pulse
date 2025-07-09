@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("login-btn");
   const loginError = document.getElementById("login-error");
 
-  // Check if user s is already logged in from a previous session
+  // Check if user is already logged in from a previous session
   if (sessionStorage.getItem("isAdminAuthenticated") === "true") {
     showAdminContent();
   }
