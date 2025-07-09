@@ -632,12 +632,9 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
   }
   res.status(200).json(results);
 });
-// --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
 
-// Helper function to get an access token from the first available active user.
-// This is suitable for a developer tool where we need any valid token.
+// --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
 const getDiscoveryApiToken = async () => {
-  [cite_start]; // First, find an active user with a refresh token in the database [cite: 50]
   const userResult = await pgPool.query(
     "SELECT refresh_token FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1"
   );
@@ -648,7 +645,6 @@ const getDiscoveryApiToken = async () => {
   }
   const refreshToken = userResult.rows[0].refresh_token;
 
-  [cite_start]; // Exchange the refresh token for a new access token [cite: 29]
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
@@ -682,8 +678,9 @@ app.get("/api/get-all-datasets", requireApiLogin, async (req, res) => {
       }
     );
     const data = await apiResponse.json();
-    if (!apiResponse.ok)
+    if (!apiResponse.ok) {
       throw new Error(data.message || "Failed to fetch datasets.");
+    }
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -701,8 +698,9 @@ app.get("/api/datasets/:id/multi-levels", requireApiLogin, async (req, res) => {
       }
     );
     const data = await apiResponse.json();
-    if (!apiResponse.ok)
+    if (!apiResponse.ok) {
       throw new Error(data.message || "Failed to fetch multi-levels.");
+    }
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -722,13 +720,15 @@ app.get("/api/datasets/:id/fields", requireApiLogin, async (req, res) => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     const data = await apiResponse.json();
-    if (!apiResponse.ok)
+    if (!apiResponse.ok) {
       throw new Error(data.message || "Failed to fetch fields.");
+    }
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
 // --- Static and fallback routes (Middleware order is corrected here) ---
 const publicPath = path.join(process.cwd(), "public");
 
