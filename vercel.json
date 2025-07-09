@@ -2,14 +2,18 @@
   "version": 2,
   "builds": [
     { "src": "server.js", "use": "@vercel/node" },
-    { "src": "daily-refresh.js", "use": "@vercel/node" },
-    { "src": "initial-sync.js", "use": "@vercel/node" },
+    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
+    { "src": "api/initial-sync.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
     {
       "src": "/api/daily-refresh",
-      "dest": "/daily-refresh.js"
+      "dest": "/api/daily-refresh.js"
+    },
+    {
+      "src": "/api/initial-sync",
+      "dest": "/api/initial-sync.js"
     },
     {
       "src": "/api/(.*)",
