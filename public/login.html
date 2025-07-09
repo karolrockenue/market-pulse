@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <title>Sign In - Market Pulse</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Manrope (from dashboard) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,16 +21,12 @@
       .brand-text {
         color: #60a5fa; /* --accent-primary from dashboard */
       }
-      .font-data {
-        font-family: "Manrope", sans-serif;
-      }
     </style>
   </head>
-  <body class="flex items-center justify-center min-h-screen">
-    <div
-      class="max-w-md w-full text-center p-8 bg-white shadow-xl rounded-2xl border border-slate-200"
-    >
-      <div class="flex justify-center items-center gap-3 mb-4">
+  <body class="flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-md">
+      <!-- Logo and Title -->
+      <div class="flex justify-center items-center gap-3 mb-8">
         <svg
           class="h-9 w-auto brand-text"
           viewBox="0 0 24 24"
@@ -42,46 +40,80 @@
           <line x1="18" y1="20" x2="18" y2="4"></line>
           <line x1="6" y1="20" x2="6" y2="16"></line>
         </svg>
-        <h1 class="text-2xl font-bold text-gray-800">Market Pulse</h1>
+        <h1 class="text-3xl font-bold text-gray-800">Market Pulse</h1>
       </div>
 
-      <p class="text-gray-500 mb-6">
-        Sign in to your dashboard with a secure magic link.
-      </p>
+      <!-- Main Login Card for Returning Users -->
+      <div class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
+        <h2 class="text-xl font-semibold text-gray-800 text-center">
+          Welcome Back
+        </h2>
+        <p class="text-gray-500 mb-6 text-center">
+          Enter your email to sign in with a magic link.
+        </p>
+        <form id="login-form" class="space-y-4">
+          <div>
+            <input
+              type="email"
+              id="email-input"
+              required
+              placeholder="Enter your email"
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
+            />
+          </div>
+          <button
+            type="submit"
+            id="submit-btn"
+            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+          >
+            Send Magic Link
+          </button>
+        </form>
+        <div id="message-container" class="mt-5 text-sm"></div>
+      </div>
 
-      <form id="login-form" class="space-y-4">
-        <div>
-          <input
-            type="email"
-            id="email-input"
-            required
-            placeholder="Enter your email"
-            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
-          />
-        </div>
-        <button
-          type="submit"
-          id="submit-btn"
-          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-        >
-          Send Magic Link
-        </button>
-      </form>
+      <!-- Divider -->
+      <div class="flex items-center my-6">
+        <div class="flex-grow border-t border-gray-300"></div>
+        <span class="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
+        <div class="flex-grow border-t border-gray-300"></div>
+      </div>
 
-      <div id="message-container" class="mt-5 text-sm"></div>
-
-      <div class="mt-8 text-xs text-gray-400">
-        <p>New here? Find Market Pulse on the</p>
+      <!-- New User Onboarding Card -->
+      <div
+        class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center"
+      >
+        <h2 class="text-xl font-semibold text-gray-800">
+          New to Market Pulse?
+        </h2>
+        <p class="text-gray-500 my-4">
+          Connect your hotel account for the first time using the official
+          Cloudbeds Marketplace.
+        </p>
         <a
-          href="https://www.cloudbeds.com/marketplace/"
-          target="_blank"
-          class="font-medium text-blue-500 hover:underline"
-          >Cloudbeds Marketplace</a
+          href="/api/auth/cloudbeds"
+          class="w-full inline-flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm font-semibold text-white bg-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all duration-200"
         >
-        to connect your account.
+          <svg
+            class="w-5 h-5 mr-2 -ml-1"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v6a1.5 1.5 0 001.5 1.5z"
+            />
+          </svg>
+          Connect with Cloudbeds
+        </a>
       </div>
     </div>
 
+    <!-- The script for handling the magic link form -->
     <script>
       const loginForm = document.getElementById("login-form");
       const emailInput = document.getElementById("email-input");
@@ -112,7 +144,7 @@
             messageContainer.className =
               "text-sm text-yellow-800 p-3 bg-yellow-100/80 rounded-lg";
             messageContainer.innerHTML =
-              'This email is not associated with an account. New users must connect via the <a href="https://www.cloudbeds.com/marketplace/" target="_blank" class="font-bold underline">Cloudbeds Marketplace</a> first.';
+              'This email is not associated with an account. New users must connect via the <a href="/api/auth/cloudbeds" class="font-bold underline">Cloudbeds Marketplace</a> first.';
           } else {
             throw new Error("An unexpected error occurred.");
           }

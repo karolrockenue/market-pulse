@@ -709,6 +709,47 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   setupDropdowns();
 
+  // NEW: Setup for the logout button
+  function setupLogout() {
+    const userDropdown = document.getElementById("user-dropdown");
+    if (!userDropdown) return;
+
+    // Find the placeholder link and replace it with a functional button
+    const logoutPlaceholder = userDropdown.querySelector(
+      'a[href="#"]:last-of-type'
+    );
+    if (logoutPlaceholder && logoutPlaceholder.textContent === "Log Out") {
+      const logoutBtn = document.createElement("button");
+      logoutBtn.id = "logout-btn";
+      logoutBtn.className =
+        "block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100";
+      logoutBtn.textContent = "Log Out";
+
+      logoutPlaceholder.replaceWith(logoutBtn);
+
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/auth/logout", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            window.location.href = "/signin";
+          } else {
+            showError("Logout failed. Please try again.");
+          }
+        } catch (error) {
+          console.error("Logout error:", error);
+          showError("An error occurred during logout.");
+        }
+      });
+    }
+  }
+  setupLogout(); // Call the new function
+
   document.querySelectorAll("[data-preset]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const preset = btn.dataset.preset;

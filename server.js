@@ -1,4 +1,4 @@
-// server.js (Production Ready - with all latest updates and final fix)
+// server.js (Production Ready - with Logout and UX Fixes)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -71,14 +71,29 @@ const requireApiLogin = (req, res, next) => {
 
 const requirePageLogin = (req, res, next) => {
   if (!req.session.userId) {
-    // --- DEBUG LOG ---
-    console.log(`[Express Middleware] No session. Redirecting.`);
     return res.redirect("/signin");
   }
   next();
 };
 
-// --- NEW MAGIC LINK AUTH ---
+// --- NEW MAGIC LINK & LOGOUT AUTH ---
+app.post("/api/auth/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Error destroying session:", err);
+      return res
+        .status(500)
+        .json({ error: "Could not log out, please try again." });
+    }
+    // The cookie domain must match what was used to set it.
+    const cookieDomain =
+      process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
+    // Clear the cookie from the browser
+    res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
+    res.status(200).json({ message: "Logged out successfully" });
+  });
+});
+
 app.post("/api/auth/login", async (req, res) => {
   const { email } = req.body;
   if (!email) {
@@ -326,9 +341,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 });
 
 // --- DASHBOARD AND ADMIN APIs ---
-// This section contains all your /api/... endpoints
-// They are correctly protected by requireApiLogin where needed.
-// No changes are needed in this section.
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
     const { propertyId } = req.query;
@@ -633,10 +645,6 @@ app.get("/signin", (req, res) => {
 });
 
 app.get("/app/", requirePageLogin, (req, res) => {
-  // --- DEBUG LOG ---
-  console.log(
-    `[Express Route] Successfully passed login check. Serving /app/index.html`
-  );
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
