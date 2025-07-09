@@ -1,4 +1,4 @@
-// server.js (Production Ready)
+// server.js (Production Ready - with all latest updates)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -7,6 +7,10 @@ const pgSession = require("connect-pg-simple")(session);
 const cors = require("cors");
 const fetch = require("node-fetch");
 const path = require("path");
+const crypto = require("crypto");
+const sgMail = require("@sendgrid/mail");
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const app = express();
 app.use(express.json());
@@ -65,6 +69,90 @@ const requireApiLogin = (req, res, next) => {
   next();
 };
 
+// --- NEW MAGIC LINK AUTH ---
+app.post("/api/auth/login", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required." });
+  }
+
+  try {
+    const userResult = await pgPool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found." });
+    }
+
+    const user = userResult.rows[0];
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minute expiry
+
+    await pgPool.query(
+      "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
+      [token, user.user_id, expires_at]
+    );
+
+    const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
+    const msg = {
+      to: user.email,
+      from: "login@market-pulse.io", // This must be a verified sender in SendGrid
+      subject: "Your Market Pulse Login Link",
+      html: `<p>Hello ${user.first_name},</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}">Log in to Market Pulse</a></p>`,
+    };
+
+    await sgMail.send(msg);
+
+    res.status(200).json({ success: true, message: "Login link sent." });
+  } catch (error) {
+    console.error("Error during magic link login:", error);
+    res.status(500).json({ error: "An internal error occurred." });
+  }
+});
+
+app.get("/api/auth/magic-link-callback", async (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(400).send("Invalid or missing login token.");
+  }
+
+  try {
+    const tokenResult = await pgPool.query(
+      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
+      [token]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res
+        .status(400)
+        .send(
+          "Login link is invalid or has expired. Please request a new one."
+        );
+    }
+
+    const validToken = tokenResult.rows[0];
+    req.session.userId = validToken.user_id;
+
+    await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
+      token,
+    ]);
+
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error after magic link login:", err);
+        return res.status(500).send("An error occurred during login.");
+      }
+      res.redirect("/app/");
+    });
+  } catch (error) {
+    console.error("Error during magic link callback:", error);
+    res.status(500).send("An internal server error occurred.");
+  }
+});
+
+// --- ADMIN & CLOUDBEDS OAUTH ---
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -74,9 +162,7 @@ app.post("/api/admin-login", (req, res) => {
       .json({ error: "Admin password not configured on server." });
   }
   if (password === adminPassword) {
-    // Set a user ID on the session to satisfy requireApiLogin
     req.session.userId = "admin";
-    // Save the session before sending the response
     req.session.save((err) => {
       if (err) {
         console.error("Session save error:", err);
@@ -90,61 +176,37 @@ app.post("/api/admin-login", (req, res) => {
 });
 
 app.get("/api/auth/cloudbeds", (req, res) => {
-  console.log("--- Attempting to initiate Cloudbeds OAuth ---");
-  try {
-    const { CLOUDBEDS_CLIENT_ID, VERCEL_ENV, CLOUDBEDS_REDIRECT_URI } =
-      process.env;
+  const { CLOUDBEDS_CLIENT_ID } = process.env;
+  const isProduction = process.env.VERCEL_ENV === "production";
+  const redirectUri = isProduction
+    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+    : process.env.CLOUDBEDS_REDIRECT_URI;
 
-    console.log(`VERCEL_ENV: ${VERCEL_ENV}`);
-    console.log(`CLOUDBEDS_CLIENT_ID exists: ${!!CLOUDBEDS_CLIENT_ID}`);
-    console.log(`CLOUDBEDS_REDIRECT_URI exists: ${!!CLOUDBEDS_REDIRECT_URI}`);
-
-    const isProduction = VERCEL_ENV === "production";
-    const redirectUri = isProduction
-      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
-      : CLOUDBEDS_REDIRECT_URI;
-
-    console.log(`Is Production: ${isProduction}`);
-    console.log(`Final Redirect URI: ${redirectUri}`);
-
-    if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
-      console.error(
-        "CRITICAL: Server configuration error. A required environment variable is missing."
-      );
-      return res.status(500).send("Server configuration error.");
-    }
-
-    const scopes = [
-      "read:user",
-      "read:hotel",
-      "read:guest",
-      "read:reservation",
-      "read:room",
-      "read:rate",
-      "read:currency",
-      "read:taxesAndFees",
-      "read:dataInsightsGuests",
-      "read:dataInsightsOccupancy",
-      "read:dataInsightsReservations",
-    ].join(" ");
-
-    const params = new URLSearchParams({
-      client_id: CLOUDBEDS_CLIENT_ID,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: scopes,
-    });
-
-    const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
-    console.log(
-      "Successfully constructed authorization URL. Redirecting now..."
-    );
-    res.redirect(authorizationUrl);
-  } catch (error) {
-    console.error("--- UNHANDLED EXCEPTION in /api/auth/cloudbeds ---");
-    console.error(error); // Log the full error object
-    res.status(500).send("A critical and unexpected error occurred.");
+  if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
+    return res.status(500).send("Server configuration error.");
   }
+  const scopes = [
+    "read:user",
+    "read:hotel",
+    "read:guest",
+    "read:reservation",
+    "read:room",
+    "read:rate",
+    "read:currency",
+    "read:taxesAndFees",
+    "read:dataInsightsGuests",
+    "read:dataInsightsOccupancy",
+    "read:dataInsightsReservations",
+  ].join(" ");
+
+  const params = new URLSearchParams({
+    client_id: CLOUDBEDS_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: scopes,
+  });
+  const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+  res.redirect(authorizationUrl);
 });
 
 app.get("/api/auth/cloudbeds/callback", async (req, res) => {
@@ -153,11 +215,7 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     return res.status(400).send("Error: No authorization code provided.");
   }
   try {
-    const {
-      CLOUDBEDS_CLIENT_ID,
-      CLOUDBEDS_CLIENT_SECRET,
-      CLOUDBEDS_PROPERTY_ID,
-    } = process.env;
+    const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
     const isProduction = process.env.VERCEL_ENV === "production";
     const redirectUri = isProduction
       ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
@@ -183,16 +241,13 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const userInfo = await userInfoResponse.json();
+
     const propertyInfoResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "X-PROPERTY-ID": CLOUDBEDS_PROPERTY_ID,
-        },
-      }
+      { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const propertyInfo = await propertyInfoResponse.json();
+
     const userQuery = `
       INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
       VALUES ($1, $2, $3, $4, $5, $6, 'active')
@@ -216,20 +271,19 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     }
     for (const property of properties) {
       if (property && property.id) {
-        // Step 1: Add the hotel to the 'hotels' table with a default tier if it's new.
-        // The property object from Cloudbeds includes 'name' and 'city'.
+        // **NEW**: Add the hotel to the 'hotels' table with a default tier
         const hotelInsertQuery = `
-      INSERT INTO hotels (hotel_id, property_name, city, star_rating)
-      VALUES ($1, $2, $3, 2)
-      ON CONFLICT (hotel_id) DO NOTHING;
-    `;
+          INSERT INTO hotels (hotel_id, property_name, city, star_rating)
+          VALUES ($1, $2, $3, 2)
+          ON CONFLICT (hotel_id) DO NOTHING;
+        `;
         await pgPool.query(hotelInsertQuery, [
           property.id,
           property.name,
           property.city,
         ]);
 
-        // Step 2: Link the user to the property (existing logic).
+        // Link the user to the property
         const userPropertyLinkQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
         await pgPool.query(userPropertyLinkQuery, [
           userInfo.user_id,
@@ -254,6 +308,7 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   }
 });
 
+// --- DASHBOARD AND ADMIN APIs ---
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
     const { propertyId } = req.query;
@@ -314,22 +369,35 @@ app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
     if (accessCheck.rows.length === 0) {
       return res.status(403).json({ error: "Access denied to this property." });
     }
+    const hotelRatingResult = await pgPool.query(
+      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (
+      hotelRatingResult.rows.length === 0 ||
+      !hotelRatingResult.rows[0].star_rating
+    ) {
+      return res.json({ yourHotel: {}, market: {} });
+    }
+    const starRating = hotelRatingResult.rows[0].star_rating;
+
     const kpiQuery = `
             SELECT
-                (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END), 0)) AS your_adr,
-                (SUM(CASE WHEN hotel_id = $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_occupancy,
-                (SUM(CASE WHEN hotel_id = $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id = $1 THEN capacity_count ELSE 0 END), 0)) AS your_revpar,
-                (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END), 0)) AS market_adr,
-                (SUM(CASE WHEN hotel_id != $1 THEN rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_occupancy,
-                (SUM(CASE WHEN hotel_id != $1 THEN total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN hotel_id != $1 THEN capacity_count ELSE 0 END), 0)) AS market_revpar
-            FROM daily_metrics_snapshots
-            WHERE stay_date >= $2 AND stay_date <= $3 AND cloudbeds_user_id = $4;
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS your_adr,
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_revpar,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS market_adr,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
+            FROM daily_metrics_snapshots dms
+            JOIN hotels h ON dms.hotel_id = h.hotel_id
+            WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
         `;
     const result = await pgPool.query(kpiQuery, [
       propertyId,
       startDate,
       endDate,
-      req.session.userId,
+      starRating,
     ]);
     const kpis = result.rows[0];
     res.json({
@@ -367,15 +435,10 @@ app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
     const query = `
             SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
             FROM daily_metrics_snapshots
-            WHERE hotel_id = $1 AND cloudbeds_user_id = $2 AND stay_date >= $3 AND stay_date <= $4
+            WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
             GROUP BY period ORDER BY period ASC;
         `;
-    const result = await pgPool.query(query, [
-      propertyId,
-      req.session.userId,
-      startDate,
-      endDate,
-    ]);
+    const result = await pgPool.query(query, [propertyId, startDate, endDate]);
     res.json({ metrics: result.rows });
   } catch (error) {
     console.error("Error in /api/metrics-from-db:", error);
@@ -412,15 +475,14 @@ app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
             SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
             FROM daily_metrics_snapshots dms
             JOIN hotels h ON dms.hotel_id = h.hotel_id
-            WHERE dms.hotel_id != $1 AND dms.cloudbeds_user_id = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4 AND h.star_rating = $5
+            WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
             GROUP BY period ORDER BY period ASC;
         `;
     const result = await pgPool.query(query, [
       propertyId,
-      req.session.userId,
+      starRating,
       startDate,
       endDate,
-      starRating,
     ]);
     const competitorCountResult = await pgPool.query(
       "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE star_rating = $1 AND hotel_id != $2",
@@ -428,7 +490,7 @@ app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
     );
     res.json({
       metrics: result.rows,
-      competitorCount: competitorCountResult.rows[0]?.count || 0,
+      competitorCount: parseInt(competitorCountResult.rows[0]?.count || 0, 10),
     });
   } catch (error) {
     console.error("Error in /api/competitor-metrics:", error);
@@ -455,7 +517,6 @@ app.get("/api/my-properties", requireApiLogin, async (req, res) => {
 
 app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
   try {
-    // Admin user won't have a real token, so we can bypass the API call for them.
     if (req.session.userId === "admin") {
       return res.status(200).json({
         success: true,
@@ -543,11 +604,7 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
 // --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 
-// This is the correct production order:
-// 1. Define protected page routes.
-// 2. Serve static assets.
-// 3. Define public fallback routes.
-
+// **FIXED**: Removed the erroneous 'requirePageLogin' from these routes
 app.get("/app/", (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
@@ -556,10 +613,12 @@ app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
+// This route serves static files from the 'public' directory
 app.use(express.static(publicPath));
 
+// Fallback for the root URL
 app.get("/", (req, res) => {
-  res.sendFile(path.join(publicPath, "index.html"));
+  res.sendFile(path.join(publicPath, "index.html")); // This should likely redirect to /login or /app
 });
 
 app.get("/login", (req, res) => {
