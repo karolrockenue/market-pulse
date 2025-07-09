@@ -72,7 +72,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    // NEW: Function to fetch and render all hotels
     const fetchAndRenderHotels = async () => {
       try {
         const response = await fetch("/api/get-all-hotels");
@@ -109,7 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
           statusEl.textContent = "✅ Connected";
           statusEl.className = "ml-4 text-sm font-semibold text-green-600";
         } else {
-          const data = await response.json();
           statusEl.textContent = `❌ Error: ${response.status}`;
           statusEl.className = "ml-4 text-sm font-semibold text-red-600";
         }
@@ -211,6 +209,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     fetchLastRefreshTime();
-    fetchAndRenderHotels(); // Call the new function on load
+    fetchAndRenderHotels();
   }
 });
