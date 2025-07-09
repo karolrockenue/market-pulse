@@ -90,35 +90,61 @@ app.post("/api/admin-login", (req, res) => {
 });
 
 app.get("/api/auth/cloudbeds", (req, res) => {
-  const { CLOUDBEDS_CLIENT_ID } = process.env;
-  const isProduction = process.env.VERCEL_ENV === "production";
-  const redirectUri = isProduction
-    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
-    : process.env.CLOUDBEDS_REDIRECT_URI;
-  if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
-    return res.status(500).send("Server configuration error.");
+  console.log("--- Attempting to initiate Cloudbeds OAuth ---");
+  try {
+    const { CLOUDBEDS_CLIENT_ID, VERCEL_ENV, CLOUDBEDS_REDIRECT_URI } =
+      process.env;
+
+    console.log(`VERCEL_ENV: ${VERCEL_ENV}`);
+    console.log(`CLOUDBEDS_CLIENT_ID exists: ${!!CLOUDBEDS_CLIENT_ID}`);
+    console.log(`CLOUDBEDS_REDIRECT_URI exists: ${!!CLOUDBEDS_REDIRECT_URI}`);
+
+    const isProduction = VERCEL_ENV === "production";
+    const redirectUri = isProduction
+      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+      : CLOUDBEDS_REDIRECT_URI;
+
+    console.log(`Is Production: ${isProduction}`);
+    console.log(`Final Redirect URI: ${redirectUri}`);
+
+    if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
+      console.error(
+        "CRITICAL: Server configuration error. A required environment variable is missing."
+      );
+      return res.status(500).send("Server configuration error.");
+    }
+
+    const scopes = [
+      "read:user",
+      "read:hotel",
+      "read:guest",
+      "read:reservation",
+      "read:room",
+      "read:rate",
+      "read:currency",
+      "read:taxesAndFees",
+      "read:dataInsightsGuests",
+      "read:dataInsightsOccupancy",
+      "read:dataInsightsReservations",
+    ].join(" ");
+
+    const params = new URLSearchParams({
+      client_id: CLOUDBEDS_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: scopes,
+    });
+
+    const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+    console.log(
+      "Successfully constructed authorization URL. Redirecting now..."
+    );
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error("--- UNHANDLED EXCEPTION in /api/auth/cloudbeds ---");
+    console.error(error); // Log the full error object
+    res.status(500).send("A critical and unexpected error occurred.");
   }
-  const scopes = [
-    "read:user",
-    "read:hotel",
-    "read:guest",
-    "read:reservation",
-    "read:room",
-    "read:rate",
-    "read:currency",
-    "read:taxesAndFees",
-    "read:dataInsightsGuests",
-    "read:dataInsightsOccupancy",
-    "read:dataInsightsReservations",
-  ].join(" ");
-  const params = new URLSearchParams({
-    client_id: CLOUDBEDS_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: scopes,
-  });
-  const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
-  res.redirect(authorizationUrl);
 });
 
 app.get("/api/auth/cloudbeds/callback", async (req, res) => {
@@ -414,13 +440,11 @@ app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
   try {
     // Admin user won't have a real token, so we can bypass the API call for them.
     if (req.session.userId === "admin") {
-      return res
-        .status(200)
-        .json({
-          success: true,
-          status: 200,
-          message: "Admin connection test successful.",
-        });
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: "Admin connection test successful.",
+      });
     }
     const user = await pgPool.query(
       "SELECT access_token FROM users WHERE cloudbeds_user_id = $1",
