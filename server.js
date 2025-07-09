@@ -216,8 +216,25 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     }
     for (const property of properties) {
       if (property && property.id) {
-        const insertQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
-        await pgPool.query(insertQuery, [userInfo.user_id, property.id]);
+        // Step 1: Add the hotel to the 'hotels' table with a default tier if it's new.
+        // The property object from Cloudbeds includes 'name' and 'city'.
+        const hotelInsertQuery = `
+      INSERT INTO hotels (hotel_id, property_name, city, star_rating)
+      VALUES ($1, $2, $3, 2)
+      ON CONFLICT (hotel_id) DO NOTHING;
+    `;
+        await pgPool.query(hotelInsertQuery, [
+          property.id,
+          property.name,
+          property.city,
+        ]);
+
+        // Step 2: Link the user to the property (existing logic).
+        const userPropertyLinkQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
+        await pgPool.query(userPropertyLinkQuery, [
+          userInfo.user_id,
+          property.id,
+        ]);
       }
     }
     req.session.userId = userInfo.user_id;
