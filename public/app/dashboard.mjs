@@ -13,7 +13,7 @@ const metricConfig = {
   revpar: { label: "RevPAR", format: "currency" },
 };
 
-const chartColors = { primary: "#FAC35F", secondary: "#3C455B" };
+const chartColors = { primary: "#60a5fa", secondary: "#334155" };
 
 async function populatePropertySwitcher() {
   const switcherBtn = document.getElementById("hotel-btn");
@@ -451,12 +451,12 @@ function renderChart() {
           borderWidth: isLineChart ? 2.5 : 1,
           pointRadius: 0,
           tension: 0.3,
-          clip: false, // <-- ADD THIS LINE
+          clip: false,
           fill: isLineChart
             ? {
                 target: 1,
-                above: "rgba(250, 195, 95, 0.1)",
-                below: "rgba(60, 69, 91, 0.1)",
+                above: "rgba(96, 165, 250, 0.1)",
+                below: "rgba(51, 65, 85, 0.1)",
               }
             : false,
         },
@@ -554,7 +554,6 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
     const marketData = await marketResponse.json();
     const kpiData = await kpiResponse.json();
 
-    // Now that we have data, we can update the main hotel name display
     await fetchAndSetDisplayNames();
 
     renderKpiCards(kpiData);
@@ -709,24 +708,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   setupDropdowns();
 
-  // NEW: Setup for the logout button
   function setupLogout() {
-    const userDropdown = document.getElementById("user-dropdown");
-    if (!userDropdown) return;
-
-    // Find the placeholder link and replace it with a functional button
-    const logoutPlaceholder = userDropdown.querySelector(
-      'a[href="#"]:last-of-type'
-    );
-    if (logoutPlaceholder && logoutPlaceholder.textContent === "Log Out") {
-      const logoutBtn = document.createElement("button");
-      logoutBtn.id = "logout-btn";
-      logoutBtn.className =
-        "block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100";
-      logoutBtn.textContent = "Log Out";
-
-      logoutPlaceholder.replaceWith(logoutBtn);
-
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
       logoutBtn.addEventListener("click", async () => {
         try {
           const response = await fetch("/api/auth/logout", {
@@ -748,7 +732,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
   }
-  setupLogout(); // Call the new function
+  setupLogout();
+
+  // --- NEW: Modal Handling Script ---
+  function setupModals() {
+    document.querySelectorAll("[data-modal-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const modal = document.getElementById(button.dataset.modalTarget);
+        if (modal) {
+          modal.classList.remove("hidden");
+          modal.classList.add("flex");
+        }
+      });
+    });
+    document.querySelectorAll("[data-modal-close]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const modal = document.getElementById(button.dataset.modalClose);
+        if (modal) {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        }
+      });
+    });
+    window.addEventListener("click", (event) => {
+      if (event.target.matches('[id$="-modal"]')) {
+        event.target.classList.add("hidden");
+        event.target.classList.remove("flex");
+      }
+    });
+  }
+  setupModals();
 
   document.querySelectorAll("[data-preset]").forEach((btn) => {
     btn.addEventListener("click", () => {

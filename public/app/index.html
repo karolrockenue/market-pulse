@@ -7,6 +7,7 @@
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.x/dist/typography.min.js"></script>
 
     <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -322,15 +323,7 @@
                 </svg>
               </button>
               <div id="hotel-dropdown" class="dropdown-content">
-                <a href="#" class="font-semibold bg-blue-50"
-                  >Rockenue Partner Account</a
-                >
-                <a href="#" class="opacity-50 cursor-not-allowed"
-                  >Grand Hotel London (soon)</a
-                >
-                <a href="#" class="opacity-50 cursor-not-allowed"
-                  >Seaside Resort (soon)</a
-                >
+                <!-- Dynamic content -->
               </div>
             </div>
             <div class="dropdown">
@@ -358,7 +351,11 @@
               </button>
               <div id="user-dropdown" class="dropdown-content">
                 <a href="#" class="opacity-50 cursor-not-allowed">Profile</a>
-                <a href="#" class="opacity-50 cursor-not-allowed">Log Out</a>
+                <hr class="my-1 border-gray-200" />
+                <a href="mailto:support@market-pulse.io">Support</a>
+                <button data-modal-target="legal-modal">Legal</button>
+                <hr class="my-1 border-gray-200" />
+                <button id="logout-btn">Log Out</button>
               </div>
             </div>
           </div>
@@ -653,6 +650,256 @@
             </div>
           </div>
         </main>
+      </div>
+    </div>
+
+    <!-- Legal Modal -->
+    <div
+      id="legal-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full m-4 max-h-[80vh] overflow-y-auto"
+      >
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-800">Legal Information</h2>
+          <button
+            data-modal-close="legal-modal"
+            class="text-gray-500 hover:text-gray-800"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-10">
+          <!-- Terms of Service Section -->
+          <div>
+            <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">
+              Terms of Service
+            </h3>
+            <div class="prose max-w-none space-y-4">
+              <p><strong>Last Updated: July 9, 2025</strong></p>
+              <div>
+                <h4>Introduction</h4>
+                <p>
+                  Welcome to Market Pulse. These Terms of Service ("Terms")
+                  govern your access to and use of the services, websites, and
+                  applications offered by Market Pulse ("Service"), operated by
+                  <strong>ROCKENUE INTERNATIONAL GROUP</strong>.
+                </p>
+                <p>
+                  By accessing or using our Service, you agree to be bound by
+                  these Terms and our Privacy Policy. If you do not agree to
+                  these Terms, you may not use the Service.
+                </p>
+              </div>
+              <div>
+                <h4>1. Description of Service</h4>
+                <p>
+                  The Service provides hotel operators with a performance
+                  analytics dashboard, market benchmarking tools, and other data
+                  insights by accessing data from your connected Property
+                  Management System (PMS) on a read-only basis.
+                </p>
+              </div>
+              <div>
+                <h4>2. Fees and Changes to Service</h4>
+                <p>
+                  The core features of the Service are currently provided to you
+                  free of charge. However, we reserve the right to introduce
+                  fees for the use of the Service or for new premium features in
+                  the future. We may also change our business model at our sole
+                  discretion. We will provide you with at least
+                  <strong>30 days' advance notice</strong> of any such changes
+                  to fees or the business model. Your continued use of the
+                  Service after a price change becomes effective constitutes
+                  your agreement to pay the new amount.
+                </p>
+              </div>
+              <div>
+                <h4>3. Intellectual Property and Data Rights</h4>
+                <h5>a) Our Intellectual Property</h5>
+                <p>
+                  The Service and its original content, features, and
+                  functionality are and will remain the exclusive property of
+                  ROCKENUE INTERNATIONAL GROUP and its licensors.
+                </p>
+                <h5>b) License to Your Data</h5>
+                <p>
+                  To operate and improve the Service, you grant us a worldwide,
+                  perpetual, irrevocable, royalty-free license to use, host,
+                  store, reproduce, modify, and create derivative works from the
+                  data provided by your PMS. Specifically, you agree that:
+                </p>
+                <ul class="list-disc list-inside space-y-2 pl-4">
+                  <li>
+                    We will use your hotel's performance data to power your
+                    private dashboard.
+                  </li>
+                  <li>
+                    We will use your hotel's performance data in an
+                    <strong>anonymized and aggregated</strong> form, combined
+                    with data from other hotels, to create market analytics,
+                    reports, and other data-driven products.
+                  </li>
+                  <li>
+                    These aggregated and anonymized data products may be used to
+                    create new tools or be part of commercial offerings sold to
+                    third parties (such as developers, research agencies, or
+                    other businesses).
+                  </li>
+                  <li>
+                    In any public or commercial use of this aggregated data,
+                    your hotel's name, confidential information, or any other
+                    personally identifiable information will
+                    <strong>never</strong> be disclosed.
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h4>4. User Conduct and Acceptable Use</h4>
+                <p>
+                  You are responsible for all activities that occur under your
+                  account. You agree not to: Use the Service for any illegal or
+                  unauthorized purpose; Attempt to de-anonymize,
+                  reverse-engineer, scrape, or otherwise steal the data, source
+                  code, or core business ideas of the Service; or Resell or
+                  sublicense your access to the Service.
+                </p>
+              </div>
+              <div>
+                <h4>5. Termination</h4>
+                <p>
+                  You may terminate these Terms at any time by disconnecting the
+                  Market Pulse application from within your PMS settings. We may
+                  terminate or suspend your access to our Service immediately,
+                  without prior notice or liability, if you breach the Terms,
+                  particularly the "User Conduct and Acceptable Use" section.
+                </p>
+              </div>
+              <div>
+                <h4>6. Data Withdrawal</h4>
+                <p>
+                  In addition to your rights under our Privacy Policy, you may
+                  request the removal of your specific hotel's historical
+                  performance data from our active databases. To do so, you must
+                  send a formal request to our support email. We will process
+                  this request and remove the data as is commercially
+                  reasonable. Please note that data already included in
+                  historical, anonymized, and aggregated market sets cannot be
+                  retroactively removed.
+                </p>
+              </div>
+              <div>
+                <h4>7. Disclaimer of Warranties & Limitation of Liability</h4>
+                <p>
+                  The Service is provided on an "AS IS" and "AS AVAILABLE"
+                  basis. We do not warrant that the service will be
+                  uninterrupted, secure, or error-free. In no event shall
+                  ROCKENUE INTERNATIONAL GROUP be liable for any indirect,
+                  incidental, or consequential damages resulting from your use
+                  of the Service.
+                </p>
+              </div>
+              <div>
+                <h4>8. Governing Law</h4>
+                <p>
+                  These Terms shall be governed and construed in accordance with
+                  the laws of the <strong>United Arab Emirates</strong>, without
+                  regard to its conflict of law provisions.
+                </p>
+              </div>
+              <div>
+                <h4>9. Contact Us</h4>
+                <p>
+                  If you have any questions about these Terms, please contact us
+                  at: <strong>support@market-pulse.io</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Privacy Policy Section -->
+          <div>
+            <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">
+              Privacy Policy
+            </h3>
+            <div class="prose max-w-none space-y-4">
+              <p><strong>Last Updated: July 9, 2025</strong></p>
+              <div>
+                <h4>Introduction</h4>
+                <p>
+                  This Privacy Policy describes how Market Pulse, operated by
+                  <strong>ROCKENUE INTERNATIONAL GROUP</strong> ("we", "us", or
+                  "our"), collects, uses, and discloses your information when
+                  you use our services. Our registered address is 5842+632 Grand
+                  Stand, Nad Al Sheba 1, Dubai, United Arab Emirates.
+                </p>
+              </div>
+              <div>
+                <h4>1. Information We Collect</h4>
+                <p>
+                  We collect Personal Data (name, email), Hotel Performance Data
+                  (read-only metrics like ADR, Occupancy), and Usage Data (via
+                  essential session cookies and Google Analytics).
+                </p>
+              </div>
+              <div>
+                <h4>2. How We Use Your Information</h4>
+                <p>
+                  We use your data to power your dashboard, create anonymized
+                  market benchmarks, manage your account, and improve the
+                  service.
+                </p>
+              </div>
+              <div>
+                <h4>3. Sharing and Disclosure of Information</h4>
+                <p>
+                  We do not sell your personal or individual hotel data. We
+                  share data only with essential third-party services like
+                  Vercel, Neon, SendGrid, and Google Analytics for operational
+                  purposes.
+                </p>
+              </div>
+              <div>
+                <h4>4. Data Retention</h4>
+                <p>
+                  We retain your Personal Data for 1 year after account
+                  termination. Anonymized hotel data is retained indefinitely
+                  for market analysis.
+                </p>
+              </div>
+              <div>
+                <h4>5. Your Data Protection Rights (GDPR)</h4>
+                <p>
+                  You have the right to access, update, delete, or object to the
+                  processing of your Personal Data. Please contact us to
+                  exercise these rights.
+                </p>
+              </div>
+              <div>
+                <h4>6. Contact Us</h4>
+                <p>
+                  If you have any questions about this Privacy Policy, please
+                  contact us by email at:
+                  <strong>support@market-pulse.io</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
