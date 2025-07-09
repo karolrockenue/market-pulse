@@ -8,6 +8,14 @@
   ],
   "routes": [
     {
+      "src": "/api/daily-refresh",
+      "dest": "/api/daily-refresh.js"
+    },
+    {
+      "src": "/api/initial-sync",
+      "dest": "/api/initial-sync.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/server.js"
     },
