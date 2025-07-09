@@ -1,120 +1,452 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <title>Sign In - Market Pulse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Pulse - Hotel Performance Intelligence</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Inter & Manrope (from dashboard) -->
+    <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
     <style>
-      /* Using styles from dashboard for consistency */
+      /* --- Base Styles & Futuristic Theme --- */
       body {
         font-family: "Inter", sans-serif;
-        background-color: #f7f8fc; /* --bg-primary from dashboard */
+        background-color: #0d1117; /* Dark background */
+        color: #c9d1d9; /* Light text */
+        overflow-x: hidden;
       }
-      .brand-text {
-        color: #60a5fa; /* --accent-primary from dashboard */
+
+      /* --- Aurora Background Effect --- */
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        pointer-events: none;
+        background: radial-gradient(
+            circle at 10% 20%,
+            rgba(22, 93, 255, 0.15),
+            transparent 30%
+          ),
+          radial-gradient(
+            circle at 90% 80%,
+            rgba(138, 43, 226, 0.15),
+            transparent 40%
+          );
+        animation: pulse-aurora 15s infinite ease-in-out;
+      }
+
+      @keyframes pulse-aurora {
+        0%,
+        100% {
+          transform: scale(1) rotate(0deg);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.2) rotate(5deg);
+          opacity: 1;
+        }
+      }
+
+      /* --- Glassmorphism Effect for Cards --- */
+      .glass-card {
+        background: rgba(22, 27, 34, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      /* --- Custom Scrollbar --- */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0d1117;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #2a313c;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3a4250;
+      }
+
+      /* --- Animation for elements on scroll --- */
+      .reveal {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+      }
+      .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
       }
     </style>
   </head>
-  <body class="flex items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-md">
-      <!-- Logo and Title -->
-      <div class="flex justify-center items-center gap-3 mb-8">
-        <svg
-          class="h-9 w-auto brand-text"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="12" y1="20" x2="12" y2="10"></line>
-          <line x1="18" y1="20" x2="18" y2="4"></line>
-          <line x1="6" y1="20" x2="6" y2="16"></line>
-        </svg>
-        <h1 class="text-3xl font-bold text-gray-800">Market Pulse</h1>
-      </div>
-
-      <!-- Main Login Card for Returning Users -->
-      <div class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
-        <h2 class="text-xl font-semibold text-gray-800 text-center">
-          Welcome Back
-        </h2>
-        <p class="text-gray-500 mb-6 text-center">
-          Enter your email to sign in with a magic link.
-        </p>
-        <form id="login-form" class="space-y-4">
-          <div>
-            <input
-              type="email"
-              id="email-input"
-              required
-              placeholder="Enter your email"
-              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
-            />
-          </div>
-          <button
-            type="submit"
-            id="submit-btn"
-            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-          >
-            Send Magic Link
-          </button>
-        </form>
-        <div id="message-container" class="mt-5 text-sm"></div>
-      </div>
-
-      <!-- Divider -->
-      <div class="flex items-center my-6">
-        <div class="flex-grow border-t border-gray-300"></div>
-        <span class="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
-        <div class="flex-grow border-t border-gray-300"></div>
-      </div>
-
-      <!-- New User Onboarding Card -->
-      <div
-        class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center"
+  <body class="antialiased">
+    <!-- Header Navigation -->
+    <header
+      id="header"
+      class="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+    >
+      <nav
+        class="container mx-auto px-6 py-4 flex justify-between items-center"
       >
-        <h2 class="text-xl font-semibold text-gray-800">
-          New to Market Pulse?
-        </h2>
-        <p class="text-gray-500 my-4">
-          Connect your hotel account for the first time using the official
-          Cloudbeds Marketplace.
-        </p>
-        <a
-          href="/api/auth/cloudbeds"
-          class="w-full inline-flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm font-semibold text-white bg-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all duration-200"
-        >
+        <!-- Logo -->
+        <a href="#" class="flex items-center gap-2">
           <svg
-            class="w-5 h-5 mr-2 -ml-1"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
+            class="h-7 w-auto text-blue-400"
             viewBox="0 0 24 24"
-            stroke-width="1.5"
+            fill="none"
             stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v6a1.5 1.5 0 001.5 1.5z"
-            />
+            <line x1="12" y1="20" x2="12" y2="10"></line>
+            <line x1="18" y1="20" x2="18" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="16"></line>
           </svg>
-          Connect with Cloudbeds
+          <span class="text-xl font-bold text-white">Market Pulse</span>
         </a>
+
+        <!-- Desktop Menu -->
+        <div class="hidden md:flex items-center gap-8">
+          <a href="#features" class="text-gray-300 hover:text-white transition"
+            >Features</a
+          >
+          <button
+            data-modal-target="faq-modal"
+            class="text-gray-300 hover:text-white transition"
+          >
+            FAQs
+          </button>
+          <button
+            data-modal-target="contact-modal"
+            class="text-gray-300 hover:text-white transition"
+          >
+            Contact
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pt-24">
+      <!-- Hero Section with Login -->
+      <section
+        id="home"
+        class="min-h-screen flex items-center justify-center -mt-24"
+      >
+        <div class="container mx-auto px-6 text-center">
+          <h1
+            class="text-4xl md:text-6xl font-extrabold text-white leading-tight reveal"
+          >
+            Unlock Your Hotel's
+            <span
+              class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400"
+              >True Market Potential</span
+            >
+          </h1>
+          <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400 reveal">
+            Live dashboards, competitor insights, and powerful analytics. Market
+            Pulse gives you the data to dominate your market.
+          </p>
+
+          <div class="mt-12 w-full max-w-md mx-auto reveal">
+            <!-- Login/Onboarding Cards -->
+            <div class="w-full">
+              <!-- Main Login Card for Returning Users -->
+              <div class="glass-card p-8 rounded-2xl">
+                <h2 class="text-xl font-semibold text-white text-center">
+                  Welcome Back
+                </h2>
+                <p class="text-gray-400 mb-6 text-center">
+                  Sign in with a secure magic link.
+                </p>
+                <form id="login-form" class="space-y-4">
+                  <div>
+                    <input
+                      type="email"
+                      id="email-input"
+                      required
+                      placeholder="Enter your email"
+                      class="w-full px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    id="submit-btn"
+                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500 transition-all duration-200"
+                  >
+                    Send Magic Link
+                  </button>
+                </form>
+                <div id="message-container" class="mt-5 text-sm"></div>
+              </div>
+
+              <!-- Divider -->
+              <div class="flex items-center my-6">
+                <div class="flex-grow border-t border-gray-700"></div>
+                <span class="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
+                <div class="flex-grow border-t border-gray-700"></div>
+              </div>
+
+              <!-- New User Onboarding Card -->
+              <div class="glass-card p-8 rounded-2xl text-center">
+                <h2 class="text-xl font-semibold text-white">
+                  New to Market Pulse?
+                </h2>
+                <p class="text-gray-400 my-4">
+                  Connect your hotel for the first time via the Cloudbeds
+                  Marketplace.
+                </p>
+                <a
+                  href="/api/auth/cloudbeds"
+                  class="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-600 rounded-lg shadow-lg font-semibold text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500 transition-all duration-200"
+                >
+                  <svg
+                    class="w-5 h-5 mr-2 -ml-1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width="1.5"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v6a1.5 1.5 0 001.5 1.5z"
+                    />
+                  </svg>
+                  Connect with Cloudbeds
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features Section -->
+      <section id="features" class="py-20">
+        <div class="container mx-auto px-6">
+          <div class="text-center mb-12 reveal">
+            <h2 class="text-3xl font-bold text-white">
+              Everything You Need to Succeed
+            </h2>
+            <p class="mt-2 text-gray-400">
+              Stop guessing. Start making data-driven decisions.
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <!-- Feature 1 -->
+            <div class="glass-card p-8 rounded-2xl reveal">
+              <div
+                class="w-16 h-16 bg-blue-900/50 text-blue-300 rounded-xl flex items-center justify-center mx-auto mb-4"
+              >
+                <svg
+                  class="w-8 h-8"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                  ></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-white">Live Dashboard</h3>
+              <p class="mt-2 text-gray-400">
+                Visualize your key performance indicators like Occupancy, ADR,
+                and RevPAR in real-time.
+              </p>
+            </div>
+            <!-- Feature 2 -->
+            <div class="glass-card p-8 rounded-2xl reveal">
+              <div
+                class="w-16 h-16 bg-purple-900/50 text-purple-300 rounded-xl flex items-center justify-center mx-auto mb-4"
+              >
+                <svg
+                  class="w-8 h-8"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  ></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-white">
+                Competitor Benchmarking
+              </h3>
+              <p class="mt-2 text-gray-400">
+                Compare your performance against an aggregated, anonymized set
+                of similar hotels in your market.
+              </p>
+            </div>
+            <!-- Feature 3 -->
+            <div class="glass-card p-8 rounded-2xl reveal">
+              <div
+                class="w-16 h-16 bg-green-900/50 text-green-300 rounded-xl flex items-center justify-center mx-auto mb-4"
+              >
+                <svg
+                  class="w-8 h-8"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  ></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-white">
+                Powerful Reporting
+              </h3>
+              <p class="mt-2 text-gray-400">
+                Dive deep into historical data with flexible granularity—view
+                trends daily, weekly, or monthly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-8">
+      <div class="container mx-auto px-6 text-center text-gray-500">
+        <p>&copy; 2025 Market Pulse. All rights reserved.</p>
+      </div>
+    </footer>
+
+    <!-- FAQ Modal -->
+    <div
+      id="faq-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50"
+    >
+      <div
+        class="glass-card rounded-2xl p-8 max-w-2xl w-full m-4 max-h-[80vh] overflow-y-auto"
+      >
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-white">
+            Frequently Asked Questions
+          </h2>
+          <button
+            data-modal-close="faq-modal"
+            class="text-gray-400 hover:text-white"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div class="space-y-4 text-gray-300">
+          <div>
+            <h4 class="font-semibold text-white">Is my hotel's data secure?</h4>
+            <p>
+              Absolutely. Your data is isolated and never shared individually.
+              All competitor data is aggregated and anonymized, so your specific
+              performance metrics are only visible to you.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              How is "The Market" calculated?
+            </h4>
+            <p>
+              The market is a competitive set of hotels with a similar quality
+              tier (star rating) to your own. This ensures you're comparing your
+              performance against true, like-for-like competitors.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              How often is the data refreshed?
+            </h4>
+            <p>
+              Data is automatically synced from Cloudbeds every 24 hours,
+              typically overnight, to ensure you have the freshest insights each
+              morning.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- The script for handling the magic link form -->
+    <!-- Contact Modal -->
+    <div
+      id="contact-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50"
+    >
+      <div class="glass-card rounded-2xl p-8 max-w-lg w-full m-4">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-white">Contact Us</h2>
+          <button
+            data-modal-close="contact-modal"
+            class="text-gray-400 hover:text-white"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <p class="text-gray-300">
+          For support or inquiries, please email us at:
+          <a
+            href="mailto:support@market-pulse.io"
+            class="text-blue-400 hover:underline"
+            >support@market-pulse.io</a
+          >
+        </p>
+      </div>
+    </div>
+
+    <!-- Scripts -->
     <script>
+      // --- Magic Link Form Script ---
       const loginForm = document.getElementById("login-form");
       const emailInput = document.getElementById("email-input");
       const submitBtn = document.getElementById("submit-btn");
@@ -123,33 +455,30 @@
       loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = emailInput.value;
-
         submitBtn.disabled = true;
         submitBtn.textContent = "Sending...";
         messageContainer.textContent = "";
-
         try {
           const response = await fetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email }),
           });
-
           if (response.ok) {
-            messageContainer.className = "text-sm text-green-600 font-medium";
+            messageContainer.className = "text-sm text-green-400 font-medium";
             messageContainer.textContent =
-              "Success! Please check your email for a login link.";
+              "Success! Check your email for a login link.";
             loginForm.reset();
           } else if (response.status === 404) {
             messageContainer.className =
-              "text-sm text-yellow-800 p-3 bg-yellow-100/80 rounded-lg";
+              "text-sm text-yellow-400 p-3 bg-yellow-900/30 rounded-lg";
             messageContainer.innerHTML =
               'This email is not associated with an account. New users must connect via the <a href="/api/auth/cloudbeds" class="font-bold underline">Cloudbeds Marketplace</a> first.';
           } else {
             throw new Error("An unexpected error occurred.");
           }
         } catch (error) {
-          messageContainer.className = "text-sm text-red-600 font-medium";
+          messageContainer.className = "text-sm text-red-400 font-medium";
           messageContainer.textContent =
             "Failed to send login link. Please try again.";
         } finally {
@@ -157,6 +486,53 @@
           submitBtn.textContent = "Send Magic Link";
         }
       });
+
+      // --- Header Scroll Effect ---
+      const header = document.getElementById("header");
+      window.addEventListener("scroll", () => {
+        if (window.scrollY > 10) {
+          header.classList.add("glass-card");
+        } else {
+          header.classList.remove("glass-card");
+        }
+      });
+
+      // --- Modal Handling Script ---
+      document.querySelectorAll("[data-modal-target]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const modal = document.getElementById(button.dataset.modalTarget);
+          modal.classList.remove("hidden");
+          modal.classList.add("flex");
+        });
+      });
+      document.querySelectorAll("[data-modal-close]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const modal = document.getElementById(button.dataset.modalClose);
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        });
+      });
+      // Close modal on outside click
+      window.addEventListener("click", (event) => {
+        if (event.target.matches('[id$="-modal"]')) {
+          event.target.classList.add("hidden");
+          event.target.classList.remove("flex");
+        }
+      });
+
+      // --- Scroll Reveal Animation ---
+      const revealElements = document.querySelectorAll(".reveal");
+      const revealOnScroll = () => {
+        const windowHeight = window.innerHeight;
+        revealElements.forEach((el) => {
+          const elementTop = el.getBoundingClientRect().top;
+          if (elementTop < windowHeight - 50) {
+            el.classList.add("visible");
+          }
+        });
+      };
+      window.addEventListener("scroll", revealOnScroll);
+      revealOnScroll(); // Trigger on initial load
     </script>
   </body>
 </html>
