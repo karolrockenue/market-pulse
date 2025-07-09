@@ -1,14 +1,33 @@
-"routes": [
+{
+  "version": 2,
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
+    { "src": "api/initial-sync.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
     {
-      "src": "/api/daily-refresh",
+      "src": "/jobs/daily-refresh",
       "dest": "/api/daily-refresh.js"
     },
     {
-      "src": "/api/initial-sync",
+      "src": "/jobs/initial-sync",
       "dest": "/api/initial-sync.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/server.js"
     },
     {
       "src": "/(.*)",
       "dest": "/public/$1"
     }
   ],
+  "crons": [
+    {
+      "path": "/jobs/daily-refresh",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}
