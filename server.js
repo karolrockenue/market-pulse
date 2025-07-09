@@ -70,11 +70,6 @@ const requireApiLogin = (req, res, next) => {
 };
 
 const requirePageLogin = (req, res, next) => {
-  // --- DEBUG LOG ---
-  console.log(
-    `[Express Middleware] requirePageLogin checking path: ${req.path}. UserID: ${req.session.userId}`
-  );
-
   if (!req.session.userId) {
     // --- DEBUG LOG ---
     console.log(`[Express Middleware] No session. Redirecting.`);
@@ -637,10 +632,6 @@ app.get("/signin", (req, res) => {
   res.sendFile(path.join(publicPath, "login.html"));
 });
 
-app.get("/app", requirePageLogin, (req, res) => {
-  res.redirect("/app/");
-});
-
 app.get("/app/", requirePageLogin, (req, res) => {
   // --- DEBUG LOG ---
   console.log(
@@ -652,10 +643,6 @@ app.get("/app/", requirePageLogin, (req, res) => {
 // Serve reports page with protection
 app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
-});
-
-app.get("/admin", requirePageLogin, (req, res) => {
-  res.redirect("/admin/");
 });
 
 app.get("/admin/", requirePageLogin, (req, res) => {

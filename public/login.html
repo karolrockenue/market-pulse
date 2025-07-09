@@ -2,17 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Login - Market Pulse</title>
+    <title>Sign In - Market Pulse</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Using styles from dashboard for consistency */
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f7f8fc; /* --bg-primary from dashboard */
+      }
+      .brand-text {
+        color: #60a5fa; /* --accent-primary from dashboard */
+      }
+      .font-data {
+        font-family: "Manrope", sans-serif;
+      }
+    </style>
   </head>
-  <body class="bg-gray-50 flex items-center justify-center min-h-screen">
-    <div class="max-w-md w-full text-center p-8 bg-white shadow-md rounded-lg">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">
-        Sign In to Market Pulse
-      </h1>
-      <p class="text-gray-600 mb-6">
-        Enter your email to receive a secure login link.
+  <body class="flex items-center justify-center min-h-screen">
+    <div
+      class="max-w-md w-full text-center p-8 bg-white shadow-xl rounded-2xl border border-slate-200"
+    >
+      <div class="flex justify-center items-center gap-3 mb-4">
+        <svg
+          class="h-9 w-auto brand-text"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="12" y1="20" x2="12" y2="10"></line>
+          <line x1="18" y1="20" x2="18" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="16"></line>
+        </svg>
+        <h1 class="text-2xl font-bold text-gray-800">Market Pulse</h1>
+      </div>
+
+      <p class="text-gray-500 mb-6">
+        Sign in to your dashboard with a secure magic link.
       </p>
+
       <form id="login-form" class="space-y-4">
         <div>
           <input
@@ -20,18 +56,30 @@
             id="email-input"
             required
             placeholder="Enter your email"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
           />
         </div>
         <button
           type="submit"
           id="submit-btn"
-          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
         >
-          Send Login Link
+          Send Magic Link
         </button>
       </form>
-      <div id="message-container" class="mt-4 text-sm"></div>
+
+      <div id="message-container" class="mt-5 text-sm"></div>
+
+      <div class="mt-8 text-xs text-gray-400">
+        <p>New here? Find Market Pulse on the</p>
+        <a
+          href="https://www.cloudbeds.com/marketplace/"
+          target="_blank"
+          class="font-medium text-blue-500 hover:underline"
+          >Cloudbeds Marketplace</a
+        >
+        to connect your account.
+      </div>
     </div>
 
     <script>
@@ -56,25 +104,25 @@
           });
 
           if (response.ok) {
-            messageContainer.className = "text-sm text-green-600";
+            messageContainer.className = "text-sm text-green-600 font-medium";
             messageContainer.textContent =
               "Success! Please check your email for a login link.";
             loginForm.reset();
           } else if (response.status === 404) {
             messageContainer.className =
-              "text-sm text-yellow-700 p-3 bg-yellow-50 rounded-md";
+              "text-sm text-yellow-800 p-3 bg-yellow-100/80 rounded-lg";
             messageContainer.innerHTML =
-              'This email is not associated with an account. To get started, please find and connect the Market Pulse app from within the <a href="https://www.cloudbeds.com/marketplace/" target="_blank" class="font-bold underline">Cloudbeds Marketplace</a>.';
+              'This email is not associated with an account. New users must connect via the <a href="https://www.cloudbeds.com/marketplace/" target="_blank" class="font-bold underline">Cloudbeds Marketplace</a> first.';
           } else {
             throw new Error("An unexpected error occurred.");
           }
         } catch (error) {
-          messageContainer.className = "text-sm text-red-600";
+          messageContainer.className = "text-sm text-red-600 font-medium";
           messageContainer.textContent =
             "Failed to send login link. Please try again.";
         } finally {
           submitBtn.disabled = false;
-          submitBtn.textContent = "Send Login Link";
+          submitBtn.textContent = "Send Magic Link";
         }
       });
     </script>
