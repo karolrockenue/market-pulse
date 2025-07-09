@@ -16,8 +16,7 @@
       "dest": "/api/initial-sync.js"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
+      "src": "/api/(.*)"
     },
     {
       "src": "/(.*)",
