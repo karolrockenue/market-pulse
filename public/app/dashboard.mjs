@@ -360,17 +360,17 @@ Chart.defaults.color = "#64748b";
 Chart.defaults.borderColor = "#e2e8f0";
 
 function getYAxisOptions(metric, dataMin, dataMax) {
-  const baseOptions = { grid: { color: "#e2e8f0" } };
+  const baseOptions = {
+    grid: { color: "#e2e8f0" },
+    beginAtZero: true, // Ensure axis always starts at 0
+  };
 
   if (metric === "occupancy") {
-    const padding = 20;
-    let suggestedMin = Math.floor((dataMin - padding) / 10) * 10;
-    let suggestedMax = Math.ceil((dataMax + padding) / 10) * 10;
-    suggestedMin = Math.max(0, suggestedMin);
+    let suggestedMax = Math.ceil((dataMax + 20) / 10) * 10;
     suggestedMax = Math.min(100, suggestedMax);
     return {
       ...baseOptions,
-      min: suggestedMin,
+      min: 0, // Explicitly set min to 0
       max: suggestedMax,
       ticks: { stepSize: 10, callback: (value) => value + "%" },
     };
@@ -378,11 +378,10 @@ function getYAxisOptions(metric, dataMin, dataMax) {
 
   const range = dataMax - dataMin;
   const padding = range > 0 ? range * 0.2 : dataMax * 0.2;
-  const suggestedMin = Math.floor((dataMin - padding) / 10) * 10;
   const suggestedMax = Math.ceil((dataMax + padding) / 10) * 10;
   return {
     ...baseOptions,
-    min: Math.max(0, suggestedMin),
+    min: 0, // Explicitly set min to 0 for all other metrics
     max: suggestedMax,
     ticks: { callback: (value) => "$" + value },
   };
