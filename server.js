@@ -632,7 +632,103 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
   }
   res.status(200).json(results);
 });
+// --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
 
+// Helper function to get an access token from the first available active user.
+// This is suitable for a developer tool where we need any valid token.
+const getDiscoveryApiToken = async () => {
+  [cite_start]; // First, find an active user with a refresh token in the database [cite: 50]
+  const userResult = await pgPool.query(
+    "SELECT refresh_token FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1"
+  );
+  if (userResult.rows.length === 0) {
+    throw new Error(
+      "No active user with a refresh token found to use for API discovery."
+    );
+  }
+  const refreshToken = userResult.rows[0].refresh_token;
+
+  [cite_start]; // Exchange the refresh token for a new access token [cite: 29]
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    {
+      method: "POST",
+      body: params,
+    }
+  );
+  const tokenData = await response.json();
+  if (!tokenData.access_token) {
+    throw new Error("Could not refresh access token for API discovery.");
+  }
+  return tokenData.access_token;
+};
+
+// Route to get all available datasets
+app.get("/api/get-all-datasets", requireApiLogin, async (req, res) => {
+  try {
+    const accessToken = await getDiscoveryApiToken();
+    const apiResponse = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/datasets",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    const data = await apiResponse.json();
+    if (!apiResponse.ok)
+      throw new Error(data.message || "Failed to fetch datasets.");
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Route to get multi-levels for a specific dataset
+app.get("/api/datasets/:id/multi-levels", requireApiLogin, async (req, res) => {
+  try {
+    const accessToken = await getDiscoveryApiToken();
+    const apiResponse = await fetch(
+      `https://api.cloudbeds.com/datainsights/v1.1/datasets/${req.params.id}/multi-levels`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    const data = await apiResponse.json();
+    if (!apiResponse.ok)
+      throw new Error(data.message || "Failed to fetch multi-levels.");
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Route to get fields for a specific dataset (and optional multi-level)
+app.get("/api/datasets/:id/fields", requireApiLogin, async (req, res) => {
+  try {
+    const accessToken = await getDiscoveryApiToken();
+    const mlId = req.query.ml_id; // Handle optional multi-level ID
+    const url = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${
+      req.params.id
+    }/fields${mlId ? `?ml_id=${mlId}` : ""}`;
+
+    const apiResponse = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await apiResponse.json();
+    if (!apiResponse.ok)
+      throw new Error(data.message || "Failed to fetch fields.");
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // --- Static and fallback routes (Middleware order is corrected here) ---
 const publicPath = path.join(process.cwd(), "public");
 

@@ -14,16 +14,16 @@
     <style>
       body {
         font-family: "Inter", sans-serif;
-        background-color: #f7f8fc;
+        background-color: #f3f4f6;
       }
     </style>
   </head>
-  <body class="antialiased">
-    <div class="flex min-h-screen">
-      <aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r">
-        <div class="h-16 flex items-center px-6 border-b">
+  <body class="antialiased text-gray-800">
+    <div class="flex h-screen bg-gray-100">
+      <div class="hidden md:flex flex-col w-64 bg-white shadow-lg">
+        <div class="flex items-center justify-center h-16 bg-white shadow-md">
           <svg
-            class="h-8 w-auto text-blue-500"
+            class="h-8 w-auto text-blue-600"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -35,248 +35,225 @@
             <line x1="18" y1="20" x2="18" y2="4"></line>
             <line x1="6" y1="20" x2="6" y2="16"></line>
           </svg>
-          <span class="ml-3 text-lg font-bold text-gray-800">Market Pulse</span>
+          <span class="ml-2 text-lg font-bold">Market Pulse</span>
         </div>
-        <nav class="flex-1 px-4 py-4 space-y-1">
-          <a
-            href="/app/"
-            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
-          >
-            <svg
-              class="h-5 w-5 mr-3"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+        <div class="flex flex-col flex-1 overflow-y-auto">
+          <nav class="flex-1 px-2 py-4 bg-white">
+            <a
+              href="/app/"
+              class="flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100"
             >
-              <path
-                d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-              ></path>
-            </svg>
-            Dashboard
-          </a>
-          <a
-            href="/app/reports.html"
-            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
-          >
-            <svg
-              class="h-5 w-5 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-6 w-6 mr-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 6h16M4 12h16M4 18h7"
+                />
+              </svg>
+              Dashboard
+            </a>
+            <a
+              href="/admin/"
+              class="flex items-center px-4 py-2 mt-2 text-gray-700 bg-blue-50 border-r-4 border-blue-600"
             >
-              <path d="M3 3v18h18" />
-              <path d="m19 9-5 5-4-4-3 3" />
-            </svg>
-            Reports
-          </a>
-          <a
-            href="/admin/"
-            class="flex items-center px-4 py-2.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-lg"
-          >
-            <svg
-              class="h-5 w-5 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-              ></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            Admin Panel
-          </a>
-        </nav>
-      </aside>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-6 w-6 mr-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              Admin Panel
+            </a>
+          </nav>
+        </div>
+      </div>
 
-      <div class="flex-1 flex flex-col">
-        <header class="bg-white h-16 flex items-center justify-between px-8">
-          <h1 class="text-xl font-semibold text-gray-800">Admin Panel</h1>
-        </header>
-
-        <main class="flex-1 p-8">
-          <div id="login-form" class="max-w-md mx-auto mt-10">
-            <div
-              class="bg-white p-8 rounded-xl border border-gray-200 shadow-sm"
-            >
+      <div class="flex flex-col flex-1 overflow-y-auto">
+        <div
+          class="flex items-center justify-between h-16 bg-white border-b border-gray-200"
+        >
+          <div class="px-4">
+            <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
+          </div>
+        </div>
+        <div class="p-4 md:p-8 space-y-8">
+          <div id="login-form">
+            <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
               <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
                 Admin Access
               </h2>
-              <div class="space-y-4">
-                <div>
-                  <label
-                    for="password"
-                    class="text-sm font-medium text-gray-700"
-                    >Password</label
-                  >
-                  <input
-                    type="password"
-                    id="password"
-                    class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <button
-                  id="login-btn"
-                  class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              <div class="mb-4">
+                <label
+                  for="password"
+                  class="block text-sm font-medium text-gray-700"
+                  >Password</label
                 >
-                  Log In
-                </button>
-                <p
-                  id="login-error"
-                  class="text-sm text-red-600 text-center"
-                ></p>
+                <input
+                  type="password"
+                  id="password"
+                  class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
+              <button
+                id="login-btn"
+                class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition"
+              >
+                Log In
+              </button>
+              <p id="login-error" class="text-red-500 text-sm mt-2"></p>
             </div>
           </div>
 
           <div id="admin-content" class="hidden space-y-8">
-            <div class="bg-white p-6 rounded-xl border border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+              <h2 class="text-xl font-bold text-gray-800 mb-4">
                 System Health
-              </h3>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <h4 class="text-sm font-medium text-gray-500">
-                    Last Data Refresh
-                  </h4>
-                  <p
-                    id="last-refresh-time"
-                    class="text-2xl font-bold text-gray-800 mt-1"
-                  >
-                    Loading...
-                  </p>
+              </h2>
+              <div class="space-y-4">
+                <div
+                  class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div>
+                    <p class="font-semibold text-gray-700">Last Data Refresh</p>
+                    <p id="last-refresh-time" class="text-gray-600"></p>
+                  </div>
                 </div>
-                <div>
-                  <h4 class="text-sm font-medium text-gray-500">
-                    Cloudbeds API Status
-                  </h4>
-                  <div class="flex items-center mt-2">
+                <div
+                  class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <p class="font-semibold text-gray-700">API Status</p>
+                  <div>
                     <button
                       id="test-cloudbeds-btn"
-                      class="text-sm font-medium text-blue-600 hover:text-blue-800"
+                      class="bg-blue-500 text-white px-3 py-1 text-sm rounded-md"
                     >
                       Test Connection
                     </button>
-                    <p
-                      id="cloudbeds-status"
-                      class="ml-4 text-sm font-semibold"
-                    ></p>
+                    <span id="cloudbeds-status"></span>
                   </div>
                 </div>
-                <div>
-                  <h4 class="text-sm font-medium text-gray-500">
-                    Database Status
-                  </h4>
-                  <div class="flex items-center mt-2">
+                <div
+                  class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <p class="font-semibold text-gray-700">Database Status</p>
+                  <div>
                     <button
                       id="test-db-btn"
-                      class="text-sm font-medium text-blue-600 hover:text-blue-800"
+                      class="bg-blue-500 text-white px-3 py-1 text-sm rounded-md"
                     >
                       Test Connection
                     </button>
-                    <p id="db-status" class="ml-4 text-sm font-semibold"></p>
+                    <span id="db-status"></span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl border border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+              <h2 class="text-xl font-bold text-gray-800 mb-4">
                 Manual Action Triggers
-              </h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 class="font-semibold text-gray-700">
-                    Daily Forecast Refresh
-                  </h4>
-                  <p class="text-sm text-gray-500 mt-1 mb-3">
-                    Manually run the job that updates the next 365 days of
-                    forecast data.
-                  </p>
-                  <button
-                    id="run-daily-refresh-btn"
-                    class="px-4 py-2 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition"
-                  >
-                    Run Job
-                  </button>
-                </div>
-                <div>
-                  <h4 class="font-semibold text-gray-700">
-                    Full Initial Data Sync
-                  </h4>
-                  <p class="text-sm text-gray-500 mt-1 mb-3">
-                    Wipe and re-sync all historical and forecast data. Use with
-                    caution.
-                  </p>
-                  <button
-                    id="run-initial-sync-btn"
-                    class="px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition"
-                  >
-                    Run Full Sync
-                  </button>
-                </div>
+              </h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  id="run-daily-refresh-btn"
+                  class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition"
+                >
+                  Run Job: Daily Forecast Refresh
+                </button>
+                <button
+                  id="run-initial-sync-btn"
+                  class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition"
+                >
+                  Run Job: Initial Full Sync
+                </button>
               </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl border border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                API Endpoint Health Check
-              </h3>
-              <p class="text-sm text-gray-500 mb-4">
-                Click the button to run a live test against all critical API
-                endpoints. This will verify they are running and responding
+            <div class="bg-white p-6 rounded-lg shadow-md">
+              <h2 class="text-xl font-bold text-gray-800 mb-4">
+                Endpoint Health Check
+              </h2>
+              <p class="text-sm text-gray-600 mb-4">
+                Test if the core application API endpoints are responding
                 correctly.
               </p>
               <button
                 id="run-endpoint-tests-btn"
-                class="px-4 py-2 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition"
+                class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-purple-700 transition"
               >
                 Run Endpoint Tests
               </button>
-              <div id="endpoint-test-results" class="mt-6"></div>
+              <div id="endpoint-test-results" class="mt-4 border-t pt-4"></div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl border border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                Hotels in Database
-              </h3>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+              <h2 class="text-xl font-bold text-gray-800 mb-4">API Explorer</h2>
+              <p class="text-sm text-gray-600 mb-4">
+                Click the button to discover all available datasets and their
+                specific data fields from the Cloudbeds Insights API.
+              </p>
+              <button
+                id="run-api-discovery"
+                class="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+              >
+                Discover API Endpoints
+              </button>
+              <div
+                id="discovery-status"
+                class="mt-4 text-sm font-medium text-gray-500"
+              ></div>
+              <div
+                id="discovery-results"
+                class="mt-4 bg-gray-50 p-4 rounded-lg border max-h-96 overflow-y-auto"
+              ></div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+              <h2 class="text-xl font-bold text-gray-800 mb-4">
+                Registered Hotels
+              </h2>
               <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="border-b">
+                <table class="min-w-full bg-white">
+                  <thead class="bg-gray-100">
+                    <tr>
                       <th
-                        class="px-4 py-3 text-left font-semibold text-gray-600"
+                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
                       >
                         Hotel ID
                       </th>
                       <th
-                        class="px-4 py-3 text-left font-semibold text-gray-600"
+                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
                       >
                         Property Name
                       </th>
                       <th
-                        class="px-4 py-3 text-left font-semibold text-gray-600"
+                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
                       >
                         Type
                       </th>
                       <th
-                        class="px-4 py-3 text-left font-semibold text-gray-600"
+                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
                       >
                         City
                       </th>
@@ -290,7 +267,7 @@
               </div>
             </div>
           </div>
-        </main>
+        </div>
       </div>
     </div>
     <script src="admin.mjs" type="module"></script>

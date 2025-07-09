@@ -56,6 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
       "endpoint-test-results"
     );
     const hotelsTableBody = document.getElementById("hotels-table-body");
+    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
+    const discoveryStatusEl = document.getElementById("discovery-status");
+    const discoveryResultsEl = document.getElementById("discovery-results");
 
     const fetchLastRefreshTime = async () => {
       try {
@@ -207,6 +210,75 @@ document.addEventListener("DOMContentLoaded", () => {
         runJob("/api/initial-sync", runInitialSyncBtn);
       }
     });
+
+    const runApiDiscovery = async () => {
+      discoveryStatusEl.textContent = "Running discovery...";
+      discoveryResultsEl.innerHTML = "";
+      runApiDiscoveryBtn.disabled = true;
+      runApiDiscoveryBtn.textContent = "Discovering...";
+
+      try {
+        // 1. Get all available datasets from our proxy
+        const datasetsResponse = await fetch("/api/get-all-datasets");
+        const datasets = await datasetsResponse.json();
+        if (!datasetsResponse.ok) {
+          throw new Error(datasets.error || "Could not fetch datasets.");
+        }
+        discoveryStatusEl.textContent = `Found ${datasets.length} datasets. Fetching fields...`;
+
+        for (const dataset of datasets) {
+          const datasetDiv = document.createElement("div");
+          datasetDiv.className = "mb-6";
+          let content = `<h3 class="text-lg font-bold text-gray-700">Dataset ${dataset.id}: ${dataset.name}</h3>`;
+
+          // 2. Check for nested "multi-levels"
+          const mlResponse = await fetch(
+            `/api/datasets/${dataset.id}/multi-levels`
+          );
+          const multiLevels = await mlResponse.json();
+
+          if (multiLevels && multiLevels.length > 0) {
+            content += `<p class="text-xs text-gray-500 italic">Nested Dataset</p>`;
+            for (const ml of multiLevels) {
+              const fieldsResponse = await fetch(
+                `/api/datasets/${dataset.id}/fields?ml_id=${ml.id}`
+              );
+              const fields = await fieldsResponse.json();
+              content += `<h4 class="font-semibold mt-2">Fields for Multi-Level: ${ml.name}</h4>`;
+              const pre = document.createElement("pre");
+              pre.className =
+                "bg-gray-900 text-white text-xs p-3 rounded-md mt-1";
+              pre.textContent = JSON.stringify(fields, null, 2);
+              content += pre.outerHTML;
+            }
+          } else {
+            // 3. Handle simple "flat" datasets
+            content += `<p class="text-xs text-gray-500 italic">Flat Dataset</p>`;
+            const fieldsResponse = await fetch(
+              `/api/datasets/${dataset.id}/fields`
+            );
+            const fields = await fieldsResponse.json();
+            const pre = document.createElement("pre");
+            pre.className =
+              "bg-gray-900 text-white text-xs p-3 rounded-md mt-1";
+            pre.textContent = JSON.stringify(fields, null, 2);
+            content += pre.outerHTML;
+          }
+          datasetDiv.innerHTML = content;
+          discoveryResultsEl.appendChild(datasetDiv);
+        }
+        discoveryStatusEl.textContent =
+          "✅ Discovery Complete! Results are shown below.";
+      } catch (error) {
+        discoveryStatusEl.textContent = `❌ Error during discovery: ${error.message}`;
+        console.error("Discovery Error:", error);
+      } finally {
+        runApiDiscoveryBtn.disabled = false;
+        runApiDiscoveryBtn.textContent = "Discover API Endpoints";
+      }
+    };
+
+    runApiDiscoveryBtn.addEventListener("click", runApiDiscovery);
 
     fetchLastRefreshTime();
     fetchAndRenderHotels();
