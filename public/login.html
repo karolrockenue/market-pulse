@@ -158,8 +158,8 @@
             >
           </h1>
           <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400 reveal">
-            Live dashboards, competitor insights, and powerful analytics. Market
-            Pulse gives you the data to dominate your market.
+            Your hotel versus the market. Do you truly know how you're
+            performing? Get insights backed by real market data.
           </p>
 
           <!-- "Free Platform" Badge -->
@@ -216,7 +216,7 @@
                   New to Market Pulse?
                 </h2>
                 <p class="text-gray-400 my-4">
-                  Connect your hotel for the first time via the Cloudbeds
+                  Connect your hotel for the first time via your PMS
                   Marketplace.
                 </p>
                 <a
@@ -345,8 +345,22 @@
     </main>
 
     <!-- Footer -->
-    <footer class="py-8">
+    <footer class="py-8 border-t border-gray-800">
       <div class="container mx-auto px-6 text-center text-gray-500">
+        <div class="flex justify-center gap-6 mb-4">
+          <button
+            data-modal-target="privacy-modal"
+            class="hover:text-gray-300 transition"
+          >
+            Privacy Policy
+          </button>
+          <button
+            data-modal-target="terms-modal"
+            class="hover:text-gray-300 transition"
+          >
+            Terms of Service
+          </button>
+        </div>
         <p>&copy; 2025 Market Pulse. All rights reserved.</p>
       </div>
     </footer>
@@ -393,6 +407,17 @@
           </div>
           <div>
             <h4 class="font-semibold text-white">
+              Does this app make changes in my PMS?
+            </h4>
+            <p>
+              No. Market Pulse has read-only access. Our application only reads
+              the data required for analytics and has no permission to create,
+              edit, or delete any information in your property management
+              system.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
               How is "The Market" calculated?
             </h4>
             <p>
@@ -406,9 +431,63 @@
               How often is the data refreshed?
             </h4>
             <p>
-              Data is automatically synced from Cloudbeds every 24 hours,
+              Data is automatically synced from your PMS every 24 hours,
               typically overnight, to ensure you have the freshest insights each
               morning.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              Why is the platform free? What's the catch?
+            </h4>
+            <p>
+              There's no catch. Market Pulse is currently offered completely
+              free as we build our user base and gather feedback. Our goal is to
+              provide immense value to hoteliers. In the future, we may
+              introduce optional premium features, but the core dashboard will
+              remain free for early adopters.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              How do I add another hotel to my account?
+            </h4>
+            <p>
+              To connect additional properties, you must initiate the connection
+              from within the PMS account for that specific property. Find
+              Market Pulse in your PMS Marketplace for the new hotel and follow
+              the connection steps. Once connected, it will automatically appear
+              in your property switcher on the dashboard.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              How do I disconnect the app?
+            </h4>
+            <p>
+              You can revoke access at any time directly from the "Connected
+              Apps" or "Marketplace" section within your PMS settings. This will
+              immediately stop any future data synchronization.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              Can I request a new PMS integration?
+            </h4>
+            <p>
+              Yes! We are always looking to expand our list of supported PMS
+              providers. Please send your integration requests to our support
+              email.
+            </p>
+          </div>
+          <div>
+            <h4 class="font-semibold text-white">
+              Where can I send suggestions for new features?
+            </h4>
+            <p>
+              We would love to hear your ideas! Please send all feedback and
+              feature suggestions to our support email, which can be found in
+              the "Contact" section.
             </p>
           </div>
         </div>
@@ -443,13 +522,131 @@
           </button>
         </div>
         <p class="text-gray-300">
-          For support or inquiries, please email us at:
+          For support, feature requests, or integration inquiries, please email
+          us at:
           <a
             href="mailto:support@market-pulse.io"
             class="text-blue-400 hover:underline"
             >support@market-pulse.io</a
           >
         </p>
+      </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div
+      id="privacy-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50"
+    >
+      <div
+        class="glass-card rounded-2xl p-8 max-w-3xl w-full m-4 max-h-[80vh] overflow-y-auto"
+      >
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-white">Privacy Policy</h2>
+          <button
+            data-modal-close="privacy-modal"
+            class="text-gray-400 hover:text-white"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div class="prose prose-invert text-gray-300 max-w-none">
+          <p><em>Last Updated: July 9, 2025</em></p>
+          <p>
+            This Privacy Policy describes how Market Pulse ("we", "us", or
+            "our") collects, uses, and discloses your information.
+          </p>
+          <h4 class="text-white">1. Information We Collect</h4>
+          <p>
+            We collect information you provide directly to us when you connect
+            your PMS, such as your name, email address, and property details. We
+            also collect aggregated, anonymized performance data from your PMS
+            for analytical purposes.
+          </p>
+          <h4 class="text-white">2. Use of Information</h4>
+          <p>
+            We use the information we collect to provide, maintain, and improve
+            our services, including the display of your dashboard and the
+            calculation of market averages. Your individual data is never shared
+            with third parties.
+          </p>
+          <h4 class="text-white">3. Data Security</h4>
+          <p>
+            We implement reasonable measures to help protect information about
+            you from loss, theft, misuse, and unauthorized access, disclosure,
+            alteration, and destruction.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terms of Service Modal -->
+    <div
+      id="terms-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50"
+    >
+      <div
+        class="glass-card rounded-2xl p-8 max-w-3xl w-full m-4 max-h-[80vh] overflow-y-auto"
+      >
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-white">Terms of Service</h2>
+          <button
+            data-modal-close="terms-modal"
+            class="text-gray-400 hover:text-white"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div class="prose prose-invert text-gray-300 max-w-none">
+          <p><em>Last Updated: July 9, 2025</em></p>
+          <p>
+            By accessing or using the Market Pulse service, you agree to be
+            bound by these Terms of Service.
+          </p>
+          <h4 class="text-white">1. Use of Service</h4>
+          <p>
+            You may use the service only for lawful purposes and in accordance
+            with these Terms. You agree not to use the service in any way that
+            violates any applicable law or regulation.
+          </p>
+          <h4 class="text-white">2. Disclaimer of Warranties</h4>
+          <p>
+            The service is provided on an "AS IS" and "AS AVAILABLE" basis. We
+            expressly disclaim all warranties of any kind, whether express or
+            implied.
+          </p>
+          <h4 class="text-white">3. Limitation of Liability</h4>
+          <p>
+            In no event shall Market Pulse be liable for any indirect,
+            incidental, special, consequential or punitive damages resulting
+            from your access to or use of, or inability to access or use, the
+            service.
+          </p>
+        </div>
       </div>
     </div>
 
@@ -483,7 +680,7 @@
             messageContainer.className =
               "text-sm text-yellow-400 p-3 bg-yellow-900/30 rounded-lg";
             messageContainer.innerHTML =
-              'This email is not associated with an account. New users must connect via the <a href="/api/auth/cloudbeds" class="font-bold underline">Cloudbeds Marketplace</a> first.';
+              "This email is not associated with an account. New users must connect via their PMS Marketplace first.";
           } else {
             throw new Error("An unexpected error occurred.");
           }
