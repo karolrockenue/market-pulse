@@ -37,7 +37,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// **CORRECTED LOCATION**: Serves static files (JS, CSS, images) from the 'public' directory
 const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
 
@@ -109,7 +108,7 @@ app.post("/api/auth/login", async (req, res) => {
     const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
     const msg = {
       to: user.email,
-      from: "login@market-pulse.io", // This must be a verified sender in SendGrid
+      from: "login@market-pulse.io",
       subject: "Your Market Pulse Login Link",
       html: `<p>Hello ${user.first_name},</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}">Log in to Market Pulse</a></p>`,
     };
@@ -146,7 +145,6 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
     const validToken = tokenResult.rows[0];
     const internalUserId = validToken.user_id;
 
-    // New Step: Use the internal ID to look up the correct cloudbeds_user_id
     const userResult = await pgPool.query(
       "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
       [internalUserId]
@@ -155,8 +153,7 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
     if (userResult.rows.length === 0) {
       return res.status(404).send("Could not find a matching user account.");
     }
-    
-    // Set the session to the CORRECT (Cloudbeds) ID
+
     req.session.userId = userResult.rows[0].cloudbeds_user_id;
 
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
@@ -170,9 +167,11 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
       }
       res.redirect("/app/");
     });
-} catch (error) {
-    // ...
-}
+  } catch (error) {
+    console.error("Error during magic link callback:", error);
+    res.status(500).send("An internal error occurred.");
+  }
+});
 
 // --- ADMIN & CLOUDBEDS OAUTH ---
 app.post("/api/admin-login", (req, res) => {
@@ -293,7 +292,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
     }
     for (const property of properties) {
       if (property && property.id) {
-        // **NEW**: Add the hotel to the 'hotels' table with a default tier
         const hotelInsertQuery = `
           INSERT INTO hotels (hotel_id, property_name, city, star_rating)
           VALUES ($1, $2, $3, 2)
@@ -304,8 +302,6 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
           property.name,
           property.city,
         ]);
-
-        // Link the user to the property
         const userPropertyLinkQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
         await pgPool.query(userPropertyLinkQuery, [
           userInfo.user_id,
