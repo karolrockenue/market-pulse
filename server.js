@@ -634,9 +634,6 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
 });
 
 // --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
-// --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
-
-// This helper function is now only used by the context route below.
 const getDiscoveryApiContext = async () => {
   const userResult = await pgPool.query(
     "SELECT cloudbeds_user_id, refresh_token FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1"
@@ -753,6 +750,7 @@ app.get("/api/datasets/:id/fields", requireApiLogin, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 // --- Static and fallback routes (Middleware order is corrected here) ---
 const publicPath = path.join(process.cwd(), "public");
 

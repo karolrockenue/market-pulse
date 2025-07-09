@@ -313,7 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    runApiDiscoveryBtn.addEventListener("click", runApiDiscovery);
+    // Attaching the event listener only ONCE
     runApiDiscoveryBtn.addEventListener("click", runApiDiscovery);
 
     fetchLastRefreshTime();
