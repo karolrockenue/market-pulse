@@ -1,4 +1,4 @@
-// server.js (Production Ready - with all latest updates and final fix)
+// server.js (Corrected with page routes moved for proper authentication)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -37,9 +37,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-const publicPath = path.join(process.cwd(), "public");
-app.use(express.static(publicPath));
-
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(
@@ -68,13 +65,6 @@ app.use(
 const requireApiLogin = (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Unauthorized" });
-  }
-  next();
-};
-
-const requirePageLogin = (req, res, next) => {
-  if (!req.session.userId) {
-    return res.redirect("/signin");
   }
   next();
 };
@@ -619,15 +609,18 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
   res.status(200).json(results);
 });
 
-// --- Static and fallback routes ---
-app.get("/", (req, res) => {
-  res.redirect("/signin");
-});
+// --- PROTECTED PAGE-SERVING ROUTES & STATIC FILE SERVING ---
 
-app.get("/signin", (req, res) => {
-  res.sendFile(path.join(publicPath, "login.html"));
-});
+const publicPath = path.join(process.cwd(), "public");
 
+const requirePageLogin = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.redirect("/signin");
+  }
+  next();
+};
+
+// Define protected page routes FIRST
 app.get("/app", requirePageLogin, (req, res) => {
   res.redirect("/app/");
 });
@@ -635,7 +628,6 @@ app.get("/app/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-// Serve reports page with protection
 app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
@@ -646,6 +638,19 @@ app.get("/admin", requirePageLogin, (req, res) => {
 app.get("/admin/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
+
+// Serve all other static assets (JS, CSS, images) AFTER the protected routes
+app.use(express.static(publicPath));
+
+// --- Unprotected and fallback routes ---
+app.get("/", (req, res) => {
+  res.redirect("/signin");
+});
+
+app.get("/signin", (req, res) => {
+  res.sendFile(path.join(publicPath, "login.html"));
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
