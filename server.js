@@ -634,23 +634,40 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
 });
 
 // --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
-const getDiscoveryApiToken = async () => {
+// --- NEW: API DISCOVERY PROXY ENDPOINTS (FOR ADMIN PANEL) ---
+
+// Helper function to get an access token AND a property ID to use for API calls.
+const getDiscoveryApiContext = async () => {
+  // Find an active user with a refresh token
   const userResult = await pgPool.query(
-    "SELECT refresh_token FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1"
+    "SELECT cloudbeds_user_id, refresh_token FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1"
   );
   if (userResult.rows.length === 0) {
     throw new Error(
-      "No active user with a refresh token found to use for API discovery."
+      "No active user with a refresh token found for API discovery."
     );
   }
-  const refreshToken = userResult.rows[0].refresh_token;
+  const { cloudbeds_user_id, refresh_token } = userResult.rows[0];
 
+  // Find a property associated with that user
+  const propertyResult = await pgPool.query(
+    "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+    [cloudbeds_user_id]
+  );
+  if (propertyResult.rows.length === 0) {
+    throw new Error(
+      "No property associated with the user found for API discovery."
+    );
+  }
+  const propertyId = propertyResult.rows[0].property_id;
+
+  // Exchange the refresh token for a new access token
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: CLOUDBEDS_CLIENT_ID,
     client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: refreshToken,
+    refresh_token: refresh_token,
   });
 
   const response = await fetch(
@@ -664,17 +681,22 @@ const getDiscoveryApiToken = async () => {
   if (!tokenData.access_token) {
     throw new Error("Could not refresh access token for API discovery.");
   }
-  return tokenData.access_token;
+
+  // Return both the token and the property ID
+  return { accessToken: tokenData.access_token, propertyId };
 };
 
 // Route to get all available datasets
 app.get("/api/get-all-datasets", requireApiLogin, async (req, res) => {
   try {
-    const accessToken = await getDiscoveryApiToken();
+    const { accessToken, propertyId } = await getDiscoveryApiContext();
     const apiResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/datasets",
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-PROPERTY-ID": propertyId,
+        },
       }
     );
     const data = await apiResponse.json();
@@ -690,11 +712,14 @@ app.get("/api/get-all-datasets", requireApiLogin, async (req, res) => {
 // Route to get multi-levels for a specific dataset
 app.get("/api/datasets/:id/multi-levels", requireApiLogin, async (req, res) => {
   try {
-    const accessToken = await getDiscoveryApiToken();
+    const { accessToken, propertyId } = await getDiscoveryApiContext();
     const apiResponse = await fetch(
       `https://api.cloudbeds.com/datainsights/v1.1/datasets/${req.params.id}/multi-levels`,
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-PROPERTY-ID": propertyId,
+        },
       }
     );
     const data = await apiResponse.json();
@@ -710,14 +735,17 @@ app.get("/api/datasets/:id/multi-levels", requireApiLogin, async (req, res) => {
 // Route to get fields for a specific dataset (and optional multi-level)
 app.get("/api/datasets/:id/fields", requireApiLogin, async (req, res) => {
   try {
-    const accessToken = await getDiscoveryApiToken();
+    const { accessToken, propertyId } = await getDiscoveryApiContext();
     const mlId = req.query.ml_id; // Handle optional multi-level ID
     const url = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${
       req.params.id
     }/fields${mlId ? `?ml_id=${mlId}` : ""}`;
 
     const apiResponse = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
     });
     const data = await apiResponse.json();
     if (!apiResponse.ok) {
