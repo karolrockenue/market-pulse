@@ -367,7 +367,7 @@ function getYAxisOptions(metric, dataMin, dataMax) {
     let suggestedMin = Math.floor((dataMin - padding) / 10) * 10;
     let suggestedMax = Math.ceil((dataMax + padding) / 10) * 10;
     suggestedMin = Math.max(0, suggestedMin);
-    suggestedMax = Math.min(105, suggestedMax);
+    suggestedMax = Math.min(100, suggestedMax);
     return {
       ...baseOptions,
       min: suggestedMin,
@@ -451,6 +451,7 @@ function renderChart() {
           borderWidth: isLineChart ? 2.5 : 1,
           pointRadius: 0,
           tension: 0.3,
+          clip: false, // <-- ADD THIS LINE
           fill: isLineChart
             ? {
                 target: 1,
