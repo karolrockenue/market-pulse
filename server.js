@@ -37,9 +37,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-const publicPath = path.join(process.cwd(), "public");
-app.use(express.static(publicPath));
-
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(
@@ -334,6 +331,9 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 });
 
 // --- DASHBOARD AND ADMIN APIs ---
+// This section contains all your /api/... endpoints
+// They are correctly protected by requireApiLogin where needed.
+// No changes are needed in this section.
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
     const { propertyId } = req.query;
@@ -626,7 +626,9 @@ app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
   res.status(200).json(results);
 });
 
-// --- Static and fallback routes ---
+// --- Static and fallback routes (Middleware order is corrected here) ---
+const publicPath = path.join(process.cwd(), "public");
+
 app.get("/", (req, res) => {
   res.redirect("/signin");
 });
@@ -655,9 +657,15 @@ app.get("/app/reports.html", requirePageLogin, (req, res) => {
 app.get("/admin", requirePageLogin, (req, res) => {
   res.redirect("/admin/");
 });
+
 app.get("/admin/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
+
+// The static middleware MUST come AFTER the specific page routes
+// to ensure authentication is checked first.
+app.use(express.static(publicPath));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
