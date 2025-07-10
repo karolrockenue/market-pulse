@@ -248,9 +248,9 @@ function initializeAdminPanel() {
     fetchStructureBtn.disabled = true;
 
     try {
-      // Calling our new, separate serverless function
+      // Calling our new, reliable proxy route in server.js
       const response = await fetch(
-        `/api/get-dataset-structure?id=${datasetId}`
+        `/api/explore/dataset-structure?id=${datasetId}`
       );
       const data = await response.json();
 

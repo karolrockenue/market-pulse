@@ -654,6 +654,69 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
 });
 // --- END: NEW API EXPLORER PROXY ---
 
+// Add this new block right after the "/api/explore/datasets" endpoint
+
+app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching dataset structure...");
+  try {
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({ error: "Dataset ID is required." });
+    }
+
+    // Step 1: Get a fresh access token
+    const {
+      CLOUDBEDS_CLIENT_ID,
+      CLOUDBEDS_CLIENT_SECRET,
+      CLOUDBEDS_REFRESH_TOKEN,
+    } = process.env;
+
+    const params = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: CLOUDBEDS_CLIENT_ID,
+      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      refresh_token: CLOUDBEDS_REFRESH_TOKEN,
+    });
+
+    const tokenResponse = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      { method: "POST", body: params }
+    );
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.access_token) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+    const accessToken = tokenData.access_token;
+
+    // Step 2: Call the actual Cloudbeds API endpoint for multi-levels
+    const targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}/multi-levels`;
+    console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+      },
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok) {
+      throw new Error(
+        `Cloudbeds API responded with status ${
+          cloudbedsApiResponse.status
+        }: ${JSON.stringify(data)}`
+      );
+    }
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   const results = [];
   const endpoints = [
