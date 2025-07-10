@@ -338,7 +338,24 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 });
 
 // --- USER-FACING DASHBOARD APIs ---
+// Add this missing route back into server.js
 
+app.get("/api/my-properties", requireApiLogin, async (req, res) => {
+  try {
+    const query = `
+      SELECT up.property_id, h.property_name
+      FROM user_properties up
+      JOIN hotels h ON up.property_id = h.hotel_id
+      WHERE up.user_id = $1
+      ORDER BY h.property_name;
+    `;
+    const result = await pgPool.query(query, [req.session.userId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/my-properties:", error);
+    res.status(500).json({ error: "Failed to fetch user properties." });
+  }
+});
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
     const { propertyId } = req.query;
