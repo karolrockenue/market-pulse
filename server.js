@@ -689,7 +689,7 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
     const accessToken = tokenData.access_token;
 
     // Step 2: Call the actual Cloudbeds API endpoint for multi-levels
-    const targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}/multi-levels`;
+    const targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
     console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
 
     const cloudbedsApiResponse = await fetch(targetUrl, {
