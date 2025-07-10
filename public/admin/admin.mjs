@@ -223,6 +223,28 @@ function initializeAdminPanel() {
     endpointTestResultsEl.innerHTML = tableHTML;
   }
 
+  // Listener for "Get Sample Guest"
+  const fetchSampleGuestBtn = document.getElementById("fetch-sample-guest-btn");
+  fetchSampleGuestBtn.addEventListener("click", async () => {
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching sample guest record...</div>`;
+    fetchSampleGuestBtn.disabled = true;
+    try {
+      const response = await fetch("/api/explore/sample-guest");
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "An unknown server error occurred.");
+      apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
+    } catch (error) {
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
+    } finally {
+      fetchSampleGuestBtn.disabled = false;
+    }
+  });
+
   // --- Initial Setup Calls ---
   fetchLastRefreshTime();
   fetchAndRenderHotels();
