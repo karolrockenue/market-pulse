@@ -215,16 +215,23 @@ function initializeAdminPanel() {
 
     try {
       const response = await fetch("/api/get-all-datasets");
-      const data = await response.json();
+      const data = await response.json(); // Always try to parse as JSON first
 
-      if (!response.ok) {
-        throw new Error(data.error || "An unknown error occurred.");
+      // Check for a structured error from our own API
+      if (!response.ok || data.success === false) {
+        // Use the error message from our API if it exists, otherwise use a default
+        const errorMessage =
+          data.error || `Server responded with status ${response.status}`;
+        const errorDetails = data.details ? `\n\nDetails: ${data.details}` : "";
+        throw new Error(errorMessage + errorDetails);
       }
 
-      // Display the formatted JSON response in our container.
+      // If everything is OK, display the data
       apiResultsContainer.textContent = JSON.stringify(data, null, 2);
     } catch (error) {
-      apiResultsContainer.textContent = `Error: ${error.message}`;
+      // This catch block is now much more powerful
+      console.error("API Explorer Fetch Error:", error);
+      apiResultsContainer.textContent = `An error occurred:\n\n${error.message}`;
     } finally {
       fetchDatasetsBtn.disabled = false;
     }

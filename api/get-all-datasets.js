@@ -1,13 +1,12 @@
 // api/get-all-datasets.js
 const fetch = require("node-fetch").default || require("node-fetch");
 
-// Re-usable function to get an access token using our system's refresh token.
-// This is a simplified version for our admin tool.
 async function getCloudbedsAccessToken() {
+  console.log("[get-all-datasets] Attempting to get access token...");
   const {
     CLOUDBEDS_CLIENT_ID,
     CLOUDBEDS_CLIENT_SECRET,
-    CLOUDBEDS_REFRESH_TOKEN, // Using the system-wide refresh token for this tool
+    CLOUDBEDS_REFRESH_TOKEN,
   } = process.env;
 
   const params = new URLSearchParams({
@@ -27,41 +26,59 @@ async function getCloudbedsAccessToken() {
 
   const tokenData = await response.json();
   if (!tokenData.access_token) {
+    console.error(
+      "[get-all-datasets] Failed to authenticate with Cloudbeds:",
+      tokenData
+    );
     throw new Error("Failed to authenticate with Cloudbeds.");
   }
+  console.log("[get-all-datasets] Access token received successfully.");
   return tokenData.access_token;
 }
 
-// The main handler for our new serverless function.
 module.exports = async (request, response) => {
+  console.log(
+    `[get-all-datasets] Function invoked at: ${new Date().toISOString()}`
+  );
   try {
     const accessToken = await getCloudbedsAccessToken();
+    const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
 
-    const cloudbedsApiResponse = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/datasets",
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-          "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID, // Required header
-        },
-      }
+    console.log(`[get-all-datasets] Calling Cloudbeds API: ${targetUrl}`);
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+      },
+    });
+    console.log(
+      `[get-all-datasets] Cloudbeds API responded with status: ${cloudbedsApiResponse.status}`
     );
 
     if (!cloudbedsApiResponse.ok) {
       const errorBody = await cloudbedsApiResponse.text();
-      throw new Error(
-        `Cloudbeds API Error: ${cloudbedsApiResponse.status} ${errorBody}`
+      console.error(
+        `[get-all-datasets] Cloudbeds API Error: ${cloudbedsApiResponse.status}`,
+        errorBody
       );
+      // Important: Send a structured JSON error back to our frontend
+      return response.status(cloudbedsApiResponse.status).json({
+        success: false,
+        error: "Failed to fetch from Cloudbeds API.",
+        details: errorBody,
+      });
     }
 
     const data = await cloudbedsApiResponse.json();
-
-    // Send the data from Cloudbeds back to our frontend.
-    response.status(200).json(data);
+    console.log(
+      "[get-all-datasets] Successfully fetched data, sending to client."
+    );
+    return response.status(200).json(data);
   } catch (error) {
-    console.error("Error in /api/get-all-datasets:", error);
-    response.status(500).json({ error: error.message });
+    console.error("[get-all-datasets] A critical error occurred:", error);
+    // Important: Send a structured JSON error back to our frontend
+    return response.status(500).json({ success: false, error: error.message });
   }
 };
