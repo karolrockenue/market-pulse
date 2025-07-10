@@ -151,6 +151,54 @@ function initializeAdminPanel() {
     }
   };
 
+  /**
+   * Renders an array of field data into a formatted HTML table.
+   * @param {Array} fields - The array of field objects from the API.
+   * @param {HTMLElement} container - The container element to render the table into.
+   */
+  function renderFieldsTable(fields, container) {
+    if (!fields || fields.length === 0) {
+      container.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">No fields or structure found for this dataset. The API returned an empty array.</div>`;
+      return;
+    }
+
+    // Create the table structure with headers
+    let tableHTML = `
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr class="text-left">
+              <th class="px-4 py-3 font-semibold text-gray-600">Column (API Name)</th>
+              <th class="px-4 py-3 font-semibold text-gray-600">Friendly Name</th>
+              <th class="px-4 py-3 font-semibold text-gray-600">Description</th>
+              <th class="px-4 py-3 font-semibold text-gray-600">Data Type</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">`;
+
+    // Loop through each field and create a table row for it
+    for (const field of fields) {
+      tableHTML += `
+        <tr>
+          <td class="px-4 py-3 font-mono text-blue-600">${
+            field.column || "N/A"
+          }</td>
+          <td class="px-4 py-3 font-medium text-gray-800">${
+            field.name || "N/A"
+          }</td>
+          <td class="px-4 py-3 text-gray-600">${field.description || "N/A"}</td>
+          <td class="px-4 py-3 font-mono text-gray-600">${
+            field.kind || "N/A"
+          }</td>
+        </tr>`;
+    }
+
+    tableHTML += `</tbody></table></div>`;
+
+    // Inject the final HTML into the container
+    container.innerHTML = tableHTML;
+  }
+
   runEndpointTestsBtn.addEventListener("click", async () => {
     runEndpointTestsBtn.disabled = true;
     runEndpointTestsBtn.textContent = "Testing...";
