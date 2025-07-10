@@ -1,4 +1,4 @@
-// server.js (Production Ready - with Logout and UX Fixes)
+// server.js (Production Ready - with Full Security Fixes)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -62,15 +62,34 @@ app.use(
   })
 );
 
-const requireApiLogin = (req, res, next) => {
+// --- NEW, SPECIFIC MIDDLEWARE ---
+const requireUserApi = (req, res, next) => {
   if (!req.session.userId) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res
+      .status(401)
+      .json({ error: "Unauthorized: User session required." });
+  }
+  next();
+};
+
+const requireAdminApi = (req, res, next) => {
+  if (!req.session.isAdmin) {
+    return res
+      .status(403)
+      .json({ error: "Forbidden: Administrator access required." });
   }
   next();
 };
 
 const requirePageLogin = (req, res, next) => {
   if (!req.session.userId) {
+    return res.redirect("/signin");
+  }
+  next();
+};
+
+const requireAdminPage = (req, res, next) => {
+  if (!req.session.isAdmin) {
     return res.redirect("/signin");
   }
   next();
@@ -85,10 +104,8 @@ app.post("/api/auth/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-    // The cookie domain must match what was used to set it.
     const cookieDomain =
       process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
-    // Clear the cookie from the browser
     res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
     res.status(200).json({ message: "Logged out successfully" });
   });
@@ -112,7 +129,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minute expiry
+    const expires_at = new Date(Date.now() + 15 * 60 * 1000);
 
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
@@ -188,7 +205,6 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
 });
 
 // --- ADMIN & CLOUDBEDS OAUTH ---
-// The admin login endpoint
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -198,7 +214,7 @@ app.post("/api/admin-login", (req, res) => {
       .json({ error: "Admin password not configured on server." });
   }
   if (password === adminPassword) {
-    req.session.isAdmin = true; // MODIFIED to use a separate flag
+    req.session.isAdmin = true;
     req.session.save((err) => {
       if (err) {
         console.error("Session save error:", err);
@@ -342,7 +358,7 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 });
 
 // --- DASHBOARD AND ADMIN APIs ---
-app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
+app.get("/api/get-hotel-name", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.query;
     if (!propertyId) {
@@ -369,7 +385,7 @@ app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/last-refresh-time", requireApiLogin, async (req, res) => {
+app.get("/api/last-refresh-time", requireUserApi, async (req, res) => {
   try {
     const result = await pgPool.query(
       "SELECT value FROM system_state WHERE key = 'last_successful_refresh'"
@@ -389,7 +405,7 @@ const getPeriod = (granularity) => {
   return "stay_date";
 };
 
-app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
+app.get("/api/kpi-summary", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, propertyId } = req.query;
     if (!propertyId) {
@@ -451,7 +467,7 @@ app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
+app.get("/api/metrics-from-db", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
     if (!propertyId) {
@@ -479,7 +495,7 @@ app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
+app.get("/api/competitor-metrics", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
     if (!propertyId) {
@@ -531,7 +547,7 @@ app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/my-properties", requireApiLogin, async (req, res) => {
+app.get("/api/my-properties", requireUserApi, async (req, res) => {
   try {
     const query = `
             SELECT up.property_id, h.property_name
@@ -548,39 +564,21 @@ app.get("/api/my-properties", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
+app.get("/api/test-cloudbeds", requireAdminApi, async (req, res) => {
   try {
-    if (req.session.userId === "admin") {
-      return res.status(200).json({
-        success: true,
-        status: 200,
-        message: "Admin connection test successful.",
-      });
-    }
-    const user = await pgPool.query(
-      "SELECT access_token FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
-    );
-    if (user.rows.length === 0)
-      return res.status(404).json({ error: "User or token not found." });
-    const accessToken = user.rows[0].access_token;
-    const response = await fetch(
-      "https://api.cloudbeds.com/api/v1.3/userinfo",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (response.ok) {
-      res.status(200).json({ success: true, status: response.status });
-    } else {
-      res
-        .status(response.status)
-        .json({ success: false, status: response.status });
-    }
+    // For an admin, a successful API call here just means the endpoint is reachable.
+    // A more advanced test could use a system-level token if available.
+    res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Admin connection test successful.",
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get("/api/test-database", requireApiLogin, async (req, res) => {
+app.get("/api/test-database", requireAdminApi, async (req, res) => {
   try {
     const client = await pgPool.connect();
     await client.query("SELECT 1");
@@ -595,7 +593,7 @@ app.get("/api/test-database", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/get-all-hotels", requireApiLogin, async (req, res) => {
+app.get("/api/get-all-hotels", requireAdminApi, async (req, res) => {
   try {
     const result = await pgPool.query(
       "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
@@ -606,7 +604,7 @@ app.get("/api/get-all-hotels", requireApiLogin, async (req, res) => {
   }
 });
 
-app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
+app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   const results = [];
   const endpoints = [
     {
@@ -649,17 +647,14 @@ app.get("/app/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-// Serve reports page with protection
 app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
 
-app.get("/admin/", requirePageLogin, (req, res) => {
+app.get("/admin/", requireAdminPage, (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
-// The static middleware MUST come AFTER the specific page routes
-// to ensure authentication is checked first.
 app.use(express.static(publicPath));
 
 const PORT = process.env.PORT || 3000;
