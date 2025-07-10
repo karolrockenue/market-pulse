@@ -1,4 +1,4 @@
-// server.js (Refactored to be cleaner)
+// server.js (Correctly Refactored)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -37,6 +37,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// Create the single, shared database pool
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(
@@ -76,11 +77,13 @@ const requirePageLogin = (req, res, next) => {
   next();
 };
 
-// --- AUTHENTICATION & OAUTH ---
-// NOTE: All admin-specific routes have been moved to api/admin-routes.js
+// --- ROUTERS ---
 
-const adminRoutes = require("./api/admin-routes.js"); // Make sure path is correct
-app.use("/api/admin", requireApiLogin, adminRoutes);
+// Import the admin router module and initialize it with the database pool
+const adminRouter = require("./api/admin-routes.js")(pgPool);
+app.use("/api/admin", requireApiLogin, adminRouter);
+
+// --- AUTHENTICATION & OAUTH ---
 
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((err) => {
