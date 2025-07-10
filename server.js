@@ -673,7 +673,7 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
 });
 
 // New endpoint to get a sample of real data from the Insights API
-// This endpoint is now "smarter" and handles special cases for certain datasets.
+// This endpoint is now "smarter" and uses the correct filter for each dataset.
 app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching insights data...");
   try {
@@ -685,12 +685,28 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
     const accessToken = await getCloudbedsAccessToken();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const stayDate = yesterday.toISOString().split("T")[0];
+    const dateForFilter = yesterday.toISOString().split("T")[0];
 
     const requestedColumns = columns.split(",").map((colName) => ({
       cdf: { column: colName.trim() },
       metrics: ["sum", "mean"],
     }));
+
+    // --- NEW LOGIC: Determine the correct date column to filter by ---
+    let filterColumn;
+    if (id === "7") {
+      // For Dataset 7 (Occupancy)
+      filterColumn = "stay_date";
+    } else if (id === "3") {
+      // For Dataset 3 (Reservations)
+      filterColumn = "checkin_date";
+    } else {
+      // A sensible default for other potential datasets
+      filterColumn = "checkin_date";
+    }
+    console.log(
+      `[server.js] Using '${filterColumn}' as the date filter for Dataset ${id}.`
+    );
 
     let insightsPayload = {
       property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
@@ -698,22 +714,17 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
       columns: requestedColumns,
       filters: {
         and: [
-          // THIS IS THE FIX: The operator is now "equals"
+          // Use the dynamic filterColumn variable here
           {
-            cdf: { column: "stay_date" },
+            cdf: { column: filterColumn },
             operator: "equals",
-            value: `${stayDate}T00:00:00.000Z`,
+            value: `${dateForFilter}T00:00:00.000Z`,
           },
         ],
       },
     };
 
-    // THIS IS THE NEW LOGIC: Add special parameters only if required by the dataset.
     if (id === "7") {
-      // For Dataset 7 (Occupancy)
-      console.log(
-        "[server.js] Applying special 'group_rows' parameter for Dataset 7."
-      );
       insightsPayload.group_rows = [
         { cdf: { column: "stay_date" }, modifier: "day" },
       ];
