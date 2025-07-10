@@ -697,7 +697,7 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
         and: [
           {
             cdf: { column: "stay_date" },
-            operator: "equal",
+            operator: "equals",
             value: `${stayDate}T00:00:00.000Z`,
           },
         ],
@@ -735,8 +735,7 @@ app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
 
     // This endpoint path is a guess based on standard API design.
     // We may need to correct it based on the documentation.
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuests?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
-
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
