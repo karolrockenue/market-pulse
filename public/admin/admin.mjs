@@ -205,4 +205,28 @@ function initializeAdminPanel() {
 
   fetchLastRefreshTime();
   fetchAndRenderHotels();
+  // --- API EXPLORER LOGIC ---
+  const fetchDatasetsBtn = document.getElementById("fetch-datasets-btn");
+  const apiResultsContainer = document.getElementById("api-results-container");
+
+  fetchDatasetsBtn.addEventListener("click", async () => {
+    apiResultsContainer.textContent = "Fetching...";
+    fetchDatasetsBtn.disabled = true;
+
+    try {
+      const response = await fetch("/api/get-all-datasets");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "An unknown error occurred.");
+      }
+
+      // Display the formatted JSON response in our container.
+      apiResultsContainer.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+      apiResultsContainer.textContent = `Error: ${error.message}`;
+    } finally {
+      fetchDatasetsBtn.disabled = false;
+    }
+  });
 }
