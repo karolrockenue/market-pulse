@@ -672,6 +672,36 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
   }
 });
 
+// Add this new endpoint to handle the "Get Sample Guest" button
+app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching sample guest...");
+  try {
+    const accessToken = await getCloudbedsAccessToken();
+
+    // This is the corrected URL for getGuestList from the documentation
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+
+    // Return just the first guest from the list
+    if (data.data && data.data.length > 0) {
+      res.status(200).json(data.data[0]);
+    } else {
+      res.status(200).json({ message: "No guests found for this property." });
+    }
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // New endpoint to get a sample of real data from the Insights API
 // This is the final, most intelligent version of this endpoint.
 app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
