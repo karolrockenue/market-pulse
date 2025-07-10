@@ -673,7 +673,7 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
 });
 
 // New endpoint to get a sample of real data from the Insights API
-// This endpoint will now dynamically build the columns to query
+// This endpoint is now "smarter" and handles special cases for certain datasets.
 app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching insights data...");
   try {
@@ -687,18 +687,18 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
     yesterday.setDate(yesterday.getDate() - 1);
     const stayDate = yesterday.toISOString().split("T")[0];
 
-    // Dynamically build the columns array from the query parameter
     const requestedColumns = columns.split(",").map((colName) => ({
       cdf: { column: colName.trim() },
-      metrics: ["sum", "mean"], // Request sum and mean for each column
+      metrics: ["sum", "mean"],
     }));
 
-    const insightsPayload = {
+    let insightsPayload = {
       property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
       dataset_id: parseInt(id),
       columns: requestedColumns,
       filters: {
         and: [
+          // THIS IS THE FIX: The operator is now "equals"
           {
             cdf: { column: "stay_date" },
             operator: "equals",
@@ -707,6 +707,17 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
         ],
       },
     };
+
+    // THIS IS THE NEW LOGIC: Add special parameters only if required by the dataset.
+    if (id === "7") {
+      // For Dataset 7 (Occupancy)
+      console.log(
+        "[server.js] Applying special 'group_rows' parameter for Dataset 7."
+      );
+      insightsPayload.group_rows = [
+        { cdf: { column: "stay_date" }, modifier: "day" },
+      ];
+    }
 
     const targetUrl =
       "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run";
