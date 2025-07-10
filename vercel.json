@@ -15,6 +15,10 @@
       "dest": "/api/initial-sync.js"
     },
     {
+      "src": "/api/get-all-datasets",
+      "dest": "/api/get-all-datasets.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "server.js"
     }
