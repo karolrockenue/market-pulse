@@ -57,7 +57,7 @@ app.use(
         process.env.VERCEL_ENV === "production"
           ? ".market-pulse.io"
           : undefined,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: 60 * 24 * 60 * 60 * 1000,
     },
   })
 );
@@ -188,6 +188,7 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
 });
 
 // --- ADMIN & CLOUDBEDS OAUTH ---
+// The admin login endpoint
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -197,7 +198,7 @@ app.post("/api/admin-login", (req, res) => {
       .json({ error: "Admin password not configured on server." });
   }
   if (password === adminPassword) {
-    req.session.userId = "admin";
+    req.session.isAdmin = true; // MODIFIED to use a separate flag
     req.session.save((err) => {
       if (err) {
         console.error("Session save error:", err);
