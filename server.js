@@ -702,6 +702,32 @@ app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
   }
 });
 
+// New endpoint to get a single, real hotel record
+app.get("/api/explore/sample-hotel", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching sample hotel...");
+  try {
+    const accessToken = await getCloudbedsAccessToken();
+
+    // This endpoint path is a guess. Please provide the correct one from the documentation.
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotel?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+
+    // Hotel endpoints usually return a single object, not a list
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // New endpoint to get a sample of real data from the Insights API
 // This is the final, most intelligent version of this endpoint.
 app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
