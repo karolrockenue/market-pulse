@@ -782,31 +782,44 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
   }
 });
 
-// New endpoint to get a single, real guest record from the General API
-app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching sample guest...");
-  try {
-    const accessToken = await getCloudbedsAccessToken();
+// Replace the old "/api/explore/sample-guest" endpoint with this one for Reservations.
+// I have also updated the name to be more accurate.
+app.get(
+  "/api/explore/sample-reservation",
+  requireAdminApi,
+  async (req, res) => {
+    console.log(
+      "[server.js] Admin API Explorer: Fetching sample reservation..."
+    );
+    try {
+      const accessToken = await getCloudbedsAccessToken();
 
-    // This endpoint path is a guess based on standard API design.
-    // We may need to correct it based on the documentation.
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
-    const cloudbedsApiResponse = await fetch(targetUrl, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+      // This is the corrected URL and parameters from the documentation.
+      const targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1&sortByRecent=true`;
 
-    const data = await cloudbedsApiResponse.json();
-    if (!cloudbedsApiResponse.ok)
-      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+      const cloudbedsApiResponse = await fetch(targetUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-    // Return just the first guest from the list
-    res.status(200).json(data.data[0]);
-  } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+      const data = await cloudbedsApiResponse.json();
+      if (!cloudbedsApiResponse.ok)
+        throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+
+      // Return just the first reservation from the list
+      if (data.data && data.data.length > 0) {
+        res.status(200).json(data.data[0]);
+      } else {
+        res
+          .status(200)
+          .json({ message: "No reservations found for this property." });
+      }
+    } catch (error) {
+      console.error("[server.js] Admin API Explorer Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
-});
+);
 // --- END: NEW API EXPLORER PROXY ---
 
 app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
