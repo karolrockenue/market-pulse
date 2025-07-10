@@ -15,30 +15,40 @@ const metricConfig = {
 
 const chartColors = { primary: "#60a5fa", secondary: "#334155" };
 
+async function checkUserRoleAndSetupNav() {
+  try {
+    const response = await fetch("/api/auth/session-info");
+    const sessionInfo = await response.json();
+    if (sessionInfo.isAdmin) {
+      const adminLink = document.getElementById("admin-nav-link");
+      if (adminLink) {
+        adminLink.style.display = "flex";
+      }
+    }
+  } catch (error) {
+    console.error("Could not check user role:", error);
+  }
+}
+
 async function populatePropertySwitcher() {
   const switcherBtn = document.getElementById("hotel-btn");
   const currentNameEl = document.getElementById("current-property-name");
   const dropdownEl = document.getElementById("hotel-dropdown");
-
   try {
     const response = await fetch("/api/my-properties", {
       credentials: "include",
     });
     if (!response.ok) throw new Error("Could not fetch properties.");
-
     const properties = await response.json();
     dropdownEl.innerHTML = "";
-
     if (properties.length === 0) {
       currentNameEl.textContent = "No Properties Found";
       switcherBtn.disabled = true;
       return;
     }
-
     let activeProperty = properties[0];
     currentNameEl.textContent = activeProperty.property_name;
     window.currentPropertyId = activeProperty.property_id;
-
     properties.forEach((property) => {
       const link = document.createElement("a");
       link.href = "#";
@@ -46,13 +56,11 @@ async function populatePropertySwitcher() {
         "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100";
       link.textContent = property.property_name;
       link.dataset.propertyId = property.property_id;
-
       link.addEventListener("click", (e) => {
         e.preventDefault();
         window.currentPropertyId = property.property_id;
         currentNameEl.textContent = property.property_name;
         dropdownEl.classList.remove("show");
-
         const startDate = document.getElementById("start-date").value;
         const endDate = document.getElementById("end-date").value;
         loadDataFromAPI(startDate, endDate, currentGranularity);
@@ -66,7 +74,6 @@ async function populatePropertySwitcher() {
   }
 }
 
-// --- Error Handling UI Functions ---
 function showError(message) {
   const errorNotification = document.getElementById("error-notification");
   const errorMessage = document.getElementById("error-message");
@@ -84,10 +91,8 @@ function hideError() {
   }
 }
 
-// --- DATA PROCESSING ---
 function processAndMergeData(yourData, marketData) {
   const dataMap = new Map();
-
   yourData.forEach((row) => {
     const date = (row.stay_date || row.period).substring(0, 10);
     if (!dataMap.has(date)) {
@@ -100,7 +105,6 @@ function processAndMergeData(yourData, marketData) {
       revpar: parseFloat(row.revpar) || 0,
     };
   });
-
   marketData.forEach((row) => {
     const date = (row.stay_date || row.period).substring(0, 10);
     if (!dataMap.has(date)) {
@@ -113,9 +117,7 @@ function processAndMergeData(yourData, marketData) {
       revpar: parseFloat(row.market_revpar) || 0,
     };
   });
-
   const mergedData = Array.from(dataMap.values());
-
   mergedData.forEach((entry) => {
     if (Object.keys(entry.your).length === 0) {
       entry.your = { occupancy: 0, adr: 0, revpar: 0 };
@@ -124,11 +126,9 @@ function processAndMergeData(yourData, marketData) {
       entry.market = { occupancy: 0, adr: 0, revpar: 0 };
     }
   });
-
   return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
-// --- DYNAMIC RENDERING LOGIC ---
 function setActiveMetric(metric) {
   activeMetric = metric;
   document
@@ -150,14 +150,11 @@ function renderKpiCards(kpiData) {
     });
     return;
   }
-
   const { yourHotel, market } = kpiData;
-
   ["occupancy", "adr", "revpar"].forEach((metric) => {
     const yourValue = yourHotel[metric];
     const marketValue = market[metric];
     const delta = yourValue - marketValue;
-
     document.getElementById(`kpi-${metric}-your`).textContent = formatValue(
       yourValue,
       metricConfig[metric].format
@@ -166,13 +163,11 @@ function renderKpiCards(kpiData) {
       marketValue,
       metricConfig[metric].format
     );
-
     const deltaEl = document.getElementById(`kpi-${metric}-delta`);
     if (isNaN(delta)) {
       deltaEl.textContent = "";
       return;
     }
-
     const deltaSign = delta >= 0 ? "+" : "";
     let formattedDelta;
     if (metricConfig[metric].format === "percent") {
@@ -194,7 +189,6 @@ function formatValue(value, type) {
   if (value === null || value === undefined) return "-";
   const num = parseFloat(value);
   if (isNaN(num)) return "-";
-
   if (type === "currency") return `$${num.toFixed(2)}`;
   if (type === "percent") return `${(num * 100).toFixed(1)}%`;
   return num.toFixed(0);
@@ -222,7 +216,6 @@ function renderTables() {
   const marketHeader = document.getElementById("market-table-header");
   yourTable.innerHTML = "";
   marketTable.innerHTML = "";
-
   const dateHeaderLabel =
     currentGranularity.charAt(0).toUpperCase() + currentGranularity.slice(1);
   yourHeader.innerHTML = `
@@ -238,14 +231,12 @@ function renderTables() {
       <th class="px-4 py-2 font-semibold">Market RevPAR</th>
       <th class="px-4 py-2 font-semibold">${metricConfig[activeMetric].label} Delta</th>
   `;
-
   if (yourHotelMetrics.length === 0) {
     const placeholderRow = `<tr><td colspan="5" class="text-center p-8 text-gray-500">No data to display for this period</td></tr>`;
     yourTable.innerHTML = placeholderRow;
     marketTable.innerHTML = placeholderRow;
     return;
   }
-
   yourHotelMetrics.forEach((day, index) => {
     const marketDay = marketMetrics[index];
     const displayDate = formatDateLabel(day.date, currentGranularity);
@@ -267,7 +258,6 @@ function renderTables() {
           )}</td>
       `;
     yourTable.appendChild(yourRow);
-
     const marketRow = document.createElement("tr");
     marketRow.dataset.date = marketDay.date;
     const delta = day.your[activeMetric] - marketDay.market[activeMetric];
@@ -280,7 +270,6 @@ function renderTables() {
       formattedDelta = `${deltaSign}${(Math.abs(delta) * 100).toFixed(1)}pts`;
     }
     const deltaCell = `<td class="px-4 py-3 font-semibold font-data ${deltaColor}">${formattedDelta}</td>`;
-
     marketRow.innerHTML = `
           <td class="px-4 py-3 whitespace-nowrap font-data">${displayDate}</td>
           <td class="px-4 py-3 font-data">${formatValue(
@@ -312,10 +301,13 @@ function handleRowMouseover(event) {
     label.startsWith(date)
   );
   if (dataIndex !== -1) {
-    comparisonChart.tooltip.setActiveElements([
-      { datasetIndex: 0, index: dataIndex },
-      { datasetIndex: 1, index: dataIndex },
-    ]);
+    comparisonChart.tooltip.setActiveElements(
+      [
+        { datasetIndex: 0, index: dataIndex },
+        { datasetIndex: 1, index: dataIndex },
+      ],
+      { x: 0, y: 0 }
+    );
     comparisonChart.update();
   }
 }
@@ -362,26 +354,24 @@ Chart.defaults.borderColor = "#e2e8f0";
 function getYAxisOptions(metric, dataMin, dataMax) {
   const baseOptions = {
     grid: { color: "#e2e8f0" },
-    beginAtZero: true, // Ensure axis always starts at 0
+    beginAtZero: true,
   };
-
   if (metric === "occupancy") {
     let suggestedMax = Math.ceil((dataMax + 20) / 10) * 10;
     suggestedMax = Math.min(100, suggestedMax);
     return {
       ...baseOptions,
-      min: 0, // Explicitly set min to 0
+      min: 0,
       max: suggestedMax,
       ticks: { stepSize: 10, callback: (value) => value + "%" },
     };
   }
-
   const range = dataMax - dataMin;
   const padding = range > 0 ? range * 0.2 : dataMax * 0.2;
   const suggestedMax = Math.ceil((dataMax + padding) / 10) * 10;
   return {
     ...baseOptions,
-    min: 0, // Explicitly set min to 0 for all other metrics
+    min: 0,
     max: suggestedMax,
     ticks: { callback: (value) => "$" + value },
   };
@@ -390,12 +380,10 @@ function getYAxisOptions(metric, dataMin, dataMax) {
 function renderChart() {
   const chartContainer = document.getElementById("chart-container");
   const noDataOverlay = document.getElementById("no-data-overlay");
-
   if (comparisonChart) {
     comparisonChart.destroy();
     comparisonChart = null;
   }
-
   if (yourHotelMetrics.length === 0) {
     chartContainer.classList.add("hidden");
     noDataOverlay.classList.remove("hidden");
@@ -404,9 +392,7 @@ function renderChart() {
     chartContainer.classList.remove("hidden");
     noDataOverlay.classList.add("hidden");
   }
-
   const ctx = document.getElementById("comparisonChart").getContext("2d");
-
   const isSingleDataPoint = yourHotelMetrics.length === 1;
   const chartType = isSingleDataPoint
     ? "bar"
@@ -414,7 +400,6 @@ function renderChart() {
     ? "line"
     : "bar";
   const isLineChart = chartType === "line";
-
   const labels = yourHotelMetrics.map((d) =>
     formatDateLabel(d.date, currentGranularity)
   );
@@ -428,15 +413,12 @@ function renderChart() {
       ? d.market[activeMetric] * 100
       : d.market[activeMetric]
   );
-
   const allData = [...yourData, ...marketData];
   const dataMin = allData.length > 0 ? Math.min(...allData) : 0;
   const dataMax = allData.length > 0 ? Math.max(...allData) : 100;
-
   document.getElementById(
     "comparison-chart-title"
   ).textContent = `${metricConfig[activeMetric].label} for ${hotelName} vs The Market`;
-
   const config = {
     type: chartType,
     data: {
@@ -523,38 +505,30 @@ function renderChart() {
   });
 }
 
-// --- DATA LOADING ---
 async function loadDataFromAPI(startDate, endDate, granularity) {
   const dataDisplayWrapper = document.getElementById("data-display-wrapper");
   const loadingOverlay = document.getElementById("loading-overlay");
   const contentWrapper = document.getElementById("dashboard-content-wrapper");
-
   hideError();
   if (!isInitialLoad) {
     dataDisplayWrapper.classList.add("loading");
   }
-
   try {
     const yourHotelUrl = `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${window.currentPropertyId}`;
     const marketUrl = `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${window.currentPropertyId}`;
     const kpiUrl = `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}&propertyId=${window.currentPropertyId}`;
-
     const [yourHotelResponse, marketResponse, kpiResponse] = await Promise.all([
       fetch(yourHotelUrl, { credentials: "include" }),
       fetch(marketUrl, { credentials: "include" }),
       fetch(kpiUrl, { credentials: "include" }),
     ]);
-
     if (!yourHotelResponse.ok || !marketResponse.ok || !kpiResponse.ok) {
       throw new Error("Failed to fetch data from one or more API endpoints.");
     }
-
     const yourHotelData = await yourHotelResponse.json();
     const marketData = await marketResponse.json();
     const kpiData = await kpiResponse.json();
-
     await fetchAndSetDisplayNames();
-
     renderKpiCards(kpiData);
     const processedData = processAndMergeData(
       yourHotelData.metrics,
@@ -562,7 +536,6 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
     );
     yourHotelMetrics = processedData;
     marketMetrics = processedData;
-
     const marketSubtitleEl = document.getElementById("market-subtitle");
     if (marketData.competitorCount > 0) {
       marketSubtitleEl.textContent = `Based on a competitive set of ${marketData.competitorCount} hotels of a similar standard.`;
@@ -570,7 +543,6 @@ async function loadDataFromAPI(startDate, endDate, granularity) {
       marketSubtitleEl.textContent =
         "No competitor data available for this period or standard.";
     }
-
     renderTables();
     renderChart();
   } catch (error) {
@@ -655,8 +627,9 @@ function formatDateForInput(date) {
   return `${year}-${month}-${day}`;
 }
 
-// --- INITIALIZE ---
 document.addEventListener("DOMContentLoaded", async () => {
+  await checkUserRoleAndSetupNav();
+
   const startDateInput = document.getElementById("start-date");
   const endDateInput = document.getElementById("end-date");
   const runBtn = document.getElementById("run-btn");
@@ -733,7 +706,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   setupLogout();
 
-  // --- NEW: Modal Handling Script ---
   function setupModals() {
     document.querySelectorAll("[data-modal-target]").forEach((button) => {
       button.addEventListener("click", () => {

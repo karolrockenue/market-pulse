@@ -1,4 +1,4 @@
-// server.js (Production Ready - with Full Security Fixes)
+// server.js (Production Ready - Database-Driven Roles)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -62,7 +62,7 @@ app.use(
   })
 );
 
-// --- NEW, SPECIFIC MIDDLEWARE ---
+// --- AUTHENTICATION & ROLE-BASED MIDDLEWARE ---
 const requireUserApi = (req, res, next) => {
   if (!req.session.userId) {
     return res
@@ -88,14 +88,7 @@ const requirePageLogin = (req, res, next) => {
   next();
 };
 
-const requireAdminPage = (req, res, next) => {
-  if (!req.session.isAdmin) {
-    return res.redirect("/signin");
-  }
-  next();
-};
-
-// --- NEW MAGIC LINK & LOGOUT AUTH ---
+// --- AUTHENTICATION ENDPOINTS ---
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -116,26 +109,21 @@ app.post("/api/auth/login", async (req, res) => {
   if (!email) {
     return res.status(400).json({ error: "Email is required." });
   }
-
   try {
     const userResult = await pgPool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
-
     if (userResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: "User not found." });
     }
-
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
     const expires_at = new Date(Date.now() + 15 * 60 * 1000);
-
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
       [token, user.user_id, expires_at]
     );
-
     const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
     const msg = {
       to: user.email,
@@ -143,9 +131,7 @@ app.post("/api/auth/login", async (req, res) => {
       subject: "Your Market Pulse Login Link",
       html: `<p>Hello ${user.first_name},</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}">Log in to Market Pulse</a></p>`,
     };
-
     await sgMail.send(msg);
-
     res.status(200).json({ success: true, message: "Login link sent." });
   } catch (error) {
     console.error("Error during magic link login:", error);
@@ -158,13 +144,11 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
   }
-
   try {
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
     );
-
     if (tokenResult.rows.length === 0) {
       return res
         .status(400)
@@ -172,12 +156,11 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
           "Login link is invalid or has expired. Please request a new one."
         );
     }
-
     const validToken = tokenResult.rows[0];
     const internalUserId = validToken.user_id;
 
     const userResult = await pgPool.query(
-      "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
+      "SELECT cloudbeds_user_id, is_admin FROM users WHERE user_id = $1",
       [internalUserId]
     );
 
@@ -185,7 +168,9 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
       return res.status(404).send("Could not find a matching user account.");
     }
 
-    req.session.userId = userResult.rows[0].cloudbeds_user_id;
+    const user = userResult.rows[0];
+    req.session.userId = user.cloudbeds_user_id;
+    req.session.isAdmin = user.is_admin || false;
 
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
@@ -204,26 +189,17 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   }
 });
 
-// --- ADMIN & CLOUDBEDS OAUTH ---
-app.post("/api/admin-login", (req, res) => {
-  const { password } = req.body;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) {
-    return res
-      .status(500)
-      .json({ error: "Admin password not configured on server." });
-  }
-  if (password === adminPassword) {
-    req.session.isAdmin = true;
-    req.session.save((err) => {
-      if (err) {
-        console.error("Session save error:", err);
-        return res.status(500).json({ error: "Failed to save session." });
-      }
-      res.status(200).json({ success: true });
+app.get("/api/auth/session-info", (req, res) => {
+  if (req.session.userId) {
+    res.json({
+      isLoggedIn: true,
+      isAdmin: req.session.isAdmin || false,
     });
   } else {
-    res.status(401).json({ error: "Invalid password." });
+    res.json({
+      isLoggedIn: false,
+      isAdmin: false,
+    });
   }
 });
 
@@ -340,7 +316,16 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
         ]);
       }
     }
+
+    const userRoleResult = await pgPool.query(
+      "SELECT is_admin FROM users WHERE cloudbeds_user_id = $1",
+      [userInfo.user_id]
+    );
+    const isAdmin = userRoleResult.rows[0]?.is_admin || false;
+
     req.session.userId = userInfo.user_id;
+    req.session.isAdmin = isAdmin;
+
     req.session.save((err) => {
       if (err) {
         return res
@@ -651,7 +636,7 @@ app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
 
-app.get("/admin/", requireAdminPage, (req, res) => {
+app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
