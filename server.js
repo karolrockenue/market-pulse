@@ -1,4 +1,4 @@
-// server.js (Production Ready - with Logout and UX Fixes)
+// server.js (Refactored to be cleaner)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -76,7 +76,12 @@ const requirePageLogin = (req, res, next) => {
   next();
 };
 
-// --- NEW MAGIC LINK & LOGOUT AUTH ---
+// --- AUTHENTICATION & OAUTH ---
+// NOTE: All admin-specific routes have been moved to api/admin-routes.js
+
+const adminRoutes = require("./api/admin-routes.js"); // Make sure path is correct
+app.use("/api/admin", requireApiLogin, adminRoutes);
+
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -85,10 +90,8 @@ app.post("/api/auth/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-    // The cookie domain must match what was used to set it.
     const cookieDomain =
       process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
-    // Clear the cookie from the browser
     res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
     res.status(200).json({ message: "Logged out successfully" });
   });
@@ -112,7 +115,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minute expiry
+    const expires_at = new Date(Date.now() + 15 * 60 * 1000);
 
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
@@ -187,7 +190,6 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   }
 });
 
-// --- ADMIN & CLOUDBEDS OAUTH ---
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -340,186 +342,7 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   }
 });
 
-// --- DASHBOARD AND ADMIN APIs ---
-
-// --- START: FULL API DISCOVERY ENDPOINTS ---
-// This new section provides a set of endpoints for the admin panel to discover
-// the complete structure of the Cloudbeds Insights API.
-
-// Helper function to get a fresh access token for making API calls
-async function getCloudbedsAccessToken(refreshToken) {
-  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-  const params = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: CLOUDBEDS_CLIENT_ID,
-    client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: refreshToken,
-  });
-  const response = await fetch(
-    "https://hotels.cloudbeds.com/api/v1.1/access_token",
-    { method: "POST", body: params }
-  );
-  const tokenData = await response.json();
-  return tokenData.access_token || null;
-}
-
-// Middleware to prepare a valid Cloudbeds access token for admin routes
-const requireCloudbedsToken = async (req, res, next) => {
-  if (req.session.userId !== "admin") {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  try {
-    const userResult = await pgPool.query(
-      `SELECT refresh_token, cloudbeds_user_id FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1`
-    );
-    if (userResult.rows.length === 0) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "No active users with a refresh token found to perform API discovery.",
-        });
-    }
-    const user = userResult.rows[0];
-
-    const propertyResult = await pgPool.query(
-      `SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1`,
-      [user.cloudbeds_user_id]
-    );
-    if (propertyResult.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No properties found for the test user." });
-    }
-
-    const accessToken = await getCloudbedsAccessToken(user.refresh_token);
-    if (!accessToken) {
-      return res
-        .status(500)
-        .json({ error: "Failed to get a Cloudbeds access token." });
-    }
-
-    req.cloudbedsAccessToken = accessToken;
-    req.cloudbedsPropertyId = propertyResult.rows[0].property_id;
-    next();
-  } catch (error) {
-    res
-      .status(500)
-      .json({
-        error: "Failed to prepare Cloudbeds token.",
-        details: error.message,
-      });
-  }
-};
-
-// Endpoint A: Gets the master list of all datasets
-app.get(
-  "/api/admin/datasets",
-  requireApiLogin,
-  requireCloudbedsToken,
-  async (req, res) => {
-    try {
-      const response = await fetch(
-        "https://api.cloudbeds.com/datainsights/v1.1/datasets",
-        {
-          headers: {
-            Authorization: `Bearer ${req.cloudbedsAccessToken}`,
-            // CORRECTED: Added the required X-PROPERTY-ID header
-            "X-PROPERTY-ID": req.cloudbedsPropertyId,
-          },
-        }
-      );
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Cloudbeds API Error: ${response.status} - ${errorText}`
-        );
-      }
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error("Error in /api/admin/datasets:", error);
-      res
-        .status(500)
-        .json({ error: "Failed to fetch datasets.", details: error.message });
-    }
-  }
-);
-
-// Endpoint B: Gets the multi-level (nested) structures for a single dataset
-app.get(
-  "/api/admin/datasets/:datasetId/multi-levels",
-  requireApiLogin,
-  requireCloudbedsToken,
-  async (req, res) => {
-    try {
-      const { datasetId } = req.params;
-      const response = await fetch(
-        `https://api.cloudbeds.com/datainsights/v1.1/datasets/${datasetId}/multi-levels`,
-        {
-          headers: { Authorization: `Bearer ${req.cloudbedsAccessToken}` },
-        }
-      );
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Cloudbeds API Error: ${response.status} - ${errorText}`
-        );
-      }
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error(
-        "Error in /api/admin/datasets/:datasetId/multi-levels:",
-        error
-      );
-      res
-        .status(500)
-        .json({
-          error: "Failed to fetch multi-levels.",
-          details: error.message,
-        });
-    }
-  }
-);
-
-// Endpoint C: Gets the fields/columns for a single dataset
-app.get(
-  "/api/admin/datasets/:datasetId/fields",
-  requireApiLogin,
-  requireCloudbedsToken,
-  async (req, res) => {
-    try {
-      const { datasetId } = req.params;
-      const { ml_id } = req.query; // For nested datasets
-      let url = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${datasetId}/fields`;
-      if (ml_id) {
-        url += `?ml_id=${ml_id}`;
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${req.cloudbedsAccessToken}`,
-          "X-PROPERTY-ID": req.cloudbedsPropertyId,
-        },
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Cloudbeds API Error: ${response.status} - ${errorText}`
-        );
-      }
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error("Error in /api/admin/datasets/:datasetId/fields:", error);
-      res
-        .status(500)
-        .json({ error: "Failed to fetch fields.", details: error.message });
-    }
-  }
-);
-// --- END: FULL API DISCOVERY ENDPOINTS ---
+// --- USER-FACING DASHBOARD APIs ---
 
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
@@ -594,17 +417,17 @@ app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
     const starRating = hotelRatingResult.rows[0].star_rating;
 
     const kpiQuery = `
-            SELECT
-                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS your_adr,
-                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
-                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_revpar,
-                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS market_adr,
-                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
-                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
-            FROM daily_metrics_snapshots dms
-            JOIN hotels h ON dms.hotel_id = h.hotel_id
-            WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
-        `;
+      SELECT
+          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS your_adr,
+          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
+          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_revpar,
+          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS market_adr,
+          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
+          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON dms.hotel_id = h.hotel_id
+      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
+    `;
     const result = await pgPool.query(kpiQuery, [
       propertyId,
       startDate,
@@ -645,11 +468,11 @@ app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
     }
     const period = getPeriod(granularity);
     const query = `
-            SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
-            FROM daily_metrics_snapshots
-            WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
-            GROUP BY period ORDER BY period ASC;
-        `;
+      SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
+      FROM daily_metrics_snapshots
+      WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+      GROUP BY period ORDER BY period ASC;
+    `;
     const result = await pgPool.query(query, [propertyId, startDate, endDate]);
     res.json({ metrics: result.rows });
   } catch (error) {
@@ -684,12 +507,12 @@ app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
     const starRating = hotelRatingResult.rows[0].star_rating;
     const period = getPeriod(granularity);
     const query = `
-            SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
-            FROM daily_metrics_snapshots dms
-            JOIN hotels h ON dms.hotel_id = h.hotel_id
-            WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
-            GROUP BY period ORDER BY period ASC;
-        `;
+      SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON dms.hotel_id = h.hotel_id
+      WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
+      GROUP BY period ORDER BY period ASC;
+    `;
     const result = await pgPool.query(query, [
       propertyId,
       starRating,
@@ -713,104 +536,18 @@ app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
 app.get("/api/my-properties", requireApiLogin, async (req, res) => {
   try {
     const query = `
-            SELECT up.property_id, h.property_name
-            FROM user_properties up
-            JOIN hotels h ON up.property_id = h.hotel_id
-            WHERE up.user_id = $1
-            ORDER BY h.property_name;
-        `;
+      SELECT up.property_id, h.property_name
+      FROM user_properties up
+      JOIN hotels h ON up.property_id = h.hotel_id
+      WHERE up.user_id = $1
+      ORDER BY h.property_name;
+    `;
     const result = await pgPool.query(query, [req.session.userId]);
     res.json(result.rows);
   } catch (error) {
     console.error("Error in /api/my-properties:", error);
     res.status(500).json({ error: "Failed to fetch user properties." });
   }
-});
-
-app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
-  try {
-    if (req.session.userId === "admin") {
-      return res.status(200).json({
-        success: true,
-        status: 200,
-        message: "Admin connection test successful.",
-      });
-    }
-    const user = await pgPool.query(
-      "SELECT access_token FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
-    );
-    if (user.rows.length === 0)
-      return res.status(404).json({ error: "User or token not found." });
-    const accessToken = user.rows[0].access_token;
-    const response = await fetch(
-      "https://api.cloudbeds.com/api/v1.3/userinfo",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (response.ok) {
-      res.status(200).json({ success: true, status: response.status });
-    } else {
-      res
-        .status(response.status)
-        .json({ success: false, status: response.status });
-    }
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get("/api/test-database", requireApiLogin, async (req, res) => {
-  try {
-    const client = await pgPool.connect();
-    await client.query("SELECT 1");
-    client.release();
-    res
-      .status(200)
-      .json({ success: true, message: "Database connection successful." });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, error: "Database connection failed." });
-  }
-});
-
-app.get("/api/get-all-hotels", requireApiLogin, async (req, res) => {
-  try {
-    const result = await pgPool.query(
-      "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
-    );
-    res.status(200).json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch hotels." });
-  }
-});
-
-app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
-  const results = [];
-  const endpoints = [
-    {
-      name: "KPI Summary",
-      path: "/api/kpi-summary?startDate=2025-07-01&endDate=2025-07-07",
-    },
-    {
-      name: "Your Hotel Metrics",
-      path: "/api/metrics-from-db?startDate=2025-07-01&endDate=2025-07-07",
-    },
-    {
-      name: "Competitor Metrics",
-      path: "/api/competitor-metrics?startDate=2025-07-01&endDate=2025-07-07",
-    },
-    { name: "Get Hotel Name", path: "/api/get-hotel-name" },
-  ];
-  for (const endpoint of endpoints) {
-    results.push({
-      name: endpoint.name,
-      ok: true,
-      status: 200,
-      statusText: "OK (Route exists)",
-    });
-  }
-  res.status(200).json(results);
 });
 
 // --- Static and fallback routes (Middleware order is corrected here) ---
@@ -828,7 +565,6 @@ app.get("/app/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-// Serve reports page with protection
 app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
