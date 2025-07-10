@@ -205,6 +205,24 @@ function initializeAdminPanel() {
     container.innerHTML = finalHTML;
   }
 
+  // --- THIS IS THE RESTORED CODE BLOCK ---
+  function renderTestResults(results) {
+    let tableHTML = `
+      <table class="w-full text-sm border-collapse">
+        <thead><tr class="border-b"><th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th><th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th><th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th></tr></thead>
+        <tbody class="divide-y divide-gray-200">`;
+    results.forEach((result) => {
+      const statusClass = result.ok
+        ? "bg-green-100 text-green-800"
+        : "bg-red-100 text-red-800";
+      const statusIcon = result.ok ? "✅" : "❌";
+      const statusText = result.ok ? "OK" : "FAIL";
+      tableHTML += `<tr><td class="px-4 py-3 font-medium text-gray-700">${result.name}</td><td class="px-4 py-3"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">${statusIcon} ${statusText}</span></td><td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td></tr>`;
+    });
+    tableHTML += `</tbody></table>`;
+    endpointTestResultsEl.innerHTML = tableHTML;
+  }
+
   // --- Initial Setup Calls ---
   fetchLastRefreshTime();
   fetchAndRenderHotels();
@@ -228,8 +246,22 @@ function initializeAdminPanel() {
       runJob("/api/initial-sync", runInitialSyncBtn);
     }
   });
-  runEndpointTestsBtn.addEventListener("click", () => {
-    /* ... existing test logic ... */
+
+  // --- THIS IS THE RESTORED EVENT LISTENER ---
+  runEndpointTestsBtn.addEventListener("click", async () => {
+    runEndpointTestsBtn.disabled = true;
+    runEndpointTestsBtn.textContent = "Testing...";
+    endpointTestResultsEl.innerHTML = `<div class="text-center p-4 text-gray-500">Running tests, please wait...</div>`;
+    try {
+      const response = await fetch("/api/run-endpoint-tests");
+      const results = await response.json();
+      renderTestResults(results);
+    } catch (error) {
+      endpointTestResultsEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> Could not run the test suite. ${error.message}</div>`;
+    } finally {
+      runEndpointTestsBtn.disabled = false;
+      runEndpointTestsBtn.textContent = "Run Endpoint Tests";
+    }
   });
 
   // --- API EXPLORER LOGIC ---
