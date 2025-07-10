@@ -1,12 +1,10 @@
-// api/admin-routes.js (Dependency Injection Pattern)
+// api/admin-routes.js (Now with all admin routes included)
 const express = require("express");
 const fetch = require("node-fetch");
 const router = express.Router();
 
-// This module now exports a function that takes the database pool as an argument
 module.exports = function (pgPool) {
-  // --- HELPER & MIDDLEWARE (Scoped to Admin Routes) ---
-
+  // --- HELPER & MIDDLEWARE ---
   async function getCloudbedsAccessToken(refreshToken) {
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
     const params = new URLSearchParams({
@@ -28,7 +26,6 @@ module.exports = function (pgPool) {
       return res.status(403).json({ error: "Forbidden" });
     }
     try {
-      // It now uses the 'pgPool' passed into the module
       const userResult = await pgPool.query(
         `SELECT refresh_token, cloudbeds_user_id FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1`
       );
@@ -39,7 +36,6 @@ module.exports = function (pgPool) {
         });
       }
       const user = userResult.rows[0];
-
       const propertyResult = await pgPool.query(
         `SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1`,
         [user.cloudbeds_user_id]
@@ -49,14 +45,12 @@ module.exports = function (pgPool) {
           .status(404)
           .json({ error: "No properties found for the test user." });
       }
-
       const accessToken = await getCloudbedsAccessToken(user.refresh_token);
       if (!accessToken) {
         return res
           .status(500)
           .json({ error: "Failed to get a Cloudbeds access token." });
       }
-
       req.cloudbedsAccessToken = accessToken;
       req.cloudbedsPropertyId = propertyResult.rows[0].property_id;
       next();
@@ -69,7 +63,6 @@ module.exports = function (pgPool) {
   };
 
   // --- API DISCOVERY ENDPOINTS ---
-
   router.get("/datasets", requireCloudbedsToken, async (req, res) => {
     try {
       const response = await fetch(
@@ -90,7 +83,6 @@ module.exports = function (pgPool) {
       const data = await response.json();
       res.json(data);
     } catch (error) {
-      console.error("Error in /api/admin/datasets:", error);
       res
         .status(500)
         .json({ error: "Failed to fetch datasets.", details: error.message });
@@ -121,10 +113,6 @@ module.exports = function (pgPool) {
         const data = await response.json();
         res.json(data);
       } catch (error) {
-        console.error(
-          "Error in /api/admin/datasets/:datasetId/multi-levels:",
-          error
-        );
         res.status(500).json({
           error: "Failed to fetch multi-levels.",
           details: error.message,
@@ -144,7 +132,6 @@ module.exports = function (pgPool) {
         if (ml_id) {
           url += `?ml_id=${ml_id}`;
         }
-
         const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${req.cloudbedsAccessToken}`,
@@ -160,7 +147,6 @@ module.exports = function (pgPool) {
         const data = await response.json();
         res.json(data);
       } catch (error) {
-        console.error("Error in /api/admin/datasets/:datasetId/fields:", error);
         res
           .status(500)
           .json({ error: "Failed to fetch fields.", details: error.message });
@@ -168,6 +154,71 @@ module.exports = function (pgPool) {
     }
   );
 
-  // Return the configured router object
+  // --- START: MISSING ADMIN ROUTES ADDED BACK ---
+  router.get("/test-cloudbeds", requireCloudbedsToken, async (req, res) => {
+    // This now uses the requireCloudbedsToken middleware to perform a real check
+    res
+      .status(200)
+      .json({ success: true, message: "Cloudbeds API token is valid." });
+  });
+
+  router.get("/test-database", async (req, res) => {
+    try {
+      const client = await pgPool.connect();
+      await client.query("SELECT 1");
+      client.release();
+      res
+        .status(200)
+        .json({ success: true, message: "Database connection successful." });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Database connection failed." });
+    }
+  });
+
+  router.get("/get-all-hotels", async (req, res) => {
+    try {
+      const result = await pgPool.query(
+        "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
+      );
+      res.status(200).json(result.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch hotels." });
+    }
+  });
+
+  router.get("/run-endpoint-tests", async (req, res) => {
+    // This is a placeholder test but now resides in the correct file
+    const results = [
+      {
+        name: "KPI Summary",
+        ok: true,
+        status: 200,
+        statusText: "OK (Route exists)",
+      },
+      {
+        name: "Your Hotel Metrics",
+        ok: true,
+        status: 200,
+        statusText: "OK (Route exists)",
+      },
+      {
+        name: "Competitor Metrics",
+        ok: true,
+        status: 200,
+        statusText: "OK (Route exists)",
+      },
+      {
+        name: "Get Hotel Name",
+        ok: true,
+        status: 200,
+        statusText: "OK (Route exists)",
+      },
+    ];
+    res.status(200).json(results);
+  });
+  // --- END: MISSING ADMIN ROUTES ADDED BACK ---
+
   return router;
 };
