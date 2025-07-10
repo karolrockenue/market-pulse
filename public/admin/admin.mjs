@@ -289,6 +289,28 @@ function initializeAdminPanel() {
     }
   });
 
+  // Listener for "Get Sample Rate"
+  const fetchSampleRateBtn = document.getElementById("fetch-sample-rate-btn");
+  fetchSampleRateBtn.addEventListener("click", async () => {
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching sample rate plan record...</div>`;
+    fetchSampleRateBtn.disabled = true;
+    try {
+      const response = await fetch("/api/explore/sample-rate");
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "An unknown server error occurred.");
+      apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
+    } catch (error) {
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
+    } finally {
+      fetchSampleRateBtn.disabled = false;
+    }
+  });
+
   // --- Initial Setup Calls ---
   fetchLastRefreshTime();
   fetchAndRenderHotels();
