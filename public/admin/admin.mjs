@@ -146,6 +146,66 @@ function initializeAdminPanel() {
     }
   };
 
+  // --- New event listener for fetching sample Insights data ---
+  const fetchInsightsDataBtn = document.getElementById(
+    "fetch-insights-data-btn"
+  );
+  fetchInsightsDataBtn.addEventListener("click", async () => {
+    const datasetId = datasetIdInput.value;
+    if (!datasetId) {
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">Please enter a Dataset ID.</div>`;
+      return;
+    }
+
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching sample data for Dataset ${datasetId}...</div>`;
+    fetchInsightsDataBtn.disabled = true;
+
+    try {
+      const response = await fetch(
+        `/api/explore/insights-data?id=${datasetId}`
+      );
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "An unknown server error occurred.");
+
+      apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
+    } catch (error) {
+      console.error("API Explorer Fetch Error:", error);
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
+    } finally {
+      fetchInsightsDataBtn.disabled = false;
+    }
+  });
+
+  // --- New event listener for fetching a sample Guest record ---
+  const fetchSampleGuestBtn = document.getElementById("fetch-sample-guest-btn");
+  fetchSampleGuestBtn.addEventListener("click", async () => {
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching sample guest record...</div>`;
+    fetchSampleGuestBtn.disabled = true;
+
+    try {
+      const response = await fetch("/api/explore/sample-guest");
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "An unknown server error occurred.");
+
+      apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
+    } catch (error) {
+      console.error("API Explorer Fetch Error:", error);
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
+    } finally {
+      fetchSampleGuestBtn.disabled = false;
+    }
+  });
+
   // --- START: TABLE RENDERING FUNCTIONS ---
   function renderDatasetsTable(datasets, container) {
     if (!datasets || datasets.length === 0) {

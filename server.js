@@ -12,6 +12,30 @@ const sgMail = require("@sendgrid/mail");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+// --- Reusable Cloudbeds Auth Function ---
+async function getCloudbedsAccessToken() {
+  const {
+    CLOUDBEDS_CLIENT_ID,
+    CLOUDBEDS_CLIENT_SECRET,
+    CLOUDBEDS_REFRESH_TOKEN,
+  } = process.env;
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    refresh_token: CLOUDBEDS_REFRESH_TOKEN,
+  });
+  const tokenResponse = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    { method: "POST", body: params }
+  );
+  const tokenData = await tokenResponse.json();
+  if (!tokenData.access_token) {
+    throw new Error("Cloudbeds authentication failed.");
+  }
+  return tokenData.access_token;
+}
+
 const app = express();
 app.use(express.json());
 app.set("trust proxy", 1);
@@ -551,8 +575,6 @@ app.get("/api/my-properties", requireUserApi, async (req, res) => {
 
 app.get("/api/test-cloudbeds", requireAdminApi, async (req, res) => {
   try {
-    // For an admin, a successful API call here just means the endpoint is reachable.
-    // A more advanced test could use a system-level token if available.
     res.status(200).json({
       success: true,
       status: 200,
@@ -592,38 +614,10 @@ app.get("/api/get-all-hotels", requireAdminApi, async (req, res) => {
 // --- START: NEW API EXPLORER PROXY ---
 app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching datasets...");
-
   try {
-    // Step 1: Get a fresh access token (logic copied from working scripts)
-    const {
-      CLOUDBEDS_CLIENT_ID,
-      CLOUDBEDS_CLIENT_SECRET,
-      CLOUDBEDS_REFRESH_TOKEN,
-    } = process.env;
-
-    const params = new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: CLOUDBEDS_CLIENT_ID,
-      client_secret: CLOUDBEDS_CLIENT_SECRET,
-      refresh_token: CLOUDBEDS_REFRESH_TOKEN,
-    });
-
-    const tokenResponse = await fetch(
-      "https://hotels.cloudbeds.com/api/v1.1/access_token",
-      { method: "POST", body: params }
-    );
-    const tokenData = await tokenResponse.json();
-
-    if (!tokenData.access_token) {
-      throw new Error("Cloudbeds authentication failed.");
-    }
-    const accessToken = tokenData.access_token;
-    console.log("[server.js] Admin API Explorer: Authentication successful.");
-
-    // Step 2: Call the actual Cloudbeds API endpoint
+    const accessToken = await getCloudbedsAccessToken();
     const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
     console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: {
@@ -632,8 +626,6 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
         "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
       },
     });
-
-    // Step 3: Send the response from Cloudbeds back to our frontend
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok) {
       throw new Error(
@@ -642,7 +634,6 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
         }: ${JSON.stringify(data)}`
       );
     }
-
     console.log(
       "[server.js] Admin API Explorer: Successfully fetched data from Cloudbeds."
     );
@@ -652,9 +643,6 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-// --- END: NEW API EXPLORER PROXY ---
-
-// Add this new block right after the "/api/explore/datasets" endpoint
 
 app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching dataset structure...");
@@ -663,35 +651,9 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
     if (!id) {
       return res.status(400).json({ error: "Dataset ID is required." });
     }
-
-    // Step 1: Get a fresh access token
-    const {
-      CLOUDBEDS_CLIENT_ID,
-      CLOUDBEDS_CLIENT_SECRET,
-      CLOUDBEDS_REFRESH_TOKEN,
-    } = process.env;
-
-    const params = new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: CLOUDBEDS_CLIENT_ID,
-      client_secret: CLOUDBEDS_CLIENT_SECRET,
-      refresh_token: CLOUDBEDS_REFRESH_TOKEN,
-    });
-
-    const tokenResponse = await fetch(
-      "https://hotels.cloudbeds.com/api/v1.1/access_token",
-      { method: "POST", body: params }
-    );
-    const tokenData = await tokenResponse.json();
-    if (!tokenData.access_token) {
-      throw new Error("Cloudbeds authentication failed.");
-    }
-    const accessToken = tokenData.access_token;
-
-    // Step 2: Call the actual Cloudbeds API endpoint for multi-levels
+    const accessToken = await getCloudbedsAccessToken();
     const targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
     console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: {
@@ -700,7 +662,6 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
         "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
       },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok) {
       throw new Error(
@@ -709,8 +670,84 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
         }: ${JSON.stringify(data)}`
       );
     }
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// New endpoint to get a sample of real data from the Insights API
+app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching insights data...");
+  try {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: "Dataset ID is required." });
+
+    const accessToken = await getCloudbedsAccessToken();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const stayDate = yesterday.toISOString().split("T")[0];
+
+    // This payload is a lightweight query for a single day's data
+    const insightsPayload = {
+      property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
+      dataset_id: parseInt(id),
+      filters: {
+        and: [
+          {
+            cdf: { column: "stay_date" },
+            operator: "equal",
+            value: `${stayDate}T00:00:00.000Z`,
+          },
+        ],
+      },
+    };
+
+    const targetUrl =
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run";
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+      },
+      body: JSON.stringify(insightsPayload),
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
 
     res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// New endpoint to get a single, real guest record from the General API
+app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching sample guest...");
+  try {
+    const accessToken = await getCloudbedsAccessToken();
+
+    // This endpoint path is a guess based on standard API design.
+    // We may need to correct it based on the documentation.
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuests?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+
+    // Return just the first guest from the list
+    res.status(200).json(data.data[0]);
   } catch (error) {
     console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
