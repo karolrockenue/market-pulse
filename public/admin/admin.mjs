@@ -30,16 +30,11 @@ async function checkAdminSessionAndInitialize() {
     loginError.textContent =
       "Could not verify session. Please try again later.";
   } finally {
-    // This block hides the spinner and shows the content wrapper
-    // after the session check is complete.
     document.getElementById("loading-spinner").classList.add("hidden");
     document.getElementById("admin-wrapper").classList.remove("hidden");
   }
 }
 
-/**
- * Hides the login form, reveals the main content, and sets up all event listeners for the admin tools.
- */
 function showAdminContent() {
   document.getElementById("login-form").classList.add("hidden");
   document.getElementById("admin-content").classList.remove("hidden");
@@ -151,18 +146,40 @@ function initializeAdminPanel() {
     }
   };
 
-  /**
-   * Renders an array of field data into a formatted HTML table.
-   * @param {Array} fields - The array of field objects from the API.
-   * @param {HTMLElement} container - The container element to render the table into.
-   */
+  // --- START: NEW TABLE RENDERING FUNCTIONS ---
+  function renderDatasetsTable(datasets, container) {
+    if (!datasets || datasets.length === 0) {
+      container.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">No datasets found.</div>`;
+      return;
+    }
+    let tableHTML = `
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr class="text-left">
+              <th class="px-4 py-3 font-semibold text-gray-600">ID</th>
+              <th class="px-4 py-3 font-semibold text-gray-600">Name</th>
+              <th class="px-4 py-3 font-semibold text-gray-600">Read Only</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">`;
+    for (const dataset of datasets) {
+      tableHTML += `
+        <tr>
+          <td class="px-4 py-3 font-mono text-gray-600">${dataset.id}</td>
+          <td class="px-4 py-3 font-medium text-gray-800">${dataset.name}</td>
+          <td class="px-4 py-3 font-mono text-gray-600">${dataset.read_only}</td>
+        </tr>`;
+    }
+    tableHTML += `</tbody></table></div>`;
+    container.innerHTML = tableHTML;
+  }
+
   function renderFieldsTable(fields, container) {
     if (!fields || fields.length === 0) {
       container.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">No fields or structure found for this dataset. The API returned an empty array.</div>`;
       return;
     }
-
-    // Create the table structure with headers
     let tableHTML = `
       <div class="overflow-x-auto border border-gray-200 rounded-lg">
         <table class="w-full text-sm">
@@ -175,8 +192,6 @@ function initializeAdminPanel() {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">`;
-
-    // Loop through each field and create a table row for it
     for (const field of fields) {
       tableHTML += `
         <tr>
@@ -192,12 +207,10 @@ function initializeAdminPanel() {
           }</td>
         </tr>`;
     }
-
     tableHTML += `</tbody></table></div>`;
-
-    // Inject the final HTML into the container
     container.innerHTML = tableHTML;
   }
+  // --- END: NEW TABLE RENDERING FUNCTIONS ---
 
   runEndpointTestsBtn.addEventListener("click", async () => {
     runEndpointTestsBtn.disabled = true;
@@ -259,57 +272,53 @@ function initializeAdminPanel() {
   const apiResultsContainer = document.getElementById("api-results-container");
 
   fetchDatasetsBtn.addEventListener("click", async () => {
-    apiResultsContainer.textContent = "Fetching from Cloudbeds API...";
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching from Cloudbeds API...</div>`;
     fetchDatasetsBtn.disabled = true;
 
     try {
-      // This endpoint now needs to be defined in server.js to work reliably
       const response = await fetch("/api/explore/datasets");
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || "An unknown server error occurred.");
       }
-
-      // Success! Display the data from Cloudbeds.
-      apiResultsContainer.textContent = JSON.stringify(data, null, 2);
+      // CORRECTED: Use the new table rendering function
+      renderDatasetsTable(data, apiResultsContainer);
     } catch (error) {
       console.error("API Explorer Fetch Error:", error);
-      apiResultsContainer.textContent = `An error occurred:\n\n${error.message}`;
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
     } finally {
       fetchDatasetsBtn.disabled = false;
     }
   });
 
-  // --- NEW LOGIC FOR FETCHING DATASET STRUCTURE ---
   const fetchStructureBtn = document.getElementById("fetch-structure-btn");
   const datasetIdInput = document.getElementById("dataset-id-input");
 
   fetchStructureBtn.addEventListener("click", async () => {
     const datasetId = datasetIdInput.value;
     if (!datasetId) {
-      apiResultsContainer.textContent = "Please enter a Dataset ID.";
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">Please enter a Dataset ID.</div>`;
       return;
     }
 
-    apiResultsContainer.textContent = `Fetching structure for Dataset ${datasetId}...`;
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching structure for Dataset ${datasetId}...</div>`;
     fetchStructureBtn.disabled = true;
 
     try {
-      // Calling our new, reliable proxy route in server.js
       const response = await fetch(
         `/api/explore/dataset-structure?id=${datasetId}`
       );
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || "An unknown server error occurred.");
       }
 
-      apiResultsContainer.textContent = JSON.stringify(data, null, 2);
+      // CORRECTED: Use the correct table rendering function
+      // and pass the correct part of the data object (data.cdfs).
+      renderFieldsTable(data.cdfs, apiResultsContainer);
     } catch (error) {
       console.error("API Explorer Fetch Error:", error);
-      apiResultsContainer.textContent = `An error occurred:\n\n${error.message}`;
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
     } finally {
       fetchStructureBtn.disabled = false;
     }
