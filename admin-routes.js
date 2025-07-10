@@ -1,4 +1,4 @@
-// api/admin-routes.js (Corrected with Dependency Injection)
+// api/admin-routes.js (Dependency Injection Pattern)
 const express = require("express");
 const fetch = require("node-fetch");
 const router = express.Router();
@@ -167,34 +167,6 @@ module.exports = function (pgPool) {
       }
     }
   );
-
-  // --- OTHER ADMIN TEST ENDPOINTS ---
-
-  router.get("/test-database", async (req, res) => {
-    try {
-      const client = await pgPool.connect(); // uses the passed-in pgPool
-      await client.query("SELECT 1");
-      client.release();
-      res
-        .status(200)
-        .json({ success: true, message: "Database connection successful." });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Database connection failed." });
-    }
-  });
-
-  router.get("/get-all-hotels", async (req, res) => {
-    try {
-      const result = await pgPool.query(
-        "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
-      );
-      res.status(200).json(result.rows);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch hotels." });
-    }
-  });
 
   // Return the configured router object
   return router;
