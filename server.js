@@ -789,6 +789,55 @@ app.get("/api/explore/sample-rate", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// New endpoint to get taxes and fees
+app.get("/api/explore/taxes-fees", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching taxes and fees...");
+  try {
+    const accessToken = await getCloudbedsAccessToken();
+
+    // Correct URL from the documentation
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// New endpoint to get user info
+app.get("/api/explore/user-info", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching user info...");
+  try {
+    const accessToken = await getCloudbedsAccessToken();
+
+    // Correct URL from the documentation
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getUsers?property_ids=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // New endpoint to get a sample of real data from the Insights API
 // This is the final, most intelligent version of this endpoint.
