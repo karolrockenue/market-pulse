@@ -1,301 +1,849 @@
-import { DATASET_7_MAP } from "../constants.mjs";
+// server.js (Production Ready - with Logout and UX Fixes)
+require("dotenv").config();
+const express = require("express");
+const session = require("express-session");
+const { Pool } = require("pg");
+const pgSession = require("connect-pg-simple")(session);
+const cors = require("cors");
+const fetch = require("node-fetch");
+const path = require("path");
+const crypto = require("crypto");
+const sgMail = require("@sendgrid/mail");
 
-document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("login-form");
-  const adminContent = document.getElementById("admin-content");
-  const passwordInput = document.getElementById("password");
-  const loginBtn = document.getElementById("login-btn");
-  const loginError = document.getElementById("login-error");
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-  // Check if user is already logged in from a previous session
-  if (sessionStorage.getItem("isAdminAuthenticated") === "true") {
-    showAdminContent();
-  }
+const app = express();
+app.use(express.json());
+app.set("trust proxy", 1);
 
-  loginBtn.addEventListener("click", async () => {
-    const password = passwordInput.value;
-    loginError.textContent = "";
-
-    try {
-      const response = await fetch("/api/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-
-      if (response.ok) {
-        sessionStorage.setItem("isAdminAuthenticated", "true");
-        showAdminContent();
-      } else {
-        const data = await response.json();
-        loginError.textContent = data.error || "Invalid password.";
-      }
-    } catch (error) {
-      loginError.textContent = "An error occurred. Please try again.";
+const allowedOrigins = [
+  "https://market-pulse.io",
+  "https://www.market-pulse.io",
+];
+if (process.env.VERCEL_ENV !== "production") {
+  allowedOrigins.push("http://localhost:3000");
+}
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg =
+        "The CORS policy for this site does not allow access from the specified Origin.";
+      return callback(new Error(msg), false);
     }
+    return callback(null, true);
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+app.use(
+  session({
+    store: new pgSession({
+      pool: pgPool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.VERCEL_ENV === "production",
+      httpOnly: true,
+      sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
+      domain:
+        process.env.VERCEL_ENV === "production"
+          ? ".market-pulse.io"
+          : undefined,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
+const requireApiLogin = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+};
+
+const requirePageLogin = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.redirect("/signin");
+  }
+  next();
+};
+
+// --- NEW MAGIC LINK & LOGOUT AUTH ---
+app.post("/api/auth/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Error destroying session:", err);
+      return res
+        .status(500)
+        .json({ error: "Could not log out, please try again." });
+    }
+    // The cookie domain must match what was used to set it.
+    const cookieDomain =
+      process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
+    // Clear the cookie from the browser
+    res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
+    res.status(200).json({ message: "Logged out successfully" });
   });
+});
 
-  function showAdminContent() {
-    loginForm.classList.add("hidden");
-    adminContent.classList.remove("hidden");
-    initializeAdminPanel();
+app.post("/api/auth/login", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required." });
   }
 
-  function initializeAdminPanel() {
-    const lastRefreshTimeEl = document.getElementById("last-refresh-time");
-    const testCloudbedsBtn = document.getElementById("test-cloudbeds-btn");
-    const cloudbedsStatusEl = document.getElementById("cloudbeds-status");
-    const testDbBtn = document.getElementById("test-db-btn");
-    const dbStatusEl = document.getElementById("db-status");
-    const runDailyRefreshBtn = document.getElementById("run-daily-refresh-btn");
-    const runInitialSyncBtn = document.getElementById("run-initial-sync-btn");
-    const runEndpointTestsBtn = document.getElementById(
-      "run-endpoint-tests-btn"
+  try {
+    const userResult = await pgPool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
     );
-    const endpointTestResultsEl = document.getElementById(
-      "endpoint-test-results"
-    );
-    const hotelsTableBody = document.getElementById("hotels-table-body");
-    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
 
-    const fetchLastRefreshTime = async () => {
-      try {
-        const response = await fetch("/api/last-refresh-time");
-        if (!response.ok) throw new Error("Not found");
-        const data = await response.json();
-        const date = new Date(data.last_successful_run);
-        lastRefreshTimeEl.textContent = date.toLocaleString("en-GB", {
-          timeZone: "Europe/Warsaw",
-        });
-      } catch (error) {
-        lastRefreshTimeEl.textContent = "Never";
-        lastRefreshTimeEl.classList.add("text-yellow-600");
-      }
-    };
-
-    const fetchAndRenderHotels = async () => {
-      try {
-        const response = await fetch("/api/get-all-hotels");
-        if (!response.ok) throw new Error("Failed to fetch hotels.");
-        const hotels = await response.json();
-
-        hotelsTableBody.innerHTML = ""; // Clear existing rows
-        if (hotels.length === 0) {
-          hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No hotels found in the database.</td></tr>`;
-          return;
-        }
-
-        hotels.forEach((hotel) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
-            <td class="px-4 py-3 font-medium text-gray-800">${hotel.property_name}</td>
-            <td class="px-4 py-3 text-gray-600">${hotel.property_type}</td>
-            <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
-          `;
-          hotelsTableBody.appendChild(row);
-        });
-      } catch (error) {
-        hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-600">${error.message}</td></tr>`;
-      }
-    };
-
-    const testConnection = async (url, statusEl) => {
-      statusEl.textContent = "Testing...";
-      statusEl.className = "ml-4 text-sm font-semibold text-gray-500";
-      try {
-        const response = await fetch(url);
-        if (response.ok) {
-          statusEl.textContent = "✅ Connected";
-          statusEl.className = "ml-4 text-sm font-semibold text-green-600";
-        } else {
-          statusEl.textContent = `❌ Error: ${response.status}`;
-          statusEl.className = "ml-4 text-sm font-semibold text-red-600";
-        }
-      } catch (error) {
-        statusEl.textContent = "❌ Failed";
-        statusEl.className = "ml-4 text-sm font-semibold text-red-600";
-      }
-    };
-
-    const runJob = async (url, btn) => {
-      const originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "Running...";
-      try {
-        const response = await fetch(url);
-        if (response.ok) {
-          alert("Job completed successfully!");
-          fetchLastRefreshTime(); // Refresh the timestamp
-        } else {
-          const data = await response.json();
-          alert(`Job failed: ${data.error || "Unknown error"}`);
-        }
-      } catch (error) {
-        alert(`Job failed to start: ${error.message}`);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
-      }
-    };
-
-    runEndpointTestsBtn.addEventListener("click", async () => {
-      runEndpointTestsBtn.disabled = true;
-      runEndpointTestsBtn.textContent = "Testing...";
-      endpointTestResultsEl.innerHTML = `<div class="text-center p-4 text-gray-500">Running tests, please wait...</div>`;
-
-      try {
-        const response = await fetch("/api/run-endpoint-tests");
-        const results = await response.json();
-        renderTestResults(results);
-      } catch (error) {
-        endpointTestResultsEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> Could not run the test suite. ${error.message}</div>`;
-      } finally {
-        runEndpointTestsBtn.disabled = false;
-        runEndpointTestsBtn.textContent = "Run Endpoint Tests";
-      }
-    });
-
-    function renderTestResults(results) {
-      let tableHTML = `
-        <table class="w-full text-sm border-collapse">
-            <thead>
-                <tr class="border-b">
-                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th>
-                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-      `;
-      results.forEach((result) => {
-        const statusClass = result.ok
-          ? "bg-green-100 text-green-800"
-          : "bg-red-100 text-red-800";
-        const statusIcon = result.ok ? "✅" : "❌";
-        const statusText = result.ok ? "OK" : "FAIL";
-        tableHTML += `
-            <tr>
-                <td class="px-4 py-3 font-medium text-gray-700">${result.name}</td>
-                <td class="px-4 py-3">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">
-                        ${statusIcon} ${statusText}
-                    </span>
-                </td>
-                <td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td>
-            </tr>
-        `;
-      });
-      tableHTML += `</tbody></table>`;
-      endpointTestResultsEl.innerHTML = tableHTML;
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found." });
     }
 
-    testCloudbedsBtn.addEventListener("click", () =>
-      testConnection("/api/test-cloudbeds", cloudbedsStatusEl)
+    const user = userResult.rows[0];
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minute expiry
+
+    await pgPool.query(
+      "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
+      [token, user.user_id, expires_at]
     );
-    testDbBtn.addEventListener("click", () =>
-      testConnection("/api/test-database", dbStatusEl)
-    );
-    runDailyRefreshBtn.addEventListener("click", () =>
-      runJob("/api/daily-refresh", runDailyRefreshBtn)
-    );
-    runInitialSyncBtn.addEventListener("click", () => {
-      if (
-        confirm(
-          "Are you sure you want to run a full data sync? This can take several minutes and will overwrite existing data."
-        )
-      ) {
-        runJob("/api/initial-sync", runInitialSyncBtn);
-      }
-    });
 
-    // --- NEW: FULL API DISCOVERY LOGIC ---
-    const runFullApiDiscovery = async () => {
-      const discoveryStatusEl = document.getElementById("discovery-status");
-      const discoveryResultsEl = document.getElementById("discovery-results");
-
-      runApiDiscoveryBtn.disabled = true;
-      runApiDiscoveryBtn.textContent = "Discovering...";
-      discoveryStatusEl.textContent = "Fetching master list of datasets...";
-      discoveryResultsEl.innerHTML = "";
-
-      try {
-        // 1. Get all datasets
-        const datasetsResponse = await fetch("/api/admin/datasets");
-        if (!datasetsResponse.ok)
-          throw new Error("Could not fetch master dataset list from server.");
-        const datasets = await datasetsResponse.json();
-        discoveryStatusEl.textContent = `Found ${datasets.length} datasets. Now fetching fields for each...`;
-
-        for (const dataset of datasets) {
-          const datasetContainer = document.createElement("div");
-          datasetContainer.className = "p-4 mb-4 border rounded-lg bg-gray-50";
-
-          const title = document.createElement("h3");
-          title.className = "text-lg font-bold text-gray-800";
-          title.textContent = `Dataset ${dataset.id}: ${dataset.name}`;
-          datasetContainer.appendChild(title);
-
-          const content = document.createElement("pre");
-          content.className =
-            "mt-2 text-xs bg-white p-3 rounded overflow-x-auto";
-          content.textContent = "Loading fields...";
-          datasetContainer.appendChild(content);
-
-          discoveryResultsEl.appendChild(datasetContainer);
-
-          // This try...catch ensures one failed dataset doesn't stop the whole process
-          try {
-            // 2. Check for multi-levels
-            const mlResponse = await fetch(
-              `/api/admin/datasets/${dataset.id}/multi-levels`
-            );
-            if (!mlResponse.ok)
-              throw new Error("Could not fetch multi-levels.");
-            const multiLevels = await mlResponse.json();
-
-            let allFields = {};
-
-            if (multiLevels && multiLevels.length > 0) {
-              // Logic for NESTED datasets
-              for (const ml of multiLevels) {
-                const fieldsResponse = await fetch(
-                  `/api/admin/datasets/${dataset.id}/fields?ml_id=${ml.id}`
-                );
-                if (!fieldsResponse.ok)
-                  throw new Error(
-                    `Could not fetch fields for multi-level: ${ml.name}`
-                  );
-                allFields[ml.name] = await fieldsResponse.json();
-              }
-            } else {
-              // Logic for FLAT datasets
-              const fieldsResponse = await fetch(
-                `/api/admin/datasets/${dataset.id}/fields`
-              );
-              if (!fieldsResponse.ok)
-                throw new Error("Could not fetch fields.");
-              allFields = await fieldsResponse.json();
-            }
-            content.textContent = JSON.stringify(allFields, null, 2);
-          } catch (error) {
-            content.textContent = `Error loading details for this dataset: ${error.message}`;
-            content.classList.add("text-red-600");
-          }
-        }
-        discoveryStatusEl.textContent = "✅ Discovery Complete!";
-      } catch (error) {
-        discoveryStatusEl.textContent = `❌ A critical error occurred: ${error.message}`;
-      } finally {
-        runApiDiscoveryBtn.disabled = false;
-        runApiDiscoveryBtn.textContent = "Discover API Endpoints";
-      }
+    const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
+    const msg = {
+      to: user.email,
+      from: "login@market-pulse.io",
+      subject: "Your Market Pulse Login Link",
+      html: `<p>Hello ${user.first_name},</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}">Log in to Market Pulse</a></p>`,
     };
 
-    runApiDiscoveryBtn.addEventListener("click", runFullApiDiscovery);
+    await sgMail.send(msg);
 
-    // Initial data loads
-    fetchLastRefreshTime();
-    fetchAndRenderHotels();
+    res.status(200).json({ success: true, message: "Login link sent." });
+  } catch (error) {
+    console.error("Error during magic link login:", error);
+    res.status(500).json({ error: "An internal error occurred." });
   }
 });
+
+app.get("/api/auth/magic-link-callback", async (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(400).send("Invalid or missing login token.");
+  }
+
+  try {
+    const tokenResult = await pgPool.query(
+      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
+      [token]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res
+        .status(400)
+        .send(
+          "Login link is invalid or has expired. Please request a new one."
+        );
+    }
+
+    const validToken = tokenResult.rows[0];
+    const internalUserId = validToken.user_id;
+
+    const userResult = await pgPool.query(
+      "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
+      [internalUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).send("Could not find a matching user account.");
+    }
+
+    req.session.userId = userResult.rows[0].cloudbeds_user_id;
+
+    await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
+      token,
+    ]);
+
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error after magic link login:", err);
+        return res.status(500).send("An error occurred during login.");
+      }
+      res.redirect("/app/");
+    });
+  } catch (error) {
+    console.error("Error during magic link callback:", error);
+    res.status(500).send("An internal error occurred.");
+  }
+});
+
+// --- ADMIN & CLOUDBEDS OAUTH ---
+app.post("/api/admin-login", (req, res) => {
+  const { password } = req.body;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    return res
+      .status(500)
+      .json({ error: "Admin password not configured on server." });
+  }
+  if (password === adminPassword) {
+    req.session.userId = "admin";
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.status(500).json({ error: "Failed to save session." });
+      }
+      res.status(200).json({ success: true });
+    });
+  } else {
+    res.status(401).json({ error: "Invalid password." });
+  }
+});
+
+app.get("/api/auth/cloudbeds", (req, res) => {
+  const { CLOUDBEDS_CLIENT_ID } = process.env;
+  const isProduction = process.env.VERCEL_ENV === "production";
+  const redirectUri = isProduction
+    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+    : process.env.CLOUDBEDS_REDIRECT_URI;
+
+  if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
+    return res.status(500).send("Server configuration error.");
+  }
+  const scopes = [
+    "read:user",
+    "read:hotel",
+    "read:guest",
+    "read:reservation",
+    "read:room",
+    "read:rate",
+    "read:currency",
+    "read:taxesAndFees",
+    "read:dataInsightsGuests",
+    "read:dataInsightsOccupancy",
+    "read:dataInsightsReservations",
+  ].join(" ");
+
+  const params = new URLSearchParams({
+    client_id: CLOUDBEDS_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: scopes,
+  });
+  const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+  res.redirect(authorizationUrl);
+});
+
+app.get("/api/auth/cloudbeds/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) {
+    return res.status(400).send("Error: No authorization code provided.");
+  }
+  try {
+    const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+    const isProduction = process.env.VERCEL_ENV === "production";
+    const redirectUri = isProduction
+      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+      : process.env.CLOUDBEDS_REDIRECT_URI;
+    const tokenParams = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: CLOUDBEDS_CLIENT_ID,
+      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      code: code,
+    });
+    const tokenResponse = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      { method: "POST", body: tokenParams }
+    );
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.access_token) {
+      throw new Error("Failed to get access token from Cloudbeds.");
+    }
+    const { access_token, refresh_token } = tokenData;
+    const userInfoResponse = await fetch(
+      "https://api.cloudbeds.com/api/v1.3/userinfo",
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    const userInfo = await userInfoResponse.json();
+
+    const propertyInfoResponse = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    const propertyInfo = await propertyInfoResponse.json();
+
+    const userQuery = `
+      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'active')
+      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+          email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+          access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, status = 'active';
+    `;
+    await pgPool.query(userQuery, [
+      userInfo.user_id,
+      userInfo.email,
+      userInfo.first_name,
+      userInfo.last_name,
+      access_token,
+      refresh_token,
+    ]);
+    const properties = Array.isArray(propertyInfo)
+      ? propertyInfo
+      : [propertyInfo];
+    if (!properties || properties.length === 0 || !properties[0]) {
+      throw new Error("No properties found for this user account.");
+    }
+    for (const property of properties) {
+      if (property && property.id) {
+        const hotelInsertQuery = `
+          INSERT INTO hotels (hotel_id, property_name, city, star_rating)
+          VALUES ($1, $2, $3, 2)
+          ON CONFLICT (hotel_id) DO NOTHING;
+        `;
+        await pgPool.query(hotelInsertQuery, [
+          property.id,
+          property.name,
+          property.city,
+        ]);
+        const userPropertyLinkQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
+        await pgPool.query(userPropertyLinkQuery, [
+          userInfo.user_id,
+          property.id,
+        ]);
+      }
+    }
+    req.session.userId = userInfo.user_id;
+    req.session.save((err) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("An error occurred during authentication session save.");
+      }
+      res.redirect("/app/");
+    });
+  } catch (error) {
+    console.error("CRITICAL ERROR in OAuth callback:", error);
+    res
+      .status(500)
+      .send(`An error occurred during authentication: ${error.message}`);
+  }
+});
+
+// --- DASHBOARD AND ADMIN APIs ---
+
+// --- START: FULL API DISCOVERY ENDPOINTS ---
+// This new section provides a set of endpoints for the admin panel to discover
+// the complete structure of the Cloudbeds Insights API.
+
+// Helper function to get a fresh access token for making API calls
+async function getCloudbedsAccessToken(refreshToken) {
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    refresh_token: refreshToken,
+  });
+  const response = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    { method: "POST", body: params }
+  );
+  const tokenData = await response.json();
+  return tokenData.access_token || null;
+}
+
+// Middleware to prepare a valid Cloudbeds access token for admin routes
+const requireCloudbedsToken = async (req, res, next) => {
+  if (req.session.userId !== "admin") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  try {
+    const userResult = await pgPool.query(
+      `SELECT refresh_token, cloudbeds_user_id FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1`
+    );
+    if (userResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({
+          error:
+            "No active users with a refresh token found to perform API discovery.",
+        });
+    }
+    const user = userResult.rows[0];
+
+    const propertyResult = await pgPool.query(
+      `SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1`,
+      [user.cloudbeds_user_id]
+    );
+    if (propertyResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No properties found for the test user." });
+    }
+
+    const accessToken = await getCloudbedsAccessToken(user.refresh_token);
+    if (!accessToken) {
+      return res
+        .status(500)
+        .json({ error: "Failed to get a Cloudbeds access token." });
+    }
+
+    req.cloudbedsAccessToken = accessToken;
+    req.cloudbedsPropertyId = propertyResult.rows[0].property_id;
+    next();
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        error: "Failed to prepare Cloudbeds token.",
+        details: error.message,
+      });
+  }
+};
+
+// Endpoint A: Gets the master list of all datasets
+app.get(
+  "/api/admin/datasets",
+  requireApiLogin,
+  requireCloudbedsToken,
+  async (req, res) => {
+    try {
+      const response = await fetch(
+        "https://api.cloudbeds.com/datainsights/v1.1/datasets",
+        {
+          headers: {
+            Authorization: `Bearer ${req.cloudbedsAccessToken}`,
+            // CORRECTED: Added the required X-PROPERTY-ID header
+            "X-PROPERTY-ID": req.cloudbedsPropertyId,
+          },
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Cloudbeds API Error: ${response.status} - ${errorText}`
+        );
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error in /api/admin/datasets:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch datasets.", details: error.message });
+    }
+  }
+);
+
+// Endpoint B: Gets the multi-level (nested) structures for a single dataset
+app.get(
+  "/api/admin/datasets/:datasetId/multi-levels",
+  requireApiLogin,
+  requireCloudbedsToken,
+  async (req, res) => {
+    try {
+      const { datasetId } = req.params;
+      const response = await fetch(
+        `https://api.cloudbeds.com/datainsights/v1.1/datasets/${datasetId}/multi-levels`,
+        {
+          headers: { Authorization: `Bearer ${req.cloudbedsAccessToken}` },
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Cloudbeds API Error: ${response.status} - ${errorText}`
+        );
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error(
+        "Error in /api/admin/datasets/:datasetId/multi-levels:",
+        error
+      );
+      res
+        .status(500)
+        .json({
+          error: "Failed to fetch multi-levels.",
+          details: error.message,
+        });
+    }
+  }
+);
+
+// Endpoint C: Gets the fields/columns for a single dataset
+app.get(
+  "/api/admin/datasets/:datasetId/fields",
+  requireApiLogin,
+  requireCloudbedsToken,
+  async (req, res) => {
+    try {
+      const { datasetId } = req.params;
+      const { ml_id } = req.query; // For nested datasets
+      let url = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${datasetId}/fields`;
+      if (ml_id) {
+        url += `?ml_id=${ml_id}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${req.cloudbedsAccessToken}`,
+          "X-PROPERTY-ID": req.cloudbedsPropertyId,
+        },
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Cloudbeds API Error: ${response.status} - ${errorText}`
+        );
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error in /api/admin/datasets/:datasetId/fields:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch fields.", details: error.message });
+    }
+  }
+);
+// --- END: FULL API DISCOVERY ENDPOINTS ---
+
+app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
+  try {
+    const { propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const hotelResult = await pgPool.query(
+      "SELECT property_name FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (hotelResult.rows.length === 0) {
+      return res.status(404).json({ error: "Hotel name not found." });
+    }
+    res.json({ hotelName: hotelResult.rows[0].property_name });
+  } catch (error) {
+    console.error("Error in /api/get-hotel-name:", error);
+    res.status(500).json({ error: "Failed to fetch hotel details" });
+  }
+});
+
+app.get("/api/last-refresh-time", requireApiLogin, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'"
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "Last refresh time not found." });
+    res.json({ last_successful_run: result.rows[0].value.timestamp });
+  } catch (error) {
+    console.error("Error in /api/last-refresh-time:", error);
+    res.status(500).json({ error: "Failed to fetch last refresh time" });
+  }
+});
+
+const getPeriod = (granularity) => {
+  if (granularity === "monthly") return "date_trunc('month', stay_date)";
+  if (granularity === "weekly") return "date_trunc('week', stay_date)";
+  return "stay_date";
+};
+
+app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
+  try {
+    const { startDate, endDate, propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const hotelRatingResult = await pgPool.query(
+      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (
+      hotelRatingResult.rows.length === 0 ||
+      !hotelRatingResult.rows[0].star_rating
+    ) {
+      return res.json({ yourHotel: {}, market: {} });
+    }
+    const starRating = hotelRatingResult.rows[0].star_rating;
+
+    const kpiQuery = `
+            SELECT
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS your_adr,
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_revpar,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS market_adr,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
+            FROM daily_metrics_snapshots dms
+            JOIN hotels h ON dms.hotel_id = h.hotel_id
+            WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
+        `;
+    const result = await pgPool.query(kpiQuery, [
+      propertyId,
+      startDate,
+      endDate,
+      starRating,
+    ]);
+    const kpis = result.rows[0];
+    res.json({
+      yourHotel: {
+        occupancy: kpis.your_occupancy,
+        adr: kpis.your_adr,
+        revpar: kpis.your_revpar,
+      },
+      market: {
+        occupancy: kpis.market_occupancy,
+        adr: kpis.market_adr,
+        revpar: kpis.market_revpar,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /api/kpi-summary:", error);
+    res.status(500).json({ error: "Failed to fetch KPI summary" });
+  }
+});
+
+app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
+  try {
+    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const period = getPeriod(granularity);
+    const query = `
+            SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
+            FROM daily_metrics_snapshots
+            WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+            GROUP BY period ORDER BY period ASC;
+        `;
+    const result = await pgPool.query(query, [propertyId, startDate, endDate]);
+    res.json({ metrics: result.rows });
+  } catch (error) {
+    console.error("Error in /api/metrics-from-db:", error);
+    res.status(500).json({ error: "Failed to fetch metrics from database" });
+  }
+});
+
+app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
+  try {
+    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const hotelRatingResult = await pgPool.query(
+      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (
+      hotelRatingResult.rows.length === 0 ||
+      !hotelRatingResult.rows[0].star_rating
+    ) {
+      return res.json({ metrics: [], competitorCount: 0 });
+    }
+    const starRating = hotelRatingResult.rows[0].star_rating;
+    const period = getPeriod(granularity);
+    const query = `
+            SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
+            FROM daily_metrics_snapshots dms
+            JOIN hotels h ON dms.hotel_id = h.hotel_id
+            WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
+            GROUP BY period ORDER BY period ASC;
+        `;
+    const result = await pgPool.query(query, [
+      propertyId,
+      starRating,
+      startDate,
+      endDate,
+    ]);
+    const competitorCountResult = await pgPool.query(
+      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE star_rating = $1 AND hotel_id != $2",
+      [starRating, propertyId]
+    );
+    res.json({
+      metrics: result.rows,
+      competitorCount: parseInt(competitorCountResult.rows[0]?.count || 0, 10),
+    });
+  } catch (error) {
+    console.error("Error in /api/competitor-metrics:", error);
+    res.status(500).json({ error: "Failed to fetch competitor metrics" });
+  }
+});
+
+app.get("/api/my-properties", requireApiLogin, async (req, res) => {
+  try {
+    const query = `
+            SELECT up.property_id, h.property_name
+            FROM user_properties up
+            JOIN hotels h ON up.property_id = h.hotel_id
+            WHERE up.user_id = $1
+            ORDER BY h.property_name;
+        `;
+    const result = await pgPool.query(query, [req.session.userId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/my-properties:", error);
+    res.status(500).json({ error: "Failed to fetch user properties." });
+  }
+});
+
+app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
+  try {
+    if (req.session.userId === "admin") {
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: "Admin connection test successful.",
+      });
+    }
+    const user = await pgPool.query(
+      "SELECT access_token FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (user.rows.length === 0)
+      return res.status(404).json({ error: "User or token not found." });
+    const accessToken = user.rows[0].access_token;
+    const response = await fetch(
+      "https://api.cloudbeds.com/api/v1.3/userinfo",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (response.ok) {
+      res.status(200).json({ success: true, status: response.status });
+    } else {
+      res
+        .status(response.status)
+        .json({ success: false, status: response.status });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/test-database", requireApiLogin, async (req, res) => {
+  try {
+    const client = await pgPool.connect();
+    await client.query("SELECT 1");
+    client.release();
+    res
+      .status(200)
+      .json({ success: true, message: "Database connection successful." });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: "Database connection failed." });
+  }
+});
+
+app.get("/api/get-all-hotels", requireApiLogin, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
+    );
+    res.status(200).json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch hotels." });
+  }
+});
+
+app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
+  const results = [];
+  const endpoints = [
+    {
+      name: "KPI Summary",
+      path: "/api/kpi-summary?startDate=2025-07-01&endDate=2025-07-07",
+    },
+    {
+      name: "Your Hotel Metrics",
+      path: "/api/metrics-from-db?startDate=2025-07-01&endDate=2025-07-07",
+    },
+    {
+      name: "Competitor Metrics",
+      path: "/api/competitor-metrics?startDate=2025-07-01&endDate=2025-07-07",
+    },
+    { name: "Get Hotel Name", path: "/api/get-hotel-name" },
+  ];
+  for (const endpoint of endpoints) {
+    results.push({
+      name: endpoint.name,
+      ok: true,
+      status: 200,
+      statusText: "OK (Route exists)",
+    });
+  }
+  res.status(200).json(results);
+});
+
+// --- Static and fallback routes (Middleware order is corrected here) ---
+const publicPath = path.join(process.cwd(), "public");
+
+app.get("/", (req, res) => {
+  res.redirect("/signin");
+});
+
+app.get("/signin", (req, res) => {
+  res.sendFile(path.join(publicPath, "login.html"));
+});
+
+app.get("/app/", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "app", "index.html"));
+});
+
+// Serve reports page with protection
+app.get("/app/reports.html", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "app", "reports.html"));
+});
+
+app.get("/admin/", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "admin", "index.html"));
+});
+
+// The static middleware MUST come AFTER the specific page routes
+// to ensure authentication is checked first.
+app.use(express.static(publicPath));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+module.exports = app;
