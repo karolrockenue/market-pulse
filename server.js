@@ -673,7 +673,7 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
 });
 
 // New endpoint to get a sample of real data from the Insights API
-// This endpoint is now "smarter" and uses the correct filter for each dataset.
+// This is the final, most intelligent version of this endpoint.
 app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching insights data...");
   try {
@@ -683,30 +683,59 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
       return res.status(400).json({ error: "Column names are required." });
 
     const accessToken = await getCloudbedsAccessToken();
+
+    // Step 1: Fetch the dataset's schema to learn the data types of all fields.
+    const schemaUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
+    const schemaResponse = await fetch(schemaUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+      },
+    });
+    const schemaData = await schemaResponse.json();
+    if (!schemaResponse.ok)
+      throw new Error(
+        `Could not fetch dataset schema: ${JSON.stringify(schemaData)}`
+      );
+
+    // Create a simple map of column names to their data types (e.g., { "adr": "DynamicCurrency", "id": "Identifier" })
+    const fieldTypeMap = new Map();
+    if (schemaData.cdfs) {
+      for (const category of schemaData.cdfs) {
+        if (category.cdfs) {
+          for (const field of category.cdfs) {
+            fieldTypeMap.set(field.column, field.kind);
+          }
+        }
+      }
+    }
+
+    // Step 2: Intelligently build the columns array for the data request.
+    const requestedColumns = columns.split(",").map((colName) => {
+      const trimmedColName = colName.trim();
+      const kind = fieldTypeMap.get(trimmedColName);
+
+      // Only add metrics for column types that support it (Numbers, Currencies).
+      if (
+        kind === "Number" ||
+        kind === "Currency" ||
+        kind === "DynamicCurrency" ||
+        kind === "DynamicPercentage"
+      ) {
+        return { cdf: { column: trimmedColName }, metrics: ["sum", "mean"] };
+      } else {
+        // For Identifiers, Strings, Dates, etc., do NOT request metrics.
+        return { cdf: { column: trimmedColName } };
+      }
+    });
+
+    // Step 3: Build the final payload with the smart columns array.
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dateForFilter = yesterday.toISOString().split("T")[0];
 
-    const requestedColumns = columns.split(",").map((colName) => ({
-      cdf: { column: colName.trim() },
-      metrics: ["sum", "mean"],
-    }));
-
-    // --- NEW LOGIC: Determine the correct date column to filter by ---
-    let filterColumn;
-    if (id === "7") {
-      // For Dataset 7 (Occupancy)
-      filterColumn = "stay_date";
-    } else if (id === "3") {
-      // For Dataset 3 (Reservations)
-      filterColumn = "checkin_date";
-    } else {
-      // A sensible default for other potential datasets
-      filterColumn = "checkin_date";
-    }
-    console.log(
-      `[server.js] Using '${filterColumn}' as the date filter for Dataset ${id}.`
-    );
+    let filterColumn = id === "7" ? "stay_date" : "checkin_date";
 
     let insightsPayload = {
       property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
@@ -714,7 +743,6 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
       columns: requestedColumns,
       filters: {
         and: [
-          // Use the dynamic filterColumn variable here
           {
             cdf: { column: filterColumn },
             operator: "equals",
@@ -730,6 +758,7 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
       ];
     }
 
+    // Step 4: Make the final data request.
     const targetUrl =
       "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run";
     const cloudbedsApiResponse = await fetch(targetUrl, {
