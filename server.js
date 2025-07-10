@@ -342,8 +342,11 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 
 // --- DASHBOARD AND ADMIN APIs ---
 
-// --- START: NEW API EXPLORER ENDPOINT ---
-// NOTE: This section was added to enable the API Explorer feature in the admin panel.
+// --- START: FULL API DISCOVERY ENDPOINTS ---
+// This new section provides a set of endpoints for the admin panel to discover
+// the complete structure of the Cloudbeds Insights API.
+
+// Helper function to get a fresh access token for making API calls
 async function getCloudbedsAccessToken(refreshToken) {
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
@@ -360,24 +363,22 @@ async function getCloudbedsAccessToken(refreshToken) {
   return tokenData.access_token || null;
 }
 
-app.get("/api/admin/discover-properties", requireApiLogin, async (req, res) => {
-  // Ensure this is an admin-only function
+// Middleware to prepare a valid Cloudbeds access token for admin routes
+const requireCloudbedsToken = async (req, res, next) => {
   if (req.session.userId !== "admin") {
     return res.status(403).json({ error: "Forbidden" });
   }
-
   try {
-    // For an admin tool, we must "borrow" the token of an active user.
-    // Fetch the first active user and their property to make the test call.
     const userResult = await pgPool.query(
       `SELECT refresh_token, cloudbeds_user_id FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1`
     );
-
     if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        error:
-          "No active users with a refresh token found to perform API discovery.",
-      });
+      return res
+        .status(404)
+        .json({
+          error:
+            "No active users with a refresh token found to perform API discovery.",
+        });
     }
     const user = userResult.rows[0];
 
@@ -385,15 +386,12 @@ app.get("/api/admin/discover-properties", requireApiLogin, async (req, res) => {
       `SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1`,
       [user.cloudbeds_user_id]
     );
-
     if (propertyResult.rows.length === 0) {
       return res
         .status(404)
         .json({ error: "No properties found for the test user." });
     }
-    const propertyId = propertyResult.rows[0].property_id;
 
-    // 1. Get a fresh access token using the user's refresh token
     const accessToken = await getCloudbedsAccessToken(user.refresh_token);
     if (!accessToken) {
       return res
@@ -401,30 +399,127 @@ app.get("/api/admin/discover-properties", requireApiLogin, async (req, res) => {
         .json({ error: "Failed to get a Cloudbeds access token." });
     }
 
-    // 2. Call the Cloudbeds API
-    const response = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "X-PROPERTY-ID": propertyId,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Cloudbeds API error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    res.status(200).json(data);
+    req.cloudbedsAccessToken = accessToken;
+    req.cloudbedsPropertyId = propertyResult.rows[0].property_id;
+    next();
   } catch (error) {
-    console.error("Error in /api/admin/discover-properties:", error);
-    res.status(500).json({ error: error.message });
+    res
+      .status(500)
+      .json({
+        error: "Failed to prepare Cloudbeds token.",
+        details: error.message,
+      });
   }
-});
-// --- END: NEW API EXPLORER ENDPOINT ---
+};
+
+// Endpoint A: Gets the master list of all datasets
+app.get(
+  "/api/admin/datasets",
+  requireApiLogin,
+  requireCloudbedsToken,
+  async (req, res) => {
+    try {
+      const response = await fetch(
+        "https://api.cloudbeds.com/datainsights/v1.1/datasets",
+        {
+          headers: {
+            Authorization: `Bearer ${req.cloudbedsAccessToken}`,
+            // CORRECTED: Added the required X-PROPERTY-ID header
+            "X-PROPERTY-ID": req.cloudbedsPropertyId,
+          },
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Cloudbeds API Error: ${response.status} - ${errorText}`
+        );
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error in /api/admin/datasets:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch datasets.", details: error.message });
+    }
+  }
+);
+
+// Endpoint B: Gets the multi-level (nested) structures for a single dataset
+app.get(
+  "/api/admin/datasets/:datasetId/multi-levels",
+  requireApiLogin,
+  requireCloudbedsToken,
+  async (req, res) => {
+    try {
+      const { datasetId } = req.params;
+      const response = await fetch(
+        `https://api.cloudbeds.com/datainsights/v1.1/datasets/${datasetId}/multi-levels`,
+        {
+          headers: { Authorization: `Bearer ${req.cloudbedsAccessToken}` },
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Cloudbeds API Error: ${response.status} - ${errorText}`
+        );
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error(
+        "Error in /api/admin/datasets/:datasetId/multi-levels:",
+        error
+      );
+      res
+        .status(500)
+        .json({
+          error: "Failed to fetch multi-levels.",
+          details: error.message,
+        });
+    }
+  }
+);
+
+// Endpoint C: Gets the fields/columns for a single dataset
+app.get(
+  "/api/admin/datasets/:datasetId/fields",
+  requireApiLogin,
+  requireCloudbedsToken,
+  async (req, res) => {
+    try {
+      const { datasetId } = req.params;
+      const { ml_id } = req.query; // For nested datasets
+      let url = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${datasetId}/fields`;
+      if (ml_id) {
+        url += `?ml_id=${ml_id}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${req.cloudbedsAccessToken}`,
+          "X-PROPERTY-ID": req.cloudbedsPropertyId,
+        },
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Cloudbeds API Error: ${response.status} - ${errorText}`
+        );
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error in /api/admin/datasets/:datasetId/fields:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch fields.", details: error.message });
+    }
+  }
+);
+// --- END: FULL API DISCOVERY ENDPOINTS ---
 
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
