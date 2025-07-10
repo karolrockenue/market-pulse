@@ -150,10 +150,20 @@ function initializeAdminPanel() {
   const fetchInsightsDataBtn = document.getElementById(
     "fetch-insights-data-btn"
   );
+  const insightsColumnsInput = document.getElementById(
+    "insights-columns-input"
+  );
+
   fetchInsightsDataBtn.addEventListener("click", async () => {
     const datasetId = datasetIdInput.value;
+    const columns = insightsColumnsInput.value;
+
     if (!datasetId) {
       apiResultsContainer.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">Please enter a Dataset ID.</div>`;
+      return;
+    }
+    if (!columns) {
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">Please enter at least one column name.</div>`;
       return;
     }
 
@@ -161,8 +171,11 @@ function initializeAdminPanel() {
     fetchInsightsDataBtn.disabled = true;
 
     try {
+      // Pass the selected columns to the backend proxy
       const response = await fetch(
-        `/api/explore/insights-data?id=${datasetId}`
+        `/api/explore/insights-data?id=${datasetId}&columns=${encodeURIComponent(
+          columns
+        )}`
       );
       const data = await response.json();
       if (!response.ok)

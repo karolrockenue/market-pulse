@@ -673,26 +673,30 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
 });
 
 // New endpoint to get a sample of real data from the Insights API
+// This endpoint will now dynamically build the columns to query
 app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching insights data...");
   try {
-    const { id } = req.query;
+    const { id, columns } = req.query;
     if (!id) return res.status(400).json({ error: "Dataset ID is required." });
+    if (!columns)
+      return res.status(400).json({ error: "Column names are required." });
 
     const accessToken = await getCloudbedsAccessToken();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const stayDate = yesterday.toISOString().split("T")[0];
 
-    // This payload is a lightweight query for a single day's data
+    // Dynamically build the columns array from the query parameter
+    const requestedColumns = columns.split(",").map((colName) => ({
+      cdf: { column: colName.trim() },
+      metrics: ["sum", "mean"], // Request sum and mean for each column
+    }));
+
     const insightsPayload = {
       property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
       dataset_id: parseInt(id),
-      columns: [
-        { cdf: { column: "rooms_sold" }, metrics: ["sum"] },
-        { cdf: { column: "adr" }, metrics: ["mean"] },
-        { cdf: { column: "revpar" }, metrics: ["mean"] },
-      ],
+      columns: requestedColumns,
       filters: {
         and: [
           {
