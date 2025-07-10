@@ -205,35 +205,65 @@ function initializeAdminPanel() {
 
   fetchLastRefreshTime();
   fetchAndRenderHotels();
+
   // --- API EXPLORER LOGIC ---
   const fetchDatasetsBtn = document.getElementById("fetch-datasets-btn");
   const apiResultsContainer = document.getElementById("api-results-container");
 
   fetchDatasetsBtn.addEventListener("click", async () => {
-    apiResultsContainer.textContent = "Fetching...";
+    apiResultsContainer.textContent = "Fetching from Cloudbeds API...";
     fetchDatasetsBtn.disabled = true;
 
     try {
+      // This endpoint now needs to be defined in server.js to work reliably
       const response = await fetch("/api/explore/datasets");
-      const data = await response.json(); // Always try to parse as JSON first
+      const data = await response.json();
 
-      // Check for a structured error from our own API
-      if (!response.ok || data.success === false) {
-        // Use the error message from our API if it exists, otherwise use a default
-        const errorMessage =
-          data.error || `Server responded with status ${response.status}`;
-        const errorDetails = data.details ? `\n\nDetails: ${data.details}` : "";
-        throw new Error(errorMessage + errorDetails);
+      if (!response.ok) {
+        throw new Error(data.error || "An unknown server error occurred.");
       }
 
-      // If everything is OK, display the data
+      // Success! Display the data from Cloudbeds.
       apiResultsContainer.textContent = JSON.stringify(data, null, 2);
     } catch (error) {
-      // This catch block is now much more powerful
       console.error("API Explorer Fetch Error:", error);
       apiResultsContainer.textContent = `An error occurred:\n\n${error.message}`;
     } finally {
       fetchDatasetsBtn.disabled = false;
+    }
+  });
+
+  // --- NEW LOGIC FOR FETCHING DATASET STRUCTURE ---
+  const fetchStructureBtn = document.getElementById("fetch-structure-btn");
+  const datasetIdInput = document.getElementById("dataset-id-input");
+
+  fetchStructureBtn.addEventListener("click", async () => {
+    const datasetId = datasetIdInput.value;
+    if (!datasetId) {
+      apiResultsContainer.textContent = "Please enter a Dataset ID.";
+      return;
+    }
+
+    apiResultsContainer.textContent = `Fetching structure for Dataset ${datasetId}...`;
+    fetchStructureBtn.disabled = true;
+
+    try {
+      // Calling our new, separate serverless function
+      const response = await fetch(
+        `/api/get-dataset-structure?id=${datasetId}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "An unknown server error occurred.");
+      }
+
+      apiResultsContainer.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+      console.error("API Explorer Fetch Error:", error);
+      apiResultsContainer.textContent = `An error occurred:\n\n${error.message}`;
+    } finally {
+      fetchStructureBtn.disabled = false;
     }
   });
 }
