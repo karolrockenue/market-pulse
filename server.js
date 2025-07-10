@@ -617,7 +617,6 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
   try {
     const accessToken = await getCloudbedsAccessToken();
     const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
-    console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: {
@@ -634,9 +633,6 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
         }: ${JSON.stringify(data)}`
       );
     }
-    console.log(
-      "[server.js] Admin API Explorer: Successfully fetched data from Cloudbeds."
-    );
     res.status(200).json(data);
   } catch (error) {
     console.error("[server.js] Admin API Explorer Error:", error);
@@ -653,7 +649,6 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
     }
     const accessToken = await getCloudbedsAccessToken();
     const targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
-    console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: {
@@ -693,6 +688,11 @@ app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
     const insightsPayload = {
       property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
       dataset_id: parseInt(id),
+      columns: [
+        { cdf: { column: "rooms_sold" }, metrics: ["sum"] },
+        { cdf: { column: "adr" }, metrics: ["mean"] },
+        { cdf: { column: "revpar" }, metrics: ["mean"] },
+      ],
       filters: {
         and: [
           {
@@ -753,6 +753,7 @@ app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// --- END: NEW API EXPLORER PROXY ---
 
 app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   const results = [];
