@@ -146,7 +146,7 @@ function initializeAdminPanel() {
     }
   };
 
-  // --- START: NEW TABLE RENDERING FUNCTIONS ---
+  // --- START: TABLE RENDERING FUNCTIONS ---
   function renderDatasetsTable(datasets, container) {
     if (!datasets || datasets.length === 0) {
       container.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">No datasets found.</div>`;
@@ -210,7 +210,7 @@ function initializeAdminPanel() {
     tableHTML += `</tbody></table></div>`;
     container.innerHTML = tableHTML;
   }
-  // --- END: NEW TABLE RENDERING FUNCTIONS ---
+  // --- END: TABLE RENDERING FUNCTIONS ---
 
   runEndpointTestsBtn.addEventListener("click", async () => {
     runEndpointTestsBtn.disabled = true;
@@ -281,7 +281,6 @@ function initializeAdminPanel() {
       if (!response.ok) {
         throw new Error(data.error || "An unknown server error occurred.");
       }
-      // CORRECTED: Use the new table rendering function
       renderDatasetsTable(data, apiResultsContainer);
     } catch (error) {
       console.error("API Explorer Fetch Error:", error);
@@ -291,6 +290,7 @@ function initializeAdminPanel() {
     }
   });
 
+  // This is the block we are focused on
   const fetchStructureBtn = document.getElementById("fetch-structure-btn");
   const datasetIdInput = document.getElementById("dataset-id-input");
 
@@ -301,7 +301,7 @@ function initializeAdminPanel() {
       return;
     }
 
-    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching structure for Dataset ${datasetId}...</div>`;
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching raw structure for Dataset ${datasetId}...</div>`;
     fetchStructureBtn.disabled = true;
 
     try {
@@ -313,12 +313,17 @@ function initializeAdminPanel() {
         throw new Error(data.error || "An unknown server error occurred.");
       }
 
-      // CORRECTED: Use the correct table rendering function
-      // and pass the correct part of the data object (data.cdfs).
-      renderFieldsTable(data.cdfs, apiResultsContainer);
+      // Temporarily display raw JSON to debug
+      const resultsContainer = document.getElementById("api-results-container");
+      resultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
     } catch (error) {
       console.error("API Explorer Fetch Error:", error);
-      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
+      const resultsContainer = document.getElementById("api-results-container");
+      resultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
     } finally {
       fetchStructureBtn.disabled = false;
     }
