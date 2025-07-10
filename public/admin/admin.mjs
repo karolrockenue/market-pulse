@@ -2,17 +2,10 @@
 
 // --- MAIN INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
-  // This is the only function that needs to run on page load.
   checkAdminSessionAndInitialize();
 });
 
 // --- NEW SESSION CHECKING LOGIC ---
-
-/**
- * Checks the user's session with the server.
- * If the user is an admin, it shows the admin panel.
- * Otherwise, it shows an access denied message.
- */
 async function checkAdminSessionAndInitialize() {
   const loginForm = document.getElementById("login-form");
   const adminContent = document.getElementById("admin-content");
@@ -23,15 +16,12 @@ async function checkAdminSessionAndInitialize() {
     const sessionInfo = await response.json();
 
     if (sessionInfo.isAdmin) {
-      // If the server confirms the user is an admin, show the panel.
       showAdminContent();
     } else {
-      // If the user is not an admin, show a clear access denied message.
       loginForm.classList.remove("hidden");
       adminContent.classList.add("hidden");
       loginError.textContent =
         "Access Denied: You must be an administrator to view this page.";
-      // Disable the form elements as they are now useless.
       document.getElementById("password").disabled = true;
       document.getElementById("login-btn").disabled = true;
     }
@@ -39,6 +29,11 @@ async function checkAdminSessionAndInitialize() {
     console.error("Could not verify admin session", error);
     loginError.textContent =
       "Could not verify session. Please try again later.";
+  } finally {
+    // This block hides the spinner and shows the content wrapper
+    // after the session check is complete.
+    document.getElementById("loading-spinner").classList.add("hidden");
+    document.getElementById("admin-wrapper").classList.remove("hidden");
   }
 }
 
@@ -52,11 +47,6 @@ function showAdminContent() {
 }
 
 // --- ADMIN PANEL FUNCTIONALITY ---
-
-/**
- * This function contains all the logic for the buttons, tables, and tests on the admin panel.
- * It is only called after the user's admin status has been successfully verified.
- */
 function initializeAdminPanel() {
   const lastRefreshTimeEl = document.getElementById("last-refresh-time");
   const testCloudbedsBtn = document.getElementById("test-cloudbeds-btn");
@@ -131,22 +121,33 @@ function initializeAdminPanel() {
 
   const runJob = async (url, btn) => {
     const originalText = btn.textContent;
+    const statusEl = document.getElementById("job-status-message");
     btn.disabled = true;
     btn.textContent = "Running...";
+    statusEl.textContent = "Job started, please wait...";
+    statusEl.className = "mt-4 text-sm font-medium text-gray-500";
     try {
       const response = await fetch(url);
       if (response.ok) {
-        alert("Job completed successfully!");
+        statusEl.textContent = "✅ Job completed successfully!";
+        statusEl.className = "mt-4 text-sm font-medium text-green-600";
         fetchLastRefreshTime();
       } else {
         const data = await response.json();
-        alert(`Job failed: ${data.error || "Unknown error"}`);
+        statusEl.textContent = `❌ Job failed: ${
+          data.error || "Unknown error"
+        }`;
+        statusEl.className = "mt-4 text-sm font-medium text-red-600";
       }
     } catch (error) {
-      alert(`Job failed to start: ${error.message}`);
+      statusEl.textContent = `❌ Job failed to start: ${error.message}`;
+      statusEl.className = "mt-4 text-sm font-medium text-red-600";
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;
+      setTimeout(() => {
+        statusEl.textContent = "";
+      }, 5000);
     }
   };
 
@@ -169,13 +170,7 @@ function initializeAdminPanel() {
   function renderTestResults(results) {
     let tableHTML = `
       <table class="w-full text-sm border-collapse">
-        <thead>
-          <tr class="border-b">
-            <th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th>
-            <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-            <th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
-          </tr>
-        </thead>
+        <thead><tr class="border-b"><th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th><th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th><th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th></tr></thead>
         <tbody class="divide-y divide-gray-200">`;
     results.forEach((result) => {
       const statusClass = result.ok
@@ -183,16 +178,7 @@ function initializeAdminPanel() {
         : "bg-red-100 text-red-800";
       const statusIcon = result.ok ? "✅" : "❌";
       const statusText = result.ok ? "OK" : "FAIL";
-      tableHTML += `
-        <tr>
-          <td class="px-4 py-3 font-medium text-gray-700">${result.name}</td>
-          <td class="px-4 py-3">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">
-              ${statusIcon} ${statusText}
-            </span>
-          </td>
-          <td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td>
-        </tr>`;
+      tableHTML += `<tr><td class="px-4 py-3 font-medium text-gray-700">${result.name}</td><td class="px-4 py-3"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">${statusIcon} ${statusText}</span></td><td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td></tr>`;
     });
     tableHTML += `</tbody></table>`;
     endpointTestResultsEl.innerHTML = tableHTML;

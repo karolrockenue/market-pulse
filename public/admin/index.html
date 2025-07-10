@@ -3,107 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Market Pulse - Admin</title>
+    <title>Admin Panel - Market Pulse</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700;800&display=swap"
       rel="stylesheet"
     />
     <style>
+      :root {
+        --bg-primary: #f7f8fc;
+        --text-primary: #1e293b;
+        --border-color: #e2e8f0;
+        --accent-primary: #60a5fa;
+      }
       body {
         font-family: "Inter", sans-serif;
-        background-color: #f3f4f6;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      .font-data {
+        font-family: "Manrope", sans-serif;
+        font-variant-numeric: tabular-nums;
+      }
+      .control-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        transition: all 0.2s;
+        background-color: #ffffff;
+      }
+      .control-btn:hover {
+        background-color: #f1f5f9;
+        border-color: #94a3b8;
+      }
+      .control-btn.active,
+      .control-btn:active {
+        background-color: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
       }
     </style>
   </head>
-  <body class="antialiased text-gray-800">
-    <div class="flex h-screen bg-gray-100">
-      <div class="hidden md:flex flex-col w-64 bg-white shadow-lg">
-        <div class="flex items-center justify-center h-16 bg-white shadow-md">
-          <svg
-            class="h-8 w-auto text-blue-600"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="20" x2="12" y2="10"></line>
-            <line x1="18" y1="20" x2="18" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="16"></line>
-          </svg>
-          <span class="ml-2 text-lg font-bold">Market Pulse</span>
-        </div>
-        <div class="flex flex-col flex-1 overflow-y-auto">
-          <nav class="flex-1 px-2 py-4 bg-white">
-            <a
-              href="/app/"
-              class="flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-6 w-6 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 6h16M4 12h16M4 18h7"
-                />
-              </svg>
-              Dashboard
-            </a>
-            <a
-              href="/admin/"
-              class="flex items-center px-4 py-2 mt-2 text-gray-700 bg-blue-50 border-r-4 border-blue-600"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-6 w-6 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              Admin Panel
-            </a>
-          </nav>
-        </div>
-      </div>
+  <body class="antialiased">
+    <div
+      id="loading-spinner"
+      class="flex items-center justify-center min-h-screen"
+    >
+      <div
+        class="w-10 h-10 border-2 border-slate-400 border-t-slate-700 rounded-full animate-spin"
+      ></div>
+    </div>
 
-      <div class="flex flex-col flex-1 overflow-y-auto">
-        <div
-          class="flex items-center justify-between h-16 bg-white border-b border-gray-200"
+    <div id="admin-wrapper" class="hidden flex min-h-screen">
+      <aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r"></aside>
+
+      <div class="flex-1 flex flex-col">
+        <header
+          class="bg-white h-16 flex items-center justify-between px-8 border-b"
         >
-          <div class="px-4">
-            <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
-          </div>
-        </div>
-        <div class="p-4 md:p-8 space-y-8">
-          <div id="login-form">
-            <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-              <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
-                Admin Access
-              </h2>
-              <div class="mb-4">
+          <h1 class="text-xl font-semibold text-gray-800">Admin Panel</h1>
+        </header>
+
+        <main class="flex-1 p-8">
+          <div
+            id="login-form"
+            class="max-w-md mx-auto bg-white p-8 rounded-xl border"
+          >
+            <h2 class="text-2xl font-bold text-center mb-1">
+              Administrator Access
+            </h2>
+            <p
+              id="login-error"
+              class="text-center text-red-600 text-sm h-5 mb-4"
+            ></p>
+            <form class="space-y-4">
+              <div>
                 <label
                   for="password"
                   class="block text-sm font-medium text-gray-700"
@@ -112,162 +90,127 @@
                 <input
                   type="password"
                   id="password"
-                  class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
                 />
               </div>
               <button
+                type="button"
                 id="login-btn"
-                class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition"
+                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600"
               >
                 Log In
               </button>
-              <p id="login-error" class="text-red-500 text-sm mt-2"></p>
-            </div>
+            </form>
           </div>
 
           <div id="admin-content" class="hidden space-y-8">
-            <div class="bg-white p-6 rounded-lg shadow-md">
-              <h2 class="text-xl font-bold text-gray-800 mb-4">
-                System Health
-              </h2>
-              <div class="space-y-4">
-                <div
-                  class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p class="font-semibold text-gray-700">Last Data Refresh</p>
-                    <p id="last-refresh-time" class="text-gray-600"></p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div class="space-y-8">
+                <div class="bg-white p-6 rounded-xl border">
+                  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
+                    System Health
+                  </h3>
+                  <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                      <p class="text-sm font-medium text-gray-600">
+                        Last Data Refresh:
+                      </p>
+                      <p
+                        id="last-refresh-time"
+                        class="text-sm font-semibold font-data text-gray-800"
+                      ></p>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <p class="text-sm font-medium text-gray-600">
+                        Cloudbeds API:
+                      </p>
+                      <div class="flex items-center">
+                        <button
+                          id="test-cloudbeds-btn"
+                          class="control-btn text-xs"
+                        >
+                          Test Connection
+                        </button>
+                        <span
+                          id="cloudbeds-status"
+                          class="ml-4 text-sm font-semibold"
+                        ></span>
+                      </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <p class="text-sm font-medium text-gray-600">
+                        PostgreSQL Database:
+                      </p>
+                      <div class="flex items-center">
+                        <button id="test-db-btn" class="control-btn text-xs">
+                          Test Connection
+                        </button>
+                        <span
+                          id="db-status"
+                          class="ml-4 text-sm font-semibold"
+                        ></span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div
-                  class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                >
-                  <p class="font-semibold text-gray-700">API Status</p>
-                  <div>
-                    <button
-                      id="test-cloudbeds-btn"
-                      class="bg-blue-500 text-white px-3 py-1 text-sm rounded-md"
-                    >
-                      Test Connection
+                <div class="bg-white p-6 rounded-xl border">
+                  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
+                    Manual Action Triggers
+                  </h3>
+                  <div class="flex items-center space-x-4">
+                    <button id="run-daily-refresh-btn" class="control-btn">
+                      Run Job: Daily Forecast Refresh
                     </button>
-                    <span id="cloudbeds-status"></span>
+                    <button id="run-initial-sync-btn" class="control-btn">
+                      Run Job: Initial Full Sync
+                    </button>
                   </div>
+                  <div
+                    id="job-status-message"
+                    class="mt-4 text-sm font-medium h-5"
+                  ></div>
                 </div>
-                <div
-                  class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                >
-                  <p class="font-semibold text-gray-700">Database Status</p>
-                  <div>
-                    <button
-                      id="test-db-btn"
-                      class="bg-blue-500 text-white px-3 py-1 text-sm rounded-md"
-                    >
-                      Test Connection
-                    </button>
-                    <span id="db-status"></span>
-                  </div>
+              </div>
+              <div class="space-y-8">
+                <div class="bg-white p-6 rounded-xl border">
+                  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
+                    Application API Health
+                  </h3>
+                  <button id="run-endpoint-tests-btn" class="control-btn">
+                    Run Endpoint Tests
+                  </button>
+                  <div id="endpoint-test-results" class="mt-4"></div>
                 </div>
               </div>
             </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-              <h2 class="text-xl font-bold text-gray-800 mb-4">
-                Manual Action Triggers
-              </h2>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  id="run-daily-refresh-btn"
-                  class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition"
-                >
-                  Run Job: Daily Forecast Refresh
-                </button>
-                <button
-                  id="run-initial-sync-btn"
-                  class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition"
-                >
-                  Run Job: Initial Full Sync
-                </button>
-              </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-              <h2 class="text-xl font-bold text-gray-800 mb-4">
-                Endpoint Health Check
-              </h2>
-              <p class="text-sm text-gray-600 mb-4">
-                Test if the core application API endpoints are responding
-                correctly.
-              </p>
-              <button
-                id="run-endpoint-tests-btn"
-                class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-purple-700 transition"
-              >
-                Run Endpoint Tests
-              </button>
-              <div id="endpoint-test-results" class="mt-4 border-t pt-4"></div>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-              <h2 class="text-xl font-bold text-gray-800 mb-4">API Explorer</h2>
-              <p class="text-sm text-gray-600 mb-4">
-                Click the button to discover all available datasets and their
-                specific data fields from the Cloudbeds Insights API.
-              </p>
-              <button
-                id="run-api-discovery"
-                class="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-              >
-                Discover API Endpoints
-              </button>
-              <div
-                id="discovery-status"
-                class="mt-4 text-sm font-medium text-gray-500"
-              ></div>
-              <div
-                id="discovery-results"
-                class="mt-4 bg-gray-50 p-4 rounded-lg border max-h-96 overflow-y-auto"
-              ></div>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-              <h2 class="text-xl font-bold text-gray-800 mb-4">
+            <div class="bg-white p-6 rounded-xl border mt-8">
+              <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
                 Registered Hotels
-              </h2>
+              </h3>
               <div class="overflow-x-auto">
-                <table class="min-w-full bg-white">
-                  <thead class="bg-gray-100">
-                    <tr>
-                      <th
-                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                      >
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b text-left">
+                      <th class="px-4 py-3 font-semibold text-gray-600">
                         Hotel ID
                       </th>
-                      <th
-                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                      >
+                      <th class="px-4 py-3 font-semibold text-gray-600">
                         Property Name
                       </th>
-                      <th
-                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                      >
+                      <th class="px-4 py-3 font-semibold text-gray-600">
                         Type
                       </th>
-                      <th
-                        class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                      >
+                      <th class="px-4 py-3 font-semibold text-gray-600">
                         City
                       </th>
                     </tr>
                   </thead>
-                  <tbody
-                    id="hotels-table-body"
-                    class="divide-y divide-gray-200"
-                  ></tbody>
+                  <tbody id="hotels-table-body" class="divide-y"></tbody>
                 </table>
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
     <script src="admin.mjs" type="module"></script>
