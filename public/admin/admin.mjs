@@ -267,6 +267,28 @@ function initializeAdminPanel() {
     }
   });
 
+  // Listener for "Get Sample Room"
+  const fetchSampleRoomBtn = document.getElementById("fetch-sample-room-btn");
+  fetchSampleRoomBtn.addEventListener("click", async () => {
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching sample room record...</div>`;
+    fetchSampleRoomBtn.disabled = true;
+    try {
+      const response = await fetch("/api/explore/sample-room");
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "An unknown server error occurred.");
+      apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
+    } catch (error) {
+      apiResultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
+    } finally {
+      fetchSampleRoomBtn.disabled = false;
+    }
+  });
+
   // --- Initial Setup Calls ---
   fetchLastRefreshTime();
   fetchAndRenderHotels();
