@@ -175,40 +175,56 @@ function initializeAdminPanel() {
     container.innerHTML = tableHTML;
   }
 
-  function renderFieldsTable(fields, container) {
-    if (!fields || fields.length === 0) {
+  function renderFieldsTable(data, container) {
+    if (!data.cdfs || data.cdfs.length === 0) {
       container.innerHTML = `<div class="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-sm">No fields or structure found for this dataset. The API returned an empty array.</div>`;
       return;
     }
-    let tableHTML = `
-      <div class="overflow-x-auto border border-gray-200 rounded-lg">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50">
-            <tr class="text-left">
-              <th class="px-4 py-3 font-semibold text-gray-600">Column (API Name)</th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Friendly Name</th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Description</th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Data Type</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">`;
-    for (const field of fields) {
-      tableHTML += `
-        <tr>
-          <td class="px-4 py-3 font-mono text-blue-600">${
-            field.column || "N/A"
-          }</td>
-          <td class="px-4 py-3 font-medium text-gray-800">${
-            field.name || "N/A"
-          }</td>
-          <td class="px-4 py-3 text-gray-600">${field.description || "N/A"}</td>
-          <td class="px-4 py-3 font-mono text-gray-600">${
-            field.kind || "N/A"
-          }</td>
-        </tr>`;
+
+    let finalHTML = ``;
+
+    for (const category of data.cdfs) {
+      finalHTML += `
+        <div class="mb-8">
+          <h4 class="text-lg font-bold text-gray-700 mb-2 p-2 bg-slate-100 rounded-md">${category.category}</h4>`;
+
+      if (category.cdfs && category.cdfs.length > 0) {
+        finalHTML += `
+          <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr class="text-left">
+                  <th class="px-4 py-3 font-semibold text-gray-600">Column (API Name)</th>
+                  <th class="px-4 py-3 font-semibold text-gray-600">Friendly Name</th>
+                  <th class="px-4 py-3 font-semibold text-gray-600">Description</th>
+                  <th class="px-4 py-3 font-semibold text-gray-600">Data Type</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">`;
+
+        for (const field of category.cdfs) {
+          finalHTML += `
+            <tr>
+              <td class="px-4 py-3 font-mono text-blue-600">${
+                field.column || "N/A"
+              }</td>
+              <td class="px-4 py-3 font-medium text-gray-800">${
+                field.name || "N/A"
+              }</td>
+              <td class="px-4 py-3 text-gray-600">${
+                field.description || "N/A"
+              }</td>
+              <td class="px-4 py-3 font-mono text-gray-600">${
+                field.kind || "N/A"
+              }</td>
+            </tr>`;
+        }
+        finalHTML += `</tbody></table></div>`;
+      }
+      finalHTML += `</div>`;
     }
-    tableHTML += `</tbody></table></div>`;
-    container.innerHTML = tableHTML;
+
+    container.innerHTML = finalHTML;
   }
   // --- END: TABLE RENDERING FUNCTIONS ---
 
@@ -290,7 +306,6 @@ function initializeAdminPanel() {
     }
   });
 
-  // This is the block we are focused on
   const fetchStructureBtn = document.getElementById("fetch-structure-btn");
   const datasetIdInput = document.getElementById("dataset-id-input");
 
@@ -301,7 +316,7 @@ function initializeAdminPanel() {
       return;
     }
 
-    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching raw structure for Dataset ${datasetId}...</div>`;
+    apiResultsContainer.innerHTML = `<div class="text-center p-4">Fetching structure for Dataset ${datasetId}...</div>`;
     fetchStructureBtn.disabled = true;
 
     try {
@@ -313,13 +328,8 @@ function initializeAdminPanel() {
         throw new Error(data.error || "An unknown server error occurred.");
       }
 
-      // Temporarily display raw JSON to debug
-      const resultsContainer = document.getElementById("api-results-container");
-      resultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all text-xs">${JSON.stringify(
-        data,
-        null,
-        2
-      )}</pre>`;
+      // Pass the entire data object to our new renderer
+      renderFieldsTable(data, apiResultsContainer);
     } catch (error) {
       console.error("API Explorer Fetch Error:", error);
       const resultsContainer = document.getElementById("api-results-container");
