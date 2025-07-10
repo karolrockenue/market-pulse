@@ -214,7 +214,7 @@ function initializeAdminPanel() {
     fetchDatasetsBtn.disabled = true;
 
     try {
-      const response = await fetch("/api/get-all-hotels");
+      const response = await fetch("/api/explore/datasets");
       const data = await response.json(); // Always try to parse as JSON first
 
       // Check for a structured error from our own API

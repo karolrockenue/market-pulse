@@ -589,6 +589,71 @@ app.get("/api/get-all-hotels", requireAdminApi, async (req, res) => {
   }
 });
 
+// --- START: NEW API EXPLORER PROXY ---
+app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
+  console.log("[server.js] Admin API Explorer: Fetching datasets...");
+
+  try {
+    // Step 1: Get a fresh access token (logic copied from working scripts)
+    const {
+      CLOUDBEDS_CLIENT_ID,
+      CLOUDBEDS_CLIENT_SECRET,
+      CLOUDBEDS_REFRESH_TOKEN,
+    } = process.env;
+
+    const params = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: CLOUDBEDS_CLIENT_ID,
+      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      refresh_token: CLOUDBEDS_REFRESH_TOKEN,
+    });
+
+    const tokenResponse = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      { method: "POST", body: params }
+    );
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+    const accessToken = tokenData.access_token;
+    console.log("[server.js] Admin API Explorer: Authentication successful.");
+
+    // Step 2: Call the actual Cloudbeds API endpoint
+    const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
+    console.log(`[server.js] Admin API Explorer: Calling ${targetUrl}`);
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+      },
+    });
+
+    // Step 3: Send the response from Cloudbeds back to our frontend
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok) {
+      throw new Error(
+        `Cloudbeds API responded with status ${
+          cloudbedsApiResponse.status
+        }: ${JSON.stringify(data)}`
+      );
+    }
+
+    console.log(
+      "[server.js] Admin API Explorer: Successfully fetched data from Cloudbeds."
+    );
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Admin API Explorer Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+// --- END: NEW API EXPLORER PROXY ---
+
 app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   const results = [];
   const endpoints = [
