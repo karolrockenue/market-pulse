@@ -56,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "endpoint-test-results"
     );
     const hotelsTableBody = document.getElementById("hotels-table-body");
+    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
 
     const fetchLastRefreshTime = async () => {
       try {
@@ -87,11 +88,11 @@ document.addEventListener("DOMContentLoaded", () => {
         hotels.forEach((hotel) => {
           const row = document.createElement("tr");
           row.innerHTML = `
-                    <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
-                    <td class="px-4 py-3 font-medium text-gray-800">${hotel.property_name}</td>
-                    <td class="px-4 py-3 text-gray-600">${hotel.property_type}</td>
-                    <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
-                `;
+            <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
+            <td class="px-4 py-3 font-medium text-gray-800">${hotel.property_name}</td>
+            <td class="px-4 py-3 text-gray-600">${hotel.property_type}</td>
+            <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
+          `;
           hotelsTableBody.appendChild(row);
         });
       } catch (error) {
@@ -157,16 +158,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderTestResults(results) {
       let tableHTML = `
-            <table class="w-full text-sm border-collapse">
-                <thead>
-                    <tr class="border-b">
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-        `;
+        <table class="w-full text-sm border-collapse">
+            <thead>
+                <tr class="border-b">
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+      `;
       results.forEach((result) => {
         const statusClass = result.ok
           ? "bg-green-100 text-green-800"
@@ -174,16 +175,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const statusIcon = result.ok ? "✅" : "❌";
         const statusText = result.ok ? "OK" : "FAIL";
         tableHTML += `
-                <tr>
-                    <td class="px-4 py-3 font-medium text-gray-700">${result.name}</td>
-                    <td class="px-4 py-3">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">
-                            ${statusIcon} ${statusText}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td>
-                </tr>
-            `;
+            <tr>
+                <td class="px-4 py-3 font-medium text-gray-700">${result.name}</td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">
+                        ${statusIcon} ${statusText}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td>
+            </tr>
+        `;
       });
       tableHTML += `</tbody></table>`;
       endpointTestResultsEl.innerHTML = tableHTML;
@@ -208,42 +209,93 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    fetchLastRefreshTime();
-    fetchAndRenderHotels();
+    // --- NEW: FULL API DISCOVERY LOGIC ---
+    const runFullApiDiscovery = async () => {
+      const discoveryStatusEl = document.getElementById("discovery-status");
+      const discoveryResultsEl = document.getElementById("discovery-results");
 
-    // Add this inside the initializeAdminPanel function in admin.mjs
-    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
-    const discoveryStatusEl = document.getElementById("discovery-status");
-    const discoveryResultsEl = document.getElementById("discovery-results");
-
-    runApiDiscoveryBtn.addEventListener("click", async () => {
       runApiDiscoveryBtn.disabled = true;
       runApiDiscoveryBtn.textContent = "Discovering...";
-      discoveryStatusEl.textContent =
-        "Fetching data from Cloudbeds via the server...";
+      discoveryStatusEl.textContent = "Fetching master list of datasets...";
       discoveryResultsEl.innerHTML = "";
 
       try {
-        const response = await fetch("/api/admin/discover-properties");
-        const data = await response.json();
+        // 1. Get all datasets
+        const datasetsResponse = await fetch("/api/admin/datasets");
+        if (!datasetsResponse.ok)
+          throw new Error("Could not fetch master dataset list from server.");
+        const datasets = await datasetsResponse.json();
+        discoveryStatusEl.textContent = `Found ${datasets.length} datasets. Now fetching fields for each...`;
 
-        if (!response.ok) {
-          throw new Error(data.error || "An unknown error occurred.");
+        for (const dataset of datasets) {
+          const datasetContainer = document.createElement("div");
+          datasetContainer.className = "p-4 mb-4 border rounded-lg bg-gray-50";
+
+          const title = document.createElement("h3");
+          title.className = "text-lg font-bold text-gray-800";
+          title.textContent = `Dataset ${dataset.id}: ${dataset.name}`;
+          datasetContainer.appendChild(title);
+
+          const content = document.createElement("pre");
+          content.className =
+            "mt-2 text-xs bg-white p-3 rounded overflow-x-auto";
+          content.textContent = "Loading fields...";
+          datasetContainer.appendChild(content);
+
+          discoveryResultsEl.appendChild(datasetContainer);
+
+          // This try...catch ensures one failed dataset doesn't stop the whole process
+          try {
+            // 2. Check for multi-levels
+            const mlResponse = await fetch(
+              `/api/admin/datasets/${dataset.id}/multi-levels`
+            );
+            if (!mlResponse.ok)
+              throw new Error("Could not fetch multi-levels.");
+            const multiLevels = await mlResponse.json();
+
+            let allFields = {};
+
+            if (multiLevels && multiLevels.length > 0) {
+              // Logic for NESTED datasets
+              for (const ml of multiLevels) {
+                const fieldsResponse = await fetch(
+                  `/api/admin/datasets/${dataset.id}/fields?ml_id=${ml.id}`
+                );
+                if (!fieldsResponse.ok)
+                  throw new Error(
+                    `Could not fetch fields for multi-level: ${ml.name}`
+                  );
+                allFields[ml.name] = await fieldsResponse.json();
+              }
+            } else {
+              // Logic for FLAT datasets
+              const fieldsResponse = await fetch(
+                `/api/admin/datasets/${dataset.id}/fields`
+              );
+              if (!fieldsResponse.ok)
+                throw new Error("Could not fetch fields.");
+              allFields = await fieldsResponse.json();
+            }
+            content.textContent = JSON.stringify(allFields, null, 2);
+          } catch (error) {
+            content.textContent = `Error loading details for this dataset: ${error.message}`;
+            content.classList.add("text-red-600");
+          }
         }
-
-        // Display the raw JSON data in a <pre> tag for readability
-        const pre = document.createElement("pre");
-        pre.textContent = JSON.stringify(data, null, 2);
-        discoveryResultsEl.appendChild(pre);
-
-        discoveryStatusEl.textContent =
-          "✅ Discovery successful! Showing raw data for /me/properties below.";
+        discoveryStatusEl.textContent = "✅ Discovery Complete!";
       } catch (error) {
-        discoveryStatusEl.textContent = `❌ Error: ${error.message}`;
+        discoveryStatusEl.textContent = `❌ A critical error occurred: ${error.message}`;
       } finally {
         runApiDiscoveryBtn.disabled = false;
         runApiDiscoveryBtn.textContent = "Discover API Endpoints";
       }
-    });
+    };
+
+    runApiDiscoveryBtn.addEventListener("click", runFullApiDiscovery);
+
+    // Initial data loads
+    fetchLastRefreshTime();
+    fetchAndRenderHotels();
   }
 });
