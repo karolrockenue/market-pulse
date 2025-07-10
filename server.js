@@ -702,14 +702,14 @@ app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
   }
 });
 
-// New endpoint to get a single, real hotel record
+// This endpoint now uses the correct URL for getting hotel details
 app.get("/api/explore/sample-hotel", requireAdminApi, async (req, res) => {
   console.log("[server.js] Admin API Explorer: Fetching sample hotel...");
   try {
     const accessToken = await getCloudbedsAccessToken();
 
-    // This endpoint path is a guess. Please provide the correct one from the documentation.
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotel?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+    // This is the corrected URL from the documentation you provided.
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
 
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
@@ -720,8 +720,8 @@ app.get("/api/explore/sample-hotel", requireAdminApi, async (req, res) => {
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
 
-    // Hotel endpoints usually return a single object, not a list
-    res.status(200).json(data);
+    // getHotelDetails returns a single object under a 'data' property
+    res.status(200).json(data.data);
   } catch (error) {
     console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
