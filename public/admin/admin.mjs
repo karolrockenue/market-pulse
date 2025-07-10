@@ -210,5 +210,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
     fetchLastRefreshTime();
     fetchAndRenderHotels();
+
+    // Add this inside the initializeAdminPanel function in admin.mjs
+    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
+    const discoveryStatusEl = document.getElementById("discovery-status");
+    const discoveryResultsEl = document.getElementById("discovery-results");
+
+    runApiDiscoveryBtn.addEventListener("click", async () => {
+      runApiDiscoveryBtn.disabled = true;
+      runApiDiscoveryBtn.textContent = "Discovering...";
+      discoveryStatusEl.textContent =
+        "Fetching data from Cloudbeds via the server...";
+      discoveryResultsEl.innerHTML = "";
+
+      try {
+        const response = await fetch("/api/admin/discover-properties");
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "An unknown error occurred.");
+        }
+
+        // Display the raw JSON data in a <pre> tag for readability
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(data, null, 2);
+        discoveryResultsEl.appendChild(pre);
+
+        discoveryStatusEl.textContent =
+          "✅ Discovery successful! Showing raw data for /me/properties below.";
+      } catch (error) {
+        discoveryStatusEl.textContent = `❌ Error: ${error.message}`;
+      } finally {
+        runApiDiscoveryBtn.disabled = false;
+        runApiDiscoveryBtn.textContent = "Discover API Endpoints";
+      }
+    });
   }
 });

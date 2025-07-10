@@ -341,6 +341,93 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
 });
 
 // --- DASHBOARD AND ADMIN APIs ---
+
+// --- START: NEW API EXPLORER ENDPOINT ---
+// NOTE: This section was added to enable the API Explorer feature in the admin panel.
+async function getCloudbedsAccessToken(refreshToken) {
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    refresh_token: refreshToken,
+  });
+  const response = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    { method: "POST", body: params }
+  );
+  const tokenData = await response.json();
+  return tokenData.access_token || null;
+}
+
+app.get("/api/admin/discover-properties", requireApiLogin, async (req, res) => {
+  // Ensure this is an admin-only function
+  if (req.session.userId !== "admin") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    // For an admin tool, we must "borrow" the token of an active user.
+    // Fetch the first active user and their property to make the test call.
+    const userResult = await pgPool.query(
+      `SELECT refresh_token, cloudbeds_user_id FROM users WHERE status = 'active' AND refresh_token IS NOT NULL LIMIT 1`
+    );
+
+    if (userResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({
+          error:
+            "No active users with a refresh token found to perform API discovery.",
+        });
+    }
+    const user = userResult.rows[0];
+
+    const propertyResult = await pgPool.query(
+      `SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1`,
+      [user.cloudbeds_user_id]
+    );
+
+    if (propertyResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No properties found for the test user." });
+    }
+    const propertyId = propertyResult.rows[0].property_id;
+
+    // 1. Get a fresh access token using the user's refresh token
+    const accessToken = await getCloudbedsAccessToken(user.refresh_token);
+    if (!accessToken) {
+      return res
+        .status(500)
+        .json({ error: "Failed to get a Cloudbeds access token." });
+    }
+
+    // 2. Call the Cloudbeds API
+    const response = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "X-PROPERTY-ID": propertyId,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Cloudbeds API error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Error in /api/admin/discover-properties:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+// --- END: NEW API EXPLORER ENDPOINT ---
+
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
     const { propertyId } = req.query;
