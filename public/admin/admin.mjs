@@ -1,4 +1,3 @@
-// admin.mjs (Corrected with new /api/admin/ paths)
 import { DATASET_7_MAP } from "../constants.mjs";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -8,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("login-btn");
   const loginError = document.getElementById("login-error");
 
+  // Check if user is already logged in from a previous session
   if (sessionStorage.getItem("isAdminAuthenticated") === "true") {
     showAdminContent();
   }
@@ -56,11 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
       "endpoint-test-results"
     );
     const hotelsTableBody = document.getElementById("hotels-table-body");
-    const runApiDiscoveryBtn = document.getElementById("run-api-discovery");
 
     const fetchLastRefreshTime = async () => {
       try {
-        // CORRECTED PATH
         const response = await fetch("/api/last-refresh-time");
         if (!response.ok) throw new Error("Not found");
         const data = await response.json();
@@ -76,29 +74,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const fetchAndRenderHotels = async () => {
       try {
-        // CORRECTED PATH
-        const response = await fetch("/api/admin/get-all-hotels");
+        const response = await fetch("/api/get-all-hotels");
         if (!response.ok) throw new Error("Failed to fetch hotels.");
         const hotels = await response.json();
 
-        hotelsTableBody.innerHTML = "";
+        hotelsTableBody.innerHTML = ""; // Clear existing rows
         if (hotels.length === 0) {
-          hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No hotels found.</td></tr>`;
+          hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No hotels found in the database.</td></tr>`;
           return;
         }
 
         hotels.forEach((hotel) => {
           const row = document.createElement("tr");
           row.innerHTML = `
-            <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
-            <td class="px-4 py-3 font-medium text-gray-800">${
-              hotel.property_name
-            }</td>
-            <td class="px-4 py-3 text-gray-600">${
-              hotel.property_type || "N/A"
-            }</td>
-            <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
-          `;
+                    <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
+                    <td class="px-4 py-3 font-medium text-gray-800">${hotel.property_name}</td>
+                    <td class="px-4 py-3 text-gray-600">${hotel.property_type}</td>
+                    <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
+                `;
           hotelsTableBody.appendChild(row);
         });
       } catch (error) {
@@ -132,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const response = await fetch(url);
         if (response.ok) {
           alert("Job completed successfully!");
-          fetchLastRefreshTime();
+          fetchLastRefreshTime(); // Refresh the timestamp
         } else {
           const data = await response.json();
           alert(`Job failed: ${data.error || "Unknown error"}`);
@@ -148,14 +141,14 @@ document.addEventListener("DOMContentLoaded", () => {
     runEndpointTestsBtn.addEventListener("click", async () => {
       runEndpointTestsBtn.disabled = true;
       runEndpointTestsBtn.textContent = "Testing...";
-      endpointTestResultsEl.innerHTML = `<div class="text-center p-4 text-gray-500">Running tests...</div>`;
+      endpointTestResultsEl.innerHTML = `<div class="text-center p-4 text-gray-500">Running tests, please wait...</div>`;
+
       try {
-        // CORRECTED PATH
-        const response = await fetch("/api/admin/run-endpoint-tests");
+        const response = await fetch("/api/run-endpoint-tests");
         const results = await response.json();
         renderTestResults(results);
       } catch (error) {
-        endpointTestResultsEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg">Error: ${error.message}</div>`;
+        endpointTestResultsEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-lg"><strong>Error:</strong> Could not run the test suite. ${error.message}</div>`;
       } finally {
         runEndpointTestsBtn.disabled = false;
         runEndpointTestsBtn.textContent = "Run Endpoint Tests";
@@ -163,17 +156,44 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function renderTestResults(results) {
-      // ... (this function does not need changes)
+      let tableHTML = `
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr class="border-b">
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Endpoint Name</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+        `;
+      results.forEach((result) => {
+        const statusClass = result.ok
+          ? "bg-green-100 text-green-800"
+          : "bg-red-100 text-red-800";
+        const statusIcon = result.ok ? "✅" : "❌";
+        const statusText = result.ok ? "OK" : "FAIL";
+        tableHTML += `
+                <tr>
+                    <td class="px-4 py-3 font-medium text-gray-700">${result.name}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">
+                            ${statusIcon} ${statusText}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 font-mono">${result.status} - ${result.statusText}</td>
+                </tr>
+            `;
+      });
+      tableHTML += `</tbody></table>`;
+      endpointTestResultsEl.innerHTML = tableHTML;
     }
 
-    // --- Button Event Listeners with CORRECTED PATHS ---
     testCloudbedsBtn.addEventListener("click", () =>
-      // This route does not exist in admin-routes, so it won't work yet.
-      // For now, let's just point it to a valid admin route for testing connection.
-      testConnection("/api/admin/datasets", cloudbedsStatusEl)
+      testConnection("/api/test-cloudbeds", cloudbedsStatusEl)
     );
     testDbBtn.addEventListener("click", () =>
-      testConnection("/api/admin/test-database", dbStatusEl)
+      testConnection("/api/test-database", dbStatusEl)
     );
     runDailyRefreshBtn.addEventListener("click", () =>
       runJob("/api/daily-refresh", runDailyRefreshBtn)
@@ -181,22 +201,13 @@ document.addEventListener("DOMContentLoaded", () => {
     runInitialSyncBtn.addEventListener("click", () => {
       if (
         confirm(
-          "Are you sure you want to run a full data sync? This will overwrite existing data."
+          "Are you sure you want to run a full data sync? This can take several minutes and will overwrite existing data."
         )
       ) {
         runJob("/api/initial-sync", runInitialSyncBtn);
       }
     });
 
-    const runFullApiDiscovery = async () => {
-      // ... (this logic is already correct)
-    };
-
-    if (runApiDiscoveryBtn) {
-      runApiDiscoveryBtn.addEventListener("click", runFullApiDiscovery);
-    }
-
-    // Initial data loads
     fetchLastRefreshTime();
     fetchAndRenderHotels();
   }

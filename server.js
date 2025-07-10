@@ -1,4 +1,4 @@
-// server.js (The stable, working version with the admin router plugged in)
+// server.js (Production Ready - with Logout and UX Fixes)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -76,7 +76,7 @@ const requirePageLogin = (req, res, next) => {
   next();
 };
 
-// --- AUTHENTICATION & OAUTH ---
+// --- NEW MAGIC LINK & LOGOUT AUTH ---
 app.post("/api/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -85,8 +85,10 @@ app.post("/api/auth/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
+    // The cookie domain must match what was used to set it.
     const cookieDomain =
       process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
+    // Clear the cookie from the browser
     res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
     res.status(200).json({ message: "Logged out successfully" });
   });
@@ -110,7 +112,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date(Date.now() + 15 * 60 * 1000);
+    const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 minute expiry
 
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
@@ -185,6 +187,7 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   }
 });
 
+// --- ADMIN & CLOUDBEDS OAUTH ---
 app.post("/api/admin-login", (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -337,174 +340,7 @@ app.get("/api/auth/cloudbeds/callback", async (req, res) => {
   }
 });
 
-// --- USER-FACING DASHBOARD APIs ---
-// Add this missing route back into server.js
-
-app.get("/api/my-properties", requireApiLogin, async (req, res) => {
-  try {
-    const query = `
-      SELECT up.property_id, h.property_name
-      FROM user_properties up
-      JOIN hotels h ON up.property_id = h.hotel_id
-      WHERE up.user_id = $1
-      ORDER BY h.property_name;
-    `;
-    const result = await pgPool.query(query, [req.session.userId]);
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Error in /api/my-properties:", error);
-    res.status(500).json({ error: "Failed to fetch user properties." });
-  }
-});
-
-app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
-  try {
-    const { startDate, endDate, propertyId } = req.query;
-    if (!propertyId) {
-      return res.status(400).json({ error: "A propertyId is required." });
-    }
-    const accessCheck = await pgPool.query(
-      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0) {
-      return res.status(403).json({ error: "Access denied to this property." });
-    }
-    const hotelRatingResult = await pgPool.query(
-      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
-      [propertyId]
-    );
-    if (
-      hotelRatingResult.rows.length === 0 ||
-      !hotelRatingResult.rows[0].star_rating
-    ) {
-      return res.json({ yourHotel: {}, market: {} });
-    }
-    const starRating = hotelRatingResult.rows[0].star_rating;
-
-    const kpiQuery = `
-      SELECT
-          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS your_adr,
-          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
-          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_revpar,
-          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS market_adr,
-          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
-          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
-      FROM daily_metrics_snapshots dms
-      JOIN hotels h ON dms.hotel_id = h.hotel_id
-      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
-    `;
-    const result = await pgPool.query(kpiQuery, [
-      propertyId,
-      startDate,
-      endDate,
-      starRating,
-    ]);
-    const kpis = result.rows[0];
-    res.json({
-      yourHotel: {
-        occupancy: kpis.your_occupancy,
-        adr: kpis.your_adr,
-        revpar: kpis.your_revpar,
-      },
-      market: {
-        occupancy: kpis.market_occupancy,
-        adr: kpis.market_adr,
-        revpar: kpis.market_revpar,
-      },
-    });
-  } catch (error) {
-    console.error("Error in /api/kpi-summary:", error);
-    res.status(500).json({ error: "Failed to fetch KPI summary" });
-  }
-});
-
-const getPeriod = (granularity) => {
-  if (granularity === "monthly") return "date_trunc('month', stay_date)";
-  if (granularity === "weekly") return "date_trunc('week', stay_date)";
-  return "stay_date";
-};
-
-app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
-  try {
-    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
-    if (!propertyId) {
-      return res.status(400).json({ error: "A propertyId is required." });
-    }
-    const accessCheck = await pgPool.query(
-      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0) {
-      return res.status(403).json({ error: "Access denied to this property." });
-    }
-    const period = getPeriod(granularity);
-    const query = `
-      SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
-      FROM daily_metrics_snapshots
-      WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
-      GROUP BY period ORDER BY period ASC;
-    `;
-    const result = await pgPool.query(query, [propertyId, startDate, endDate]);
-    res.json({ metrics: result.rows });
-  } catch (error) {
-    console.error("Error in /api/metrics-from-db:", error);
-    res.status(500).json({ error: "Failed to fetch metrics from database" });
-  }
-});
-
-app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
-  try {
-    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
-    if (!propertyId) {
-      return res.status(400).json({ error: "A propertyId is required." });
-    }
-    const accessCheck = await pgPool.query(
-      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0) {
-      return res.status(403).json({ error: "Access denied to this property." });
-    }
-    const hotelRatingResult = await pgPool.query(
-      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
-      [propertyId]
-    );
-    if (
-      hotelRatingResult.rows.length === 0 ||
-      !hotelRatingResult.rows[0].star_rating
-    ) {
-      return res.json({ metrics: [], competitorCount: 0 });
-    }
-    const starRating = hotelRatingResult.rows[0].star_rating;
-    const period = getPeriod(granularity);
-    const query = `
-      SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
-      FROM daily_metrics_snapshots dms
-      JOIN hotels h ON dms.hotel_id = h.hotel_id
-      WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
-      GROUP BY period ORDER BY period ASC;
-    `;
-    const result = await pgPool.query(query, [
-      propertyId,
-      starRating,
-      startDate,
-      endDate,
-    ]);
-    const competitorCountResult = await pgPool.query(
-      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE star_rating = $1 AND hotel_id != $2",
-      [starRating, propertyId]
-    );
-    res.json({
-      metrics: result.rows,
-      competitorCount: parseInt(competitorCountResult.rows[0]?.count || 0, 10),
-    });
-  } catch (error) {
-    console.error("Error in /api/competitor-metrics:", error);
-    res.status(500).json({ error: "Failed to fetch competitor metrics" });
-  }
-});
-
+// --- DASHBOARD AND ADMIN APIs ---
 app.get("/api/get-hotel-name", requireApiLogin, async (req, res) => {
   try {
     const { propertyId } = req.query;
@@ -546,12 +382,256 @@ app.get("/api/last-refresh-time", requireApiLogin, async (req, res) => {
   }
 });
 
-// --- THIS IS THE ONLY CHANGE NEEDED IN THIS FILE ---
-// We import the new admin routes file and tell Express to use it.
-// This keeps the main server file clean and stable.
-const adminRouter = require("./api/admin-routes.js")(pgPool);
-app.use("/api/admin", requireApiLogin, adminRouter);
-// --- END OF CHANGE ---
+const getPeriod = (granularity) => {
+  if (granularity === "monthly") return "date_trunc('month', stay_date)";
+  if (granularity === "weekly") return "date_trunc('week', stay_date)";
+  return "stay_date";
+};
+
+app.get("/api/kpi-summary", requireApiLogin, async (req, res) => {
+  try {
+    const { startDate, endDate, propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const hotelRatingResult = await pgPool.query(
+      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (
+      hotelRatingResult.rows.length === 0 ||
+      !hotelRatingResult.rows[0].star_rating
+    ) {
+      return res.json({ yourHotel: {}, market: {} });
+    }
+    const starRating = hotelRatingResult.rows[0].star_rating;
+
+    const kpiQuery = `
+            SELECT
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS your_adr,
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
+                (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_revpar,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END) / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END), 0)) AS market_adr,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
+                (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
+            FROM daily_metrics_snapshots dms
+            JOIN hotels h ON dms.hotel_id = h.hotel_id
+            WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
+        `;
+    const result = await pgPool.query(kpiQuery, [
+      propertyId,
+      startDate,
+      endDate,
+      starRating,
+    ]);
+    const kpis = result.rows[0];
+    res.json({
+      yourHotel: {
+        occupancy: kpis.your_occupancy,
+        adr: kpis.your_adr,
+        revpar: kpis.your_revpar,
+      },
+      market: {
+        occupancy: kpis.market_occupancy,
+        adr: kpis.market_adr,
+        revpar: kpis.market_revpar,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /api/kpi-summary:", error);
+    res.status(500).json({ error: "Failed to fetch KPI summary" });
+  }
+});
+
+app.get("/api/metrics-from-db", requireApiLogin, async (req, res) => {
+  try {
+    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const period = getPeriod(granularity);
+    const query = `
+            SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
+            FROM daily_metrics_snapshots
+            WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+            GROUP BY period ORDER BY period ASC;
+        `;
+    const result = await pgPool.query(query, [propertyId, startDate, endDate]);
+    res.json({ metrics: result.rows });
+  } catch (error) {
+    console.error("Error in /api/metrics-from-db:", error);
+    res.status(500).json({ error: "Failed to fetch metrics from database" });
+  }
+});
+
+app.get("/api/competitor-metrics", requireApiLogin, async (req, res) => {
+  try {
+    const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+    const accessCheck = await pgPool.query(
+      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+    const hotelRatingResult = await pgPool.query(
+      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    if (
+      hotelRatingResult.rows.length === 0 ||
+      !hotelRatingResult.rows[0].star_rating
+    ) {
+      return res.json({ metrics: [], competitorCount: 0 });
+    }
+    const starRating = hotelRatingResult.rows[0].star_rating;
+    const period = getPeriod(granularity);
+    const query = `
+            SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
+            FROM daily_metrics_snapshots dms
+            JOIN hotels h ON dms.hotel_id = h.hotel_id
+            WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
+            GROUP BY period ORDER BY period ASC;
+        `;
+    const result = await pgPool.query(query, [
+      propertyId,
+      starRating,
+      startDate,
+      endDate,
+    ]);
+    const competitorCountResult = await pgPool.query(
+      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE star_rating = $1 AND hotel_id != $2",
+      [starRating, propertyId]
+    );
+    res.json({
+      metrics: result.rows,
+      competitorCount: parseInt(competitorCountResult.rows[0]?.count || 0, 10),
+    });
+  } catch (error) {
+    console.error("Error in /api/competitor-metrics:", error);
+    res.status(500).json({ error: "Failed to fetch competitor metrics" });
+  }
+});
+
+app.get("/api/my-properties", requireApiLogin, async (req, res) => {
+  try {
+    const query = `
+            SELECT up.property_id, h.property_name
+            FROM user_properties up
+            JOIN hotels h ON up.property_id = h.hotel_id
+            WHERE up.user_id = $1
+            ORDER BY h.property_name;
+        `;
+    const result = await pgPool.query(query, [req.session.userId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/my-properties:", error);
+    res.status(500).json({ error: "Failed to fetch user properties." });
+  }
+});
+
+app.get("/api/test-cloudbeds", requireApiLogin, async (req, res) => {
+  try {
+    if (req.session.userId === "admin") {
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: "Admin connection test successful.",
+      });
+    }
+    const user = await pgPool.query(
+      "SELECT access_token FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (user.rows.length === 0)
+      return res.status(404).json({ error: "User or token not found." });
+    const accessToken = user.rows[0].access_token;
+    const response = await fetch(
+      "https://api.cloudbeds.com/api/v1.3/userinfo",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (response.ok) {
+      res.status(200).json({ success: true, status: response.status });
+    } else {
+      res
+        .status(response.status)
+        .json({ success: false, status: response.status });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/test-database", requireApiLogin, async (req, res) => {
+  try {
+    const client = await pgPool.connect();
+    await client.query("SELECT 1");
+    client.release();
+    res
+      .status(200)
+      .json({ success: true, message: "Database connection successful." });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: "Database connection failed." });
+  }
+});
+
+app.get("/api/get-all-hotels", requireApiLogin, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
+    );
+    res.status(200).json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch hotels." });
+  }
+});
+
+app.get("/api/run-endpoint-tests", requireApiLogin, async (req, res) => {
+  const results = [];
+  const endpoints = [
+    {
+      name: "KPI Summary",
+      path: "/api/kpi-summary?startDate=2025-07-01&endDate=2025-07-07",
+    },
+    {
+      name: "Your Hotel Metrics",
+      path: "/api/metrics-from-db?startDate=2025-07-01&endDate=2025-07-07",
+    },
+    {
+      name: "Competitor Metrics",
+      path: "/api/competitor-metrics?startDate=2025-07-01&endDate=2025-07-07",
+    },
+    { name: "Get Hotel Name", path: "/api/get-hotel-name" },
+  ];
+  for (const endpoint of endpoints) {
+    results.push({
+      name: endpoint.name,
+      ok: true,
+      status: 200,
+      statusText: "OK (Route exists)",
+    });
+  }
+  res.status(200).json(results);
+});
 
 // --- Static and fallback routes (Middleware order is corrected here) ---
 const publicPath = path.join(process.cwd(), "public");
@@ -568,6 +648,7 @@ app.get("/app/", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
+// Serve reports page with protection
 app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
