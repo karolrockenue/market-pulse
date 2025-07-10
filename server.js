@@ -616,6 +616,65 @@ app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   }
   res.status(200).json(results);
 });
+// ADD THIS NEW ENDPOINT
+app.get("/api/get-all-datasets", requireAdminApi, async (req, res) => {
+  console.log(
+    `[server.js] /api/get-all-datasets invoked at: ${new Date().toISOString()}`
+  );
+  try {
+    // Re-using the same auth logic from our previous attempt
+    const {
+      CLOUDBEDS_CLIENT_ID,
+      CLOUDBEDS_CLIENT_SECRET,
+      CLOUDBEDS_REFRESH_TOKEN,
+    } = process.env;
+
+    const params = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: CLOUDBEDS_CLIENT_ID,
+      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      refresh_token: CLOUDBEDS_REFRESH_TOKEN,
+    });
+
+    const tokenResponse = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      { method: "POST", body: params }
+    );
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.access_token) {
+      throw new Error("Failed to authenticate with Cloudbeds.");
+    }
+
+    const accessToken = tokenData.access_token;
+    const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
+
+    console.log(`[server.js] Calling Cloudbeds API: ${targetUrl}`);
+
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+      },
+    });
+
+    if (!cloudbedsApiResponse.ok) {
+      const errorBody = await cloudbedsApiResponse.text();
+      return res.status(cloudbedsApiResponse.status).json({
+        success: false,
+        error: "Failed to fetch from Cloudbeds API.",
+        details: errorBody,
+      });
+    }
+
+    const data = await cloudbedsApiResponse.json();
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error("[server.js] Error in /api/get-all-datasets:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // --- Static and fallback routes (Middleware order is corrected here) ---
 const publicPath = path.join(process.cwd(), "public");
