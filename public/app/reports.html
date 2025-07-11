@@ -7,10 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700;800&display=swap"
       rel="stylesheet"
     />
+
     <style>
       :root {
         --bg-primary: #f7f8fc;
@@ -18,7 +20,7 @@
         --text-primary: #1e293b;
         --text-secondary: #64748b;
         --border-color: #e2e8f0;
-        --accent-primary: #60a5fa; /* Tailwind blue-400 - This color is fixed for UI elements */
+        --accent-primary: #60a5fa; /* Tailwind blue-400 */
         --highlight-color: #eff6ff; /* Tailwind blue-50 */
         --font-sans: "Inter", sans-serif;
         --font-data: "Manrope", sans-serif;
@@ -50,48 +52,44 @@
         color: white;
         border-color: var(--accent-primary);
       }
-      .tooltip-container {
-        position: relative;
-        display: inline-flex;
+      .date-picker {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+      }
+      .report-option-card h4 {
+        display: flex;
         align-items: center;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 1.5rem;
       }
-      .tooltip-container .tooltip-text {
-        visibility: hidden;
-        width: 240px;
-        background-color: #1e293b;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 8px;
-        position: absolute;
-        z-index: 1;
-        bottom: 150%;
-        left: 50%;
-        margin-left: -120px;
-        opacity: 0;
-        transition: opacity 0.3s;
-        font-size: 12px;
-        font-weight: 500;
+      .report-option-card h4 svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-right: 0.75rem;
+        color: var(--accent-primary);
       }
-      .tooltip-container .tooltip-text::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #1e293b transparent transparent transparent;
+      details summary {
+        list-style: none;
       }
-      .tooltip-container:hover .tooltip-text {
-        visibility: visible;
-        opacity: 1;
+      details summary::-webkit-details-marker {
+        display: none;
+      }
+      details summary .chevron {
+        transition: transform 0.2s;
+      }
+      details[open] summary .chevron {
+        transform: rotate(90deg);
       }
     </style>
   </head>
   <body class="antialiased">
-    <div class="flex min-h-screen">
-      <aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r">
+    <div class="flex flex-col lg:flex-row min-h-screen">
+      <aside
+        class="w-full lg:w-64 lg:flex-shrink-0 flex flex-col bg-white border-r"
+      >
         <div class="h-16 flex items-center px-6 border-b">
           <svg
             class="h-8 w-auto text-blue-500"
@@ -150,14 +148,14 @@
             Reports
           </a>
           <a
+            id="admin-nav-link"
             href="/admin/"
             class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
+            style="display: none"
           >
             <svg
               class="h-5 w-5 mr-3"
               xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -165,11 +163,7 @@
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <path
-                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-              ></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
             </svg>
             Admin Panel
           </a>
@@ -177,21 +171,22 @@
       </aside>
 
       <div class="flex-1 flex flex-col">
-        <header class="bg-white h-16 flex items-center justify-between px-8">
+        <header
+          class="bg-white h-16 flex items-center justify-between px-8 border-b sticky top-0 z-20"
+        >
           <h1 class="text-xl font-semibold text-gray-800">
             Advanced Reporting
           </h1>
         </header>
 
-        <main class="flex-1 p-8 space-y-6">
-          <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-              <div class="flex items-center space-x-2">
+        <main class="flex-1 p-8">
+          <div
+            class="bg-white p-4 rounded-xl border border-gray-200 mb-8 flex flex-col gap-4"
+          >
+            <div class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-2">
                 <svg
                   class="h-5 w-5 text-gray-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -204,259 +199,766 @@
                   <line x1="8" y1="2" x2="8" y2="6"></line>
                   <line x1="3" y1="10" x2="21" y2="10"></line>
                 </svg>
-                <label class="text-sm font-medium text-gray-700"
-                  >Date Range</label
+                <span class="font-semibold text-gray-600 text-sm"
+                  >Date Range</span
                 >
               </div>
-              <div class="flex items-center space-x-2">
+              <div class="flex items-center gap-3 ml-auto">
                 <input
                   type="date"
                   id="start-date"
-                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
                 />
-                <span class="text-gray-500">-</span>
+                <span class="text-gray-400">-</span>
                 <input
                   type="date"
                   id="end-date"
-                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
                 />
               </div>
             </div>
-            <hr class="border-dashed" />
-            <div class="flex flex-wrap items-center justify-between gap-4">
-              <div class="flex items-center space-x-4">
-                <label class="text-xs font-bold text-gray-400 uppercase"
-                  >Display</label
+            <div
+              id="control-buttons-wrapper"
+              class="flex flex-wrap items-center gap-4 border-t border-dashed pt-4 mt-2"
+            >
+              <div id="granularity-group" class="flex items-center gap-2">
+                <span class="text-xs font-bold text-gray-400 uppercase mr-2"
+                  >Display:</span
                 >
-                <div id="granularity-group" class="flex items-center space-x-2">
-                  <button data-granularity="daily" class="control-btn active">
-                    Daily
-                  </button>
-                  <button data-granularity="weekly" class="control-btn">
-                    Weekly
-                  </button>
-                  <button data-granularity="monthly" class="control-btn">
-                    Monthly
-                  </button>
-                </div>
+                <button class="control-btn active" data-granularity="daily">
+                  Daily
+                </button>
+                <button class="control-btn" data-granularity="weekly">
+                  Weekly
+                </button>
+                <button class="control-btn" data-granularity="monthly">
+                  Monthly
+                </button>
               </div>
-              <div class="flex items-center space-x-4">
-                <label class="text-xs font-bold text-gray-400 uppercase"
-                  >Presets</label
+              <div class="flex items-center gap-2 ml-auto">
+                <span class="text-xs font-bold text-gray-400 uppercase mr-2"
+                  >Presets:</span
                 >
-                <div class="flex items-center space-x-2">
-                  <button
-                    data-preset="current-month"
-                    class="control-btn active"
-                  >
-                    Current Month
-                  </button>
-                  <button data-preset="next-month" class="control-btn">
-                    Next Month
-                  </button>
-                  <button data-preset="this-year" class="control-btn">
-                    This Year
-                  </button>
-                </div>
+                <button class="control-btn" data-preset="last-week">
+                  Last Week
+                </button>
+                <button class="control-btn" data-preset="current-week">
+                  Current Week
+                </button>
+                <button class="control-btn" data-preset="current-month">
+                  Current Month
+                </button>
+                <button class="control-btn" data-preset="next-month">
+                  Next Month
+                </button>
+                <button class="control-btn" data-preset="this-year">
+                  This Year
+                </button>
               </div>
             </div>
           </div>
 
-          <div class="bg-white p-4 rounded-xl border border-gray-200">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-gray-800">Options</h3>
-              <div class="flex items-center space-x-6">
-                <label class="flex items-center">
-                  <input
-                    id="display-totals-checkbox"
-                    type="checkbox"
-                    checked
-                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  /><span class="ml-3 text-sm text-gray-600"
-                    >Display <strong>Totals</strong></span
-                  ></label
+          <div
+            id="report-options-container"
+            class="bg-white p-6 rounded-xl border border-gray-200"
+          >
+            <details open>
+              <summary class="flex justify-between items-center cursor-pointer">
+                <h2 class="text-lg font-semibold text-gray-900">
+                  Report Options
+                </h2>
+                <svg
+                  class="h-5 w-5 text-gray-500 chevron"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
                 >
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-white rounded-xl border border-gray-200">
-            <div class="grid grid-cols-1 md:grid-cols-2">
-              <div class="p-6">
-                <h3 class="font-semibold text-gray-800 mb-2">Hotel Metrics</h3>
-                <p class="text-sm text-gray-500 mb-6">
-                  Select the core metrics for your property.
-                </p>
-                <div class="grid grid-cols-2 gap-x-6">
-                  <div class="space-y-4">
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        checked
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >Occupancy</span
-                      ></label
-                    >
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        checked
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >ADR</span
-                      ></label
-                    >
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >RevPAR</span
-                      ></label
-                    >
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        checked
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >Total Revenue</span
-                      ></label
-                    >
-                  </div>
-                  <div class="space-y-4">
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        checked
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >Rooms Sold</span
-                      ></label
-                    >
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >Rooms Unsold</span
-                      ></label
-                    >
-                    <label class="flex items-center"
-                      ><input
-                        type="checkbox"
-                        checked
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      /><span class="ml-3 text-sm text-gray-600"
-                        >Total Rooms</span
-                      ></label
-                    >
-                  </div>
-                </div>
-              </div>
-
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </summary>
               <div
-                class="p-6 border-t md:border-t-0 md:border-l border-gray-200 flex flex-col"
+                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 mt-6 border-t pt-6"
               >
-                <div>
-                  <h3 class="font-semibold text-gray-800 mb-2">
-                    Market Metrics
-                  </h3>
-                  <p class="text-sm text-gray-500 mb-6">
-                    Select market data to compare against.
-                  </p>
-                  <div class="grid grid-cols-2 gap-x-6">
-                    <div class="space-y-4">
-                      <label class="flex items-center"
-                        ><input
-                          type="checkbox"
-                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        /><span class="ml-3 text-sm text-gray-600"
-                          >Market Occupancy</span
-                        ></label
-                      >
-                      <label class="flex items-center"
-                        ><input
-                          type="checkbox"
-                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        /><span class="ml-3 text-sm text-gray-600"
-                          >Market ADR</span
-                        ></label
-                      >
+                <div class="lg:col-span-1">
+                  <h4
+                    class="flex items-center font-semibold text-slate-800 border-b pb-3 mb-4"
+                  >
+                    <svg
+                      class="h-6 w-6 mr-2 text-blue-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Select Metrics
+                  </h4>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                    <div>
+                      <h5 class="text-sm font-semibold text-gray-600 mb-3">
+                        Hotel Metrics
+                      </h5>
+                      <div class="space-y-3">
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >Occupancy</span
+                          ></label
+                        >
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >ADR</span
+                          ></label
+                        >
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >RevPAR</span
+                          ></label
+                        >
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >Total Revenue</span
+                          ></label
+                        >
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >Rooms Sold</span
+                          ></label
+                        >
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >Rooms Unsold</span
+                          ></label
+                        >
+                      </div>
                     </div>
-                    <div class="space-y-4">
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span class="ml-3 text-sm text-gray-600"
-                          >Market Revenue (Adjusted for Size)</span
+                    <div>
+                      <h5 class="text-sm font-semibold text-gray-600 mb-3">
+                        Market Metrics
+                      </h5>
+                      <div class="space-y-3">
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >Market Occupancy</span
+                          ></label
                         >
-                        <div class="tooltip-container">
-                          <svg
-                            class="h-4 w-4 ml-1.5 text-gray-400 cursor-pointer"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fill-rule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
-                              clip-rule="evenodd"
-                            />
-                          </svg>
-                          <span class="tooltip-text"
-                            >This metric calculates the market's total revenue,
-                            normalized to match your hotel's room capacity. It
-                            estimates what the market's revenue would be if it
-                            were the same size as your hotel.</span
-                          >
-                        </div>
-                      </label>
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span class="ml-3 text-sm text-gray-600"
-                          >Market RevPAR (Adjusted for Size)</span
+                        <label class="flex items-center"
+                          ><input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-sm text-gray-700"
+                            >Market ADR</span
+                          ></label
                         >
-                        <div class="tooltip-container">
-                          <svg
-                            class="h-4 w-4 ml-1.5 text-gray-400 cursor-pointer"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fill-rule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
-                              clip-rule="evenodd"
-                            />
-                          </svg>
-                          <span class="tooltip-text"
-                            >This metric calculates the market's RevPAR,
-                            normalized to match your hotel's room capacity,
-                            providing a more accurate 'like-for-like'
-                            comparison.</span
-                          >
-                        </div>
-                      </label>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div class="mt-auto pt-6 text-right">
-                  <button id="generate-report-btn" class="control-btn active">
-                    Generate Report
-                  </button>
+
+                <div class="space-y-6">
+                  <h4
+                    class="flex items-center font-semibold text-slate-800 border-b pb-3 mb-4"
+                  >
+                    <svg
+                      class="h-6 w-6 mr-2 text-blue-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"
+                      />
+                    </svg>
+                    Formatting & Comparisons
+                  </h4>
+                  <label
+                    for="display-totals-checkbox"
+                    class="flex items-center justify-between cursor-pointer"
+                    ><span class="font-medium text-gray-800 text-sm"
+                      >Display Totals Row</span
+                    ><input
+                      type="checkbox"
+                      id="display-totals-checkbox"
+                      checked
+                      class="sr-only peer" />
+                    <div
+                      class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
+                    ></div
+                  ></label>
+                  <label
+                    for="include-taxes-toggle"
+                    class="flex items-center justify-between cursor-pointer"
+                    ><span class="font-medium text-gray-800 text-sm"
+                      >Show Tax-Inclusive Values</span
+                    ><input
+                      type="checkbox"
+                      id="include-taxes-toggle"
+                      class="sr-only peer" />
+                    <div
+                      class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
+                    ></div
+                  ></label>
+                  <div class="pt-6 border-t">
+                    <label
+                      for="add-comparisons-toggle"
+                      class="flex items-center justify-between cursor-pointer"
+                      ><span class="font-medium text-gray-800 text-sm"
+                        >Add Market Comparisons</span
+                      ><input
+                        type="checkbox"
+                        id="add-comparisons-toggle"
+                        class="sr-only peer" />
+                      <div
+                        class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
+                      ></div
+                    ></label>
+                    <fieldset
+                      id="comparison-display-options"
+                      class="mt-4 disabled:opacity-50 transition"
+                      disabled
+                    >
+                      <legend class="text-xs text-gray-500 mb-2">
+                        Display Order
+                      </legend>
+                      <div class="flex items-center gap-4">
+                        <label class="flex items-center text-sm"
+                          ><input
+                            type="radio"
+                            name="comparison-order"
+                            value="metric"
+                            checked
+                            class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-gray-600"
+                            >Group by Metric</span
+                          ></label
+                        >
+                        <label class="flex items-center text-sm"
+                          ><input
+                            type="radio"
+                            name="comparison-order"
+                            value="source"
+                            class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                          /><span class="ml-2 text-gray-600"
+                            >Group by Source</span
+                          ></label
+                        >
+                      </div>
+                    </fieldset>
+                  </div>
+                </div>
+
+                <div class="space-y-4">
+                  <h4
+                    class="flex items-center font-semibold text-slate-800 border-b pb-3 mb-4"
+                  >
+                    <svg
+                      class="h-6 w-6 mr-2 text-blue-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      />
+                    </svg>
+                    Export & Actions
+                  </h4>
+                  <div class="space-y-3">
+                    <button
+                      id="csv-btn"
+                      class="w-full text-left inline-flex items-center px-4 py-2.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <svg
+                        class="h-5 w-5 mr-3 text-gray-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM6.75 9.25a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      Export to CSV
+                    </button>
+
+                    <button
+                      id="open-schedule-modal-btn"
+                      class="w-full text-left inline-flex items-center px-4 py-2.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <svg
+                        class="h-5 w-5 mr-3 text-gray-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M6.28 5.22a.75.75 0 00-1.06 1.06l7.22 7.22H6.75a.75.75 0 000 1.5h7.5a.75.75 0 00.75-.75V7.25a.75.75 0 00-1.5 0v5.69L6.28 5.22z"
+                        />
+                      </svg>
+                      Create Scheduled Report
+                    </button>
+                    <button
+                      id="manage-schedules-btn"
+                      class="w-full text-left relative inline-flex items-center px-4 py-2.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <svg
+                        class="h-5 w-5 mr-3 text-gray-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z"
+                          clip-rule="evenodd"
+                        />
+                        <path
+                          d="M16.707 5.293a1 1 0 010 1.414l-1.5 1.5a1 1 0 01-1.414-1.414l1.5-1.5a1 1 0 011.414 0zM5.293 3.293a1 1 0 011.414 0l1.5 1.5a1 1 0 01-1.414 1.414l-1.5-1.5a1 1 0 010-1.414zM16.707 14.707a1 1 0 010-1.414l-1.5-1.5a1 1 0 01-1.414 1.414l1.5 1.5a1 1 0 011.414 0zM5.293 16.707a1 1 0 011.414 0l1.5-1.5a1 1 0 11-1.414-1.414l-1.5 1.5a1 1 0 010 1.414z"
+                        />
+                      </svg>
+                      Manage Schedules
+                      <span
+                        id="schedule-count-badge"
+                        class="hidden absolute top-1 right-1 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold"
+                      ></span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
+
           <div id="report-results-container" class="mt-8"></div>
         </main>
+      </div>
+    </div>
+    <div
+      id="schedule-modal"
+      class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50 items-center justify-center"
+    >
+      <div
+        id="schedule-modal-backdrop"
+        class="fixed inset-0 w-full h-full"
+      ></div>
+      <div
+        class="relative mx-auto p-8 w-full max-w-3xl shadow-2xl rounded-2xl bg-slate-50"
+      >
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <h3 class="text-2xl font-bold text-slate-800">
+              Create a Scheduled Report
+            </h3>
+            <p class="text-sm text-slate-500 mt-1">
+              Configure and save a report to be delivered automatically via
+              email.
+            </p>
+          </div>
+          <button
+            id="cancel-schedule-btn-close"
+            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 -mt-2 -mr-2 ml-auto inline-flex items-center"
+          >
+            <svg
+              class="w-5 h-5"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
+          <div class="space-y-6">
+            <fieldset>
+              <legend class="block mb-3 text-base font-semibold text-slate-700">
+                Report Period
+              </legend>
+              <div id="modal-preset-group" class="grid grid-cols-2 gap-3">
+                <div>
+                  <input
+                    type="radio"
+                    id="preset-last-week"
+                    name="modal-preset"
+                    value="last-week"
+                    class="hidden peer"
+                  />
+                  <label
+                    for="preset-last-week"
+                    class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <div class="block">
+                      <div class="w-full text-sm font-semibold">Last Week</div>
+                    </div>
+                  </label>
+                </div>
+                <div>
+                  <input
+                    type="radio"
+                    id="preset-current-week"
+                    name="modal-preset"
+                    value="current-week"
+                    class="hidden peer"
+                  />
+                  <label
+                    for="preset-current-week"
+                    class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <div class="block">
+                      <div class="w-full text-sm font-semibold">
+                        Current Week
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                <div>
+                  <input
+                    type="radio"
+                    id="preset-current-month"
+                    name="modal-preset"
+                    value="current-month"
+                    class="hidden peer"
+                    checked
+                  />
+                  <label
+                    for="preset-current-month"
+                    class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <div class="block">
+                      <div class="w-full text-sm font-semibold">
+                        Current Month
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                <div>
+                  <input
+                    type="radio"
+                    id="preset-next-month"
+                    name="modal-preset"
+                    value="next-month"
+                    class="hidden peer"
+                  />
+                  <label
+                    for="preset-next-month"
+                    class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <div class="block">
+                      <div class="w-full text-sm font-semibold">Next Month</div>
+                    </div>
+                  </label>
+                </div>
+                <div>
+                  <input
+                    type="radio"
+                    id="preset-this-year"
+                    name="modal-preset"
+                    value="this-year"
+                    class="hidden peer"
+                  />
+                  <label
+                    for="preset-this-year"
+                    class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <div class="block">
+                      <div class="w-full text-sm font-semibold">This Year</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="border-t border-slate-200 pt-6">
+              <fieldset>
+                <legend
+                  class="block mb-3 text-base font-semibold text-slate-700"
+                >
+                  Delivery Schedule
+                </legend>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      for="schedule-frequency"
+                      class="block mb-2 text-sm font-medium text-slate-600"
+                      >Frequency</label
+                    >
+                    <select
+                      id="schedule-frequency"
+                      class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                    >
+                      <option>Daily</option>
+                      <option selected>Weekly</option>
+                      <option>Monthly</option>
+                    </select>
+                  </div>
+                  <div id="schedule-weekly-day-container">
+                    <label
+                      for="schedule-weekly-day"
+                      class="block mb-2 text-sm font-medium text-slate-600"
+                      >Day of Week</label
+                    >
+                    <select
+                      id="schedule-weekly-day"
+                      class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                    >
+                      <option>Monday</option>
+                      <option>Tuesday</option>
+                      <option>Wednesday</option>
+                      <option>Thursday</option>
+                      <option>Friday</option>
+                    </select>
+                  </div>
+                  <div id="schedule-monthly-day-container" class="hidden">
+                    <label
+                      for="schedule-monthly-day"
+                      class="block mb-2 text-sm font-medium text-slate-600"
+                      >Day of Month</label
+                    >
+                    <select
+                      id="schedule-monthly-day"
+                      class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                    >
+                      <option value="1">1st of the month</option>
+                      <option value="-1">Last day of the month</option>
+                    </select>
+                  </div>
+                  <div class="col-span-2">
+                    <label
+                      for="schedule-time"
+                      class="block mb-2 text-sm font-medium text-slate-600"
+                      >Time of Day (UTC)</label
+                    >
+                    <select
+                      id="schedule-time"
+                      class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                    ></select>
+                  </div>
+                </div>
+              </fieldset>
+            </div>
+          </div>
+
+          <div class="space-y-6 lg:border-l lg:pl-8 border-slate-200">
+            <fieldset>
+              <legend class="block mb-3 text-base font-semibold text-slate-700">
+                Report Details
+              </legend>
+              <div>
+                <label
+                  for="schedule-name"
+                  class="block mb-2 text-sm font-medium text-slate-600"
+                  >Report Name</label
+                >
+                <div class="relative">
+                  <div
+                    class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"
+                  >
+                    <svg
+                      class="w-5 h-5 text-slate-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z"
+                      />
+                      <path
+                        d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    id="schedule-name"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pl-10"
+                    placeholder="E.g., Weekly Occupancy Summary"
+                  />
+                </div>
+              </div>
+              <div class="mt-4">
+                <label
+                  for="schedule-recipients"
+                  class="block mb-2 text-sm font-medium text-slate-600"
+                  >Email Recipients</label
+                >
+                <div class="relative">
+                  <div
+                    class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"
+                  >
+                    <svg
+                      class="w-5 h-5 text-slate-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z"
+                      />
+                      <path
+                        d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z"
+                      />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    id="schedule-recipients"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pl-10"
+                    placeholder="owner@hotel.com, manager@hotel.com"
+                  />
+                </div>
+                <p class="mt-2 text-xs text-slate-500">
+                  Separate multiple email addresses with a comma.
+                </p>
+              </div>
+            </fieldset>
+            <div class="border-t border-slate-200 pt-6">
+              <h4 class="text-base font-semibold text-slate-700 mb-3">
+                Report Content
+              </h4>
+              <div
+                class="text-sm p-4 bg-white rounded-lg border border-slate-200"
+              >
+                <p class="text-slate-600">
+                  The metrics and formatting options currently configured on the
+                  main page will be saved with this schedule.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-200"
+        >
+          <button
+            id="cancel-schedule-btn"
+            class="text-slate-600 bg-white hover:bg-slate-100 focus:ring-4 focus:outline-none focus:ring-slate-200 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5"
+          >
+            Cancel
+          </button>
+          <button
+            id="save-schedule-btn"
+            class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+          >
+            Save Schedule
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="manage-schedules-modal"
+      class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center justify-center"
+    >
+      <div
+        id="manage-schedules-modal-backdrop"
+        class="fixed inset-0 w-full h-full"
+      ></div>
+      <div
+        class="relative mx-auto p-8 border w-full max-w-2xl shadow-lg rounded-xl bg-white"
+      >
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900">Manage Schedules</h3>
+          <button
+            id="close-manage-modal-btn"
+            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
+          >
+            <svg
+              class="w-5 h-5"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div class="overflow-x-auto rounded-lg border">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Report Name & Recipients
+                </th>
+                <th
+                  scope="col"
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Frequency
+                </th>
+                <th scope="col" class="relative px-6 py-3">
+                  <span class="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody
+              id="scheduled-reports-tbody"
+              class="bg-white divide-y divide-gray-200"
+            >
+              <tr id="no-schedules-row">
+                <td colspan="3" class="px-6 py-12 text-center">
+                  <div class="text-sm text-gray-500">
+                    You have no scheduled reports.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
     <script src="/app/reports.js" type="module"></script>

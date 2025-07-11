@@ -1,4 +1,4 @@
-// server.js (Production Ready - Database-Driven Roles)
+// server.js (Production Ready - Database-Driven Roles & Landscape PDF)
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
@@ -37,7 +37,7 @@ async function getCloudbedsAccessToken() {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "10mb" })); // Increased limit for HTML payload
 app.set("trust proxy", 1);
 
 const allowedOrigins = [
@@ -573,6 +573,7 @@ app.get("/api/my-properties", requireUserApi, async (req, res) => {
   }
 });
 
+// --- ADMIN & EXPLORER APIS ---
 app.get("/api/test-cloudbeds", requireAdminApi, async (req, res) => {
   try {
     res.status(200).json({
@@ -611,9 +612,7 @@ app.get("/api/get-all-hotels", requireAdminApi, async (req, res) => {
   }
 });
 
-// --- START: NEW API EXPLORER PROXY ---
 app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching datasets...");
   try {
     const accessToken = await getCloudbedsAccessToken();
     const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
@@ -635,13 +634,11 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
     }
     res.status(200).json(data);
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching dataset structure...");
   try {
     const { id } = req.query;
     if (!id) {
@@ -667,116 +664,80 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
     }
     res.status(200).json(data);
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Add this new endpoint to handle the "Get Sample Guest" button
 app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching sample guest...");
   try {
     const accessToken = await getCloudbedsAccessToken();
-
-    // This is the corrected URL for getGuestList from the documentation
     const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
-    // Return just the first guest from the list
     if (data.data && data.data.length > 0) {
       res.status(200).json(data.data[0]);
     } else {
       res.status(200).json({ message: "No guests found for this property." });
     }
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// This endpoint now uses the correct URL for getting hotel details
 app.get("/api/explore/sample-hotel", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching sample hotel...");
   try {
     const accessToken = await getCloudbedsAccessToken();
-
-    // This is the corrected URL from the documentation you provided.
     const targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
-    // getHotelDetails returns a single object under a 'data' property
     res.status(200).json(data.data);
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// New endpoint to get a single, real room record
 app.get("/api/explore/sample-room", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching sample room...");
   try {
     const accessToken = await getCloudbedsAccessToken();
-
-    // This is the corrected URL from the documentation you provided.
     const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
-    // Return just the first room from the list
     if (data.data && data.data.length > 0) {
       res.status(200).json(data.data[0]);
     } else {
       res.status(200).json({ message: "No rooms found for this property." });
     }
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// New endpoint to get a single, real rate plan record
 app.get("/api/explore/sample-rate", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching sample rate...");
   try {
     const accessToken = await getCloudbedsAccessToken();
-
-    // This is the corrected URL from the documentation you provided.
     const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRatePlans?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}`;
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
-    // Return just the first rate plan from the list
     if (data && data.length > 0) {
       res.status(200).json(data[0]);
     } else {
@@ -785,195 +746,58 @@ app.get("/api/explore/sample-rate", requireAdminApi, async (req, res) => {
         .json({ message: "No rate plans found for this property." });
     }
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
-// New endpoint to get taxes and fees
+
 app.get("/api/explore/taxes-fees", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching taxes and fees...");
   try {
     const accessToken = await getCloudbedsAccessToken();
-
-    // Correct URL from the documentation
     const targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
     res.status(200).json(data);
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// New endpoint to get user info
 app.get("/api/explore/user-info", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching user info...");
   try {
     const accessToken = await getCloudbedsAccessToken();
-
-    // Correct URL from the documentation
     const targetUrl = `https://api.cloudbeds.com/api/v1.1/getUsers?property_ids=${process.env.CLOUDBEDS_PROPERTY_ID}`;
-
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
     res.status(200).json(data);
   } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// New endpoint to get a sample of real data from the Insights API
-// This is the final, most intelligent version of this endpoint.
-app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
-  console.log("[server.js] Admin API Explorer: Fetching insights data...");
-  try {
-    const { id, columns } = req.query;
-    if (!id) return res.status(400).json({ error: "Dataset ID is required." });
-    if (!columns)
-      return res.status(400).json({ error: "Column names are required." });
-
-    const accessToken = await getCloudbedsAccessToken();
-
-    // Step 1: Fetch the dataset's schema to learn the data types of all fields.
-    const schemaUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
-    const schemaResponse = await fetch(schemaUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
-      },
-    });
-    const schemaData = await schemaResponse.json();
-    if (!schemaResponse.ok)
-      throw new Error(
-        `Could not fetch dataset schema: ${JSON.stringify(schemaData)}`
-      );
-
-    // Create a simple map of column names to their data types (e.g., { "adr": "DynamicCurrency", "id": "Identifier" })
-    const fieldTypeMap = new Map();
-    if (schemaData.cdfs) {
-      for (const category of schemaData.cdfs) {
-        if (category.cdfs) {
-          for (const field of category.cdfs) {
-            fieldTypeMap.set(field.column, field.kind);
-          }
-        }
-      }
-    }
-
-    // Step 2: Intelligently build the columns array for the data request.
-    const requestedColumns = columns.split(",").map((colName) => {
-      const trimmedColName = colName.trim();
-      const kind = fieldTypeMap.get(trimmedColName);
-
-      // Only add metrics for column types that support it (Numbers, Currencies).
-      if (
-        kind === "Number" ||
-        kind === "Currency" ||
-        kind === "DynamicCurrency" ||
-        kind === "DynamicPercentage"
-      ) {
-        return { cdf: { column: trimmedColName }, metrics: ["sum", "mean"] };
-      } else {
-        // For Identifiers, Strings, Dates, etc., do NOT request metrics.
-        return { cdf: { column: trimmedColName } };
-      }
-    });
-
-    // Step 3: Build the final payload with the smart columns array.
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateForFilter = yesterday.toISOString().split("T")[0];
-
-    let filterColumn = id === "7" ? "stay_date" : "checkin_date";
-
-    let insightsPayload = {
-      property_ids: [parseInt(process.env.CLOUDBEDS_PROPERTY_ID)],
-      dataset_id: parseInt(id),
-      columns: requestedColumns,
-      filters: {
-        and: [
-          {
-            cdf: { column: filterColumn },
-            operator: "equals",
-            value: `${dateForFilter}T00:00:00.000Z`,
-          },
-        ],
-      },
-    };
-
-    if (id === "7") {
-      insightsPayload.group_rows = [
-        { cdf: { column: "stay_date" }, modifier: "day" },
-      ];
-    }
-
-    // Step 4: Make the final data request.
-    const targetUrl =
-      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run";
-    const cloudbedsApiResponse = await fetch(targetUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
-      },
-      body: JSON.stringify(insightsPayload),
-    });
-
-    const data = await cloudbedsApiResponse.json();
-    if (!cloudbedsApiResponse.ok)
-      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
-    res.status(200).json(data);
-  } catch (error) {
-    console.error("[server.js] Admin API Explorer Error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Replace the old "/api/explore/sample-guest" endpoint with this one for Reservations.
-// I have also updated the name to be more accurate.
 app.get(
   "/api/explore/sample-reservation",
   requireAdminApi,
   async (req, res) => {
-    console.log(
-      "[server.js] Admin API Explorer: Fetching sample reservation..."
-    );
     try {
       const accessToken = await getCloudbedsAccessToken();
-
-      // This is the corrected URL and parameters from the documentation.
       const targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1&sortByRecent=true`;
-
       const cloudbedsApiResponse = await fetch(targetUrl, {
         method: "GET",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-
       const data = await cloudbedsApiResponse.json();
       if (!cloudbedsApiResponse.ok)
         throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-
-      // Return just the first reservation from the list
       if (data.data && data.data.length > 0) {
         res.status(200).json(data.data[0]);
       } else {
@@ -982,12 +806,10 @@ app.get(
           .json({ message: "No reservations found for this property." });
       }
     } catch (error) {
-      console.error("[server.js] Admin API Explorer Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   }
 );
-// --- END: NEW API EXPLORER PROXY ---
 
 app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   const results = [];
@@ -1017,7 +839,7 @@ app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   res.status(200).json(results);
 });
 
-// --- Static and fallback routes (Middleware order is corrected here) ---
+// --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 
 app.get("/", (req, res) => {
