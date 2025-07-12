@@ -394,17 +394,6 @@
               &times;
             </button>
           </div>
-          <div
-            x-show="isInitialLoading"
-            x-transition:leave="transition ease-in-out duration-500"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="absolute inset-0 bg-white/70 z-30 flex items-center justify-center"
-          >
-            <div
-              class="w-10 h-10 border-2 border-slate-400 border-t-slate-700 rounded-full animate-spin"
-            ></div>
-          </div>
 
           <template x-if="!isInitialLoading && !hasProperties">
             <div
@@ -456,8 +445,8 @@
 
           <div
             id="dashboard-content-wrapper"
-            class="hidden-content"
-            :class="{ 'visible-content': !isInitialLoading && hasProperties }"
+            class="opacity-0 transition-opacity duration-500"
+            :class="{ 'opacity-100': !isLoading.properties && hasProperties }"
           >
             <div
               class="bg-white p-4 rounded-xl border border-gray-200 mb-8 flex flex-col gap-4"
@@ -491,14 +480,12 @@
                 <div class="flex items-center gap-3 ml-auto">
                   <input
                     type="date"
-                    id="start-date"
                     x-model="dates.start"
                     @change="activePreset = ''"
                     class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
                   /><span class="text-gray-400">-</span
                   ><input
                     type="date"
-                    id="end-date"
                     x-model="dates.end"
                     @change="activePreset = ''"
                     class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
@@ -561,7 +548,17 @@
                 </div>
               </div>
             </div>
-            <div id="data-display-wrapper" :class="{'loading': isLoadingData}">
+
+            <template x-if="isLoading.kpis">
+              <div
+                class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-pulse"
+              >
+                <div class="h-[108px] bg-gray-200 rounded-lg"></div>
+                <div class="h-[108px] bg-gray-200 rounded-lg"></div>
+                <div class="h-[108px] bg-gray-200 rounded-lg"></div>
+              </div>
+            </template>
+            <template x-if="!isLoading.kpis">
               <div
                 id="kpi-card-container"
                 class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
@@ -605,6 +602,14 @@
                   </div>
                 </template>
               </div>
+            </template>
+
+            <template x-if="isLoading.chart">
+              <div
+                class="bg-gray-200 p-6 rounded-xl mb-8 animate-pulse h-[368px]"
+              ></div>
+            </template>
+            <template x-if="!isLoading.chart">
               <div
                 class="relative bg-white p-6 rounded-xl border border-gray-200 mb-8"
               >
@@ -626,15 +631,28 @@
                   </p>
                 </div>
               </div>
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div>
-                  <div class="flex justify-between items-center mb-4">
-                    <h2
-                      id="your-hotel-table-title"
-                      class="text-xl font-semibold text-gray-800"
-                      x-text="currentPropertyName"
-                    ></h2>
+            </template>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <div class="flex justify-between items-center">
+                  <h2
+                    id="your-hotel-table-title"
+                    class="text-xl font-semibold text-gray-800"
+                    x-text="currentPropertyName"
+                  ></h2>
+                </div>
+                <p class="text-sm text-gray-500 -mt-2 mb-4">&nbsp;</p>
+                <template x-if="isLoading.tables">
+                  <div class="space-y-2 animate-pulse">
+                    <div class="h-10 bg-gray-200 rounded-t-lg"></div>
+                    <div class="h-12 bg-gray-200"></div>
+                    <div class="h-12 bg-gray-200"></div>
+                    <div class="h-12 bg-gray-200"></div>
+                    <div class="h-12 bg-gray-200 rounded-b-lg"></div>
                   </div>
+                </template>
+                <template x-if="!isLoading.tables">
                   <div class="table-container rounded-lg overflow-x-auto">
                     <table class="w-full text-sm text-gray-600">
                       <thead
@@ -701,16 +719,27 @@
                       </tbody>
                     </table>
                   </div>
-                </div>
-                <div>
-                  <h2 class="text-xl font-semibold text-gray-800 mb-4">
-                    The Market
-                  </h2>
-                  <p
-                    id="market-subtitle"
-                    class="text-sm text-gray-500 -mt-2 mb-4"
-                    x-text="marketSubtitle"
-                  ></p>
+                </template>
+              </div>
+              <div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                  The Market
+                </h2>
+                <p
+                  id="market-subtitle"
+                  class="text-sm text-gray-500 -mt-2 mb-4"
+                  x-text="marketSubtitle"
+                ></p>
+                <template x-if="isLoading.tables">
+                  <div class="space-y-2 animate-pulse">
+                    <div class="h-10 bg-gray-200 rounded-t-lg"></div>
+                    <div class="h-12 bg-gray-200"></div>
+                    <div class="h-12 bg-gray-200"></div>
+                    <div class="h-12 bg-gray-200"></div>
+                    <div class="h-12 bg-gray-200 rounded-b-lg"></div>
+                  </div>
+                </template>
+                <template x-if="!isLoading.tables">
                   <div class="table-container rounded-lg overflow-x-auto">
                     <table class="w-full text-sm text-gray-600">
                       <thead
@@ -787,7 +816,7 @@
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>

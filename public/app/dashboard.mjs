@@ -1,12 +1,16 @@
 // dashboard.mjs
 
-// ACTION: All component logic is defined here and exported as a single default object.
-// REASON: This creates a self-contained, maintainable module for the dashboard's functionality.
-//         The index.html file will be clean and only responsible for initializing this module.
 export default {
   // --- STATE PROPERTIES ---
-  isInitialLoading: true,
-  isLoadingData: false,
+  // ACTION: Replaced single 'isInitialLoading' with a granular loading state object.
+  // REASON: This allows us to track the loading state for each part of the dashboard
+  //         independently, which is essential for the skeleton loading pattern.
+  isLoading: {
+    kpis: true,
+    chart: true,
+    tables: true,
+    properties: true,
+  },
   hasProperties: false,
   isLegalModalOpen: false,
   propertyDropdownOpen: false,
@@ -34,15 +38,14 @@ export default {
   // --- INITIALIZATION ---
   init() {
     this.initializeDashboard();
-    // Use this.$watch, which is the correct Alpine syntax inside a component object
     this.$watch("allMetrics", () => this.updateChart());
     this.$watch("activeMetric", () => this.updateChart());
   },
 
   // --- STARTUP LOGIC ---
   async initializeDashboard() {
-    await this.checkUserRoleAndSetupNav();
-    await this.fetchAndDisplayLastRefreshTime();
+    this.checkUserRoleAndSetupNav(); // Fire-and-forget
+    this.fetchAndDisplayLastRefreshTime(); // Fire-and-forget
     await this.populatePropertySwitcher();
   },
 
@@ -51,7 +54,6 @@ export default {
       const response = await fetch("/api/auth/session-info");
       const sessionInfo = await response.json();
       if (sessionInfo.isAdmin) {
-        // Use this.$refs for robust element access
         this.$refs.adminNavLink.style.display = "flex";
       }
     } catch (error) {
@@ -64,17 +66,16 @@ export default {
       const response = await fetch("/api/my-properties");
       if (!response.ok) throw new Error("Could not fetch properties.");
       const properties = await response.json();
+      this.isLoading.properties = false;
 
       if (properties.length === 0) {
         this.hasProperties = false;
         this.currentPropertyName = "No Properties Found";
-        this.isInitialLoading = false;
         return;
       }
 
       this.hasProperties = true;
       this.properties = properties;
-
       const firstProperty = properties[0];
       this.currentPropertyId = firstProperty.property_id;
       this.currentPropertyName = firstProperty.property_name;
@@ -82,7 +83,7 @@ export default {
       this.setPreset("current-month");
     } catch (error) {
       this.showError(error.message);
-      this.isInitialLoading = false;
+      this.isLoading.properties = false;
     }
   },
 
@@ -102,30 +103,44 @@ export default {
   },
 
   // --- CORE DATA LOGIC ---
-  async loadDataFromAPI(startDate, endDate, granularity) {
-    if (!this.currentPropertyId) return;
+  // ACTION: Created separate, focused functions for loading different data modules.
+  // REASON: This allows us to update each part of the UI as soon as its data is
+  //         ready, rather than waiting for all API calls to finish.
+  async loadKpis(startDate, endDate) {
+    this.isLoading.kpis = true;
+    try {
+      const url = `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}&propertyId=${this.currentPropertyId}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Could not load KPI data.");
+      const kpiData = await response.json();
+      this.renderKpiCards(kpiData);
+    } catch (error) {
+      this.showError(error.message);
+      this.renderKpiCards(null); // Clear cards on error
+    } finally {
+      this.isLoading.kpis = false;
+    }
+  },
 
-    this.isLoadingData = true;
-    this.error.show = false;
-
+  async loadChartAndTables(startDate, endDate, granularity) {
+    this.isLoading.chart = true;
+    this.isLoading.tables = true;
     try {
       const propertyId = this.currentPropertyId;
       const urls = [
         `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
         `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
-        `/api/kpi-summary?startDate=${startDate}&endDate=${endDate}&propertyId=${propertyId}`,
       ];
-      const responses = await Promise.all(urls.map((url) => fetch(url)));
-
-      for (const response of responses) {
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error || `Failed with status ${response.status}`);
-        }
-      }
-      const [yourHotelData, marketData, kpiData] = await Promise.all(
-        responses.map((res) => res.json())
+      const [yourHotelResponse, marketResponse] = await Promise.all(
+        urls.map((url) => fetch(url))
       );
+
+      if (!yourHotelResponse.ok || !marketResponse.ok) {
+        throw new Error("Could not load chart/table data.");
+      }
+
+      const yourHotelData = await yourHotelResponse.json();
+      const marketData = await marketResponse.json();
 
       this.allMetrics = this.processAndMergeData(
         yourHotelData.metrics,
@@ -135,19 +150,17 @@ export default {
         marketData.competitorCount > 0
           ? `Based on a competitive set of ${marketData.competitorCount} hotels.`
           : "No competitor data available for this standard.";
-      this.renderKpiCards(kpiData);
     } catch (error) {
-      this.showError(`Could not load dashboard data: ${error.message}`);
+      this.showError(error.message);
       this.allMetrics = [];
     } finally {
-      this.isLoadingData = false;
-      if (this.isInitialLoading) {
-        this.isInitialLoading = false;
-      }
+      this.isLoading.chart = false;
+      this.isLoading.tables = false;
     }
   },
 
   processAndMergeData(yourData, marketData) {
+    // This function remains the same as before
     const dataMap = new Map();
     const processRow = (row, source) => {
       const date = (row.stay_date || row.period).substring(0, 10);
@@ -182,8 +195,13 @@ export default {
   },
 
   renderKpiCards(kpiData) {
+    // This function remains the same as before
     if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
-      this.kpi = { occupancy: {}, adr: {}, revpar: {} };
+      this.kpi = {
+        occupancy: { your: "-", market: "-", delta: "" },
+        adr: { your: "-", market: "-", delta: "" },
+        revpar: { your: "-", market: "-", delta: "" },
+      };
       return;
     }
     for (const metric of ["occupancy", "adr", "revpar"]) {
@@ -217,9 +235,14 @@ export default {
   },
 
   // --- UI CONTROL METHODS ---
+  // ACTION: Modified runReport to trigger the new modular loading functions.
+  // REASON: This orchestrates the progressive loading, fetching data for
+  //         all modules concurrently.
   runReport() {
     if (!this.dates.start || !this.dates.end || !this.granularity) return;
-    this.loadDataFromAPI(this.dates.start, this.dates.end, this.granularity);
+    this.error.show = false;
+    this.loadKpis(this.dates.start, this.dates.end);
+    this.loadChartAndTables(this.dates.start, this.dates.end, this.granularity);
   },
 
   setGranularity(newGranularity) {
@@ -228,6 +251,7 @@ export default {
   },
 
   setPreset(preset) {
+    // This function remains largely the same
     this.activePreset = preset;
     const today = new Date();
     const yearUTC = today.getUTCFullYear();
@@ -251,6 +275,7 @@ export default {
   },
 
   switchProperty(propertyId) {
+    // This function remains the same
     if (this.currentPropertyId === propertyId) return;
     const property = this.properties.find((p) => p.property_id === propertyId);
     if (property) {
@@ -265,6 +290,7 @@ export default {
   },
 
   logout() {
+    // This function remains the same
     fetch("/api/auth/logout", { method: "POST" })
       .then((res) => {
         if (res.ok) window.location.href = "/signin";
@@ -279,6 +305,7 @@ export default {
   },
 
   // --- HELPER & FORMATTING METHODS ---
+  // All helpers (getDelta, formatValue, formatDateLabel) remain the same
   getDelta(day) {
     if (
       !day.your ||
@@ -342,53 +369,35 @@ export default {
   },
 
   // --- REACTIVE CHART METHOD ---
-  // --- REACTIVE CHART METHOD ---
+  // The updateChart method remains the same
   updateChart() {
-    // Destroy the previous chart instance if it exists.
     if (this.chartInstance) {
       this.chartInstance.destroy();
     }
-
-    // Check if there is data to display and update the state.
     this.isChartEmpty = this.allMetrics.length === 0;
     if (this.isChartEmpty) return;
 
-    // Get the canvas context from the element referenced by 'chartCanvas'.
     const ctx = this.$refs.chartCanvas.getContext("2d");
-
-    // Define configurations for different metrics and colors for the chart.
     const metricConfig = {
       occupancy: { label: "Occupancy", format: "percent" },
       adr: { label: "ADR", format: "currency" },
       revpar: { label: "RevPAR", format: "currency" },
     };
-    // Define configurations for different metrics and colors for the chart.
     const chartColors = {
-      primary: "#60a5fa", // Blue
-      secondary: "#334155", // Dark Gray
-      // ACTION: Changed the 'win' color to a subtle blue and made both fills more transparent.
-      // REASON: To align the 'win' color with the primary brand color and make the
-      //         visual effect less distracting, as requested.
-      win: "rgba(96, 165, 250, 0.05)", // Very subtle blue
-      lose: "rgba(239, 68, 68, 0.05)", // Very subtle red
+      primary: "#60a5fa",
+      secondary: "#334155",
+      win: "rgba(96, 165, 250, 0.05)",
+      lose: "rgba(239, 68, 68, 0.05)",
     };
-
-    // Determine the chart type dynamically based on the current granularity.
     const chartType = this.granularity === "daily" ? "line" : "bar";
-
-    // Set the chart title dynamically based on the active metric and property name.
     this.chartTitle = `${metricConfig[this.activeMetric].label} for ${
       this.currentPropertyName
     } vs The Market`;
-
-    // Prepare the data for the chart's axes.
     const labels = this.allMetrics.map((d) =>
       this.formatDateLabel(d.date, this.granularity)
     );
     const yourData = this.allMetrics.map((d) => d.your[this.activeMetric]);
     const marketData = this.allMetrics.map((d) => d.market[this.activeMetric]);
-
-    // Define the datasets for the chart.
     const datasets = [
       {
         label: `Your Hotel`,
@@ -397,18 +406,14 @@ export default {
         tension: 0.3,
         pointRadius: chartType === "line" ? 3 : 0,
         pointBackgroundColor: chartColors.primary,
-        // ACTION: Implement conditional fill coloring for line charts.
-        // REASON: This shades the area between the two lines to visually highlight performance
-        //         gaps. The color changes based on which data point is higher.
         fill:
           chartType === "line"
             ? {
-                target: 1, // Fill to the 'Market' dataset (at index 1)
-                above: chartColors.win, // Use green shade when 'we' are winning
-                below: chartColors.lose, // Use red shade when 'market' is winning
+                target: 1,
+                above: chartColors.win,
+                below: chartColors.lose,
               }
             : true,
-        // Use a solid color for the bar chart background, but make the line's own background transparent.
         backgroundColor:
           chartType === "bar" ? chartColors.primary : "transparent",
       },
@@ -419,20 +424,14 @@ export default {
         tension: 0.3,
         pointRadius: chartType === "line" ? 3 : 0,
         pointBackgroundColor: chartColors.secondary,
-        // The fill is handled by the first dataset, so this one can be simple.
         fill: false,
         backgroundColor:
           chartType === "bar" ? chartColors.secondary : "transparent",
       },
     ];
-
-    // Create the new Chart.js instance with the dynamic configuration.
     this.chartInstance = new Chart(ctx, {
       type: chartType,
-      data: {
-        labels: labels,
-        datasets: datasets,
-      },
+      data: { labels: labels, datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
