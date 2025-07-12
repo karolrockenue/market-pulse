@@ -342,44 +342,81 @@ export default {
   },
 
   // --- REACTIVE CHART METHOD ---
+  // --- REACTIVE CHART METHOD ---
   updateChart() {
+    // Destroy the previous chart instance if it exists.
     if (this.chartInstance) {
       this.chartInstance.destroy();
     }
+
+    // Check if there is data to display and update the state.
     this.isChartEmpty = this.allMetrics.length === 0;
     if (this.isChartEmpty) return;
 
+    // Get the canvas context from the element referenced by 'chartCanvas'.
     const ctx = this.$refs.chartCanvas.getContext("2d");
+
+    // Define configurations for different metrics and colors for the chart.
     const metricConfig = {
       occupancy: { label: "Occupancy", format: "percent" },
       adr: { label: "ADR", format: "currency" },
       revpar: { label: "RevPAR", format: "currency" },
     };
     const chartColors = { primary: "#60a5fa", secondary: "#334155" };
+
+    // ACTION: Determine the chart type dynamically based on the current granularity.
+    // REASON: This fulfills the requirement to use a line chart for detailed daily trend analysis
+    //         and a bar chart for clearer comparison of aggregated weekly/monthly data.
+    const chartType = this.granularity === "daily" ? "line" : "bar";
+
+    // Set the chart title dynamically based on the active metric and property name.
     this.chartTitle = `${metricConfig[this.activeMetric].label} for ${
       this.currentPropertyName
     } vs The Market`;
+
+    // Prepare the data for the chart's axes.
     const labels = this.allMetrics.map((d) =>
       this.formatDateLabel(d.date, this.granularity)
     );
     const yourData = this.allMetrics.map((d) => d.your[this.activeMetric]);
     const marketData = this.allMetrics.map((d) => d.market[this.activeMetric]);
+
+    // ACTION: Define the datasets for the chart.
+    // REASON: We add line-specific properties (like tension and point radius) and adjust
+    //         background/border colors conditionally to ensure proper styling for both chart types.
+    const datasets = [
+      {
+        label: `Your Hotel`,
+        data: yourData,
+        backgroundColor:
+          chartType === "line" ? chartColors.primary : chartColors.primary,
+        borderColor: chartColors.primary,
+        fill: chartType === "line" ? false : true, // Only fill for bar charts
+        tension: 0.3, // Makes the line smooth
+        pointRadius: chartType === "line" ? 3 : 0, // Only show points on line charts
+        pointBackgroundColor: chartColors.primary,
+      },
+      {
+        label: `The Market`,
+        data: marketData,
+        backgroundColor:
+          chartType === "line" ? chartColors.secondary : chartColors.secondary,
+        borderColor: chartColors.secondary,
+        fill: chartType === "line" ? false : true,
+        tension: 0.3,
+        pointRadius: chartType === "line" ? 3 : 0,
+        pointBackgroundColor: chartColors.secondary,
+      },
+    ];
+
+    // Create the new Chart.js instance with the dynamic configuration.
     this.chartInstance = new Chart(ctx, {
-      type: "bar",
+      // ACTION: Use the dynamic chartType variable.
+      type: chartType,
       data: {
         labels: labels,
-        datasets: [
-          {
-            label: `Your Hotel`,
-            data: yourData,
-            backgroundColor: chartColors.primary,
-          },
-          {
-            label: `The Market`,
-            data: marketData,
-            backgroundColor: chartColors.secondary,
-          },
-        ],
+        // ACTION: Use the dynamically configured datasets.
+        datasets: datasets,
       },
       options: {
         responsive: true,
