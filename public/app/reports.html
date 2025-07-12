@@ -1065,27 +1065,10 @@
     </div>
     <script src="/app/reports.js" type="module"></script>
     <script src="/app/reports.js"></script>
-    <script type="module">
-      // Import the component loader we created earlier
-      import { loadComponent } from "./utils.mjs";
-      // Also import the mock data generator from reports.js
-      import { generateMockData } from "/app/reports.js";
-
+    <script>
       function reportsPage() {
         return {
-          // --- STATE FOR HEADER (NEW) ---
-          // These properties are needed for the shared header to work.
-          pageTitle: "Advanced Reporting",
-          propertyDropdownOpen: false,
-          userDropdownOpen: false,
-          isLegalModalOpen: false,
-          hasProperties: false, // For now, we'll keep this disabled on reports page
-          lastRefreshText: "Real-time View", // Static text for now
-          currentPropertyName: "No Property Selected", // Static text for now
-          properties: [],
-
-          // --- STATE FOR REPORTS (Original) ---
-          // This is your original, working state management
+          // Properties
           isScheduleModalOpen: false,
           isManageModalOpen: false,
           addComparisons: false,
@@ -1099,33 +1082,14 @@
           newScheduleFrequency: "Weekly",
           nextScheduleId: 1,
 
-          // --- INITIALIZATION (MODIFIED) ---
+          // Init
           init() {
-            // 1. Load the shared header into the placeholder div
-            loadComponent("/app/_shared/header.html", "header-placeholder");
-
-            // 2. Run your original, working initialization logic
             this.handlePresetChange("current-month");
-            this.handleGenerateReport(); // This will still use MOCK data
+            this.handleGenerateReport();
             this.handleFrequencyChange();
           },
 
-          // --- STUB FUNCTIONS FOR HEADER (NEW) ---
-          // These are placeholder functions to prevent errors when clicking header buttons.
-          switchProperty(id) {
-            console.log("Switching to property:", id);
-            alert("Property switching is not yet implemented on this page.");
-          },
-          logout() {
-            fetch("/api/auth/logout", { method: "POST" }).then((res) => {
-              if (res.ok) window.location.href = "/signin";
-              else alert("Logout failed.");
-            });
-          },
-
-          // --- ORIGINAL REPORT METHODS (Unchanged) ---
-          // All of your original functions like handleGenerateReport, getSelectedColumns, etc.
-          // remain exactly the same and will continue to use the mock data.
+          // Methods from reports.js are now part of the component
           handleGenerateReport() {
             const reportContainer = document.getElementById(
               "report-results-container"
@@ -1152,12 +1116,9 @@
             const displayOrder = document.querySelector(
               'input[name="comparison-order"]:checked'
             )?.value;
-
             if (!startDate || !endDate || !this.granularity || !displayOrder)
               return;
-
-            // This still uses the imported mock data generator
-            const mockData = generateMockData(
+            const mockData = window.generateMockData(
               startDate,
               endDate,
               allSelected,
@@ -1541,6 +1502,7 @@
             document.body.removeChild(link);
           },
 
+          // Scheduler methods from the original component
           handleFrequencyChange() {
             const timeSelect = document.getElementById("schedule-time");
             if (!timeSelect) return;
@@ -1577,16 +1539,6 @@
           },
         };
       }
-
-      // This makes the component available to Alpine
-      window.reportsPage = reportsPage;
-
-      // Dynamically load Alpine after our component is defined
-      const alpineScript = document.createElement("script");
-      alpineScript.src =
-        "https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js";
-      alpineScript.defer = true;
-      document.head.appendChild(alpineScript);
     </script>
   </body>
 </html>
