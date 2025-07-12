@@ -24,7 +24,7 @@
         --text-primary: #1e293b;
         --text-secondary: #64748b;
         --border-color: #e2e8f0;
-        --accent-primary: #60a5fa; /* Tailwind blue-400 */
+        --accent-primary: #60a5fa; /* Tailwind blsue-400 */
         --highlight-color: #eff6ff; /* Tailwind blue-50 */
         --font-sans: "Inter", sans-serif;
         --font-data: "Manrope", sans-serif;
@@ -72,19 +72,6 @@
       }
       details[open] summary .chevron {
         transform: rotate(90deg);
-      }
-      /* Styles for shared header dropdowns */
-      .dropdown-content {
-        position: absolute;
-        background-color: #ffffff;
-        min-width: 160px;
-        box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.1);
-        z-index: 10;
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        right: 0;
-        margin-top: 8px;
-        padding: 8px 0;
       }
     </style>
   </head>
@@ -1076,23 +1063,12 @@
         </main>
       </div>
     </div>
-
-    <script type="module">
-      import { loadComponent } from "./utils.mjs";
-
+    <script src="/app/reports.js" type="module"></script>
+    <script src="/app/reports.js"></script>
+    <script>
       function reportsPage() {
         return {
-          // --- STATE FOR HEADER ---
-          pageTitle: "Advanced Reporting",
-          propertyDropdownOpen: false,
-          userDropdownOpen: false,
-          isLegalModalOpen: false,
-          hasProperties: false,
-          lastRefreshText: "Loading...",
-          currentPropertyName: "Loading...",
-          properties: [],
-
-          // --- STATE FOR REPORTS (Original) ---
+          // Properties
           isScheduleModalOpen: false,
           isManageModalOpen: false,
           addComparisons: false,
@@ -1106,34 +1082,14 @@
           newScheduleFrequency: "Weekly",
           nextScheduleId: 1,
 
-          // --- INITIALIZATION ---
+          // Init
           init() {
-            // Load the shared header component
-            loadComponent("/app/_shared/header.html", "header-placeholder");
-
-            // Keep original mock-data initialization for now
             this.handlePresetChange("current-month");
             this.handleGenerateReport();
             this.handleFrequencyChange();
           },
 
-          // --- STUB FUNCTIONS FOR HEADER ---
-          // These prevent errors until we wire them up properly.
-          switchProperty(id) {
-            console.log("Switching to property:", id);
-            alert("Property switching is not yet implemented on this page.");
-          },
-          logout() {
-            // Replicate basic logout functionality
-            fetch("/api/auth/logout", { method: "POST" })
-              .then((res) => {
-                if (res.ok) window.location.href = "/signin";
-                else alert("Logout failed.");
-              })
-              .catch(() => alert("An error occurred during logout."));
-          },
-
-          // --- ORIGINAL REPORT METHODS (Using Mock Data) ---
+          // Methods from reports.js are now part of the component
           handleGenerateReport() {
             const reportContainer = document.getElementById(
               "report-results-container"
@@ -1162,7 +1118,6 @@
             )?.value;
             if (!startDate || !endDate || !this.granularity || !displayOrder)
               return;
-            // This still calls the mock data function from the external file
             const mockData = window.generateMockData(
               startDate,
               endDate,
@@ -1584,12 +1539,6 @@
           },
         };
       }
-
-      // This needs to be in a separate script tag to ensure the `reportsPage` function is globally available for Alpine
-      document.addEventListener("alpine:init", () => {
-        Alpine.data("reportsPage", reportsPage);
-      });
     </script>
-    <script src="/app/reports.js" type="module"></script>
   </body>
 </html>
