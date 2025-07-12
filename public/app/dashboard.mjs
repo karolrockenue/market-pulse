@@ -37,7 +37,6 @@ export default {
     // Use this.$watch, which is the correct Alpine syntax inside a component object
     this.$watch("allMetrics", () => this.updateChart());
     this.$watch("activeMetric", () => this.updateChart());
-    this.$watch("granularity", () => this.updateChart()); // Re-render chart on granularity change
   },
 
   // --- STARTUP LOGIC ---
@@ -365,48 +364,28 @@ export default {
     );
     const yourData = this.allMetrics.map((d) => d.your[this.activeMetric]);
     const marketData = this.allMetrics.map((d) => d.market[this.activeMetric]);
-
-    // --- DYNAMIC CHART CONFIGURATION (CORRECTED) ---
-    const isLineChart = this.granularity === "daily";
-    const chartType = isLineChart ? "line" : "bar";
-
-    const datasets = [
-      {
-        label: `Your Hotel`,
-        data: yourData,
-        borderColor: chartColors.primary,
-        backgroundColor: isLineChart ? "transparent" : chartColors.primary,
-        tension: 0.3,
-        pointRadius: isLineChart ? 3 : 0,
-        pointBackgroundColor: chartColors.primary,
-        fill: false,
-      },
-      {
-        label: `The Market`,
-        data: marketData,
-        borderColor: chartColors.secondary,
-        backgroundColor: isLineChart ? "transparent" : chartColors.secondary,
-        tension: 0.3,
-        pointRadius: isLineChart ? 3 : 0,
-        pointBackgroundColor: chartColors.secondary,
-        fill: false,
-      },
-    ];
-
     this.chartInstance = new Chart(ctx, {
-      type: chartType, // Use the dynamic chart type
+      type: "bar",
       data: {
-        labels: labels, // Keep using the labels array for the category scale
-        datasets: datasets,
+        labels: labels,
+        datasets: [
+          {
+            label: `Your Hotel`,
+            data: yourData,
+            backgroundColor: chartColors.primary,
+          },
+          {
+            label: `The Market`,
+            data: marketData,
+            backgroundColor: chartColors.secondary,
+          },
+        ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: {
-            // Reverted to default category scale, removing 'time' type
-            grid: { display: false },
-          },
+          x: { grid: { display: false } },
           y: {
             min: 0,
             ticks: {
