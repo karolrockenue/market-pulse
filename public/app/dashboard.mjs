@@ -362,11 +362,14 @@ export default {
       adr: { label: "ADR", format: "currency" },
       revpar: { label: "RevPAR", format: "currency" },
     };
-    const chartColors = { primary: "#60a5fa", secondary: "#334155" };
+    const chartColors = {
+      primary: "#60a5fa", // Blue
+      secondary: "#334155", // Dark Gray
+      win: "rgba(16, 185, 129, 0.1)", // Subtle Green
+      lose: "rgba(239, 68, 68, 0.1)", // Subtle Red
+    };
 
-    // ACTION: Determine the chart type dynamically based on the current granularity.
-    // REASON: This fulfills the requirement to use a line chart for detailed daily trend analysis
-    //         and a bar chart for clearer comparison of aggregated weekly/monthly data.
+    // Determine the chart type dynamically based on the current granularity.
     const chartType = this.granularity === "daily" ? "line" : "bar";
 
     // Set the chart title dynamically based on the active metric and property name.
@@ -381,41 +384,49 @@ export default {
     const yourData = this.allMetrics.map((d) => d.your[this.activeMetric]);
     const marketData = this.allMetrics.map((d) => d.market[this.activeMetric]);
 
-    // ACTION: Define the datasets for the chart.
-    // REASON: We add line-specific properties (like tension and point radius) and adjust
-    //         background/border colors conditionally to ensure proper styling for both chart types.
+    // Define the datasets for the chart.
     const datasets = [
       {
         label: `Your Hotel`,
         data: yourData,
-        backgroundColor:
-          chartType === "line" ? chartColors.primary : chartColors.primary,
         borderColor: chartColors.primary,
-        fill: chartType === "line" ? false : true, // Only fill for bar charts
-        tension: 0.3, // Makes the line smooth
-        pointRadius: chartType === "line" ? 3 : 0, // Only show points on line charts
+        tension: 0.3,
+        pointRadius: chartType === "line" ? 3 : 0,
         pointBackgroundColor: chartColors.primary,
+        // ACTION: Implement conditional fill coloring for line charts.
+        // REASON: This shades the area between the two lines to visually highlight performance
+        //         gaps. The color changes based on which data point is higher.
+        fill:
+          chartType === "line"
+            ? {
+                target: 1, // Fill to the 'Market' dataset (at index 1)
+                above: chartColors.win, // Use green shade when 'we' are winning
+                below: chartColors.lose, // Use red shade when 'market' is winning
+              }
+            : true,
+        // Use a solid color for the bar chart background, but make the line's own background transparent.
+        backgroundColor:
+          chartType === "bar" ? chartColors.primary : "transparent",
       },
       {
         label: `The Market`,
         data: marketData,
-        backgroundColor:
-          chartType === "line" ? chartColors.secondary : chartColors.secondary,
         borderColor: chartColors.secondary,
-        fill: chartType === "line" ? false : true,
         tension: 0.3,
         pointRadius: chartType === "line" ? 3 : 0,
         pointBackgroundColor: chartColors.secondary,
+        // The fill is handled by the first dataset, so this one can be simple.
+        fill: false,
+        backgroundColor:
+          chartType === "bar" ? chartColors.secondary : "transparent",
       },
     ];
 
     // Create the new Chart.js instance with the dynamic configuration.
     this.chartInstance = new Chart(ctx, {
-      // ACTION: Use the dynamic chartType variable.
       type: chartType,
       data: {
         labels: labels,
-        // ACTION: Use the dynamically configured datasets.
         datasets: datasets,
       },
       options: {
