@@ -85,6 +85,35 @@ app.use(
     },
   })
 );
+// ADD THIS BLOCK FOR LOCAL DEVELOPMENT LOGIN
+if (process.env.VERCEL_ENV !== "production") {
+  // This endpoint is for development only and will not exist in the deployed Vercel environment.
+  // It allows developers to create an authenticated session without the full OAuth flow.
+  app.post("/api/dev-login", (req, res) => {
+    // Get the user ID from the request body.
+    const { userId, isAdmin = false } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "A userId is required." });
+    }
+
+    // Set the user ID and admin status in the session.
+    // This mimics the result of a real login.
+    req.session.userId = userId;
+    req.session.isAdmin = isAdmin;
+
+    // Save the session to the store.
+    req.session.save((err) => {
+      if (err) {
+        console.error("Dev login session save error:", err);
+        return res.status(500).json({ error: "Failed to save session." });
+      }
+      // Respond with success.
+      res
+        .status(200)
+        .json({ message: `Session created for user ${userId}.`, isAdmin });
+    });
+  });
+}
 
 // --- AUTHENTICATION & ROLE-BASED MIDDLEWARE ---
 const requireUserApi = (req, res, next) => {
@@ -213,16 +242,65 @@ app.get("/api/auth/magic-link-callback", async (req, res) => {
   }
 });
 
-app.get("/api/auth/session-info", (req, res) => {
+// server.js
+
+app.get("/api/auth/session-info", async (req, res) => {
+  // Check if a user session exists.
   if (req.session.userId) {
-    res.json({
-      isLoggedIn: true,
-      isAdmin: req.session.isAdmin || false,
-    });
+    try {
+      // --- START: DEBUG LOGGING ---
+      // Log the session user ID we are about to use in the query.
+      console.log(
+        "Attempting to fetch session info for userId:",
+        req.session.userId
+      );
+      // Log the type of the user ID to check for mismatches (e.g., number vs. string).
+      console.log("Type of session userId:", typeof req.session.userId);
+      // --- END: DEBUG LOGGING ---
+
+      // If a session exists, query the database to get the user's details.
+      const userResult = await pgPool.query(
+        "SELECT first_name, last_name, is_admin FROM users WHERE cloudbeds_user_id = $1",
+        [req.session.userId]
+      );
+
+      // If no user is found in the DB (edge case), respond with logged-out status.
+      if (userResult.rows.length === 0) {
+        // --- START: DEBUG LOGGING ---
+        // Log when a user is not found, which is different from an error.
+        console.log(
+          "User not found in database for userId:",
+          req.session.userId
+        );
+        // --- END: DEBUG LOGGING ---
+        return res.json({ isLoggedIn: false });
+      }
+
+      const user = userResult.rows[0];
+
+      // Respond with a rich object containing all necessary session info.
+      res.json({
+        isLoggedIn: true,
+        isAdmin: user.is_admin || false,
+        firstName: user.first_name,
+        lastName: user.last_name,
+      });
+    } catch (error) {
+      // --- START: DEBUG LOGGING ---
+      // This is the most important log. It will print the exact database error to the console.
+      console.error(
+        "CRITICAL ERROR in /api/auth/session-info endpoint:",
+        error
+      );
+      // --- END: DEBUG LOGGING ---
+
+      // If the database query fails, log the error and send a server error status.
+      res.status(500).json({ error: "Could not retrieve session info." });
+    }
   } else {
+    // If there is no session ID, respond with logged-out status.
     res.json({
       isLoggedIn: false,
-      isAdmin: false,
     });
   }
 });
