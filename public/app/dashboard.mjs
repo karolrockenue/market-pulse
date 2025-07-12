@@ -362,11 +362,15 @@ export default {
       adr: { label: "ADR", format: "currency" },
       revpar: { label: "RevPAR", format: "currency" },
     };
+    // Define configurations for different metrics and colors for the chart.
     const chartColors = {
       primary: "#60a5fa", // Blue
       secondary: "#334155", // Dark Gray
-      win: "rgba(16, 185, 129, 0.1)", // Subtle Green
-      lose: "rgba(239, 68, 68, 0.1)", // Subtle Red
+      // ACTION: Changed the 'win' color to a subtle blue and made both fills more transparent.
+      // REASON: To align the 'win' color with the primary brand color and make the
+      //         visual effect less distracting, as requested.
+      win: "rgba(96, 165, 250, 0.05)", // Very subtle blue
+      lose: "rgba(239, 68, 68, 0.05)", // Very subtle red
     };
 
     // Determine the chart type dynamically based on the current granularity.
