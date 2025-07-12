@@ -91,5 +91,5 @@ function parseDateFromInput(dateString) {
   return new Date(year, month - 1, day);
 }
 
-// Expose ONLY the function that the new component will need from the outside.
+// Expose ONLY the function that tche new component will need from the outside.
 window.generateMockData = generateMockData;
