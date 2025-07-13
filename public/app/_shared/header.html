@@ -1,18 +1,17 @@
 <header
   class="header h-auto md:h-16 flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 flex-shrink-0 sticky top-0 z-20"
+  x-data="pageHeader()"
+  x-cloak
 >
-  <h1
-    class="text-xl font-semibold text-gray-800 mb-4 md:mb-0"
-    x-text="pageTitle"
-  ></h1>
+  <div></div>
 
   <div class="flex items-center flex-wrap gap-4 md:gap-6">
     <div class="flex items-center gap-2">
       <div class="relative flex h-3 w-3">
         <span
           class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
-        ></span
-        ><span
+        ></span>
+        <span
           class="relative inline-flex rounded-full h-3 w-3 bg-green-500"
         ></span>
       </div>
@@ -23,7 +22,7 @@
       <button
         @click="propertyDropdownOpen = !propertyDropdownOpen"
         class="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-        :disabled="!hasProperties"
+        :disabled="properties.length === 0"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -60,14 +59,21 @@
           />
         </svg>
       </button>
-      <div x-show="propertyDropdownOpen" x-transition class="dropdown-content">
+      <div
+        x-show="propertyDropdownOpen"
+        x-transition
+        class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-1 z-10 border"
+      >
         <template x-for="property in properties" :key="property.property_id">
           <a
             href="#"
-            @click.prevent="switchProperty(property.property_id); propertyDropdownOpen = false;"
+            @click.prevent="switchProperty(property.property_id)"
             class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             x-text="property.property_name"
           ></a>
+        </template>
+        <template x-if="properties.length === 0">
+          <p class="px-4 py-2 text-sm text-gray-500">No properties found.</p>
         </template>
       </div>
     </div>
@@ -75,16 +81,16 @@
     <div @click.away="userDropdownOpen = false" class="relative">
       <button
         @click="userDropdownOpen = !userDropdownOpen"
-        class="flex items-center gap-2"
+        class="flex items-center gap-3"
       >
-        <img
-          class="h-9 w-9 rounded-full object-cover"
-          src="https://placehold.co/100x100/E2E8F0/4A5568?text=KM"
-          alt="Your avatar"
-        />
+        <div
+          class="h-9 w-9 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm"
+        >
+          <span x-text="user.initials"></span>
+        </div>
         <div>
-          <p class="text-sm font-semibold">Karol Marcu</p>
-          <p class="text-xs text-gray-400">Administrator</p>
+          <p class="text-sm font-semibold" x-text="user.name"></p>
+          <p class="text-xs text-gray-400" x-text="user.role"></p>
         </div>
         <svg
           class="h-4 w-4 text-gray-400"
@@ -98,13 +104,11 @@
           />
         </svg>
       </button>
-      <div x-show="userDropdownOpen" x-transition class="dropdown-content">
-        <a
-          href="#"
-          class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 opacity-50 cursor-not-allowed"
-          >Profile</a
-        >
-        <hr class="my-1 border-gray-200" />
+      <div
+        x-show="userDropdownOpen"
+        x-transition
+        class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-1 z-10 border"
+      >
         <a
           href="mailto:support@market-pulse.io"
           class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -116,13 +120,219 @@
         >
           Legal
         </button>
-        <hr class="my-1 border-gray-200" />
+        <div class="border-t my-1"></div>
         <button
           @click="logout()"
           class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
         >
           Log Out
         </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    x-show="isLegalModalOpen"
+    x-transition
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75"
+    style="display: none"
+  >
+    <div
+      @click.away="isLegalModalOpen = false"
+      class="relative bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full m-4 max-h-[80vh] overflow-y-auto"
+    >
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Legal Information</h2>
+        <button
+          @click="isLegalModalOpen = false"
+          class="text-gray-500 hover:text-gray-800"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            ></path>
+          </svg>
+        </button>
+      </div>
+      <div
+        class="space-y-10 prose prose-slate max-w-none text-sm prose-headings:mb-2 prose-p:mt-1 prose-p:leading-normal"
+      >
+        <div>
+          <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">
+            Terms of Service
+          </h3>
+          <p><strong>Last Updated: July 9, 2025</strong></p>
+          <h5>Introduction</h5>
+          <p>
+            Welcome to Market Pulse. These Terms of Service ("Terms") govern
+            your access to and use of the services, websites, and applications
+            offered by Market Pulse ("Service"), operated by
+            <strong>ROCKENUE INTERNATIONAL GROUP</strong>.
+          </p>
+          <p>
+            By accessing or using our Service, you agree to be bound by these
+            Terms and our Privacy Policy. If you do not agree to these Terms,
+            you may not use the Service.
+          </p>
+          <h5>1. Description of Service</h5>
+          <p>
+            The Service provides hotel operators with a performance analytics
+            dashboard, market benchmarking tools, and other data insights by
+            accessing data from your connected Property Management System (PMS)
+            on a read-only basis.
+          </p>
+          <h5>2. Fees and Changes to Service</h5>
+          <p>
+            The core features of the Service are currently provided to you free
+            of charge. However, we reserve the right to introduce fees for the
+            use of the Service or for new premium features in the future. We may
+            also change our business model at our sole discretion. We will
+            provide you with at least
+            <strong>30 days' advance notice</strong> of any such changes to fees
+            or the business model. Your continued use of the Service after a
+            price change becomes effective constitutes your agreement to pay the
+            new amount.
+          </p>
+          <h5>3. Intellectual Property and Data Rights</h5>
+          <h6>a) Our Intellectual Property</h6>
+          <p>
+            The Service and its original content, features, and functionality
+            are and will remain the exclusive property of ROCKENUE INTERNATIONAL
+            GROUP and its licensors.
+          </p>
+          <h6>b) License to Your Data</h6>
+          <p>
+            To operate and improve the Service, you grant us a worldwide,
+            perpetual, irrevocable, royalty-free license to use, host, store,
+            reproduce, modify, and create derivative works from the data
+            provided by your PMS. Specifically, you agree that:
+          </p>
+          <ul class="list-disc list-inside space-y-2 pl-4">
+            <li>
+              We will use your hotel's performance data to power your private
+              dashboard.
+            </li>
+            <li>
+              We will use your hotel's performance data in an
+              <strong>anonymized and aggregated</strong> form, combined with
+              data from other hotels, to create market analytics, reports, and
+              other data-driven products.
+            </li>
+            <li>
+              These aggregated and anonymized data products may be used to
+              create new tools or be part of commercial offerings sold to third
+              parties (such as developers, research agencies, or other
+              businesses).
+            </li>
+            <li>
+              In any public or commercial use of this aggregated data, your
+              hotel's name, confidential information, or any other personally
+              identifiable information will <strong>never</strong> be disclosed.
+            </li>
+          </ul>
+          <h5>4. User Conduct and Acceptable Use</h5>
+          <p>
+            You are responsible for all activities that occur under your
+            account. You agree not to: Use the Service for any illegal or
+            unauthorized purpose; Attempt to de-anonymize, reverse-engineer,
+            scrape, or otherwise steal the data, source code, or core business
+            ideas of the Service; or Resell or sublicense your access to the
+            Service.
+          </p>
+          <h5>5. Termination</h5>
+          <p>
+            You may terminate these Terms at any time by disconnecting the
+            Market Pulse application from within your PMS settings. We may
+            terminate or suspend your access to our Service immediately, without
+            prior notice or liability, if you breach the Terms, particularly the
+            "User Conduct and Acceptable Use" section.
+          </p>
+          <h5>6. Data Withdrawal</h5>
+          <p>
+            In addition to your rights under our Privacy Policy, you may request
+            the removal of your specific hotel's historical performance data
+            from our active databases. To do so, you must send a formal request
+            to our support email. We will process this request and remove the
+            data as is commercially reasonable. Please note that data already
+            included in historical, anonymized, and aggregated market sets
+            cannot be retroactively removed.
+          </p>
+          <h5>7. Disclaimer of Warranties & Limitation of Liability</h5>
+          <p>
+            The Service is provided on an "AS IS" and "AS AVAILABLE" basis. We
+            do not warrant that the service will be uninterrupted, secure, or
+            error-free. In no event shall ROCKENUE INTERNATIONAL GROUP be liable
+            for any indirect, incidental, or consequential damages resulting
+            from your use of the Service.
+          </p>
+          <h5>8. Governing Law</h5>
+          <p>
+            These Terms shall be governed and construed in accordance with the
+            laws of the <strong>United Arab Emirates</strong>, without regard to
+            its conflict of law provisions.
+          </p>
+          <h5>9. Contact Us</h5>
+          <p>
+            If you have any questions about these Terms, please contact us at:
+            <strong>support@market-pulse.io</strong>.
+          </p>
+        </div>
+        <div>
+          <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">
+            Privacy Policy
+          </h3>
+          <p><strong>Last Updated: July 9, 2025</strong></p>
+          <h5>Introduction</h5>
+          <p>
+            This Privacy Policy describes how Market Pulse, operated by
+            <strong>ROCKENUE INTERNATIONAL GROUP</strong> ("we", "us", or
+            "our"), collects, uses, and discloses your information when you use
+            our services. Our registered address is 5842+632 Grand Stand, Nad Al
+            Sheba 1, Dubai, United Arab Emirates.
+          </p>
+          <h5>1. Information We Collect</h5>
+          <p>
+            We collect Personal Data (name, email), Hotel Performance Data
+            (read-only metrics like ADR, Occupancy), and Usage Data (via
+            essential session cookies and Google Analytics).
+          </p>
+          <h5>2. How We Use Your Information</h5>
+          <p>
+            We use your data to power your dashboard, create anonymized market
+            benchmarks, manage your account, and improve the service.
+          </p>
+          <h5>3. Sharing and Disclosure of Information</h5>
+          <p>
+            We do not sell your personal or individual hotel data. We share data
+            only with essential third-party services like Vercel, Neon,
+            SendGrid, and Google Analytics for operational purposes.
+          </p>
+          <h5>4. Data Retention</h5>
+          <p>
+            We have retained your Personal Data for 1 year after account
+            termination. Anonymized hotel data is retained indefinitely for
+            market analysis.
+          </p>
+          <h5>5. Your Data Protection Rights (GDPR)</h5>
+          <p>
+            You have the right to access, update, delete, or object to the
+            processing of your Personal Data. Please contact us to exercise
+            these rights.
+          </p>
+          <h5>6. Contact Us</h5>
+          <p>
+            If you have any questions about this Privacy Policy, please contact
+            us by email at: <strong>support@market-pulse.io</strong>
+          </p>
+        </div>
       </div>
     </div>
   </div>

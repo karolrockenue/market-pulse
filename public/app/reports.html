@@ -11,7 +11,7 @@
     ></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.x/dist/typography.min.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700;800&display=swap"
       rel="stylesheet"
@@ -33,6 +33,10 @@
         font-family: var(--font-sans);
         background-color: var(--bg-primary);
         color: var(--text-primary);
+      }
+      .header {
+        background-color: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
       }
       .font-data {
         font-family: var(--font-data);
@@ -162,7 +166,6 @@
 
       <div class="flex-1 flex flex-col">
         <div id="header-placeholder"></div>
-
         <main class="flex-1 p-8" x-data="reportsPage()">
           <div
             class="bg-white p-4 rounded-xl border border-gray-200 mb-8 flex flex-col gap-4"
@@ -1083,10 +1086,38 @@
           nextScheduleId: 1,
 
           // Init
-          init() {
+          // Init
+          // Init
+          async init() {
+            // --- Start: Header Loading Logic ---
+
+            // 1. Dynamically import the loader utility AND the header's JavaScript logic
+            const { loadComponent } = await import("/app/utils.mjs");
+            const { default: pageHeader } = await import(
+              "/app/_shared/header.mjs"
+            );
+
+            // 2. Manually register the header's logic with AlpineJS under the name 'pageHeader'
+            Alpine.data("pageHeader", pageHeader);
+
+            // 3. NOW load the header's HTML. Alpine will find the component it needs.
+            await loadComponent("header", "header-placeholder");
+
+            // --- End: Header Loading Logic ---
+
+            // Original initialization logic for the reports page
             this.handlePresetChange("current-month");
             this.handleGenerateReport();
             this.handleFrequencyChange();
+
+            // Listen for property changes from the header
+            window.addEventListener("property-changed", (event) => {
+              console.log(
+                "Reports page heard a property change:",
+                event.detail.propertyId
+              );
+              // When we connect to live data, we will re-run the report here.
+            });
           },
 
           renderReportTable(
