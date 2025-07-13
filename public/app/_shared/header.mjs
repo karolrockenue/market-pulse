@@ -3,9 +3,8 @@ export default function pageHeader() {
   return {
     // --- STATE ---
     propertyDropdownOpen: false,
-
     userDropdownOpen: false,
-    isLegalModalOpen: false, // Add this line
+    isLegalModalOpen: false,
     properties: [],
     currentPropertyId: null,
     currentPropertyName: "Loading...",
@@ -22,11 +21,10 @@ export default function pageHeader() {
       this.fetchProperties();
       this.fetchLastRefreshTime();
 
-      // Listen for a custom event from a page to change the property
       window.addEventListener("change-property", (event) => {
         const newId = event.detail.propertyId;
         if (this.currentPropertyId !== newId) {
-          this.switchProperty(newId, false); // don't trigger a new event
+          this.switchProperty(newId, false);
         }
       });
     },
@@ -37,7 +35,10 @@ export default function pageHeader() {
         const response = await fetch("/api/auth/session-info");
         const session = await response.json();
         if (session.isLoggedIn) {
-          this.user.name = session.firstName || "User";
+          // This combines first and last name to show the full name
+          this.user.name =
+            `${session.firstName || ""} ${session.lastName || ""}`.trim() ||
+            "User";
           this.user.initials = (session.firstName || "U").charAt(0);
           this.user.role = session.isAdmin ? "Administrator" : "User";
         }
@@ -55,10 +56,7 @@ export default function pageHeader() {
         this.properties = props;
 
         if (props.length > 0) {
-          // Try to get the last selected property from localStorage
           let savedPropertyId = localStorage.getItem("selectedPropertyId");
-
-          // Check if the saved ID is valid
           const isValid = props.some((p) => p.property_id === savedPropertyId);
 
           if (savedPropertyId && isValid) {
@@ -78,16 +76,42 @@ export default function pageHeader() {
       }
     },
 
+    // --- THIS FUNCTION HAS BEEN UPDATED ---
     async fetchLastRefreshTime() {
       try {
         const response = await fetch("/api/last-refresh-time");
+        if (!response.ok) throw new Error("Could not fetch refresh time."); // Fail silently to the catch block
+
         const data = await response.json();
         const lastRefreshDate = new Date(data.last_successful_run);
-        this.lastRefreshText = `Data updated ${lastRefreshDate.toLocaleDateString(
-          "en-GB",
-          { day: "2-digit", month: "short", year: "numeric" }
-        )}`;
+        const now = new Date();
+
+        // 1. Format the full date and time string using toLocaleString
+        const fullTimestamp = lastRefreshDate.toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false, // Use 24-hour format
+        });
+
+        // 2. Calculate the difference in hours or minutes
+        const diffMs = now - lastRefreshDate;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        let relativeTime = "";
+
+        if (diffHours < 1) {
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          relativeTime = `(${diffMinutes}m ago)`;
+        } else {
+          relativeTime = `(${diffHours}h ago)`;
+        }
+
+        // 3. Combine them into the final text
+        this.lastRefreshText = `Data updated ${fullTimestamp} ${relativeTime}`;
       } catch (error) {
+        // Fallback if the API fails
         this.lastRefreshText = "Live Data";
       }
     },
@@ -104,7 +128,7 @@ export default function pageHeader() {
     switchProperty(propertyId, dispatchEvent = true) {
       this.currentPropertyId = propertyId;
       this.updateCurrentPropertyName();
-      localStorage.setItem("selectedPropertyId", propertyId); // Save selection
+      localStorage.setItem("selectedPropertyId", propertyId);
       this.propertyDropdownOpen = false;
 
       if (dispatchEvent) {
@@ -113,7 +137,6 @@ export default function pageHeader() {
     },
 
     dispatchPropertyChangeEvent() {
-      // Dispatch a custom event that the main page component can listen to
       window.dispatchEvent(
         new CustomEvent("property-changed", {
           detail: { propertyId: this.currentPropertyId },
