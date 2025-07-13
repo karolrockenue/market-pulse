@@ -2,9 +2,6 @@
 
 export default {
   // --- STATE PROPERTIES ---
-  // ACTION: Replaced single 'isInitialLoading' with a granular loading state object.
-  // REASON: This allows us to track the loading state for each part of the dashboard
-  //         independently, which is essential for the skeleton loading pattern.
   isLoading: {
     kpis: true,
     chart: true,
@@ -29,26 +26,38 @@ export default {
     adr: { your: "-", market: "-", delta: "" },
     revpar: { your: "-", market: "-", delta: "" },
   },
-  chartTitle: "",
-  isChartEmpty: true,
   marketSubtitle: "",
   allMetrics: [],
-  chartInstance: null,
+  // This will hold the ECharts instance.
+  chart: null,
+  chartUpdateTimeout: null,
 
   // --- INITIALIZATION ---
   init() {
     this.initializeDashboard();
-    this.$watch("allMetrics", () => this.updateChart());
-    this.$watch("activeMetric", () => this.updateChart());
+  },
+
+  async initializeDashboard() {
+    this.checkUserRoleAndSetupNav();
+    this.fetchAndDisplayLastRefreshTime();
+
+    // Defer chart initialization until the DOM is fully rendered.
+    // This uses Alpine's $nextTick to wait for the container div to be ready,
+    // which fixes the "only appears with dev tools" bug.
+    this.$nextTick(() => {
+      this.initChart();
+    });
+    // Fetch properties, which will trigger the first data load.
+    await this.populatePropertySwitcher();
+    // Add a listener to resize the chart when the window is resized.
+    window.addEventListener("resize", () => {
+      if (this.chart) {
+        this.chart.resize();
+      }
+    });
   },
 
   // --- STARTUP LOGIC ---
-  async initializeDashboard() {
-    this.checkUserRoleAndSetupNav(); // Fire-and-forget
-    this.fetchAndDisplayLastRefreshTime(); // Fire-and-forget
-    await this.populatePropertySwitcher();
-  },
-
   async checkUserRoleAndSetupNav() {
     try {
       const response = await fetch("/api/auth/session-info");
@@ -71,6 +80,9 @@ export default {
       if (properties.length === 0) {
         this.hasProperties = false;
         this.currentPropertyName = "No Properties Found";
+        this.chart.setOption({
+          graphic: { style: { text: "Connect a property to see your data." } },
+        });
         return;
       }
 
@@ -102,10 +114,204 @@ export default {
     }
   },
 
+  // --- CHART LOGIC (ECHARTS) ---
+  initChart() {
+    // Initialize an ECharts instance in the 'light' theme.
+    this.chart = echarts.init(this.$refs.chartContainer, "light", {
+      renderer: "svg",
+    });
+
+    // Define the baseline options that are common to all chart states.
+    const baselineOptions = {
+      // Use a title component for the main title text.
+      title: {
+        text: "",
+        left: "left",
+        textStyle: {
+          color: "#1e293b",
+          fontFamily: "Inter, sans-serif",
+          fontSize: 20,
+          fontWeight: 600,
+        },
+      },
+      // Configure the legend for our two data series.
+      legend: {
+        data: ["Your Hotel", "The Market"],
+        right: 10,
+        top: 5,
+        icon: "circle",
+        itemStyle: {
+          borderColor: "#60a5fa", // A subtle touch
+        },
+      },
+      // The grid component controls the positioning of the chart plot.
+      grid: {
+        left: "3%",
+        right: "4%",
+        bottom: "3%",
+        containLabel: true, // Ensures axis labels don't get cut off.
+      },
+      // Tooltip configuration for hover interactions.
+      tooltip: {
+        trigger: "axis",
+        axisPointer: {
+          type: "cross",
+          label: {
+            backgroundColor: "#6a7985",
+          },
+        },
+      },
+      // X-axis configured for time-series data.
+      xAxis: {
+        type: "time",
+      },
+      // Y-axis configured for numerical values.
+      yAxis: {
+        type: "value",
+        min: 0,
+        axisLabel: {
+          formatter: (value) => this.formatValue(value, this.activeMetric),
+        },
+      },
+      // The series array will be populated dynamically.
+      series: [],
+      // Animation settings for smooth transitions.
+      animationEasing: "easeinout",
+      animationDuration: 1000,
+    };
+
+    // Set the initial options on the chart.
+    this.chart.setOption(baselineOptions);
+    // Show a loading message until data is fetched.
+    this.chart.showLoading();
+  },
+
+  updateChart() {
+    // Use the timeout pattern to ensure stability.
+    clearTimeout(this.chartUpdateTimeout);
+    this.chartUpdateTimeout = setTimeout(() => {
+      if (!this.chart) return;
+
+      // Hide loading animation now that we have data.
+      this.chart.hideLoading();
+
+      const metricConfig = {
+        occupancy: { label: "Occupancy", format: "percent" },
+        adr: { label: "ADR", format: "currency" },
+        revpar: { label: "RevPAR", format: "currency" },
+      };
+
+      const newChartType = this.granularity === "monthly" ? "bar" : "line";
+
+      // --- ECharts Series Configuration ---
+      // This is where we define the visual representation of our data.
+      const yourHotelSeries = {
+        name: "Your Hotel",
+        type: newChartType,
+        smooth: true,
+        symbol: "none", // No data point markers by default
+        sampling: "lttb", // Downsampling for performance with large datasets
+        emphasis: {
+          // Style on hover
+          focus: "series",
+        },
+        lineStyle: {
+          width: 2,
+        },
+        // For 'line' charts, this creates the gradient area fill.
+        areaStyle:
+          newChartType === "line"
+            ? {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: "rgba(96, 165, 250, 0.25)" },
+                  { offset: 1, color: "rgba(96, 165, 250, 0.05)" },
+                ]),
+              }
+            : null,
+        // For 'bar' charts, this provides rounded corners.
+        itemStyle:
+          newChartType === "bar"
+            ? {
+                borderRadius: [4, 4, 0, 0],
+              }
+            : null,
+        data: this.allMetrics.map((d) => [d.date, d.your[this.activeMetric]]),
+      };
+
+      const marketSeries = {
+        name: "The Market",
+        type: newChartType,
+        smooth: true,
+        symbol: "none",
+        sampling: "lttb",
+        emphasis: {
+          focus: "series",
+        },
+        lineStyle: {
+          width: 2,
+        },
+        itemStyle:
+          newChartType === "bar"
+            ? {
+                borderRadius: [4, 4, 0, 0],
+              }
+            : null,
+        data: this.allMetrics.map((d) => [d.date, d.market[this.activeMetric]]),
+      };
+
+      // The `setOption` method is declarative. ECharts intelligently merges
+      // these options with the existing ones to create a smooth transition.
+      this.chart.setOption(
+        {
+          title: {
+            text: `${metricConfig[this.activeMetric].label} for ${
+              this.currentPropertyName
+            } vs The Market`,
+          },
+          // The color palette for the series.
+          color: ["#60a5fa", "#334155"],
+          tooltip: {
+            // Custom formatter for the tooltip content.
+            formatter: (params) => {
+              let date = new Date(params[0].axisValue);
+              let tooltipHtml = `${date.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}<br/>`;
+              params.forEach((param) => {
+                tooltipHtml += `
+                        <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${
+                          param.color
+                        };"></span>
+                        ${param.seriesName}: <strong>${this.formatValue(
+                  param.value[1],
+                  this.activeMetric
+                )}</strong>
+                        <br/>
+                    `;
+              });
+              return tooltipHtml;
+            },
+          },
+          // Update the y-axis label formatter for the current metric.
+          yAxis: {
+            axisLabel: {
+              formatter: (value) => this.formatValue(value, this.activeMetric),
+            },
+          },
+          // Provide the new series data. `notMerge` is false by default, allowing smooth animation.
+          series: [yourHotelSeries, marketSeries],
+        },
+        {
+          // Do not merge series arrays, replace them instead.
+          replaceMerge: ["series"],
+        }
+      );
+    }, 100);
+  },
+
   // --- CORE DATA LOGIC ---
-  // ACTION: Created separate, focused functions for loading different data modules.
-  // REASON: This allows us to update each part of the UI as soon as its data is
-  //         ready, rather than waiting for all API calls to finish.
   async loadKpis(startDate, endDate) {
     this.isLoading.kpis = true;
     try {
@@ -116,7 +322,7 @@ export default {
       this.renderKpiCards(kpiData);
     } catch (error) {
       this.showError(error.message);
-      this.renderKpiCards(null); // Clear cards on error
+      this.renderKpiCards(null);
     } finally {
       this.isLoading.kpis = false;
     }
@@ -125,6 +331,7 @@ export default {
   async loadChartAndTables(startDate, endDate, granularity) {
     this.isLoading.chart = true;
     this.isLoading.tables = true;
+    this.chart?.showLoading();
     try {
       const propertyId = this.currentPropertyId;
       const urls = [
@@ -150,9 +357,11 @@ export default {
         marketData.competitorCount > 0
           ? `Based on a competitive set of ${marketData.competitorCount} hotels.`
           : "No competitor data available for this standard.";
+      this.updateChart();
     } catch (error) {
       this.showError(error.message);
       this.allMetrics = [];
+      this.updateChart();
     } finally {
       this.isLoading.chart = false;
       this.isLoading.tables = false;
@@ -160,7 +369,6 @@ export default {
   },
 
   processAndMergeData(yourData, marketData) {
-    // This function remains the same as before
     const dataMap = new Map();
     const processRow = (row, source) => {
       const date = (row.stay_date || row.period).substring(0, 10);
@@ -195,7 +403,6 @@ export default {
   },
 
   renderKpiCards(kpiData) {
-    // This function remains the same as before
     if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
       this.kpi = {
         occupancy: { your: "-", market: "-", delta: "" },
@@ -235,9 +442,6 @@ export default {
   },
 
   // --- UI CONTROL METHODS ---
-  // ACTION: Modified runReport to trigger the new modular loading functions.
-  // REASON: This orchestrates the progressive loading, fetching data for
-  //         all modules concurrently.
   runReport() {
     if (!this.dates.start || !this.dates.end || !this.granularity) return;
     this.error.show = false;
@@ -251,7 +455,6 @@ export default {
   },
 
   setPreset(preset) {
-    // This function remains largely the same
     this.activePreset = preset;
     const today = new Date();
     const yearUTC = today.getUTCFullYear();
@@ -275,7 +478,6 @@ export default {
   },
 
   switchProperty(propertyId) {
-    // This function remains the same
     if (this.currentPropertyId === propertyId) return;
     const property = this.properties.find((p) => p.property_id === propertyId);
     if (property) {
@@ -287,10 +489,10 @@ export default {
 
   setActiveMetric(metric) {
     this.activeMetric = metric;
+    this.updateChart();
   },
 
   logout() {
-    // This function remains the same
     fetch("/api/auth/logout", { method: "POST" })
       .then((res) => {
         if (res.ok) window.location.href = "/signin";
@@ -305,7 +507,6 @@ export default {
   },
 
   // --- HELPER & FORMATTING METHODS ---
-  // All helpers (getDelta, formatValue, formatDateLabel) remain the same
   getDelta(day) {
     if (
       !day.your ||
@@ -334,6 +535,9 @@ export default {
   },
 
   formatValue(value, type) {
+    if (value === null || typeof value === "undefined") {
+      return "-";
+    }
     const num = parseFloat(value);
     if (isNaN(num)) return "-";
     if (type === "percent" || type === "occupancy") {
@@ -347,6 +551,8 @@ export default {
       return new Intl.NumberFormat("en-GB", {
         style: "currency",
         currency: "GBP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }).format(num);
     }
     return num.toFixed(2);
@@ -366,104 +572,5 @@ export default {
       return `Wk of ${date.toLocaleDateString("en-GB", { timeZone: "UTC" })}`;
     }
     return date.toLocaleDateString("en-GB", { timeZone: "UTC" });
-  },
-
-  // --- REACTIVE CHART METHOD ---
-  // The updateChart method remains the same
-  updateChart() {
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-    }
-    this.isChartEmpty = this.allMetrics.length === 0;
-    if (this.isChartEmpty) return;
-
-    const ctx = this.$refs.chartCanvas.getContext("2d");
-    const metricConfig = {
-      occupancy: { label: "Occupancy", format: "percent" },
-      adr: { label: "ADR", format: "currency" },
-      revpar: { label: "RevPAR", format: "currency" },
-    };
-    const chartColors = {
-      primary: "#60a5fa",
-      secondary: "#334155",
-      win: "rgba(96, 165, 250, 0.05)",
-      lose: "rgba(239, 68, 68, 0.05)",
-    };
-    const chartType = this.granularity === "daily" ? "line" : "bar";
-    this.chartTitle = `${metricConfig[this.activeMetric].label} for ${
-      this.currentPropertyName
-    } vs The Market`;
-    const labels = this.allMetrics.map((d) =>
-      this.formatDateLabel(d.date, this.granularity)
-    );
-    const yourData = this.allMetrics.map((d) => d.your[this.activeMetric]);
-    const marketData = this.allMetrics.map((d) => d.market[this.activeMetric]);
-    const datasets = [
-      {
-        label: `Your Hotel`,
-        data: yourData,
-        borderColor: chartColors.primary,
-        tension: 0.3,
-        pointRadius: chartType === "line" ? 3 : 0,
-        pointBackgroundColor: chartColors.primary,
-        fill:
-          chartType === "line"
-            ? {
-                target: 1,
-                above: chartColors.win,
-                below: chartColors.lose,
-              }
-            : true,
-        backgroundColor:
-          chartType === "bar" ? chartColors.primary : "transparent",
-      },
-      {
-        label: `The Market`,
-        data: marketData,
-        borderColor: chartColors.secondary,
-        tension: 0.3,
-        pointRadius: chartType === "line" ? 3 : 0,
-        pointBackgroundColor: chartColors.secondary,
-        fill: false,
-        backgroundColor:
-          chartType === "bar" ? chartColors.secondary : "transparent",
-      },
-    ];
-    this.chartInstance = new Chart(ctx, {
-      type: chartType,
-      data: { labels: labels, datasets: datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: { grid: { display: false } },
-          y: {
-            min: 0,
-            ticks: {
-              callback: (value) =>
-                this.formatValue(value, metricConfig[this.activeMetric].format),
-            },
-          },
-        },
-        plugins: {
-          legend: {
-            position: "top",
-            align: "end",
-            labels: { usePointStyle: true, boxWidth: 8, padding: 20 },
-          },
-          tooltip: {
-            mode: "index",
-            intersect: false,
-            callbacks: {
-              label: (context) =>
-                `${context.dataset.label}: ${this.formatValue(
-                  context.parsed.y,
-                  metricConfig[this.activeMetric].format
-                )}`,
-            },
-          },
-        },
-      },
-    });
   },
 };
