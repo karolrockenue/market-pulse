@@ -187,48 +187,46 @@ export default {
   },
 
   updateChart() {
-    // Use the timeout pattern to ensure stability.
+    // Use the timeout pattern to ensure stability and prevent rapid-fire updates from conflicting.
     clearTimeout(this.chartUpdateTimeout);
     this.chartUpdateTimeout = setTimeout(() => {
+      // Guard clause to ensure the chart instance exists before we try to update it.
       if (!this.chart) return;
 
-      // Hide loading animation now that we have data.
+      // Capture the Alpine component's context (`this`) into a variable.
+      // This is the key fix to ensure helper functions like formatValue can be found
+      // from within the ECharts tooltip formatter callback.
+      const self = this;
+
+      // Hide the loading animation now that we have data to display.
       this.chart.hideLoading();
 
+      // A configuration map to get display properties for the active metric.
       const metricConfig = {
         occupancy: { label: "Occupancy", format: "percent" },
         adr: { label: "ADR", format: "currency" },
         revpar: { label: "RevPAR", format: "currency" },
       };
 
+      // Dynamically switch between a bar chart for monthly data and a line chart for daily data.
       const newChartType = this.granularity === "monthly" ? "bar" : "line";
 
       // --- ECharts Series Configuration ---
-      // This is where we define the visual representation of our data.
       const yourHotelSeries = {
         name: "Your Hotel",
         type: newChartType,
         smooth: true,
-        symbol: "none", // No data point markers by default
-        sampling: "lttb", // Downsampling for performance with large datasets
+        symbol: "none",
+        sampling: "lttb",
         emphasis: {
-          // Style on hover
           focus: "series",
         },
         lineStyle: {
-          width: 2,
+          width: 3, // Slightly thicker line for emphasis
         },
-        // For 'line' charts, this creates the gradient area fill.
-        areaStyle:
-          newChartType === "line"
-            ? {
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: "rgba(96, 165, 250, 0.25)" },
-                  { offset: 1, color: "rgba(96, 165, 250, 0.05)" },
-                ]),
-              }
-            : null,
-        // For 'bar' charts, this provides rounded corners.
+        // The color is now set directly on the series for guaranteed results.
+        color: "#FBBF24", // Warm Yellow
+        // The areaStyle has been completely removed to get rid of the background fill.
         itemStyle:
           newChartType === "bar"
             ? {
@@ -250,6 +248,8 @@ export default {
         lineStyle: {
           width: 2,
         },
+        // The color is also set directly on this series.
+        color: "#60a5fa", // Clear Blue
         itemStyle:
           newChartType === "bar"
             ? {
@@ -259,8 +259,7 @@ export default {
         data: this.allMetrics.map((d) => [d.date, d.market[this.activeMetric]]),
       };
 
-      // The `setOption` method is declarative. ECharts intelligently merges
-      // these options with the existing ones to create a smooth transition.
+      // The `setOption` method declaratively updates the chart.
       this.chart.setOption(
         {
           title: {
@@ -268,10 +267,10 @@ export default {
               this.currentPropertyName
             } vs The Market`,
           },
-          // The color palette for the series.
-          color: ["#60a5fa", "#334155"],
+          // The top-level color array is removed, as colors are now set on each series directly.
           tooltip: {
-            // Custom formatter for the tooltip content.
+            // This custom formatter now uses the 'self' variable to reliably
+            // call the formatValue helper, ensuring correct formatting.
             formatter: (params) => {
               let date = new Date(params[0].axisValue);
               let tooltipHtml = `${date.toLocaleDateString("en-GB", {
@@ -279,14 +278,15 @@ export default {
                 month: "short",
                 year: "numeric",
               })}<br/>`;
+
               params.forEach((param) => {
                 tooltipHtml += `
                         <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${
                           param.color
                         };"></span>
-                        ${param.seriesName}: <strong>${this.formatValue(
+                        ${param.seriesName}: <strong>${self.formatValue(
                   param.value[1],
-                  this.activeMetric
+                  self.activeMetric
                 )}</strong>
                         <br/>
                     `;
@@ -294,17 +294,16 @@ export default {
               return tooltipHtml;
             },
           },
-          // Update the y-axis label formatter for the current metric.
           yAxis: {
             axisLabel: {
-              formatter: (value) => this.formatValue(value, this.activeMetric),
+              // Also update the y-axis formatter to use the safe 'self' context.
+              formatter: (value) => self.formatValue(value, self.activeMetric),
             },
           },
-          // Provide the new series data. `notMerge` is false by default, allowing smooth animation.
+          // Provide the new series data.
           series: [yourHotelSeries, marketSeries],
         },
         {
-          // Do not merge series arrays, replace them instead.
           replaceMerge: ["series"],
         }
       );

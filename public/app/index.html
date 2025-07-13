@@ -4,26 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Market Pulse Dashboard</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.x/dist/typography.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;700;800&display=swap"
-      rel="stylesheet"
-    />
+
     <style>
       :root {
-        --bg-primary: #f7f8fc;
-        --bg-secondary: #ffffff;
-        --text-primary: #1e293b;
-        --text-secondary: #64748b;
-        --border-color: #e2e8f0;
-        --accent-primary: #60a5fa;
-        --highlight-color: #eff6ff;
-        --font-sans: "Inter", sans-serif;
-        --font-data: "Manrope", sans-serif;
+        /* New "Light AI" color palette */
+        --bg-primary: #f8fafc; /* A very light, cool grey for the main background */
+        --bg-secondary: #ffffff; /* Pure white for cards, sidebars, and panels */
+        --text-primary: #0f172a; /* High-contrast slate for primary text */
+        --text-secondary: #3b82f6; /* Softer slate for secondary text and labels */
+        --border-color: #e2e8f0; /* A neutral border color */
+        --accent-primary: #3b82f6; /* A vibrant, futuristic purple for accents */
+        --highlight-color: #f5f3ff; /* A light lavender for hover states and highlights */
+
+        /* New font pairing for a more scientific feel */
+        --font-sans: "Inter", sans-serif; /* Keep Inter for its excellent UI clarity */
+        --font-data: "IBM Plex Mono", monospace; /* Use a monospaced font for all numerical data */
       }
       body {
         font-family: var(--font-sans);
