@@ -11,7 +11,7 @@
     />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.x/dist/typography.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
@@ -128,7 +128,7 @@
       }
     </style>
   </head>
-  <body class="antialiased" x-data="dashboardPage()" x-cloak>
+  <body class="antialiased" x-data="dashboard" x-cloak>
     <div class="flex flex-col lg:flex-row min-h-screen">
       <aside class="sidebar w-full lg:w-64 lg:flex-shrink-0 flex flex-col">
         <div
@@ -812,17 +812,18 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
     <script type="module">
-      import dashboard from "/app/dashboard.mjs";
-      window.dashboardPage = function () {
-        return dashboard;
-      };
-      // Load Alpine.js after our component is defined
-      const alpineScript = document.createElement("script");
-      alpineScript.src =
-        "https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js";
-      alpineScript.defer = true;
-      document.head.appendChild(alpineScript);
+      import dashboardComponent from "/app/dashboard.mjs";
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("dashboard", () => dashboardComponent);
+      });
     </script>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+      defer
+    ></script>
   </body>
 </html>

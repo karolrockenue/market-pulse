@@ -1,13 +1,160 @@
-// dashboard.mjs
+// --- Standalone Helper Function ---
+// This function is now independent and can be used by both the Alpine component and the chart manager.
+function formatValue(value, type) {
+  if (value === null || typeof value === "undefined") {
+    return "-";
+  }
+  const num = parseFloat(value);
+  if (isNaN(num)) return "-";
+  if (type === "percent" || type === "occupancy") {
+    return new Intl.NumberFormat("en-GB", {
+      style: "percent",
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(num);
+  }
+  if (type === "currency" || type === "adr" || type === "revpar") {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  }
+  return num.toFixed(2);
+}
 
-export default {
-  // --- STATE PROPERTIES ---
-  isLoading: {
-    kpis: true,
-    chart: true,
-    tables: true,
-    properties: true,
+// --- NEW: The Standalone Chart Manager ---
+// This object handles all ECharts logic, completely separate from Alpine.js.
+const chartManager = {
+  chartInstance: null,
+  activeMetric: "occupancy", // The chart needs to know the metric type for formatting
+
+  // The init function now accepts the container element as an argument.
+  init(containerElement) {
+    // Use the default Canvas renderer for stability.
+    this.chartInstance = echarts.init(containerElement, "light");
+
+    const baselineOptions = {
+      title: {
+        text: "",
+        left: "left",
+        textStyle: {
+          color: "#1e293b",
+          fontFamily: "Inter, sans-serif",
+          fontSize: 20,
+          fontWeight: 600,
+        },
+      },
+      legend: {
+        data: ["Your Hotel", "The Market"],
+        right: 10,
+        top: 5,
+        icon: "circle",
+        itemStyle: { borderColor: "#60a5fa" },
+      },
+      grid: { left: "3%", right: "4%", bottom: "3%", containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "cross", label: { backgroundColor: "#6a7985" } },
+        // The formatter now calls the standalone helper function.
+        valueFormatter: (value) => formatValue(value, this.activeMetric),
+      },
+      xAxis: { type: "time" },
+      yAxis: {
+        type: "value",
+        min: 0,
+        axisLabel: {
+          // The axis label also uses the standalone helper.
+          formatter: (value) => formatValue(value, this.activeMetric),
+        },
+      },
+      series: [],
+      animationEasing: "easeinout",
+      animationDuration: 1000,
+    };
+    this.chartInstance.setOption(baselineOptions);
   },
+
+  // The update function now accepts all the data it needs as arguments.
+  update(chartData) {
+    if (!this.chartInstance) return;
+
+    // Update the active metric so the formatters work correctly.
+    this.activeMetric = chartData.activeMetric;
+
+    this.chartInstance.hideLoading();
+
+    const metricConfig = {
+      occupancy: { label: "Occupancy" },
+      adr: { label: "ADR" },
+      revpar: { label: "RevPAR" },
+    };
+    const newChartType = chartData.granularity === "monthly" ? "bar" : "line";
+
+    const yourHotelSeries = {
+      name: "Your Hotel",
+      type: newChartType,
+      smooth: true,
+      symbol: "none",
+      sampling: "lttb",
+      emphasis: { focus: "series" },
+      lineStyle: { width: 3 },
+      color: "#FBBF24",
+      itemStyle: newChartType === "bar" ? { borderRadius: [4, 4, 0, 0] } : null,
+      data: chartData.metrics.map((d) => [
+        d.date,
+        d.your[chartData.activeMetric],
+      ]),
+    };
+    const marketSeries = {
+      name: "The Market",
+      type: newChartType,
+      smooth: true,
+      symbol: "none",
+      sampling: "lttb",
+      emphasis: { focus: "series" },
+      lineStyle: { width: 2 },
+      color: "#60a5fa",
+      itemStyle: newChartType === "bar" ? { borderRadius: [4, 4, 0, 0] } : null,
+      data: chartData.metrics.map((d) => [
+        d.date,
+        d.market[chartData.activeMetric],
+      ]),
+    };
+
+    this.chartInstance.setOption(
+      {
+        title: {
+          text: `${metricConfig[chartData.activeMetric].label} for ${
+            chartData.propertyName
+          } vs The Market`,
+        },
+        yAxis: {
+          axisLabel: {
+            formatter: (value) => formatValue(value, chartData.activeMetric),
+          },
+        },
+        series: [yourHotelSeries, marketSeries],
+      },
+      { replaceMerge: ["series"] }
+    );
+  },
+
+  // Add helper methods for loading and resizing.
+  showLoading() {
+    this.chartInstance?.showLoading();
+  },
+
+  resize() {
+    this.chartInstance?.resize();
+  },
+};
+
+// --- The Refactored Alpine.js Component ---
+export default {
+  // --- STATE PROPERTIES (No chart properties anymore) ---
+  isLoading: { kpis: true, chart: true, tables: true, properties: true },
   hasProperties: false,
   isLegalModalOpen: false,
   propertyDropdownOpen: false,
@@ -28,9 +175,7 @@ export default {
   },
   marketSubtitle: "",
   allMetrics: [],
-  // This will hold the ECharts instance.
-  chart: null,
-  chartUpdateTimeout: null,
+  // chart and chartUpdateTimeout have been removed.
 
   // --- INITIALIZATION ---
   init() {
@@ -41,23 +186,21 @@ export default {
     this.checkUserRoleAndSetupNav();
     this.fetchAndDisplayLastRefreshTime();
 
-    // Defer chart initialization until the DOM is fully rendered.
-    // This uses Alpine's $nextTick to wait for the container div to be ready,
-    // which fixes the "only appears with dev tools" bug.
+    // The chart initialization is now much cleaner.
     this.$nextTick(() => {
-      this.initChart();
+      // It calls the chart manager, passing in the DOM element.
+      chartManager.init(this.$refs.chartContainer);
     });
-    // Fetch properties, which will trigger the first data load.
+
     await this.populatePropertySwitcher();
-    // Add a listener to resize the chart when the window is resized.
+
+    // The resize listener now calls the chart manager's resize method.
     window.addEventListener("resize", () => {
-      if (this.chart) {
-        this.chart.resize();
-      }
+      chartManager.resize();
     });
   },
 
-  // --- STARTUP LOGIC ---
+  // --- STARTUP LOGIC (Unchanged) ---
   async checkUserRoleAndSetupNav() {
     try {
       const response = await fetch("/api/auth/session-info");
@@ -69,36 +212,28 @@ export default {
       console.error("Could not check user role:", error);
     }
   },
-
   async populatePropertySwitcher() {
     try {
       const response = await fetch("/api/my-properties");
       if (!response.ok) throw new Error("Could not fetch properties.");
       const properties = await response.json();
       this.isLoading.properties = false;
-
       if (properties.length === 0) {
         this.hasProperties = false;
         this.currentPropertyName = "No Properties Found";
-        this.chart.setOption({
-          graphic: { style: { text: "Connect a property to see your data." } },
-        });
         return;
       }
-
       this.hasProperties = true;
       this.properties = properties;
       const firstProperty = properties[0];
       this.currentPropertyId = firstProperty.property_id;
       this.currentPropertyName = firstProperty.property_name;
-
       this.setPreset("current-month");
     } catch (error) {
       this.showError(error.message);
       this.isLoading.properties = false;
     }
   },
-
   async fetchAndDisplayLastRefreshTime() {
     try {
       const response = await fetch("/api/last-refresh-time");
@@ -114,203 +249,9 @@ export default {
     }
   },
 
-  // --- CHART LOGIC (ECHARTS) ---
-  initChart() {
-    // Initialize an ECharts instance in the 'light' theme.
-    this.chart = echarts.init(this.$refs.chartContainer, "light", {
-      renderer: "svg",
-    });
+  // --- Chart Logic has been removed from the Alpine component ---
 
-    // Define the baseline options that are common to all chart states.
-    const baselineOptions = {
-      // Use a title component for the main title text.
-      title: {
-        text: "",
-        left: "left",
-        textStyle: {
-          color: "#1e293b",
-          fontFamily: "Inter, sans-serif",
-          fontSize: 20,
-          fontWeight: 600,
-        },
-      },
-      // Configure the legend for our two data series.
-      legend: {
-        data: ["Your Hotel", "The Market"],
-        right: 10,
-        top: 5,
-        icon: "circle",
-        itemStyle: {
-          borderColor: "#60a5fa", // A subtle touch
-        },
-      },
-      // The grid component controls the positioning of the chart plot.
-      grid: {
-        left: "3%",
-        right: "4%",
-        bottom: "3%",
-        containLabel: true, // Ensures axis labels don't get cut off.
-      },
-      // Tooltip configuration for hover interactions.
-      tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: "cross",
-          label: {
-            backgroundColor: "#6a7985",
-          },
-        },
-      },
-      // X-axis configured for time-series data.
-      xAxis: {
-        type: "time",
-      },
-      // Y-axis configured for numerical values.
-      yAxis: {
-        type: "value",
-        min: 0,
-        axisLabel: {
-          formatter: (value) => this.formatValue(value, this.activeMetric),
-        },
-      },
-      // The series array will be populated dynamically.
-      series: [],
-      // Animation settings for smooth transitions.
-      animationEasing: "easeinout",
-      animationDuration: 1000,
-    };
-
-    // Set the initial options on the chart.
-    this.chart.setOption(baselineOptions);
-    // Show a loading message until data is fetched.
-    this.chart.showLoading();
-  },
-
-  updateChart() {
-    // Use the timeout pattern to ensure stability and prevent rapid-fire updates from conflicting.
-    clearTimeout(this.chartUpdateTimeout);
-    this.chartUpdateTimeout = setTimeout(() => {
-      // Guard clause to ensure the chart instance exists before we try to update it.
-      if (!this.chart) return;
-
-      // Capture the Alpine component's context (`this`) into a variable.
-      // This is the key fix to ensure helper functions like formatValue can be found
-      // from within the ECharts tooltip formatter callback.
-      const self = this;
-
-      // Hide the loading animation now that we have data to display.
-      this.chart.hideLoading();
-
-      // A configuration map to get display properties for the active metric.
-      const metricConfig = {
-        occupancy: { label: "Occupancy", format: "percent" },
-        adr: { label: "ADR", format: "currency" },
-        revpar: { label: "RevPAR", format: "currency" },
-      };
-
-      // Dynamically switch between a bar chart for monthly data and a line chart for daily data.
-      const newChartType = this.granularity === "monthly" ? "bar" : "line";
-
-      // --- ECharts Series Configuration ---
-      const yourHotelSeries = {
-        name: "Your Hotel",
-        type: newChartType,
-        smooth: true,
-        symbol: "none",
-        sampling: "lttb",
-        emphasis: {
-          focus: "series",
-        },
-        lineStyle: {
-          width: 3, // Slightly thicker line for emphasis
-        },
-        // The color is now set directly on the series for guaranteed results.
-        color: "#FBBF24", // Warm Yellow
-        // The areaStyle has been completely removed to get rid of the background fill.
-        itemStyle:
-          newChartType === "bar"
-            ? {
-                borderRadius: [4, 4, 0, 0],
-              }
-            : null,
-        data: this.allMetrics.map((d) => [d.date, d.your[this.activeMetric]]),
-      };
-
-      const marketSeries = {
-        name: "The Market",
-        type: newChartType,
-        smooth: true,
-        symbol: "none",
-        sampling: "lttb",
-        emphasis: {
-          focus: "series",
-        },
-        lineStyle: {
-          width: 2,
-        },
-        // The color is also set directly on this series.
-        color: "#60a5fa", // Clear Blue
-        itemStyle:
-          newChartType === "bar"
-            ? {
-                borderRadius: [4, 4, 0, 0],
-              }
-            : null,
-        data: this.allMetrics.map((d) => [d.date, d.market[this.activeMetric]]),
-      };
-
-      // The `setOption` method declaratively updates the chart.
-      this.chart.setOption(
-        {
-          title: {
-            text: `${metricConfig[this.activeMetric].label} for ${
-              this.currentPropertyName
-            } vs The Market`,
-          },
-          // The top-level color array is removed, as colors are now set on each series directly.
-          tooltip: {
-            // This custom formatter now uses the 'self' variable to reliably
-            // call the formatValue helper, ensuring correct formatting.
-            formatter: (params) => {
-              let date = new Date(params[0].axisValue);
-              let tooltipHtml = `${date.toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}<br/>`;
-
-              params.forEach((param) => {
-                tooltipHtml += `
-                        <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${
-                          param.color
-                        };"></span>
-                        ${param.seriesName}: <strong>${self.formatValue(
-                  param.value[1],
-                  self.activeMetric
-                )}</strong>
-                        <br/>
-                    `;
-              });
-              return tooltipHtml;
-            },
-          },
-          yAxis: {
-            axisLabel: {
-              // Also update the y-axis formatter to use the safe 'self' context.
-              formatter: (value) => self.formatValue(value, self.activeMetric),
-            },
-          },
-          // Provide the new series data.
-          series: [yourHotelSeries, marketSeries],
-        },
-        {
-          replaceMerge: ["series"],
-        }
-      );
-    }, 100);
-  },
-
-  // --- CORE DATA LOGIC ---
+  // --- CORE DATA LOGIC (Now calls chartManager.update) ---
   async loadKpis(startDate, endDate) {
     this.isLoading.kpis = true;
     try {
@@ -326,11 +267,10 @@ export default {
       this.isLoading.kpis = false;
     }
   },
-
   async loadChartAndTables(startDate, endDate, granularity) {
     this.isLoading.chart = true;
     this.isLoading.tables = true;
-    this.chart?.showLoading();
+    chartManager.showLoading(); // Call the chart manager's method
     try {
       const propertyId = this.currentPropertyId;
       const urls = [
@@ -344,10 +284,8 @@ export default {
       if (!yourHotelResponse.ok || !marketResponse.ok) {
         throw new Error("Could not load chart/table data.");
       }
-
       const yourHotelData = await yourHotelResponse.json();
       const marketData = await marketResponse.json();
-
       this.allMetrics = this.processAndMergeData(
         yourHotelData.metrics,
         marketData.metrics
@@ -356,17 +294,30 @@ export default {
         marketData.competitorCount > 0
           ? `Based on a competitive set of ${marketData.competitorCount} hotels.`
           : "No competitor data available for this standard.";
-      this.updateChart();
+
+      // Call the chart manager to update the chart, passing all necessary data.
+      chartManager.update({
+        metrics: this.allMetrics,
+        activeMetric: this.activeMetric,
+        granularity: this.granularity,
+        propertyName: this.currentPropertyName,
+      });
     } catch (error) {
       this.showError(error.message);
       this.allMetrics = [];
-      this.updateChart();
+      chartManager.update({
+        metrics: [],
+        activeMetric: this.activeMetric,
+        granularity: this.granularity,
+        propertyName: this.currentPropertyName,
+      });
     } finally {
       this.isLoading.chart = false;
       this.isLoading.tables = false;
     }
   },
 
+  // --- DATA PROCESSING & RENDERING (renderKpiCards uses the new standalone helper) ---
   processAndMergeData(yourData, marketData) {
     const dataMap = new Map();
     const processRow = (row, source) => {
@@ -375,19 +326,12 @@ export default {
         dataMap.set(date, { date, your: {}, market: {} });
       }
       const entry = dataMap.get(date);
-      const dataObject =
-        source === "your"
-          ? {
-              occupancy: parseFloat(row.occupancy_direct) || 0,
-              adr: parseFloat(row.adr) || 0,
-              revpar: parseFloat(row.revpar) || 0,
-            }
-          : {
-              occupancy: parseFloat(row.market_occupancy) || 0,
-              adr: parseFloat(row.market_adr) || 0,
-              revpar: parseFloat(row.market_revpar) || 0,
-            };
-      entry[source] = dataObject;
+      entry[source] = {
+        occupancy:
+          parseFloat(row.occupancy_direct || row.market_occupancy) || 0,
+        adr: parseFloat(row.adr || row.market_adr) || 0,
+        revpar: parseFloat(row.revpar || row.market_revpar) || 0,
+      };
     };
     yourData.forEach((row) => processRow(row, "your"));
     marketData.forEach((row) => processRow(row, "market"));
@@ -400,7 +344,6 @@ export default {
     });
     return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
   },
-
   renderKpiCards(kpiData) {
     if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
       this.kpi = {
@@ -420,16 +363,17 @@ export default {
           ? ""
           : `${delta >= 0 ? "+" : ""}${(Math.abs(delta) * 100).toFixed(1)}pts`;
       } else {
+        // Use the new standalone formatValue helper
         formattedDelta = isNaN(delta)
           ? ""
-          : `${delta >= 0 ? "+" : ""}${this.formatValue(
+          : `${delta >= 0 ? "+" : ""}${formatValue(
               Math.abs(delta),
               "currency"
             )}`;
       }
       this.kpi[metric] = {
-        your: this.formatValue(yourValue, metric),
-        market: this.formatValue(marketValue, metric),
+        your: formatValue(yourValue, metric), // Use the new standalone formatValue helper
+        market: formatValue(marketValue, metric), // Use the new standalone formatValue helper
         delta: formattedDelta,
         deltaClass: isNaN(delta)
           ? ""
@@ -440,19 +384,17 @@ export default {
     }
   },
 
-  // --- UI CONTROL METHODS ---
+  // --- UI CONTROL METHODS (setActiveMetric now calls chartManager.update) ---
   runReport() {
     if (!this.dates.start || !this.dates.end || !this.granularity) return;
     this.error.show = false;
     this.loadKpis(this.dates.start, this.dates.end);
     this.loadChartAndTables(this.dates.start, this.dates.end, this.granularity);
   },
-
   setGranularity(newGranularity) {
     this.granularity = newGranularity;
     this.runReport();
   },
-
   setPreset(preset) {
     this.activePreset = preset;
     const today = new Date();
@@ -475,7 +417,6 @@ export default {
     this.granularity = preset === "this-year" ? "monthly" : "daily";
     this.runReport();
   },
-
   switchProperty(propertyId) {
     if (this.currentPropertyId === propertyId) return;
     const property = this.properties.find((p) => p.property_id === propertyId);
@@ -485,12 +426,16 @@ export default {
       this.runReport();
     }
   },
-
   setActiveMetric(metric) {
     this.activeMetric = metric;
-    this.updateChart();
+    // Instead of calling its own updateChart, it calls the chart manager.
+    chartManager.update({
+      metrics: this.allMetrics,
+      activeMetric: this.activeMetric,
+      granularity: this.granularity,
+      propertyName: this.currentPropertyName,
+    });
   },
-
   logout() {
     fetch("/api/auth/logout", { method: "POST" })
       .then((res) => {
@@ -499,13 +444,14 @@ export default {
       })
       .catch(() => this.showError("An error occurred during logout."));
   },
-
   showError(message) {
     this.error.message = message;
     this.error.show = true;
   },
 
-  // --- HELPER & FORMATTING METHODS ---
+  // --- HELPER METHODS (getDelta uses the standalone helper) ---
+  formatValue: formatValue, // Add a reference to the standalone function so the HTML template can find it.
+
   getDelta(day) {
     if (
       !day.your ||
@@ -522,41 +468,16 @@ export default {
     if (this.activeMetric === "occupancy") {
       formattedDelta = `${deltaSign}${(Math.abs(delta) * 100).toFixed(1)}pts`;
     } else {
-      formattedDelta = `${deltaSign}${this.formatValue(
+      formattedDelta = `${deltaSign}${formatValue(
         Math.abs(delta),
         "currency"
-      )}`;
+      )}`; // Use standalone helper
     }
     return {
       formattedDelta: formattedDelta,
       deltaClass: delta >= 0 ? "text-green-600" : "text-red-600",
     };
   },
-
-  formatValue(value, type) {
-    if (value === null || typeof value === "undefined") {
-      return "-";
-    }
-    const num = parseFloat(value);
-    if (isNaN(num)) return "-";
-    if (type === "percent" || type === "occupancy") {
-      return new Intl.NumberFormat("en-GB", {
-        style: "percent",
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
-      }).format(num);
-    }
-    if (type === "currency" || type === "adr" || type === "revpar") {
-      return new Intl.NumberFormat("en-GB", {
-        style: "currency",
-        currency: "GBP",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(num);
-    }
-    return num.toFixed(2);
-  },
-
   formatDateLabel(dateString, granularity) {
     if (!dateString) return "";
     const date = new Date(dateString);
