@@ -31,6 +31,7 @@ const chartManager = {
   activeMetric: "occupancy", // The chart needs to know the metric type for formatting
 
   // The init function now accepts the container element as an argument.
+  // replace with this
   init(containerElement) {
     // Use the default Canvas renderer for stability.
     this.chartInstance = echarts.init(containerElement, "light");
@@ -57,16 +58,39 @@ const chartManager = {
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross", label: { backgroundColor: "#6a7985" } },
-        // The formatter now calls the standalone helper function.
         valueFormatter: (value) => formatValue(value, this.activeMetric),
       },
-      xAxis: { type: "time" },
+      xAxis: {
+        type: "time",
+        // --- NEW: X-Axis Pointer Configuration ---
+        axisPointer: {
+          label: {
+            // This formats the date in the small black box on the x-axis.
+            formatter: (params) => {
+              const date = new Date(params.value);
+              return date.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+            },
+          },
+        },
+      },
       yAxis: {
         type: "value",
         min: 0,
         axisLabel: {
-          // The axis label also uses the standalone helper.
           formatter: (value) => formatValue(value, this.activeMetric),
+        },
+        // --- NEW: Y-Axis Pointer Configuration ---
+        axisPointer: {
+          label: {
+            // This formats the number in the small black box on the y-axis.
+            formatter: (params) => {
+              return formatValue(params.value, this.activeMetric);
+            },
+          },
         },
       },
       series: [],
@@ -75,7 +99,6 @@ const chartManager = {
     };
     this.chartInstance.setOption(baselineOptions);
   },
-
   // The update function now accepts all the data it needs as arguments.
   update(chartData) {
     if (!this.chartInstance) return;
