@@ -568,15 +568,26 @@ app.get("/api/metrics-from-db", requireUserApi, async (req, res) => {
       return res.status(403).json({ error: "Access denied to this property." });
     }
     const period = getPeriod(granularity);
+
+    // This is the correct and complete query.
     const query = `
-            SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar
+            SELECT
+                ${period} as period,
+                AVG(adr) as adr,
+                AVG(occupancy_direct) as occupancy_direct,
+                AVG(revpar) as revpar,
+                SUM(total_revenue) as total_revenue,
+                SUM(rooms_sold) as rooms_sold,
+                SUM(capacity_count) as capacity_count
             FROM daily_metrics_snapshots
             WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
             GROUP BY period ORDER BY period ASC;
         `;
+
     const result = await pgPool.query(query, [propertyId, startDate, endDate]);
     res.json({ metrics: result.rows });
   } catch (error) {
+    // The error message from this log is what we need to see.
     console.error("Error in /api/metrics-from-db:", error);
     res.status(500).json({ error: "Failed to fetch metrics from database" });
   }
@@ -608,12 +619,18 @@ app.get("/api/competitor-metrics", requireUserApi, async (req, res) => {
     const starRating = hotelRatingResult.rows[0].star_rating;
     const period = getPeriod(granularity);
     const query = `
-            SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar
+            SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar,
+           SUM(dms.total_revenue) as market_total_revenue,
+           SUM(dms.rooms_sold) as market_rooms_sold,
+           SUM(dms.capacity_count) as market_capacity_count
+
+
             FROM daily_metrics_snapshots dms
             JOIN hotels h ON dms.hotel_id = h.hotel_id
             WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
             GROUP BY period ORDER BY period ASC;
         `;
+
     const result = await pgPool.query(query, [
       propertyId,
       starRating,

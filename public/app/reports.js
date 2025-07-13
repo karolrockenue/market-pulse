@@ -51,124 +51,166 @@ function handlePresetChange(preset) {
   document.getElementById("end-date").value = formatDateForInput(endDate);
 }
 
-function handleGenerateReport(component) {
+// This function now orchestrates fetching live data instead of mock data.
+// This function is updated to receive the propertyId directly as an argument,
+// which is more reliable than reading from localStorage.
+async function handleGenerateReport(component, propertyId) {
   const reportContainer = document.getElementById("report-results-container");
-  const selectedColumns = getSelectedColumns(); // Use the local helper
-  const allSelected = [...selectedColumns.hotel, ...selectedColumns.market];
-  if (allSelected.length === 0) {
-    reportContainer.innerHTML =
-      '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">Please select at least one metric.</div>';
-    return;
+  reportContainer.innerHTML =
+    '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">Loading live report data...</div>';
+
+  try {
+    // The propertyId is now passed in directly. Check if it's valid.
+    if (!propertyId) {
+      throw new Error(
+        "No property selected. Please choose a property from the header dropdown."
+      );
+    }
+
+    // This part remains the same
+    const selectedColumns = getSelectedColumns();
+    const allSelected = [...selectedColumns.hotel, ...selectedColumns.market];
+
+    if (allSelected.length === 0) {
+      reportContainer.innerHTML =
+        '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">Please select at least one metric.</div>';
+      return;
+    }
+
+    const startDate = parseDateFromInput(
+      document.getElementById("start-date").value
+    );
+    const endDate = parseDateFromInput(
+      document.getElementById("end-date").value
+    );
+    const addComparisons = document.getElementById(
+      "add-comparisons-toggle"
+    )?.checked;
+    const displayOrder = document.querySelector(
+      'input[name="comparison-order"]:checked'
+    )?.value;
+
+    const granularity = component.granularity;
+    const shouldDisplayTotals = component.displayTotals;
+
+    if (!startDate || !endDate || !granularity || !displayOrder) return;
+
+    // The rest of the function is the same, it just uses the propertyId argument
+    const [yourData, marketData] = await Promise.all([
+      fetchYourHotelMetrics(propertyId, startDate, endDate, granularity),
+      fetchMarketMetrics(propertyId, startDate, endDate, granularity),
+    ]);
+    console.log("RAW 'Your Hotel' METRICS FROM SERVER:", yourData.metrics);
+    const liveData = processAndMergeData(yourData.metrics, marketData.metrics);
+
+    renderReportTable(
+      liveData,
+      selectedColumns,
+      shouldDisplayTotals,
+      granularity,
+      addComparisons,
+      displayOrder
+    );
+  } catch (error) {
+    console.error("Failed to generate report:", error);
+    reportContainer.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg" role="alert">
+      <strong class="font-bold">Error:</strong>
+      <span class="block sm:inline">${error.message}</span>
+    </div>`;
   }
-  const startDate = parseDateFromInput(
-    document.getElementById("start-date").value
-  );
-  const endDate = parseDateFromInput(document.getElementById("end-date").value);
-  const addComparisons = document.getElementById(
-    "add-comparisons-toggle"
-  )?.checked;
-  const displayOrder = document.querySelector(
-    'input[name="comparison-order"]:checked'
-  )?.value;
-
-  // Use the granularity from the component state passed as an argument
-  const granularity = component.granularity;
-  const shouldDisplayTotals = component.displayTotals;
-
-  if (!startDate || !endDate || !granularity || !displayOrder) return;
-
-  const mockData = generateMockData(
-    startDate,
-    endDate,
-    allSelected,
-    granularity
-  );
-  renderReportTable(
-    mockData,
-    selectedColumns,
-    shouldDisplayTotals,
-    granularity,
-    addComparisons,
-    displayOrder
-  );
 }
 
-// --- PREVIOUSLY MOVED FUNCTIONS ---
+// --- LIVE DATA FETCHING & PROCESSING ---
+// Fetches the core metrics for the user's selected property.
+async function fetchYourHotelMetrics(
+  propertyId,
+  startDate,
+  endDate,
+  granularity
+) {
+  const url = `/api/metrics-from-db?startDate=${formatDateForInput(
+    startDate
+  )}&endDate=${formatDateForInput(
+    endDate
+  )}&granularity=${granularity}&propertyId=${propertyId}`;
+  const response = await fetch(url);
+  if (!response.ok)
+    throw new Error("Could not load your hotel data from the server.");
+  return response.json();
+}
 
-function generateMockData(startDate, endDate, columns, granularity) {
-  const dailyData = [];
-  let currentDate = new Date(startDate.getTime());
-  const capacity = 100;
-  while (currentDate <= endDate) {
-    let row = { date: formatDateForInput(currentDate) };
-    const roomsSold = Math.floor(Math.random() * 20 + 75);
-    const totalRevenue = (Math.random() * 60 + 120) * roomsSold;
-    columns.forEach((col) => {
-      row[col] = generateMockValue(col, { roomsSold, totalRevenue, capacity });
-    });
-    dailyData.push(row);
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
+// Fetches the aggregated metrics for the competitor set.
+async function fetchMarketMetrics(propertyId, startDate, endDate, granularity) {
+  const url = `/api/competitor-metrics?startDate=${formatDateForInput(
+    startDate
+  )}&endDate=${formatDateForInput(
+    endDate
+  )}&granularity=${granularity}&propertyId=${propertyId}`;
+  const response = await fetch(url);
+  if (!response.ok)
+    throw new Error("Could not load market data from the server.");
+  return response.json();
+}
 
-  if (granularity === "daily") return dailyData;
+// Merges the user's hotel data and market data into a single, flat array of objects.
+// Merges "Your Hotel" data and "Market" data into a single, flat array of objects.
+function processAndMergeData(yourData, marketData) {
+  // Use a Map to efficiently group all metrics by date.
+  const dataMap = new Map();
 
-  const aggregatedData = {};
-  dailyData.forEach((row) => {
-    let key;
-    const rowDate = parseDateFromInput(row.date);
-    if (granularity === "weekly") {
-      const weekStart = new Date(rowDate);
-      const day = rowDate.getDay();
-      const diff = rowDate.getDate() - day + (day === 0 ? -6 : 1);
-      weekStart.setDate(diff);
-      key = formatDateForInput(weekStart);
-    } else {
-      key = row.date.substring(0, 7) + "-01";
+  // This helper function processes a single row of data from any source.
+  const processRow = (row) => {
+    // Get the date, whether it's from a daily row ('stay_date') or a grouped period ('period').
+    const date = (row.period || row.stay_date).substring(0, 10);
+
+    // If we haven't seen this date before, create an entry for it.
+    if (!dataMap.has(date)) {
+      dataMap.set(date, { date });
     }
-    if (!aggregatedData[key]) {
-      aggregatedData[key] = { date: key, dayCount: 0 };
-      columns.forEach((col) => (aggregatedData[key][col] = 0));
-    }
-    columns.forEach((col) => (aggregatedData[key][col] += row[col]));
-    aggregatedData[key].dayCount++;
-  });
+    const entry = dataMap.get(date);
 
-  return Object.values(aggregatedData).map((row) => {
-    const newRow = { date: row.date };
-    columns.forEach((col) => {
-      const lowerCol = col.toLowerCase();
-      if (
-        lowerCol.includes("occupancy") ||
-        lowerCol.includes("adr") ||
-        lowerCol.includes("revpar")
-      ) {
-        newRow[col] = row[col] / row.dayCount;
-      } else {
-        newRow[col] = row[col];
+    // --- THIS IS THE FIX ---
+    // Calculate Rooms Unsold and define all possible metrics.
+    const roomsSold = parseInt(row.rooms_sold, 10);
+    const capacity = parseInt(row.capacity_count, 10);
+    const roomsUnsold = capacity - roomsSold;
+
+    const metrics = {
+      // "Your Hotel" metrics from the API
+      Occupancy: parseFloat(row.occupancy_direct),
+      ADR: parseFloat(row.adr),
+      RevPAR: parseFloat(row.revpar),
+      "Total Revenue": parseFloat(row.total_revenue),
+      "Rooms Sold": roomsSold,
+      "Rooms Unsold": roomsUnsold, // This is now calculated correctly.
+
+      // "Market" metrics from the API
+      "Market Occupancy": parseFloat(row.market_occupancy),
+      "Market ADR": parseFloat(row.market_adr),
+      "Market Total Revenue": parseFloat(row.market_total_revenue),
+      "Market Rooms Sold": parseInt(row.market_rooms_sold, 10),
+    };
+    // --- END OF FIX ---
+
+    // Loop through all possible metrics and add them to the entry for the current date
+    // if they are a valid number. This prevents 'NaN' from appearing in the report.
+    for (const key in metrics) {
+      if (!isNaN(metrics[key])) {
+        entry[key] = metrics[key];
       }
-    });
-    return newRow;
-  });
+    }
+  };
+
+  // Process all rows from both your data and the market data.
+  yourData.forEach(processRow);
+  marketData.forEach(processRow);
+
+  // Convert the map of data back to an array and sort it by date.
+  const mergedData = Array.from(dataMap.values());
+  return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
-function generateMockValue(columnName, baseData) {
-  const { roomsSold, totalRevenue, capacity } = baseData;
-  const lowerCaseCol = columnName.toLowerCase();
-  if (lowerCaseCol === "rooms sold") return roomsSold;
-  if (lowerCaseCol === "total revenue") return totalRevenue;
-  if (lowerCaseCol === "occupancy") return roomsSold / capacity;
-  if (lowerCaseCol === "adr")
-    return roomsSold > 0 ? totalRevenue / roomsSold : 0;
-  if (lowerCaseCol === "revpar") return totalRevenue / capacity;
-  if (lowerCaseCol === "rooms unsold") return capacity - roomsSold;
-  const marketFactor = Math.random() * 0.1 + 0.95;
-  if (lowerCaseCol.includes("market")) {
-    const baseMetricName = lowerCaseCol.replace("market ", "");
-    return generateMockValue(baseMetricName, baseData) * marketFactor;
-  }
-  return 0;
-}
-
+// --- UTILITY FUNCTIONS ---
 function formatDateForInput(date) {
   if (!date) return "";
   const year = date.getFullYear();
@@ -190,7 +232,7 @@ function parseDateFromInput(dateString) {
 }
 
 function generateReportTitle(selected) {
-  const hotelName = "Rockenue Partner Account";
+  const hotelName = "Rockenue Partner Account"; // This can be made dynamic later
   let title = `${hotelName} Report`;
   if (
     selected &&
@@ -306,6 +348,7 @@ function deleteSchedule(component, id) {
   );
 }
 
+// --- RENDERING ENGINE ---
 function buildTableHeaders(selected, addComparisons, displayOrder) {
   let headers = [{ label: "Date", align: "left", key: "date" }];
   const { hotel: hotelMetrics, market: marketMetrics } = selected;
@@ -504,7 +547,6 @@ function renderReportTable(
 }
 
 // --- Expose functions on the window object ---
-window.generateMockData = generateMockData;
 window.generateReportTitle = generateReportTitle;
 window.formatDateForInput = formatDateForInput;
 window.formatDateForDisplay = formatDateForDisplay;
@@ -515,8 +557,8 @@ window.handleFrequencyChange = handleFrequencyChange;
 window.saveSchedule = saveSchedule;
 window.deleteSchedule = deleteSchedule;
 window.renderReportTable = renderReportTable;
-window.handlePresetChange = handlePresetChange; // Expose new function
-window.handleGenerateReport = handleGenerateReport; // Expose new function
+window.handlePresetChange = handlePresetChange;
+window.handleGenerateReport = handleGenerateReport;
 
 // Helper for the export function
 window.getSelectedColumnsForExport = () => {

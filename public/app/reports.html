@@ -1067,11 +1067,12 @@
       </div>
     </div>
     <script src="/app/reports.js" type="module"></script>
-    <script src="/app/reports.js"></script>
+
     <script>
       function reportsPage() {
         return {
-          // Properties
+          // --- STATE ---
+          propertyId: null, // Add a new state variable to hold the current property ID.
           isScheduleModalOpen: false,
           isManageModalOpen: false,
           addComparisons: false,
@@ -1085,41 +1086,45 @@
           newScheduleFrequency: "Weekly",
           nextScheduleId: 1,
 
-          // Init
-          // Init
-          // Init
+          // --- INIT ---
           async init() {
-            // --- Start: Header Loading Logic ---
-
-            // 1. Dynamically import the loader utility AND the header's JavaScript logic
+            // Header loading logic (unchanged)
             const { loadComponent } = await import("/app/utils.mjs");
             const { default: pageHeader } = await import(
               "/app/_shared/header.mjs"
             );
-
-            // 2. Manually register the header's logic with AlpineJS under the name 'pageHeader'
             Alpine.data("pageHeader", pageHeader);
-
-            // 3. NOW load the header's HTML. Alpine will find the component it needs.
             await loadComponent("header", "header-placeholder");
 
-            // --- End: Header Loading Logic ---
-
-            // Original initialization logic for the reports page
+            // Set default dates (unchanged)
             this.handlePresetChange("current-month");
-            this.handleGenerateReport();
             this.handleFrequencyChange();
 
-            // Listen for property changes from the header
+            // --- THE FIX ---
+            // The event listener is updated to use the ID from the event's 'detail' payload.
             window.addEventListener("property-changed", (event) => {
-              console.log(
-                "Reports page heard a property change:",
-                event.detail.propertyId
-              );
-              // When we connect to live data, we will re-run the report here.
+              // 1. Store the property ID from the event into our component's state.
+              this.propertyId = event.detail.propertyId;
+
+              // 2. Run the report.
+              this.handleGenerateReport();
             });
           },
 
+          // --- PROXY METHODS ---
+          // This proxy method is updated to pass the stored propertyId to the global function.
+          handleGenerateReport() {
+            window.handleGenerateReport(this, this.propertyId);
+          },
+
+          handlePresetChange(preset) {
+            // Calls the global function to update the date inputs.
+            window.handlePresetChange(preset);
+            // NOTE: We no longer call handleGenerateReport() from here.
+            // The user will trigger it by changing a metric or clicking a preset button.
+          },
+
+          // All other proxy methods remain the same
           renderReportTable(
             data,
             selected,
@@ -1128,7 +1133,6 @@
             addComparisons,
             displayOrder
           ) {
-            // This now calls the global rendering engine defined in reports.js
             window.renderReportTable(
               data,
               selected,
@@ -1139,55 +1143,30 @@
             );
           },
           formatValue(value, columnName, isDelta = false) {
-            // This now calls the global function defined in reports.js
             return window.formatValue(value, columnName, isDelta);
           },
-
           generateReportTitle(selected) {
-            // This now calls the global function defined in reports.js
             return window.generateReportTitle(selected);
-          },
-          handleGenerateReport() {
-            // Calls the global function, passing its own context ('this')
-            window.handleGenerateReport(this);
-          },
-
-          handlePresetChange(preset) {
-            // Calls the global function
-            window.handlePresetChange(preset);
-            // After changing the preset, we also need to regenerate the report
-            this.handleGenerateReport();
           },
           formatDateForInput(date) {
             return window.formatDateForInput(date);
           },
-
           formatDateForDisplay(dateString) {
             return window.formatDateForDisplay(dateString);
           },
-
           parseDateFromInput(dateString) {
             return window.parseDateFromInput(dateString);
           },
-
           exportToCSV() {
-            // This now calls the global function defined in reports.js
             window.exportToCSV();
           },
-
-          // Scheduler methods from the original component
           handleFrequencyChange() {
-            // This now calls the global function
             window.handleFrequencyChange();
           },
-
           saveSchedule() {
-            // Calls the global function, passing its own context ('this')
             window.saveSchedule(this);
           },
-
           deleteSchedule(id) {
-            // Calls the global function, passing its own context ('this') and the id
             window.deleteSchedule(this, id);
           },
         };
