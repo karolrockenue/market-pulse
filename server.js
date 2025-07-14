@@ -910,30 +910,58 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// --- Start of Corrected API Explorer Block ---
 
 app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
   try {
+    // This is the repeating pattern for all explorer endpoints.
+    // 1. Get admin user info from the session and database.
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token for this user." });
+    }
+    const adminRefreshToken = userResult.rows[0].refresh_token;
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties are associated with this admin account.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    // 2. Get a valid access token.
+    const accessToken = await getCloudbedsAccessToken(adminRefreshToken);
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    // 3. Process the specific request for this endpoint.
     const { id } = req.query;
     if (!id) {
       return res.status(400).json({ error: "Dataset ID is required." });
     }
-    const accessToken = await getCloudbedsAccessToken();
     const targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
+
+    // 4. Make the authenticated call to Cloudbeds.
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/json",
-        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+        "X-PROPERTY-ID": propertyIdForHeader,
       },
     });
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok) {
-      throw new Error(
-        `Cloudbeds API responded with status ${
-          cloudbedsApiResponse.status
-        }: ${JSON.stringify(data)}`
-      );
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
     }
     res.status(200).json(data);
   } catch (error) {
@@ -941,10 +969,103 @@ app.get("/api/explore/dataset-structure", requireAdminApi, async (req, res) => {
   }
 });
 
+// NOTE: This endpoint was referenced in admin.mjs but was missing from server.js.
+// It has been implemented here based on the changelog and the corrected auth pattern.
+app.get("/api/explore/insights-data", requireAdminApi, async (req, res) => {
+  try {
+    const { id, columns } = req.query;
+    if (!id || !columns) {
+      return res
+        .status(400)
+        .json({ error: "Dataset ID and columns are required." });
+    }
+
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token for this user." });
+    }
+    const adminRefreshToken = userResult.rows[0].refresh_token;
+    const accessToken = await getCloudbedsAccessToken(adminRefreshToken);
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties are associated with this admin account.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    const insightsPayload = {
+      property_ids: [propertyIdForHeader],
+      dataset_id: parseInt(id, 10),
+      columns: columns
+        .split(",")
+        .map((c) => ({ cdf: { column: c.trim() }, metrics: ["sum"] })),
+      group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
+      settings: { details: true, totals: true },
+    };
+
+    const targetUrl =
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run";
+    const cloudbedsApiResponse = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-PROPERTY-ID": propertyIdForHeader,
+      },
+      body: JSON.stringify(insightsPayload),
+    });
+
+    const data = await cloudbedsApiResponse.json();
+    if (!cloudbedsApiResponse.ok)
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// The same corrected auth pattern is applied to all endpoints below.
 app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token." });
+    }
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties associated with admin.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyIDs=${propertyIdForHeader}&pageSize=1`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -952,11 +1073,13 @@ app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-    if (data.data && data.data.length > 0) {
-      res.status(200).json(data.data[0]);
-    } else {
-      res.status(200).json({ message: "No guests found for this property." });
-    }
+    res
+      .status(200)
+      .json(
+        data.data && data.data.length > 0
+          ? data.data[0]
+          : { message: "No guests found." }
+      );
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -964,8 +1087,33 @@ app.get("/api/explore/sample-guest", requireAdminApi, async (req, res) => {
 
 app.get("/api/explore/sample-hotel", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token." });
+    }
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties associated with admin.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyIdForHeader}`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -981,8 +1129,33 @@ app.get("/api/explore/sample-hotel", requireAdminApi, async (req, res) => {
 
 app.get("/api/explore/sample-room", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1`;
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token." });
+    }
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties associated with admin.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyIDs=${propertyIdForHeader}&pageSize=1`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -990,11 +1163,13 @@ app.get("/api/explore/sample-room", requireAdminApi, async (req, res) => {
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-    if (data.data && data.data.length > 0) {
-      res.status(200).json(data.data[0]);
-    } else {
-      res.status(200).json({ message: "No rooms found for this property." });
-    }
+    res
+      .status(200)
+      .json(
+        data.data && data.data.length > 0
+          ? data.data[0]
+          : { message: "No rooms found." }
+      );
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1002,8 +1177,33 @@ app.get("/api/explore/sample-room", requireAdminApi, async (req, res) => {
 
 app.get("/api/explore/sample-rate", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRatePlans?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token." });
+    }
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties associated with admin.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRatePlans?propertyIDs=${propertyIdForHeader}`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -1011,13 +1211,11 @@ app.get("/api/explore/sample-rate", requireAdminApi, async (req, res) => {
     const data = await cloudbedsApiResponse.json();
     if (!cloudbedsApiResponse.ok)
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-    if (data && data.length > 0) {
-      res.status(200).json(data[0]);
-    } else {
-      res
-        .status(200)
-        .json({ message: "No rate plans found for this property." });
-    }
+    res
+      .status(200)
+      .json(
+        data && data.length > 0 ? data[0] : { message: "No rate plans found." }
+      );
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1025,8 +1223,33 @@ app.get("/api/explore/sample-rate", requireAdminApi, async (req, res) => {
 
 app.get("/api/explore/taxes-fees", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token." });
+    }
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties associated with admin.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyIdForHeader}`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -1042,8 +1265,34 @@ app.get("/api/explore/taxes-fees", requireAdminApi, async (req, res) => {
 
 app.get("/api/explore/user-info", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
-    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getUsers?property_ids=${process.env.CLOUDBEDS_PROPERTY_ID}`;
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token." });
+    }
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties associated with admin.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    // Note: The 'getUsers' endpoint might require special permissions.
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getUsers?property_ids=${propertyIdForHeader}`;
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -1062,8 +1311,33 @@ app.get(
   requireAdminApi,
   async (req, res) => {
     try {
-      const accessToken = await getCloudbedsAccessToken();
-      const targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyIDs=${process.env.CLOUDBEDS_PROPERTY_ID}&pageSize=1&sortByRecent=true`;
+      const adminUserId = req.session.userId;
+      const userResult = await pgPool.query(
+        "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+        [adminUserId]
+      );
+      if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+        return res
+          .status(401)
+          .json({ error: "Could not find a valid refresh token." });
+      }
+      const accessToken = await getCloudbedsAccessToken(
+        userResult.rows[0].refresh_token
+      );
+      if (!accessToken) {
+        throw new Error("Cloudbeds authentication failed.");
+      }
+
+      const propertyResult = await pgPool.query(
+        "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+        [adminUserId]
+      );
+      if (propertyResult.rows.length === 0) {
+        throw new Error("No properties associated with admin.");
+      }
+      const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+      const targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyIDs=${propertyIdForHeader}&pageSize=1&sortByRecent=true`;
       const cloudbedsApiResponse = await fetch(targetUrl, {
         method: "GET",
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -1071,13 +1345,13 @@ app.get(
       const data = await cloudbedsApiResponse.json();
       if (!cloudbedsApiResponse.ok)
         throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-      if (data.data && data.data.length > 0) {
-        res.status(200).json(data.data[0]);
-      } else {
-        res
-          .status(200)
-          .json({ message: "No reservations found for this property." });
-      }
+      res
+        .status(200)
+        .json(
+          data.data && data.data.length > 0
+            ? data.data[0]
+            : { message: "No reservations found." }
+        );
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -1085,6 +1359,7 @@ app.get(
 );
 
 app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
+  // This endpoint does not require external API calls, so it remains unchanged.
   const results = [];
   const endpoints = [
     {
@@ -1112,6 +1387,7 @@ app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   res.status(200).json(results);
 });
 
+// --- End of Corrected API Explorer Block ---
 // --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");
 
