@@ -237,6 +237,7 @@ async function generateXLSX(data, report) {
 }
 
 async function generatePDF(data, report) {
+  // The logic to build the HTML string remains the same.
   const { headers, body, totals } = getReportData(data, report);
   let html = `
         <style>
@@ -262,7 +263,10 @@ async function generatePDF(data, report) {
                               headers[i] === "Occupancy"
                                 ? (cell * 100).toFixed(2) + "%"
                                 : typeof cell === "number"
-                                ? cell.toFixed(2)
+                                ? cell.toLocaleString("en-GB", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
                                 : cell
                             }</td>`
                         )
@@ -279,7 +283,10 @@ async function generatePDF(data, report) {
                               totals[h] !== undefined
                                 ? h === "Occupancy"
                                   ? (totals[h] * 100).toFixed(2) + "%"
-                                  : totals[h].toFixed(2)
+                                  : totals[h].toLocaleString("en-GB", {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })
                                 : ""
                             }</td>`
                         )
@@ -290,23 +297,18 @@ async function generatePDF(data, report) {
         </table>
     `;
 
-  // Launch Puppeteer with the corrected configuration.
-  // **THIS IS THE FIX.**
-  // We explicitly load a font file before launching the browser.
-  // This forces the @sparticuz/chromium library to initialize its temporary
-  // directory and download the browser binary, ensuring the executablePath is available.
-  await chromium.font(
-    "https://raw.githack.com/googlei18n/noto-cjk/main/NotoSansCJK-Regular.ttc"
-  );
-
-  // Launch Puppeteer with the corrected configuration.
+  // Launch Puppeteer with the final, correct configuration.
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    executablePath: chromium.executablePath,
+    // **THIS IS THE CORRECT IMPLEMENTATION**
+    // We 'await' the 'executablePath' property which contains a Promise.
+    // This resolves to the string path for the browser executable.
+    executablePath: await chromium.executablePath,
     headless: chromium.headless,
     ignoreHTTPSErrors: true,
   });
+
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
   const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
