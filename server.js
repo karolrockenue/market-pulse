@@ -1388,6 +1388,7 @@ app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
 });
 
 // This new endpoint finds the oldest stay_date for a given property.
+// This new endpoint finds the oldest stay_date for a given property.
 app.get("/api/first-record-date", requireAdminApi, async (req, res) => {
   try {
     const { propertyId } = req.query;
@@ -1414,19 +1415,23 @@ app.get("/api/first-record-date", requireAdminApi, async (req, res) => {
       throw new Error("Cloudbeds authentication failed.");
     }
 
-    // This is a special, lightweight payload for the Cloudbeds Insights API.
+    // This is the corrected payload for the Cloudbeds Insights API.
     const insightsPayload = {
       property_ids: [propertyId],
-      dataset_id: 7, // The main dataset for daily metrics.
-      columns: [{ cdf: { column: "stay_date" } }], // We only need the date.
-      order: [
-        {
-          cdf: { column: "stay_date" },
-          direction: "ASC", // Sort oldest to newest.
-        },
-      ],
-      limit: 1, // We only need the very first record.
-      settings: { details: true, totals: false },
+      dataset_id: 7,
+      columns: [{ cdf: { column: "stay_date" } }],
+      settings: {
+        details: true,
+        totals: false,
+        // The 'order' and 'limit' properties have been correctly moved inside the 'settings' object.
+        order: [
+          {
+            cdf: { column: "stay_date" },
+            direction: "ASC",
+          },
+        ],
+        limit: 1,
+      },
     };
 
     // Make the API call to Cloudbeds.
@@ -1445,6 +1450,7 @@ app.get("/api/first-record-date", requireAdminApi, async (req, res) => {
 
     const data = await apiResponse.json();
     if (!apiResponse.ok) {
+      // This will now properly catch the error if the structure is still wrong.
       throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
     }
 
