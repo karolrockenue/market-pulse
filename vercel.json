@@ -24,6 +24,10 @@
       "dest": "/api/get-dataset-structure.js"
     },
     {
+      "src": "/api/send-scheduled-reports",
+      "dest": "/api/send-scheduled-reports.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "server.js"
     }
