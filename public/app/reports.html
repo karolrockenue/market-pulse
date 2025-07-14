@@ -306,7 +306,7 @@
               >
                 <div class="lg:col-span-1">
                   <h4
-                    class="flex items-center font-semibold text-slate-800 border-b pb-3 mb-4"
+                    class="flex items-center text-sm font-semibold text-slate-800 border-b pb-2 mb-3"
                   >
                     <svg
                       class="h-6 w-6 mr-2 text-blue-500"
@@ -337,7 +337,7 @@
                             @change="handleGenerateReport(granularity)"
                             checked
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >Occupancy</span
                           ></label
                         >
@@ -348,7 +348,7 @@
                             @change="handleGenerateReport(granularity)"
                             checked
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >ADR</span
                           ></label
                         >
@@ -358,7 +358,7 @@
                             data-metric-key="RevPAR"
                             @change="handleGenerateReport(granularity)"
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >RevPAR</span
                           ></label
                         >
@@ -369,7 +369,7 @@
                             @change="handleGenerateReport(granularity)"
                             checked
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >Total Revenue</span
                           ></label
                         >
@@ -380,7 +380,7 @@
                             @change="handleGenerateReport(granularity)"
                             checked
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >Rooms Sold</span
                           ></label
                         >
@@ -390,7 +390,7 @@
                             data-metric-key="Rooms Unsold"
                             @change="handleGenerateReport(granularity)"
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >Rooms Unsold</span
                           ></label
                         >
@@ -407,7 +407,7 @@
                             data-metric-key="Market Occupancy"
                             @change="handleGenerateReport(granularity)"
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >Market Occupancy</span
                           ></label
                         >
@@ -417,7 +417,7 @@
                             data-metric-key="Market ADR"
                             @change="handleGenerateReport(granularity)"
                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-sm text-gray-700"
+                          /><span class="ml-2 text-xs text-gray-700"
                             >Market ADR</span
                           ></label
                         >
@@ -426,10 +426,10 @@
                   </div>
                 </div>
 
-                <div>
+                <div class="lg:border-l lg:pl-6 border-slate-200">
                   <div class="space-y-6">
                     <h4
-                      class="flex items-center font-semibold text-slate-800 border-b pb-3 mb-4"
+                      class="flex items-center text-sm font-semibold text-slate-800 border-b pb-2 mb-3"
                     >
                       <svg
                         class="h-6 w-6 mr-2 text-blue-500"
@@ -450,7 +450,7 @@
                     <label
                       for="display-totals-checkbox"
                       class="flex items-center justify-between cursor-pointer"
-                      ><span class="font-medium text-gray-800 text-sm"
+                      ><span class="font-medium text-gray-800 text-xs"
                         >Display Totals Row</span
                       ><input
                         type="checkbox"
@@ -465,7 +465,7 @@
                     <label
                       for="include-taxes-toggle"
                       class="flex items-center justify-between cursor-pointer"
-                      ><span class="font-medium text-gray-800 text-sm"
+                      ><span class="font-medium text-gray-800 text-xs"
                         >Show Tax-Inclusive Values</span
                       ><input
                         type="checkbox"
@@ -480,7 +480,7 @@
                       <label
                         for="add-comparisons-toggle"
                         class="flex items-center justify-between cursor-pointer"
-                        ><span class="font-medium text-gray-800 text-sm"
+                        ><span class="font-medium text-gray-800 text-xs"
                           >Add Market Comparisons</span
                         ><input
                           type="checkbox"
@@ -501,7 +501,7 @@
                           Display Order
                         </legend>
                         <div class="flex items-center gap-4">
-                          <label class="flex items-center text-sm"
+                          <label class="flex items-center text-xs"
                             ><input
                               type="radio"
                               name="comparison-order"
@@ -513,7 +513,7 @@
                               >Group by Metric</span
                             ></label
                           >
-                          <label class="flex items-center text-sm"
+                          <label class="flex items-center text-xs"
                             ><input
                               type="radio"
                               name="comparison-order"
@@ -529,9 +529,9 @@
                     </div>
                   </div>
                 </div>
-                <div class="space-y-4">
+                <div class="space-y-4 lg:border-l lg:pl-6 border-slate-200">
                   <h4
-                    class="flex items-center font-semibold text-slate-800 border-b pb-3 mb-4"
+                    class="flex items-center text-sm font-semibold text-slate-800 border-b pb-2 mb-3"
                   >
                     <svg
                       class="h-6 w-6 mr-2 text-blue-500"
@@ -552,7 +552,7 @@
                   <div class="space-y-3">
                     <button
                       @click="exportToCSV()"
-                      class="w-full text-left inline-flex items-center px-4 py-2.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      class="w-full text-left inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <svg
                         class="h-5 w-5 mr-3 text-gray-500"
@@ -571,7 +571,7 @@
 
                     <button
                       @click="isScheduleModalOpen = true"
-                      class="w-full text-left inline-flex items-center px-4 py-2.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      class="w-full text-left inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <svg
                         class="h-5 w-5 mr-3 text-gray-500"
@@ -587,7 +587,7 @@
                     </button>
                     <button
                       @click="isManageModalOpen = true"
-                      class="w-full text-left relative inline-flex items-center px-4 py-2.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      class="w-full text-left relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <svg
                         class="h-5 w-5 mr-3 text-gray-500"

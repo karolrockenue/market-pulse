@@ -938,7 +938,14 @@ app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
 const publicPath = path.join(process.cwd(), "public");
 
 app.get("/", (req, res) => {
-  res.redirect("/signin");
+  // Check if the user has an active session.
+  if (req.session.userId) {
+    // If the user is logged in, redirect them to the main application dashboard.
+    res.redirect("/app/");
+  } else {
+    // If the user is not logged in, redirect them to the sign-in page.
+    res.redirect("/signin");
+  }
 });
 
 app.get("/signin", (req, res) => {
