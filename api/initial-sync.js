@@ -1,13 +1,12 @@
-// /api/initial-sync.js (Refactored for Targeted Sync)
+// /api/initial-sync.js (Final Version: Targeted, 15-Year Sync)
 const fetch = require("node-fetch").default || require("node-fetch");
 const { Client } = require("pg");
 
-// --- HELPER FUNCTIONS (No changes needed) ---
+// --- HELPER FUNCTIONS (No changes) ---
 async function getCloudbedsAccessToken(refreshToken) {
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-  if (!refreshToken) {
+  if (!refreshToken)
     throw new Error("Cannot get access token without a refresh token.");
-  }
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: CLOUDBEDS_CLIENT_ID,
@@ -46,53 +45,47 @@ function processApiDataForTable(allData) {
 
 // --- MAIN HANDLER ---
 module.exports = async (request, response) => {
-  // This script now expects a POST request with a specific propertyId and oldestDate.
   if (request.method !== "POST") {
     return response.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const { propertyId, oldestDate } = request.body;
-  if (!propertyId || !oldestDate) {
-    return response
-      .status(400)
-      .json({ error: "propertyId and oldestDate are required." });
+  const { propertyId } = request.body;
+  if (!propertyId) {
+    return response.status(400).json({ error: "A propertyId is required." });
   }
 
-  console.log(
-    `Starting INITIAL SYNC for property: ${propertyId} from date: ${oldestDate}`
-  );
+  console.log(`Starting 15-YEAR initial sync for property: ${propertyId}`);
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   let totalRecordsUpdated = 0;
 
   try {
     await client.connect();
 
-    // Fetch the user associated with this property to get their refresh token.
     const userResult = await client.query(
-      `SELECT u.cloudbeds_user_id, u.refresh_token 
-       FROM users u 
-       JOIN user_properties up ON u.user_id = up.user_id 
-       WHERE up.property_id = $1 LIMIT 1`,
+      `SELECT u.cloudbeds_user_id, u.refresh_token FROM users u JOIN user_properties up ON u.user_id = up.user_id WHERE up.property_id = $1 LIMIT 1`,
       [propertyId]
     );
 
-    if (userResult.rows.length === 0) {
+    if (userResult.rows.length === 0)
       throw new Error(`No active user found for property ${propertyId}.`);
-    }
     const user = userResult.rows[0];
 
     const accessToken = await getCloudbedsAccessToken(user.refresh_token);
-    if (!accessToken) {
+    if (!accessToken)
       throw new Error(
         `Authentication failed for the user of property ${propertyId}.`
       );
-    }
 
-    // Use the dynamically provided oldestDate instead of a hardcoded one.
-    const startDate = oldestDate.split("T")[0];
+    // Define a fixed 15-year historical range.
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setFullYear(today.getFullYear() - 15);
     const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 365);
+    futureDate.setFullYear(today.getFullYear() + 1);
+
+    const startDate = pastDate.toISOString().split("T")[0];
     const endDate = futureDate.toISOString().split("T")[0];
+    console.log(`Fetching data from ${startDate} to ${endDate}`);
 
     const columnsToRequest = [
       "adr",
@@ -128,10 +121,11 @@ module.exports = async (request, response) => {
 
     let allApiData = [];
     let nextToken = null;
+    let pageNum = 1;
     do {
       const insightsPayload = { ...initialInsightsPayload };
       if (nextToken) insightsPayload.nextToken = nextToken;
-
+      console.log(`Fetching page ${pageNum} for property ${propertyId}...`);
       const apiResponse = await fetch(
         "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
         {
@@ -144,15 +138,15 @@ module.exports = async (request, response) => {
           body: JSON.stringify(insightsPayload),
         }
       );
-
       const responseText = await apiResponse.text();
       if (!apiResponse.ok)
         throw new Error(
-          `API Error for property ${propertyId}: ${apiResponse.status}: ${responseText}`
+          `API Error on page ${pageNum}: ${apiResponse.status}: ${responseText}`
         );
       const pageData = JSON.parse(responseText);
       allApiData.push(pageData);
       nextToken = pageData.nextToken || null;
+      pageNum++;
     } while (nextToken);
 
     const processedData = processApiDataForTable(allApiData);

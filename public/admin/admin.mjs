@@ -116,7 +116,7 @@ function initializeAdminPanel() {
     }
   };
 
-  const runJob = async (url, btn) => {
+  const runJob = async (url, btn, options = {}) => {
     const originalText = btn.textContent;
     const statusEl = document.getElementById("job-status-message");
     btn.disabled = true;
@@ -124,11 +124,23 @@ function initializeAdminPanel() {
     statusEl.textContent = "Job started, please wait...";
     statusEl.className = "mt-4 text-sm font-medium text-gray-500";
     try {
-      const response = await fetch(url);
+      // Use the provided options, defaulting to a GET request if none are passed.
+      const response = await fetch(url, options);
       if (response.ok) {
-        statusEl.textContent = "✅ Job completed successfully!";
-        statusEl.className = "mt-4 text-sm font-medium text-green-600";
-        fetchLastRefreshTime();
+        const data = await response.json();
+        // Check if we are updating the initial-sync-status specifically
+        const syncStatusEl = document.getElementById("initial-sync-status");
+        if (url.includes("initial-sync") && syncStatusEl) {
+          syncStatusEl.textContent = `✅ Success! Synced ${data.totalRecordsUpdated} records.`;
+          syncStatusEl.className = "mt-2 text-sm text-green-600";
+          setTimeout(() => {
+            syncStatusEl.textContent = "";
+          }, 8000);
+        } else {
+          statusEl.textContent = "✅ Job completed successfully!";
+          statusEl.className = "mt-4 text-sm font-medium text-green-600";
+        }
+        fetchLastRefreshTime(); // Assumes this is a desired side-effect
       } else {
         const data = await response.json();
         statusEl.textContent = `❌ Job failed: ${
@@ -142,9 +154,12 @@ function initializeAdminPanel() {
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;
-      setTimeout(() => {
-        statusEl.textContent = "";
-      }, 5000);
+      // Clear general job status, but leave sync-specific status
+      if (!url.includes("initial-sync")) {
+        setTimeout(() => {
+          statusEl.textContent = "";
+        }, 5000);
+      }
     }
   };
 
@@ -370,6 +385,7 @@ function initializeAdminPanel() {
     runJob("/api/daily-refresh", runDailyRefreshBtn)
   );
   // This listener now orchestrates the new dynamic sync process.
+  // This listener now triggers a direct, property-specific deep sync.
   runInitialSyncBtn.addEventListener("click", async () => {
     const propertyId = document.getElementById("sync-property-id").value;
     const statusEl = document.getElementById("initial-sync-status");
@@ -382,57 +398,22 @@ function initializeAdminPanel() {
 
     if (
       !confirm(
-        `Are you sure you want to run a full data sync for property ${propertyId}? This can take several minutes.`
+        `Are you sure you want to run a full 15-year data sync for property ${propertyId}? This can take several minutes.`
       )
     ) {
       return;
     }
 
-    // Disable button and show progress
-    runInitialSyncBtn.disabled = true;
-    runInitialSyncBtn.textContent = "Step 1: Finding Oldest Record...";
-    statusEl.className = "mt-2 text-sm text-gray-600";
-    statusEl.textContent =
-      "Attempting to find the first data point for this property...";
-
-    try {
-      // Step 1: Call the new discovery endpoint.
-      const discoveryResponse = await fetch(
-        `/api/first-record-date?propertyId=${propertyId}`
-      );
-      const discoveryData = await discoveryResponse.json();
-
-      if (!discoveryResponse.ok) {
-        throw new Error(
-          discoveryData.error || "Failed to find the first record date."
-        );
-      }
-
-      const oldestDate = discoveryData.oldestDate;
-      statusEl.textContent = `Oldest record found: ${oldestDate}. Now starting full sync...`;
-      runInitialSyncBtn.textContent = "Step 2: Running Full Sync...";
-
-      // Step 2: Call the main sync job, passing the discovered date and property ID.
-      const syncResponse = await fetch("/api/initial-sync", {
+    // Call the runJob helper, which handles UI updates.
+    runJob(
+      "/api/initial-sync", // The API endpoint to call
+      runInitialSyncBtn, // The button to disable/re-enable
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ propertyId, oldestDate }),
-      });
-
-      const syncData = await syncResponse.json();
-      if (!syncResponse.ok) {
-        throw new Error(syncData.error || "The main sync process failed.");
-      }
-
-      statusEl.textContent = `✅ Success! Synced ${syncData.totalRecordsUpdated} records for property ${propertyId}.`;
-      statusEl.className = "mt-2 text-sm text-green-600";
-    } catch (error) {
-      statusEl.textContent = `❌ Error: ${error.message}`;
-      statusEl.className = "mt-2 text-sm text-red-600";
-    } finally {
-      runInitialSyncBtn.disabled = false;
-      runInitialSyncBtn.textContent = "Run Initial Sync For Property";
-    }
+        body: JSON.stringify({ propertyId }),
+      } // The request options
+    );
   });
 
   // --- THIS IS THE RESTORED EVENT LISTENER ---
