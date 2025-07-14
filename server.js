@@ -174,7 +174,6 @@ app.get("/api/scheduled-reports", requireUserApi, async (req, res) => {
 // POST a new scheduled report
 app.post("/api/scheduled-reports", requireUserApi, async (req, res) => {
   try {
-    // Also get the internal user_id here for the INSERT statement.
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
@@ -189,8 +188,8 @@ app.post("/api/scheduled-reports", requireUserApi, async (req, res) => {
       reportName,
       recipients,
       frequency,
-      dayOfWeek, // This is the variable from the request body
-      dayOfMonth, // This is the variable from the request body
+      dayOfWeek,
+      dayOfMonth,
       timeOfDay,
       metricsHotel,
       metricsMarket,
@@ -199,21 +198,23 @@ app.post("/api/scheduled-reports", requireUserApi, async (req, res) => {
       displayTotals,
       includeTaxes,
       reportPeriod,
+      attachmentFormats, // <-- New property from the request
     } = req.body;
 
     const { rows } = await pgPool.query(
       `INSERT INTO scheduled_reports (
         user_id, property_id, report_name, recipients, frequency, day_of_week, day_of_month, time_of_day,
-        metrics_hotel, metrics_market, add_comparisons, display_order, display_totals, include_taxes, report_period
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+        metrics_hotel, metrics_market, add_comparisons, display_order, display_totals, include_taxes, report_period,
+        attachment_formats -- <-- New column
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`, // <-- New parameter
       [
         internalUserId,
         propertyId,
         reportName,
         recipients,
         frequency,
-        dayOfWeek, // Pass the correct variable to the query
-        dayOfMonth, // Pass the correct variable to the query
+        dayOfWeek,
+        dayOfMonth,
         timeOfDay,
         metricsHotel,
         metricsMarket,
@@ -222,11 +223,11 @@ app.post("/api/scheduled-reports", requireUserApi, async (req, res) => {
         displayTotals,
         includeTaxes,
         reportPeriod,
+        attachmentFormats, // <-- New value
       ]
     );
     res.status(201).json(rows[0]);
   } catch (error) {
-    // This will now log the detailed error to your server console
     console.error("Error creating scheduled report:", error);
     res.status(500).json({ error: "Failed to create scheduled report" });
   }

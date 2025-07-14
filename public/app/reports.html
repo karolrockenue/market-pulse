@@ -931,17 +931,46 @@
                     </div>
                   </fieldset>
                   <div class="border-t border-slate-200 pt-6">
-                    <h4 class="text-base font-semibold text-slate-700 mb-3">
-                      Report Content
-                    </h4>
-                    <div
-                      class="text-sm p-4 bg-white rounded-lg border border-slate-200"
-                    >
-                      <p class="text-slate-600">
-                        The metrics and formatting options currently configured
-                        on the main page will be saved with this schedule.
+                    <fieldset>
+                      <legend class="text-base font-semibold text-slate-700">
+                        Attachment Formats
+                      </legend>
+                      <p class="text-sm text-slate-500 mb-3">
+                        Select at least one file format for the email
+                        attachment.
                       </p>
-                    </div>
+                      <div class="flex items-center gap-4 pt-2">
+                        <label class="flex items-center">
+                          <input
+                            type="checkbox"
+                            value="csv"
+                            x-model="newScheduleFormats"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span class="ml-2 text-sm text-gray-700">CSV</span>
+                        </label>
+                        <label class="flex items-center">
+                          <input
+                            type="checkbox"
+                            value="xlsx"
+                            x-model="newScheduleFormats"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span class="ml-2 text-sm text-gray-700"
+                            >Excel (.xlsx)</span
+                          >
+                        </label>
+                        <label class="flex items-center">
+                          <input
+                            type="checkbox"
+                            value="pdf"
+                            x-model="newScheduleFormats"
+                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span class="ml-2 text-sm text-gray-700">PDF</span>
+                        </label>
+                      </div>
+                    </fieldset>
                   </div>
                 </div>
               </div>
@@ -957,7 +986,8 @@
                 </button>
                 <button
                   @click="saveSchedule()"
-                  class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+                  :disabled="newScheduleFormats.length === 0"
+                  class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed"
                 >
                   Save Schedule
                 </button>
@@ -1097,7 +1127,7 @@
           newScheduleRecipients: "",
           newSchedulePeriod: "current-month",
           newScheduleFrequency: "Weekly",
-          nextScheduleId: 1,
+          newScheduleFormats: ["csv"],
 
           // --- INIT ---
           // --- INIT ---
