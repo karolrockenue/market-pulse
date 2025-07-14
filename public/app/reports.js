@@ -389,22 +389,6 @@ function handleFrequencyChange() {
   const timeSelect = document.getElementById("schedule-time");
   if (!timeSelect) return;
   timeSelect.innerHTML = "";
-
-  // --- TEMPORARY TEST CODE ---
-  // 1. Calculate the time 2 minutes from now in UTC.
-  const testDate = new Date();
-  testDate.setMinutes(testDate.getMinutes() + 2);
-  const testHours = testDate.getUTCHours().toString().padStart(2, "0");
-  const testMinutes = testDate.getUTCMinutes().toString().padStart(2, "0");
-  const testTimeValue = `${testHours}:${testMinutes}`;
-
-  // 2. Create and add the new "Test Now" option to the dropdown.
-  const testOption = document.createElement("option");
-  testOption.value = testTimeValue;
-  testOption.textContent = `Test Now (${testTimeValue} UTC)`;
-  timeSelect.appendChild(testOption);
-  // --- END OF TEST CODE ---
-
   // Add the standard, permanent options.
   ["08:00", "16:00"].forEach((time) => {
     const option = document.createElement("option");
