@@ -85,77 +85,79 @@ async function getMarketMetrics(propertyId, starRating, startDate, endDate) {
   ]);
   return rows;
 }
-
-// This function merges the two datasets together by date.
+// This function merges the two datasets and calculates new metrics.
 function processData(hotelData, marketData) {
   const dataMap = new Map();
-  hotelData.forEach((row) =>
-    dataMap.set(row.stay_date.toISOString().substring(0, 10), { ...row })
-  );
-  marketData.forEach((row) => {
+
+  const processRow = (row, isMarket = false) => {
     const date = row.stay_date.toISOString().substring(0, 10);
-    if (dataMap.has(date)) {
-      Object.assign(dataMap.get(date), row);
-    } else {
-      dataMap.set(date, { ...row });
+    if (!dataMap.has(date)) {
+      dataMap.set(date, { date: date });
     }
-  });
+    const entry = dataMap.get(date);
+
+    // Add data to the correct properties (e.g., adr vs market_adr)
+    const prefix = isMarket ? "market_" : "";
+    entry[`${prefix}adr`] = row.adr;
+    entry[`${prefix}occupancy`] = row.occupancy;
+    entry[`${prefix}total_revenue`] = row.total_revenue;
+    entry[`${prefix}rooms_sold`] = row.rooms_sold;
+
+    // Add non-market-prefixed calculations only once
+    if (!isMarket) {
+      entry.capacity_count = row.capacity_count;
+      entry.revpar = row.revpar;
+    }
+  };
+
+  hotelData.forEach((row) => processRow(row, false));
+  marketData.forEach((row) => processRow(row, true));
+
   return Array.from(dataMap.values()).sort(
-    (a, b) => new Date(a.stay_date) - new Date(b.stay_date)
+    (a, b) => new Date(a.date) - new Date(b.date)
   );
 }
 
 // --- DYNAMIC CSV GENERATION ---
-// This function creates the CSV string from the live data.
-// --- DYNAMIC CSV GENERATION ---
-// This function creates the CSV string from the live data.
+// This function creates the CSV string with the new column order and names.
 function generateCSV(data, report) {
-  const headers = ["Date"];
+  // 1. Define the desired master order of columns.
+  const masterHeaderOrder = {
+    Date: (row) => row.date,
+    "Rooms Sold": (row) => parseFloat(row.rooms_sold) || 0,
+    "Rooms Unsold": (row) =>
+      parseFloat(row.capacity_count) - parseFloat(row.rooms_sold) || 0,
+    ADR: (row) => (parseFloat(row.adr) || 0).toFixed(2),
+    RevPAR: (row) => (parseFloat(row.revpar) || 0).toFixed(2),
+    Occupancy: (row) => (parseFloat(row.occupancy) * 100 || 0).toFixed(2) + "%",
+    "Total Revenue": (row) => (parseFloat(row.total_revenue) || 0).toFixed(2),
+  };
+
+  const headers = [];
   const hotelMetrics = new Set(report.metrics_hotel);
-  const marketMetrics = new Set(report.metrics_market);
 
-  // Dynamically build headers based on saved metrics
-  if (hotelMetrics.has("Occupancy")) headers.push("Your Occupancy");
-  if (hotelMetrics.has("ADR")) headers.push("Your ADR");
-  if (hotelMetrics.has("Total Revenue")) headers.push("Your Total Revenue");
-  if (hotelMetrics.has("Rooms Sold")) headers.push("Your Rooms Sold");
-
-  if (report.add_comparisons) {
-    if (marketMetrics.has("Market Occupancy")) headers.push("Market Occupancy");
-    if (marketMetrics.has("Market ADR")) headers.push("Market ADR");
+  // 2. Build the list of active headers based on saved metrics and desired order.
+  for (const header of Object.keys(masterHeaderOrder)) {
+    if (hotelMetrics.has(header) || header === "Date") {
+      headers.push(header);
+    }
   }
 
+  // 3. Generate the rows based on the final active headers.
   const headerRow = headers.join(",");
   const bodyRows = data
     .map((row) => {
-      const rowData = [formatDateForQuery(new Date(row.stay_date))];
-
-      // --- THIS IS THE FIX ---
-      // We use parseFloat() to convert the string values from the database back to numbers.
-      if (hotelMetrics.has("Occupancy"))
-        rowData.push((parseFloat(row.occupancy) * 100 || 0).toFixed(2) + "%");
-      if (hotelMetrics.has("ADR"))
-        rowData.push((parseFloat(row.adr) || 0).toFixed(2));
-      if (hotelMetrics.has("Total Revenue"))
-        rowData.push((parseFloat(row.total_revenue) || 0).toFixed(2));
-      if (hotelMetrics.has("Rooms Sold"))
-        rowData.push(parseFloat(row.rooms_sold) || 0);
-
-      if (report.add_comparisons) {
-        if (marketMetrics.has("Market Occupancy"))
-          rowData.push(
-            (parseFloat(row.market_occupancy) * 100 || 0).toFixed(2) + "%"
-          );
-        if (marketMetrics.has("Market ADR"))
-          rowData.push((parseFloat(row.market_adr) || 0).toFixed(2));
-      }
-      return rowData.join(",");
+      return headers
+        .map((header) => {
+          // Use the function from our master order to get the correct value.
+          return masterHeaderOrder[header](row);
+        })
+        .join(",");
     })
     .join("\n");
 
   return `${headerRow}\n${bodyRows}`;
 }
-
 // --- MAIN HANDLER ---
 // This is the main function executed by the cron job.
 module.exports = async (req, res) => {
