@@ -144,7 +144,6 @@ const requirePageLogin = (req, res, next) => {
 // --- NEW SCHEDULED REPORTS API ENDPOINTS ---
 // GET all scheduled reports for the logged-in user
 // GET all scheduled reports for the logged-in user
-// GET all scheduled reports for the logged-in user
 app.get("/api/scheduled-reports", requireUserApi, async (req, res) => {
   try {
     const userResult = await pgPool.query(
@@ -157,11 +156,11 @@ app.get("/api/scheduled-reports", requireUserApi, async (req, res) => {
     const internalUserId = userResult.rows[0].user_id;
 
     // --- THIS QUERY IS THE ONLY CHANGE ---
-    // The JOIN is now a direct comparison, which should work if both columns are the same type.
+    // It now casts the property_id from text to an integer for the JOIN.
     const { rows } = await pgPool.query(
       `SELECT sr.*, h.property_name
        FROM scheduled_reports sr
-       LEFT JOIN hotels h ON sr.property_id = h.hotel_id
+       LEFT JOIN hotels h ON sr.property_id::integer = h.hotel_id
        WHERE sr.user_id = $1
        ORDER BY sr.created_at DESC`,
       [internalUserId]
