@@ -13,26 +13,42 @@ const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // --- Reusable Cloudbeds Auth Function ---
-async function getCloudbedsAccessToken() {
-  const {
-    CLOUDBEDS_CLIENT_ID,
-    CLOUDBEDS_CLIENT_SECRET,
-    CLOUDBEDS_REFRESH_TOKEN,
-  } = process.env;
+// --- Reusable Cloudbeds Auth Function ---
+// This is the CORRECT, multi-tenant version of the function.
+// It accepts a specific user's refresh token to generate an access token.
+async function getCloudbedsAccessToken(refreshToken) {
+  // Get the app credentials from environment variables.
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+
+  // Ensure a refresh token was actually provided.
+  if (!refreshToken) {
+    throw new Error("Cannot get access token without a refresh token.");
+  }
+
+  // Prepare the request to Cloudbeds.
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: CLOUDBEDS_CLIENT_ID,
     client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: CLOUDBEDS_REFRESH_TOKEN,
+    refresh_token: refreshToken, // Use the provided user-specific token.
   });
-  const tokenResponse = await fetch(
+
+  // Make the call to the Cloudbeds token endpoint.
+  const response = await fetch(
     "https://hotels.cloudbeds.com/api/v1.1/access_token",
     { method: "POST", body: params }
   );
-  const tokenData = await tokenResponse.json();
+
+  const tokenData = await response.json();
+
+  // If the response does not contain an access_token, the refresh failed.
   if (!tokenData.access_token) {
-    throw new Error("Cloudbeds authentication failed.");
+    console.error("Token refresh failed for a user:", tokenData);
+    // Return null to indicate failure, allowing the calling function to handle it gracefully.
+    return null;
   }
+
+  // Return the newly acquired access token.
   return tokenData.access_token;
 }
 
@@ -830,16 +846,53 @@ app.get("/api/get-all-hotels", requireAdminApi, async (req, res) => {
   }
 });
 
+// This endpoint is now correctly implemented for a multi-tenant environment.
 app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
   try {
-    const accessToken = await getCloudbedsAccessToken();
+    // 1. Get the logged-in admin's user ID from the session.
+    const adminUserId = req.session.userId;
+
+    // 2. Fetch the admin's specific refresh token from the database.
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid refresh token for this user." });
+    }
+    const adminRefreshToken = userResult.rows[0].refresh_token;
+
+    // 3. Call the authentication function with the admin's specific token.
+    const accessToken = await getCloudbedsAccessToken(adminRefreshToken);
+    if (!accessToken) {
+      // This handles the "User is not assigned" error gracefully.
+      throw new Error(
+        "Cloudbeds authentication failed. Please re-authenticate via the sign-in page."
+      );
+    }
+
+    // 4. As a sensible default, get the first property associated with the admin.
+    const propertyResult = await pgPool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+      [adminUserId]
+    );
+    if (propertyResult.rows.length === 0) {
+      throw new Error("No properties are associated with this admin account.");
+    }
+    const propertyIdForHeader = propertyResult.rows[0].property_id;
+
+    // 5. Make the API call to Cloudbeds with the valid token and property ID.
     const targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
     const cloudbedsApiResponse = await fetch(targetUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/json",
-        "X-PROPERTY-ID": process.env.CLOUDBEDS_PROPERTY_ID,
+        // Use the dynamically fetched property ID, not an obsolete environment variable.
+        "X-PROPERTY-ID": propertyIdForHeader,
       },
     });
     const data = await cloudbedsApiResponse.json();
@@ -852,6 +905,8 @@ app.get("/api/explore/datasets", requireAdminApi, async (req, res) => {
     }
     res.status(200).json(data);
   } catch (error) {
+    // Log the detailed error and send a clean message to the client.
+    console.error("Error in /api/explore/datasets:", error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
