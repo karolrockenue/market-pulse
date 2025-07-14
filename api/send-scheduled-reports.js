@@ -154,32 +154,39 @@ module.exports = async (req, res) => {
 
   try {
     const now = new Date();
-    const currentHour = now.getUTCHours();
+    // --- THIS IS THE FIX ---
+    // We now get the current hour AND minute for a precise match.
+    const currentHour = now.getUTCHours().toString().padStart(2, "0");
+    const currentMinute = now.getUTCMinutes().toString().padStart(2, "0");
+    const currentTime = `${currentHour}:${currentMinute}`;
+
     const currentDayOfWeek = now.getUTCDay();
     const currentDayOfMonth = now.getUTCDate();
 
+    // The query now looks for an EXACT time match (e.g., '08:51').
     const { rows: dueReports } = await pgPool.query(
       `SELECT sr.*, h.star_rating
        FROM scheduled_reports sr
-       JOIN hotels h ON sr.property_id = h.hotel_id::varchar
-       WHERE sr.time_of_day LIKE $1 AND (
+       JOIN hotels h ON sr.property_id::integer = h.hotel_id
+       WHERE sr.time_of_day = $1 AND (
          (sr.frequency = 'Daily') OR
          (sr.frequency = 'Weekly' AND sr.day_of_week = $2) OR
          (sr.frequency = 'Monthly' AND sr.day_of_month = $3)
        )`,
-      [`${currentHour}:00%`, currentDayOfWeek, currentDayOfMonth]
+      [currentTime, currentDayOfWeek, currentDayOfMonth]
     );
 
     if (dueReports.length === 0) {
-      console.log("No reports due at this time.");
+      // This message is expected if no reports are scheduled for the current minute.
+      console.log(`No reports due at this time (${currentTime} UTC).`);
       return res.status(200).send("No reports due.");
     }
 
     console.log(`Found ${dueReports.length} report(s) to send.`);
 
+    // The rest of the fudnction remains the same...
     for (const report of dueReports) {
       const { startDate, endDate } = calculateDateRange(report.report_period);
-
       const hotelData = await getHotelMetrics(
         report.property_id,
         startDate,
@@ -193,7 +200,6 @@ module.exports = async (req, res) => {
             endDate
           )
         : [];
-
       const processedData = processData(hotelData, marketData);
 
       if (processedData.length === 0) {
