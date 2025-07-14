@@ -155,8 +155,7 @@ app.get("/api/scheduled-reports", requireUserApi, async (req, res) => {
     }
     const internalUserId = userResult.rows[0].user_id;
 
-    // --- THIS QUERY IS THE ONLY CHANGE ---
-    // It now casts the property_id from text to an integer for the JOIN.
+    // This query casts the text property_id to an integer to correctly join with hotels.hotel_id
     const { rows } = await pgPool.query(
       `SELECT sr.*, h.property_name
        FROM scheduled_reports sr

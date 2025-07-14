@@ -119,6 +119,7 @@ function processData(hotelData, marketData) {
 }
 
 // --- DYNAMIC CSV GENERATION ---
+// --- DYNAMIC CSV GENERATION ---
 // This function creates the CSV string with the new column order and names.
 function generateCSV(data, report) {
   // 1. Define the desired master order of columns.
@@ -127,10 +128,10 @@ function generateCSV(data, report) {
     "Rooms Sold": (row) => parseFloat(row.rooms_sold) || 0,
     "Rooms Unsold": (row) =>
       parseFloat(row.capacity_count) - parseFloat(row.rooms_sold) || 0,
-    ADR: (row) => (parseFloat(row.adr) || 0).toFixed(2),
-    RevPAR: (row) => (parseFloat(row.revpar) || 0).toFixed(2),
-    Occupancy: (row) => (parseFloat(row.occupancy) * 100 || 0).toFixed(2) + "%",
-    "Total Revenue": (row) => (parseFloat(row.total_revenue) || 0).toFixed(2),
+    ADR: (row) => parseFloat(row.adr) || 0,
+    RevPAR: (row) => parseFloat(row.revpar) || 0,
+    Occupancy: (row) => parseFloat(row.occupancy) || 0,
+    "Total Revenue": (row) => parseFloat(row.total_revenue) || 0,
   };
 
   const headers = [];
@@ -145,16 +146,56 @@ function generateCSV(data, report) {
 
   // 3. Generate the rows based on the final active headers.
   const headerRow = headers.join(",");
-  const bodyRows = data
+  let bodyRows = data
     .map((row) => {
       return headers
         .map((header) => {
-          // Use the function from our master order to get the correct value.
-          return masterHeaderOrder[header](row);
+          const value = masterHeaderOrder[header](row);
+          // Format for display in CSV
+          if (header === "Occupancy") return (value * 100).toFixed(2) + "%";
+          if (typeof value === "number") return value.toFixed(2);
+          return value;
         })
         .join(",");
     })
     .join("\n");
+
+  // --- THIS IS THE NEW LOGIC ---
+  // 4. If the report is set to display totals, calculate and append them.
+  if (report.display_totals) {
+    const totals = {};
+    const sums = ["Rooms Sold", "Rooms Unsold", "Total Revenue"];
+    const avgs = ["ADR", "RevPAR", "Occupancy"];
+
+    // Calculate sums
+    sums.forEach((key) => {
+      totals[key] = data.reduce(
+        (sum, row) => sum + (masterHeaderOrder[key](row) || 0),
+        0
+      );
+    });
+
+    // Calculate averages
+    avgs.forEach((key) => {
+      totals[key] =
+        data.reduce((sum, row) => sum + (masterHeaderOrder[key](row) || 0), 0) /
+        data.length;
+    });
+
+    const totalsRowData = headers.map((header) => {
+      if (header === "Date") return "Totals / Averages";
+      if (totals[header] !== undefined) {
+        const value = totals[header];
+        if (header === "Occupancy") return (value * 100).toFixed(2) + "%";
+        if (typeof value === "number") return value.toFixed(2);
+        return value;
+      }
+      return ""; // Empty cell for non-totaled columns
+    });
+
+    // Append the formatted totals row to the CSV body
+    bodyRows += "\n" + totalsRowData.join(",");
+  }
 
   return `${headerRow}\n${bodyRows}`;
 }
