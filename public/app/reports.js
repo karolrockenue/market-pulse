@@ -354,6 +354,30 @@ function exportToCSV() {
   document.body.removeChild(link);
 }
 
+function exportToExcel() {
+  const table = document.querySelector("#report-results-container table");
+  if (!table) {
+    alert("No report table found to export.");
+    return;
+  }
+  const reportTitle = window.generateReportTitle(
+    window.getSelectedColumnsForExport()
+  );
+  const fileName = `${reportTitle
+    .replace(/[^a-z0-9]/gi, "-")
+    .toLowerCase()}.xlsx`;
+
+  // Convert the HTML table to a worksheet object
+  const ws = XLSX.utils.table_to_sheet(table);
+
+  // Create a new workbook and append the worksheet
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+
+  // Generate the .xlsx file and trigger the download
+  XLSX.writeFile(wb, fileName);
+}
+
 function formatValue(value, columnName, isDelta = false) {
   if (typeof value !== "number" || isNaN(value)) return "-";
   const lowerCaseCol = columnName.toLowerCase();
@@ -602,6 +626,7 @@ window.formatDateForInput = formatDateForInput;
 window.formatDateForDisplay = formatDateForDisplay;
 window.parseDateFromInput = parseDateFromInput;
 window.exportToCSV = exportToCSV;
+window.exportToExcel = exportToExcel;
 window.formatValue = formatValue;
 window.handleFrequencyChange = handleFrequencyChange;
 window.renderReportTable = renderReportTable;
