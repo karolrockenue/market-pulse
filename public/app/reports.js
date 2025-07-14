@@ -22,52 +22,69 @@ function getSelectedColumns() {
 
 // --- CORE LOGIC MOVED FROM HTML ---
 function handlePresetChange(preset) {
-  const today = new Date();
+  // --- THIS IS THE FIX ---
+  // We now create a date object representing the start of today in UTC.
+  const localToday = new Date();
+  const today = new Date(
+    Date.UTC(
+      localToday.getFullYear(),
+      localToday.getMonth(),
+      localToday.getDate()
+    )
+  );
+
   let startDate, endDate;
-  const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1; // Monday is 0, Sunday is 6
+
+  // The day of the week is now also calculated based on UTC.
+  const dayOfWeek = today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1; // Monday is 0, Sunday is 6
+
   if (preset === "current-week") {
     startDate = new Date(today);
-    startDate.setDate(today.getDate() - dayOfWeek);
+    startDate.setUTCDate(today.getUTCDate() - dayOfWeek);
     endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6);
+    endDate.setUTCDate(startDate.getUTCDate() + 6);
   } else if (preset === "last-week") {
     startDate = new Date(today);
-    startDate.setDate(today.getDate() - dayOfWeek - 7);
+    startDate.setUTCDate(today.getUTCDate() - dayOfWeek - 7);
     endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6);
+    endDate.setUTCDate(startDate.getUTCDate() + 6);
   } else if (preset === "current-month") {
-    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    startDate = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)
+    );
+    endDate = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)
+    );
   } else if (preset === "next-month") {
-    startDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    startDate = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)
+    );
+    endDate = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0)
+    );
   } else if (preset === "this-year") {
-    startDate = new Date(today.getFullYear(), 0, 1);
-    endDate = new Date(today.getFullYear(), 11, 31);
+    startDate = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+    endDate = new Date(Date.UTC(today.getUTCFullYear(), 11, 31));
   } else {
     return; // No valid preset
   }
+
   document.getElementById("start-date").value = formatDateForInput(startDate);
   document.getElementById("end-date").value = formatDateForInput(endDate);
 }
 
-// This function now orchestrates fetching live data instead of mock data.
-// This function is updated to receive the propertyId directly as an argument,
-// which is more reliable than reading from localStorage.
 async function handleGenerateReport(component, propertyId) {
   const reportContainer = document.getElementById("report-results-container");
   reportContainer.innerHTML =
     '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">Loading live report data...</div>';
 
   try {
-    // The propertyId is now passed in directly. Check if it's valid.
     if (!propertyId) {
       throw new Error(
         "No property selected. Please choose a property from the header dropdown."
       );
     }
 
-    // This part remains the same
     const selectedColumns = getSelectedColumns();
     const allSelected = [...selectedColumns.hotel, ...selectedColumns.market];
 
@@ -95,7 +112,6 @@ async function handleGenerateReport(component, propertyId) {
 
     if (!startDate || !endDate || !granularity || !displayOrder) return;
 
-    // The rest of the function is the same, it just uses the propertyId argument
     const [yourData, marketData] = await Promise.all([
       fetchYourHotelMetrics(propertyId, startDate, endDate, granularity),
       fetchMarketMetrics(propertyId, startDate, endDate, granularity),
@@ -121,7 +137,6 @@ async function handleGenerateReport(component, propertyId) {
 }
 
 // --- LIVE DATA FETCHING & PROCESSING ---
-// Fetches the core metrics for the user's selected property.
 async function fetchYourHotelMetrics(
   propertyId,
   startDate,
@@ -139,7 +154,6 @@ async function fetchYourHotelMetrics(
   return response.json();
 }
 
-// Fetches the aggregated metrics for the competitor set.
 async function fetchMarketMetrics(propertyId, startDate, endDate, granularity) {
   const url = `/api/competitor-metrics?startDate=${formatDateForInput(
     startDate
@@ -152,70 +166,127 @@ async function fetchMarketMetrics(propertyId, startDate, endDate, granularity) {
   return response.json();
 }
 
-// Merges the user's hotel data and market data into a single, flat array of objects.
-// Merges "Your Hotel" data and "Market" data into a single, flat array of objects.
 function processAndMergeData(yourData, marketData) {
-  // Use a Map to efficiently group all metrics by date.
   const dataMap = new Map();
-
-  // This helper function processes a single row of data from any source.
   const processRow = (row) => {
-    // Get the date, whether it's from a daily row ('stay_date') or a grouped period ('period').
     const date = (row.period || row.stay_date).substring(0, 10);
-
-    // If we haven't seen this date before, create an entry for it.
     if (!dataMap.has(date)) {
       dataMap.set(date, { date });
     }
     const entry = dataMap.get(date);
-
-    // --- THIS IS THE FIX ---
-    // Calculate Rooms Unsold and define all possible metrics.
     const roomsSold = parseInt(row.rooms_sold, 10);
     const capacity = parseInt(row.capacity_count, 10);
     const roomsUnsold = capacity - roomsSold;
 
     const metrics = {
-      // "Your Hotel" metrics from the API
       Occupancy: parseFloat(row.occupancy_direct),
       ADR: parseFloat(row.adr),
       RevPAR: parseFloat(row.revpar),
       "Total Revenue": parseFloat(row.total_revenue),
       "Rooms Sold": roomsSold,
-      "Rooms Unsold": roomsUnsold, // This is now calculated correctly.
-
-      // "Market" metrics from the API
+      "Rooms Unsold": roomsUnsold,
       "Market Occupancy": parseFloat(row.market_occupancy),
       "Market ADR": parseFloat(row.market_adr),
       "Market Total Revenue": parseFloat(row.market_total_revenue),
       "Market Rooms Sold": parseInt(row.market_rooms_sold, 10),
     };
-    // --- END OF FIX ---
-
-    // Loop through all possible metrics and add them to the entry for the current date
-    // if they are a valid number. This prevents 'NaN' from appearing in the report.
     for (const key in metrics) {
       if (!isNaN(metrics[key])) {
         entry[key] = metrics[key];
       }
     }
   };
-
-  // Process all rows from both your data and the market data.
   yourData.forEach(processRow);
   marketData.forEach(processRow);
-
-  // Convert the map of data back to an array and sort it by date.
   const mergedData = Array.from(dataMap.values());
   return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+// --- SCHEDULE API FUNCTIONS ---
+async function fetchSchedules() {
+  const response = await fetch("/api/scheduled-reports");
+  if (!response.ok) {
+    alert("Could not load your scheduled reports.");
+    return [];
+  }
+  return response.json();
+}
+
+async function saveSchedule(component) {
+  if (!component.newScheduleName) {
+    alert("Please enter a name for the report.");
+    return;
+  }
+
+  // --- THIS IS THE FIX ---
+  // We now correctly read the propertyId from the component's state.
+  if (!component.propertyId) {
+    alert("Cannot save schedule: No property is currently selected.");
+    return;
+  }
+
+  const selectedColumns = getSelectedColumns();
+
+  const payload = {
+    propertyId: component.propertyId, // And include it in the payload.
+    reportName: component.newScheduleName,
+    recipients: component.newScheduleRecipients,
+    frequency: component.newScheduleFrequency,
+    dayOfWeek: document.getElementById("schedule-weekly-day")?.value,
+    dayOfMonth: document.getElementById("schedule-monthly-day")?.value,
+    timeOfDay: document.getElementById("schedule-time")?.value,
+    reportPeriod: component.newSchedulePeriod,
+    metricsHotel: selectedColumns.hotel,
+    metricsMarket: selectedColumns.market,
+    addComparisons: component.addComparisons,
+    displayOrder: document.querySelector(
+      'input[name="comparison-order"]:checked'
+    )?.value,
+    displayTotals: component.displayTotals,
+    includeTaxes: document.getElementById("include-taxes-toggle")?.checked,
+  };
+
+  const response = await fetch("/api/scheduled-reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    alert("Failed to save the schedule. Please try again.");
+    return;
+  }
+
+  const newSchedule = await response.json();
+  component.schedules.push(newSchedule);
+
+  component.newScheduleName = "";
+  component.newScheduleRecipients = "";
+  component.isScheduleModalOpen = false;
+}
+async function deleteSchedule(component, id) {
+  if (!confirm("Are you sure you want to delete this scheduled report?")) {
+    return;
+  }
+  const response = await fetch(`/api/scheduled-reports/${id}`, {
+    method: "DELETE",
+  });
+
+  if (response.status === 204) {
+    component.schedules = component.schedules.filter((s) => s.id !== id);
+  } else {
+    alert("Failed to delete the schedule.");
+  }
 }
 
 // --- UTILITY FUNCTIONS ---
 function formatDateForInput(date) {
   if (!date) return "";
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const day = date.getDate().toString().padStart(2, "0");
+  // --- THIS IS THE FIX ---
+  // We explicitly get the UTC parts of the date to prevent timezone shifts.
+  const year = date.getUTCFullYear();
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const day = date.getUTCDate().toString().padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -228,11 +299,12 @@ function formatDateForDisplay(dateString) {
 function parseDateFromInput(dateString) {
   if (!dateString) return null;
   const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  // This creates the Date object in the UTC timezone, preventing timezone shift issues.
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 function generateReportTitle(selected) {
-  const hotelName = "Rockenue Partner Account"; // This can be made dynamic later
+  const hotelName = "Rockenue Partner Account";
   let title = `${hotelName} Report`;
   if (
     selected &&
@@ -317,35 +389,29 @@ function handleFrequencyChange() {
   const timeSelect = document.getElementById("schedule-time");
   if (!timeSelect) return;
   timeSelect.innerHTML = "";
-  ["8:00 AM", "4:00 PM"].forEach((time) => {
+
+  // --- TEMPORARY TEST CODE ---
+  // 1. Calculate the time 2 minutes from now in UTC.
+  const testDate = new Date();
+  testDate.setMinutes(testDate.getMinutes() + 2);
+  const testHours = testDate.getUTCHours().toString().padStart(2, "0");
+  const testMinutes = testDate.getUTCMinutes().toString().padStart(2, "0");
+  const testTimeValue = `${testHours}:${testMinutes}`;
+
+  // 2. Create and add the new "Test Now" option to the dropdown.
+  const testOption = document.createElement("option");
+  testOption.value = testTimeValue;
+  testOption.textContent = `Test Now (${testTimeValue} UTC)`;
+  timeSelect.appendChild(testOption);
+  // --- END OF TEST CODE ---
+
+  // Add the standard, permanent options.
+  ["08:00", "16:00"].forEach((time) => {
     const option = document.createElement("option");
     option.value = time;
-    option.textContent = time;
+    option.textContent = time + " UTC";
     timeSelect.appendChild(option);
   });
-}
-
-function saveSchedule(component) {
-  if (!component.newScheduleName) {
-    alert("Please enter a name for the report.");
-    return;
-  }
-  component.schedules.push({
-    id: component.nextScheduleId++,
-    name: component.newScheduleName,
-    recipients: component.newScheduleRecipients,
-    frequency: component.newScheduleFrequency,
-    period: component.newSchedulePeriod,
-  });
-  component.newScheduleName = "";
-  component.newScheduleRecipients = "";
-  component.isScheduleModalOpen = false;
-}
-
-function deleteSchedule(component, id) {
-  component.schedules = component.schedules.filter(
-    (schedule) => schedule.id !== id
-  );
 }
 
 // --- RENDERING ENGINE ---
@@ -554,11 +620,14 @@ window.parseDateFromInput = parseDateFromInput;
 window.exportToCSV = exportToCSV;
 window.formatValue = formatValue;
 window.handleFrequencyChange = handleFrequencyChange;
-window.saveSchedule = saveSchedule;
-window.deleteSchedule = deleteSchedule;
 window.renderReportTable = renderReportTable;
 window.handlePresetChange = handlePresetChange;
 window.handleGenerateReport = handleGenerateReport;
+
+// --- NEW LIVE SCHEDULE FUNCTIONS ---
+window.fetchSchedules = fetchSchedules;
+window.saveSchedule = saveSchedule;
+window.deleteSchedule = deleteSchedule;
 
 // Helper for the export function
 window.getSelectedColumnsForExport = () => {

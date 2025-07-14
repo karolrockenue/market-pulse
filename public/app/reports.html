@@ -691,7 +691,7 @@
                         >
                           <div class="block">
                             <div class="w-full text-sm font-semibold">
-                              Last Week
+                              Previous Week
                             </div>
                           </div>
                         </label>
@@ -814,11 +814,13 @@
                             id="schedule-weekly-day"
                             class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
                           >
-                            <option>Monday</option>
-                            <option>Tuesday</option>
-                            <option>Wednesday</option>
-                            <option>Thursday</option>
-                            <option>Friday</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
                           </select>
                         </div>
                         <div x-show="newScheduleFrequency === 'Monthly'">
@@ -1010,7 +1012,7 @@
                         scope="col"
                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        Report Name & Recipients
+                        Report Details
                       </th>
                       <th
                         scope="col"
@@ -1035,20 +1037,31 @@
                     </template>
                     <template x-for="schedule in schedules" :key="schedule.id">
                       <tr>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 whitespace-nowrap">
                           <div
                             class="text-sm font-semibold text-slate-800"
-                            x-text="schedule.name"
+                            x-text="schedule.report_name"
                           ></div>
+                          <div class="text-xs text-slate-500 mt-1">
+                            For Hotel:
+                            <span
+                              class="font-medium"
+                              x-text="schedule.property_name || 'Unknown Hotel'"
+                            ></span>
+                          </div>
                           <div
                             class="text-xs text-slate-500 mt-1"
-                            x-text="schedule.recipients"
+                            x-text="`To: ${schedule.recipients}`"
                           ></div>
                         </td>
-                        <td class="px-6 py-4 text-sm text-slate-600">
+                        <td
+                          class="px-6 py-4 whitespace-nowrap text-sm text-slate-600"
+                        >
                           <span x-text="schedule.frequency"></span>
                         </td>
-                        <td class="px-6 py-4 text-right text-sm font-medium">
+                        <td
+                          class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                        >
                           <a
                             href="#"
                             @click.prevent="deleteSchedule(schedule.id)"
@@ -1087,8 +1100,21 @@
           nextScheduleId: 1,
 
           // --- INIT ---
+          // --- INIT ---
+          // --- INIT ---
           async init() {
-            // Header loading logic (unchanged)
+            // --- THIS IS THE FIX ---
+            // 1. Set up the listener immediately, so it's ready to catch the event.
+            window.addEventListener("property-changed", (event) => {
+              if (event.detail.propertyId) {
+                this.propertyId = event.detail.propertyId;
+                // As soon as we get the property ID, generate the initial report.
+                this.handleGenerateReport();
+              }
+            });
+
+            // 2. Now, load the header component. When it finishes and sends its
+            //    broadcast, our listener will be ready and waiting.
             const { loadComponent } = await import("/app/utils.mjs");
             const { default: pageHeader } = await import(
               "/app/_shared/header.mjs"
@@ -1096,19 +1122,10 @@
             Alpine.data("pageHeader", pageHeader);
             await loadComponent("header", "header-placeholder");
 
-            // Set default dates (unchanged)
+            // 3. The rest of the initialization can proceed.
             this.handlePresetChange("current-month");
             this.handleFrequencyChange();
-
-            // --- THE FIX ---
-            // The event listener is updated to use the ID from the event's 'detail' payload.
-            window.addEventListener("property-changed", (event) => {
-              // 1. Store the property ID from the event into our component's state.
-              this.propertyId = event.detail.propertyId;
-
-              // 2. Run the report.
-              this.handleGenerateReport();
-            });
+            this.schedules = await window.fetchSchedules();
           },
 
           // --- PROXY METHODS ---
