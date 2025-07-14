@@ -290,11 +290,20 @@ async function generatePDF(data, report) {
         </table>
     `;
 
+  // Launch Puppeteer with the correct arguments for a serverless environment.
   const browser = await puppeteer.launch({
+    // These are the crucial arguments that tell Chromium how to run in a restricted environment.
+    // They disable features that rely on missing system libraries like the GPU sandbox and shared memory.
     args: chromium.args,
+    // Use the recommended default viewport.
     defaultViewport: chromium.defaultViewport,
+    // Get the path to the pre-compiled Chromium executable provided by the @sparticuz/chromium package.
     executablePath: await chromium.executablePath(),
+    // Ensure we run in headless mode (no visible UI), which is required for servers.
+    // The 'new' headless mode is more modern and reliable.
     headless: chromium.headless,
+    // This flag is often necessary in containerized environments to prevent permission errors.
+    ignoreHTTPSErrors: true,
   });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
