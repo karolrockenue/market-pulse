@@ -12,7 +12,7 @@
   "description": "",
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
-    "@sparticuz/chromium": "^138.0.1",
+    "@sparticuz/chromium-min": "^138.0.1",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
