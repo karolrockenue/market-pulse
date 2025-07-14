@@ -107,6 +107,8 @@ function processData(hotelData, marketData) {
 
 // --- DYNAMIC CSV GENERATION ---
 // This function creates the CSV string from the live data.
+// --- DYNAMIC CSV GENERATION ---
+// This function creates the CSV string from the live data.
 function generateCSV(data, report) {
   const headers = ["Date"];
   const hotelMetrics = new Set(report.metrics_hotel);
@@ -127,18 +129,25 @@ function generateCSV(data, report) {
   const bodyRows = data
     .map((row) => {
       const rowData = [formatDateForQuery(new Date(row.stay_date))];
+
+      // --- THIS IS THE FIX ---
+      // We use parseFloat() to convert the string values from the database back to numbers.
       if (hotelMetrics.has("Occupancy"))
-        rowData.push((row.occupancy * 100 || 0).toFixed(2) + "%");
-      if (hotelMetrics.has("ADR")) rowData.push((row.adr || 0).toFixed(2));
+        rowData.push((parseFloat(row.occupancy) * 100 || 0).toFixed(2) + "%");
+      if (hotelMetrics.has("ADR"))
+        rowData.push((parseFloat(row.adr) || 0).toFixed(2));
       if (hotelMetrics.has("Total Revenue"))
-        rowData.push((row.total_revenue || 0).toFixed(2));
-      if (hotelMetrics.has("Rooms Sold")) rowData.push(row.rooms_sold || 0);
+        rowData.push((parseFloat(row.total_revenue) || 0).toFixed(2));
+      if (hotelMetrics.has("Rooms Sold"))
+        rowData.push(parseFloat(row.rooms_sold) || 0);
 
       if (report.add_comparisons) {
         if (marketMetrics.has("Market Occupancy"))
-          rowData.push((row.market_occupancy * 100 || 0).toFixed(2) + "%");
+          rowData.push(
+            (parseFloat(row.market_occupancy) * 100 || 0).toFixed(2) + "%"
+          );
         if (marketMetrics.has("Market ADR"))
-          rowData.push((row.market_adr || 0).toFixed(2));
+          rowData.push((parseFloat(row.market_adr) || 0).toFixed(2));
       }
       return rowData.join(",");
     })
