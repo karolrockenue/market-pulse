@@ -1387,6 +1387,85 @@ app.get("/api/run-endpoint-tests", requireAdminApi, async (req, res) => {
   res.status(200).json(results);
 });
 
+// This new endpoint finds the oldest stay_date for a given property.
+app.get("/api/first-record-date", requireAdminApi, async (req, res) => {
+  try {
+    const { propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+
+    // Get the logged-in admin's refresh token from the database.
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+    if (!userResult.rows.length || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Could not find a valid token for this user." });
+    }
+    const adminRefreshToken = userResult.rows[0].refresh_token;
+
+    // Get a valid access token.
+    const accessToken = await getCloudbedsAccessToken(adminRefreshToken);
+    if (!accessToken) {
+      throw new Error("Cloudbeds authentication failed.");
+    }
+
+    // This is a special, lightweight payload for the Cloudbeds Insights API.
+    const insightsPayload = {
+      property_ids: [propertyId],
+      dataset_id: 7, // The main dataset for daily metrics.
+      columns: [{ cdf: { column: "stay_date" } }], // We only need the date.
+      order: [
+        {
+          cdf: { column: "stay_date" },
+          direction: "ASC", // Sort oldest to newest.
+        },
+      ],
+      limit: 1, // We only need the very first record.
+      settings: { details: true, totals: false },
+    };
+
+    // Make the API call to Cloudbeds.
+    const apiResponse = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-PROPERTY-ID": propertyId,
+        },
+        body: JSON.stringify(insightsPayload),
+      }
+    );
+
+    const data = await apiResponse.json();
+    if (!apiResponse.ok) {
+      throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
+    }
+
+    // Extract the date from the response.
+    if (data && data.index && data.index.length > 0) {
+      const oldestDate = data.index[0][0];
+      res.status(200).json({ success: true, oldestDate: oldestDate });
+    } else {
+      res
+        .status(404)
+        .json({
+          success: false,
+          error: "No historical data found for this property.",
+        });
+    }
+  } catch (error) {
+    console.error("Error fetching first record date:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // --- End of Corrected API Explorer Block ---
 // --- Static and fallback routes ---
 const publicPath = path.join(process.cwd(), "public");

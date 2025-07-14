@@ -369,13 +369,69 @@ function initializeAdminPanel() {
   runDailyRefreshBtn.addEventListener("click", () =>
     runJob("/api/daily-refresh", runDailyRefreshBtn)
   );
-  runInitialSyncBtn.addEventListener("click", () => {
+  // This listener now orchestrates the new dynamic sync process.
+  runInitialSyncBtn.addEventListener("click", async () => {
+    const propertyId = document.getElementById("sync-property-id").value;
+    const statusEl = document.getElementById("initial-sync-status");
+
+    if (!propertyId) {
+      statusEl.textContent = "Please enter a Property ID.";
+      statusEl.className = "mt-2 text-sm text-red-600";
+      return;
+    }
+
     if (
-      confirm(
-        "Are you sure you want to run a full data sync? This can take several minutes and will overwrite existing data."
+      !confirm(
+        `Are you sure you want to run a full data sync for property ${propertyId}? This can take several minutes.`
       )
     ) {
-      runJob("/api/initial-sync", runInitialSyncBtn);
+      return;
+    }
+
+    // Disable button and show progress
+    runInitialSyncBtn.disabled = true;
+    runInitialSyncBtn.textContent = "Step 1: Finding Oldest Record...";
+    statusEl.className = "mt-2 text-sm text-gray-600";
+    statusEl.textContent =
+      "Attempting to find the first data point for this property...";
+
+    try {
+      // Step 1: Call the new discovery endpoint.
+      const discoveryResponse = await fetch(
+        `/api/first-record-date?propertyId=${propertyId}`
+      );
+      const discoveryData = await discoveryResponse.json();
+
+      if (!discoveryResponse.ok) {
+        throw new Error(
+          discoveryData.error || "Failed to find the first record date."
+        );
+      }
+
+      const oldestDate = discoveryData.oldestDate;
+      statusEl.textContent = `Oldest record found: ${oldestDate}. Now starting full sync...`;
+      runInitialSyncBtn.textContent = "Step 2: Running Full Sync...";
+
+      // Step 2: Call the main sync job, passing the discovered date and property ID.
+      const syncResponse = await fetch("/api/initial-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId, oldestDate }),
+      });
+
+      const syncData = await syncResponse.json();
+      if (!syncResponse.ok) {
+        throw new Error(syncData.error || "The main sync process failed.");
+      }
+
+      statusEl.textContent = `✅ Success! Synced ${syncData.totalRecordsUpdated} records for property ${propertyId}.`;
+      statusEl.className = "mt-2 text-sm text-green-600";
+    } catch (error) {
+      statusEl.textContent = `❌ Error: ${error.message}`;
+      statusEl.className = "mt-2 text-sm text-red-600";
+    } finally {
+      runInitialSyncBtn.disabled = false;
+      runInitialSyncBtn.textContent = "Run Initial Sync For Property";
     }
   });
 
