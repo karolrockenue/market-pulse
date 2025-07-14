@@ -3,7 +3,7 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const sgMail = require("@sendgrid/mail");
 const exceljs = require("exceljs");
-const chromium = require("@sparticuz/chromium@123.0.1");
+const chromium = require("@sparticuz/chromium");
 const puppeteer = require("puppeteer-core");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
