@@ -35,7 +35,7 @@
     },
     {
       "path": "/api/send-scheduled-reports",
-      "schedule": "0 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
