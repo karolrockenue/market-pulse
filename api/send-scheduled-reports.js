@@ -3,7 +3,7 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const sgMail = require("@sendgrid/mail");
 const exceljs = require("exceljs");
-const chromium = require("@sparticuz/chromium");
+const chromium = require("@sparticuz/chromium-min");
 const puppeteer = require("puppeteer-core");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -237,7 +237,6 @@ async function generateXLSX(data, report) {
 }
 
 async function generatePDF(data, report) {
-  // The logic to build the HTML string remains the same.
   const { headers, body, totals } = getReportData(data, report);
   let html = `
         <style>
@@ -297,13 +296,9 @@ async function generatePDF(data, report) {
         </table>
     `;
 
-  // Launch Puppeteer with the final, correct configuration.
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    // **THIS IS THE CORRECT IMPLEMENTATION**
-    // We 'await' the 'executablePath' property which contains a Promise.
-    // This resolves to the string path for the browser executable.
     executablePath: await chromium.executablePath,
     headless: chromium.headless,
     ignoreHTTPSErrors: true,
