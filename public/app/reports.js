@@ -218,8 +218,6 @@ async function saveSchedule(component) {
     return;
   }
 
-  // --- THIS IS THE FIX ---
-  // We now correctly read the propertyId from the component's state.
   if (!component.propertyId) {
     alert("Cannot save schedule: No property is currently selected.");
     return;
@@ -228,7 +226,7 @@ async function saveSchedule(component) {
   const selectedColumns = getSelectedColumns();
 
   const payload = {
-    propertyId: component.propertyId, // And include it in the payload.
+    propertyId: component.propertyId,
     reportName: component.newScheduleName,
     recipients: component.newScheduleRecipients,
     frequency: component.newScheduleFrequency,
@@ -244,6 +242,9 @@ async function saveSchedule(component) {
     )?.value,
     displayTotals: component.displayTotals,
     includeTaxes: document.getElementById("include-taxes-toggle")?.checked,
+    // --- THIS IS THE FIX ---
+    // We now correctly include the selected formats in the payload.
+    attachmentFormats: component.newScheduleFormats,
   };
 
   const response = await fetch("/api/scheduled-reports", {
@@ -253,12 +254,16 @@ async function saveSchedule(component) {
   });
 
   if (!response.ok) {
+    // This will now show the detailed error from the server in the console.
+    console.error("Failed to save schedule:", await response.json());
     alert("Failed to save the schedule. Please try again.");
     return;
   }
 
   const newSchedule = await response.json();
-  component.schedules.push(newSchedule);
+  // We need to update the frontend list to include the property name for the new item.
+  // The easiest way is to just reload all schedules from the server.
+  component.schedules = await window.fetchSchedules();
 
   component.newScheduleName = "";
   component.newScheduleRecipients = "";
