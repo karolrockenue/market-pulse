@@ -2,12 +2,15 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 const sgMail = require("@sendgrid/mail");
+const exceljs = require("exceljs");
+const chromium = require("@sparticuz/chromium@123.0.1");
+const puppeteer = require("puppeteer-core");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// --- DATE & HELPER FUNCTIONS ---
-// These functions help calculate the correct date ranges for reports.
+// --- HELPER FUNCTIONS (Date, Data Processing) ---
+// These are unchanged, but needed for the script to run.
 function formatDateForQuery(date) {
   const year = date.getUTCFullYear();
   const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
@@ -41,7 +44,6 @@ function calculateDateRange(period) {
         Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)
       );
       break;
-    // Add other periods as needed (next-month, this-year, etc.)
     case "current-week":
     default:
       startDate = new Date(today);
@@ -56,11 +58,15 @@ function calculateDateRange(period) {
   };
 }
 
-// --- BACKEND DATA FETCHING LOGIC ---
-// These functions fetch data directly from the database for the report.
 async function getHotelMetrics(propertyId, startDate, endDate) {
   const query = `
-    SELECT stay_date::date, AVG(adr) as adr, AVG(occupancy_direct) as occupancy, SUM(total_revenue) as total_revenue, SUM(rooms_sold) as rooms_sold
+    SELECT stay_date::date, 
+           AVG(adr) as adr, 
+           AVG(occupancy_direct) as occupancy, 
+           AVG(revpar) as revpar,
+           SUM(total_revenue) as total_revenue, 
+           SUM(rooms_sold) as rooms_sold,
+           SUM(capacity_count) as capacity_count
     FROM daily_metrics_snapshots
     WHERE hotel_id = $1 AND stay_date::date >= $2 AND stay_date::date <= $3
     GROUP BY stay_date::date ORDER BY stay_date::date ASC;
@@ -85,44 +91,34 @@ async function getMarketMetrics(propertyId, starRating, startDate, endDate) {
   ]);
   return rows;
 }
-// This function merges the two datasets and calculates new metrics.
+
 function processData(hotelData, marketData) {
   const dataMap = new Map();
-
   const processRow = (row, isMarket = false) => {
     const date = row.stay_date.toISOString().substring(0, 10);
-    if (!dataMap.has(date)) {
-      dataMap.set(date, { date: date });
-    }
+    if (!dataMap.has(date)) dataMap.set(date, { date: date });
     const entry = dataMap.get(date);
-
-    // Add data to the correct properties (e.g., adr vs market_adr)
     const prefix = isMarket ? "market_" : "";
     entry[`${prefix}adr`] = row.adr;
     entry[`${prefix}occupancy`] = row.occupancy;
-    entry[`${prefix}total_revenue`] = row.total_revenue;
-    entry[`${prefix}rooms_sold`] = row.rooms_sold;
-
-    // Add non-market-prefixed calculations only once
     if (!isMarket) {
-      entry.capacity_count = row.capacity_count;
       entry.revpar = row.revpar;
+      entry.total_revenue = row.total_revenue;
+      entry.rooms_sold = row.rooms_sold;
+      entry.capacity_count = row.capacity_count;
     }
   };
-
   hotelData.forEach((row) => processRow(row, false));
   marketData.forEach((row) => processRow(row, true));
-
   return Array.from(dataMap.values()).sort(
     (a, b) => new Date(a.date) - new Date(b.date)
   );
 }
 
-// --- DYNAMIC CSV GENERATION ---
-// --- DYNAMIC CSV GENERATION ---
-// This function creates the CSV string with the new column order and names.
-function generateCSV(data, report) {
-  // 1. Define the desired master order of columns.
+// --- DYNAMIC FILE GENERATORS ---
+
+// Reusable function to get headers and format data
+function getReportData(data, report) {
   const masterHeaderOrder = {
     Date: (row) => row.date,
     "Rooms Sold": (row) => parseFloat(row.rooms_sold) || 0,
@@ -133,55 +129,53 @@ function generateCSV(data, report) {
     Occupancy: (row) => parseFloat(row.occupancy) || 0,
     "Total Revenue": (row) => parseFloat(row.total_revenue) || 0,
   };
-
   const headers = [];
   const hotelMetrics = new Set(report.metrics_hotel);
-
-  // 2. Build the list of active headers based on saved metrics and desired order.
   for (const header of Object.keys(masterHeaderOrder)) {
     if (hotelMetrics.has(header) || header === "Date") {
       headers.push(header);
     }
   }
+  const body = data.map((row) =>
+    headers.map((header) => masterHeaderOrder[header](row))
+  );
 
-  // 3. Generate the rows based on the final active headers.
-  const headerRow = headers.join(",");
-  let bodyRows = data
-    .map((row) => {
-      return headers
-        .map((header) => {
-          const value = masterHeaderOrder[header](row);
-          // Format for display in CSV
-          if (header === "Occupancy") return (value * 100).toFixed(2) + "%";
-          if (typeof value === "number") return value.toFixed(2);
-          return value;
-        })
-        .join(",");
-    })
-    .join("\n");
-
-  // --- THIS IS THE NEW LOGIC ---
-  // 4. If the report is set to display totals, calculate and append them.
+  let totals = null;
   if (report.display_totals) {
-    const totals = {};
+    totals = {};
     const sums = ["Rooms Sold", "Rooms Unsold", "Total Revenue"];
     const avgs = ["ADR", "RevPAR", "Occupancy"];
-
-    // Calculate sums
     sums.forEach((key) => {
       totals[key] = data.reduce(
         (sum, row) => sum + (masterHeaderOrder[key](row) || 0),
         0
       );
     });
-
-    // Calculate averages
     avgs.forEach((key) => {
       totals[key] =
         data.reduce((sum, row) => sum + (masterHeaderOrder[key](row) || 0), 0) /
         data.length;
     });
+  }
+  return { headers, body, totals };
+}
 
+function generateCSV(data, report) {
+  const { headers, body, totals } = getReportData(data, report);
+  const headerRow = headers.join(",");
+  let bodyRows = body
+    .map((row) =>
+      row
+        .map((cell, i) => {
+          if (headers[i] === "Occupancy") return (cell * 100).toFixed(2) + "%";
+          if (typeof cell === "number") return cell.toFixed(2);
+          return cell;
+        })
+        .join(",")
+    )
+    .join("\n");
+
+  if (totals) {
     const totalsRowData = headers.map((header) => {
       if (header === "Date") return "Totals / Averages";
       if (totals[header] !== undefined) {
@@ -190,32 +184,138 @@ function generateCSV(data, report) {
         if (typeof value === "number") return value.toFixed(2);
         return value;
       }
-      return ""; // Empty cell for non-totaled columns
+      return "";
     });
-
-    // Append the formatted totals row to the CSV body
     bodyRows += "\n" + totalsRowData.join(",");
   }
 
-  return `${headerRow}\n${bodyRows}`;
+  return Buffer.from(`${headerRow}\n${bodyRows}`, "utf-8");
 }
+
+async function generateXLSX(data, report) {
+  const { headers, body, totals } = getReportData(data, report);
+  const workbook = new exceljs.Workbook();
+  const worksheet = workbook.addWorksheet("Report");
+
+  worksheet.columns = headers.map((header) => ({
+    header: header,
+    key: header,
+    width: 15,
+  }));
+  worksheet.getRow(1).font = { bold: true };
+
+  body.forEach((row) => {
+    const rowData = {};
+    headers.forEach((header, i) => {
+      rowData[header] = row[i];
+    });
+    worksheet.addRow(rowData);
+  });
+
+  if (totals) {
+    worksheet.addRow([]); // Spacer row
+    const totalsRow = worksheet.addRow({});
+    totalsRow.getCell("Date").value = "Totals / Averages";
+    totalsRow.font = { bold: true };
+    headers.forEach((header) => {
+      if (totals[header] !== undefined) {
+        totalsRow.getCell(header).value = totals[header];
+      }
+    });
+  }
+
+  // Apply number formatting
+  worksheet.columns.forEach((column) => {
+    if (column.key === "Occupancy") {
+      column.numFmt = "0.00%";
+    } else if (["ADR", "RevPAR", "Total Revenue"].includes(column.key)) {
+      column.numFmt = '"£"#,##0.00';
+    }
+  });
+
+  return await workbook.xlsx.writeBuffer();
+}
+
+async function generatePDF(data, report) {
+  const { headers, body, totals } = getReportData(data, report);
+  let html = `
+        <style>
+            body { font-family: sans-serif; font-size: 10px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #dddddd; text-align: left; padding: 8px; }
+            th { background-color: #f2f2f2; }
+            .totals { font-weight: bold; }
+        </style>
+        <h2>${report.report_name}</h2>
+        <table>
+            <thead>
+                <tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr>
+            </thead>
+            <tbody>
+                ${body
+                  .map(
+                    (row) =>
+                      `<tr>${row
+                        .map(
+                          (cell, i) =>
+                            `<td>${
+                              headers[i] === "Occupancy"
+                                ? (cell * 100).toFixed(2) + "%"
+                                : typeof cell === "number"
+                                ? cell.toFixed(2)
+                                : cell
+                            }</td>`
+                        )
+                        .join("")}</tr>`
+                  )
+                  .join("")}
+                ${
+                  totals
+                    ? `<tr class="totals"><td>Totals / Averages</td>${headers
+                        .slice(1)
+                        .map(
+                          (h) =>
+                            `<td>${
+                              totals[h] !== undefined
+                                ? h === "Occupancy"
+                                  ? (totals[h] * 100).toFixed(2) + "%"
+                                  : totals[h].toFixed(2)
+                                : ""
+                            }</td>`
+                        )
+                        .join("")}</tr>`
+                    : ""
+                }
+            </tbody>
+        </table>
+    `;
+
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
+  });
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+  const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
+  await browser.close();
+  return pdfBuffer;
+}
+
 // --- MAIN HANDLER ---
-// This is the main function executed by the cron job.
 module.exports = async (req, res) => {
   console.log("Cron job started: Checking for scheduled reports to send.");
 
   try {
     const now = new Date();
-    // --- THIS IS THE FIX ---
-    // We now get the current hour AND minute for a precise match.
-    const currentHour = now.getUTCHours().toString().padStart(2, "0");
-    const currentMinute = now.getUTCMinutes().toString().padStart(2, "0");
-    const currentTime = `${currentHour}:${currentMinute}`;
-
+    const currentTime = `${now.getUTCHours().toString().padStart(2, "0")}:${now
+      .getUTCMinutes()
+      .toString()
+      .padStart(2, "0")}`;
     const currentDayOfWeek = now.getUTCDay();
     const currentDayOfMonth = now.getUTCDate();
 
-    // The query now looks for an EXACT time match (e.g., '08:51').
     const { rows: dueReports } = await pgPool.query(
       `SELECT sr.*, h.star_rating
        FROM scheduled_reports sr
@@ -229,14 +329,12 @@ module.exports = async (req, res) => {
     );
 
     if (dueReports.length === 0) {
-      // This message is expected if no reports are scheduled for the current minute.
       console.log(`No reports due at this time (${currentTime} UTC).`);
       return res.status(200).send("No reports due.");
     }
 
     console.log(`Found ${dueReports.length} report(s) to send.`);
 
-    // The rest of the fudnction remains the same...
     for (const report of dueReports) {
       const { startDate, endDate } = calculateDateRange(report.report_period);
       const hotelData = await getHotelMetrics(
@@ -259,34 +357,52 @@ module.exports = async (req, res) => {
         continue;
       }
 
-      const csvData = generateCSV(processedData, report);
-      const csvBuffer = Buffer.from(csvData, "utf-8");
+      const attachments = [];
+      const formats = report.attachment_formats || ["csv"]; // Default to csv if not set
 
-      const msg = {
-        to: report.recipients.split(",").map((e) => e.trim()),
-        from: {
-          name: "Market Pulse Reports",
-          email: "reports@market-pulse.io",
-        },
-        subject: `Your Scheduled Report: ${report.report_name}`,
-        text: `Hello,\n\nPlease find your scheduled report, "${report.report_name}", attached.\n\nThis report was generated for the period of ${startDate} to ${endDate}.\n\nRegards,\nThe Market Pulse Team`,
-        attachments: [
-          {
-            content: csvBuffer.toString("base64"),
-            filename: `${report.report_name.replace(
-              /\s/g,
-              "_"
-            )}_${startDate}_to_${endDate}.csv`,
-            type: "text/csv",
-            disposition: "attachment",
+      if (formats.includes("csv")) {
+        attachments.push({
+          content: generateCSV(processedData, report).toString("base64"),
+          filename: `${report.report_name.replace(/\s/g, "_")}.csv`,
+          type: "text/csv",
+          disposition: "attachment",
+        });
+      }
+      if (formats.includes("xlsx")) {
+        const xlsxBuffer = await generateXLSX(processedData, report);
+        attachments.push({
+          content: xlsxBuffer.toString("base64"),
+          filename: `${report.report_name.replace(/\s/g, "_")}.xlsx`,
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          disposition: "attachment",
+        });
+      }
+      if (formats.includes("pdf")) {
+        const pdfBuffer = await generatePDF(processedData, report);
+        attachments.push({
+          content: pdfBuffer.toString("base64"),
+          filename: `${report.report_name.replace(/\s/g, "_")}.pdf`,
+          type: "application/pdf",
+          disposition: "attachment",
+        });
+      }
+
+      if (attachments.length > 0) {
+        const msg = {
+          to: report.recipients.split(",").map((e) => e.trim()),
+          from: {
+            name: "Market Pulse Reports",
+            email: "reports@market-pulse.io",
           },
-        ],
-      };
-
-      await sgMail.send(msg);
-      console.log(
-        `Successfully sent report "${report.report_name}" to ${report.recipients}`
-      );
+          subject: `Your Scheduled Report: ${report.report_name}`,
+          text: `Hello,\n\nPlease find your scheduled report, "${report.report_name}", attached.\n\nThis report was generated for the period of ${startDate} to ${endDate}.\n\nRegards,\nThe Market Pulse Team`,
+          attachments: attachments,
+        };
+        await sgMail.send(msg);
+        console.log(
+          `Successfully sent report "${report.report_name}" to ${report.recipients}`
+        );
+      }
     }
 
     res
