@@ -144,6 +144,7 @@ const requirePageLogin = (req, res, next) => {
 // --- NEW SCHEDULED REPORTS API ENDPOINTS ---
 // GET all scheduled reports for the logged-in user
 // GET all scheduled reports for the logged-in user
+// GET all scheduled reports for the logged-in user
 app.get("/api/scheduled-reports", requireUserApi, async (req, res) => {
   try {
     const userResult = await pgPool.query(
@@ -156,11 +157,11 @@ app.get("/api/scheduled-reports", requireUserApi, async (req, res) => {
     const internalUserId = userResult.rows[0].user_id;
 
     // --- THIS QUERY IS THE ONLY CHANGE ---
-    // The JOIN condition now casts hotel_id to varchar to match property_id.
+    // The JOIN is now a direct comparison, which should work if both columns are the same type.
     const { rows } = await pgPool.query(
       `SELECT sr.*, h.property_name
        FROM scheduled_reports sr
-       LEFT JOIN hotels h ON sr.property_id = h.hotel_id::varchar
+       LEFT JOIN hotels h ON sr.property_id = h.hotel_id
        WHERE sr.user_id = $1
        ORDER BY sr.created_at DESC`,
       [internalUserId]
