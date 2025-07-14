@@ -290,19 +290,15 @@ async function generatePDF(data, report) {
         </table>
     `;
 
-  // Launch Puppeteer with a more explicit configuration for Vercel.
+  // Launch Puppeteer with the corrected configuration.
   const browser = await puppeteer.launch({
-    // These arguments are essential for running in a restricted serverless environment.
     args: chromium.args,
-    // Use the recommended default viewport.
     defaultViewport: chromium.defaultViewport,
-    // **THIS IS THE CRITICAL CHANGE.**
-    // We are now explicitly getting the path to the AWS-compatible Chromium binary
-    // that is bundled with the @sparticuz/chromium package for serverless environments.
-    executablePath: await chromium.executablePath(),
-    // Ensure we run in headless mode (no visible UI).
+    // **THIS IS THE FIX.**
+    // In the latest version of the library, 'executablePath' is a direct string property,
+    // not a function that needs to be awaited. We just access it directly.
+    executablePath: chromium.executablePath,
     headless: chromium.headless,
-    // This flag can help prevent permission errors in containerized environments.
     ignoreHTTPSErrors: true,
   });
   const page = await browser.newPage();
