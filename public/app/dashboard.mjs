@@ -201,25 +201,24 @@ export default {
   // chart and chartUpdateTimeout have been removed.
 
   // --- INITIALIZATION ---
+  // --- INITIALIZATION ---
   init() {
     this.initializeDashboard();
+
+    // Listen for the 'property-changed' event from the shared header
+    window.addEventListener("property-changed", (event) => {
+      // When the event is heard, call a handler to update the dashboard
+      this.handlePropertyChange(event.detail.propertyId);
+    });
   },
 
-  async initializeDashboard() {
-    this.checkUserRoleAndSetupNav();
-    this.fetchAndDisplayLastRefreshTime();
-
-    // The chart initialization is now much cleaner.
+  initializeDashboard() {
+    // The only setup task left is to initialize the chart and its resize listener.
     this.$nextTick(() => {
-      // It calls the chart manager, passing in the DOM element.
       chartManager.init(this.$refs.chartContainer);
-    });
-
-    await this.populatePropertySwitcher();
-
-    // The resize listener now calls the chart manager's resize method.
-    window.addEventListener("resize", () => {
-      chartManager.resize();
+      window.addEventListener("resize", () => {
+        chartManager.resize();
+      });
     });
   },
 
@@ -440,15 +439,7 @@ export default {
     this.granularity = preset === "this-year" ? "monthly" : "daily";
     this.runReport();
   },
-  switchProperty(propertyId) {
-    if (this.currentPropertyId === propertyId) return;
-    const property = this.properties.find((p) => p.property_id === propertyId);
-    if (property) {
-      this.currentPropertyId = property.property_id;
-      this.currentPropertyName = property.property_name;
-      this.runReport();
-    }
-  },
+
   setActiveMetric(metric) {
     this.activeMetric = metric;
     // Instead of calling its own updateChart, it calls the chart manager.
@@ -458,6 +449,23 @@ export default {
       granularity: this.granularity,
       propertyName: this.currentPropertyName,
     });
+  },
+  handlePropertyChange(propertyId) {
+    // If there's no ID or the ID hasn't changed, do nothing.
+    if (!propertyId || this.currentPropertyId === propertyId) {
+      return;
+    }
+    // Set the dashboard's current property ID.
+    this.currentPropertyId = propertyId;
+    this.isLoading.properties = false;
+    this.hasProperties = true;
+
+    // Set the dashboard's property name (the header already knows its own).
+    const property = this.properties.find((p) => p.property_id === propertyId);
+    if (property) this.currentPropertyName = property.property_name;
+
+    // Trigger a full data refresh for the new property.
+    this.setPreset("current-month");
   },
   logout() {
     fetch("/api/auth/logout", { method: "POST" })

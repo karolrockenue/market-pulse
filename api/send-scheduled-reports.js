@@ -308,15 +308,6 @@ module.exports = async (req, res) => {
           disposition: "attachment",
         });
       }
-      if (formats.includes("pdf")) {
-        const pdfBuffer = await generatePDF(processedData, report);
-        attachments.push({
-          content: pdfBuffer.toString("base64"),
-          filename: `${report.report_name.replace(/\s/g, "_")}.pdf`,
-          type: "application/pdf",
-          disposition: "attachment",
-        });
-      }
 
       if (attachments.length > 0) {
         const msg = {
