@@ -291,12 +291,18 @@ async function generatePDF(data, report) {
     `;
 
   // Launch Puppeteer with the corrected configuration.
+  // **THIS IS THE FIX.**
+  // We explicitly load a font file before launching the browser.
+  // This forces the @sparticuz/chromium library to initialize its temporary
+  // directory and download the browser binary, ensuring the executablePath is available.
+  await chromium.font(
+    "https://raw.githack.com/googlei18n/noto-cjk/main/NotoSansCJK-Regular.ttc"
+  );
+
+  // Launch Puppeteer with the corrected configuration.
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    // **THIS IS THE FIX.**
-    // In the latest version of the library, 'executablePath' is a direct string property,
-    // not a function that needs to be awaited. We just access it directly.
     executablePath: chromium.executablePath,
     headless: chromium.headless,
     ignoreHTTPSErrors: true,
