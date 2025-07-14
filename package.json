@@ -12,7 +12,6 @@
   "description": "",
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
-    "@sparticuz/chromium-min": "^138.0.1",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
@@ -21,7 +20,6 @@
     "express": "^4.19.2",
     "express-session": "^1.18.1",
     "node-fetch": "^2.7.0",
-    "pg": "^8.16.3",
-    "puppeteer-core": "^24.12.1"
+    "pg": "^8.16.3"
   }
 }

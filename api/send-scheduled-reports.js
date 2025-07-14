@@ -3,8 +3,6 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const sgMail = require("@sendgrid/mail");
 const exceljs = require("exceljs");
-const chromium = require("@sparticuz/chromium-min");
-const puppeteer = require("puppeteer-core");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -234,81 +232,6 @@ async function generateXLSX(data, report) {
   });
 
   return await workbook.xlsx.writeBuffer();
-}
-
-async function generatePDF(data, report) {
-  const { headers, body, totals } = getReportData(data, report);
-  let html = `
-        <style>
-            body { font-family: sans-serif; font-size: 10px; }
-            table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid #dddddd; text-align: left; padding: 8px; }
-            th { background-color: #f2f2f2; }
-            .totals { font-weight: bold; }
-        </style>
-        <h2>${report.report_name}</h2>
-        <table>
-            <thead>
-                <tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr>
-            </thead>
-            <tbody>
-                ${body
-                  .map(
-                    (row) =>
-                      `<tr>${row
-                        .map(
-                          (cell, i) =>
-                            `<td>${
-                              headers[i] === "Occupancy"
-                                ? (cell * 100).toFixed(2) + "%"
-                                : typeof cell === "number"
-                                ? cell.toLocaleString("en-GB", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })
-                                : cell
-                            }</td>`
-                        )
-                        .join("")}</tr>`
-                  )
-                  .join("")}
-                ${
-                  totals
-                    ? `<tr class="totals"><td>Totals / Averages</td>${headers
-                        .slice(1)
-                        .map(
-                          (h) =>
-                            `<td>${
-                              totals[h] !== undefined
-                                ? h === "Occupancy"
-                                  ? (totals[h] * 100).toFixed(2) + "%"
-                                  : totals[h].toLocaleString("en-GB", {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })
-                                : ""
-                            }</td>`
-                        )
-                        .join("")}</tr>`
-                    : ""
-                }
-            </tbody>
-        </table>
-    `;
-
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath,
-    headless: chromium.headless,
-    ignoreHTTPSErrors: true,
-  });
-
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0" });
-  const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
-  await browser.close();
-  return pdfBuffer;
 }
 
 // --- MAIN HANDLER ---
