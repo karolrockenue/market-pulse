@@ -61,12 +61,11 @@ module.exports = async (request, response) => {
   try {
     await client.connect();
 
-    // Fetch the user associated with this property to get their refresh token.
     const userResult = await client.query(
       `SELECT u.cloudbeds_user_id, u.refresh_token 
        FROM users u 
-       JOIN user_properties up ON u.user_id = up.user_id 
-       WHERE up.property_id = $1::integer LIMIT 1`, // <-- The fix is here
+       JOIN user_properties up ON u.cloudbeds_user_id = up.user_id 
+       WHERE up.property_id = $1::integer LIMIT 1`, // <-- Corrected JOIN condition
       [propertyId]
     );
 
