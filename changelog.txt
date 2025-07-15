@@ -1,0 +1,195 @@
+# Project "Market Pulse" - Architectural Principles & Development History
+
+## 1. Guiding Principles for AI-Assisted Development
+
+This document provides a complete technical overview and chronological development history for the Market Pulse application. All future development work must adhere to the following architectural principles to ensure consistency, maintainability, and stability.
+
+### Frontend Architecture: Declarative UI with Alpine.js
+- The project has adopted a declarative, state-driven UI model using the Alpine.js library.
+- **Rule:** All new UI interactivity must be built within a self-contained Alpine.js component (`x-data`). Manual DOM manipulation (e.g., `document.getElementById`) is to be avoided.
+- **Pattern:** The component's state and UI-related methods should be defined within a single object in an external `.mjs` file, which is then imported and registered with Alpine.js in the corresponding HTML file. The HTML file should serve as a clean template, with all logic encapsulated in the JavaScript module.
+
+### Backend Architecture: Modular Express Routers
+- The backend has been refactored from a monolithic `server.js` file into a modular architecture.
+- **Rule:** All new API endpoints must be added to the appropriate feature-based router file within the `/api/routes/` directory (e.g., `auth.router.js`, `dashboard.router.js`).
+- **Pattern:** Shared logic, such as database connections (`db.js`) and authentication middleware (`middleware.js`), should be placed in the `/api/utils/` directory to be reused across routers. The main `server.js` file should remain a lean script responsible only for server initialization and mounting the routers.
+
+### Component Architecture: Reusable Shared Components
+- The application utilizes shared UI components to ensure a consistent user experience and reduce code duplication.
+- **Rule:** Common UI elements, such as the page header, must be built as reusable components.
+- **Pattern:** Shared components should be placed in the `/public/app/_shared/` directory, with their HTML and JavaScript logic separated into `header.html` and `header.mjs` files, respectively. A utility function (`utils.mjs`) is used to load these components dynamically.
+
+### Changelog Maintenance
+When requested by the user (Karol), a new entry detailing the completed work must be appended to the end of the "Development History" section. Each new entry must strictly adhere to the existing format used in previous entries (Date, Objective, Key Changes, and Outcome). Previous historical entries are considered immutable and must not be altered. The only section that should be modified is the "Current Project File Structure" tree, which must be updated if any files or directories are added, modified, or deleted.
+
+
+## 2. Current Project File Structure
+
+market-pulse/
+├── api/
+│   ├── routes/
+│   │   ├── admin.router.js
+│   │   ├── auth.router.js
+│   │   ├── dashboard.router.js
+│   │   └── reports.router.js
+│   ├── utils/
+│   │   ├── db.js
+│   │   └── middleware.js
+│   ├── daily-refresh.js
+│   ├── initial-sync.js
+│   └── send-scheduled-reports.js
+├── node_modules/
+├── public/
+│   ├── admin/
+│   │   ├── admin.mjs
+│   │   └── index.html
+│   ├── app/
+│   │   ├── _shared/
+│   │   │   ├── header.html
+│   │   │   └── header.mjs
+│   │   ├── dashboard.mjs
+│   │   ├── index.html
+│   │   ├── reports.html
+│   │   ├── reports.js
+│   │   └── utils.mjs
+│   ├── constants.mjs
+│   └── login.html
+├── changelog.md
+├── Introduction AI-Assisted Development Workflow.docx
+├── package-lock.json
+├── package.json
+├── server.js
+└── vercel.json
+
+## 3. Development History
+
+---
+
+### **Date: July 5, 2025**
+- **Objective**: Migrate the project from a local setup to a cloud-native solution and establish the initial dataset.
+- **Key Changes**:
+    - The application was deployed to Vercel and connected to a production Neon PostgreSQL database.
+    - A background data refresh script was converted into a Vercel Serverless Function, scheduled via `vercel.json`.
+    - To solve the "cold start" problem, the database was seeded with mock data for five competitor hotels to establish a market for comparison.
+    - The backend API was updated to aggregate this mock data, providing an averaged "market" row for the dashboard.
+- **Outcome**: The application was successfully deployed to a cloud-native environment with a foundational dataset for market comparisons.
+
+---
+
+### **Date: July 8, 2025**
+- **Objective**: Refactor the application into a secure, multi-tenant platform and resolve critical post-deployment issues.
+- **Summary**: A major refactoring effort was completed to support multiple hotel clients. This was followed by a debugging session to stabilize the new session management system in a serverless environment.
+- **Key Changes**:
+    - **Multi-Tenant Refactor (V2.0)**:
+        - Implemented the Cloudbeds OAuth 2.0 flow for user onboarding and authentication.
+        - Updated the database schema to be user-aware, ensuring data isolation between tenants.
+        - Secured all API endpoints using `express-session`.
+    - **Post-Deployment Debugging**:
+        - **Problem**: Users were unable to log in because the default in-memory session store was not viable in a serverless environment, causing login state to be lost between requests.
+        - **Resolution**: Replaced the in-memory store with a persistent PostgreSQL-backed store (`connect-pg-simple`). Implemented previously missing API endpoints (`/api/metrics-from-db`, `/api/competitor-metrics`) to resolve a `TypeError` on the dashboard.
+- **Outcome**: The application was successfully converted and stabilized into a fully functional multi-tenant platform.
+
+---
+
+### **Date: July 9, 2025**
+- **Objective**: Implement a secure, passwordless magic link login system and resolve a series of critical production bugs.
+- **Summary**: This day involved significant work on a new authentication flow, followed by several rounds of high-stakes debugging to restore application stability after encountering build, routing, and caching issues.
+- **Key Changes**:
+    - **Magic Link Authentication**:
+        - A passwordless login system was designed and implemented.
+        - Integrated the SendGrid API for sending transactional emails.
+        - Added a `magic_login_tokens` table to the database for storing single-use, expiring tokens.
+        - Created new backend endpoints (`/api/auth/login`, `/api/auth/magic-link-callback`) to manage the flow.
+    - **Critical Bug Fixes**:
+        - **Build Failure**: Resolved an `Uncaught ReferenceError: require is not defined` build error by renaming frontend JavaScript files from `.js` to `.mjs` to explicitly signal their ES Module type to the Vercel build system.
+        - **Routing & Caching Issues**: Fixed an incorrect redirect by changing the login route from `/login` to `/signin` to bypass a stale Vercel Edge Cache entry.
+        - **Session Data Mismatch**: Corrected the magic link callback logic to set the correct `cloudbeds_user_id` in the user's session, which resolved an issue where the dashboard failed to load user properties.
+- **Outcome**: The magic link authentication system was successfully implemented. Multiple critical bugs were resolved, restoring the application to a stable and functional state.
+
+---
+
+### **Date: July 10, 2025**
+- **Objective**: Overhaul the application's authorization model, redesign the Admin Panel, and build an in-app API exploration tool.
+- **Summary**: A foundational refactor of the authentication system was completed, moving from a dual-login system to a unified, database-driven role model. The Admin Panel was also rebuilt with a new UI and a powerful API explorer.
+- **Key Changes**:
+    - **Database-Driven Role System**:
+        - **Problem**: A dual-login system (magic link for users, password for admin) was causing session corruption bugs.
+        - **Resolution**: Removed the separate admin login and added an `is_admin` boolean column to the `users` table. The login flow was unified, with the user's admin status now stored in their session upon login. New role-specific API middleware (`requireUserApi`, `requireAdminApi`) was created to protect endpoints.
+    - **Admin Panel Overhaul**:
+        - The Admin Panel UI was completely redesigned to match the main dashboard's aesthetic.
+        - Created a dynamic, in-app "Cloudbeds API Explorer" tool, allowing administrators to query API datasets and inspect their structure directly from the UI. This explorer was later enhanced to query real sample data from both the Insights and General APIs.
+- **Outcome**: The session conflict bug was resolved. The new role-based system is more secure and scalable, and the Admin Panel was transformed into a professional and highly functional utility.
+
+---
+
+### **Date: July 11, 2025**
+- **Objective**: Build a feature-rich Advanced Reporting page, including market comparisons, robust exporting, and a fully reactive UI.
+- **Summary**: This was an extensive development session focused on the `reports.html` page. It covered the entire lifecycle of a PDF export feature (from creation to deletion) and concluded with a major, successful architectural refactor of the page's frontend to use Alpine.js.
+- **Key Changes**:
+    - **Reporting Features**:
+        - Built UI for custom report generation with market comparisons and automatic "Delta" calculations (Your Hotel vs. Market).
+        - Implemented flexible "Group by Metric" and "Group by Source" display modes for advanced analysis.
+    - **PDF Export Lifecycle**:
+        - An initial attempt at client-side PDF export using `jsPDF` failed due to CDN and library loading issues.
+        - The feature was re-architected to use a server-side `puppeteer` solution, but this also suffered from critical, unresolvable file corruption and layout bugs.
+        - **Decision**: After multiple failed attempts, the entire PDF export feature was removed from the application to reduce complexity and improve stability.
+    - **Architectural Refactor (Alpine.js)**:
+        - The Advanced Reporting page's frontend was refactored from an imperative, manual DOM manipulation model to a modern, declarative approach using Alpine.js.
+        - All interactive controls were bound to the Alpine component's state, eliminating the need for manual event listeners and creating a fully reactive UI where any change instantly updates the report.
+        - The process involved resolving a JavaScript module scope issue where Alpine.js could not access functions inside a module, which was fixed by explicitly exposing the handler function to the `window` object.
+- **Outcome**: The Advanced Reporting page was transformed into a stable, powerful, and maintainable tool with a fully reactive interface. The problematic PDF export feature was strategically removed, and the successful Alpine.js refactor established the go-forward architectural pattern for the rest of the application's frontend.
+
+---
+
+### **Date: July 12, 2025**
+- **Objective**: Modernize the main application dashboard by refactoring its frontend to align with the new reactive pattern.
+- **Key Changes**:
+    - Following the successful pattern from the reports page, the main dashboard's frontend (`public/app/index.html` and `dashboard.mjs`) was completely overhauled.
+    - The previous implementation, which relied on imperative JavaScript and manual DOM manipulation, was replaced with a clean, declarative architecture powered by a single self-contained Alpine.js component (`x-data="dashboardPage()"`).
+    - All dashboard logic was consolidated into the `dashboardPage()` component object, and the HTML was simplified to a clean template with Alpine directives (`x-text`, `x-show`, etc.) bound to the component's state.
+- **Outcome**: The dashboard's frontend is now stable, maintainable, and architecturally consistent with the rest of the application, resolving a significant piece of technical debt.
+
+---
+
+### **Date: July 13, 2025**
+- **Objective**: Implement a reusable shared header, connect the Advanced Reporting page to live data, and resolve a critical chart rendering bug on the main dashboard.
+- **Summary**: This session focused on creating a a component-based architecture for the UI, followed by connecting the reports page to the backend. It concluded with a deep debugging session that resulted in migrating to a new charting library.
+- **Key Changes**:
+    - **Shared Header Component**:
+        - A reusable header component was created and stored in `/public/app/_shared/` to ensure a consistent UI.
+        - A JavaScript race condition that occurred while loading the component was resolved by ensuring the component's logic was imported and registered *before* its HTML was injected into the DOM.
+    - **Live Data for Reporting**:
+        - The Advanced Reporting page was successfully connected to the backend API, replacing its mock data generator with live data from the database.
+        - A data-fetching race condition between the header and the report was resolved by implementing a custom event listener (`property-changed`), ensuring the report only fetches data after the header has loaded the user's properties.
+    - **Dashboard Chart Migration (ECharts)**:
+        - **Problem**: The existing chart library (`Chart.js`) suffered from an unresolvable race condition, causing frequent crashes and visual glitches.
+        - **Resolution**: The application was migrated to the more robust Apache ECharts library. The tooltip formatting then failed due to a deep architectural conflict between ECharts and Alpine.js, which was resolved by completely decoupling the chart logic into a standalone `chartManager` object that is no longer controlled by Alpine.
+- **Outcome**: The application now features a more consistent and maintainable UI with a shared header. The Advanced Reporting page is fully functional with live data. The dashboard chart is stable and visually polished after a successful migration to ECharts.
+
+---
+
+### **Date: July 14, 2025**
+- **Objective**: Implement an end-to-end automated report scheduling system and standardize the UI by integrating the shared header into the main dashboard.
+- **Summary**: A major feature, scheduled reports via email, was fully implemented from the database schema to the frontend UI. This was followed by a final refactor to align the main dashboard with the new shared component architecture.
+- **Key Changes**:
+    - **Report Scheduling Feature**:
+        - A `scheduled_reports` table was added to the database to store report configurations.
+        - New API endpoints (`POST`, `GET`, `DELETE /api/scheduled-reports`) were created to manage schedules.
+        - An automated Vercel Cron Job (`/api/send-scheduled-reports.js`) was built to query for due reports, generate a CSV file with live data, and email it as an attachment using SendGrid.
+        - **Decision**: An attempt to add server-side PDF generation for scheduled reports failed due to an unresolvable Vercel build/dependency issue with `puppeteer`. The feature was strategically removed to ensure the stability of the core scheduler.
+    - **Dashboard UI Standardization**:
+        - The main dashboard's static header was replaced with the dynamic, shared header component.
+        - All duplicated header logic was removed from the dashboard's script.
+        - The dashboard was refactored to be event-driven; it now listens for the `property-changed` event from the header to refresh its data, decoupling the components.
+- **Outcome**: The report scheduling feature is production-ready and fully functional for CSV and Excel formats. The application's primary pages now share a single, consistent UI component, completing the UI standardization effort.
+
+---
+
+### **Date: July 15, 2025**
+- **Objective**: Address significant technical debt by refactoring the monolithic `server.js` file into a modular architecture.
+- **Key Changes**:
+    - The entire backend was refactored to eliminate the risks of a single, monolithic `server.js` file.
+    - Core API logic was separated into four distinct, feature-based Express Router files in `/api/routes/`: `auth.router.js`, `dashboard.router.js`, `reports.router.js`, and `admin.router.js`.
+    - Shared utilities, including the database connection pool (`db.js`) and authentication middleware (`middleware.js`), were extracted into a `/api/utils/` directory.
+    - The main `server.js` file was simplified to be a lean script that only initializes the server and mounts the new routers.
+- **Outcome**: The backend refactoring was completed successfully. The new modular structure improves code organization, enhances maintainability, and makes the application significantly easier and safer to extend in the future.

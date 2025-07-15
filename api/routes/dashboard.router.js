@@ -7,6 +7,8 @@ const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware"); // Only need user auth for this router
 
 // Helper function to get the period for SQL queries
+// Export both the router for the app and the helper for tests
+
 const getPeriod = (granularity) => {
   if (granularity === "monthly") return "date_trunc('month', stay_date)";
   if (granularity === "weekly") return "date_trunc('week', stay_date)";
@@ -190,4 +192,5 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
   }
 });
 
+// The main export is the router itself, which the server needs.
 module.exports = router;
