@@ -54,6 +54,62 @@ router.post("/logout", (req, res) => {
   });
 });
 
+// /api/routes/auth.router.js
+
+// Add this new route.
+router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
+  const { propertyId } = req.query;
+  if (!propertyId) {
+    return res.status(400).send("Property ID is required.");
+  }
+  try {
+    // Find the specific credentials for this property, linked to the logged-in user.
+    const credsResult = await pgPool.query(
+      `SELECT override_client_id FROM user_properties WHERE user_id = $1 AND property_id = $2`,
+      [req.session.userId, propertyId]
+    );
+
+    if (
+      credsResult.rows.length === 0 ||
+      !credsResult.rows[0].override_client_id
+    ) {
+      return res
+        .status(404)
+        .send(
+          "Credentials for this property not found or you do not have access."
+        );
+    }
+    const clientId = credsResult.rows[0].override_client_id;
+
+    const redirectUri =
+      process.env.VERCEL_ENV === "production"
+        ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+        : process.env.CLOUDBEDS_REDIRECT_URI;
+
+    // We use the 'state' parameter to pass the propertyId through the OAuth flow.
+    const state = propertyId;
+
+    const scopes =
+      "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: scopes,
+      state: state, // Pass the propertyId in the state.
+    });
+
+    const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error("Error starting pilot connection:", error);
+    res
+      .status(500)
+      .send("An error occurred while starting the connection process.");
+  }
+});
+
 router.post("/login", async (req, res) => {
   const { email } = req.body;
   if (!email) {
@@ -214,99 +270,102 @@ router.get("/cloudbeds/callback", async (req, res) => {
   if (!code) {
     return res.status(400).send("Error: No authorization code provided.");
   }
-  try {
-    const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-    const isProduction = process.env.VERCEL_ENV === "production";
-    const redirectUri = isProduction
-      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
-      : process.env.CLOUDBEDS_REDIRECT_URI;
+  // /api/routes/auth.router.js
+
+// Replace the try...catch block in the /cloudbeds/callback route.
+try {
+    const { code, state } = req.query; // 'state' will contain our propertyId for pilot users.
+    if (!code) {
+      return res.status(400).send("Error: No authorization code provided.");
+    }
+
+    let clientId = process.env.CLOUDBEDS_CLIENT_ID;
+    let clientSecret = process.env.CLOUDBEDS_CLIENT_SECRET;
+    const isPilotFlow = !!state;
+
+    // If it's a pilot flow (state exists), get the specific credentials from the DB.
+    if (isPilotFlow) {
+        const credsResult = await pgPool.query(
+            'SELECT override_client_id, override_client_secret FROM user_properties WHERE property_id = $1',
+            [state]
+        );
+        if (credsResult.rows.length > 0 && credsResult.rows[0].override_client_id) {
+            clientId = credsResult.rows[0].override_client_id;
+            clientSecret = credsResult.rows[0].override_client_secret;
+        } else {
+            throw new Error(`Could not find pilot credentials for property ID: ${state}`);
+        }
+    }
+
+    const redirectUri = process.env.VERCEL_ENV === "production"
+        ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+        : process.env.CLOUDBEDS_REDIRECT_URI;
+
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
-      client_id: CLOUDBEDS_CLIENT_ID,
-      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       redirect_uri: redirectUri,
       code: code,
     });
-    const tokenResponse = await fetch(
-      "https://hotels.cloudbeds.com/api/v1.1/access_token",
-      { method: "POST", body: tokenParams }
-    );
+
+    const tokenResponse = await fetch("https://hotels.cloudbeds.com/api/v1.1/access_token", { method: "POST", body: tokenParams });
     const tokenData = await tokenResponse.json();
     if (!tokenData.access_token) {
-      throw new Error("Failed to get access token from Cloudbeds.");
+      throw new Error(`Failed to get access token from Cloudbeds. Response: ${JSON.stringify(tokenData)}`);
     }
-    const { access_token, refresh_token } = tokenData;
-    const userInfoResponse = await fetch(
-      "https://api.cloudbeds.com/api/v1.3/userinfo",
-      { headers: { Authorization: `Bearer ${access_token}` } }
-    );
+    
+    const { access_token, refresh_token, expires_in } = tokenData;
+    const tokenExpiry = new Date(Date.now() + expires_in * 1000);
+
+    // If it's a pilot flow, update the specific property record and redirect to the admin panel.
+    if (isPilotFlow) {
+        const propertyId = state;
+        await pgPool.query(
+            `UPDATE user_properties 
+             SET access_token = $1, refresh_token = $2, token_expiry = $3, status = 'connected'
+             WHERE property_id = $4`,
+            [access_token, refresh_token, tokenExpiry, propertyId]
+        );
+        return res.redirect('/admin/');
+    }
+
+    // --- Standard OAuth Flow Logic (Unchanged) ---
+    const userInfoResponse = await fetch("https://api.cloudbeds.com/api/v1.3/userinfo", { headers: { Authorization: `Bearer ${access_token}` } });
     const userInfo = await userInfoResponse.json();
-    const propertyInfoResponse = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
-      { headers: { Authorization: `Bearer ${access_token}` } }
-    );
-    const propertyInfo = await propertyInfoResponse.json();
+    
     const userQuery = `
-      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, status)
-      VALUES ($1, $2, $3, $4, $5, $6, 'active')
+      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, token_expiry, status, auth_mode)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'oauth')
       ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
           email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-          access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, status = 'active';
+          access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, token_expiry = EXCLUDED.token_expiry, status = 'active', auth_mode = 'oauth';
     `;
-    await pgPool.query(userQuery, [
-      userInfo.user_id,
-      userInfo.email,
-      userInfo.first_name,
-      userInfo.last_name,
-      access_token,
-      refresh_token,
-    ]);
-    const properties = Array.isArray(propertyInfo)
-      ? propertyInfo
-      : [propertyInfo];
-    if (!properties || properties.length === 0 || !properties[0]) {
-      throw new Error("No properties found for this user account.");
-    }
+    await pgPool.query(userQuery, [userInfo.user_id, userInfo.email, userInfo.first_name, userInfo.last_name, access_token, refresh_token, tokenExpiry]);
+
+    const propertyInfoResponse = await fetch("https://api.cloudbeds.com/datainsights/v1.1/me/properties", { headers: { Authorization: `Bearer ${access_token}` } });
+    const propertyInfo = await propertyInfoResponse.json();
+    const properties = Array.isArray(propertyInfo) ? propertyInfo : [propertyInfo];
+
     for (const property of properties) {
       if (property && property.id) {
-        const hotelInsertQuery = `
-          INSERT INTO hotels (hotel_id, property_name, city, star_rating)
-          VALUES ($1, $2, $3, 2)
-          ON CONFLICT (hotel_id) DO NOTHING;
-        `;
-        await pgPool.query(hotelInsertQuery, [
-          property.id,
-          property.name,
-          property.city,
-        ]);
-        const userPropertyLinkQuery = `INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING;`;
-        await pgPool.query(userPropertyLinkQuery, [
-          userInfo.user_id,
-          property.id,
-        ]);
+        await pgPool.query(`INSERT INTO hotels (hotel_id, property_name, city) VALUES ($1, $2, $3) ON CONFLICT (hotel_id) DO NOTHING;`, [property.id, property.name, property.city]);
+        await pgPool.query(`INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected') ON CONFLICT (user_id, property_id) DO UPDATE SET status = 'connected';`, [userInfo.user_id, property.id]);
       }
     }
-    const userRoleResult = await pgPool.query(
-      "SELECT is_admin FROM users WHERE cloudbeds_user_id = $1",
-      [userInfo.user_id]
-    );
-    const isAdmin = userRoleResult.rows[0]?.is_admin || false;
+
     req.session.userId = userInfo.user_id;
-    req.session.isAdmin = isAdmin;
+    req.session.isAdmin = userInfo.is_admin || false;
     req.session.save((err) => {
-      if (err) {
-        return res
-          .status(500)
-          .send("An error occurred during authentication session save.");
-      }
+      if (err) { return res.status(500).send("An error occurred during authentication session save."); }
       res.redirect("/app/");
     });
+
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
-    res
-      .status(500)
-      .send(`An error occurred during authentication: ${error.message}`);
+    res.status(500).send(`An error occurred during authentication: ${error.message}`);
   }
+});
 });
 
 // Export the router so server.js can use it.

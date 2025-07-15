@@ -397,7 +397,29 @@ rooms_sold, adr, revpar, total_revenue</textarea
                 </div>
               </div>
             </div>
+<!-- /public/admin/index.html -->
 
+<!-- NEW: Pilot Hotel Connection Status Table -->
+<div class="bg-white p-6 rounded-xl border mt-8">
+  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
+    Pilot Hotel Connection Status
+  </h3>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left">
+          <th class="px-4 py-3 font-semibold text-gray-600">Property Name</th>
+          <th class="px-4 py-3 font-semibold text-gray-600">Property ID</th>
+          <th class="px-4 py-3 font-semibold text-gray-600">Status</th>
+          <th class="px-4 py-3 font-semibold text-gray-600">Action</th>
+        </tr>
+      </thead>
+      <tbody id="pilot-hotels-table-body" class="divide-y">
+        <!-- Rows will be dynamically inserted here by admin.mjs -->
+      </tbody>
+    </table>
+  </div>
+</div>
 <div class="mt-8 p-6 bg-white rounded-lg shadow-md">
   <h3 class="text-xl font-semibold text-gray-800 mb-4">Provision Pilot Hotel</h3>
   <form id="credential-form" class="space-y-4">

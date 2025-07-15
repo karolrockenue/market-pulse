@@ -586,6 +586,28 @@ router.get("/explore/sample-reservation", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// /api/routes/admin.router.js
+
+// Add this new route to the file.
+router.get("/pilot-properties", requireAdminApi, async (req, res) => {
+  try {
+    // This query fetches all properties that have been provisioned for any user
+    // who is in 'manual' mode, and joins to get the hotel name if it exists.
+    const query = `
+      SELECT up.property_id, up.status, up.user_id, h.property_name
+      FROM user_properties up
+      LEFT JOIN hotels h ON up.property_id = h.hotel_id
+      WHERE up.user_id IN (SELECT cloudbeds_user_id FROM users WHERE auth_mode = 'manual')
+      ORDER BY up.user_id, h.property_name;
+    `;
+    const result = await pgPool.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/pilot-properties:", error);
+    res.status(500).json({ error: "Failed to fetch pilot properties." });
+  }
+});
 // --- NEW: Route for setting manual API credentials for a pilot user ---
 // --- FINAL FIX: Using the correct ID (cloudbeds_user_id) ---
 // /api/routes/admin.router.js
@@ -595,12 +617,9 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
   const { email, propertyId, clientId, clientSecret } = req.body;
 
   if (!email || !propertyId || !clientId || !clientSecret) {
-    return res
-      .status(400)
-      .json({
-        message:
-          "Email, Property ID, Client ID, and Client Secret are required.",
-      });
+    return res.status(400).json({
+      message: "Email, Property ID, Client ID, and Client Secret are required.",
+    });
   }
 
   const client = await pgPool.connect();
@@ -635,11 +654,9 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
     ]);
 
     await client.query("COMMIT");
-    res
-      .status(200)
-      .json({
-        message: `Successfully provisioned property ${propertyId} for user ${email}.`,
-      });
+    res.status(200).json({
+      message: `Successfully provisioned property ${propertyId} for user ${email}.`,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error in pilot provisioning:", error);

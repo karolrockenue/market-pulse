@@ -98,6 +98,50 @@ function initializeAdminPanel() {
     }
   };
 
+  // /public/admin/admin.mjs
+
+  // Add this new function inside initializeAdminPanel()
+  const fetchAndRenderPilotStatus = async () => {
+    const pilotTableBody = document.getElementById("pilot-hotels-table-body");
+    try {
+      const response = await fetch("/api/pilot-properties");
+      if (!response.ok) throw new Error("Failed to fetch pilot properties.");
+      const properties = await response.json();
+
+      pilotTableBody.innerHTML = ""; // Clear existing rows
+      if (properties.length === 0) {
+        pilotTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No pilot properties have been provisioned.</td></tr>`;
+        return;
+      }
+
+      properties.forEach((prop) => {
+        const row = document.createElement("tr");
+        const statusClass =
+          prop.status === "connected"
+            ? "bg-green-100 text-green-800"
+            : "bg-yellow-100 text-yellow-800";
+        const statusText =
+          prop.status === "connected" ? "✓ Connected" : "Pending";
+        const actionButton =
+          prop.status !== "connected"
+            ? `<a href="/api/auth/connect-pilot-property?propertyId=${prop.property_id}" class="control-btn">Connect</a>`
+            : `<span class="font-semibold text-green-600">✓ Connected</span>`;
+
+        row.innerHTML = `
+          <td class="px-4 py-3 font-medium text-gray-800">${
+            prop.property_name || "N/A"
+          }</td>
+          <td class="px-4 py-3 font-mono text-gray-600">${prop.property_id}</td>
+          <td class="px-4 py-3"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">${statusText}</span></td>
+          <td class="px-4 py-3">${actionButton}</td>
+        `;
+        pilotTableBody.appendChild(row);
+      });
+    } catch (error) {
+      pilotTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-600">${error.message}</td></tr>`;
+    }
+  };
+
   const testConnection = async (url, statusEl) => {
     statusEl.textContent = "Testing...";
     statusEl.className = "ml-4 text-sm font-semibold text-gray-500";
@@ -373,6 +417,7 @@ function initializeAdminPanel() {
   // --- Initial Setup Calls ---
   fetchLastRefreshTime();
   fetchAndRenderHotels();
+  fetchAndRenderPilotStatus();
 
   // --- Attach Event Listeners for Core Tools ---
   testCloudbedsBtn.addEventListener("click", () =>
