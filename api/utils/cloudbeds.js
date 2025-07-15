@@ -78,7 +78,7 @@ async function getHotelDetails(accessToken, propertyId) {
 
 module.exports = {
   getOAuthAccessToken,
-  getManualAccessToken,
+
   getPropertiesForUser,
   getHotelDetails,
 };
