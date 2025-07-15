@@ -201,14 +201,25 @@ export default {
   // chart and chartUpdateTimeout have been removed.
 
   // --- INITIALIZATION ---
+  // Find and replace the entire init() method
   init() {
-    this.initializeDashboard();
-
-    // Listen for the 'property-changed' event from the shared header
+    console.log("Dashboard initializing...");
+    // This event listener ensures we don't fetch data until the header
+    // has loaded properties and selected one.
     window.addEventListener("property-changed", (event) => {
-      // When the event is heard, pass the entire detail object to the handler.
-      this.handlePropertyChange(event.detail);
+      const propertyId = event.detail.propertyId;
+      if (propertyId) {
+        console.log(
+          `Property changed to ${propertyId}, fetching all dashboard data.`
+        );
+        this.fetchKpiSummary(propertyId);
+        this.fetchChartData(propertyId);
+      }
     });
+
+    // We no longer fetch data directly here. We let the header's
+    // initialization trigger the 'property-changed' event which starts the process.
+    this.fetchLastRefreshTime(); // This one is safe, it doesn't need a property ID.
   },
 
   initializeDashboard() {
@@ -288,15 +299,17 @@ export default {
       this.isLoading.kpis = false;
     }
   },
+  // Find and replace the entire loadChartAndTables() method
   async loadChartAndTables(startDate, endDate, granularity) {
     this.isLoading.chart = true;
     this.isLoading.tables = true;
-    chartManager.showLoading(); // Call the chart manager's method
+    chartManager.showLoading();
     try {
       const propertyId = this.currentPropertyId;
+      // CORRECTED: The second URL no longer includes the propertyId query parameter.
       const urls = [
         `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
-        `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
+        `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`,
       ];
       const [yourHotelResponse, marketResponse] = await Promise.all(
         urls.map((url) => fetch(url))
@@ -316,7 +329,6 @@ export default {
           ? `Based on a competitive set of ${marketData.competitorCount} hotels.`
           : "No competitor data available for this standard.";
 
-      // Call the chart manager to update the chart, passing all necessary data.
       chartManager.update({
         metrics: this.allMetrics,
         activeMetric: this.activeMetric,
@@ -337,7 +349,6 @@ export default {
       this.isLoading.tables = false;
     }
   },
-
   // --- DATA PROCESSING & RENDERING (renderKpiCards uses the new standalone helper) ---
   processAndMergeData(yourData, marketData) {
     const dataMap = new Map();

@@ -48,31 +48,20 @@ export default function pageHeader() {
       }
     },
 
+    // Find the fetchProperties() method
     async fetchProperties() {
       try {
         const response = await fetch("/api/my-properties");
-        if (!response.ok) throw new Error("Could not fetch properties.");
-        const props = await response.json();
-        this.properties = props;
-
-        if (props.length > 0) {
-          let savedPropertyId = localStorage.getItem("selectedPropertyId");
-          const isValid = props.some((p) => p.property_id === savedPropertyId);
-
-          if (savedPropertyId && isValid) {
-            this.currentPropertyId = savedPropertyId;
-          } else {
-            this.currentPropertyId = props[0].property_id;
-          }
-
-          this.updateCurrentPropertyName();
-          this.dispatchPropertyChangeEvent();
-        } else {
-          this.currentPropertyName = "No Properties Found";
+        if (!response.ok) throw new Error("Could not fetch properties");
+        this.properties = await response.json();
+        if (this.properties.length > 0) {
+          // --- ADD THIS LINE ---
+          // Automatically select the first property on load
+          this.selectedPropertyId = this.properties[0].property_id;
         }
       } catch (error) {
         console.error("Error fetching properties:", error);
-        this.currentPropertyName = "Error Loading";
+        this.properties = [];
       }
     },
 
