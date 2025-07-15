@@ -673,20 +673,24 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
 // It replaces the old redirect-based flow.
 // /api/routes/admin.router.js
 
+//
 router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
-  const { propertyId } = req.body;
-  if (!propertyId) {
-    return res.status(400).json({ message: "Property ID is required." });
+  // Now expecting both propertyId and userId from the request body
+  const { propertyId, userId } = req.body;
+  if (!propertyId || !userId) {
+    return res
+      .status(400)
+      .json({ message: "Property ID and User ID are required." });
   }
 
   const client = await pgPool.connect();
   try {
     await client.query("BEGIN");
 
-    // Step 1: Get the provisioned API key for this property.
+    // The query now uses both propertyId and userId to find the exact record.
     const credsResult = await client.query(
-      "SELECT override_api_key FROM user_properties WHERE property_id = $1",
-      [propertyId]
+      "SELECT override_api_key FROM user_properties WHERE property_id = $1 AND user_id = $2",
+      [propertyId, userId]
     );
 
     if (
@@ -699,7 +703,6 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     }
     const apiKey = credsResult.rows[0].override_api_key;
 
-    // Step 2: Use the API key DIRECTLY as the access token to fetch hotel details.
     const hotelDetails = await cloudbeds.getHotelDetails(apiKey, propertyId);
     if (!hotelDetails) {
       throw new Error(
@@ -707,7 +710,6 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
       );
     }
 
-    // Step 3: Save the details into our 'hotels' table.
     await client.query(
       `INSERT INTO hotels (hotel_id, property_name, city)
        VALUES ($1, $2, $3)
@@ -721,16 +723,18 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
       ]
     );
 
-    // Step 4: Update the property's status to 'connected'.
+    // Also use both IDs to update the correct record
     await client.query(
-      "UPDATE user_properties SET status = 'connected', override_client_id = NULL, override_client_secret = NULL WHERE property_id = $1",
-      [propertyId]
+      "UPDATE user_properties SET status = 'connected', override_client_id = NULL, override_client_secret = NULL WHERE property_id = $1 AND user_id = $2",
+      [propertyId, userId]
     );
 
     await client.query("COMMIT");
-    res.status(200).json({
-      message: `Property ${propertyId} has been successfully activated.`,
-    });
+    res
+      .status(200)
+      .json({
+        message: `Property ${propertyId} has been successfully activated.`,
+      });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error activating pilot property:", error);

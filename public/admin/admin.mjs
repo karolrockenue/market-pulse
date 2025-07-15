@@ -75,18 +75,21 @@ function initializeAdminPanel() {
     button.textContent = "Connecting...";
 
     try {
-      // Call our new backend-only activation endpoint
+      // Get both the propertyId and userId from the button's data attributes
+      const propertyId = button.dataset.propertyId;
+      const userId = button.dataset.userId;
+
+      // Call our new backend-only activation endpoint, now sending both IDs
       const response = await fetch("/api/activate-pilot-property", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ propertyId }),
+        body: JSON.stringify({ propertyId, userId }), // Send both IDs
       });
 
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.message);
       }
-
       // Success! Refresh the entire table to show the new "Connected" status.
       fetchAndRenderPilotStatus();
     } catch (error) {
@@ -163,9 +166,10 @@ function initializeAdminPanel() {
           prop.status === "connected" ? "✓ Connected" : "Pending";
         // Change the action from a link to a button with a data-property-id attribute.
         // This allows our new JavaScript listener to target it.
+        //
         const actionButton =
           prop.status !== "connected"
-            ? `<button data-property-id="${prop.property_id}" class="control-btn connect-btn">Connect</button>`
+            ? `<button data-property-id="${prop.property_id}" data-user-id="${prop.user_id}" class="control-btn connect-btn">Connect</button>`
             : `<span class="font-semibold text-green-600">✓ Connected</span>`;
 
         row.innerHTML = `
