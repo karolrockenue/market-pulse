@@ -56,7 +56,46 @@ function initializeAdminPanel() {
     "endpoint-test-results"
   );
   const hotelsTableBody = document.getElementById("hotels-table-body");
+  // public/admin/admin.mjs -> inside initializeAdminPanel()
 
+  // NEW: Event listener for the pilot hotel connection table.
+  // We use event delegation to handle clicks on buttons that are added dynamically.
+  const pilotTableBody = document.getElementById("pilot-hotels-table-body");
+  pilotTableBody.addEventListener("click", async (event) => {
+    // Only proceed if a connect button was clicked
+    if (!event.target.classList.contains("connect-btn")) {
+      return;
+    }
+
+    const button = event.target;
+    const propertyId = button.dataset.propertyId;
+
+    // Disable the button and show a loading state to prevent multiple clicks
+    button.disabled = true;
+    button.textContent = "Connecting...";
+
+    try {
+      // Call our new backend-only activation endpoint
+      const response = await fetch("/api/activate-pilot-property", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message);
+      }
+
+      // Success! Refresh the entire table to show the new "Connected" status.
+      fetchAndRenderPilotStatus();
+    } catch (error) {
+      alert(`Connection failed: ${error.message}`);
+      // Re-enable the button if an error occurs
+      button.disabled = false;
+      button.textContent = "Connect";
+    }
+  });
   // --- Helper Functions ---
   const fetchLastRefreshTime = async () => {
     try {
@@ -122,9 +161,11 @@ function initializeAdminPanel() {
             : "bg-yellow-100 text-yellow-800";
         const statusText =
           prop.status === "connected" ? "✓ Connected" : "Pending";
+        // Change the action from a link to a button with a data-property-id attribute.
+        // This allows our new JavaScript listener to target it.
         const actionButton =
           prop.status !== "connected"
-            ? `<a href="/api/auth/connect-pilot-property?propertyId=${prop.property_id}" class="control-btn">Connect</a>`
+            ? `<button data-property-id="${prop.property_id}" class="control-btn connect-btn">Connect</button>`
             : `<span class="font-semibold text-green-600">✓ Connected</span>`;
 
         row.innerHTML = `

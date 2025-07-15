@@ -667,4 +667,101 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
     client.release();
   }
 });
+// /api/routes/admin.router.js
+
+// NEW: This is the new, backend-only route for activating a pilot property.
+// It replaces the old redirect-based flow.
+router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
+  const { propertyId } = req.body;
+  if (!propertyId) {
+    return res.status(400).json({ message: "Property ID is required." });
+  }
+
+  const client = await pgPool.connect();
+  try {
+    // Start a database transaction.
+    await client.query("BEGIN");
+
+    // Step 1: Get the provisioned credentials for this property.
+    // We don't need the user ID here, as the property ID is unique.
+    const credsResult = await client.query(
+      "SELECT override_client_id, override_client_secret FROM user_properties WHERE property_id = $1",
+      [propertyId]
+    );
+
+    if (
+      credsResult.rows.length === 0 ||
+      !credsResult.rows[0].override_client_id
+    ) {
+      throw new Error(
+        `No credentials found for property ${propertyId}. Please provision it first.`
+      );
+    }
+    const { override_client_id, override_client_secret } = credsResult.rows[0];
+
+    // Step 2: Make a direct, server-to-server call to get an access token.
+    const tokenData = await cloudbeds.getManualAccessToken(
+      override_client_id,
+      override_client_secret
+    );
+    if (!tokenData || !tokenData.access_token) {
+      throw new Error(
+        "Failed to get an access token from Cloudbeds using the stored credentials."
+      );
+    }
+    const accessToken = tokenData.access_token;
+
+    // Step 3: Use the token to fetch the hotel's details. This is the missing step.
+    const hotelDetails = await cloudbeds.getHotelDetails(
+      accessToken,
+      propertyId
+    );
+    if (!hotelDetails) {
+      throw new Error(
+        `Could not fetch details for property ${propertyId} from Cloudbeds.`
+      );
+    }
+
+    // Step 4: Insert or update the hotel's details in our 'hotels' table.
+    await client.query(
+      `INSERT INTO hotels (hotel_id, property_name, city)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (hotel_id) DO UPDATE SET
+         property_name = EXCLUDED.property_name,
+         city = EXCLUDED.city;`,
+      [
+        hotelDetails.propertyID,
+        hotelDetails.propertyName,
+        hotelDetails.propertyCity,
+      ]
+    );
+
+    // Step 5: Update the property's status to 'connected'.
+    await client.query(
+      "UPDATE user_properties SET status = 'connected' WHERE property_id = $1",
+      [propertyId]
+    );
+
+    // Commit all changes to the database.
+    await client.query("COMMIT");
+
+    res
+      .status(200)
+      .json({
+        message: `Property ${propertyId} has been successfully activated.`,
+      });
+
+    //
+  } catch (error) {
+    // If anything fails, roll back the transaction.
+    await client.query("ROLLBACK");
+    console.error("Error activating pilot property:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "An internal server error occurred." });
+  } finally {
+    // Release the database client.
+    client.release();
+  }
+});
 module.exports = router;
