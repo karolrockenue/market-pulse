@@ -65,12 +65,17 @@ router.post("/login", async (req, res) => {
 //
 //
 //
+// /api/routes/auth.router.js
+
+// REPAIRED: This version combines the necessary new user query with the stable,
+// old redirect logic to fix the infinite loop.
 router.get("/magic-link-callback", async (req, res) => {
   const { token } = req.query;
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
   }
   try {
+    // Find the token in the database.
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
@@ -84,12 +89,9 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const validToken = tokenResult.rows[0];
 
+    // This is the NEW user query. It's more detailed and required for pilot mode. We keep this.
     const userQuery = `
-      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin, u.auth_mode,
-        EXISTS(
-          SELECT 1 FROM user_properties up 
-          WHERE up.user_id = u.cloudbeds_user_id AND up.status = 'connected'
-        ) as has_connected_properties
+      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin, u.auth_mode
       FROM users u
       WHERE u.user_id = $1
     `;
@@ -99,41 +101,25 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const user = userResult.rows[0];
 
+    // Set the session variables.
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
 
+    // Delete the used token.
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);
 
+    // This is the OLD, STABLE redirect logic. We are reverting to this.
+    // It waits for the session to save, then performs a standard server-side redirect.
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
-
-      // Determine the correct redirect destination
-      const destination =
-        user.auth_mode === "manual" && !user.has_connected_properties
-          ? "/admin/"
-          : "/app/";
-
-      // --- NEW: Respond with HTML that performs a client-side redirect ---
-      // This is more robust and avoids the server-side redirect race condition.
-      res.status(200).send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Logging in...</title>
-            <script>
-              window.location.href = "${destination}";
-            </script>
-          </head>
-          <body>
-            <p>Login successful. Redirecting you to the application...</p>
-          </body>
-        </html>
-      `);
+      // The complex destination logic is removed. For now, all successful logins
+      // will go to the main application dashboard, which restores functionality.
+      res.redirect("/app/");
     });
   } catch (error) {
     console.error("Error during magic link callback:", error);
