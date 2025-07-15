@@ -89,6 +89,9 @@ async function requireUserApi(req, res, next) {
             "[DEBUG 7] Temporary token acquired. Fetching property list from Cloudbeds..."
           );
 
+          // /api/utils/middleware.js
+
+          //...
           const properties = await cloudbeds.getPropertiesForUser(
             tempTokenForSync.access_token
           );
@@ -101,7 +104,18 @@ async function requireUserApi(req, res, next) {
             `[DEBUG 8] Found ${properties.length} properties. Starting DB transaction.`
           );
 
+          // --- NEW: Store properties in the session ---
+          // Before committing to the DB, we'll prepare the property list and
+          // a map of hotel details to store in the user's session. This makes
+          // them immediately available to the frontend after the next redirect.
+          req.session.syncedProperties = properties.map((p) => ({
+            property_id: p.id,
+            property_name: p.name,
+          }));
+          // --- END NEW ---
+
           await client.query("BEGIN");
+          //...
           for (const prop of properties) {
             console.log(`[DEBUG 9] Processing property ID: ${prop.id}`);
             const hotelDetails = await cloudbeds.getHotelDetails(
