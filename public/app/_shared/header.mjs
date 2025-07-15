@@ -49,15 +49,20 @@ export default function pageHeader() {
     },
 
     // Find the fetchProperties() method
+    // Find and replace the entire fetchProperties() method
     async fetchProperties() {
       try {
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
         if (this.properties.length > 0) {
-          // --- ADD THIS LINE ---
           // Automatically select the first property on load
-          this.selectedPropertyId = this.properties[0].property_id;
+          this.currentPropertyId = this.properties[0].property_id;
+          this.updateCurrentPropertyName(); // Ensure the name is also updated
+
+          // --- THIS IS THE FIX ---
+          // Announce the initial property selection to the rest of the app
+          this.dispatchPropertyChangeEvent();
         }
       } catch (error) {
         console.error("Error fetching properties:", error);
