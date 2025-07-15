@@ -31,32 +31,46 @@ async function requireUserApi(req, res, next) {
 
     // /api/utils/middleware.js
 
+    // /api/utils/middleware.js
+
     if (user.auth_mode === "manual") {
-      console.log("[DEBUG 3] Manual auth mode detected.");
-      const propertyId = req.headers["x-property-id"];
+      // --- FIX: Define paths that DON'T need a property ID ---
+      const allowedPaths = ["/my-properties", "/last-refresh-time"];
 
-      if (!propertyId) {
-        // We still need the property ID header for dashboard/report API calls.
-        // This check is now much simpler.
-        return res.status(400).json({
-          error: "X-Property-ID header is required for this request.",
-        });
+      // If the request is for a general, non-property-specific endpoint,
+      // we can skip the property ID header check.
+      if (allowedPaths.includes(req.path)) {
+        console.log(
+          `[DEBUG] Path ${req.path} is allowed without X-Property-ID. Skipping header check.`
+        );
+        // We still call next() at the end, so we just let this block pass.
+      } else {
+        // For all other data-intensive endpoints, enforce the header requirement.
+        const propertyId = req.headers["x-property-id"];
+        if (!propertyId) {
+          return res.status(400).json({
+            error: "An X-Property-ID header is required for this request.",
+          });
+        }
+
+        // Retrieve the permanently stored API key for the requested property.
+        const keyResult = await pgPool.query(
+          "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
+          [req.user.cloudbedsId, propertyId]
+        );
+
+        if (
+          keyResult.rows.length === 0 ||
+          !keyResult.rows[0].override_api_key
+        ) {
+          return res.status(403).json({
+            error: "API Key not configured for this property.",
+          });
+        }
+
+        // Attach the API key as the 'accessToken' for the downstream API call.
+        req.user.accessToken = keyResult.rows[0].override_api_key;
       }
-
-      // Retrieve the permanently stored API key for the requested property.
-      const keyResult = await pgPool.query(
-        "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        [req.user.cloudbedsId, propertyId]
-      );
-
-      if (keyResult.rows.length === 0 || !keyResult.rows[0].override_api_key) {
-        return res.status(403).json({
-          error: "API Key not configured for this property.",
-        });
-      }
-
-      // Attach the API key as the 'accessToken' for the downstream API call.
-      req.user.accessToken = keyResult.rows[0].override_api_key;
     }
     console.log(
       `[DEBUG FINAL] Middleware success for path: ${req.path}. Calling next().`
