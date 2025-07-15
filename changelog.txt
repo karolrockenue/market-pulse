@@ -295,3 +295,11 @@ allowedPaths exception for non-property-specific routes, resolving the access is
    * Dashboard Data Fix: After fixing the access issue, subsequent API calls were still failing with a 400 error. This was traced to a mismatch where the middleware expected the propertyId in the request headers, but the frontend was sending it in the URL query string. The middleware was corrected to read the
 propertyId from the query string, aligning the back-end expectation with the front-end implementation.
    * Outcome: The application is now fully stable. The critical login bug is resolved for all users. The "Pilot Mode" feature is now functionally complete, allowing pilot users to log in and view their hotel-specific data on the dashboard as intended.
+Date: July 15, 2025 (Part 6)
+   * Objective: Enable backend data synchronization for "Pilot Mode" users by running the initial data pull.
+   * Summary: After fixing the dashboard UI, the backend sync scripts (initial-sync and daily-refresh) were found to be incompatible with the "Pilot Mode" authentication method. Both scripts were refactored to handle manual API keys. This work successfully resolved our internal bugs but then uncovered a hard 403 Forbidden error from the Cloudbeds API, shifting the problem from our codebase to an external permission issue.
+   * Key Changes:
+   * Backend Sync Refactor: Both initial-sync.js and daily-refresh.js were updated. The scripts, originally built only for OAuth users, now detect a user's
+auth_mode. If the mode is 'manual', the scripts correctly use the property-specific override_api_key instead of attempting to use a non-existent refresh_token.
+   * API Permission Discovery: After the refactor, running the initial sync failed with a 403 Forbidden error with the message "User does not have permission to VIEW report". This confirmed that the issue is not with our code's logic but with the permissions associated with the manually generated Cloudbeds API key.
+      * Outcome: Our internal backend scripts are now complete and correctly handle both standard and pilot user authentication flows. However, the data sync for pilot users is currently blocked by the 403 Forbidden error from the Cloudbeds API. The immediate next step is to await a response from Cloudbeds support to resolve this final permission issue.

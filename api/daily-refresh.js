@@ -89,35 +89,68 @@ module.exports = async (request, response) => {
 
     console.log("Fetching list of active users...");
     const usersResult = await client.query(
-      "SELECT cloudbeds_user_id, refresh_token FROM users WHERE status = 'active'"
+      "SELECT cloudbeds_user_id, refresh_token, auth_mode FROM users WHERE status = 'active'"
     );
     const activeUsers = usersResult.rows;
     console.log(`Found ${activeUsers.length} active user(s) to process.`);
 
+    // api/daily-refresh.js
+
     for (const user of activeUsers) {
-      console.log(`--- Processing user: ${user.cloudbeds_user_id} ---`);
+      console.log(
+        `--- Processing user: ${user.cloudbeds_user_id} (Mode: ${user.auth_mode}) ---`
+      );
       try {
-        const accessToken = await getCloudbedsAccessToken(user.refresh_token);
-        if (!accessToken) {
-          console.log(
-            `Skipping user ${user.cloudbeds_user_id} due to authentication failure.`
-          );
-          continue;
+        let oauthAccessToken = null;
+
+        // For OAuth users, we can get a single access token to use for all their properties.
+        if (user.auth_mode === "oauth") {
+          oauthAccessToken = await getCloudbedsAccessToken(user.refresh_token);
+          if (!oauthAccessToken) {
+            console.log(
+              `Skipping user ${user.cloudbeds_user_id} due to OAuth authentication failure.`
+            );
+            continue; // Skip to the next user
+          }
         }
 
-        // NEW: Fetch all properties for the current user
+        // Fetch all properties for the current user.
         const propertiesResult = await client.query(
-          "SELECT property_id FROM user_properties WHERE user_id = $1",
+          "SELECT property_id FROM user_properties WHERE user_id = $1 AND status = 'connected'",
           [user.cloudbeds_user_id]
         );
         const userProperties = propertiesResult.rows;
         console.log(
-          `User ${user.cloudbeds_user_id} has ${userProperties.length} properties to refresh.`
+          `User ${user.cloudbeds_user_id} has ${userProperties.length} connected properties to refresh.`
         );
 
-        // NEW: Nested loop to refresh each property
+        // Loop through each of the user's properties.
+        // Loop through each of the user's properties.
         for (const prop of userProperties) {
           const propertyId = prop.property_id;
+          let propertySpecificAccessToken;
+
+          // Determine which token to use for the API call.
+          if (user.auth_mode === "manual") {
+            const keyResult = await client.query(
+              "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
+              [user.cloudbeds_user_id, propertyId]
+            );
+            if (
+              keyResult.rows.length > 0 &&
+              keyResult.rows[0].override_api_key
+            ) {
+              propertySpecificAccessToken = keyResult.rows[0].override_api_key;
+            } else {
+              console.log(
+                `-- Skipping property ${propertyId}: No override_api_key found. --`
+              );
+              continue;
+            }
+          } else {
+            propertySpecificAccessToken = oauthAccessToken;
+          }
+
           console.log(`-- Starting refresh for property: ${propertyId} --`);
 
           const today = new Date();
@@ -135,6 +168,7 @@ module.exports = async (request, response) => {
             "total_revenue",
           ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
+          // This is the complete insightsPayload with the correct filters.
           const insightsPayload = {
             property_ids: [propertyId],
             dataset_id: 7,
@@ -162,7 +196,7 @@ module.exports = async (request, response) => {
             {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${accessToken}`,
+                Authorization: `Bearer ${propertySpecificAccessToken}`,
                 "Content-Type": "application/json",
                 "X-PROPERTY-ID": propertyId,
               },
@@ -170,11 +204,13 @@ module.exports = async (request, response) => {
             }
           );
 
+          // This is the complete data processing and saving logic.
           if (!apiResponse.ok) {
             const errorText = await apiResponse.text();
-            throw new Error(
-              `Cloudbeds API Error for property ${propertyId}: ${apiResponse.status} ${errorText}`
+            console.error(
+              `-- API Error for property ${propertyId}: ${apiResponse.status} - ${errorText}`
             );
+            continue; // Skip to next property on API error
           }
 
           const apiData = await apiResponse.json();
@@ -182,42 +218,37 @@ module.exports = async (request, response) => {
           const datesToUpdate = Object.keys(processedData);
 
           if (datesToUpdate.length > 0) {
-            console.log(
-              `Updating ${datesToUpdate.length} records for property ${propertyId}...`
-            );
-            const insertQuery = `
-                INSERT INTO daily_metrics_snapshots (
-                    hotel_id, stay_date, adr, occupancy_direct, revpar,
-                    rooms_sold, capacity_count, total_revenue, cloudbeds_user_id
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
-                  adr = EXCLUDED.adr,
-                  occupancy_direct = EXCLUDED.occupancy_direct,
-                  revpar = EXCLUDED.revpar,
-                  rooms_sold = EXCLUDED.rooms_sold,
-                  capacity_count = EXCLUDED.capacity_count,
-                  total_revenue = EXCLUDED.total_revenue;
-              `;
-
             for (const date of datesToUpdate) {
               const metrics = processedData[date];
+              const query = `
+                INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+                    adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+                    capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
+            `;
               const values = [
-                propertyId,
                 date,
-                sanitizeMetric(metrics.adr),
-                sanitizeMetric(metrics.occupancy),
-                sanitizeMetric(metrics.revpar),
-                sanitizeMetric(metrics.rooms_sold),
-                sanitizeMetric(metrics.capacity_count),
-                sanitizeMetric(metrics.total_revenue),
+                propertyId,
+                metrics.adr,
+                metrics.occupancy,
+                metrics.revpar,
+                metrics.rooms_sold,
+                metrics.capacity_count,
+                metrics.total_revenue,
                 user.cloudbeds_user_id,
               ];
-              await client.query(insertQuery, values);
+              await client.query(query, values);
             }
             totalRecordsUpdated += datesToUpdate.length;
+            console.log(
+              `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId}. --`
+            );
+          } else {
+            console.log(
+              `-- No new records to update for property ${propertyId}. --`
+            );
           }
-          console.log(`-- Property ${propertyId} refreshed successfully. --`);
         }
       } catch (userError) {
         console.error(
