@@ -704,6 +704,10 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     const apiKey = credsResult.rows[0].override_api_key;
 
     const hotelDetails = await cloudbeds.getHotelDetails(apiKey, propertyId);
+    console.log(
+      "DEBUG: Received hotelDetails object from Cloudbeds:",
+      hotelDetails
+    );
     if (!hotelDetails) {
       throw new Error(
         `Could not fetch details for property ${propertyId} from Cloudbeds using the API key.`
