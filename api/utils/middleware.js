@@ -29,183 +29,34 @@ async function requireUserApi(req, res, next) {
       `[DEBUG 2] User found. Mode: ${user.auth_mode}, Needs Sync: ${user.needs_property_sync}`
     );
 
+    // /api/utils/middleware.js
+
     if (user.auth_mode === "manual") {
       console.log("[DEBUG 3] Manual auth mode detected.");
       const propertyId = req.headers["x-property-id"];
 
-      // api/utils/middleware.js
-
-      // ...
-
-      // This conditional check now includes an exception for the '/api/auth/connect-pilot-property'
-      // route. This route initiates the OAuth flow and therefore will not have the
-      // X-Property-ID header, which is only needed for subsequent API calls.
-      if (
-        !propertyId &&
-        req.path !== "/my-properties" &&
-        req.path !== "/api/auth/connect-pilot-property"
-      ) {
-        console.log(
-          `[DEBUG FAIL] Manual user on path '${req.path}' requires X-Property-ID header.`
-        );
+      if (!propertyId) {
+        // We still need the property ID header for dashboard/report API calls.
+        // This check is now much simpler.
         return res.status(400).json({
           error: "X-Property-ID header is required for this request.",
         });
       }
 
-      if (user.needs_property_sync) {
-        console.log(
-          "[DEBUG 4] 'needs_property_sync' is TRUE. Starting one-time sync."
-        );
-        const client = await pgPool.connect();
-        try {
-          console.log(
-            "[DEBUG 5] Fetching first available credential to get a temporary token."
-          );
-          const credsResult = await client.query(
-            "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND override_client_id IS NOT NULL LIMIT 1",
-            [req.user.cloudbedsId]
-          );
+      // Retrieve the permanently stored API key for the requested property.
+      const keyResult = await pgPool.query(
+        "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [req.user.cloudbedsId, propertyId]
+      );
 
-          if (credsResult.rows.length === 0) {
-            throw new Error(
-              "Could not find any credentials to perform initial property sync."
-            );
-          }
-          const { override_client_id, override_client_secret } =
-            credsResult.rows[0];
-          console.log(
-            "[DEBUG 6] Credentials found. Fetching temporary access token..."
-          );
-
-          const tempTokenForSync = await cloudbeds.getManualAccessToken(
-            override_client_id,
-            override_client_secret
-          );
-          if (!tempTokenForSync || !tempTokenForSync.access_token) {
-            throw new Error("Failed to get temporary access token for sync.");
-          }
-          console.log(
-            "[DEBUG 7] Temporary token acquired. Fetching property list from Cloudbeds..."
-          );
-
-          // /api/utils/middleware.js
-
-          //...
-          const properties = await cloudbeds.getPropertiesForUser(
-            tempTokenForSync.access_token
-          );
-          if (!properties) {
-            throw new Error(
-              "Failed to fetch property list from Cloudbeds during sync."
-            );
-          }
-          console.log(
-            `[DEBUG 8] Found ${properties.length} properties. Starting DB transaction.`
-          );
-
-          // --- NEW: Store properties in the session ---
-          // Before committing to the DB, we'll prepare the property list and
-          // a map of hotel details to store in the user's session. This makes
-          // them immediately available to the frontend after the next redirect.
-          req.session.syncedProperties = properties.map((p) => ({
-            property_id: p.id,
-            property_name: p.name,
-          }));
-          // --- END NEW ---
-
-          await client.query("BEGIN");
-          //...
-          for (const prop of properties) {
-            console.log(`[DEBUG 9] Processing property ID: ${prop.id}`);
-            const hotelDetails = await cloudbeds.getHotelDetails(
-              tempTokenForSync.access_token,
-              prop.id
-            );
-            if (hotelDetails) {
-              console.log(
-                `[DEBUG 10] Fetched details for ${hotelDetails.propertyName}. Inserting into 'hotels' table.`
-              );
-              await client.query(
-                `INSERT INTO hotels (hotel_id, property_name, city, star_rating) VALUES ($1, $2, $3, $4) ON CONFLICT (hotel_id) DO NOTHING`,
-                [
-                  hotelDetails.propertyID,
-                  hotelDetails.propertyName,
-                  hotelDetails.propertyCity,
-                  2,
-                ]
-              );
-            }
-            console.log(
-              `[DEBUG 11] Linking property ${prop.id} to user ${req.user.cloudbedsId}.`
-            );
-            await client.query(
-              "INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING",
-              [req.user.cloudbedsId, prop.id]
-            );
-          }
-          console.log(
-            "[DEBUG 12] All properties processed. Updating user 'needs_property_sync' flag to false."
-          );
-          await client.query(
-            "UPDATE users SET needs_property_sync = false WHERE user_id = $1",
-            [req.user.internalId]
-          );
-          await client.query("COMMIT");
-          console.log(
-            "[DEBUG 13] DB transaction committed successfully. Sync complete."
-          );
-        } catch (e) {
-          console.error(
-            "[DEBUG FAIL] Error during property sync transaction:",
-            e
-          );
-          await client.query("ROLLBACK");
-          throw e; // Re-throw the error to be caught by the main catch block
-        } finally {
-          client.release();
-        }
+      if (keyResult.rows.length === 0 || !keyResult.rows[0].override_api_key) {
+        return res.status(403).json({
+          error: "API Key not configured for this property.",
+        });
       }
-      // This part handles normal API calls after the initial sync is done.
-      if (propertyId) {
-        if (
-          req.session.manualTokens &&
-          req.session.manualTokens[propertyId] &&
-          req.session.manualTokens[propertyId].expires > Date.now()
-        ) {
-          req.user.accessToken = req.session.manualTokens[propertyId].token;
-        } else {
-          const credsResult = await pgPool.query(
-            "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND property_id = $2",
-            [req.user.cloudbedsId, propertyId]
-          );
-          if (
-            credsResult.rows.length === 0 ||
-            !credsResult.rows[0].override_client_id
-          ) {
-            return res.status(403).json({
-              error: "Manual credentials not configured for this property.",
-            });
-          }
-          const { override_client_id, override_client_secret } =
-            credsResult.rows[0];
-          const tokenData = await cloudbeds.getManualAccessToken(
-            override_client_id,
-            override_client_secret
-          );
-          if (!tokenData || !tokenData.access_token) {
-            return res
-              .status(503)
-              .json({ error: "Could not authenticate with Cloudbeds." });
-          }
-          if (!req.session.manualTokens) req.session.manualTokens = {};
-          req.session.manualTokens[propertyId] = {
-            token: tokenData.access_token,
-            expires: Date.now() + (tokenData.expires_in - 300) * 1000,
-          };
-          req.user.accessToken = tokenData.access_token;
-        }
-      }
+
+      // Attach the API key as the 'accessToken' for the downstream API call.
+      req.user.accessToken = keyResult.rows[0].override_api_key;
     }
     console.log(
       `[DEBUG FINAL] Middleware success for path: ${req.path}. Calling next().`

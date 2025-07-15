@@ -42,26 +42,6 @@ async function getOAuthAccessToken(refreshToken) {
  * @param {string} clientSecret - The pilot user's override client secret.
  * @returns {Promise<object|null>} The token object { access_token, expires_in }, or null if failed.
  */
-async function getManualAccessToken(clientId, clientSecret) {
-  const params = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: clientId,
-    client_secret: clientSecret,
-  });
-  const response = await fetch(
-    "https://hotels.cloudbeds.com/api/v1.1/access_token",
-    {
-      method: "POST",
-      body: params,
-    }
-  );
-  const tokenData = await response.json();
-  if (!tokenData.access_token) {
-    console.error("Manual token fetch failed:", tokenData);
-    return null;
-  }
-  return tokenData;
-}
 
 /**
  * Fetches the list of properties associated with an account.

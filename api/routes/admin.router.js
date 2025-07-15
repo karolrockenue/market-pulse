@@ -671,6 +671,8 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
 
 // NEW: This is the new, backend-only route for activating a pilot property.
 // It replaces the old redirect-based flow.
+// /api/routes/admin.router.js
+
 router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
   const { propertyId } = req.body;
   if (!propertyId) {
@@ -679,50 +681,33 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
 
   const client = await pgPool.connect();
   try {
-    // Start a database transaction.
     await client.query("BEGIN");
 
-    // Step 1: Get the provisioned credentials for this property.
-    // We don't need the user ID here, as the property ID is unique.
+    // Step 1: Get the provisioned API key for this property.
     const credsResult = await client.query(
-      "SELECT override_client_id, override_client_secret FROM user_properties WHERE property_id = $1",
+      "SELECT override_api_key FROM user_properties WHERE property_id = $1",
       [propertyId]
     );
 
     if (
       credsResult.rows.length === 0 ||
-      !credsResult.rows[0].override_client_id
+      !credsResult.rows[0].override_api_key
     ) {
       throw new Error(
-        `No credentials found for property ${propertyId}. Please provision it first.`
+        `No API key found for property ${propertyId}. Please provision it first.`
       );
     }
-    const { override_client_id, override_client_secret } = credsResult.rows[0];
+    const apiKey = credsResult.rows[0].override_api_key;
 
-    // Step 2: Make a direct, server-to-server call to get an access token.
-    const tokenData = await cloudbeds.getManualAccessToken(
-      override_client_id,
-      override_client_secret
-    );
-    if (!tokenData || !tokenData.access_token) {
-      throw new Error(
-        "Failed to get an access token from Cloudbeds using the stored credentials."
-      );
-    }
-    const accessToken = tokenData.access_token;
-
-    // Step 3: Use the token to fetch the hotel's details. This is the missing step.
-    const hotelDetails = await cloudbeds.getHotelDetails(
-      accessToken,
-      propertyId
-    );
+    // Step 2: Use the API key DIRECTLY as the access token to fetch hotel details.
+    const hotelDetails = await cloudbeds.getHotelDetails(apiKey, propertyId);
     if (!hotelDetails) {
       throw new Error(
-        `Could not fetch details for property ${propertyId} from Cloudbeds.`
+        `Could not fetch details for property ${propertyId} from Cloudbeds using the API key.`
       );
     }
 
-    // Step 4: Insert or update the hotel's details in our 'hotels' table.
+    // Step 3: Save the details into our 'hotels' table.
     await client.query(
       `INSERT INTO hotels (hotel_id, property_name, city)
        VALUES ($1, $2, $3)
@@ -736,31 +721,25 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
       ]
     );
 
-    // Step 5: Update the property's status to 'connected'.
+    // Step 4: Update the property's status to 'connected'.
     await client.query(
-      "UPDATE user_properties SET status = 'connected' WHERE property_id = $1",
+      "UPDATE user_properties SET status = 'connected', override_client_id = NULL, override_client_secret = NULL WHERE property_id = $1",
       [propertyId]
     );
 
-    // Commit all changes to the database.
     await client.query("COMMIT");
-
     res
       .status(200)
       .json({
         message: `Property ${propertyId} has been successfully activated.`,
       });
-
-    //
   } catch (error) {
-    // If anything fails, roll back the transaction.
     await client.query("ROLLBACK");
     console.error("Error activating pilot property:", error);
     res
       .status(500)
       .json({ message: error.message || "An internal server error occurred." });
   } finally {
-    // Release the database client.
     client.release();
   }
 });

@@ -623,13 +623,17 @@ function initializeAdminPanel() {
   const credentialForm = document.getElementById("credential-form");
   const saveBtn = document.getElementById("save-credentials-btn");
 
+  // public/admin/admin.mjs
+
   credentialForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
+    // Get the values from all form fields, including the new API key input
     const email = document.getElementById("user-email").value;
     const propertyId = document.getElementById("property-id-input").value;
     const clientId = document.getElementById("client-id").value;
     const clientSecret = document.getElementById("client-secret").value;
+    const apiKey = document.getElementById("api-key-input").value; // Get the new API key
 
     if (!confirm(`Provision property ${propertyId} for user ${email}?`)) {
       return;
@@ -640,10 +644,16 @@ function initializeAdminPanel() {
 
     try {
       const response = await fetch("/api/provision-pilot-hotel", {
-        // Using a new, clear endpoint name
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, propertyId, clientId, clientSecret }),
+        // Add the apiKey to the request body
+        body: JSON.stringify({
+          email,
+          propertyId,
+          clientId,
+          clientSecret,
+          apiKey,
+        }),
       });
 
       const result = await response.json();
@@ -651,6 +661,8 @@ function initializeAdminPanel() {
       if (response.ok) {
         alert(`Success: ${result.message}`);
         credentialForm.reset();
+        // Refresh the pilot status table to show the newly provisioned hotel
+        fetchAndRenderPilotStatus();
       } else {
         throw new Error(result.message);
       }
