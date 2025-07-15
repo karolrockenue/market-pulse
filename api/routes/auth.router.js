@@ -39,6 +39,7 @@ async function getCloudbedsAccessToken(refreshToken) {
 // --- AUTHENTICATION ENDPOINTS ---
 // Note: app.post is now router.post, app.get is now router.get
 
+// This is the correct and complete /logout route
 router.post("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -47,7 +48,8 @@ router.post("/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-
+    // This line tells the browser to delete the session cookie.
+    res.clearCookie("connect.sid", { path: "/" });
     res.status(200).json({ message: "Logged out successfully" });
   });
 });
