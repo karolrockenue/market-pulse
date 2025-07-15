@@ -47,11 +47,17 @@ app.use(cors(corsOptions));
 // server.js
 
 // --- NEW: EXPLICITLY DEFINE AND LOG COOKIE CONFIG ---
+// server.js
+
 const cookieConfig = {
   secure: process.env.VERCEL_ENV === "production",
   httpOnly: true,
   sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
   maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+  // --- FIX: Explicitly set the parent domain for the cookie ---
+  // This ensures the cookie is sent for both market-pulse.io and www.market-pulse.io
+  domain:
+    process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined,
 };
 
 console.log(
