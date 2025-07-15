@@ -8,6 +8,9 @@ const sgMail = require("@sendgrid/mail");
 // Import shared utilities
 const pgPool = require("../utils/db");
 
+// --- NEW: Initialize the SendGrid library with the API key ---
+sgMail.setApiKey(process.env.SENDGRID_API_KEY); // <<< ADD THIS LINE
+
 // --- HELPER FUNCTIONS (Specific to Auth) ---
 // This function is now co-located with the routes that use it.
 async function getCloudbedsAccessToken(refreshToken) {

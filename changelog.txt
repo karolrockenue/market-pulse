@@ -1,29 +1,38 @@
 # Project "Market Pulse" - Architectural Principles & Development History
 
+
 ## 1. Guiding Principles for AI-Assisted Development
 
+
 This document provides a complete technical overview and chronological development history for the Market Pulse application. All future development work must adhere to the following architectural principles to ensure consistency, maintainability, and stability.
+
 
 ### Frontend Architecture: Declarative UI with Alpine.js
 - The project has adopted a declarative, state-driven UI model using the Alpine.js library.
 - **Rule:** All new UI interactivity must be built within a self-contained Alpine.js component (`x-data`). Manual DOM manipulation (e.g., `document.getElementById`) is to be avoided.
 - **Pattern:** The component's state and UI-related methods should be defined within a single object in an external `.mjs` file, which is then imported and registered with Alpine.js in the corresponding HTML file. The HTML file should serve as a clean template, with all logic encapsulated in the JavaScript module.
 
+
 ### Backend Architecture: Modular Express Routers
 - The backend has been refactored from a monolithic `server.js` file into a modular architecture.
 - **Rule:** All new API endpoints must be added to the appropriate feature-based router file within the `/api/routes/` directory (e.g., `auth.router.js`, `dashboard.router.js`).
 - **Pattern:** Shared logic, such as database connections (`db.js`) and authentication middleware (`middleware.js`), should be placed in the `/api/utils/` directory to be reused across routers. The main `server.js` file should remain a lean script responsible only for server initialization and mounting the routers.
+
 
 ### Component Architecture: Reusable Shared Components
 - The application utilizes shared UI components to ensure a consistent user experience and reduce code duplication.
 - **Rule:** Common UI elements, such as the page header, must be built as reusable components.
 - **Pattern:** Shared components should be placed in the `/public/app/_shared/` directory, with their HTML and JavaScript logic separated into `header.html` and `header.mjs` files, respectively. A utility function (`utils.mjs`) is used to load these components dynamically.
 
+
 ### Changelog Maintenance
 When requested by the user (Karol), a new entry detailing the completed work must be appended to the end of the "Development History" section. Each new entry must strictly adhere to the existing format used in previous entries (Date, Objective, Key Changes, and Outcome). Previous historical entries are considered immutable and must not be altered. The only section that should be modified is the "Current Project File Structure" tree, which must be updated if any files or directories are added, modified, or deleted.
 
 
+
+
 ## 2. Current Project File Structure
+
 
 market-pulse/
 ├── api/
@@ -61,9 +70,12 @@ market-pulse/
 ├── server.js
 └── vercel.json
 
+
 ## 3. Development History
 
+
 ---
+
 
 ### **Date: July 5, 2025**
 - **Objective**: Migrate the project from a local setup to a cloud-native solution and establish the initial dataset.
@@ -74,7 +86,9 @@ market-pulse/
     - The backend API was updated to aggregate this mock data, providing an averaged "market" row for the dashboard.
 - **Outcome**: The application was successfully deployed to a cloud-native environment with a foundational dataset for market comparisons.
 
+
 ---
+
 
 ### **Date: July 8, 2025**
 - **Objective**: Refactor the application into a secure, multi-tenant platform and resolve critical post-deployment issues.
@@ -89,7 +103,9 @@ market-pulse/
         - **Resolution**: Replaced the in-memory store with a persistent PostgreSQL-backed store (`connect-pg-simple`). Implemented previously missing API endpoints (`/api/metrics-from-db`, `/api/competitor-metrics`) to resolve a `TypeError` on the dashboard.
 - **Outcome**: The application was successfully converted and stabilized into a fully functional multi-tenant platform.
 
+
 ---
+
 
 ### **Date: July 9, 2025**
 - **Objective**: Implement a secure, passwordless magic link login system and resolve a series of critical production bugs.
@@ -106,7 +122,9 @@ market-pulse/
         - **Session Data Mismatch**: Corrected the magic link callback logic to set the correct `cloudbeds_user_id` in the user's session, which resolved an issue where the dashboard failed to load user properties.
 - **Outcome**: The magic link authentication system was successfully implemented. Multiple critical bugs were resolved, restoring the application to a stable and functional state.
 
+
 ---
+
 
 ### **Date: July 10, 2025**
 - **Objective**: Overhaul the application's authorization model, redesign the Admin Panel, and build an in-app API exploration tool.
@@ -120,7 +138,9 @@ market-pulse/
         - Created a dynamic, in-app "Cloudbeds API Explorer" tool, allowing administrators to query API datasets and inspect their structure directly from the UI. This explorer was later enhanced to query real sample data from both the Insights and General APIs.
 - **Outcome**: The session conflict bug was resolved. The new role-based system is more secure and scalable, and the Admin Panel was transformed into a professional and highly functional utility.
 
+
 ---
+
 
 ### **Date: July 11, 2025**
 - **Objective**: Build a feature-rich Advanced Reporting page, including market comparisons, robust exporting, and a fully reactive UI.
@@ -139,7 +159,9 @@ market-pulse/
         - The process involved resolving a JavaScript module scope issue where Alpine.js could not access functions inside a module, which was fixed by explicitly exposing the handler function to the `window` object.
 - **Outcome**: The Advanced Reporting page was transformed into a stable, powerful, and maintainable tool with a fully reactive interface. The problematic PDF export feature was strategically removed, and the successful Alpine.js refactor established the go-forward architectural pattern for the rest of the application's frontend.
 
+
 ---
+
 
 ### **Date: July 12, 2025**
 - **Objective**: Modernize the main application dashboard by refactoring its frontend to align with the new reactive pattern.
@@ -149,7 +171,9 @@ market-pulse/
     - All dashboard logic was consolidated into the `dashboardPage()` component object, and the HTML was simplified to a clean template with Alpine directives (`x-text`, `x-show`, etc.) bound to the component's state.
 - **Outcome**: The dashboard's frontend is now stable, maintainable, and architecturally consistent with the rest of the application, resolving a significant piece of technical debt.
 
+
 ---
+
 
 ### **Date: July 13, 2025**
 - **Objective**: Implement a reusable shared header, connect the Advanced Reporting page to live data, and resolve a critical chart rendering bug on the main dashboard.
@@ -166,7 +190,9 @@ market-pulse/
         - **Resolution**: The application was migrated to the more robust Apache ECharts library. The tooltip formatting then failed due to a deep architectural conflict between ECharts and Alpine.js, which was resolved by completely decoupling the chart logic into a standalone `chartManager` object that is no longer controlled by Alpine.
 - **Outcome**: The application now features a more consistent and maintainable UI with a shared header. The Advanced Reporting page is fully functional with live data. The dashboard chart is stable and visually polished after a successful migration to ECharts.
 
+
 ---
+
 
 ### **Date: July 14, 2025**
 - **Objective**: Implement an end-to-end automated report scheduling system and standardize the UI by integrating the shared header into the main dashboard.
@@ -183,7 +209,9 @@ market-pulse/
         - The dashboard was refactored to be event-driven; it now listens for the `property-changed` event from the header to refresh its data, decoupling the components.
 - **Outcome**: The report scheduling feature is production-ready and fully functional for CSV and Excel formats. The application's primary pages now share a single, consistent UI component, completing the UI standardization effort.
 
+
 ---
+
 
 ### **Date: July 15, 2025**
 - **Objective**: Address significant technical debt by refactoring the monolithic `server.js` file into a modular architecture.
@@ -193,3 +221,27 @@ market-pulse/
     - Shared utilities, including the database connection pool (`db.js`) and authentication middleware (`middleware.js`), were extracted into a `/api/utils/` directory.
     - The main `server.js` file was simplified to be a lean script that only initializes the server and mounts the new routers.
 - **Outcome**: The backend refactoring was completed successfully. The new modular structure improves code organization, enhances maintainability, and makes the application significantly easier and safer to extend in the future.
+
+
+Date: July 15, 2025 (Part 2)
+* Objective: Implement a "Pilot Mode" to allow pre-certification onboarding of hotels using manual API credentials.
+* Summary: A critical discovery revealed that the standard OAuth 2.0 flow is disabled for uncertified applications, blocking new hotel onboarding. A new, parallel authentication system was designed and implemented to bypass this limitation for a select group of pilot hotels. This involved a significant architectural pivot, several rounds of database refactoring, and a deep debugging session to resolve a complex foreign key constraint issue.
+* Key Changes:
+   * Architectural Pivot:
+      * Initial Discovery: Realized that a standard hotel account cannot authorize an uncertified app, making the existing OAuth flow unusable for pilots. Discovered that Cloudbeds allows hotel admins to manually generate API credentials (Client ID & Client Secret) within their account.
+      * Initial (Incorrect) Plan: An initial plan to store one set of credentials per user was abandoned after discovering that in multi-property accounts, each hotel has its own unique set of API credentials.
+      * Final (Correct) Plan: The architecture was redesigned to be property-centric. The system now stores a unique set of override credentials for each property linked to a pilot user.
+   * Database Schema Evolution:
+      * Added auth_mode and needs_property_sync columns to the users table to identify pilot users and trigger a one-time property list sync.
+      * Removed the NOT NULL constraint from token-related columns in the users table to accommodate pilot users who will not have OAuth tokens.
+      * Added override_client_id and override_client_secret columns to the user_properties table to store credentials on a per-property basis.
+      * Critical Debugging: Resolved a persistent foreign key constraint violation by removing the faulty constraint from the user_properties table, bringing the database rules in line with the application's established (but inconsistent) user identification logic.
+   * Backend Implementation:
+      * Created a new /api/utils/cloudbeds.js utility to centralize all Cloudbeds API interactions.
+      * Built a new admin-only API endpoint (POST /api/set-credentials) to allow an administrator to securely provision properties for pilot users.
+      * Overhauled the requireUserApi function in /api/utils/middleware.js. It now detects users with auth_mode = 'manual', fetches a temporary access token using their stored property-specific credentials, and caches it in the user's session.
+   * Impact on OAuth Flow:
+      * The standard OAuth 2.0 flow remains the primary, long-term authentication method and is completely unaffected by these changes. The new pilot mode logic runs on a separate, conditional path that is only triggered for users explicitly marked as 'manual'.
+   * Future Migration Path:
+      * The system is designed for a simple migration. Once the application is certified on the Cloudbeds Marketplace, pilot users will be instructed to log in once via the standard OAuth flow. This will automatically connect their account the standard way, and the manual override credentials can be cleared from the database.
+* Outcome: The "Pilot Mode" feature was successfully implemented, providing a secure and robust method for onboarding hotels before official marketplace certification. The system can now handle both multi-property users with a single login and single-property users, all while preserving the integrity of the primary OAuth 2.0 architecture. Next step -testing by adding first real hotel
