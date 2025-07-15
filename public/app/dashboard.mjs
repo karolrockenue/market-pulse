@@ -202,6 +202,7 @@ export default {
 
   // --- INITIALIZATION ---
   // Find and replace the entire init() method
+  // Find and replace the entire init() method
   init() {
     console.log("Dashboard initializing...");
     // This event listener ensures we don't fetch data until the header
@@ -212,14 +213,18 @@ export default {
         console.log(
           `Property changed to ${propertyId}, fetching all dashboard data.`
         );
-        this.fetchKpiSummary(propertyId);
-        this.fetchChartData(propertyId);
+        // CORRECTED: These are the correct function names from your file.
+        this.loadKpis(this.dates.start, this.dates.end);
+        this.loadChartAndTables(
+          this.dates.start,
+          this.dates.end,
+          this.granularity
+        );
       }
     });
 
-    // We no longer fetch data directly here. We let the header's
-    // initialization trigger the 'property-changed' event which starts the process.
-    this.fetchLastRefreshTime(); // This one is safe, it doesn't need a property ID.
+    // CORRECTED: This is the correct function name from your file.
+    this.fetchAndDisplayLastRefreshTime();
   },
 
   initializeDashboard() {
@@ -300,16 +305,17 @@ export default {
     }
   },
   // Find and replace the entire loadChartAndTables() method
+  // This is the full, correct version of the function.
   async loadChartAndTables(startDate, endDate, granularity) {
     this.isLoading.chart = true;
     this.isLoading.tables = true;
     chartManager.showLoading();
     try {
       const propertyId = this.currentPropertyId;
-      // CORRECTED: The second URL no longer includes the propertyId query parameter.
+      // Both URLs correctly include the propertyId.
       const urls = [
         `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
-        `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`,
+        `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
       ];
       const [yourHotelResponse, marketResponse] = await Promise.all(
         urls.map((url) => fetch(url))
