@@ -284,3 +284,14 @@ Date: July 15, 2025 (Part 4)
       * A new bug emerged where a successfully connected pilot user was being incorrectly redirected to the /admin page instead of the dashboard.
       * An attempt was made to fix this by making the redirect logic in the /magic-link-callback more intelligent, checking if a user already had connected properties.
 * Outcome: The primary objective was a success. The pilot hotel activation flow is now correctly architected and fully functional. A hotel can be provisioned and activated successfully from the Admin Panel, with its details correctly saved to the hotels table. However, the session concluded with a critical regression: the fix to the login redirect introduced an infinite loop, sending the user back to the magic link page after login. The application is currently in a non-working state for user logins. Resolving this login loop is the top priority for the next session.
+Date: July 15, 2025 (Part 5)
+* Objective: Resolve all post-implementation bugs for the "Pilot Mode" feature, moving it from a non-functional state to a fully operational one.
+* Summary: This was an intensive debugging session that began by fixing a critical, site-wide login loop. Once access was restored, a series of cascading middleware bugs preventing the pilot user's dashboard from loading were systematically identified and resolved.
+* Key Changes:
+   * Login Loop Fix: A persistent login loop was traced to an incorrect session cookie configuration that caused the user's session to be lost between requests. The issue was resolved by adding
+domain: ".market-pulse.io" to the cookie configuration in server.js, which ensures the session cookie is correctly handled by the browser across subdomains .
+   * Dashboard Access Fix: The pilot user's dashboard initially failed to load because the requireUserApi middleware required an X-Property-ID header on all API calls. This created a chicken-and-egg problem where the initial call to get the list of properties (/api/my-properties) was blocked. The middleware was updated to create an
+allowedPaths exception for non-property-specific routes, resolving the access issue.
+   * Dashboard Data Fix: After fixing the access issue, subsequent API calls were still failing with a 400 error. This was traced to a mismatch where the middleware expected the propertyId in the request headers, but the frontend was sending it in the URL query string. The middleware was corrected to read the
+propertyId from the query string, aligning the back-end expectation with the front-end implementation.
+   * Outcome: The application is now fully stable. The critical login bug is resolved for all users. The "Pilot Mode" feature is now functionally complete, allowing pilot users to log in and view their hotel-specific data on the dashboard as intended.

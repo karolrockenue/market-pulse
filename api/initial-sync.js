@@ -61,11 +61,12 @@ module.exports = async (request, response) => {
   try {
     await client.connect();
 
+    // Also fetch the user's auth_mode to determine how to get a token.
     const userResult = await client.query(
-      `SELECT u.cloudbeds_user_id, u.refresh_token 
-       FROM users u 
-       JOIN user_properties up ON u.cloudbeds_user_id = up.user_id 
-       WHERE up.property_id = $1::integer LIMIT 1`, // <-- Corrected JOIN condition
+      `SELECT u.cloudbeds_user_id, u.refresh_token, u.auth_mode 
+   FROM users u 
+   JOIN user_properties up ON u.cloudbeds_user_id = up.user_id 
+   WHERE up.property_id = $1::integer LIMIT 1`,
       [propertyId]
     );
 
@@ -73,10 +74,31 @@ module.exports = async (request, response) => {
       throw new Error(`No active user found for property ${propertyId}.`);
     const user = userResult.rows[0];
 
-    const accessToken = await getCloudbedsAccessToken(user.refresh_token);
+    let accessToken;
+    // Check the user's authentication mode.
+    if (user.auth_mode === "manual") {
+      // For pilot users, get the specific API key for this property.
+      console.log(`User is in 'manual' mode. Fetching override API key.`);
+      const keyResult = await client.query(
+        "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [user.cloudbeds_user_id, propertyId]
+      );
+      if (keyResult.rows.length === 0 || !keyResult.rows[0].override_api_key) {
+        throw new Error(
+          `Could not find override_api_key for property ${propertyId}.`
+        );
+      }
+      // The API key IS the access token for these users.
+      accessToken = keyResult.rows[0].override_api_key;
+    } else {
+      // For standard OAuth users, use the refresh token as before.
+      console.log(`User is in 'oauth' mode. Using refresh token.`);
+      accessToken = await getCloudbedsAccessToken(user.refresh_token);
+    }
+
     if (!accessToken)
       throw new Error(
-        `Authentication failed for the user of property ${propertyId}.`
+        `Authentication failed for the user of property ${propertyId}. Mode: ${user.auth_mode}`
       );
 
     // Define a fixed 15-year historical range.
