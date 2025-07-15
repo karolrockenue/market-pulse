@@ -714,22 +714,23 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
       );
     }
 
+    // This is the final version with the correct paths to the nested data.
     await client.query(
       `INSERT INTO hotels (hotel_id, property_name, city, address_1, country, currency_code)
    VALUES ($1, $2, $3, $4, $5, $6)
    ON CONFLICT (hotel_id) DO UPDATE SET
      property_name = EXCLUDED.property_name,
      city = EXCLUDED.city,
-  address_1 = EXCLUDED.address_1,
+     address_1 = EXCLUDED.address_1,
      country = EXCLUDED.country,
      currency_code = EXCLUDED.currency_code;`,
       [
         hotelDetails.propertyID,
         hotelDetails.propertyName,
-        hotelDetails.propertyCity,
-        hotelDetails.propertyAddress1,
-        hotelDetails.propertyCountry,
-        hotelDetails.propertyCurrencyCode,
+        hotelDetails.propertyAddress.propertyCity, // Correct path
+        hotelDetails.propertyAddress.propertyAddress1, // Correct path
+        hotelDetails.propertyAddress.propertyCountry, // Correct path
+        hotelDetails.propertyCurrency.currencyCode, // Correct path
       ]
     );
 
