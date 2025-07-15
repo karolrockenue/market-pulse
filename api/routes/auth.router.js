@@ -64,6 +64,7 @@ router.post("/login", async (req, res) => {
 
 //
 //
+//
 router.get("/magic-link-callback", async (req, res) => {
   const { token } = req.query;
   if (!token) {
@@ -83,15 +84,8 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const validToken = tokenResult.rows[0];
 
-    // --- NEW, EFFICIENT QUERY ---
-    // This single query gets the user's details AND checks if they have any connected
-    // properties, avoiding a second database call inside the route.
     const userQuery = `
-      SELECT 
-        u.user_id, 
-        u.cloudbeds_user_id, 
-        u.is_admin, 
-        u.auth_mode,
+      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin, u.auth_mode,
         EXISTS(
           SELECT 1 FROM user_properties up 
           WHERE up.user_id = u.cloudbeds_user_id AND up.status = 'connected'
@@ -105,11 +99,9 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const user = userResult.rows[0];
 
-    // Set the session details
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
 
-    // Delete the used magic link token
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);
@@ -120,12 +112,28 @@ router.get("/magic-link-callback", async (req, res) => {
         return res.status(500).send("An error occurred during login.");
       }
 
-      // The redirect logic now uses the boolean field from our new query
-      if (user.auth_mode === "manual" && !user.has_connected_properties) {
-        res.redirect("/admin/");
-      } else {
-        res.redirect("/app/");
-      }
+      // Determine the correct redirect destination
+      const destination =
+        user.auth_mode === "manual" && !user.has_connected_properties
+          ? "/admin/"
+          : "/app/";
+
+      // --- NEW: Respond with HTML that performs a client-side redirect ---
+      // This is more robust and avoids the server-side redirect race condition.
+      res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Logging in...</title>
+            <script>
+              window.location.href = "${destination}";
+            </script>
+          </head>
+          <body>
+            <p>Login successful. Redirecting you to the application...</p>
+          </body>
+        </html>
+      `);
     });
   } catch (error) {
     console.error("Error during magic link callback:", error);
