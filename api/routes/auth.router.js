@@ -118,6 +118,15 @@ router.get("/magic-link-callback", async (req, res) => {
     const user = userResult.rows[0];
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
+    // --- ADD THESE DEBUG LINES ---
+    console.log(
+      `[DEBUG SESSION WRITE] Setting session for cloudbeds_user_id: ${req.session.userId}`
+    );
+    console.log(
+      `[DEBUG SESSION WRITE] isAdmin flag is: ${req.session.isAdmin}`
+    );
+    // --- END DEBUG LINES ---
+
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);

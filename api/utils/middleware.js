@@ -37,11 +37,9 @@ async function requireUserApi(req, res, next) {
         console.log(
           `[DEBUG FAIL] Manual user on path '${req.path}' requires X-Property-ID header.`
         );
-        return res
-          .status(400)
-          .json({
-            error: "X-Property-ID header is required for this request.",
-          });
+        return res.status(400).json({
+          error: "X-Property-ID header is required for this request.",
+        });
       }
 
       if (user.needs_property_sync) {
@@ -160,11 +158,9 @@ async function requireUserApi(req, res, next) {
             credsResult.rows.length === 0 ||
             !credsResult.rows[0].override_client_id
           ) {
-            return res
-              .status(403)
-              .json({
-                error: "Manual credentials not configured for this property.",
-              });
+            return res.status(403).json({
+              error: "Manual credentials not configured for this property.",
+            });
           }
           const { override_client_id, override_client_secret } =
             credsResult.rows[0];
@@ -217,6 +213,12 @@ const requireAdminApi = (req, res, next) => {
 };
 
 const requirePageLogin = (req, res, next) => {
+  // --- ADD THESE DEBUG LINES ---
+  console.log(`[DEBUG SESSION READ] Checking page login for path: ${req.path}`);
+  console.log(
+    `[DEBUG SESSION READ] Found session userId: ${req.session.userId}`
+  );
+  // --- END DEBUG LINES ---
   if (!req.session.userId) {
     return res.redirect("/signin");
   }
