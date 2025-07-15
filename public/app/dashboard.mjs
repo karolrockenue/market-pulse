@@ -202,29 +202,19 @@ export default {
 
   // --- INITIALIZATION ---
   // Find and replace the entire init() method
-  // Find and replace the entire init() method
+  // This is the final, correct version of the init() method.
   init() {
     console.log("Dashboard initializing...");
-    // This event listener ensures we don't fetch data until the header
-    // has loaded properties and selected one.
+
+    // This listener now correctly calls the handler that updates the component's state.
     window.addEventListener("property-changed", (event) => {
-      const propertyId = event.detail.propertyId;
-      if (propertyId) {
-        console.log(
-          `Property changed to ${propertyId}, fetching all dashboard data.`
-        );
-        // CORRECTED: These are the correct function names from your file.
-        this.loadKpis(this.dates.start, this.dates.end);
-        this.loadChartAndTables(
-          this.dates.start,
-          this.dates.end,
-          this.granularity
-        );
-      }
+      // The event listener's only job is to pass the event data to the existing handler.
+      this.handlePropertyChange(event.detail);
     });
 
-    // CORRECTED: This is the correct function name from your file.
+    // These two functions are safe to call on initial load as they don't depend on a property.
     this.fetchAndDisplayLastRefreshTime();
+    this.initializeDashboard(); // This is crucial for setting up the chart.
   },
 
   initializeDashboard() {
