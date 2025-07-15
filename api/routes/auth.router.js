@@ -47,9 +47,7 @@ router.post("/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-    const cookieDomain =
-      process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined;
-    res.clearCookie("connect.sid", { domain: cookieDomain, path: "/" });
+
     res.status(200).json({ message: "Logged out successfully" });
   });
 });

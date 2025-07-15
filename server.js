@@ -59,10 +59,7 @@ app.use(
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
       sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
-      domain:
-        process.env.VERCEL_ENV === "production"
-          ? ".market-pulse.io"
-          : undefined,
+
       maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
     },
   })
