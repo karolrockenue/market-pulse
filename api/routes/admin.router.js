@@ -711,12 +711,12 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     }
 
     await client.query(
-      `INSERT INTO hotels (hotel_id, property_name, city, address1, country, currency_code)
+      `INSERT INTO hotels (hotel_id, property_name, city, address_1, country, currency_code)
    VALUES ($1, $2, $3, $4, $5, $6)
    ON CONFLICT (hotel_id) DO UPDATE SET
      property_name = EXCLUDED.property_name,
      city = EXCLUDED.city,
-     address1 = EXCLUDED.address1,
+  address_1 = EXCLUDED.address1,
      country = EXCLUDED.country,
      currency_code = EXCLUDED.currency_code;`,
       [
