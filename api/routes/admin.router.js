@@ -715,22 +715,36 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     }
 
     // This is the final version with the correct paths to the nested data.
+    // This is the final, comprehensive query that saves all available details.
     await client.query(
-      `INSERT INTO hotels (hotel_id, property_name, city, address_1, country, currency_code)
-   VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO hotels (
+     hotel_id, property_name, city, address_1, country, currency_code,
+     property_type, zip_postal_code, latitude, longitude, primary_language
+   )
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
    ON CONFLICT (hotel_id) DO UPDATE SET
      property_name = EXCLUDED.property_name,
      city = EXCLUDED.city,
      address_1 = EXCLUDED.address_1,
      country = EXCLUDED.country,
-     currency_code = EXCLUDED.currency_code;`,
+     currency_code = EXCLUDED.currency_code,
+     property_type = EXCLUDED.property_type,
+     zip_postal_code = EXCLUDED.zip_postal_code,
+     latitude = EXCLUDED.latitude,
+     longitude = EXCLUDED.longitude,
+     primary_language = EXCLUDED.primary_language;`,
       [
         hotelDetails.propertyID,
         hotelDetails.propertyName,
-        hotelDetails.propertyAddress.propertyCity, // Correct path
-        hotelDetails.propertyAddress.propertyAddress1, // Correct path
-        hotelDetails.propertyAddress.propertyCountry, // Correct path
-        hotelDetails.propertyCurrency.currencyCode, // Correct path
+        hotelDetails.propertyAddress.propertyCity,
+        hotelDetails.propertyAddress.propertyAddress1,
+        hotelDetails.propertyAddress.propertyCountry,
+        hotelDetails.propertyCurrency.currencyCode,
+        hotelDetails.propertyType, // <-- Newly Added
+        hotelDetails.propertyAddress.propertyZip, // <-- Newly Added
+        hotelDetails.propertyAddress.propertyLatitude, // <-- Newly Added
+        hotelDetails.propertyAddress.propertyLongitude, // <-- Newly Added
+        hotelDetails.propertyPrimaryLanguage, // <-- Newly Added
       ]
     );
 
