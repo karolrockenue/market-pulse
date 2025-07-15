@@ -201,14 +201,13 @@ export default {
   // chart and chartUpdateTimeout have been removed.
 
   // --- INITIALIZATION ---
-  // --- INITIALIZATION ---
   init() {
     this.initializeDashboard();
 
     // Listen for the 'property-changed' event from the shared header
     window.addEventListener("property-changed", (event) => {
-      // When the event is heard, call a handler to update the dashboard
-      this.handlePropertyChange(event.detail.propertyId);
+      // When the event is heard, pass the entire detail object to the handler.
+      this.handlePropertyChange(event.detail);
     });
   },
 
@@ -450,19 +449,20 @@ export default {
       propertyName: this.currentPropertyName,
     });
   },
-  handlePropertyChange(propertyId) {
+  // This function now receives both the ID and the name directly from the event.
+  handlePropertyChange(eventDetail) {
+    const { propertyId, propertyName } = eventDetail;
+
     // If there's no ID or the ID hasn't changed, do nothing.
     if (!propertyId || this.currentPropertyId === propertyId) {
       return;
     }
-    // Set the dashboard's current property ID.
+
+    // Set the dashboard's state directly from the event data.
     this.currentPropertyId = propertyId;
+    this.currentPropertyName = propertyName; // No more lookups needed!
     this.isLoading.properties = false;
     this.hasProperties = true;
-
-    // Set the dashboard's property name (the header already knows its own).
-    const property = this.properties.find((p) => p.property_id === propertyId);
-    if (property) this.currentPropertyName = property.property_name;
 
     // Trigger a full data refresh for the new property.
     this.setPreset("current-month");

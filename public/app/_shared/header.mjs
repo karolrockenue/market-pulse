@@ -136,10 +136,14 @@ export default function pageHeader() {
       }
     },
 
+    // This function now sends both the ID and the name of the selected property.
     dispatchPropertyChangeEvent() {
       window.dispatchEvent(
         new CustomEvent("property-changed", {
-          detail: { propertyId: this.currentPropertyId },
+          detail: {
+            propertyId: this.currentPropertyId,
+            propertyName: this.currentPropertyName, // Add the name to the event
+          },
         })
       );
     },
