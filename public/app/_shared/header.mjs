@@ -70,7 +70,7 @@ export default function pageHeader() {
       }
     },
 
-    // --- THIS FUNCTION HAS BEEN UPDATED ---
+    // --- THIS FUNCTION HAS BEEN UopPDATED ---
     async fetchLastRefreshTime() {
       try {
         const response = await fetch("/api/last-refresh-time");
