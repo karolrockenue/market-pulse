@@ -1,45 +1,16 @@
-// /api/routes/auth.js
+// /api/routes/auth.router.js
 const express = require("express");
 const router = express.Router();
 const fetch = require("node-fetch");
 const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
-
-// Import shared utilities
 const pgPool = require("../utils/db");
+const { requireUserApi } = require("../utils/middleware");
 
-// --- NEW: Initialize the SendGrid library with the API key ---
-sgMail.setApiKey(process.env.SENDGRID_API_KEY); // <<< ADD THIS LINE
-
-// --- HELPER FUNCTIONS (Specific to Auth) ---
-// This function is now co-located with the routes that use it.
-async function getCloudbedsAccessToken(refreshToken) {
-  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-  if (!refreshToken) {
-    throw new Error("Cannot get access token without a refresh token.");
-  }
-  const params = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: CLOUDBEDS_CLIENT_ID,
-    client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: refreshToken,
-  });
-  const response = await fetch(
-    "https://hotels.cloudbeds.com/api/v1.1/access_token",
-    { method: "POST", body: params }
-  );
-  const tokenData = await response.json();
-  if (!tokenData.access_token) {
-    console.error("Token refresh failed for a user:", tokenData);
-    return null;
-  }
-  return tokenData.access_token;
-}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // --- AUTHENTICATION ENDPOINTS ---
-// Note: app.post is now router.post, app.get is now router.get
 
-// This is the correct and complete /logout route
 router.post("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -48,66 +19,9 @@ router.post("/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-    // This line tells the browser to delete the session cookie.
     res.clearCookie("connect.sid", { path: "/" });
     res.status(200).json({ message: "Logged out successfully" });
   });
-});
-
-// /api/routes/auth.router.js
-
-// Add this new route.
-router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
-  const { propertyId } = req.query;
-  if (!propertyId) {
-    return res.status(400).send("Property ID is required.");
-  }
-  try {
-    // Find the specific credentials for this property, linked to the logged-in user.
-    const credsResult = await pgPool.query(
-      `SELECT override_client_id FROM user_properties WHERE user_id = $1 AND property_id = $2`,
-      [req.session.userId, propertyId]
-    );
-
-    if (
-      credsResult.rows.length === 0 ||
-      !credsResult.rows[0].override_client_id
-    ) {
-      return res
-        .status(404)
-        .send(
-          "Credentials for this property not found or you do not have access."
-        );
-    }
-    const clientId = credsResult.rows[0].override_client_id;
-
-    const redirectUri =
-      process.env.VERCEL_ENV === "production"
-        ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
-        : process.env.CLOUDBEDS_REDIRECT_URI;
-
-    // We use the 'state' parameter to pass the propertyId through the OAuth flow.
-    const state = propertyId;
-
-    const scopes =
-      "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: scopes,
-      state: state, // Pass the propertyId in the state.
-    });
-
-    const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
-    res.redirect(authorizationUrl);
-  } catch (error) {
-    console.error("Error starting pilot connection:", error);
-    res
-      .status(500)
-      .send("An error occurred while starting the connection process.");
-  }
 });
 
 router.post("/login", async (req, res) => {
@@ -130,12 +44,15 @@ router.post("/login", async (req, res) => {
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
       [token, user.user_id, expires_at]
     );
+
     const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
     const msg = {
       to: user.email,
-      from: "login@market-pulse.io",
+      from: { name: "Market Pulse", email: "login@market-pulse.io" },
       subject: "Your Market Pulse Login Link",
-      html: `<p>Hello ${user.first_name},</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}">Log in to Market Pulse</a></p>`,
+      html: `<p>Hello ${
+        user.first_name || "there"
+      },</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}" style="font-size: 16px; font-weight: bold; padding: 10px 15px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px;">Log in to Market Pulse</a></p>`,
     };
     await sgMail.send(msg);
     res.status(200).json({ success: true, message: "Login link sent." });
@@ -163,10 +80,9 @@ router.get("/magic-link-callback", async (req, res) => {
         );
     }
     const validToken = tokenResult.rows[0];
-    const internalUserId = validToken.user_id;
     const userResult = await pgPool.query(
-      "SELECT cloudbeds_user_id, is_admin FROM users WHERE user_id = $1",
-      [internalUserId]
+      "SELECT cloudbeds_user_id, is_admin, auth_mode FROM users WHERE user_id = $1",
+      [validToken.user_id]
     );
     if (userResult.rows.length === 0) {
       return res.status(404).send("Could not find a matching user account.");
@@ -174,29 +90,23 @@ router.get("/magic-link-callback", async (req, res) => {
     const user = userResult.rows[0];
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
-    // --- ADD THESE DEBUG LINES ---
-    console.log(
-      `[DEBUG SESSION WRITE] Setting session for cloudbeds_user_id: ${req.session.userId}`
-    );
-    console.log(
-      `[DEBUG SESSION WRITE] isAdmin flag is: ${req.session.isAdmin}`
-    );
-    // --- END DEBUG LINES ---
 
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);
 
-    // --- THIS IS THE FIX ---
-    // The res.redirect() call is now inside the callback function,
-    // ensuring it only runs after the session is successfully saved.
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
-      // This redirect now happens only AFTER the save is complete.
-      res.redirect("/app/");
+      // If the user is a pilot user, send them to the admin panel to connect properties.
+      // Otherwise, send them to the main dashboard.
+      if (user.auth_mode === "manual") {
+        res.redirect("/admin/");
+      } else {
+        res.redirect("/app/");
+      }
     });
   } catch (error) {
     console.error("Error during magic link callback:", error);
@@ -233,28 +143,18 @@ router.get("/session-info", async (req, res) => {
   }
 });
 
+// This route starts the standard OAuth flow for new users from the main website.
 router.get("/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
-  const isProduction = process.env.VERCEL_ENV === "production";
-  const redirectUri = isProduction
-    ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
-    : process.env.CLOUDBEDS_REDIRECT_URI;
+  const redirectUri =
+    process.env.VERCEL_ENV === "production"
+      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+      : process.env.CLOUDBEDS_REDIRECT_URI;
   if (!CLOUDBEDS_CLIENT_ID || !redirectUri) {
     return res.status(500).send("Server configuration error.");
   }
-  const scopes = [
-    "read:user",
-    "read:hotel",
-    "read:guest",
-    "read:reservation",
-    "read:room",
-    "read:rate",
-    "read:currency",
-    "read:taxesAndFees",
-    "read:dataInsightsGuests",
-    "read:dataInsightsOccupancy",
-    "read:dataInsightsReservations",
-  ].join(" ");
+  const scopes =
+    "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
   const params = new URLSearchParams({
     client_id: CLOUDBEDS_CLIENT_ID,
     redirect_uri: redirectUri,
@@ -265,16 +165,56 @@ router.get("/cloudbeds", (req, res) => {
   res.redirect(authorizationUrl);
 });
 
-router.get("/cloudbeds/callback", async (req, res) => {
-  const { code } = req.query;
-  if (!code) {
-    return res.status(400).send("Error: No authorization code provided.");
+// This new route starts the connection flow for a specific pilot property.
+router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
+  const { propertyId } = req.query;
+  if (!propertyId) {
+    return res.status(400).send("Property ID is required.");
   }
-  // /api/routes/auth.router.js
+  try {
+    const credsResult = await pgPool.query(
+      `SELECT override_client_id FROM user_properties WHERE user_id = $1 AND property_id = $2`,
+      [req.session.userId, propertyId]
+    );
+    if (
+      credsResult.rows.length === 0 ||
+      !credsResult.rows[0].override_client_id
+    ) {
+      return res
+        .status(404)
+        .send(
+          "Credentials for this property not found or you do not have access."
+        );
+    }
+    const clientId = credsResult.rows[0].override_client_id;
+    const redirectUri =
+      process.env.VERCEL_ENV === "production"
+        ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+        : process.env.CLOUDBEDS_REDIRECT_URI;
+    const state = propertyId; // Pass the propertyId in the state to identify it in the callback
+    const scopes =
+      "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: scopes,
+      state: state,
+    });
+    const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error("Error starting pilot connection:", error);
+    res
+      .status(500)
+      .send("An error occurred while starting the connection process.");
+  }
+});
 
-// Replace the try...catch block in the /cloudbeds/callback route.
-try {
-    const { code, state } = req.query; // 'state' will contain our propertyId for pilot users.
+// This single callback handles both standard OAuth and pilot property connections.
+router.get("/cloudbeds/callback", async (req, res) => {
+  try {
+    const { code, state } = req.query;
     if (!code) {
       return res.status(400).send("Error: No authorization code provided.");
     }
@@ -283,24 +223,28 @@ try {
     let clientSecret = process.env.CLOUDBEDS_CLIENT_SECRET;
     const isPilotFlow = !!state;
 
-    // If it's a pilot flow (state exists), get the specific credentials from the DB.
     if (isPilotFlow) {
-        const credsResult = await pgPool.query(
-            'SELECT override_client_id, override_client_secret FROM user_properties WHERE property_id = $1',
-            [state]
+      const credsResult = await pgPool.query(
+        "SELECT override_client_id, override_client_secret FROM user_properties WHERE property_id = $1",
+        [state]
+      );
+      if (
+        credsResult.rows.length > 0 &&
+        credsResult.rows[0].override_client_id
+      ) {
+        clientId = credsResult.rows[0].override_client_id;
+        clientSecret = credsResult.rows[0].override_client_secret;
+      } else {
+        throw new Error(
+          `Could not find pilot credentials for property ID: ${state}`
         );
-        if (credsResult.rows.length > 0 && credsResult.rows[0].override_client_id) {
-            clientId = credsResult.rows[0].override_client_id;
-            clientSecret = credsResult.rows[0].override_client_secret;
-        } else {
-            throw new Error(`Could not find pilot credentials for property ID: ${state}`);
-        }
+      }
     }
 
-    const redirectUri = process.env.VERCEL_ENV === "production"
+    const redirectUri =
+      process.env.VERCEL_ENV === "production"
         ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
         : process.env.CLOUDBEDS_REDIRECT_URI;
-
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: clientId,
@@ -308,32 +252,38 @@ try {
       redirect_uri: redirectUri,
       code: code,
     });
-
-    const tokenResponse = await fetch("https://hotels.cloudbeds.com/api/v1.1/access_token", { method: "POST", body: tokenParams });
+    const tokenResponse = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      { method: "POST", body: tokenParams }
+    );
     const tokenData = await tokenResponse.json();
     if (!tokenData.access_token) {
-      throw new Error(`Failed to get access token from Cloudbeds. Response: ${JSON.stringify(tokenData)}`);
+      throw new Error(
+        `Failed to get access token from Cloudbeds. Response: ${JSON.stringify(
+          tokenData
+        )}`
+      );
     }
-    
+
     const { access_token, refresh_token, expires_in } = tokenData;
     const tokenExpiry = new Date(Date.now() + expires_in * 1000);
 
-    // If it's a pilot flow, update the specific property record and redirect to the admin panel.
     if (isPilotFlow) {
-        const propertyId = state;
-        await pgPool.query(
-            `UPDATE user_properties 
-             SET access_token = $1, refresh_token = $2, token_expiry = $3, status = 'connected'
-             WHERE property_id = $4`,
-            [access_token, refresh_token, tokenExpiry, propertyId]
-        );
-        return res.redirect('/admin/');
+      const propertyId = state;
+      await pgPool.query(
+        `UPDATE user_properties SET access_token = $1, refresh_token = $2, token_expiry = $3, status = 'connected' WHERE property_id = $4`,
+        [access_token, refresh_token, tokenExpiry, propertyId]
+      );
+      return res.redirect("/admin/");
     }
 
-    // --- Standard OAuth Flow Logic (Unchanged) ---
-    const userInfoResponse = await fetch("https://api.cloudbeds.com/api/v1.3/userinfo", { headers: { Authorization: `Bearer ${access_token}` } });
+    // --- Standard OAuth Flow Logic ---
+    const userInfoResponse = await fetch(
+      "https://api.cloudbeds.com/api/v1.3/userinfo",
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
     const userInfo = await userInfoResponse.json();
-    
+
     const userQuery = `
       INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, token_expiry, status, auth_mode)
       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'oauth')
@@ -341,32 +291,54 @@ try {
           email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
           access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, token_expiry = EXCLUDED.token_expiry, status = 'active', auth_mode = 'oauth';
     `;
-    await pgPool.query(userQuery, [userInfo.user_id, userInfo.email, userInfo.first_name, userInfo.last_name, access_token, refresh_token, tokenExpiry]);
+    await pgPool.query(userQuery, [
+      userInfo.user_id,
+      userInfo.email,
+      userInfo.first_name,
+      userInfo.last_name,
+      access_token,
+      refresh_token,
+      tokenExpiry,
+    ]);
 
-    const propertyInfoResponse = await fetch("https://api.cloudbeds.com/datainsights/v1.1/me/properties", { headers: { Authorization: `Bearer ${access_token}` } });
+    const propertyInfoResponse = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
     const propertyInfo = await propertyInfoResponse.json();
-    const properties = Array.isArray(propertyInfo) ? propertyInfo : [propertyInfo];
+    const properties = Array.isArray(propertyInfo)
+      ? propertyInfo
+      : [propertyInfo];
 
     for (const property of properties) {
       if (property && property.id) {
-        await pgPool.query(`INSERT INTO hotels (hotel_id, property_name, city) VALUES ($1, $2, $3) ON CONFLICT (hotel_id) DO NOTHING;`, [property.id, property.name, property.city]);
-        await pgPool.query(`INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected') ON CONFLICT (user_id, property_id) DO UPDATE SET status = 'connected';`, [userInfo.user_id, property.id]);
+        await pgPool.query(
+          `INSERT INTO hotels (hotel_id, property_name, city) VALUES ($1, $2, $3) ON CONFLICT (hotel_id) DO NOTHING;`,
+          [property.id, property.name, property.city]
+        );
+        await pgPool.query(
+          `INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected') ON CONFLICT (user_id, property_id) DO UPDATE SET status = 'connected';`,
+          [userInfo.user_id, property.id]
+        );
       }
     }
 
     req.session.userId = userInfo.user_id;
     req.session.isAdmin = userInfo.is_admin || false;
     req.session.save((err) => {
-      if (err) { return res.status(500).send("An error occurred during authentication session save."); }
+      if (err) {
+        return res
+          .status(500)
+          .send("An error occurred during authentication session save.");
+      }
       res.redirect("/app/");
     });
-
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error);
-    res.status(500).send(`An error occurred during authentication: ${error.message}`);
+    res
+      .status(500)
+      .send(`An error occurred during authentication: ${error.message}`);
   }
 });
-});
 
-// Export the router so server.js can use it.
 module.exports = router;
