@@ -46,7 +46,8 @@ async function requireUserApi(req, res, next) {
         // We still call next() at the end, so we just let this block pass.
       } else {
         // For all other data-intensive endpoints, enforce the header requirement.
-        const propertyId = req.headers["x-property-id"];
+        // --- FIX: Look for the property ID in the query string, not the header ---
+        const propertyId = req.query.propertyId;
         if (!propertyId) {
           return res.status(400).json({
             error: "An X-Property-ID header is required for this request.",
