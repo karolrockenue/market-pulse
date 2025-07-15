@@ -28,11 +28,9 @@ async function requireUserApi(req, res, next) {
       const propertyId = req.headers["x-property-id"];
       if (!propertyId && req.path !== "/my-properties") {
         // Allow /my-properties to pass without a header
-        return res
-          .status(400)
-          .json({
-            error: "X-Property-ID header is required for this request.",
-          });
+        return res.status(400).json({
+          error: "X-Property-ID header is required for this request.",
+        });
       }
 
       if (propertyId) {
@@ -52,11 +50,9 @@ async function requireUserApi(req, res, next) {
             credsResult.rows.length === 0 ||
             !credsResult.rows[0].override_client_id
           ) {
-            return res
-              .status(403)
-              .json({
-                error: "Manual credentials not configured for this property.",
-              });
+            return res.status(403).json({
+              error: "Manual credentials not configured for this property.",
+            });
           }
 
           const { override_client_id, override_client_secret } =
@@ -106,14 +102,40 @@ async function requireUserApi(req, res, next) {
           );
           if (properties) {
             const client = await pgPool.connect();
+            // Find this block: if (user.needs_property_sync) { ... }
+            // And replace the try...catch...finally inside it with this new version.
             try {
               await client.query("BEGIN");
               for (const prop of properties) {
+                // Step 1: NEW - Ensure the hotel exists in our main hotels table.
+                // We use our new utility function to get the hotel's details.
+                const hotelDetails = await cloudbeds.getHotelDetails(
+                  tempTokenForSync,
+                  prop.id
+                );
+                if (hotelDetails) {
+                  // If we got details, insert them into the central 'hotels' table.
+                  // ON CONFLICT ensures we don't create duplicates.
+                  await client.query(
+                    `INSERT INTO hotels (hotel_id, property_name, city, star_rating)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (hotel_id) DO NOTHING`,
+                    [
+                      hotelDetails.propertyID,
+                      hotelDetails.propertyName,
+                      hotelDetails.propertyCity,
+                      2,
+                    ] // We assume a default star rating of 2 for now.
+                  );
+                }
+
+                // Step 2: Link the property to the user (this part is unchanged).
                 await client.query(
                   "INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING",
                   [req.user.cloudbedsId, prop.id]
                 );
               }
+              // Step 3: Mark the sync as complete for this user (unchanged).
               await client.query(
                 "UPDATE users SET needs_property_sync = false WHERE user_id = $1",
                 [req.user.internalId]
@@ -121,7 +143,11 @@ async function requireUserApi(req, res, next) {
               await client.query("COMMIT");
             } catch (e) {
               await client.query("ROLLBACK");
-              console.error("Property sync for manual user failed:", e);
+              // Updated error message for better debugging.
+              console.error(
+                "Property sync and registration for manual user failed:",
+                e
+              );
             } finally {
               client.release();
             }

@@ -82,9 +82,23 @@ async function getPropertiesForUser(accessToken) {
   }
   return Array.isArray(properties) ? properties : [properties];
 }
+// Add this new function to the file
+async function getHotelDetails(accessToken, propertyId) {
+  const url = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    console.error(`Failed to fetch details for property ${propertyId}:`, data);
+    return null;
+  }
+  return data.data;
+}
 
 module.exports = {
   getOAuthAccessToken,
   getManualAccessToken,
   getPropertiesForUser,
+  getHotelDetails,
 };
