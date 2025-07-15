@@ -33,7 +33,18 @@ async function requireUserApi(req, res, next) {
       console.log("[DEBUG 3] Manual auth mode detected.");
       const propertyId = req.headers["x-property-id"];
 
-      if (!propertyId && req.path !== "/my-properties") {
+      // api/utils/middleware.js
+
+      // ...
+
+      // This conditional check now includes an exception for the '/api/auth/connect-pilot-property'
+      // route. This route initiates the OAuth flow and therefore will not have the
+      // X-Property-ID header, which is only needed for subsequent API calls.
+      if (
+        !propertyId &&
+        req.path !== "/my-properties" &&
+        req.path !== "/api/auth/connect-pilot-property"
+      ) {
         console.log(
           `[DEBUG FAIL] Manual user on path '${req.path}' requires X-Property-ID header.`
         );
