@@ -130,11 +130,16 @@ router.get("/magic-link-callback", async (req, res) => {
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);
+
+    // --- THIS IS THE FIX ---
+    // The res.redirect() call is now inside the callback function,
+    // ensuring it only runs after the session is successfully saved.
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
+      // This redirect now happens only AFTER the save is complete.
       res.redirect("/app/");
     });
   } catch (error) {
