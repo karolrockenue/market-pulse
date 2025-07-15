@@ -1,15 +1,14 @@
-// /api/utils/middleware.js
+// /api/utils/middleware.js (with extensive debugging)
 const pgPool = require("./db");
 const cloudbeds = require("./cloudbeds");
 
-/**
- * NEW: API Middleware to protect routes and manage access tokens.
- * This now handles both OAuth and Manual "pilot" auth users.
- */
 async function requireUserApi(req, res, next) {
+  console.log(`[DEBUG 0] Middleware triggered for path: ${req.path}`);
   if (!req.session || !req.session.userId) {
+    console.log("[DEBUG FAIL] No session or userId found.");
     return res.status(401).json({ error: "Authentication required." });
   }
+  console.log(`[DEBUG 1] Session found for userId: ${req.session.userId}`);
 
   try {
     const userResult = await pgPool.query(
@@ -18,21 +17,133 @@ async function requireUserApi(req, res, next) {
     );
 
     if (userResult.rows.length === 0) {
+      console.log(
+        `[DEBUG FAIL] User not found in DB for cloudbeds_user_id: ${req.session.userId}`
+      );
       return res.status(401).json({ error: "User not found." });
     }
 
     const user = userResult.rows[0];
     req.user = { internalId: user.user_id, cloudbedsId: req.session.userId };
+    console.log(
+      `[DEBUG 2] User found. Mode: ${user.auth_mode}, Needs Sync: ${user.needs_property_sync}`
+    );
 
     if (user.auth_mode === "manual") {
+      console.log("[DEBUG 3] Manual auth mode detected.");
       const propertyId = req.headers["x-property-id"];
+
       if (!propertyId && req.path !== "/my-properties") {
-        // Allow /my-properties to pass without a header
-        return res.status(400).json({
-          error: "X-Property-ID header is required for this request.",
-        });
+        console.log(
+          `[DEBUG FAIL] Manual user on path '${req.path}' requires X-Property-ID header.`
+        );
+        return res
+          .status(400)
+          .json({
+            error: "X-Property-ID header is required for this request.",
+          });
       }
 
+      if (user.needs_property_sync) {
+        console.log(
+          "[DEBUG 4] 'needs_property_sync' is TRUE. Starting one-time sync."
+        );
+        const client = await pgPool.connect();
+        try {
+          console.log(
+            "[DEBUG 5] Fetching first available credential to get a temporary token."
+          );
+          const credsResult = await client.query(
+            "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND override_client_id IS NOT NULL LIMIT 1",
+            [req.user.cloudbedsId]
+          );
+
+          if (credsResult.rows.length === 0) {
+            throw new Error(
+              "Could not find any credentials to perform initial property sync."
+            );
+          }
+          const { override_client_id, override_client_secret } =
+            credsResult.rows[0];
+          console.log(
+            "[DEBUG 6] Credentials found. Fetching temporary access token..."
+          );
+
+          const tempTokenForSync = await cloudbeds.getManualAccessToken(
+            override_client_id,
+            override_client_secret
+          );
+          if (!tempTokenForSync || !tempTokenForSync.access_token) {
+            throw new Error("Failed to get temporary access token for sync.");
+          }
+          console.log(
+            "[DEBUG 7] Temporary token acquired. Fetching property list from Cloudbeds..."
+          );
+
+          const properties = await cloudbeds.getPropertiesForUser(
+            tempTokenForSync.access_token
+          );
+          if (!properties) {
+            throw new Error(
+              "Failed to fetch property list from Cloudbeds during sync."
+            );
+          }
+          console.log(
+            `[DEBUG 8] Found ${properties.length} properties. Starting DB transaction.`
+          );
+
+          await client.query("BEGIN");
+          for (const prop of properties) {
+            console.log(`[DEBUG 9] Processing property ID: ${prop.id}`);
+            const hotelDetails = await cloudbeds.getHotelDetails(
+              tempTokenForSync.access_token,
+              prop.id
+            );
+            if (hotelDetails) {
+              console.log(
+                `[DEBUG 10] Fetched details for ${hotelDetails.propertyName}. Inserting into 'hotels' table.`
+              );
+              await client.query(
+                `INSERT INTO hotels (hotel_id, property_name, city, star_rating) VALUES ($1, $2, $3, $4) ON CONFLICT (hotel_id) DO NOTHING`,
+                [
+                  hotelDetails.propertyID,
+                  hotelDetails.propertyName,
+                  hotelDetails.propertyCity,
+                  2,
+                ]
+              );
+            }
+            console.log(
+              `[DEBUG 11] Linking property ${prop.id} to user ${req.user.cloudbedsId}.`
+            );
+            await client.query(
+              "INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING",
+              [req.user.cloudbedsId, prop.id]
+            );
+          }
+          console.log(
+            "[DEBUG 12] All properties processed. Updating user 'needs_property_sync' flag to false."
+          );
+          await client.query(
+            "UPDATE users SET needs_property_sync = false WHERE user_id = $1",
+            [req.user.internalId]
+          );
+          await client.query("COMMIT");
+          console.log(
+            "[DEBUG 13] DB transaction committed successfully. Sync complete."
+          );
+        } catch (e) {
+          console.error(
+            "[DEBUG FAIL] Error during property sync transaction:",
+            e
+          );
+          await client.query("ROLLBACK");
+          throw e; // Re-throw the error to be caught by the main catch block
+        } finally {
+          client.release();
+        }
+      }
+      // This part handles normal API calls after the initial sync is done.
       if (propertyId) {
         if (
           req.session.manualTokens &&
@@ -45,29 +156,27 @@ async function requireUserApi(req, res, next) {
             "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND property_id = $2",
             [req.user.cloudbedsId, propertyId]
           );
-
           if (
             credsResult.rows.length === 0 ||
             !credsResult.rows[0].override_client_id
           ) {
-            return res.status(403).json({
-              error: "Manual credentials not configured for this property.",
-            });
+            return res
+              .status(403)
+              .json({
+                error: "Manual credentials not configured for this property.",
+              });
           }
-
           const { override_client_id, override_client_secret } =
             credsResult.rows[0];
           const tokenData = await cloudbeds.getManualAccessToken(
             override_client_id,
             override_client_secret
           );
-
           if (!tokenData || !tokenData.access_token) {
             return res
               .status(503)
               .json({ error: "Could not authenticate with Cloudbeds." });
           }
-
           if (!req.session.manualTokens) req.session.manualTokens = {};
           req.session.manualTokens[propertyId] = {
             token: tokenData.access_token,
@@ -76,88 +185,16 @@ async function requireUserApi(req, res, next) {
           req.user.accessToken = tokenData.access_token;
         }
       }
-
-      if (user.needs_property_sync) {
-        const tempTokenForSync =
-          req.user.accessToken ||
-          (
-            await cloudbeds.getManualAccessToken(
-              (
-                await pgPool.query(
-                  "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND override_client_id IS NOT NULL LIMIT 1",
-                  [req.user.cloudbedsId]
-                )
-              ).rows[0].override_client_id,
-              (
-                await pgPool.query(
-                  "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND override_client_id IS NOT NULL LIMIT 1",
-                  [req.user.cloudbedsId]
-                )
-              ).rows[0].override_client_secret
-            )
-          )?.access_token;
-        if (tempTokenForSync) {
-          const properties = await cloudbeds.getPropertiesForUser(
-            tempTokenForSync
-          );
-          if (properties) {
-            const client = await pgPool.connect();
-            // Find this block: if (user.needs_property_sync) { ... }
-            // And replace the try...catch...finally inside it with this new version.
-            try {
-              await client.query("BEGIN");
-              for (const prop of properties) {
-                // Step 1: NEW - Ensure the hotel exists in our main hotels table.
-                // We use our new utility function to get the hotel's details.
-                const hotelDetails = await cloudbeds.getHotelDetails(
-                  tempTokenForSync,
-                  prop.id
-                );
-                if (hotelDetails) {
-                  // If we got details, insert them into the central 'hotels' table.
-                  // ON CONFLICT ensures we don't create duplicates.
-                  await client.query(
-                    `INSERT INTO hotels (hotel_id, property_name, city, star_rating)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (hotel_id) DO NOTHING`,
-                    [
-                      hotelDetails.propertyID,
-                      hotelDetails.propertyName,
-                      hotelDetails.propertyCity,
-                      2,
-                    ] // We assume a default star rating of 2 for now.
-                  );
-                }
-
-                // Step 2: Link the property to the user (this part is unchanged).
-                await client.query(
-                  "INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING",
-                  [req.user.cloudbedsId, prop.id]
-                );
-              }
-              // Step 3: Mark the sync as complete for this user (unchanged).
-              await client.query(
-                "UPDATE users SET needs_property_sync = false WHERE user_id = $1",
-                [req.user.internalId]
-              );
-              await client.query("COMMIT");
-            } catch (e) {
-              await client.query("ROLLBACK");
-              // Updated error message for better debugging.
-              console.error(
-                "Property sync and registration for manual user failed:",
-                e
-              );
-            } finally {
-              client.release();
-            }
-          }
-        }
-      }
     }
+    console.log(
+      `[DEBUG FINAL] Middleware success for path: ${req.path}. Calling next().`
+    );
     return next();
   } catch (error) {
-    console.error("CRITICAL ERROR in requireUserApi middleware:", error);
+    console.error(
+      `[CRITICAL ERROR] Middleware failed for path ${req.path}:`,
+      error
+    );
     return res
       .status(500)
       .json({ error: "Internal server error during authentication." });
@@ -165,7 +202,6 @@ async function requireUserApi(req, res, next) {
 }
 
 // --- EXISTING UNCHANGED MIDDLEWARE ---
-
 const requireAdminApi = (req, res, next) => {
   if (!req.session.userId) {
     return res
