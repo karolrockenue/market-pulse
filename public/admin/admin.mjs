@@ -170,6 +170,23 @@ function initializeAdminPanel() {
         let actionButton = `<span class="font-semibold text-gray-500">✓ Enabled</span>`; // Default text
         if (prop.status === "pending") {
           actionButton = `<button data-property-id="${prop.property_id}" data-user-id="${prop.user_id}" class="control-btn connect-btn">Activate</button>`;
+          // /public/admin/admin.mjs -> inside the forEach loop in fetchAndRenderPilotStatus()
+
+          // This block was missing. It builds the actual visible cells for the table row.
+          row.innerHTML = `
+    <td class="px-4 py-3 font-medium">${
+      prop.property_name || "(Activation Pending)"
+    }</td>
+    <td class="px-4 py-3">${prop.property_id}</td>
+    <td class="px-4 py-3">
+        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+            ${statusText}
+        </span>
+    </td>
+    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+        ${actionButton}
+    </td>
+`;
         } else if (prop.status === "connected") {
           actionButton = `<button data-property-id="${prop.property_id}" class="control-btn enable-btn text-green-600 border-green-400 hover:bg-green-50">Enable App</button>`;
         }
