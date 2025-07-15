@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
+const { syncHotelDetailsToDb } = require("../utils/cloudbeds");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -332,12 +333,14 @@ router.get("/cloudbeds/callback", async (req, res) => {
       ? propertyInfo
       : [propertyInfo];
 
+    // api/routes/auth.router.js
+
     for (const property of properties) {
       if (property && property.id) {
-        await pgPool.query(
-          `INSERT INTO hotels (hotel_id, property_name, city) VALUES ($1, $2, $3) ON CONFLICT (hotel_id) DO NOTHING;`,
-          [property.id, property.name, property.city]
-        );
+        // This single function call now replaces the old, basic INSERT query.
+        await syncHotelDetailsToDb(access_token, property.id);
+
+        // This part remains the same - it links the user to the property.
         await pgPool.query(
           `INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected') ON CONFLICT (user_id, property_id) DO UPDATE SET status = 'connected';`,
           [userInfo.user_id, property.id]

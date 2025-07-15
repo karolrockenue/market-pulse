@@ -2,6 +2,7 @@
 // A central place for all Cloudbeds API interactions.
 
 const fetch = require("node-fetch");
+const pgPool = require("./db");
 
 /**
  * Fetches a new Cloudbeds access token using a refresh token.
@@ -75,10 +76,70 @@ async function getHotelDetails(accessToken, propertyId) {
   }
   return data.data;
 }
+// api/utils/cloudbeds.js
+
+/**
+ * Fetches details for a single hotel from the Cloudbeds API and saves them
+ * to our local database. This is the unified function for all onboarding.
+ * @param {string} accessToken - A valid Cloudbeds access token or API key.
+ * @param {string} propertyId - The ID of the property to sync.
+ * @returns {Promise<void>}
+ */
+async function syncHotelDetailsToDb(accessToken, propertyId) {
+  console.log(
+    `[Sync Function] Starting detail sync for property ${propertyId}...`
+  );
+
+  // 1. Fetch the details from Cloudbeds API
+  const hotelDetails = await getHotelDetails(accessToken, propertyId);
+  if (!hotelDetails) {
+    console.error(
+      `[Sync Function] Could not fetch details for property ${propertyId}. Aborting sync for this property.`
+    );
+    return;
+  }
+
+  // 2. Save the comprehensive details to our 'hotels' table.
+  // This is the query we just perfected.
+  await pgPool.query(
+    `INSERT INTO hotels (
+       hotel_id, property_name, city, address_1, country, currency_code,
+       property_type, zip_postal_code, latitude, longitude, primary_language
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (hotel_id) DO UPDATE SET
+       property_name = EXCLUDED.property_name,
+       city = EXCLUDED.city,
+       address_1 = EXCLUDED.address_1,
+       country = EXCLUDED.country,
+       currency_code = EXCLUDED.currency_code,
+       property_type = EXCLUDED.property_type,
+       zip_postal_code = EXCLUDED.zip_postal_code,
+       latitude = EXCLUDED.latitude,
+       longitude = EXCLUDED.longitude,
+       primary_language = EXCLUDED.primary_language;`,
+    [
+      hotelDetails.propertyID,
+      hotelDetails.propertyName,
+      hotelDetails.propertyAddress.propertyCity,
+      hotelDetails.propertyAddress.propertyAddress1,
+      hotelDetails.propertyAddress.propertyCountry,
+      hotelDetails.propertyCurrency.currencyCode,
+      hotelDetails.propertyType,
+      hotelDetails.propertyAddress.propertyZip,
+      hotelDetails.propertyAddress.propertyLatitude,
+      hotelDetails.propertyAddress.propertyLongitude,
+      hotelDetails.propertyPrimaryLanguage,
+    ]
+  );
+  console.log(
+    `[Sync Function] Successfully synced details for property ${propertyId}.`
+  );
+}
 
 module.exports = {
   getOAuthAccessToken,
-
   getPropertiesForUser,
   getHotelDetails,
+  syncHotelDetailsToDb,
 };
