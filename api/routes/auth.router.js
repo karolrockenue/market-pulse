@@ -112,11 +112,20 @@ router.get("/magic-link-callback", async (req, res) => {
 
     // This is the OLD, STABLE redirect logic. We are reverting to this.
     // It waits for the session to save, then performs a standard server-side redirect.
+    // auth.router.js
+
+    // This is the OLD, STABLE redirect logic. We are reverting to this.
+    // It waits for the session to save, then performs a standard server-side redirect.
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
+      // --- BREADCRUMB 1: LOG THE SESSION RIGHT BEFORE REDIRECT ---
+      console.log(
+        `[BREADCRUMB 1 - auth.router.js] Session saved successfully. Redirecting. Session content:`,
+        req.session
+      );
       // The complex destination logic is removed. For now, all successful logins
       // will go to the main application dashboard, which restores functionality.
       res.redirect("/app/");

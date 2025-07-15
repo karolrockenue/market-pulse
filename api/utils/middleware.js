@@ -88,16 +88,24 @@ const requireAdminApi = (req, res, next) => {
   next();
 };
 
+// middleware.js
+
 const requirePageLogin = (req, res, next) => {
-  // --- ADD THESE DEBUG LINES ---
-  console.log(`[DEBUG SESSION READ] Checking page login for path: ${req.path}`);
+  // --- BREADCRUMB 2: LOG THE INCOMING SESSION STATE ---
   console.log(
-    `[DEBUG SESSION READ] Found session userId: ${req.session.userId}`
+    `[BREADCRUMB 2 - middleware.js] requirePageLogin triggered for path: ${req.path}. Session content:`,
+    req.session
   );
-  // --- END DEBUG LINES ---
+
   if (!req.session.userId) {
+    console.error(
+      `[LOGIN FAILURE] Session userId not found. Redirecting to /signin.`
+    );
     return res.redirect("/signin");
   }
+  console.log(
+    `[LOGIN SUCCESS] Session valid for userId: ${req.session.userId}. Allowing access.`
+  );
   next();
 };
 
