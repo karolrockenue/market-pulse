@@ -716,7 +716,7 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
    ON CONFLICT (hotel_id) DO UPDATE SET
      property_name = EXCLUDED.property_name,
      city = EXCLUDED.city,
-  address_1 = EXCLUDED.address1,
+  address_1 = EXCLUDED.address_1,
      country = EXCLUDED.country,
      currency_code = EXCLUDED.currency_code;`,
       [
