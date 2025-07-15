@@ -740,4 +740,46 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     client.release();
   }
 });
+
+// api/routes/admin.router.js
+
+// This new route will perform the one-time "app enabling" handshake.
+router.post("/enable-pilot-app", requireAdminApi, async (req, res) => {
+  const { propertyId } = req.body;
+  if (!propertyId) {
+    return res.status(400).json({ message: "Property ID is required." });
+  }
+
+  try {
+    // 1. Get the API key for the property from our database.
+    const keyResult = await pgPool.query(
+      "SELECT override_api_key FROM user_properties WHERE property_id = $1",
+      [propertyId]
+    );
+
+    if (keyResult.rows.length === 0 || !keyResult.rows[0].override_api_key) {
+      throw new Error(`Could not find API key for property ${propertyId}.`);
+    }
+    const apiKey = keyResult.rows[0].override_api_key;
+
+    // 2. Call the new function to set the app state to "enabled".
+    const success = await cloudbeds.setCloudbedsAppState(apiKey, propertyId);
+
+    // 3. Respond to the frontend.
+    if (success) {
+      res
+        .status(200)
+        .json({
+          success: true,
+          message: `App successfully enabled for property ${propertyId}.`,
+        });
+    } else {
+      throw new Error("Failed to set app state in Cloudbeds.");
+    }
+  } catch (error) {
+    console.error("Error enabling pilot app:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

@@ -61,42 +61,41 @@ function initializeAdminPanel() {
   // NEW: Event listener for the pilot hotel connection table.
   // We use event delegation to handle clicks on buttons that are added dynamically.
   const pilotTableBody = document.getElementById("pilot-hotels-table-body");
+  // /public/admin/admin.mjs -> inside initializeAdminPanel()
+
   pilotTableBody.addEventListener("click", async (event) => {
-    // Only proceed if a connect button was clicked
-    if (!event.target.classList.contains("connect-btn")) {
-      return;
-    }
-
     const button = event.target;
-    const propertyId = button.dataset.propertyId;
 
-    // Disable the button and show a loading state to prevent multiple clicks
-    button.disabled = true;
-    button.textContent = "Connecting...";
-
-    try {
-      // Get both the propertyId and userId from the button's data attributes
+    // Handle "Activate" button clicks
+    if (button.classList.contains("connect-btn")) {
+      button.disabled = true;
+      button.textContent = "Activating...";
       const propertyId = button.dataset.propertyId;
       const userId = button.dataset.userId;
-
-      // Call our new backend-only activation endpoint, now sending both IDs
-      const response = await fetch("/api/activate-pilot-property", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ propertyId, userId }), // Send both IDs
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message);
+      try {
+        const response = await fetch("/api/activate-pilot-property", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ propertyId, userId }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message);
+        fetchAndRenderPilotStatus();
+      } catch (error) {
+        alert(`Activation failed: ${error.message}`);
+        button.disabled = false;
+        button.textContent = "Activate";
       }
-      // Success! Refresh the entire table to show the new "Connected" status.
-      fetchAndRenderPilotStatus();
-    } catch (error) {
-      alert(`Connection failed: ${error.message}`);
-      // Re-enable the button if an error occurs
-      button.disabled = false;
-      button.textContent = "Connect";
+    }
+
+    // Handle "Enable App" button clicks
+    if (button.classList.contains("enable-btn")) {
+      button.disabled = true;
+      button.textContent = "Enabling...";
+      const propertyId = button.dataset.propertyId;
+      // Call our new function
+      await enablePilotApp(propertyId);
+      // The button will be removed on table refresh, so no need to re-enable it.
     }
   });
   // --- Helper Functions ---
@@ -167,19 +166,13 @@ function initializeAdminPanel() {
         // Change the action from a link to a button with a data-property-id attribute.
         // This allows our new JavaScript listener to target it.
         //
-        const actionButton =
-          prop.status !== "connected"
-            ? `<button data-property-id="${prop.property_id}" data-user-id="${prop.user_id}" class="control-btn connect-btn">Connect</button>`
-            : `<span class="font-semibold text-green-600">✓ Connected</span>`;
-
-        row.innerHTML = `
-          <td class="px-4 py-3 font-medium text-gray-800">${
-            prop.property_name || "N/A"
-          }</td>
-          <td class="px-4 py-3 font-mono text-gray-600">${prop.property_id}</td>
-          <td class="px-4 py-3"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusClass}">${statusText}</span></td>
-          <td class="px-4 py-3">${actionButton}</td>
-        `;
+        // Replace it with this new block
+        let actionButton = `<span class="font-semibold text-gray-500">✓ Enabled</span>`; // Default text
+        if (prop.status === "pending") {
+          actionButton = `<button data-property-id="${prop.property_id}" data-user-id="${prop.user_id}" class="control-btn connect-btn">Activate</button>`;
+        } else if (prop.status === "connected") {
+          actionButton = `<button data-property-id="${prop.property_id}" class="control-btn enable-btn text-green-600 border-green-400 hover:bg-green-50">Enable App</button>`;
+        }
         pilotTableBody.appendChild(row);
       });
     } catch (error) {
@@ -249,6 +242,34 @@ function initializeAdminPanel() {
           statusEl.textContent = "";
         }, 5000);
       }
+    }
+  };
+
+  // /public/admin/admin.mjs -> inside initializeAdminPanel()
+
+  const enablePilotApp = async (propertyId) => {
+    const statusEl = document.getElementById("job-status-message");
+    statusEl.textContent = `Enabling app for property ${propertyId}...`;
+    statusEl.className = "mt-4 text-sm font-medium text-gray-500";
+    try {
+      const response = await fetch("/api/enable-pilot-app", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.message || "Failed to enable app.");
+      statusEl.textContent = `✅ ${result.message}`;
+      statusEl.className = "mt-4 text-sm font-medium text-green-600";
+      fetchAndRenderPilotStatus(); // Refresh the table to show the new status
+    } catch (err) {
+      statusEl.textContent = `❌ ${err.message}`;
+      statusEl.className = "mt-4 text-sm font-medium text-red-600";
+    } finally {
+      setTimeout(() => {
+        statusEl.textContent = "";
+      }, 5000);
     }
   };
 

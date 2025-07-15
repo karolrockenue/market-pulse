@@ -137,9 +137,59 @@ async function syncHotelDetailsToDb(accessToken, propertyId) {
   );
 }
 
+// api/utils/cloudbeds.js
+
+/**
+ * Sets the application state for a given property. Used to "enable" a manually
+ * connected pilot hotel.
+ * @param {string} accessToken - A valid Cloudbeds access token or API key.
+ * @param {string} propertyId - The ID of the property to enable.
+ * @returns {Promise<boolean>} - True if successful, false otherwise.
+ */
+async function setCloudbedsAppState(accessToken, propertyId) {
+  console.log(
+    `[App State] Setting app state to 'enabled' for property ${propertyId}...`
+  );
+  const targetUrl = "https://api.cloudbeds.com/api/v1.1/postAppState";
+
+  // The payload for the API call.
+  const payload = {
+    propertyID: propertyId,
+    app_state: "enabled",
+  };
+
+  const response = await fetch(targetUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseData = await response.json();
+
+  // Check if the call was successful.
+  if (!response.ok || !responseData.success) {
+    console.error(
+      `[App State] Failed to set app state for property ${propertyId}. Response:`,
+      responseData
+    );
+    return false;
+  }
+
+  console.log(
+    `[App State] Successfully enabled app for property ${propertyId}.`
+  );
+  return true;
+}
+
+// api/utils/cloudbeds.js
+
 module.exports = {
   getOAuthAccessToken,
   getPropertiesForUser,
   getHotelDetails,
   syncHotelDetailsToDb,
+  setCloudbedsAppState, // <-- Add this line
 };
