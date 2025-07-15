@@ -711,15 +711,21 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     }
 
     await client.query(
-      `INSERT INTO hotels (hotel_id, property_name, city)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (hotel_id) DO UPDATE SET
-         property_name = EXCLUDED.property_name,
-         city = EXCLUDED.city;`,
+      `INSERT INTO hotels (hotel_id, property_name, city, address1, country, currency_code)
+   VALUES ($1, $2, $3, $4, $5, $6)
+   ON CONFLICT (hotel_id) DO UPDATE SET
+     property_name = EXCLUDED.property_name,
+     city = EXCLUDED.city,
+     address1 = EXCLUDED.address1,
+     country = EXCLUDED.country,
+     currency_code = EXCLUDED.currency_code;`,
       [
         hotelDetails.propertyID,
         hotelDetails.propertyName,
         hotelDetails.propertyCity,
+        hotelDetails.propertyAddress1,
+        hotelDetails.propertyCountry,
+        hotelDetails.propertyCurrencyCode,
       ]
     );
 
@@ -730,11 +736,9 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     );
 
     await client.query("COMMIT");
-    res
-      .status(200)
-      .json({
-        message: `Property ${propertyId} has been successfully activated.`,
-      });
+    res.status(200).json({
+      message: `Property ${propertyId} has been successfully activated.`,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error activating pilot property:", error);
