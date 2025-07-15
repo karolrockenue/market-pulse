@@ -532,7 +532,8 @@ function initializeAdminPanel() {
   });
 
   // Listen for the form submission event.
-  // --- CORRECTED v2: Logic for Manual Credential Entry Form ---
+
+  // /public/admin/admin.mjs
   const credentialForm = document.getElementById("credential-form");
   const saveBtn = document.getElementById("save-credentials-btn");
 
@@ -540,15 +541,11 @@ function initializeAdminPanel() {
     event.preventDefault();
 
     const email = document.getElementById("user-email").value;
-    const propertyId = document.getElementById("property-id-input").value; // Get Property ID
+    const propertyId = document.getElementById("property-id-input").value;
     const clientId = document.getElementById("client-id").value;
     const clientSecret = document.getElementById("client-secret").value;
 
-    if (
-      !confirm(
-        `Are you sure you want to set credentials for property ${propertyId} for user ${email}?`
-      )
-    ) {
+    if (!confirm(`Provision property ${propertyId} for user ${email}?`)) {
       return;
     }
 
@@ -556,10 +553,10 @@ function initializeAdminPanel() {
     saveBtn.textContent = "Saving...";
 
     try {
-      const response = await fetch("/api/set-credentials", {
+      const response = await fetch("/api/provision-pilot-hotel", {
+        // Using a new, clear endpoint name
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Add propertyId to the request body
         body: JSON.stringify({ email, propertyId, clientId, clientSecret }),
       });
 
@@ -576,7 +573,7 @@ function initializeAdminPanel() {
       alert(`Error: ${error.message}`);
     } finally {
       saveBtn.disabled = false;
-      saveBtn.textContent = "Save Credentials";
+      saveBtn.textContent = "Provision Hotel";
     }
   });
 }
