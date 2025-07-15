@@ -611,14 +611,14 @@ router.get("/pilot-properties", requireAdminApi, async (req, res) => {
 // --- NEW: Route for setting manual API credentials for a pilot user ---
 // --- FINAL FIX: Using the correct ID (cloudbeds_user_id) ---
 // /api/routes/admin.router.js
+// Add this entire block back into admin.router.js
 
-// Add this new route and remove the old '/set-credentials' one.
 router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
-  const { email, propertyId, clientId, clientSecret } = req.body;
-
-  if (!email || !propertyId || !clientId || !clientSecret) {
+  const { email, propertyId, clientId, clientSecret, apiKey } = req.body;
+  if (!email || !propertyId || !clientId || !clientSecret || !apiKey) {
     return res.status(400).json({
-      message: "Email, Property ID, Client ID, and Client Secret are required.",
+      message:
+        "Email, Property ID, Client ID, Client Secret, and API Key are required.",
     });
   }
 
@@ -626,7 +626,6 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Step 1: Get the user's cloudbeds_user_id from their email.
     const userResult = await client.query(
       "SELECT cloudbeds_user_id FROM users WHERE email = $1",
       [email]
@@ -636,14 +635,14 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
     }
     const cloudbedsUserId = userResult.rows[0].cloudbeds_user_id;
 
-    // Step 2: Insert or Update the property details in the user_properties table.
     const upsertQuery = `
-      INSERT INTO user_properties (user_id, property_id, override_client_id, override_client_secret, status)
-      VALUES ($1, $2, $3, $4, 'pending')
+      INSERT INTO user_properties (user_id, property_id, override_client_id, override_client_secret, override_api_key, status)
+      VALUES ($1, $2, $3, $4, $5, 'pending')
       ON CONFLICT (user_id, property_id) 
       DO UPDATE SET
         override_client_id = EXCLUDED.override_client_id,
         override_client_secret = EXCLUDED.override_client_secret,
+        override_api_key = EXCLUDED.override_api_key,
         status = 'pending';
     `;
     await client.query(upsertQuery, [
@@ -651,6 +650,7 @@ router.post("/provision-pilot-hotel", requireAdminApi, async (req, res) => {
       propertyId,
       clientId,
       clientSecret,
+      apiKey,
     ]);
 
     await client.query("COMMIT");
@@ -728,11 +728,9 @@ router.post("/activate-pilot-property", requireAdminApi, async (req, res) => {
     );
 
     await client.query("COMMIT");
-    res
-      .status(200)
-      .json({
-        message: `Property ${propertyId} has been successfully activated.`,
-      });
+    res.status(200).json({
+      message: `Property ${propertyId} has been successfully activated.`,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error activating pilot property:", error);
