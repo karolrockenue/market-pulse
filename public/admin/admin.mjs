@@ -142,6 +142,8 @@ function initializeAdminPanel() {
   // /public/admin/admin.mjs
 
   // Add this new function inside initializeAdminPanel()
+  // /public/admin/admin.mjs
+
   const fetchAndRenderPilotStatus = async () => {
     const pilotTableBody = document.getElementById("pilot-hotels-table-body");
     try {
@@ -157,39 +159,43 @@ function initializeAdminPanel() {
 
       properties.forEach((prop) => {
         const row = document.createElement("tr");
+
+        // --- Start of Corrected Logic ---
+
+        // 1. Determine the status class and text first.
         const statusClass =
           prop.status === "connected"
-            ? "bg-green-100 text-green-800"
-            : "bg-yellow-100 text-yellow-800";
-        const statusText =
-          prop.status === "connected" ? "✓ Connected" : "Pending";
-        // Change the action from a link to a button with a data-property-id attribute.
-        // This allows our new JavaScript listener to target it.
-        //
-        // Replace it with this new block
-        let actionButton = `<span class="font-semibold text-gray-500">✓ Enabled</span>`; // Default text
+            ? "bg-blue-100 text-blue-800"
+            : prop.status === "pending"
+            ? "bg-yellow-100 text-yellow-800"
+            : "bg-green-100 text-green-800"; // Default to green for 'enabled' etc.
+        const statusText = prop.status;
+
+        // 2. Determine which action button to show.
+        let actionButton = `<span class="font-semibold text-gray-500">✓ Done</span>`; // Default text for enabled properties
         if (prop.status === "pending") {
           actionButton = `<button data-property-id="${prop.property_id}" data-user-id="${prop.user_id}" class="control-btn connect-btn">Activate</button>`;
-          // /public/admin/admin.mjs -> inside the forEach loop in fetchAndRenderPilotStatus()
-
-          // This block was missing. It builds the actual visible cells for the table row.
-          row.innerHTML = `
-    <td class="px-4 py-3 font-medium">${
-      prop.property_name || "(Activation Pending)"
-    }</td>
-    <td class="px-4 py-3">${prop.property_id}</td>
-    <td class="px-4 py-3">
-        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
-            ${statusText}
-        </span>
-    </td>
-    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
-        ${actionButton}
-    </td>
-`;
         } else if (prop.status === "connected") {
           actionButton = `<button data-property-id="${prop.property_id}" class="control-btn enable-btn text-green-600 border-green-400 hover:bg-green-50">Enable App</button>`;
         }
+
+        // 3. NOW, build the innerHTML for the row. This part was previously in the wrong place.
+        row.innerHTML = `
+                <td class="px-4 py-3 font-medium">${
+                  prop.property_name || "(Activation Pending)"
+                }</td>
+                <td class="px-4 py-3">${prop.property_id}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                        ${statusText}
+                    </span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                    ${actionButton}
+                </td>
+            `;
+
+        // 4. Append the completed row to the table.
         pilotTableBody.appendChild(row);
       });
     } catch (error) {
