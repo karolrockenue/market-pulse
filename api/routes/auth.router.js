@@ -62,12 +62,14 @@ router.post("/login", async (req, res) => {
   }
 });
 
+//
 router.get("/magic-link-callback", async (req, res) => {
   const { token } = req.query;
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
   }
   try {
+    // This part remains the same: validate the token
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
@@ -80,29 +82,49 @@ router.get("/magic-link-callback", async (req, res) => {
         );
     }
     const validToken = tokenResult.rows[0];
+
+    // Get user details
     const userResult = await pgPool.query(
-      "SELECT cloudbeds_user_id, is_admin, auth_mode FROM users WHERE user_id = $1",
+      "SELECT user_id, cloudbeds_user_id, is_admin, auth_mode FROM users WHERE user_id = $1",
       [validToken.user_id]
     );
     if (userResult.rows.length === 0) {
       return res.status(404).send("Could not find a matching user account.");
     }
     const user = userResult.rows[0];
+
+    // --- NEW LOGIC ---
+    // Check if the manual user has any properties that are already connected.
+    let hasConnectedProperties = false;
+    if (user.auth_mode === "manual") {
+      const propertyCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE user_id = $1 AND status = 'connected' LIMIT 1",
+        [user.cloudbeds_user_id]
+      );
+      if (propertyCheck.rows.length > 0) {
+        hasConnectedProperties = true;
+      }
+    }
+
+    // Set the session details
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
 
+    // Delete the used magic link token
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
       token,
     ]);
 
+    // Save the session and perform the new, smarter redirect
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
-      // If the user is a pilot user, send them to the admin panel to connect properties.
-      // Otherwise, send them to the main dashboard.
-      if (user.auth_mode === "manual") {
+
+      // If user is manual AND has no connected properties, send to admin.
+      // Otherwise, send to the main dashboard.
+      if (user.auth_mode === "manual" && !hasConnectedProperties) {
         res.redirect("/admin/");
       } else {
         res.redirect("/app/");
