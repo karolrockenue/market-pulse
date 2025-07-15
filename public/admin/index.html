@@ -397,6 +397,35 @@ rooms_sold, adr, revpar, total_revenue</textarea
                 </div>
               </div>
             </div>
+
+<div class="mt-8 p-6 bg-white rounded-lg shadow-md">
+  <h3 class="text-xl font-semibold text-gray-800 mb-4">Set Manual API Credentials (Pilot Mode)</h3>
+  <form id="credential-form" class="space-y-4">
+    <div>
+      <label for="user-email" class="block text-sm font-medium text-gray-700">User Email</label>
+      <input type="email" id="user-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+    </div>
+    <div>
+      <label for="property-id-input" class="block text-sm font-medium text-gray-700">Property ID</label>
+      <input type="text" id="property-id-input" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+    </div>
+    <div>
+      <label for="client-id" class="block text-sm font-medium text-gray-700">Cloudbeds Client ID</label>
+      <input type="text" id="client-id" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+    </div>
+    <div>
+      <label for="client-secret" class="block text-sm font-medium text-gray-700">Cloudbeds Client Secret</label>
+      <input type="password" id="client-secret" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+    </div>
+    <button type="submit" id="save-credentials-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+      Save Credentials
+    </button>
+  </form>
+</div>
+
+
+
+
           </div>
         </main>
       </div>

@@ -11,6 +11,9 @@ const { requireAdminApi } = require("../utils/middleware");
 const dailyRefreshHandler = require("../daily-refresh.js");
 const initialSyncHandler = require("../initial-sync.js");
 
+// Add this line with the other require statements
+const cloudbeds = require("../utils/cloudbeds");
+
 // In a future step, this could be moved to a shared /api/utils/cloudbeds.js utility
 async function getCloudbedsAccessToken(refreshToken) {
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
@@ -583,5 +586,60 @@ router.get("/explore/sample-reservation", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// --- NEW: Route for setting manual API credentials for a pilot user ---
+// --- FINAL FIX: Using the correct ID (cloudbeds_user_id) ---
+router.post("/set-credentials", requireAdminApi, async (req, res) => {
+  const { email, propertyId, clientId, clientSecret } = req.body;
 
+  if (!email || !propertyId || !clientId || !clientSecret) {
+    return res.status(400).json({
+      message: "Email, Property ID, Client ID, and Secret are required.",
+    });
+  }
+
+  try {
+    // Step 1: Find the user's CLOUDBEDS ID from their email. This is the key change.
+    const userResult = await pgPool.query(
+      "SELECT user_id, cloudbeds_user_id FROM users WHERE email = $1",
+      [email]
+    );
+    if (userResult.rows.length === 0) {
+      throw new Error(`User with email ${email} not found.`);
+    }
+    const internalUserId = userResult.rows[0].user_id; // The numeric ID (e.g., 42)
+    const cloudbedsUserId = userResult.rows[0].cloudbeds_user_id; // The text ID (e.g., "test-user-123")
+
+    // Step 2: Perform the UPSERT on user_properties using the CLOUDBEDS ID.
+    const upsertQuery = `
+      INSERT INTO user_properties (user_id, property_id, override_client_id, override_client_secret)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_id, property_id) 
+      DO UPDATE SET
+        override_client_id = EXCLUDED.override_client_id,
+        override_client_secret = EXCLUDED.override_client_secret;
+    `;
+    // We now pass the text-based Cloudbeds ID to be stored, matching the auth flow.
+    await pgPool.query(upsertQuery, [
+      cloudbedsUserId,
+      propertyId,
+      clientId,
+      clientSecret,
+    ]);
+
+    // Step 3: Update the user's auth_mode using their internal numeric ID.
+    await pgPool.query(
+      "UPDATE users SET auth_mode = 'manual' WHERE user_id = $1",
+      [internalUserId]
+    );
+
+    res.status(200).json({
+      message: `Successfully set credentials for property ${propertyId}.`,
+    });
+  } catch (error) {
+    console.error("Error setting credentials:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "An internal server error occurred." });
+  }
+});
 module.exports = router;

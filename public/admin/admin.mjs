@@ -530,4 +530,53 @@ function initializeAdminPanel() {
       fetchSampleReservationBtn.disabled = false;
     }
   });
+
+  // Listen for the form submission event.
+  // --- CORRECTED v2: Logic for Manual Credential Entry Form ---
+  const credentialForm = document.getElementById("credential-form");
+  const saveBtn = document.getElementById("save-credentials-btn");
+
+  credentialForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const email = document.getElementById("user-email").value;
+    const propertyId = document.getElementById("property-id-input").value; // Get Property ID
+    const clientId = document.getElementById("client-id").value;
+    const clientSecret = document.getElementById("client-secret").value;
+
+    if (
+      !confirm(
+        `Are you sure you want to set credentials for property ${propertyId} for user ${email}?`
+      )
+    ) {
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    try {
+      const response = await fetch("/api/set-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Add propertyId to the request body
+        body: JSON.stringify({ email, propertyId, clientId, clientSecret }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(`Success: ${result.message}`);
+        credentialForm.reset();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error("Failed to save credentials:", error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Credentials";
+    }
+  });
 }

@@ -1,24 +1,151 @@
 // /api/utils/middleware.js
+const pgPool = require("./db");
+const cloudbeds = require("./cloudbeds");
 
-// Checks if a user is logged in for API endpoints.
-const requireUserApi = (req, res, next) => {
-  if (!req.session.userId) {
-    return res
-      .status(401)
-      .json({ error: "Unauthorized: User session required." });
+/**
+ * NEW: API Middleware to protect routes and manage access tokens.
+ * This now handles both OAuth and Manual "pilot" auth users.
+ */
+async function requireUserApi(req, res, next) {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: "Authentication required." });
   }
-  next();
-};
 
-// Checks if the logged-in user is an administrator.
+  try {
+    const userResult = await pgPool.query(
+      "SELECT user_id, auth_mode, refresh_token, needs_property_sync FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: "User not found." });
+    }
+
+    const user = userResult.rows[0];
+    req.user = { internalId: user.user_id, cloudbedsId: req.session.userId };
+
+    if (user.auth_mode === "manual") {
+      const propertyId = req.headers["x-property-id"];
+      if (!propertyId && req.path !== "/my-properties") {
+        // Allow /my-properties to pass without a header
+        return res
+          .status(400)
+          .json({
+            error: "X-Property-ID header is required for this request.",
+          });
+      }
+
+      if (propertyId) {
+        if (
+          req.session.manualTokens &&
+          req.session.manualTokens[propertyId] &&
+          req.session.manualTokens[propertyId].expires > Date.now()
+        ) {
+          req.user.accessToken = req.session.manualTokens[propertyId].token;
+        } else {
+          const credsResult = await pgPool.query(
+            "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND property_id = $2",
+            [req.user.cloudbedsId, propertyId]
+          );
+
+          if (
+            credsResult.rows.length === 0 ||
+            !credsResult.rows[0].override_client_id
+          ) {
+            return res
+              .status(403)
+              .json({
+                error: "Manual credentials not configured for this property.",
+              });
+          }
+
+          const { override_client_id, override_client_secret } =
+            credsResult.rows[0];
+          const tokenData = await cloudbeds.getManualAccessToken(
+            override_client_id,
+            override_client_secret
+          );
+
+          if (!tokenData || !tokenData.access_token) {
+            return res
+              .status(503)
+              .json({ error: "Could not authenticate with Cloudbeds." });
+          }
+
+          if (!req.session.manualTokens) req.session.manualTokens = {};
+          req.session.manualTokens[propertyId] = {
+            token: tokenData.access_token,
+            expires: Date.now() + (tokenData.expires_in - 300) * 1000,
+          };
+          req.user.accessToken = tokenData.access_token;
+        }
+      }
+
+      if (user.needs_property_sync) {
+        const tempTokenForSync =
+          req.user.accessToken ||
+          (
+            await cloudbeds.getManualAccessToken(
+              (
+                await pgPool.query(
+                  "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND override_client_id IS NOT NULL LIMIT 1",
+                  [req.user.cloudbedsId]
+                )
+              ).rows[0].override_client_id,
+              (
+                await pgPool.query(
+                  "SELECT override_client_id, override_client_secret FROM user_properties WHERE user_id = $1 AND override_client_id IS NOT NULL LIMIT 1",
+                  [req.user.cloudbedsId]
+                )
+              ).rows[0].override_client_secret
+            )
+          )?.access_token;
+        if (tempTokenForSync) {
+          const properties = await cloudbeds.getPropertiesForUser(
+            tempTokenForSync
+          );
+          if (properties) {
+            const client = await pgPool.connect();
+            try {
+              await client.query("BEGIN");
+              for (const prop of properties) {
+                await client.query(
+                  "INSERT INTO user_properties (user_id, property_id) VALUES ($1, $2) ON CONFLICT (user_id, property_id) DO NOTHING",
+                  [req.user.cloudbedsId, prop.id]
+                );
+              }
+              await client.query(
+                "UPDATE users SET needs_property_sync = false WHERE user_id = $1",
+                [req.user.internalId]
+              );
+              await client.query("COMMIT");
+            } catch (e) {
+              await client.query("ROLLBACK");
+              console.error("Property sync for manual user failed:", e);
+            } finally {
+              client.release();
+            }
+          }
+        }
+      }
+    }
+    return next();
+  } catch (error) {
+    console.error("CRITICAL ERROR in requireUserApi middleware:", error);
+    return res
+      .status(500)
+      .json({ error: "Internal server error during authentication." });
+  }
+}
+
+// --- EXISTING UNCHANGED MIDDLEWARE ---
+
 const requireAdminApi = (req, res, next) => {
-  // It first checks if the user is logged in at all.
   if (!req.session.userId) {
     return res
       .status(401)
       .json({ error: "Unauthorized: User session required." });
   }
-  // Then it checks for the isAdmin flag.
   if (!req.session.isAdmin) {
     return res
       .status(403)
@@ -27,16 +154,13 @@ const requireAdminApi = (req, res, next) => {
   next();
 };
 
-// This middleware is used for protecting entire pages, not just API calls.
 const requirePageLogin = (req, res, next) => {
   if (!req.session.userId) {
-    // If not logged in, redirect to the main sign-in page.
     return res.redirect("/signin");
   }
   next();
 };
 
-// Export all the middleware functions.
 module.exports = {
   requireUserApi,
   requireAdminApi,
