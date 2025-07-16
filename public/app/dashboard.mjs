@@ -231,10 +231,28 @@ export default function () {
           properties: true,
         };
         chartManager.showLoading();
+
+        // --- NEW DEBUGGING LOGS ---
+        logger.info(
+          "Dashboard.forceReloadData",
+          "Attempting to fetch '/api/my-properties'..."
+        );
         const response = await fetch("/api/my-properties");
-        if (!response.ok)
-          throw new Error("Could not fetch properties for reload.");
+        logger.info(
+          "Dashboard.forceReloadData",
+          "Fetch call for '/api/my-properties' completed.",
+          { ok: response.ok, status: response.status }
+        );
+        // --- END DEBUGGING LOGS ---
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch properties. Server responded with status: ${response.status}`
+          );
+        }
+
         const properties = await response.json();
+
         if (properties.length > 0) {
           this.hasProperties = true;
           this.properties = properties;
