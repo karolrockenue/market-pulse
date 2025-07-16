@@ -48,14 +48,17 @@ const chartManager = {
           fontWeight: 600,
         },
       },
+      // Heavily Comment All Code
       legend: {
         data: ["Your Hotel", "The Market"],
-        right: 10,
+        left: "center", // FIX: Center the legend horizontally at the top to prevent it from overflowing the right edge.
         top: 5,
         icon: "circle",
         itemStyle: { borderColor: "#60a5fa" },
       },
-      grid: { left: "3%", right: "4%", bottom: "3%", containLabel: true },
+      // FIX: The 'grid' property controls the padding around the actual chart plot.
+      // By reducing the 'left' padding, we eliminate the excess whitespace.
+      grid: { left: "1%", right: "4%", bottom: "3%", containLabel: true },
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross", label: { backgroundColor: "#6a7985" } },
