@@ -338,10 +338,6 @@
                   >
                     <div class="flex justify-between items-start">
                       <p
-                        class="text-sm text-slate-500 -mt-2 mb-4"
-                        x-text="yourHotelSubtitle"
-                      ></p>
-                      <p
                         class="text-sm font-bold font-data"
                         :class="kpi[metric]?.deltaClass"
                         x-text="kpi[metric]?.delta"
@@ -385,7 +381,10 @@
                     x-text="currentPropertyName"
                   ></h2>
                 </div>
-                <p class="text-sm text-gray-500 -mt-2 mb-4">&nbsp;</p>
+                <p
+                  class="text-sm text-slate-500 -mt-2 mb-4"
+                  x-text="yourHotelSubtitle"
+                ></p>
                 <template x-if="isLoading.tables">
                   <div class="space-y-2 animate-pulse">
                     <div class="h-10 bg-gray-200 rounded-t-lg"></div>
