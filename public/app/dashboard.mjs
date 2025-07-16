@@ -51,7 +51,7 @@ const chartManager = {
       // Heavily Comment All Code
       legend: {
         data: ["Your Hotel", "The Market"],
-        left: "center", // FIX: Center the legend horizontally at the top to prevent it from overflowing the right edge.
+        left: "right", // FIX: Center the legend horizontally at the top to prevent it from overflowing the right edge.
         top: 5,
         icon: "circle",
         itemStyle: { borderColor: "#60a5fa" },
