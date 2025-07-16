@@ -207,6 +207,7 @@ export default function () {
     // --- INITIALIZATION ---
     // Find and replace the entire init() method
     // This is the final, correct version of the init() method.
+    // This is the final, correct version of the init() method.
     init() {
       console.log("Dashboard initializing...");
 
@@ -214,6 +215,17 @@ export default function () {
       window.addEventListener("property-changed", (event) => {
         // The event listener's only job is to pass the event data to the existing handler.
         this.handlePropertyChange(event.detail);
+      });
+
+      // This is the fix. We are telling Alpine to watch the 'isInitialized' flag.
+      // When it becomes true (meaning the layout is stable), we command the chart to resize.
+      this.$watch("isInitialized", (isInitialized) => {
+        if (isInitialized) {
+          // Use $nextTick to wait for the DOM to be updated before resizing the chart.
+          this.$nextTick(() => {
+            chartManager.resize();
+          });
+        }
       });
 
       // These two functions are safe to call on initial load as they don't depend on a property.
