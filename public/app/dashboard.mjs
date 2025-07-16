@@ -360,7 +360,9 @@ export default function () {
         };
         this.yourHotelSubtitle = `Data for ${formatDate(
           this.dates.start
-        )} - ${formatDate(this.dates.end)}, with ${this.granularity} display`;
+        )} - ${formatDate(this.dates.end)}, with ${
+          this.granularity
+        } display granularity`;
 
         chartManager.update({
           metrics: this.allMetrics,
