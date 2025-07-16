@@ -48,416 +48,384 @@
       }
     </style>
   </head>
-  <body class="antialiased">
+ <body class="bg-slate-100 font-sans">
+  <div
+    id="loading-spinner"
+    class="flex items-center justify-center h-screen"
+  >
     <div
-      id="loading-spinner"
-      class="flex items-center justify-center min-h-screen"
+      class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"
+    ></div>
+  </div>
+
+  <div id="admin-wrapper" class="hidden">
+    <div
+      id="login-form"
+      class="hidden flex items-center justify-center min-h-screen"
     >
-      <div
-        class="w-10 h-10 border-2 border-slate-400 border-t-slate-700 rounded-full animate-spin"
-      ></div>
+      <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
+        <h2 class="text-2xl font-bold text-center text-slate-800">
+          Admin Panel Access
+        </h2>
+        <p id="login-error" class="text-center text-red-600 font-medium"></p>
+        <form class="space-y-4">
+          <div>
+            <label for="password" class="text-sm font-medium text-slate-600"
+              >Admin Password</label
+            >
+            <input
+              type="password"
+              id="password"
+              required
+              class="w-full px-4 py-2 mt-2 bg-slate-100 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            type="submit"
+            id="login-btn"
+            class="w-full py-3 px-4 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Authenticate
+          </button>
+        </form>
+      </div>
     </div>
 
-    <div id="admin-wrapper" class="hidden flex min-h-screen">
-      <aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r">
-        <div class="h-16 flex items-center px-6 border-b">
-          <svg
-            class="h-8 w-auto text-blue-500"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="20" x2="12" y2="10"></line>
-            <line x1="18" y1="20" x2="18" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="16"></line>
-          </svg>
-          <span class="ml-3 text-lg font-bold text-gray-800">Market Pulse</span>
-        </div>
-        <nav class="flex-1 px-4 py-4 space-y-1">
-          <a
-            href="/app/"
-            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
-          >
-            <svg
-              class="h-5 w-5 mr-3"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-              ></path>
-            </svg>
-            Dashboard
-          </a>
-          <a
-            href="/app/reports.html"
-            class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
-          >
-            <svg
-              class="h-5 w-5 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M3 3v18h18" />
-              <path d="m19 9-5 5-4-4-3 3" />
-            </svg>
-            Reports
-          </a>
-          <a
-            id="admin-nav-link"
-            href="/admin/"
-            class="flex items-center px-4 py-2.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-lg"
-            style="display: flex"
-          >
-            <svg
-              class="h-5 w-5 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            </svg>
-            Admin Panel
-          </a>
-        </nav>
-      </aside>
-
-      <div class="flex-1 flex flex-col">
-        <header
-          class="bg-white h-16 flex items-center justify-between px-8 border-b"
-        >
-          <h1 class="text-xl font-semibold text-gray-800">Admin Panel</h1>
-        </header>
+    <div id="admin-content" class="hidden">
+      <div class="flex min-h-screen">
+        <div id="sidebar-placeholder"></div>
 
         <main class="flex-1 p-8">
-          <div
-            id="login-form"
-            class="max-w-md mx-auto bg-white p-8 rounded-xl border"
-          >
-            <h2 class="text-2xl font-bold text-center mb-1">
-              Administrator Access
-            </h2>
-            <p
-              id="login-error"
-              class="text-center text-red-600 text-sm h-5 mb-4"
-            ></p>
-            <form class="space-y-4">
-              <div>
-                <label
-                  for="password"
-                  class="block text-sm font-medium text-gray-700"
-                  >Password</label
-                >
-                <input
-                  type="password"
-                  id="password"
-                  class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
-                />
+          <h1 class="text-3xl font-bold text-slate-800 mb-8">
+            Admin Dashboard
+          </h1>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white p-6 rounded-xl border border-slate-200">
+              <h2 class="text-lg font-semibold text-slate-800 border-b pb-3">
+                System Health
+              </h2>
+              <div class="space-y-4 mt-4">
+                <div class="flex items-center justify-between">
+                  <button
+                    id="test-db-btn"
+                    class="control-btn bg-slate-100 hover:bg-slate-200"
+                  >
+                    Test Database
+                  </button>
+                  <span
+                    id="db-status"
+                    class="ml-4 text-sm font-semibold text-slate-500"
+                  ></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <button
+                    id="test-cloudbeds-btn"
+                    class="control-btn bg-slate-100 hover:bg-slate-200"
+                  >
+                    Test Cloudbeds Auth
+                  </button>
+                  <span
+                    id="cloudbeds-status"
+                    class="ml-4 text-sm font-semibold text-slate-500"
+                  ></span>
+                </div>
               </div>
-              <button
-                type="button"
-                id="login-btn"
-                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600"
-              >
-                Log In
-              </button>
-            </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl border border-slate-200">
+              <h2 class="text-lg font-semibold text-slate-800 border-b pb-3">
+                Data Freshness
+              </h2>
+              <div class="space-y-4 mt-4">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium text-slate-600"
+                    >Last Daily Refresh:</span
+                  >
+                  <span
+                    id="last-refresh-time"
+                    class="font-mono text-slate-800 font-semibold"
+                  ></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <button
+                    id="run-daily-refresh-btn"
+                    class="control-btn bg-slate-100 hover:bg-slate-200"
+                  >
+                    Force Daily Refresh
+                  </button>
+                  <span
+                    id="job-status-message"
+                    class="mt-4 text-sm font-medium text-slate-500"
+                  ></span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div id="admin-content" class="hidden space-y-8">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div class="space-y-8">
-                <div class="bg-white p-6 rounded-xl border">
-                  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
-                    System Health
-                  </h3>
-                  <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                      <p class="text-sm font-medium text-gray-600">
-                        Last Data Refresh:
-                      </p>
-                      <p
-                        id="last-refresh-time"
-                        class="text-sm font-semibold font-data text-gray-800"
-                      ></p>
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <p class="text-sm font-medium text-gray-600">
-                        Cloudbeds API:
-                      </p>
-                      <div class="flex items-center">
-                        <button
-                          id="test-cloudbeds-btn"
-                          class="control-btn text-xs"
-                        >
-                          Test Connection
-                        </button>
-                        <span
-                          id="cloudbeds-status"
-                          class="ml-4 text-sm font-semibold"
-                        ></span>
-                      </div>
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <p class="text-sm font-medium text-gray-600">
-                        PostgreSQL Database:
-                      </p>
-                      <div class="flex items-center">
-                        <button id="test-db-btn" class="control-btn text-xs">
-                          Test Connection
-                        </button>
-                        <span
-                          id="db-status"
-                          class="ml-4 text-sm font-semibold"
-                        ></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="bg-white p-6 rounded-xl border">
-                  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
-                    Manual Action Triggers
-                  </h3>
-<div class="flex flex-wrap items-start gap-6">
-                    <div>
-                      <button id="run-daily-refresh-btn" class="control-btn">
-                        Run Job: Daily Forecast Refresh
-                      </button>
-                    </div>
-
-                    <div class="border-l pl-6">
-                      <p class="text-sm font-medium text-gray-700">Run a Deep Sync for a Single Property:</p>
-                      <div class="flex items-end gap-2 mt-2">
-                        <div>
-                           <label for="sync-property-id" class="text-xs font-medium text-gray-600">Property ID</label>
-                           <input type="text" id="sync-property-id" class="mt-1 block w-40 rounded-md border-gray-300 shadow-sm sm:text-sm" placeholder="Enter Property ID">
-                        </div>
-                        <button id="run-initial-sync-btn" class="control-btn">
-                           Run Initial Sync
-                        </button>
-                      </div>
-                      <div id="initial-sync-status" class="mt-2 text-sm h-5"></div>
-                    </div>
-                  </div>
-                  <div
-                    id="job-status-message"
-                    class="mt-4 text-sm font-medium h-5"
-                  ></div>
-                </div>
-              </div>
-              <div class="space-y-8">
-                <div class="bg-white p-6 rounded-xl border">
-                  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
-                    Application API Health
-                  </h3>
-                  <button id="run-endpoint-tests-btn" class="control-btn">
-                    Run Endpoint Tests
-                  </button>
-                  <div id="endpoint-test-results" class="mt-4"></div>
-                </div>
-              </div>
-            </div>
-            <div class="bg-white p-6 rounded-xl border mt-8">
-              <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
-                Registered Hotels
-              </h3>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="border-b text-left">
-                      <th class="px-4 py-3 font-semibold text-gray-600">
-                        Hotel ID
-                      </th>
-                      <th class="px-4 py-3 font-semibold text-gray-600">
-                        Property Name
-                      </th>
-                      <th class="px-4 py-3 font-semibold text-gray-600">
-                        Type
-                      </th>
-                      <th class="px-4 py-3 font-semibold text-gray-600">
-                        City
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody id="hotels-table-body" class="divide-y"></tbody>
-                </table>
-              </div>
-            </div>
-
+          <div class="bg-white p-6 rounded-xl border border-slate-200 mb-8">
+            <h2 class="text-lg font-semibold text-slate-800">
+              Hotel Management
+            </h2>
+            <p class="text-sm text-slate-500 mt-1">
+              View registered hotels, manage data syncs, and adjust quality
+              tiers.
+            </p>
             <div
-              id="api-explorer-section"
-              class="bg-white p-6 rounded-xl border mt-8"
-            >
-              <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
-                Cloudbeds API Explorer
-              </h3>
-
-              <details class="mb-2" open>
-                <summary
-                  class="font-semibold text-gray-700 cursor-pointer py-2 hover:bg-slate-50 rounded-md"
+              id="initial-sync-status"
+              class="mt-2 text-sm text-green-600"
+            ></div>
+            <div class="overflow-x-auto mt-4">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-slate-600 text-left">
+                  <tr>
+                    <th class="p-3 font-semibold">Hotel ID</th>
+                    <th class="p-3 font-semibold">Property Name</th>
+                    <th class="p-3 font-semibold">Type</th>
+                    <th class="p-3 font-semibold">City</th>
+                    <th class="p-3 font-semibold">Quality Tier</th>
+                    <th class="p-3 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody
+                  id="hotels-table-body"
+                  class="divide-y divide-slate-200"
                 >
-                  Step 1: List All Available Datasets
-                </summary>
-                <div class="pl-4 pt-3 border-l-2 ml-2">
-                  <button id="fetch-datasets-btn" class="control-btn">
-                    Fetch All Datasets
-                  </button>
-                </div>
-              </details>
+                  </tbody>
+              </table>
+            </div>
+          </div>
 
-              <details class="mb-2" open>
-                <summary
-                  class="font-semibold text-gray-700 cursor-pointer py-2 hover:bg-slate-50 rounded-md"
-                >
-                  Step 2: Inspect a Specific Dataset
-                </summary>
-                <div class="pl-4 pt-3 border-l-2 ml-2 space-y-4">
-                  <div class="flex items-start space-x-3">
-                    <div class="flex items-center space-x-3">
-                      <label for="dataset-id-input" class="text-sm font-medium"
-                        >Dataset ID:</label
-                      >
-                      <input
-                        type="text"
-                        id="dataset-id-input"
-                        value="7"
-                        class="w-16 px-2 py-1 border border-gray-300 rounded-md shadow-sm"
-                      />
-                      <button id="fetch-structure-btn" class="control-btn">
-                        Get Structure
-                      </button>
-                    </div>
-                    <div class="flex-grow">
-                      <label
-                        for="insights-columns-input"
-                        class="text-sm font-medium"
-                        >Columns (comma-separated):</label
-                      >
-                      <textarea
-                        id="insights-columns-input"
-                        class="w-full px-2 py-1 mt-1 border border-gray-300 rounded-md shadow-sm text-sm"
-                        rows="2"
-                      >
-rooms_sold, adr, revpar, total_revenue</textarea
-                      >
-                      <button
-                        id="fetch-insights-data-btn"
-                        class="control-btn active mt-1"
-                      >
-                        Get Sample Data
-                      </button>
-                    </div>
+          <div class="bg-white p-6 rounded-xl border border-slate-200 mb-8">
+            <h2 class="text-lg font-semibold text-slate-800">
+              Pilot Hotel Management
+            </h2>
+            <p class="text-sm text-slate-500 mt-1">
+              Onboard new pilot hotels and manage their connection status.
+            </p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 mt-4">
+              <div class="border-r-0 lg:border-r border-slate-200 pr-0 lg:pr-8">
+                <h3 class="font-semibold text-slate-700 mb-3">
+                  1. Provision Hotel
+                </h3>
+                <form id="credential-form" class="space-y-4">
+                  <div>
+                    <label
+                      for="user-email"
+                      class="block text-xs font-medium text-slate-600"
+                      >User Email</label
+                    >
+                    <input
+                      type="email"
+                      id="user-email"
+                      required
+                      placeholder="pilot.user@email.com"
+                      class="mt-1 w-full text-sm"
+                    />
                   </div>
-                </div>
-<div class="pl-4 pt-3 border-l-2 ml-2 space-y-2">
-    <button id="fetch-sample-reservation-btn" class="control-btn">
-       Get Sample Reservation
-   </button>
-   <button id="fetch-sample-guest-btn" class="control-btn">
-       Get Sample Guest
-   </button>
-   <button id="fetch-sample-hotel-btn" class="control-btn">
-       Get Hotel Info
-   </button>
-   <button id="fetch-sample-room-btn" class="control-btn">
-       Get Sample Room
-   </button>
-   <button id="fetch-sample-rate-btn" class="control-btn">
-       Get Sample Rate
-   </button>
-   <button id="fetch-taxes-fees-btn" class="control-btn">
-       Get Taxes & Fees
-   </button>
-   <button id="fetch-user-info-btn" class="control-btn">
-       Get User Info
-   </button>
-</div>
+                  <div>
+                    <label
+                      for="property-id-input"
+                      class="block text-xs font-medium text-slate-600"
+                      >Cloudbeds Property ID</label
+                    >
+                    <input
+                      type="text"
+                      id="property-id-input"
+                      required
+                      placeholder="e.g., 12345"
+                      class="mt-1 w-full text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="client-id"
+                      class="block text-xs font-medium text-slate-600"
+                      >Cloudbeds Client ID</label
+                    >
+                    <input type="text" id="client-id" required class="mt-1 w-full text-sm" />
+                  </div>
+                  <div>
+                    <label
+                      for="client-secret"
+                      class="block text-xs font-medium text-slate-600"
+                      >Cloudbeds Client Secret</label
+                    >
+                    <input
+                      type="password"
+                      id="client-secret"
+                      required
+                      class="mt-1 w-full text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="api-key-input"
+                      class="block text-xs font-medium text-slate-600"
+                      >Cloudbeds API Key</label
+                    >
+                    <input
+                      type="password"
+                      id="api-key-input"
+                      required
+                      class="mt-1 w-full text-sm"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    id="save-credentials-btn"
+                    class="control-btn bg-blue-500 text-white hover:bg-blue-600 w-full"
+                  >
+                    Provision Hotel
+                  </button>
+                </form>
+              </div>
 
-              <div id="api-results-container" class="mt-6">
-                <div
-                  class="p-4 bg-gray-50 rounded-lg text-center text-gray-500 text-sm"
-                >
-                  Click a button to fetch data...
+              <div>
+                <h3 class="font-semibold text-slate-700 mb-3 mt-8 lg:mt-0">
+                  2. Connection Status
+                </h3>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-600 text-left">
+                      <tr>
+                        <th class="p-3 font-semibold">Property</th>
+                        <th class="p-3 font-semibold">Status</th>
+                        <th class="p-3 font-semibold text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="pilot-hotels-table-body"
+                      class="divide-y divide-slate-200"
+                    ></tbody>
+                  </table>
                 </div>
               </div>
             </div>
-<!-- /public/admin/index.html -->
+          </div>
 
-<!-- NEW: Pilot Hotel Connection Status Table -->
-<div class="bg-white p-6 rounded-xl border mt-8">
-  <h3 class="font-semibold text-gray-800 border-b pb-3 mb-4">
-    Pilot Hotel Connection Status
-  </h3>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b text-left">
-          <th class="px-4 py-3 font-semibold text-gray-600">Property Name</th>
-          <th class="px-4 py-3 font-semibold text-gray-600">Property ID</th>
-          <th class="px-4 py-3 font-semibold text-gray-600">Status</th>
-          <th class="px-4 py-3 font-semibold text-gray-600">Action</th>
-        </tr>
-      </thead>
-      <tbody id="pilot-hotels-table-body" class="divide-y">
-        <!-- Rows will be dynamically inserted here by admin.mjs -->
-      </tbody>
-    </table>
-  </div>
-</div>
-<div class="mt-8 p-6 bg-white rounded-lg shadow-md">
-  <h3 class="text-xl font-semibold text-gray-800 mb-4">Provision Pilot Hotel</h3>
-  <form id="credential-form" class="space-y-4">
-    <div>
-      <label for="user-email" class="block text-sm font-medium text-gray-700">User Email</label>
-      <input type="email" id="user-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-    </div>
-    <div>
-      <label for="property-id-input" class="block text-sm font-medium text-gray-700">Property ID</label>
-      <input type="text" id="property-id-input" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-    </div>
-    <div>
-      <label for="client-id" class="block text-sm font-medium text-gray-700">Cloudbeds Client ID</label>
-      <input type="text" id="client-id" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-    </div>
-    <div>
-      <label for="client-secret" class="block text-sm font-medium text-gray-700">Cloudbeds Client Secret</label>
-      <input type="password" id="client-secret" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-    </div>
-    <div>
-  <label for="api-key-input" class="block text-sm font-medium text-gray-700">API Key</label>
-  <div class="mt-1">
-    <input type="password" id="api-key-input" required class="input-field" placeholder="Enter the generated API Key">
-  </div>
-</div>
-    <button type="submit" id="save-credentials-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-      Provision Hotel
-    </button>
-  </form>
-</div>
+          <div
+            x-data="{ tab: 'insights' }"
+            class="bg-white p-6 rounded-xl border border-slate-200"
+          >
+            <h2 class="text-lg font-semibold text-slate-800">
+              Cloudbeds API Explorer
+            </h2>
+            <div class="border-b border-slate-200 mt-2">
+              <nav class="-mb-px flex space-x-6">
+                <button
+                  @click="tab = 'insights'"
+                  :class="{'border-blue-500 text-blue-600': tab === 'insights', 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300': tab !== 'insights'}"
+                  class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm"
+                >
+                  Insights API
+                </button>
+                <button
+                  @click="tab = 'general'"
+                  :class="{'border-blue-500 text-blue-600': tab === 'general', 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300': tab !== 'general'}"
+                  class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm"
+                >
+                  General API
+                </button>
+              </nav>
+            </div>
 
+            <div class="pt-6">
+              <div x-show="tab === 'insights'" class="space-y-6">
+                <div class="flex items-end gap-4">
+                  <div class="flex-1">
+                    <button
+                      id="fetch-datasets-btn"
+                      class="control-btn bg-slate-100 hover:bg-slate-200"
+                    >
+                      Step 1: List All Available Datasets
+                    </button>
+                  </div>
+                </div>
+                <div class="flex items-end gap-4">
+                  <div class="flex-1">
+                    <label
+                      for="dataset-id-input"
+                      class="block text-xs font-medium text-slate-600"
+                      >Dataset ID</label
+                    >
+                    <input
+                      type="text"
+                      id="dataset-id-input"
+                      value="7"
+                      class="mt-1 w-full text-sm"
+                    />
+                  </div>
+                  <div class="flex-1">
+                    <label
+                      for="insights-columns-input"
+                      class="block text-xs font-medium text-slate-600"
+                      >Columns (comma-separated)</label
+                    >
+                    <input
+                      type="text"
+                      id="insights-columns-input"
+                      value="adr, revpar, occupancy_direct"
+                      class="mt-1 w-full text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <button
+                    id="fetch-structure-btn"
+                    class="control-btn bg-slate-100 hover:bg-slate-200"
+                  >
+                    Step 2: Get Dataset Structure
+                  </button>
+                  <button
+                    id="fetch-insights-data-btn"
+                    class="control-btn bg-slate-100 hover:bg-slate-200 ml-2"
+                  >
+                    Step 3: Get Sample Data
+                  </button>
+                </div>
+              </div>
 
+              <div x-show="tab === 'general'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <button id="fetch-sample-hotel-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Hotel Info</button>
+                  <button id="fetch-sample-guest-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Sample Guest</button>
+                  <button id="fetch-sample-reservation-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Sample Reservation</button>
+                  <button id="fetch-sample-room-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Sample Room</button>
+                  <button id="fetch-sample-rate-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Sample Rate</button>
+                  <button id="fetch-taxes-fees-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Taxes & Fees</button>
+                  <button id="fetch-user-info-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get User Info</g>
+              </div>
 
-
+              <div class="mt-6 bg-slate-50 p-4 rounded-lg border max-h-96 overflow-y-auto">
+                  <div id="api-results-container" class="text-xs text-slate-700 font-mono">
+                      API results will be displayed here...
+                  </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
     </div>
-    <script src="admin.mjs" type="module"></script>
-  </body>
+  </div>
+
+  <script type="module">
+    import { loadComponent } from "/app/utils.mjs";
+    import pageHeader from "/app/_shared/header.mjs";
+    import sidebar from "/app/_shared/sidebar.mjs";
+
+    document.addEventListener("alpine:init", () => {
+      Alpine.data("pageHeader", pageHeader);
+      Alpine.data("sidebar", sidebar);
+    });
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        await loadComponent('sidebar', 'sidebar-placeholder');
+    });
+  </script>
+
+  <script src="/admin/admin.mjs" type="module"></script>
+  <script
+    defer
+    src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+  ></script>
+</body>
 </html>
