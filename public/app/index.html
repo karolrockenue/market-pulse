@@ -600,17 +600,14 @@
         Alpine.data("sidebar", sidebar);
       });
 
-      // This is the FIX. We now make the loading process asynchronous.
+      // This corrected script ensures components load in order, then fixes the chart.
       document.addEventListener("DOMContentLoaded", async () => {
-        // 1. Wait for the header to load and render.
+        // 1. Wait for the header and sidebar to fully load before proceeding.
         await loadComponent("header", "header-placeholder");
-
-        // 2. Wait for the sidebar to load and render. This is the step that changes the page layout.
         await loadComponent("sidebar", "sidebar-placeholder");
 
-        // 3. Manually dispatch a 'resize' event on the window.
-        // The chart is already listening for this event and will redraw itself
-        // with the correct, new dimensions.
+        // 2. Manually trigger a 'resize' event. The chart's existing code
+        // will catch this and redraw the chart correctly within its new, smaller container.
         window.dispatchEvent(new Event("resize"));
       });
     </script>
