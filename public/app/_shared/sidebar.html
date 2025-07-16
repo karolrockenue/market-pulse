@@ -3,9 +3,7 @@
   x-data="sidebar()"
   x-cloak
 >
-  <div
-    class="h-16 flex items-center px-6 border-b lg:border-b-0 border-r-0 lg:border-r"
-  >
+  <div class="h-20 flex items-center px-6 flex-shrink-0">
     <svg
       class="h-8 w-auto text-blue-500"
       viewBox="0 0 24 24"
@@ -19,16 +17,18 @@
       <line x1="18" y1="20" x2="18" y2="4"></line>
       <line x1="6" y1="20" x2="6" y2="16"></line>
     </svg>
-    <span class="ml-3 text-lg font-bold text-gray-800">Market Pulse</span>
+    <span class="ml-3 text-lg font-bold text-slate-800 tracking-wide"
+      >Market Pulse</span
+    >
   </div>
 
-  <nav class="flex-1 px-4 py-4 space-y-1">
+  <nav class="flex-1 px-4 py-4 space-y-2">
     <a
       href="/app/"
-      class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg"
+      class="flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200"
       :class="{
-        'bg-blue-50 text-blue-700': window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'),
-        'text-gray-600 hover:bg-gray-50 hover:text-gray-900': !(window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'))
+        'bg-blue-100 text-blue-600 font-semibold': window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'),
+        'text-slate-500 hover:bg-slate-100 hover:text-slate-900 font-medium': !(window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'))
       }"
     >
       <svg
@@ -48,10 +48,10 @@
     </a>
     <a
       href="/app/reports.html"
-      class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg"
+      class="flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200"
       :class="{
-        'bg-blue-50 text-blue-700': window.location.pathname.endsWith('reports.html'),
-        'text-gray-600 hover:bg-gray-50 hover:text-gray-900': !window.location.pathname.endsWith('reports.html')
+        'bg-blue-100 text-blue-600 font-semibold': window.location.pathname.endsWith('reports.html'),
+        'text-slate-500 hover:bg-slate-100 hover:text-slate-900 font-medium': !window.location.pathname.endsWith('reports.html')
       }"
     >
       <svg
@@ -72,7 +72,7 @@
     <a
       id="admin-nav-link"
       href="/admin/"
-      class="flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg"
+      class="flex items-center px-3 py-3 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors duration-200"
       x-show="isAdmin"
       style="display: none"
     >
@@ -91,4 +91,29 @@
       Admin Panel
     </a>
   </nav>
+
+  <div class="px-4 py-4 mt-auto">
+    <div class="border-t pt-4">
+      <a
+        href="mailto:support@market-pulse.io"
+        class="flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors duration-200"
+      >
+        <svg
+          class="h-5 w-5 mr-3"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        Help & Support
+      </a>
+    </div>
+  </div>
 </aside>
