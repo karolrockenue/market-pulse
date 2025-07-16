@@ -81,15 +81,16 @@
     </style>
   </head>
   <body class="antialiased">
-    <div class="flex flex-col lg:flex-row min-h-screen">
-      <div
-        id="sidebar-placeholder"
-        class="w-full lg:w-64 lg:flex-shrink-0"
-      ></div>
+<div class="flex flex-col lg:flex-row min-h-screen" x-data="reportsPage()">
+  <div
+    id="sidebar-placeholder"
+    class="w-full lg:w-64 lg:flex-shrink-0"
+  ></div>
 
-      <div class="flex-1 flex flex-col">
-        <div id="header-placeholder"></div>
-        <main class="flex-1 p-8" x-data="reportsPage()">
+  <div class="flex-1 flex flex-col min-w-0">
+    <div id="header-placeholder"></div>
+    <div x-show="isInitialized" x-cloak class="flex-1 flex flex-col">
+        <main class="flex-1 p-8">
           <div
             class="bg-white p-4 rounded-xl border border-gray-200 mb-8 flex flex-col gap-4"
           >
@@ -1052,6 +1053,7 @@
       function reportsPage() {
         return {
           // --- STATE ---
+          isInitialized: false,
           propertyId: null, // Add a new state variable to hold the current property ID.
           isScheduleModalOpen: false,
           isManageModalOpen: false,
@@ -1090,11 +1092,15 @@
             Alpine.data("sidebar", sidebar); // NEW: Register the sidebar component
 
             // Load the shared HTML components into their placeholders
-            await loadComponent("header", "header-placeholder");
-            await loadComponent("sidebar", "sidebar-placeholder"); // NEW: Load the sidebar component
+           // Load the shared HTML components into their placeholders
+await loadComponent("header", "header-placeholder");
+await loadComponent("sidebar", "sidebar-placeholder");
 
-            // Proceed with the rest of the page initialization
-            this.handlePresetChange("current-month");
+// Show the page content now that components are loaded
+this.isInitialized = true;
+
+// Proceed with the rest of the page initialization
+this.handlePresetChange("current-month");
             this.handleFrequencyChange();
             this.schedules = await window.fetchSchedules();
           },

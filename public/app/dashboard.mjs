@@ -181,6 +181,7 @@ const chartManager = {
 export default function () {
   return {
     // --- STATE PROPERTIES (No chart properties anymore) ---
+    isInitialized: false,
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     hasProperties: false,
     isLegalModalOpen: false,
@@ -206,19 +207,35 @@ export default function () {
 
     // --- INITIALIZATION ---
     // Find and replace the entire init() method
+    // --- INITIALIZATION ---
     // This is the final, correct version of the init() method.
-    init() {
+    async init() {
       console.log("Dashboard initializing...");
 
-      // This listener now correctly calls the handler that updates the component's state.
+      // This listener correctly calls the handler that updates the component's state.
       window.addEventListener("property-changed", (event) => {
-        // The event listener's only job is to pass the event data to the existing handler.
         this.handlePropertyChange(event.detail);
       });
 
-      // These two functions are safe to call on initial load as they don't depend on a property.
+      // Dynamically import all necessary modules first.
+      const { loadComponent } = await import("/app/utils.mjs");
+      const { default: pageHeader } = await import("/app/_shared/header.mjs");
+      const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
+
+      // Register the Alpine.js components.
+      Alpine.data("pageHeader", pageHeader);
+      Alpine.data("sidebar", sidebar);
+
+      // Load the shared HTML components into their placeholders.
+      await loadComponent("header", "header-placeholder");
+      await loadComponent("sidebar", "sidebar-placeholder");
+
+      // NOW, initialize the rest of the dashboard.
       this.fetchAndDisplayLastRefreshTime();
-      this.initializeDashboard(); // This is crucial for setting up the chart.
+      this.initializeDashboard();
+
+      // Finally, set the page to be visible.
+      this.isInitialized = true;
     },
 
     initializeDashboard() {

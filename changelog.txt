@@ -55,7 +55,9 @@ market-pulse/
 │   ├── app/
 │   │   ├── _shared/
 │   │   │   ├── header.html
-│   │   │   └── header.mjs
+│   │   │   ├── header.mjs
+│   │   │   ├── sidebar.html
+│   │   │   └── sidebar.mjs
 │   │   ├── dashboard.mjs
 │   │   ├── index.html
 │   │   ├── reports.html
@@ -329,3 +331,13 @@ Date: July 16, 2025
       * The "All Hotels" table in the Admin Panel (public/admin/admin.mjs) was modified to display an editable <select> dropdown for each hotel's category, replacing the static text.
       * An event listener and handler function were added to call the new endpoint whenever a category is changed, providing instant visual feedback upon a successful update.
       * Outcome: The hotel quality tier system is now more descriptive and maintainable. Market comparison logic is preserved and now functions using these clearer categories. The new Admin Panel editor provides a practical and user-friendly way to manage hotel quality tiers without requiring direct database access.
+
+Date: July 16, 2025
+      * Objective: Refactor the application's sidebar into a reusable, shared component to improve maintainability, ensure consistent styling, and fix a bug where the "Admin" link was not appearing on all pages.
+      * Key Changes:
+      * Two new shared component files were created in /public/app/_shared/: sidebar.html for the UI structure and sidebar.mjs for its corresponding logic.
+      * The logic to show or hide the "Admin" link based on the user's session role was centralized into the new sidebar.mjs component.
+      * The hardcoded <aside> sidebar elements were removed from index.html and reports.html and replaced with a single placeholder div.
+      * The page initialization scripts for both pages were updated to use the loadComponent utility to dynamically inject the new shared sidebar.
+      * Project file structure tree has been updated with new additions
+      * Outcome: The initial refactoring was completed, but the implementation introduced a severe UI loading issue. The shared components now load in a disjointed, "choppy" manner, creating a race condition and a poor user experience. The pages do not load correctly, and this will require a dedicated debugging session to fix the component loading sequence. Also content on the chart on the dashboard is now going off page, presusmably ‘pushed’ by the new sidebar.
