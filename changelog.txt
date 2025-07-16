@@ -315,3 +315,17 @@ Date: July 15, 2025 (Part 7)
       * Executing the "Enable App" feature failed with a definitive error from Cloudbeds: You don't have access to property ID.
       * This proves that the manually generated API key lacks the necessary permissions to perform even basic administrative actions (like enabling its own app state) for the property it was created for.
       * Outcome: The "Pilot Mode" feature is now fully developed from our end, with all necessary logic in place to provision, activate, and enable a pilot hotel. However, the feature is currently blocked by a hard permission wall on the Cloudbeds API. The issue is now outside of our control, and the feature is shelved pending a response from Cloudbeds support, who are the only ones who can resolve this permission issue.
+Date: July 16, 2025
+      * Objective: Refactor the hotel quality tier system from a numeric star_rating to a more descriptive text-based category and build a UI in the Admin Panel to manage these categories directly.
+      * Key Changes:
+      * Database Refactor:
+      * The star_rating column in the hotels table was renamed to category and its data type was changed to VARCHAR(50).
+      * A DEFAULT value of 'Midscale' was applied to the new column.
+      * An SQL script was executed to migrate all existing numeric ratings to their new text equivalents (e.g., '1' became 'Budget', '2' became 'Midscale', etc.).
+      * Backend API Update:
+      * All backend queries in dashboard.router.js and send-scheduled-reports.js that performed market comparisons were updated to use h.category instead of h.star_rating for filtering.
+      * Admin Panel Editor:
+      * A new endpoint, POST /api/update-hotel-category, was created in admin.router.js to allow administrators to update a hotel's category securely.
+      * The "All Hotels" table in the Admin Panel (public/admin/admin.mjs) was modified to display an editable <select> dropdown for each hotel's category, replacing the static text.
+      * An event listener and handler function were added to call the new endpoint whenever a category is changed, providing instant visual feedback upon a successful update.
+      * Outcome: The hotel quality tier system is now more descriptive and maintainable. Market comparison logic is preserved and now functions using these clearer categories. The new Admin Panel editor provides a practical and user-friendly way to manage hotel quality tiers without requiring direct database access.
