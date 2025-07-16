@@ -1,5 +1,4 @@
 // --- Standalone Helper Function ---
-
 // This function is now independent and can be used by both the Alpine component and the chart manager.
 function formatValue(value, type) {
   if (value === null || typeof value === "undefined") {
@@ -25,18 +24,13 @@ function formatValue(value, type) {
   return num.toFixed(2);
 }
 
-// --- NEW: The Standalone Chart Manager ---
-// This object handles all ECharts logic, completely separate from Alpine.js.
+// --- The Standalone Chart Manager ---
 const chartManager = {
   chartInstance: null,
-  activeMetric: "occupancy", // The chart needs to know the metric type for formatting
+  activeMetric: "occupancy",
 
-  // The init function now accepts the container element as an argument.
-  // replace with this
   init(containerElement) {
-    // Use the default Canvas renderer for stability.
     this.chartInstance = echarts.init(containerElement, "light");
-
     const baselineOptions = {
       title: {
         text: "",
@@ -63,10 +57,8 @@ const chartManager = {
       },
       xAxis: {
         type: "time",
-        // --- NEW: X-Axis Pointer Configuration ---
         axisPointer: {
           label: {
-            // This formats the date in the small black box on the x-axis.
             formatter: (params) => {
               const date = new Date(params.value);
               return date.toLocaleDateString("en-GB", {
@@ -84,13 +76,9 @@ const chartManager = {
         axisLabel: {
           formatter: (value) => formatValue(value, this.activeMetric),
         },
-        // --- NEW: Y-Axis Pointer Configuration ---
         axisPointer: {
           label: {
-            // This formats the number in the small black box on the y-axis.
-            formatter: (params) => {
-              return formatValue(params.value, this.activeMetric);
-            },
+            formatter: (params) => formatValue(params.value, this.activeMetric),
           },
         },
       },
@@ -100,22 +88,17 @@ const chartManager = {
     };
     this.chartInstance.setOption(baselineOptions);
   },
-  // The update function now accepts all the data it needs as arguments.
+
   update(chartData) {
     if (!this.chartInstance) return;
-
-    // Update the active metric so the formatters work correctly.
     this.activeMetric = chartData.activeMetric;
-
     this.chartInstance.hideLoading();
-
     const metricConfig = {
       occupancy: { label: "Occupancy" },
       adr: { label: "ADR" },
       revpar: { label: "RevPAR" },
     };
     const newChartType = chartData.granularity === "monthly" ? "bar" : "line";
-
     const yourHotelSeries = {
       name: "Your Hotel",
       type: newChartType,
@@ -146,7 +129,6 @@ const chartManager = {
         d.market[chartData.activeMetric],
       ]),
     };
-
     this.chartInstance.setOption(
       {
         title: {
@@ -165,28 +147,22 @@ const chartManager = {
     );
   },
 
-  // Add helper methods for loading and resizing.
   showLoading() {
     this.chartInstance?.showLoading();
   },
-
   resize() {
     this.chartInstance?.resize();
   },
 };
 
 // --- The Refactored Alpine.js Component ---
-// --- The Refactored Alpine.js Component ---
-// The export is now a function that returns the component object.
 export default function () {
   return {
-    // --- STATE PROPERTIES (No chart properties anymore) ---
+    // --- STATE ---
     isInitialized: false,
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     hasProperties: false,
     isLegalModalOpen: false,
-    propertyDropdownOpen: false,
-    userDropdownOpen: false,
     error: { show: false, message: "" },
     activeMetric: "occupancy",
     granularity: "daily",
@@ -195,7 +171,6 @@ export default function () {
     properties: [],
     currentPropertyId: null,
     currentPropertyName: "Loading...",
-    lastRefreshText: "Loading...",
     kpi: {
       occupancy: { your: "-", market: "-", delta: "" },
       adr: { your: "-", market: "-", delta: "" },
@@ -203,42 +178,29 @@ export default function () {
     },
     marketSubtitle: "",
     allMetrics: [],
-    // chart and chartUpdateTimeout have been removed.
 
-    // --- INITIALIZATION ---
-    // This new init method is self-sufficient and no longer depends on an event for its initial load.
+    // --- INITIALIZATION & LIFECYCLE ---
     async init() {
       console.log("Dashboard initializing...");
 
-      // Watch for the page to become visible before trying to draw the chart. This is still needed.
       this.$watch("isInitialized", (isInitialized) => {
-        if (isInitialized) {
-          this.initializeDashboard();
-        }
+        if (isInitialized) this.initializeDashboard();
       });
 
-      // Listen for any SUBSEQUENT property changes from the header.
       window.addEventListener("property-changed", (event) => {
         this.handlePropertyChange(event.detail);
       });
-      // --- NEW: Back-Forward Cache Fix ---
-      // This listener handles cases where the user navigates back to the page.
+
       window.addEventListener("pageshow", (event) => {
-        // The 'persisted' property is true if the page was restored from the bfcache.
         if (event.persisted) {
           console.log(
-            "Page was restored from back-forward cache. Re-fetching data."
+            "Page was restored from bfcache. Forcing a full data reload."
           );
-          // Re-run the report to ensure the chart and tables are re-drawn with fresh data.
-          this.runReport();
-          // It's also good practice to tell the chart to resize itself, as the
-          // container dimensions can be incorrect after being restored from cache.
+          this.forceReloadData();
           this.$nextTick(() => chartManager.resize());
         }
       });
-      // --- End of New Fix ---
 
-      // Load shared components first.
       const { loadComponent } = await import("/app/utils.mjs");
       const { default: pageHeader } = await import("/app/_shared/header.mjs");
       const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
@@ -248,14 +210,29 @@ export default function () {
       await loadComponent("sidebar", "sidebar-placeholder");
 
       this.fetchAndDisplayLastRefreshTime();
+      await this.forceReloadData();
+      this.isInitialized = true;
+    },
 
-      // --- NEW: Self-Sufficient Data Loading ---
-      // The dashboard now takes responsibility for fetching the initial property list.
+    initializeDashboard() {
+      this.$nextTick(() => {
+        chartManager.init(this.$refs.chartContainer);
+        window.addEventListener("resize", () => chartManager.resize());
+      });
+    },
+
+    async forceReloadData() {
+      console.log("Force reloading all dashboard data...");
       try {
         this.isLoading.properties = true;
+        this.isLoading.kpis = true;
+        this.isLoading.chart = true;
+        this.isLoading.tables = true;
+        chartManager.showLoading();
+
         const response = await fetch("/api/my-properties");
         if (!response.ok)
-          throw new Error("Could not fetch properties for initial load.");
+          throw new Error("Could not fetch properties for reload.");
         const properties = await response.json();
 
         if (properties.length > 0) {
@@ -264,69 +241,24 @@ export default function () {
           const firstProperty = properties[0];
           this.currentPropertyId = firstProperty.property_id;
           this.currentPropertyName = firstProperty.property_name;
-
-          // Now that we have a property, trigger the data load.
           this.setPreset("current-month");
         } else {
-          // If the user has no properties, show the connection prompt.
           this.hasProperties = false;
           this.currentPropertyName = "No Properties Found";
+          this.isLoading.properties = false;
+          this.isLoading.kpis = false;
+          this.isLoading.chart = false;
+          this.isLoading.tables = false;
         }
       } catch (error) {
         this.showError(error.message);
-      } finally {
         this.isLoading.properties = false;
-      }
-      // --- End of New Logic ---
-
-      // Finally, make the page visible. The chart and tables will now load.
-      this.isInitialized = true;
-    },
-
-    initializeDashboard() {
-      // The only setup task left is to initialize the chart and its resize listener.
-      this.$nextTick(() => {
-        chartManager.init(this.$refs.chartContainer);
-        window.addEventListener("resize", () => {
-          chartManager.resize();
-        });
-      });
-    },
-
-    // --- STARTUP LOGIC (Unchanged) ---
-    async checkUserRoleAndSetupNav() {
-      try {
-        const response = await fetch("/api/auth/session-info");
-        const sessionInfo = await response.json();
-        if (sessionInfo.isAdmin) {
-          this.$refs.adminNavLink.style.display = "flex";
-        }
-      } catch (error) {
-        console.error("Could not check user role:", error);
+        this.isLoading.kpis = false;
+        this.isLoading.chart = false;
+        this.isLoading.tables = false;
       }
     },
-    async populatePropertySwitcher() {
-      try {
-        const response = await fetch("/api/my-properties");
-        if (!response.ok) throw new Error("Could not fetch properties.");
-        const properties = await response.json();
-        this.isLoading.properties = false;
-        if (properties.length === 0) {
-          this.hasProperties = false;
-          this.currentPropertyName = "No Properties Found";
-          return;
-        }
-        this.hasProperties = true;
-        this.properties = properties;
-        const firstProperty = properties[0];
-        this.currentPropertyId = firstProperty.property_id;
-        this.currentPropertyName = firstProperty.property_name;
-        this.setPreset("current-month");
-      } catch (error) {
-        this.showError(error.message);
-        this.isLoading.properties = false;
-      }
-    },
+
     async fetchAndDisplayLastRefreshTime() {
       try {
         const response = await fetch("/api/last-refresh-time");
@@ -342,9 +274,7 @@ export default function () {
       }
     },
 
-    // --- Chart Logic has been removed from the Alpine component ---
-
-    // --- CORE DATA LOGIC (Now calls chartManager.update) ---
+    // --- CORE DATA & UI LOGIC ---
     async loadKpis(startDate, endDate) {
       this.isLoading.kpis = true;
       try {
@@ -360,15 +290,13 @@ export default function () {
         this.isLoading.kpis = false;
       }
     },
-    // Find and replace the entire loadChartAndTables() method
-    // This is the full, correct version of the function.
+
     async loadChartAndTables(startDate, endDate, granularity) {
       this.isLoading.chart = true;
       this.isLoading.tables = true;
       chartManager.showLoading();
       try {
         const propertyId = this.currentPropertyId;
-        // Both URLs correctly include the propertyId.
         const urls = [
           `/api/metrics-from-db?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
           `/api/competitor-metrics?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}&propertyId=${propertyId}`,
@@ -377,9 +305,9 @@ export default function () {
           urls.map((url) => fetch(url))
         );
 
-        if (!yourHotelResponse.ok || !marketResponse.ok) {
+        if (!yourHotelResponse.ok || !marketResponse.ok)
           throw new Error("Could not load chart/table data.");
-        }
+
         const yourHotelData = await yourHotelResponse.json();
         const marketData = await marketResponse.json();
         this.allMetrics = this.processAndMergeData(
@@ -411,14 +339,13 @@ export default function () {
         this.isLoading.tables = false;
       }
     },
-    // --- DATA PROCESSING & RENDERING (renderKpiCards uses the new standalone helper) ---
+
     processAndMergeData(yourData, marketData) {
       const dataMap = new Map();
       const processRow = (row, source) => {
         const date = (row.stay_date || row.period).substring(0, 10);
-        if (!dataMap.has(date)) {
+        if (!dataMap.has(date))
           dataMap.set(date, { date, your: {}, market: {} });
-        }
         const entry = dataMap.get(date);
         entry[source] = {
           occupancy:
@@ -438,6 +365,7 @@ export default function () {
       });
       return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
     },
+
     renderKpiCards(kpiData) {
       if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
         this.kpi = {
@@ -459,7 +387,6 @@ export default function () {
                 1
               )}pts`;
         } else {
-          // Use the new standalone formatValue helper
           formattedDelta = isNaN(delta)
             ? ""
             : `${delta >= 0 ? "+" : ""}${formatValue(
@@ -468,8 +395,8 @@ export default function () {
               )}`;
         }
         this.kpi[metric] = {
-          your: formatValue(yourValue, metric), // Use the new standalone formatValue helper
-          market: formatValue(marketValue, metric), // Use the new standalone formatValue helper
+          your: formatValue(yourValue, metric),
+          market: formatValue(marketValue, metric),
           delta: formattedDelta,
           deltaClass: isNaN(delta)
             ? ""
@@ -480,7 +407,6 @@ export default function () {
       }
     },
 
-    // --- UI CONTROL METHODS (setActiveMetric now calls chartManager.update) ---
     runReport() {
       if (!this.dates.start || !this.dates.end || !this.granularity) return;
       this.error.show = false;
@@ -491,10 +417,12 @@ export default function () {
         this.granularity
       );
     },
+
     setGranularity(newGranularity) {
       this.granularity = newGranularity;
       this.runReport();
     },
+
     setPreset(preset) {
       this.activePreset = preset;
       const today = new Date();
@@ -520,7 +448,6 @@ export default function () {
 
     setActiveMetric(metric) {
       this.activeMetric = metric;
-      // Instead of calling its own updateChart, it calls the chart manager.
       chartManager.update({
         metrics: this.allMetrics,
         activeMetric: this.activeMetric,
@@ -528,40 +455,32 @@ export default function () {
         propertyName: this.currentPropertyName,
       });
     },
-    // This function now receives both the ID and the name directly from the event.
+
     handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
-
-      // If there's no ID or the ID hasn't changed, do nothing.
-      if (!propertyId || this.currentPropertyId === propertyId) {
-        return;
-      }
-
-      // Set the dashboard's state directly from the event data.
+      if (!propertyId || this.currentPropertyId === propertyId) return;
       this.currentPropertyId = propertyId;
-      this.currentPropertyName = propertyName; // No more lookups needed!
+      this.currentPropertyName = propertyName;
       this.isLoading.properties = false;
       this.hasProperties = true;
-
-      // Trigger a full data refresh for the new property.
       this.setPreset("current-month");
     },
+
     logout() {
       fetch("/api/auth/logout", { method: "POST" })
         .then((res) => {
           if (res.ok) window.location.href = "/signin";
-          else this.showError("Logout failed. Please try again.");
         })
         .catch(() => this.showError("An error occurred during logout."));
     },
+
     showError(message) {
       this.error.message = message;
       this.error.show = true;
     },
 
-    // --- HELPER METHODS (getDelta uses the standalone helper) ---
-    formatValue: formatValue, // Add a reference to the standalone function so the HTML template can find it.
-
+    // --- HELPER METHODS ---
+    formatValue: formatValue,
     getDelta(day) {
       if (
         !day.your ||
@@ -581,7 +500,7 @@ export default function () {
         formattedDelta = `${deltaSign}${formatValue(
           Math.abs(delta),
           "currency"
-        )}`; // Use standalone helper
+        )}`;
       }
       return {
         formattedDelta: formattedDelta,
