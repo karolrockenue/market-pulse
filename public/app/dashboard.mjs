@@ -206,42 +206,64 @@ export default function () {
     // chart and chartUpdateTimeout have been removed.
 
     // --- INITIALIZATION ---
-    // This is the final, correct version of the init() method.
+    // This new init method is self-sufficient and no longer depends on an event for its initial load.
     async init() {
       console.log("Dashboard initializing...");
 
-      // Set up a watcher. This function will ONLY run when 'isInitialized' becomes true.
-      // This is the key fix for the chart loading error.
+      // Watch for the page to become visible before trying to draw the chart. This is still needed.
       this.$watch("isInitialized", (isInitialized) => {
         if (isInitialized) {
-          // Because isInitialized is now true, the chart's container div is in the DOM.
-          // It's now safe to initialize the dashboard and the chart.
           this.initializeDashboard();
         }
       });
 
-      // This listener correctly calls the handler that updates the component's state.
+      // Listen for any SUBSEQUENT property changes from the header.
       window.addEventListener("property-changed", (event) => {
         this.handlePropertyChange(event.detail);
       });
 
-      // Dynamically import all necessary modules first.
+      // Load shared components first.
       const { loadComponent } = await import("/app/utils.mjs");
       const { default: pageHeader } = await import("/app/_shared/header.mjs");
       const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
-
-      // Register the Alpine.js components.
       Alpine.data("pageHeader", pageHeader);
       Alpine.data("sidebar", sidebar);
-
-      // Load the shared HTML components into their placeholders.
       await loadComponent("header", "header-placeholder");
       await loadComponent("sidebar", "sidebar-placeholder");
 
-      // This call no longer initializes the chart directly. It just fetches non-essential info.
       this.fetchAndDisplayLastRefreshTime();
 
-      // Finally, set the page to be visible. The watcher we added above will now fire.
+      // --- NEW: Self-Sufficient Data Loading ---
+      // The dashboard now takes responsibility for fetching the initial property list.
+      try {
+        this.isLoading.properties = true;
+        const response = await fetch("/api/my-properties");
+        if (!response.ok)
+          throw new Error("Could not fetch properties for initial load.");
+        const properties = await response.json();
+
+        if (properties.length > 0) {
+          this.hasProperties = true;
+          this.properties = properties;
+          const firstProperty = properties[0];
+          this.currentPropertyId = firstProperty.property_id;
+          this.currentPropertyName = firstProperty.property_name;
+
+          // Now that we have a property, trigger the data load.
+          this.setPreset("current-month");
+        } else {
+          // If the user has no properties, show the connection prompt.
+          this.hasProperties = false;
+          this.currentPropertyName = "No Properties Found";
+        }
+      } catch (error) {
+        this.showError(error.message);
+      } finally {
+        this.isLoading.properties = false;
+      }
+      // --- End of New Logic ---
+
+      // Finally, make the page visible. The chart and tables will now load.
       this.isInitialized = true;
     },
 
