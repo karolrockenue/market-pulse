@@ -25,21 +25,59 @@ async function getCloudbedsAccessToken(refreshToken) {
   return tokenData.access_token;
 }
 
+// This function now correctly calculates Occupancy and RevPAR instead of trusting the API.
 function processApiDataForTable(allData) {
   const aggregatedData = {};
   if (!allData || allData.length === 0) return aggregatedData;
+
+  // First, aggregate the raw sums from all pages of the API response.
   for (const page of allData) {
     if (!page.index || !page.records) continue;
     for (let i = 0; i < page.index.length; i++) {
       const date = page.index[i][0];
-      if (!aggregatedData[date]) aggregatedData[date] = {};
-      for (const metric in page.records) {
-        if (!aggregatedData[date][metric]) aggregatedData[date][metric] = 0;
-        aggregatedData[date][metric] +=
-          parseFloat(page.records[metric][i]) || 0;
+      if (!aggregatedData[date]) {
+        aggregatedData[date] = {
+          rooms_sold: 0,
+          capacity_count: 0,
+          total_revenue: 0,
+          // We need total room revenue to correctly calculate ADR
+          room_revenue: 0,
+        };
       }
+      // Sum the core metrics needed for calculation.
+      aggregatedData[date].rooms_sold +=
+        parseFloat(page.records.rooms_sold?.[i]) || 0;
+      aggregatedData[date].capacity_count +=
+        parseFloat(page.records.capacity_count?.[i]) || 0;
+      aggregatedData[date].total_revenue +=
+        parseFloat(page.records.total_revenue?.[i]) || 0;
+      aggregatedData[date].room_revenue +=
+        parseFloat(page.records.room_revenue?.[i]) || 0;
     }
   }
+
+  // Second, loop through the aggregated data to perform calculations for each day.
+  for (const date in aggregatedData) {
+    const metrics = aggregatedData[date];
+
+    // Calculate ADR: Room Revenue / Rooms Sold
+    if (metrics.rooms_sold > 0) {
+      metrics.adr = metrics.room_revenue / metrics.rooms_sold;
+    } else {
+      metrics.adr = 0;
+    }
+
+    // Calculate Occupancy: Rooms Sold / Capacity
+    if (metrics.capacity_count > 0) {
+      metrics.occupancy = metrics.rooms_sold / metrics.capacity_count;
+    } else {
+      metrics.occupancy = 0;
+    }
+
+    // Calculate RevPAR: ADR * Occupancy
+    metrics.revpar = metrics.adr * metrics.occupancy;
+  }
+
   return aggregatedData;
 }
 
