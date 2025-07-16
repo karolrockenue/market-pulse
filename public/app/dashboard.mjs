@@ -221,6 +221,22 @@ export default function () {
       window.addEventListener("property-changed", (event) => {
         this.handlePropertyChange(event.detail);
       });
+      // --- NEW: Back-Forward Cache Fix ---
+      // This listener handles cases where the user navigates back to the page.
+      window.addEventListener("pageshow", (event) => {
+        // The 'persisted' property is true if the page was restored from the bfcache.
+        if (event.persisted) {
+          console.log(
+            "Page was restored from back-forward cache. Re-fetching data."
+          );
+          // Re-run the report to ensure the chart and tables are re-drawn with fresh data.
+          this.runReport();
+          // It's also good practice to tell the chart to resize itself, as the
+          // container dimensions can be incorrect after being restored from cache.
+          this.$nextTick(() => chartManager.resize());
+        }
+      });
+      // --- End of New Fix ---
 
       // Load shared components first.
       const { loadComponent } = await import("/app/utils.mjs");
