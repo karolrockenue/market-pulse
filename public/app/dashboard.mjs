@@ -220,26 +220,28 @@ export default function () {
         this.handlePropertyChange(event.detail);
       });
 
-      // This is the fix. We are telling Alpine to watch the 'isInitialized' flag.
-      // When it becomes true (meaning the layout is stable), we command the chart to resize.
-      this.$watch("isInitialized", (isInitialized) => {
-        if (isInitialized) {
-          // Use $nextTick to wait for the DOM to be updated before resizing the chart.
-          this.$nextTick(() => {
-            chartManager.resize();
-          });
-        }
-      });
-
       // These two functions are safe to call on initial load as they don't depend on a property.
       this.fetchAndDisplayLastRefreshTime();
       this.initializeDashboard(); // This is crucial for setting up the chart.
     },
 
     initializeDashboard() {
-      // The only setup task left is to initialize the chart and its resize listener.
       this.$nextTick(() => {
-        chartManager.init(this.$refs.chartContainer);
+        const chartContainer = this.$refs.chartContainer;
+
+        // Initialize the chart instance.
+        chartManager.init(chartContainer);
+
+        // Create a ResizeObserver to watch the chart's container element.
+        const resizeObserver = new ResizeObserver(() => {
+          // Whenever the container size changes, tell the chart manager to resize the chart.
+          chartManager.resize();
+        });
+
+        // Tell the observer to start watching the chart's container.
+        resizeObserver.observe(chartContainer);
+
+        // Keep the window resize listener as a fallback for other scenarios.
         window.addEventListener("resize", () => {
           chartManager.resize();
         });
