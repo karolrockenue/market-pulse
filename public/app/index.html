@@ -351,6 +351,10 @@
                       <div>
                         <p class="text-xs text-gray-400">Your Hotel</p>
                         <p
+                          class="text-sm text-slate-500"
+                          x-text="marketSubtitle"
+                        ></p>
+                        <p
                           class="text-3xl font-extrabold text-gray-800 font-data"
                           x-text="kpi[metric]?.your"
                         ></p>
@@ -468,8 +472,7 @@
                   The Market
                 </h2>
                 <p
-                  id="market-subtitle"
-                  class="text-sm text-gray-500 -mt-2 mb-4"
+                  class="text-sm text-slate-500 -mt-2 mb-4"
                   x-text="marketSubtitle"
                 ></p>
                 <template x-if="isLoading.tables">
