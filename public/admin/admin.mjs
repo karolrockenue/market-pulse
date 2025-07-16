@@ -121,21 +121,45 @@ function initializeAdminPanel() {
       const hotels = await response.json();
       hotelsTableBody.innerHTML = "";
       if (hotels.length === 0) {
-        hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">No hotels found in the database.</td></tr>`;
+        hotelsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-500">No hotels found in the database.</td></tr>`;
         return;
       }
+
+      // Define the available categories for the dropdown
+      const categories = ["Budget", "Midscale", "Upper Midscale", "Luxury"];
+
       hotels.forEach((hotel) => {
         const row = document.createElement("tr");
+
+        // Create the <option> tags for the select dropdown
+        let selectOptions = categories
+          .map(
+            (cat) =>
+              `<option value="${cat}" ${
+                hotel.category === cat ? "selected" : ""
+              }>${cat}</option>`
+          )
+          .join("");
+
+        // Generate the full table row with the new dropdown
         row.innerHTML = `
           <td class="px-4 py-3 font-mono text-gray-600">${hotel.hotel_id}</td>
           <td class="px-4 py-3 font-medium text-gray-800">${hotel.property_name}</td>
           <td class="px-4 py-3 text-gray-600">${hotel.property_type}</td>
           <td class="px-4 py-3 text-gray-600">${hotel.city}</td>
+          <td class="px-4 py-3 text-gray-600">
+            <select
+              data-hotel-id="${hotel.hotel_id}"
+              class="category-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+            >
+              ${selectOptions}
+            </select>
+          </td>
         `;
         hotelsTableBody.appendChild(row);
       });
     } catch (error) {
-      hotelsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-600">${error.message}</td></tr>`;
+      hotelsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-red-600">${error.message}</td></tr>`;
     }
   };
 
@@ -267,7 +291,54 @@ function initializeAdminPanel() {
       }
     }
   };
+  // NEW: Function to send the category update to the backend
+  const updateHotelCategory = async (hotelId, newCategory, selectElement) => {
+    // Disable the dropdown to prevent multiple quick changes
+    selectElement.disabled = true;
 
+    try {
+      const response = await fetch("/api/update-hotel-category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hotelId: hotelId, category: newCategory }),
+      });
+
+      if (!response.ok) {
+        // If the server returns an error, show an alert and re-enable the dropdown
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update.");
+      }
+
+      // On success, provide positive visual feedback by flashing the border green
+      selectElement.classList.add(
+        "border-green-500",
+        "ring-2",
+        "ring-green-200"
+      );
+      setTimeout(() => {
+        selectElement.classList.remove(
+          "border-green-500",
+          "ring-2",
+          "ring-green-200"
+        );
+      }, 2000);
+    } catch (error) {
+      // On failure, show an alert with the error message
+      alert(`Error updating category for hotel ${hotelId}: ${error.message}`);
+    } finally {
+      // Re-enable the dropdown regardless of success or failure
+      selectElement.disabled = false;
+    }
+  };
+
+  // NEW: Add a single event listener to the table to handle all dropdown changes
+  hotelsTableBody.addEventListener("change", (event) => {
+    if (event.target.classList.contains("category-select")) {
+      const hotelId = event.target.dataset.hotelId;
+      const newCategory = event.target.value;
+      updateHotelCategory(hotelId, newCategory, event.target);
+    }
+  });
   // /public/admin/admin.mjs -> inside initializeAdminPanel()
 
   const enablePilotApp = async (propertyId) => {

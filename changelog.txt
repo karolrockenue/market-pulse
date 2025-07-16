@@ -303,3 +303,15 @@ Date: July 15, 2025 (Part 6)
 auth_mode. If the mode is 'manual', the scripts correctly use the property-specific override_api_key instead of attempting to use a non-existent refresh_token.
    * API Permission Discovery: After the refactor, running the initial sync failed with a 403 Forbidden error with the message "User does not have permission to VIEW report". This confirmed that the issue is not with our code's logic but with the permissions associated with the manually generated Cloudbeds API key.
       * Outcome: Our internal backend scripts are now complete and correctly handle both standard and pilot user authentication flows. However, the data sync for pilot users is currently blocked by the 403 Forbidden error from the Cloudbeds API. The immediate next step is to await a response from Cloudbeds support to resolve this final permission issue.
+Date: July 15, 2025 (Part 7)
+      * Objective: Resolve the final 403 Forbidden error to complete the data sync for pilot hotels, based on new research about enabling the app's "active session."
+      * Summary: This session was dedicated to implementing the final piece of the puzzle suggested by our research: explicitly enabling the app's session for the pilot hotel. The team built out the entire feature, from the backend API call to the frontend UI in the Admin Panel. However, the attempt to enable the app failed with a new, more fundamental permission error from the Cloudbeds API. This confirmed that the issue is not with our workflow but with the inherent limitations of the manually generated API key.
+      * Key Changes:
+      * App State Enablement Feature:
+      * A setCloudbedsAppState helper function was added to /api/utils/cloudbeds.js to make a POST request to the /api/v1.1/postAppState endpoint.
+      * A new /api/enable-pilot-app route was created in /api/routes/admin.router.js to securely call this new function.
+      * The Admin Panel UI (/public/admin/index.html and /public/admin/admin.mjs) was updated to dynamically show an "Enable App" button for pilot hotels with a "connected" status.
+      * Final Diagnosis:
+      * Executing the "Enable App" feature failed with a definitive error from Cloudbeds: You don't have access to property ID.
+      * This proves that the manually generated API key lacks the necessary permissions to perform even basic administrative actions (like enabling its own app state) for the property it was created for.
+      * Outcome: The "Pilot Mode" feature is now fully developed from our end, with all necessary logic in place to provision, activate, and enable a pilot hotel. However, the feature is currently blocked by a hard permission wall on the Cloudbeds API. The issue is now outside of our control, and the feature is shelved pending a response from Cloudbeds support, who are the only ones who can resolve this permission issue.

@@ -61,17 +61,21 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     if (accessCheck.rows.length === 0)
       return res.status(403).json({ error: "Access denied to this property." });
 
-    const hotelRatingResult = await pgPool.query(
-      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+    // Fetch the category for the selected hotel
+    const hotelCategoryResult = await pgPool.query(
+      "SELECT category FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
+    // Check if the hotel or its category exists
     if (
-      hotelRatingResult.rows.length === 0 ||
-      !hotelRatingResult.rows[0].star_rating
+      hotelCategoryResult.rows.length === 0 ||
+      !hotelCategoryResult.rows[0].category
     ) {
+      // If no category, return empty data as no market comparison is possible
       return res.json({ yourHotel: {}, market: {} });
     }
-    const starRating = hotelRatingResult.rows[0].star_rating;
+    // Store the category for the market data query
+    const category = hotelCategoryResult.rows[0].category;
 
     const kpiQuery = `
       SELECT
@@ -82,14 +86,14 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
           (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
           (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
       FROM daily_metrics_snapshots dms
-      JOIN hotels h ON dms.hotel_id = h.hotel_id
-      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.star_rating = $4;
-    `;
+  JOIN hotels h ON dms.hotel_id = h.hotel_id
+  WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.category = $4;
+`;
     const result = await pgPool.query(kpiQuery, [
       propertyId,
       startDate,
       endDate,
-      starRating,
+      category, // Use the new 'category' variable
     ]);
     const kpis = result.rows[0] || {};
     res.json({
@@ -152,35 +156,40 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     if (accessCheck.rows.length === 0)
       return res.status(403).json({ error: "Access denied to this property." });
 
-    const hotelRatingResult = await pgPool.query(
-      "SELECT star_rating FROM hotels WHERE hotel_id = $1",
+    // Fetch the category for the selected hotel
+    const hotelCategoryResult = await pgPool.query(
+      "SELECT category FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
+    // If no category, no market comparison can be done
     if (
-      hotelRatingResult.rows.length === 0 ||
-      !hotelRatingResult.rows[0].star_rating
+      hotelCategoryResult.rows.length === 0 ||
+      !hotelCategoryResult.rows[0].category
     ) {
       return res.json({ metrics: [], competitorCount: 0 });
     }
-    const starRating = hotelRatingResult.rows[0].star_rating;
+    // Store the category for the queries
+    const category = hotelCategoryResult.rows[0].category;
     const period = getPeriod(granularity);
     const query = `
       SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar,
       SUM(dms.total_revenue) as market_total_revenue, SUM(dms.rooms_sold) as market_rooms_sold, SUM(dms.capacity_count) as market_capacity_count
       FROM daily_metrics_snapshots dms
       JOIN hotels h ON dms.hotel_id = h.hotel_id
-      WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
-      GROUP BY period ORDER BY period ASC;
-    `;
+WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
+  GROUP BY period ORDER BY period ASC;
+`;
+    // Update the query to use the new 'category' variable
     const result = await pgPool.query(query, [
       propertyId,
-      starRating,
+      category,
       startDate,
       endDate,
     ]);
+    // Also update the competitor count query to use 'category'
     const competitorCountResult = await pgPool.query(
-      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE star_rating = $1 AND hotel_id != $2",
-      [starRating, propertyId]
+      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE category = $1 AND hotel_id != $2",
+      [category, propertyId]
     );
     res.json({
       metrics: result.rows,

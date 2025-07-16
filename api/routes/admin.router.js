@@ -44,14 +44,14 @@ async function getCloudbedsAccessToken(refreshToken) {
 router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
   try {
     const { rows } = await pgPool.query(
-      "SELECT hotel_id, property_name, property_type, city, star_rating FROM hotels ORDER BY property_name"
+      // Select the new 'category' column instead of 'star_rating'
+      "SELECT hotel_id, property_name, property_type, city, category FROM hotels ORDER BY property_name"
     );
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch hotels." });
   }
 });
-
 router.get("/test-database", requireAdminApi, async (req, res) => {
   try {
     const client = await pgPool.connect();
@@ -767,18 +767,50 @@ router.post("/enable-pilot-app", requireAdminApi, async (req, res) => {
 
     // 3. Respond to the frontend.
     if (success) {
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: `App successfully enabled for property ${propertyId}.`,
-        });
+      res.status(200).json({
+        success: true,
+        message: `App successfully enabled for property ${propertyId}.`,
+      });
     } else {
       throw new Error("Failed to set app state in Cloudbeds.");
     }
   } catch (error) {
     console.error("Error enabling pilot app:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// NEW: Endpoint to update a hotel's category
+router.post("/update-hotel-category", requireAdminApi, async (req, res) => {
+  const { hotelId, category } = req.body;
+
+  // Validate that the category is one of the allowed values
+  const allowedCategories = ["Budget", "Midscale", "Upper Midscale", "Luxury"];
+  if (!allowedCategories.includes(category)) {
+    return res.status(400).json({ error: "Invalid category provided." });
+  }
+
+  if (!hotelId) {
+    return res.status(400).json({ error: "Hotel ID is required." });
+  }
+
+  try {
+    // Execute the update query
+    const result = await pgPool.query(
+      "UPDATE hotels SET category = $1 WHERE hotel_id = $2",
+      [category, hotelId]
+    );
+
+    // Check if any row was actually updated
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Hotel not found." });
+    }
+
+    // Send a success response
+    res.status(200).json({ message: "Category updated successfully." });
+  } catch (error) {
+    console.error("Error updating hotel category:", error);
+    res.status(500).json({ error: "Failed to update category." });
   }
 });
 

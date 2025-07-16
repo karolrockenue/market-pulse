@@ -73,17 +73,20 @@ async function getHotelMetrics(propertyId, startDate, endDate) {
   return rows;
 }
 
-async function getMarketMetrics(propertyId, starRating, startDate, endDate) {
+// The function now accepts 'category' instead of 'starRating'
+// The function now accepts 'category' instead of 'starRating'
+async function getMarketMetrics(propertyId, category, startDate, endDate) {
   const query = `
-        SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
-        FROM daily_metrics_snapshots dms
-        JOIN hotels h ON dms.hotel_id = h.hotel_id
-        WHERE dms.hotel_id != $1 AND h.star_rating = $2 AND dms.stay_date::date >= $3 AND dms.stay_date::date <= $4
-        GROUP BY stay_date::date ORDER BY stay_date::date ASC;
-    `;
+    SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
+    FROM daily_metrics_snapshots dms
+    JOIN hotels h ON dms.hotel_id = h.hotel_id
+    WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date::date >= $3 AND dms.stay_date::date <= $4
+    GROUP BY stay_date::date ORDER BY stay_date::date ASC;
+`;
+  // Use the 'category' variable in the query
   const { rows } = await pgPool.query(query, [
     propertyId,
-    starRating,
+    category,
     startDate,
     endDate,
   ]);
@@ -248,10 +251,11 @@ module.exports = async (req, res) => {
     const currentDayOfMonth = now.getUTCDate();
 
     const { rows: dueReports } = await pgPool.query(
-      `SELECT sr.*, h.star_rating
-       FROM scheduled_reports sr
-       JOIN hotels h ON sr.property_id::integer = h.hotel_id
-       WHERE sr.time_of_day = $1 AND (
+      // Select the new 'category' column instead of 'star_rating'
+      `SELECT sr.*, h.category
+   FROM scheduled_reports sr
+   JOIN hotels h ON sr.property_id::integer = h.hotel_id
+   WHERE sr.time_of_day = $1 AND (
          (sr.frequency = 'Daily') OR
          (sr.frequency = 'Weekly' AND sr.day_of_week = $2) OR
          (sr.frequency = 'Monthly' AND sr.day_of_month = $3)
@@ -274,9 +278,10 @@ module.exports = async (req, res) => {
         endDate
       );
       const marketData = report.add_comparisons
-        ? await getMarketMetrics(
+        ? // Pass the new 'report.category' field to the updated function
+          await getMarketMetrics(
             report.property_id,
-            report.star_rating,
+            report.category,
             startDate,
             endDate
           )
