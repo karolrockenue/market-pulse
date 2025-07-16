@@ -590,20 +590,28 @@
       // Import page-specific and shared component logic
       import dashboardComponent from "/app/dashboard.mjs";
       import pageHeader from "/app/_shared/header.mjs";
-      import sidebar from "/app/_shared/sidebar.mjs"; // NEW: Import sidebar logic
+      import sidebar from "/app/_shared/sidebar.mjs";
       import { loadComponent } from "/app/utils.mjs";
 
       // Register all Alpine.js components
       document.addEventListener("alpine:init", () => {
         Alpine.data("dashboard", dashboardComponent);
         Alpine.data("pageHeader", pageHeader);
-        Alpine.data("sidebar", sidebar); // NEW: Register the sidebar component
+        Alpine.data("sidebar", sidebar);
       });
 
-      // Load shared HTML components into their placeholders
-      document.addEventListener("DOMContentLoaded", () => {
-        loadComponent("header", "header-placeholder");
-        loadComponent("sidebar", "sidebar-placeholder"); // NEW: Load the sidebar
+      // This is the FIX. We now make the loading process asynchronous.
+      document.addEventListener("DOMContentLoaded", async () => {
+        // 1. Wait for the header to load and render.
+        await loadComponent("header", "header-placeholder");
+
+        // 2. Wait for the sidebar to load and render. This is the step that changes the page layout.
+        await loadComponent("sidebar", "sidebar-placeholder");
+
+        // 3. Manually dispatch a 'resize' event on the window.
+        // The chart is already listening for this event and will redraw itself
+        // with the correct, new dimensions.
+        window.dispatchEvent(new Event("resize"));
       });
     </script>
 
