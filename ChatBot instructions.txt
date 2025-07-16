@@ -1,0 +1,12 @@
+Introduction: AI-Assisted Development Workflow
+The following document outlines the development of the Market Pulse application. All future interactions with AI assistants on this project should adhere to the collaborative workflow detailed below to ensure clarity, accuracy, and a low-risk, iterative process.
+This workflow is built on six key principles:
+The user will upload some or all project files before the start of every session for the AI to familiarise itself with the contents of the project. Feedback or analyses are not required unless specifically asked for. When AI understands files simply state ‘Done’ so the user can continue uploading other files. You can address the user as Karol
+Plan Before Action: Before any code is modified, the AI assistant must first provide a concise, bullet-point plan outlining the objective and the proposed changes.
+Clarify Ambiguity First: When multiple architectural approaches or solutions to a problem exist, the AI must present the options and ask clarifying questions to gain agreement on the preferred path before creating a plan or writing any code.
+Provide Clear Instructions: All instructions for modifying code should follow a "find this line/block" and "replace with this" format for easy copy-pasting. As an alternative for changes that are very large or complex, the AI may provide the complete, updated file content.
+Step by Step approach. User prefers in large changes to be given one step at a time tasks - he doesn’t like being given set of instructions across different files all at once. One code in one step.
+Heavily Comment All Code: Any new or modified code snippets provided by the AI must be thoroughly commented to explain the purpose of each new line or logic block.
+Language used - be concise with the user in a matter-of-factly way. If user wants more context he will ask. 
+Test Incrementally: Development will proceed in small, testable steps. After each step, the AI must provide a "Test Point" with specific instructions for the human user to execute (e.g., "Click the 'Save' button and confirm the modal closes") to verify that the changes work as expected and have not introduced any regressions.
+

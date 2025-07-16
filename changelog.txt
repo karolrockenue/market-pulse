@@ -340,4 +340,13 @@ Date: July 16, 2025
       * The hardcoded <aside> sidebar elements were removed from index.html and reports.html and replaced with a single placeholder div.
       * The page initialization scripts for both pages were updated to use the loadComponent utility to dynamically inject the new shared sidebar.
       * Project file structure tree has been updated with new additions
-      * Outcome: The initial refactoring was completed, but the implementation introduced a severe UI loading issue. The shared components now load in a disjointed, "choppy" manner, creating a race condition and a poor user experience. The pages do not load correctly, and this will require a dedicated debugging session to fix the component loading sequence. Also content on the chart on the dashboard is now going off page, presusmably ‘pushed’ by the new sidebar.
+      * Outcome: The initial refactoring was completed, but the implementation introduced a severe UI loading issue. The shared components now load in a disjointed, "choppy" manner, creating a race condition and a poor user experience. The pages do not load correctly, and this will require a dedicated debugging session to fix the component loading sequence. Also content on the chart on the dashboard is now going off page, presusmably ‘pushed’ by the new sidebar. 
+
+
+Date: July 16, 2025
+      * Objective: Resolve critical UI bugs introduced by the shared sidebar refactor, including a "choppy" component loading sequence and a severe layout bug that caused the main dashboard chart's content to overflow its container.
+      * Key Changes:
+      * Diagnosis: The primary diagnostic breakthrough occurred upon discovering that the chart layout corrected itself whenever the browser's developer console was opened. This confirmed the issue was a race condition, where the chart was rendering before the sidebar component finished loading and shrinking the chart's container. The developer console was inadvertently fixing the issue by firing a window.resize event.
+      * Console Error Fix: An Alpine Expression Error: isInitialized is not defined was being thrown in the console. This was traced to a faulty $watch statement in dashboard.mjs which was removed.
+      * Chart Overflow Fix: To permanently solve the overflow, a ResizeObserver was implemented in the initializeDashboard() method within dashboard.mjs. This observer now directly monitors the chart's container element for any size changes and triggers the chartManager.resize() function in response, ensuring the chart always redraws itself correctly to fit its container.
+      * Outcome: The UI is now fully stable and responsive. The isInitialized console error has been eliminated, and the dashboard chart renders correctly within its container on all desktop screen sizes. The technical debt introduced by the sidebar refactor is now resolved.
