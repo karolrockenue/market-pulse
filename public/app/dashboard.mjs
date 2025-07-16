@@ -187,6 +187,7 @@ export default function () {
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     hasProperties: false,
     isLegalModalOpen: false,
+    yourHotelSubtitle: "",
     propertyDropdownOpen: false,
     userDropdownOpen: false,
     error: { show: false, message: "" },
@@ -317,6 +318,7 @@ export default function () {
     },
     // Find and replace the entire loadChartAndTables() method
     // This is the full, correct version of the function.
+    // This is the full, correct version of the function.
     async loadChartAndTables(startDate, endDate, granularity) {
       this.isLoading.chart = true;
       this.isLoading.tables = true;
@@ -341,10 +343,24 @@ export default function () {
           yourHotelData.metrics,
           marketData.metrics
         );
+
+        // NEW: Update market subtitle to include total rooms.
         this.marketSubtitle =
           marketData.competitorCount > 0
-            ? `Based on a competitive set of ${marketData.competitorCount} hotels.`
+            ? `Same period, based on a competitive set of ${
+                marketData.competitorCount
+              } hotels with ${marketData.totalRooms || 0} rooms`
             : "No competitor data available for this standard.";
+
+        // NEW: Create the subtitle for 'Your Hotel'.
+        const formatDate = (dateStr) => {
+          if (!dateStr) return "";
+          const [year, month, day] = dateStr.split("-");
+          return `${day}/${month}/${year}`;
+        };
+        this.yourHotelSubtitle = `Data for ${formatDate(
+          this.dates.start
+        )} - ${formatDate(this.dates.end)}, with ${this.granularity} display`;
 
         chartManager.update({
           metrics: this.allMetrics,
@@ -355,6 +371,9 @@ export default function () {
       } catch (error) {
         this.showError(error.message);
         this.allMetrics = [];
+        // Clear subtitles on error as well
+        this.marketSubtitle = "Could not load market data.";
+        this.yourHotelSubtitle = "Could not load hotel data.";
         chartManager.update({
           metrics: [],
           activeMetric: this.activeMetric,

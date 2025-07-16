@@ -187,13 +187,31 @@ WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date >= $3 AND dms.sta
       endDate,
     ]);
     // Also update the competitor count query to use 'category'
+    // Also update the competitor count query to use 'category'
     const competitorCountResult = await pgPool.query(
       "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE category = $1 AND hotel_id != $2",
       [category, propertyId]
     );
+
+    // NEW: Query to get the total room capacity of the competitor set.
+    // It finds the most recent capacity snapshot for each competitor hotel and sums them up.
+    const competitorRoomsResult = await pgPool.query(
+      `WITH latest_snapshots AS (
+        SELECT DISTINCT ON (dms.hotel_id) dms.capacity_count
+        FROM daily_metrics_snapshots dms
+        JOIN hotels h ON dms.hotel_id = h.hotel_id
+        WHERE h.category = $1 AND h.hotel_id != $2
+        ORDER BY dms.hotel_id, dms.stay_date DESC
+      )
+      SELECT SUM(capacity_count)::integer as total_rooms FROM latest_snapshots;`,
+      [category, propertyId]
+    );
+
+    // Add the new total_rooms to the JSON response.
     res.json({
       metrics: result.rows,
       competitorCount: parseInt(competitorCountResult.rows[0]?.count || 0, 10),
+      totalRooms: competitorRoomsResult.rows[0]?.total_rooms || 0,
     });
   } catch (error) {
     console.error("Error in /api/competitor-metrics:", error);
