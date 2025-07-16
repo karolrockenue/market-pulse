@@ -206,11 +206,19 @@ export default function () {
     // chart and chartUpdateTimeout have been removed.
 
     // --- INITIALIZATION ---
-    // Find and replace the entire init() method
-    // --- INITIALIZATION ---
     // This is the final, correct version of the init() method.
     async init() {
       console.log("Dashboard initializing...");
+
+      // Set up a watcher. This function will ONLY run when 'isInitialized' becomes true.
+      // This is the key fix for the chart loading error.
+      this.$watch("isInitialized", (isInitialized) => {
+        if (isInitialized) {
+          // Because isInitialized is now true, the chart's container div is in the DOM.
+          // It's now safe to initialize the dashboard and the chart.
+          this.initializeDashboard();
+        }
+      });
 
       // This listener correctly calls the handler that updates the component's state.
       window.addEventListener("property-changed", (event) => {
@@ -230,11 +238,10 @@ export default function () {
       await loadComponent("header", "header-placeholder");
       await loadComponent("sidebar", "sidebar-placeholder");
 
-      // NOW, initialize the rest of the dashboard.
+      // This call no longer initializes the chart directly. It just fetches non-essential info.
       this.fetchAndDisplayLastRefreshTime();
-      this.initializeDashboard();
 
-      // Finally, set the page to be visible.
+      // Finally, set the page to be visible. The watcher we added above will now fire.
       this.isInitialized = true;
     },
 
