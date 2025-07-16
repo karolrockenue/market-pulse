@@ -373,7 +373,7 @@
               class="bg-white p-6 rounded-xl border border-gray-200 mb-8 transition-all duration-300"
               :class="{ 'opacity-50 filter blur-sm': isLoading.chart }"
             >
-              <div x-ref="chartContainer" class="h-[320px] md:h-[350px]"></div>
+<div x-ref="chartContainer" x-init="initializeDashboard()" class="h-[320px] md:h-[350px]"></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">

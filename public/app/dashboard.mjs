@@ -180,9 +180,7 @@ export default function () {
       logger.info("Dashboard", "Component initializing...");
       try {
         this.checkUserRoleAndSetupNav(); // Preserved from your original file
-        this.$watch("isInitialized", (isInitialized) => {
-          if (isInitialized) this.initializeDashboard();
-        });
+
         window.addEventListener("property-changed", (event) => {
           this.handlePropertyChange(event.detail);
         });
@@ -214,9 +212,14 @@ export default function () {
       }
     },
     initializeDashboard() {
-      this.$nextTick(() => {
-        chartManager.init(this.$refs.chartContainer);
-        window.addEventListener("resize", () => chartManager.resize());
+      // Because this is now called by x-init, the chartContainer ref is guaranteed to exist.
+      logger.info(
+        "Dashboard.initializeDashboard",
+        "Chart container is ready, initializing chart..."
+      );
+      chartManager.init(this.$refs.chartContainer);
+      window.addEventListener("resize", () => {
+        chartManager.resize();
       });
     },
 
