@@ -54,7 +54,8 @@ function initializeAdminPanel() {
   const pilotTableBody = document.getElementById("pilot-hotels-table-body");
   const apiResultsContainer = document.getElementById("api-results-container");
 
-  // --- NEW: Event Delegation for the main Hotel Management table ---
+  // public/admin/admin.mjs
+
   // A single listener on the table body now handles all button clicks inside it.
   hotelsTableBody.addEventListener("click", async (event) => {
     // Find the button that was clicked, if any
@@ -64,19 +65,13 @@ function initializeAdminPanel() {
     const hotelId = button.dataset.hotelId;
     const action = button.dataset.action;
 
-    // Handle the "Initial Sync" action
-    if (action === "initial-sync") {
-      if (
-        !confirm(
-          `Are you sure you want to run a full 15-year data sync for property ${hotelId}? This can take several minutes.`
-        )
-      ) {
-        return;
-      }
-      // We can re-use the generic 'runJob' helper for this.
+    // Handle the NEW "Sync Hotel Info" action
+    if (action === "sync-hotel-info") {
+      // Use the generic 'runJob' helper for a consistent UI.
+      // This provides immediate feedback to the admin.
       runJob(
-        "/api/initial-sync",
-        button, // Pass the button itself for UI updates
+        "/api/sync-hotel-info", // Call our new consolidated endpoint
+        button,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -85,10 +80,20 @@ function initializeAdminPanel() {
       );
     }
 
-    // Handle category select changes
-    if (event.target.classList.contains("category-select")) {
-      const newCategory = event.target.value;
-      updateHotelCategory(hotelId, newCategory, event.target);
+    // Handle the "Full Data Sync" action (previously "Initial Sync")
+    if (action === "initial-sync") {
+      if (
+        !confirm(
+          `Are you sure you want to run a full 15-year data sync for property ${hotelId}? This can take several minutes.`
+        )
+      ) {
+        return;
+      }
+      runJob("/api/initial-sync", button, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId: hotelId }),
+      });
     }
   });
 
@@ -150,6 +155,9 @@ function initializeAdminPanel() {
           .join("");
 
         // NEW: Row HTML now includes a cell for the Actions buttons.
+        // public/admin/admin.mjs
+
+        // The row HTML now includes separate buttons for syncing info and the full data pull.
         row.innerHTML = `
           <td class="p-3 font-mono text-slate-600">${hotel.hotel_id}</td>
           <td class="p-3 font-medium text-slate-800">${hotel.property_name}</td>
@@ -160,9 +168,12 @@ function initializeAdminPanel() {
               ${selectOptions}
             </select>
           </td>
-          <td class="p-3 text-right">
-            <button data-hotel-id="${hotel.hotel_id}" data-action="initial-sync" class="control-btn text-xs bg-blue-100 text-blue-800 hover:bg-blue-200">
-              Run Initial Sync
+          <td class="p-3 text-right space-x-2">
+            <button data-hotel-id="${hotel.hotel_id}" data-action="sync-hotel-info" class="control-btn text-xs bg-slate-100 text-slate-800 hover:bg-slate-200" title="Sync latest hotel details like name, address, and tax info.">
+              Sync Hotel Info
+            </button>
+            <button data-hotel-id="${hotel.hotel_id}" data-action="initial-sync" class="control-btn text-xs bg-blue-100 text-blue-800 hover:bg-blue-200" title="Warning: This pulls up to 15 years of historical data and can take several minutes.">
+              Full Data Sync
             </button>
           </td>
         `;
@@ -262,46 +273,53 @@ function initializeAdminPanel() {
     }
   };
 
+  // public/admin/admin.mjs
+
   const runJob = async (url, btn, options = {}) => {
     const originalText = btn.textContent;
-    const globalStatusEl = document.getElementById("job-status-message");
-    const syncStatusEl = document.getElementById("initial-sync-status");
+    const statusEl = document.getElementById("initial-sync-status"); // Use the status element above the table for all jobs
 
     btn.disabled = true;
     btn.textContent = "Running...";
-    syncStatusEl.textContent = "Job started, please wait...";
-    syncStatusEl.className = "mt-2 text-sm text-slate-500";
+    statusEl.textContent = "Job started, please wait...";
+    statusEl.className = "mt-2 text-sm text-slate-500";
 
     try {
       const response = await fetch(url, options);
       const data = await response.json();
-      if (response.ok) {
-        if (url.includes("initial-sync")) {
-          const propertyId = JSON.parse(options.body).propertyId;
-          syncStatusEl.textContent = `✅ Success! Synced ${data.totalRecordsUpdated} records for property ${propertyId}.`;
-          syncStatusEl.className = "mt-2 text-sm text-green-600";
-        } else {
-          globalStatusEl.textContent = "✅ Job completed successfully!";
-          globalStatusEl.className = "mt-4 text-sm font-medium text-green-600";
-        }
-        fetchLastRefreshTime();
-      } else {
+      if (!response.ok) {
         throw new Error(data.error || "Unknown error");
       }
+
+      // Display a specific success message based on the job that was run
+      let successMessage = data.message || "Job completed successfully!";
+      if (url.includes("initial-sync")) {
+        successMessage = `✅ Success! Synced ${
+          data.totalRecordsUpdated
+        } records for property ${JSON.parse(options.body).propertyId}.`;
+      } else {
+        successMessage = `✅ ${successMessage}`;
+      }
+
+      statusEl.textContent = successMessage;
+      statusEl.className = "mt-2 text-sm text-green-600";
+
+      // If the daily refresh was run, update the 'last refresh' time display
+      if (url.includes("daily-refresh")) {
+        fetchLastRefreshTime();
+      }
     } catch (error) {
-      syncStatusEl.textContent = `❌ Job failed: ${error.message}`;
-      syncStatusEl.className = "mt-2 text-sm text-red-600";
+      statusEl.textContent = `❌ Job failed: ${error.message}`;
+      statusEl.className = "mt-2 text-sm text-red-600";
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;
+      // Clear the status message after a few seconds
       setTimeout(() => {
-        if (syncStatusEl.textContent.startsWith("❌")) {
-          syncStatusEl.textContent = "";
-        }
+        statusEl.textContent = "";
       }, 8000);
     }
   };
-
   const updateHotelCategory = async (hotelId, newCategory, selectElement) => {
     selectElement.disabled = true;
     try {

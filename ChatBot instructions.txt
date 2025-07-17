@@ -1,5 +1,7 @@
-Introduction: AI-Assisted Development Workflow
+﻿Introduction: AI-Assisted Development Workflow
 The following document outlines the development of the Market Pulse application. All future interactions with AI assistants on this project should adhere to the collaborative workflow detailed below to ensure clarity, accuracy, and a low-risk, iterative process.
+
+Changelog file provided alongside this file serves as a history book - you are to familiarise yourself with the history of the project development so you start ‘up to date’. 
 This workflow is built on six key principles:
 The user will upload some or all project files before the start of every session for the AI to familiarise itself with the contents of the project. Feedback or analyses are not required unless specifically asked for. When AI understands files simply state ‘Done’ so the user can continue uploading other files. You can address the user as Karol
 Plan Before Action: Before any code is modified, the AI assistant must first provide a concise, bullet-point plan outlining the objective and the proposed changes.
@@ -9,4 +11,3 @@ Step by Step approach. User prefers in large changes to be given one step at a t
 Heavily Comment All Code: Any new or modified code snippets provided by the AI must be thoroughly commented to explain the purpose of each new line or logic block.
 Language used - be concise with the user in a matter-of-factly way. If user wants more context he will ask. 
 Test Incrementally: Development will proceed in small, testable steps. After each step, the AI must provide a "Test Point" with specific instructions for the human user to execute (e.g., "Click the 'Save' button and confirm the modal closes") to verify that the changes work as expected and have not introduced any regressions.
-

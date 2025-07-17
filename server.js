@@ -66,37 +66,20 @@ console.log(
 );
 // --- END NEW BLOCK ---
 
-app.use(
-  session({
-    store: new pgSession({
-      pool: pgPool,
-      tableName: "user_sessions",
-      createTableIfMissing: true,
-    }),
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    // UPDATE THIS LINE to use the new config object
-    cookie: cookieConfig,
-  })
-);
-app.use(
-  session({
-    store: new pgSession({
-      pool: pgPool,
-      tableName: "user_sessions",
-      createTableIfMissing: true,
-    }),
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.VERCEL_ENV === "production",
-      httpOnly: true,
-      sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
+// server.js
 
-      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
-    },
+app.use(
+  session({
+    store: new pgSession({
+      pool: pgPool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    // Use the new config object
+    cookie: cookieConfig,
   })
 );
 

@@ -350,3 +350,18 @@ Date: July 16, 2025
       * Console Error Fix: An Alpine Expression Error: isInitialized is not defined was being thrown in the console. This was traced to a faulty $watch statement in dashboard.mjs which was removed.
       * Chart Overflow Fix: To permanently solve the overflow, a ResizeObserver was implemented in the initializeDashboard() method within dashboard.mjs. This observer now directly monitors the chart's container element for any size changes and triggers the chartManager.resize() function in response, ensuring the chart always redraws itself correctly to fit its container.
       * Outcome: The UI is now fully stable and responsive. The isInitialized console error has been eliminated, and the dashboard chart renders correctly within its container on all desktop screen sizes. The technical debt introduced by the sidebar refactor is now resolved.
+Date: July 16, 2025 (Part 4)
+      * Objective: Conduct a comprehensive debugging and UI/UX overhaul session to fix data inaccuracies and improve the administrative interface.
+      * Summary: This session addressed several distinct issues across the application, from data presentation on the main dashboard to a complete redesign of the Admin Panel for improved workflow efficiency.
+      * Key Changes:
+      * Dashboard Subtitle Enhancement:
+      * The backend API was updated to calculate and return the total room count for the market competitor set.
+      * The dashboard frontend was refactored to display dynamic, aligned subtitles under both the "Your Hotel" and "The Market" tables, showing the active date range and the size of the competitive set.
+      * Historical Data Accuracy Fix:
+      * Problem: Historical data for "Your Hotel" on the main dashboard incorrectly showed 0% for Occupancy and £0.00 for RevPAR.
+      * Resolution: The initial-sync.js script was refactored to manually calculate Occupancy and RevPAR from raw metrics, mirroring the logic in the daily-refresh.js script. This ensures that all historical data is processed correctly, and a subsequent data backfill resolved the inaccurate values in the database.
+      * Admin Panel Redesign:
+      * The Admin Panel's layout was completely reorganized from a simple vertical list into a structured dashboard with cards for "System Health," "Hotel Management," and "Pilot Hotel Management."
+      * The "Manual Action Triggers" section was removed. The "Initial Sync" action was moved directly into the main "Hotel Management" table as a per-row button, streamlining the admin workflow and eliminating the need to manually enter a property ID.
+      * The API Explorer was redesigned with a tabbed interface to separate the "Insights API" and "General API" endpoints, making the tool more intuitive.
+      * Outcome: The dashboard is now more informative with contextual subtitles. The historical data bug has been resolved, ensuring all metrics are accurate. The Admin Panel has been transformed into a professional, efficient, and user-friendly interface.

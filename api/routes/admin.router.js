@@ -1,4 +1,7 @@
 // /api/routes/admin.router.js
+console.log("[SERVER STARTUP] Admin router file is being loaded."); // Add this line
+
+// /api/routes/admin.router.js
 const express = require("express");
 const router = express.Router();
 const fetch = require("node-fetch");
@@ -105,6 +108,62 @@ router.post("/initial-sync", requireAdminApi, async (req, res) => {
   console.log("Admin panel manually triggering initial-sync job...");
   // We call the handler directly, passing the request and response objects.
   await initialSyncHandler(req, res);
+});
+
+// /api/routes/admin.router.js
+
+// NEW: This route syncs all of a hotel's core details (general info and tax info).
+router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
+  const { propertyId } = req.body;
+  if (!propertyId) {
+    return res.status(400).json({ error: "A propertyId is required." });
+  }
+
+  try {
+    // To perform actions on a hotel's behalf, we need a valid access token.
+    // We'll use the logged-in admin's token, as they are initiating the action.
+    const adminUserId = req.session.userId;
+    const userResult = await pgPool.query(
+      "SELECT refresh_token FROM users WHERE cloudbeds_user_id = $1",
+      [adminUserId]
+    );
+
+    if (userResult.rows.length === 0 || !userResult.rows[0].refresh_token) {
+      return res
+        .status(401)
+        .json({ error: "Admin user has no valid refresh token." });
+    }
+
+    // The getCloudbedsAccessToken function is already in this file, so we can reuse it.
+    const accessToken = await getCloudbedsAccessToken(
+      userResult.rows[0].refresh_token
+    );
+    if (!accessToken) {
+      throw new Error(
+        "Could not authenticate with Cloudbeds using admin credentials."
+      );
+    }
+
+    // --- Execute Both Sync Functions ---
+    // Use Promise.all to run both sync operations concurrently for efficiency.
+    await Promise.all([
+      cloudbeds.syncHotelDetailsToDb(accessToken, propertyId),
+      cloudbeds.syncHotelTaxInfoToDb(accessToken, propertyId),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully synced all hotel information for property ${propertyId}.`,
+    });
+  } catch (error) {
+    console.error(
+      `Error syncing hotel info for property ${propertyId}:`,
+      error
+    );
+    res
+      .status(500)
+      .json({ error: error.message || "An internal server error occurred." });
+  }
 });
 
 // This endpoint was missing from the original server.js but is called by admin.mjs

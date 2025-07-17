@@ -184,6 +184,80 @@ async function setCloudbedsAppState(accessToken, propertyId) {
   return true;
 }
 
+// /api/utils/cloudbeds.js
+
+/**
+ * Fetches tax details for a property from Cloudbeds and saves the primary
+ * tax info (rate and type) to our local database.
+ * @param {string} accessToken - A valid Cloudbeds access token or API key.
+ * @param {string} propertyId - The ID of the property to sync tax info for.
+ * @returns {Promise<void>}
+ */
+async function syncHotelTaxInfoToDb(accessToken, propertyId) {
+  // Log the start of the process for debugging.
+  console.log(`[Tax Sync] Starting tax sync for property ${propertyId}...`);
+
+  // Construct the URL for the Cloudbeds getTaxesAndFees endpoint.
+  const url = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyId}`;
+
+  // Fetch the data from the Cloudbeds API.
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const taxData = await response.json();
+
+  // Check if the API call was successful and returned data.
+  if (
+    !response.ok ||
+    !taxData.success ||
+    !taxData.data ||
+    taxData.data.length === 0
+  ) {
+    console.warn(
+      `[Tax Sync] No tax data found for property ${propertyId}. Skipping.`
+    );
+    return;
+  }
+
+  // Find the first 'inclusive' or 'exclusive' tax entry. We'll treat this as the primary VAT.
+  const primaryTax = taxData.data.find(
+    (t) =>
+      t.inclusiveOrExclusive === "inclusive" ||
+      t.inclusiveOrExclusive === "exclusive"
+  );
+
+  if (!primaryTax) {
+    console.warn(
+      `[Tax Sync] No primary (inclusive/exclusive) tax found for property ${propertyId}.`
+    );
+    return;
+  }
+
+  // Extract the rate and type from the primary tax object.
+  // The API provides the rate as a percentage string (e.g., "20.00000"), so we parse it and convert to a decimal.
+  const taxRate = parseFloat(primaryTax.amount) / 100;
+  const taxType = primaryTax.inclusiveOrExclusive;
+
+  // Check if we have valid data before updating the database.
+  if (isNaN(taxRate) || !taxType) {
+    console.error(
+      `[Tax Sync] Invalid tax data parsed for property ${propertyId}. Aborting.`
+    );
+    return;
+  }
+
+  // Update the 'hotels' table with the new tax information for the specific hotel.
+  await pgPool.query(
+    `UPDATE hotels SET tax_rate = $1, tax_type = $2 WHERE hotel_id = $3`,
+    [taxRate, taxType, propertyId]
+  );
+
+  console.log(
+    `[Tax Sync] Successfully synced tax info for property ${propertyId}. Rate: ${taxRate}, Type: ${taxType}.`
+  );
+}
+// api/utils/cloudbeds.js
+
 // api/utils/cloudbeds.js
 
 module.exports = {
@@ -191,5 +265,6 @@ module.exports = {
   getPropertiesForUser,
   getHotelDetails,
   syncHotelDetailsToDb,
-  setCloudbedsAppState, // <-- Add this line
+  setCloudbedsAppState,
+  syncHotelTaxInfoToDb, // Add our new function to the exports
 };

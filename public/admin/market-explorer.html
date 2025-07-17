@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Explorer - Market Pulse</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+      :root {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --accent-primary: #3b82f6;
+        --font-sans: "Inter", sans-serif;
+        --font-data: "IBM Plex Mono", monospace;
+      }
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      .font-data {
+        font-family: var(--font-data);
+      }
+      .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+      }
+      .chart-container {
+        height: 320px; /* Adjusted height for new layout */
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div class="flex min-h-screen">
+      <!-- Sidebar Placeholder -->
+      <div id="sidebar-placeholder"></div>
+
+      <!-- Main Content -->
+      <main class="flex-1 p-8">
+        <header class="mb-8">
+          <h1 class="text-3xl font-bold text-slate-800">Market Explorer</h1>
+          <p class="text-slate-500 mt-1">
+            A macro-level view of market health, historical trends, and future
+            outlook.
+          </p>
+        </header>
+
+        <!-- NEW Two-Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <!-- Left Column (The "Now" View) -->
+          <div class="lg:col-span-2 space-y-8">
+            <!-- Section 1: The Macro View - REIMAGINED -->
+            <section id="macro-view">
+              <h2 class="text-xl font-semibold text-slate-700 mb-4">
+                Market Performance: Rolling 365-Day vs. Prior Year
+              </h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- KPI Card 1: Occupancy -->
+                <div class="card flex items-start gap-4">
+                  <div
+                    class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-medium text-slate-500">
+                      Market Occupancy
+                    </h3>
+                    <p class="text-3xl font-bold font-data text-slate-800 mt-1">
+                      72.5%
+                    </p>
+                    <p class="text-sm font-semibold font-data text-green-600">
+                      +1.2 pts
+                    </p>
+                  </div>
+                </div>
+                <!-- KPI Card 2: ADR -->
+                <div class="card flex items-start gap-4">
+                  <div
+                    class="flex-shrink-0 w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M11 11V3m0 8h8m-8 0l-8 8"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-medium text-slate-500">
+                      Market ADR
+                    </h3>
+                    <p class="text-3xl font-bold font-data text-slate-800 mt-1">
+                      £158.20
+                    </p>
+                    <p class="text-sm font-semibold font-data text-green-600">
+                      +4.5%
+                    </p>
+                  </div>
+                </div>
+                <!-- KPI Card 3: RevPAR -->
+                <div class="card flex items-start gap-4">
+                  <div
+                    class="flex-shrink-0 w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-medium text-slate-500">
+                      Market RevPAR
+                    </h3>
+                    <p class="text-3xl font-bold font-data text-slate-800 mt-1">
+                      £114.70
+                    </p>
+                    <p class="text-sm font-semibold font-data text-green-600">
+                      +6.2%
+                    </p>
+                  </div>
+                </div>
+                <div class="card bg-blue-500 text-white">
+                  <h3 class="text-sm font-medium text-blue-100">
+                    Market Trend Indicator
+                  </h3>
+                  <p class="text-2xl font-semibold mt-2">
+                    Consistent RevPAR growth indicates a strong and stable
+                    market recovery.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Section 3: Forward-Looking Outlook -->
+            <section id="forward-outlook">
+              <h2 class="text-xl font-semibold text-slate-700 mb-4">
+                Forward-Looking Outlook
+              </h2>
+              <div class="card mb-8">
+                <h3 class="font-semibold text-slate-800">
+                  Market Pacing: On-the-Books Occupancy
+                </h3>
+                <div id="pacing-chart" class="chart-container mt-4"></div>
+              </div>
+              <div class="card">
+                <h3 class="font-semibold text-slate-800">
+                  Pickup Hotspots: Last 7 Days
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">
+                  Future weeks with the largest increase in market occupancy.
+                </p>
+                <div class="mt-4 overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="text-left text-slate-500">
+                      <tr>
+                        <th class="p-2 font-semibold">Week Of</th>
+                        <th class="p-2 font-semibold">Occupancy Pickup</th>
+                        <th class="p-2 font-semibold">Demand Level</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                      <tr>
+                        <td class="p-2 font-medium text-slate-700">
+                          Aug 18, 2025
+                        </td>
+                        <td class="p-2 font-data text-green-600 font-semibold">
+                          +8.2 pts
+                        </td>
+                        <td class="p-2">
+                          <span
+                            class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"
+                            >High Surge</span
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="p-2 font-medium text-slate-700">
+                          Sep 22, 2025
+                        </td>
+                        <td class="p-2 font-data text-green-600 font-semibold">
+                          +6.5 pts
+                        </td>
+                        <td class="p-2">
+                          <span
+                            class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800"
+                            >Strong</span
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="p-2 font-medium text-slate-700">
+                          Jul 28, 2025
+                        </td>
+                        <td class="p-2 font-data text-green-600 font-semibold">
+                          +4.1 pts
+                        </td>
+                        <td class="p-2">
+                          <span
+                            class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800"
+                            >Moderate</span
+                          >
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Right Column (The "Big Picture") -->
+          <div class="lg:col-span-1 space-y-8">
+            <!-- Section 2: Historical Trends -->
+            <section id="historical-trends">
+              <h2 class="text-xl font-semibold text-slate-700 mb-4">
+                The Big Picture
+              </h2>
+              <div class="card">
+                <h3 class="font-semibold text-slate-800">YoY Market RevPAR</h3>
+                <div id="yoy-chart" class="chart-container mt-4"></div>
+              </div>
+            </section>
+
+            <!-- Section 4: Market Segmentation -->
+            <section id="segmentation">
+              <div class="card">
+                <h3 class="font-semibold text-slate-800">
+                  RevPAR Growth by Quality Tier (YoY)
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">
+                  Click legend to toggle tiers.
+                </p>
+                <div id="tier-chart" class="chart-container mt-4"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Seasonality Moved to Full Width Section -->
+        <section id="seasonality" class="mt-8">
+          <div class="card">
+            <h2 class="text-xl font-semibold text-slate-700 mb-1">
+              Market Seasonality
+            </h2>
+            <p class="text-sm text-slate-500 mt-1">
+              Average daily occupancy over the last 5 years.
+            </p>
+            <div
+              id="seasonality-heatmap"
+              class="w-full"
+              style="height: 200px"
+            ></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+      import { loadComponent } from "/app/utils.mjs";
+      import sidebar from "/app/_shared/sidebar.mjs";
+
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("sidebar", sidebar);
+      });
+
+      document.addEventListener("DOMContentLoaded", async () => {
+        await loadComponent("sidebar", "sidebar-placeholder");
+        initializeCharts();
+      });
+
+      function initializeCharts() {
+        const last12Months = Array.from({ length: 12 }, (_, i) => {
+          const d = new Date(2025, 6 - i, 1);
+          return d.toLocaleString("default", {
+            month: "short",
+            year: "2-digit",
+          });
+        }).reverse();
+
+        const yoyChart = echarts.init(document.getElementById("yoy-chart"));
+        yoyChart.setOption({
+          tooltip: {
+            trigger: "axis",
+            valueFormatter: (value) => `£${value.toFixed(2)}`,
+          },
+          legend: { data: ["2025", "2024", "5-Year Avg"], top: "bottom" },
+          grid: {
+            top: "10%",
+            left: "3%",
+            right: "4%",
+            bottom: "15%",
+            containLabel: true,
+          },
+          xAxis: { type: "category", data: last12Months },
+          yAxis: { type: "value", axisLabel: { formatter: "£{value}" } },
+          series: [
+            {
+              name: "2025",
+              type: "line",
+              smooth: true,
+              data: [120, 132, 101, 134, 90, 150, 160, 145, 180, 190, 210, 220],
+            },
+            {
+              name: "2024",
+              type: "line",
+              smooth: true,
+              data: [110, 122, 95, 120, 85, 140, 155, 135, 170, 180, 200, 210],
+            },
+            {
+              name: "5-Year Avg",
+              type: "line",
+              lineStyle: { type: "dashed" },
+              data: [100, 110, 85, 115, 80, 130, 145, 125, 160, 170, 190, 200],
+            },
+          ],
+        });
+
+        const heatmapChart = echarts.init(
+          document.getElementById("seasonality-heatmap")
+        );
+        const heatmapData = [];
+        let date = new Date(2024, 0, 1);
+        while (date.getFullYear() === 2024) {
+          let value = 50 + Math.random() * 20;
+          if (date.getDay() === 5 || date.getDay() === 6) value += 20;
+          if (date.getMonth() === 6 || date.getMonth() === 7) value += 15;
+          heatmapData.push([
+            echarts.format.formatTime("yyyy-MM-dd", date),
+            value,
+          ]);
+          date.setDate(date.getDate() + 1);
+        }
+        heatmapChart.setOption({
+          tooltip: {
+            position: "top",
+            formatter: (params) =>
+              `${params.value[0]}: ${params.value[1].toFixed(1)}%`,
+          },
+          visualMap: {
+            min: 40,
+            max: 100,
+            type: "continuous",
+            orient: "horizontal",
+            left: "center",
+            bottom: "0%",
+            text: ["High", "Low"],
+            inRange: { color: ["#dbeafe", "#3b82f6"] },
+          },
+          calendar: {
+            range: "2024",
+            dayLabel: { nameMap: "en" },
+            monthLabel: { nameMap: "en" },
+            splitLine: { show: false },
+            itemStyle: { borderWidth: 4, borderColor: "#fff" },
+            right: 30,
+            left: 30,
+          },
+          series: {
+            type: "heatmap",
+            coordinateSystem: "calendar",
+            data: heatmapData,
+          },
+        });
+
+        const pacingChart = echarts.init(
+          document.getElementById("pacing-chart")
+        );
+        pacingChart.setOption({
+          tooltip: {
+            trigger: "axis",
+            valueFormatter: (value) => `${value.toFixed(1)}%`,
+          },
+          legend: { data: ["This Year", "Last Year"], top: "bottom" },
+          grid: {
+            top: "10%",
+            left: "3%",
+            right: "4%",
+            bottom: "15%",
+            containLabel: true,
+          },
+          xAxis: {
+            type: "category",
+            data: ["+7d", "+14d", "+30d", "+60d", "+90d"],
+          },
+          yAxis: { type: "value", axisLabel: { formatter: "{value}%" } },
+          series: [
+            { name: "This Year", type: "bar", data: [25, 35, 55, 70, 75] },
+            {
+              name: "Last Year",
+              type: "line",
+              smooth: true,
+              data: [22, 30, 50, 68, 72],
+            },
+          ],
+        });
+
+        const tierChart = echarts.init(document.getElementById("tier-chart"));
+        tierChart.setOption({
+          tooltip: {
+            trigger: "axis",
+            valueFormatter: (value) => `${value.toFixed(1)}%`,
+          },
+          legend: {
+            data: ["Luxury", "Midscale", "Budget"],
+            top: "bottom",
+            selectedMode: "multiple",
+          },
+          grid: {
+            top: "10%",
+            left: "3%",
+            right: "4%",
+            bottom: "15%",
+            containLabel: true,
+          },
+          xAxis: { type: "category", data: last12Months },
+          yAxis: { type: "value", axisLabel: { formatter: "{value}%" } },
+          series: [
+            {
+              name: "Luxury",
+              type: "line",
+              smooth: true,
+              data: [8, 9, 7, 8, 6, 10, 11, 10, 12, 13, 14, 15],
+            },
+            {
+              name: "Midscale",
+              type: "line",
+              smooth: true,
+              data: [5, 6, 4, 5, 4, 7, 8, 7, 9, 10, 11, 12],
+            },
+            {
+              name: "Budget",
+              type: "line",
+              smooth: true,
+              data: [3, 4, 2, 3, 2, 5, 6, 5, 7, 8, 9, 10],
+            },
+          ],
+        });
+
+        window.addEventListener("resize", () => {
+          yoyChart.resize();
+          heatmapChart.resize();
+          pacingChart.resize();
+          tierChart.resize();
+        });
+      }
+    </script>
+  </body>
+</html>
