@@ -36,12 +36,15 @@ When requested by the user (Karol), a new entry detailing the completed work mus
 
 market-pulse/
 ├── api/
+│   ├── adapters/
+│   │   └── cloudbedsAdapter.js
 │   ├── routes/
 │   │   ├── admin.router.js
 │   │   ├── auth.router.js
 │   │   ├── dashboard.router.js
 │   │   └── reports.router.js
 │   ├── utils/
+│   │   ├── cloudbeds.js
 │   │   ├── db.js
 │   │   └── middleware.js
 │   ├── daily-refresh.js
@@ -51,7 +54,8 @@ market-pulse/
 ├── public/
 │   ├── admin/
 │   │   ├── admin.mjs
-│   │   └── index.html
+│   │   ├── index.html
+│   │   └── market-explorer.html
 │   ├── app/
 │   │   ├── _shared/
 │   │   │   ├── header.html
@@ -66,7 +70,6 @@ market-pulse/
 │   ├── constants.mjs
 │   └── login.html
 ├── changelog.md
-├── Introduction AI-Assisted Development Workflow.docx
 ├── package-lock.json
 ├── package.json
 ├── server.js
@@ -398,3 +401,25 @@ Date: July 17, 2025 (Part 2)
       * Discovery: Through a "trail of breadcrumbs" debugging strategy, it was confirmed the UPDATE query was executing correctly. The root cause was identified as a silent ROLLBACK being issued by the database driver at the end of a request if any unhandled error occurred later in the same route handler.
       * Resolution: The POST /sync-hotel-info endpoint in admin.router.js was refactored to use explicit transaction control. The entire logic is now wrapped in a manual BEGIN...COMMIT block, which ensures that all database operations are atomically saved, fixing the data persistence issue.
       * Outcome: The neighborhood lookup feature is now functionally complete on the backend and successfully saves the correct neighborhood data to the database. A minor known issue remains where the Admin Panel table does not yet display this new data, which is scheduled to be resolved in a future session.
+Date: July 19, 2025
+      * Objective: Execute a strategic, full-stack refactor of the backend to migrate the application from a tightly coupled, single-vendor architecture to a modular, PMS-agnostic Adapter Pattern, preparing the system for future integrations with new Property Management Systems.
+      * Summary: This was a foundational refactoring effort that completely decoupled the core application logic from the Cloudbeds API. The project involved creating a new architectural layer (adapters), performing a complex database schema migration with data preservation, updating all application code to conform to the new structure, and resolving a series of critical, post-refactor bugs related to database connections, timezones, and data integrity. The entire lifecycle of the change was managed, from initial planning to final system testing and verification.
+      * Key Changes:
+      * Architectural Pivot: The Adapter Pattern:
+      * A new directory, /api/adapters/, was created to house all external API communication logic.
+      * The first adapter, /api/adapters/cloudbedsAdapter.js, was built. This file is now the single source of truth for all Cloudbeds API interactions.
+      * Core data-fetching logic from the sync scripts, including pagination handling and data processing, was moved into dedicated functions within the adapter (e.g., getHistoricalMetrics, getUpcomingMetrics).
+      * Database Schema Generalization:
+      * A full database migration was performed to make the schema vendor-agnostic.
+      * In the users table, a pms_type column was added, and the Cloudbeds-specific access_token and refresh_token columns were dropped.
+      * In the user_properties table, a generic pms_credentials (JSONB) column was added.
+      * All Cloudbeds-specific credential columns (override_client_id, override_client_secret, override_api_key, access_token, refresh_token, token_expiry) were dropped from user_properties.
+      * A data migration script was executed to safely transfer all existing refresh_token and override_api_key values into the new pms_credentials JSONB column, ensuring no data was lost.
+      * Application Code Refactoring:
+      * The daily-refresh.js and initial-sync.js scripts were simplified to act as orchestrators. They now call the adapter to receive already-processed, canonical data, which they then save to the database.
+      * All backend services, including middleware.js, auth.router.js, admin.router.js, and the sync scripts, were updated to read and write credentials to and from the new generic pms_credentials column.
+      * Iterative Debugging & Critical Bug Fixes:
+      * Resolved a critical timezone bug that caused a one-day date shift on the local development environment. The root cause was the database driver's interpretation of ambiguous date strings (YYYY-MM-DD) in a non-UTC timezone. The fix involved two parts: standardizing all date formats within the adapter and configuring the node-pg driver in db.js to treat all database dates as plain strings, eliminating timezone-related side effects.
+      * Fixed a data integrity issue where a key user's property had a status of 'pending'. An UPDATE query was run to change the status to 'connected', which allowed the daily-refresh script to correctly identify and process the property.
+      * Corrected multiple bugs in admin.router.js where lingering references to the old, deleted database columns were causing crashes in the API Explorer and other admin functions.
+      * Outcome: The refactoring was completed successfully. The application's backend is now highly modular, scalable, and fully decoupled from any specific PMS. All identified post-migration bugs have been resolved, and the application is stable and fully functional. This architectural improvement makes adding future PMS integrations a significantly faster and lower-risk process.
