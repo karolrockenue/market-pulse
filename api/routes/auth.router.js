@@ -307,21 +307,19 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
     const userInfo = await userInfoResponse.json();
 
+    // This query now only saves user info, not tokens.
     const userQuery = `
-      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, access_token, refresh_token, token_expiry, status, auth_mode)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'oauth')
-      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
-          email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-          access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, token_expiry = EXCLUDED.token_expiry, status = 'active', auth_mode = 'oauth';
-    `;
+  INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
+  VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
+  ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+      email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+      status = 'active', auth_mode = 'oauth', pms_type = 'cloudbeds';
+`;
     await pgPool.query(userQuery, [
       userInfo.user_id,
       userInfo.email,
       userInfo.first_name,
       userInfo.last_name,
-      access_token,
-      refresh_token,
-      tokenExpiry,
     ]);
 
     const propertyInfoResponse = await fetch(
@@ -341,9 +339,13 @@ router.get("/cloudbeds/callback", async (req, res) => {
         await syncHotelDetailsToDb(access_token, property.id);
 
         // This part remains the same - it links the user to the property.
+        // This query now also saves the refresh_token into the new pms_credentials column.
         await pgPool.query(
-          `INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected') ON CONFLICT (user_id, property_id) DO UPDATE SET status = 'connected';`,
-          [userInfo.user_id, property.id]
+          `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
+   VALUES ($1, $2, 'connected', $3) 
+   ON CONFLICT (user_id, property_id) 
+   DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
+          [userInfo.user_id, property.id, { refresh_token }]
         );
       }
     }

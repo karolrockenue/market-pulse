@@ -1,85 +1,12 @@
-// /api/initial-sync.js (Final Version: Targeted, 15-Year Sync)
-const fetch = require("node-fetch").default || require("node-fetch");
-const { Client } = require("pg");
+// Add the fetch import back to the file.
+const fetch = require("node-fetch");
+// /api/initial-sync.js (Refactored to use Adapter)
+// Use the shared, correctly configured database pool.
+const pgPool = require("./utils/db");
+// Import the adapter instead of node-fetch.
+const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 
-// --- HELPER FUNCTIONS (No changes) ---
-async function getCloudbedsAccessToken(refreshToken) {
-  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
-  if (!refreshToken)
-    throw new Error("Cannot get access token without a refresh token.");
-  const params = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: CLOUDBEDS_CLIENT_ID,
-    client_secret: CLOUDBEDS_CLIENT_SECRET,
-    refresh_token: refreshToken,
-  });
-  const response = await fetch(
-    "https://hotels.cloudbeds.com/api/v1.1/access_token",
-    { method: "POST", body: params }
-  );
-  const tokenData = await response.json();
-  if (!tokenData.access_token) {
-    console.error("Token refresh failed for a user:", tokenData);
-    return null;
-  }
-  return tokenData.access_token;
-}
-
-// This function now correctly calculates Occupancy and RevPAR instead of trusting the API.
-function processApiDataForTable(allData) {
-  const aggregatedData = {};
-  if (!allData || allData.length === 0) return aggregatedData;
-
-  // First, aggregate the raw sums from all pages of the API response.
-  for (const page of allData) {
-    if (!page.index || !page.records) continue;
-    for (let i = 0; i < page.index.length; i++) {
-      const date = page.index[i][0];
-      if (!aggregatedData[date]) {
-        aggregatedData[date] = {
-          rooms_sold: 0,
-          capacity_count: 0,
-          total_revenue: 0,
-          // We need total room revenue to correctly calculate ADR
-          room_revenue: 0,
-        };
-      }
-      // Sum the core metrics needed for calculation.
-      aggregatedData[date].rooms_sold +=
-        parseFloat(page.records.rooms_sold?.[i]) || 0;
-      aggregatedData[date].capacity_count +=
-        parseFloat(page.records.capacity_count?.[i]) || 0;
-      aggregatedData[date].total_revenue +=
-        parseFloat(page.records.total_revenue?.[i]) || 0;
-      aggregatedData[date].room_revenue +=
-        parseFloat(page.records.room_revenue?.[i]) || 0;
-    }
-  }
-
-  // Second, loop through the aggregated data to perform calculations for each day.
-  for (const date in aggregatedData) {
-    const metrics = aggregatedData[date];
-
-    // Calculate ADR: Room Revenue / Rooms Sold
-    if (metrics.rooms_sold > 0) {
-      metrics.adr = metrics.room_revenue / metrics.rooms_sold;
-    } else {
-      metrics.adr = 0;
-    }
-
-    // Calculate Occupancy: Rooms Sold / Capacity
-    if (metrics.capacity_count > 0) {
-      metrics.occupancy = metrics.rooms_sold / metrics.capacity_count;
-    } else {
-      metrics.occupancy = 0;
-    }
-
-    // Calculate RevPAR: ADR * Occupancy
-    metrics.revpar = metrics.adr * metrics.occupancy;
-  }
-
-  return aggregatedData;
-}
+// The getCloudbedsAccessToken and processApiDataForTable helpers are no longer needed here.
 
 // --- MAIN HANDLER ---
 module.exports = async (request, response) => {
@@ -93,129 +20,84 @@ module.exports = async (request, response) => {
   }
 
   console.log(`Starting 15-YEAR initial sync for property: ${propertyId}`);
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+
   let totalRecordsUpdated = 0;
 
   try {
-    await client.connect();
-
-    // Also fetch the user's auth_mode to determine how to get a token.
-    const userResult = await client.query(
-      `SELECT u.cloudbeds_user_id, u.refresh_token, u.auth_mode 
+    // Fetch user and authentication details (this logic remains in the script).
+    // Fetch user and property credentials from the new schema.
+    const result = await pgPool.query(
+      `SELECT u.cloudbeds_user_id, u.auth_mode, up.pms_credentials
    FROM users u 
    JOIN user_properties up ON u.cloudbeds_user_id = up.user_id 
    WHERE up.property_id = $1::integer LIMIT 1`,
       [propertyId]
     );
 
-    if (userResult.rows.length === 0)
-      throw new Error(`No active user found for property ${propertyId}.`);
-    const user = userResult.rows[0];
-
-    let accessToken;
-    // Check the user's authentication mode.
-    if (user.auth_mode === "manual") {
-      // For pilot users, get the specific API key for this property.
-      console.log(`User is in 'manual' mode. Fetching override API key.`);
-      const keyResult = await client.query(
-        "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        [user.cloudbeds_user_id, propertyId]
+    if (result.rows.length === 0)
+      throw new Error(
+        `No active user or property link found for property ${propertyId}.`
       );
-      if (keyResult.rows.length === 0 || !keyResult.rows[0].override_api_key) {
+
+    const user = result.rows[0];
+    const credentials = user.pms_credentials || {};
+    let accessToken;
+
+    if (user.auth_mode === "manual") {
+      if (!credentials.api_key) {
         throw new Error(
-          `Could not find override_api_key for property ${propertyId}.`
+          `Could not find api_key in pms_credentials for property ${propertyId}.`
         );
       }
-      // The API key IS the access token for these users.
-      accessToken = keyResult.rows[0].override_api_key;
+      accessToken = credentials.api_key;
     } else {
-      // For standard OAuth users, use the refresh token as before.
-      console.log(`User is in 'oauth' mode. Using refresh token.`);
-      accessToken = await getCloudbedsAccessToken(user.refresh_token);
+      // This is for 'oauth' mode
+      if (!credentials.refresh_token) {
+        throw new Error(
+          `Could not find refresh_token in pms_credentials for property ${propertyId}.`
+        );
+      }
+      const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+      const params = new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: CLOUDBEDS_CLIENT_ID,
+        client_secret: CLOUDBEDS_CLIENT_SECRET,
+        refresh_token: credentials.refresh_token,
+      });
+      const tokenRes = await fetch(
+        "https://hotels.cloudbeds.com/api/v1.1/access_token",
+        { method: "POST", body: params }
+      );
+      const tokenData = await tokenRes.json();
+      accessToken = tokenData.access_token;
     }
 
     if (!accessToken)
-      throw new Error(
-        `Authentication failed for the user of property ${propertyId}. Mode: ${user.auth_mode}`
-      );
+      throw new Error(`Authentication failed for property ${propertyId}.`);
 
-    // Define a fixed 15-year historical range.
+    // Define the 15-year date range.
     const today = new Date();
     const pastDate = new Date();
     pastDate.setFullYear(today.getFullYear() - 15);
     const futureDate = new Date();
     futureDate.setFullYear(today.getFullYear() + 1);
-
     const startDate = pastDate.toISOString().split("T")[0];
     const endDate = futureDate.toISOString().split("T")[0];
-    console.log(`Fetching data from ${startDate} to ${endDate}`);
+    console.log(`Sync script: Fetching data from ${startDate} to ${endDate}`);
 
-    const columnsToRequest = [
-      "adr",
-      "revpar",
-      "total_revenue",
-      "room_revenue",
-      "occupancy",
-      "rooms_sold",
-      "capacity_count",
-    ].map((column) => ({ cdf: { column }, metrics: ["sum", "mean"] }));
+    // --- REFACTORED LOGIC ---
+    // All the complex API call and pagination logic is replaced by this single call.
+    const processedData = await cloudbedsAdapter.getHistoricalMetrics(
+      accessToken,
+      propertyId,
+      startDate,
+      endDate
+    );
+    // --- END REFACTORED LOGIC ---
 
-    const initialInsightsPayload = {
-      property_ids: [propertyId],
-      dataset_id: 7,
-      filters: {
-        and: [
-          {
-            cdf: { column: "stay_date" },
-            operator: "greater_than_or_equal",
-            value: `${startDate}T00:00:00.000Z`,
-          },
-          {
-            cdf: { column: "stay_date" },
-            operator: "less_than_or_equal",
-            value: `${endDate}T00:00:00.000Z`,
-          },
-        ],
-      },
-      columns: columnsToRequest,
-      group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
-      settings: { details: true, totals: false },
-    };
-
-    let allApiData = [];
-    let nextToken = null;
-    let pageNum = 1;
-    do {
-      const insightsPayload = { ...initialInsightsPayload };
-      if (nextToken) insightsPayload.nextToken = nextToken;
-      console.log(`Fetching page ${pageNum} for property ${propertyId}...`);
-      const apiResponse = await fetch(
-        "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-            "X-PROPERTY-ID": propertyId,
-          },
-          body: JSON.stringify(insightsPayload),
-        }
-      );
-      const responseText = await apiResponse.text();
-      if (!apiResponse.ok)
-        throw new Error(
-          `API Error on page ${pageNum}: ${apiResponse.status}: ${responseText}`
-        );
-      const pageData = JSON.parse(responseText);
-      allApiData.push(pageData);
-      nextToken = pageData.nextToken || null;
-      pageNum++;
-    } while (nextToken);
-
-    const processedData = processApiDataForTable(allApiData);
     const datesToUpdate = Object.keys(processedData);
-
     if (datesToUpdate.length > 0) {
+      // The database saving logic remains the same.
       for (const date of datesToUpdate) {
         const metrics = processedData[date];
         const query = `
@@ -236,7 +118,7 @@ module.exports = async (request, response) => {
           metrics.total_revenue || 0,
           user.cloudbeds_user_id,
         ];
-        await client.query(query, values);
+        await pgPool.query(query, values);
       }
       totalRecordsUpdated = datesToUpdate.length;
     }
@@ -249,7 +131,5 @@ module.exports = async (request, response) => {
       error
     );
     response.status(500).json({ success: false, error: error.message });
-  } finally {
-    if (client) await client.end();
   }
 };

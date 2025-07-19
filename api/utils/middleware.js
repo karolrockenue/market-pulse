@@ -55,22 +55,22 @@ async function requireUserApi(req, res, next) {
         }
 
         // Retrieve the permanently stored API key for the requested property.
-        const keyResult = await pgPool.query(
-          "SELECT override_api_key FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        // Read the generic credentials object from the database.
+        const credsResult = await pgPool.query(
+          "SELECT pms_credentials FROM user_properties WHERE user_id = $1 AND property_id = $2",
           [req.user.cloudbedsId, propertyId]
         );
 
-        if (
-          keyResult.rows.length === 0 ||
-          !keyResult.rows[0].override_api_key
-        ) {
+        const credentials = credsResult.rows[0]?.pms_credentials;
+
+        if (!credentials || !credentials.api_key) {
           return res.status(403).json({
             error: "API Key not configured for this property.",
           });
         }
 
-        // Attach the API key as the 'accessToken' for the downstream API call.
-        req.user.accessToken = keyResult.rows[0].override_api_key;
+        // Attach the API key from the JSON object as the 'accessToken'.
+        req.user.accessToken = credentials.api_key;
       }
     }
     console.log(

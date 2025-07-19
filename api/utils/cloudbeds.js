@@ -248,42 +248,6 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId) {
   );
 }
 
-// New function to get neighborhood from coordinates using Nominatim API
-async function getNeighborhoodFromCoords(latitude, longitude) {
-  // Construct the URL for the Nominatim reverse geocoding API
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        // IMPORTANT: Nominatim requires a custom User-Agent header that identifies our application.
-        "User-Agent": "MarketPulseApp/1.0 (karol@rockvenue.com)",
-      },
-    });
-
-    if (!response.ok) {
-      // Handle non-successful responses from the API
-      throw new Error(`Nominatim API returned status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Return the neighborhood, suburb, or quarter, whichever is available first.
-    return (
-      data.address.neighbourhood ||
-      data.address.suburb ||
-      data.address.quarter ||
-      null
-    );
-  } catch (error) {
-    // Log the error and return null if the API call fails
-    console.error("Error fetching neighborhood from Nominatim:", error);
-    return null;
-  }
-}
-// api/utils/cloudbeds.js
-
 // api/utils/cloudbeds.js
 
 module.exports = {
@@ -293,5 +257,4 @@ module.exports = {
   syncHotelDetailsToDb,
   setCloudbedsAppState,
   syncHotelTaxInfoToDb, // Add our new function to the exports
-  getNeighborhoodFromCoords, // Add the new function here
 };
