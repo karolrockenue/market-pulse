@@ -273,15 +273,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
     const { access_token, refresh_token, expires_in } = tokenData;
     const tokenExpiry = new Date(Date.now() + expires_in * 1000);
 
-    if (isPilotFlow) {
-      const propertyId = state;
-      await pgPool.query(
-        `UPDATE user_properties SET access_token = $1, refresh_token = $2, token_expiry = $3, status = 'connected' WHERE property_id = $4`,
-        [access_token, refresh_token, tokenExpiry, propertyId]
-      );
-      return res.redirect("/admin/");
-    }
-
     // --- Standard OAuth Flow Logic ---
     const userInfoResponse = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
