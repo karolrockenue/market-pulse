@@ -13,7 +13,7 @@ module.exports = async (request, response) => {
 
   try {
     const usersResult = await pgPool.query(
-      "SELECT cloudbeds_user_id, refresh_token, auth_mode FROM users WHERE status = 'active'"
+      "SELECT cloudbeds_user_id, auth_mode FROM users WHERE status = 'active'"
     );
     const activeUsers = usersResult.rows;
     console.log(`Found ${activeUsers.length} active user(s) to process.`);

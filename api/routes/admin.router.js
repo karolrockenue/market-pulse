@@ -30,6 +30,7 @@ async function getAdminRefreshToken(adminUserId) {
 }
 
 // This is the main helper we will now use in all admin routes.
+// This is the main helper we will now use in all admin routes.
 async function getAdminAccessToken(adminUserId) {
   const refreshToken = await getAdminRefreshToken(adminUserId);
   if (!refreshToken) {
@@ -37,6 +38,16 @@ async function getAdminAccessToken(adminUserId) {
       "Could not find a valid refresh token for this admin user."
     );
   }
+
+  // Get the admin's default property ID to use for API calls.
+  const propertyResult = await pgPool.query(
+    "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
+    [adminUserId]
+  );
+  if (propertyResult.rows.length === 0) {
+    throw new Error("No properties are associated with this admin account.");
+  }
+  const propertyId = propertyResult.rows[0].property_id;
 
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
@@ -56,7 +67,9 @@ async function getAdminAccessToken(adminUserId) {
     console.error("Token refresh failed for admin user:", tokenData);
     throw new Error("Cloudbeds authentication failed for admin user.");
   }
-  return tokenData.access_token;
+
+  // Return an object containing both the token and the property ID.
+  return { accessToken: tokenData.access_token, propertyId };
 }
 
 // --- ADMIN API ENDPOINTS ---
