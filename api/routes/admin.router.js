@@ -230,6 +230,7 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
     };
 
     switch (endpoint) {
+      // Insights API
       case "datasets":
         targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
         break;
@@ -257,7 +258,30 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
           settings: { details: true, totals: true },
         });
         break;
-      // Add cases for other simple GET endpoints from the old router if needed.
+
+      // General API
+      case "sample-hotel":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
+        break;
+      case "sample-guest":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${propertyId}&pageSize=1`;
+        break;
+      case "sample-reservation":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${propertyId}&pageSize=1`;
+        break;
+      case "sample-room":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageSize=1`;
+        break;
+      case "sample-rate":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${propertyId}&pageSize=1`;
+        break;
+      case "taxes-fees":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyId}`;
+        break;
+      case "user-info":
+        targetUrl = "https://api.cloudbeds.com/api/v1.3/userinfo";
+        break;
+
       default:
         return res.status(404).json({ error: "Unknown explorer endpoint." });
     }
