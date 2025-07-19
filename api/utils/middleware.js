@@ -11,11 +11,11 @@ async function requireUserApi(req, res, next) {
   console.log(`[DEBUG 1] Session found for userId: ${req.session.userId}`);
 
   try {
+    // This query now only selects columns that exist in the 'users' table.
     const userResult = await pgPool.query(
-      "SELECT user_id, auth_mode, refresh_token, needs_property_sync FROM users WHERE cloudbeds_user_id = $1",
+      "SELECT user_id, auth_mode, needs_property_sync FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
-
     if (userResult.rows.length === 0) {
       console.log(
         `[DEBUG FAIL] User not found in DB for cloudbeds_user_id: ${req.session.userId}`

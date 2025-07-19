@@ -242,27 +242,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
       return res.status(400).send("Error: No authorization code provided.");
     }
 
-    let clientId = process.env.CLOUDBEDS_CLIENT_ID;
-    let clientSecret = process.env.CLOUDBEDS_CLIENT_SECRET;
-    const isPilotFlow = !!state;
-
-    if (isPilotFlow) {
-      const credsResult = await pgPool.query(
-        "SELECT override_client_id, override_client_secret FROM user_properties WHERE property_id = $1",
-        [state]
-      );
-      if (
-        credsResult.rows.length > 0 &&
-        credsResult.rows[0].override_client_id
-      ) {
-        clientId = credsResult.rows[0].override_client_id;
-        clientSecret = credsResult.rows[0].override_client_secret;
-      } else {
-        throw new Error(
-          `Could not find pilot credentials for property ID: ${state}`
-        );
-      }
-    }
+    // This logic is now simplified, as this callback only handles the standard OAuth flow.
+    const clientId = process.env.CLOUDBEDS_CLIENT_ID;
+    const clientSecret = process.env.CLOUDBEDS_CLIENT_SECRET;
 
     const redirectUri =
       process.env.VERCEL_ENV === "production"
