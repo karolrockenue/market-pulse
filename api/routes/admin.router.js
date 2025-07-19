@@ -16,6 +16,7 @@ const initialSyncHandler = require("../initial-sync.js");
 
 // Add this line with the other require statements
 const cloudbeds = require("../utils/cloudbeds");
+const { getNeighborhoodFromCoords } = require("../utils/cloudbeds"); // <-- ADD THIS
 
 // In a future step, this could be moved to a shared /api/utils/cloudbeds.js utility
 async function getCloudbedsAccessToken(refreshToken) {
@@ -48,7 +49,7 @@ router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
   try {
     const { rows } = await pgPool.query(
       // Select the new 'category' column instead of 'star_rating'
-      "SELECT hotel_id, property_name, property_type, city, category FROM hotels ORDER BY property_name"
+      "SELECT hotel_id, property_name, property_type, city, category, neighborhood FROM hotels ORDER BY property_name"
     );
     res.json(rows);
   } catch (error) {
@@ -146,10 +147,58 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
 
     // --- Execute Both Sync Functions ---
     // Use Promise.all to run both sync operations concurrently for efficiency.
+    // --- Execute All Sync Functions ---
+    // Use Promise.all to run both sync operations concurrently for efficiency.
     await Promise.all([
       cloudbeds.syncHotelDetailsToDb(accessToken, propertyId),
       cloudbeds.syncHotelTaxInfoToDb(accessToken, propertyId),
     ]);
+
+    // --- NEW: Sync Neighborhood after core details are saved ---
+    // We do this after the sync above to ensure latitude/longitude are in the DB.
+    // --- NEW: Sync Neighborhood after core details are saved ---
+    console.log(
+      `[DEBUG] Starting neighborhood sync for property: ${propertyId}`
+    );
+
+    // 1. Fetch hotel coordinates from our database.
+    const hotelRes = await pgPool.query(
+      "SELECT latitude, longitude FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    const coords = hotelRes.rows[0];
+    console.log(`[DEBUG] Fetched coordinates from DB:`, coords);
+
+    // 2. Check if coordinates exist.
+    if (coords && coords.latitude && coords.longitude) {
+      console.log(
+        "[DEBUG] Coordinates found. Proceeding to call Nominatim API."
+      );
+      const { latitude, longitude } = coords;
+
+      // 3. Call the Nominatim utility function.
+      const neighborhood = await getNeighborhoodFromCoords(latitude, longitude);
+      console.log(`[DEBUG] Received from Nominatim API: '${neighborhood}'`);
+
+      // 4. Check if we got a result and save it.
+      if (neighborhood) {
+        await pgPool.query(
+          "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
+          [neighborhood, propertyId]
+        );
+        console.log(
+          `[DEBUG] Successfully updated database with neighborhood: '${neighborhood}'`
+        );
+      } else {
+        console.log(
+          "[DEBUG] Neighborhood was null or empty. Skipping database update."
+        );
+      }
+    } else {
+      console.log(
+        "[DEBUG] Hotel has no coordinates in the database. Skipping neighborhood sync."
+      );
+    }
 
     res.status(200).json({
       success: true,

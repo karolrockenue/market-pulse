@@ -163,16 +163,23 @@ function initializeAdminPanel() {
           <td class="p-3 font-medium text-slate-800">${hotel.property_name}</td>
           <td class="p-3 text-slate-600">${hotel.property_type}</td>
           <td class="p-3 text-slate-600">${hotel.city}</td>
+          <td class="p-3 text-slate-500">${hotel.neighborhood || "N/A"}</td>
           <td class="p-3">
-            <select data-hotel-id="${hotel.hotel_id}" class="category-select bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2">
+            <select data-hotel-id="${
+              hotel.hotel_id
+            }" class="category-select bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2">
               ${selectOptions}
             </select>
           </td>
           <td class="p-3 text-right space-x-2">
-            <button data-hotel-id="${hotel.hotel_id}" data-action="sync-hotel-info" class="control-btn text-xs bg-slate-100 text-slate-800 hover:bg-slate-200" title="Sync latest hotel details like name, address, and tax info.">
+            <button data-hotel-id="${
+              hotel.hotel_id
+            }" data-action="sync-hotel-info" class="control-btn text-xs bg-slate-100 text-slate-800 hover:bg-slate-200" title="Sync latest hotel details like name, address, and tax info.">
               Sync Hotel Info
             </button>
-            <button data-hotel-id="${hotel.hotel_id}" data-action="initial-sync" class="control-btn text-xs bg-blue-100 text-blue-800 hover:bg-blue-200" title="Warning: This pulls up to 15 years of historical data and can take several minutes.">
+            <button data-hotel-id="${
+              hotel.hotel_id
+            }" data-action="initial-sync" class="control-btn text-xs bg-blue-100 text-blue-800 hover:bg-blue-200" title="Warning: This pulls up to 15 years of historical data and can take several minutes.">
               Full Data Sync
             </button>
           </td>

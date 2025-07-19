@@ -193,20 +193,16 @@ async function setCloudbedsAppState(accessToken, propertyId) {
  * @param {string} propertyId - The ID of the property to sync tax info for.
  * @returns {Promise<void>}
  */
+// api/utils/cloudbeds.js
+
 async function syncHotelTaxInfoToDb(accessToken, propertyId) {
-  // Log the start of the process for debugging.
   console.log(`[Tax Sync] Starting tax sync for property ${propertyId}...`);
-
-  // Construct the URL for the Cloudbeds getTaxesAndFees endpoint.
   const url = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyId}`;
-
-  // Fetch the data from the Cloudbeds API.
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   const taxData = await response.json();
 
-  // Check if the API call was successful and returned data.
   if (
     !response.ok ||
     !taxData.success ||
@@ -218,14 +214,11 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId) {
     );
     return;
   }
-
-  // Find the first 'inclusive' or 'exclusive' tax entry. We'll treat this as the primary VAT.
   const primaryTax = taxData.data.find(
     (t) =>
       t.inclusiveOrExclusive === "inclusive" ||
       t.inclusiveOrExclusive === "exclusive"
   );
-
   if (!primaryTax) {
     console.warn(
       `[Tax Sync] No primary (inclusive/exclusive) tax found for property ${propertyId}.`
@@ -233,12 +226,11 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId) {
     return;
   }
 
-  // Extract the rate and type from the primary tax object.
-  // The API provides the rate as a percentage string (e.g., "20.00000"), so we parse it and convert to a decimal.
+  // Get the rate, type, AND name from the tax object.
   const taxRate = parseFloat(primaryTax.amount) / 100;
   const taxType = primaryTax.inclusiveOrExclusive;
+  const taxName = primaryTax.name || "Tax"; // Default to 'Tax' if no name is provided
 
-  // Check if we have valid data before updating the database.
   if (isNaN(taxRate) || !taxType) {
     console.error(
       `[Tax Sync] Invalid tax data parsed for property ${propertyId}. Aborting.`
@@ -246,15 +238,49 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId) {
     return;
   }
 
-  // Update the 'hotels' table with the new tax information for the specific hotel.
+  // Update the 'hotels' table with the new tax information, including the name.
   await pgPool.query(
-    `UPDATE hotels SET tax_rate = $1, tax_type = $2 WHERE hotel_id = $3`,
-    [taxRate, taxType, propertyId]
+    `UPDATE hotels SET tax_rate = $1, tax_type = $2, tax_name = $3 WHERE hotel_id::text = $4`,
+    [taxRate, taxType, taxName, propertyId]
   );
-
   console.log(
-    `[Tax Sync] Successfully synced tax info for property ${propertyId}. Rate: ${taxRate}, Type: ${taxType}.`
+    `[Tax Sync] Successfully synced tax info for property ${propertyId}.`
   );
+}
+
+// New function to get neighborhood from coordinates using Nominatim API
+async function getNeighborhoodFromCoords(latitude, longitude) {
+  // Construct the URL for the Nominatim reverse geocoding API
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        // IMPORTANT: Nominatim requires a custom User-Agent header that identifies our application.
+        "User-Agent": "MarketPulseApp/1.0 (karol@rockvenue.com)",
+      },
+    });
+
+    if (!response.ok) {
+      // Handle non-successful responses from the API
+      throw new Error(`Nominatim API returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Return the neighborhood, suburb, or quarter, whichever is available first.
+    return (
+      data.address.neighbourhood ||
+      data.address.suburb ||
+      data.address.quarter ||
+      null
+    );
+  } catch (error) {
+    // Log the error and return null if the API call fails
+    console.error("Error fetching neighborhood from Nominatim:", error);
+    return null;
+  }
 }
 // api/utils/cloudbeds.js
 
@@ -267,4 +293,5 @@ module.exports = {
   syncHotelDetailsToDb,
   setCloudbedsAppState,
   syncHotelTaxInfoToDb, // Add our new function to the exports
+  getNeighborhoodFromCoords, // Add the new function here
 };

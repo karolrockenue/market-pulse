@@ -48,20 +48,20 @@ export default function pageHeader() {
       }
     },
 
-    // Find the fetchProperties() method
-    // Find and replace the entire fetchProperties() method
+    // public/app/_shared/header.mjs
+
     async fetchProperties() {
       try {
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
-        if (this.properties.length > 0) {
-          // Automatically select the first property on load
-          this.currentPropertyId = this.properties[0].property_id;
-          this.updateCurrentPropertyName(); // Ensure the name is also updated
 
-          // --- THIS IS THE FIX ---
-          // Announce the initial property selection to the rest of the app
+        if (this.properties.length > 0) {
+          // Set the current property ID from the first property in the list.
+          this.currentPropertyId = this.properties[0].property_id;
+          // Update the display name for the header.
+          this.updateCurrentPropertyName();
+          // Announce the fully updated, initial property selection to the rest of the app.
           this.dispatchPropertyChangeEvent();
         }
       } catch (error) {
@@ -131,12 +131,23 @@ export default function pageHeader() {
     },
 
     // This function now sends both the ID and the name of the selected property.
+    // public/app/_shared/header.mjs
+
+    // This function now finds the full property object to send all necessary details.
     dispatchPropertyChangeEvent() {
+      // Find the complete object for the current property.
+      const currentProperty = this.properties.find(
+        (p) => p.property_id === this.currentPropertyId
+      );
+      if (!currentProperty) return; // Don't dispatch if no property is found
+
       window.dispatchEvent(
         new CustomEvent("property-changed", {
           detail: {
-            propertyId: this.currentPropertyId,
-            propertyName: this.currentPropertyName, // Add the name to the event
+            propertyId: currentProperty.property_id,
+            propertyName: currentProperty.property_name,
+            taxRate: currentProperty.tax_rate, // Pass the tax rate
+            taxType: currentProperty.tax_type, // Pass the tax type
           },
         })
       );

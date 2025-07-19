@@ -19,6 +19,46 @@
     />
 
     <style>
+            /* This is the new style block for the info icon */
+      .info-icon {
+        font-style: normal; /* Removes the italics */
+        font-weight: bold;
+        cursor: help;       /* Changes the mouse cursor to a question mark on hover */
+        color: #94a3b8;     /* A subtle grey color */
+        margin-left: 4px;
+      }
+      /* public/app/reports.html */
+
+      /* Add these new styles for the CSS-only tooltip */
+      .tooltip {
+        position: relative;
+        display: inline-block;
+        font-style: normal;
+        font-weight: bold;
+        cursor: help;
+        color: #94a3b8;
+        margin-left: 4px;
+      }
+      .tooltip .tooltip-text {
+        visibility: hidden;
+        width: 140px;
+        background-color: #1e293b;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -70px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
       :root {
         --bg-primary: #f7f8fc;
         --bg-secondary: #ffffff;
@@ -28,7 +68,7 @@
         --accent-primary: #60a5fa; /* Tailwind blsue-400 */
         --highlight-color: #eff6ff; /* Tailwind blue-50 */
         --font-sans: "Inter", sans-serif;
-        --font-data: "Manrope", sans-serif;
+     --font-data: "IBM Plex Mono", monospace;
       }
       body {
         font-family: var(--font-sans);
@@ -167,35 +207,35 @@
                 <button
                   class="control-btn"
                   :class="{ 'active': preset === 'last-week' }"
-                  @click="preset = 'last-week'; handlePresetChange('last-week'); handleGenerateReport(granularity)"
+                  @click="preset = 'last-week'; handlePresetChange('last-week'); handleGenerateReport()"
                 >
                   Last Week
                 </button>
                 <button
                   class="control-btn"
                   :class="{ 'active': preset === 'current-week' }"
-                  @click="preset = 'current-week'; handlePresetChange('current-week'); handleGenerateReport(granularity)"
+                  @click="preset = 'current-week'; handlePresetChange('current-week'); handleGenerateReport()"
                 >
                   Current Week
                 </button>
-                <button
-                  class="control-btn"
-                  :class="{ 'active': preset === 'current-month' }"
-                  @click="preset = 'current-month'; handlePresetChange('current-month'); handleGenerateReport(granularity)"
-                >
-                  Current Month
-                </button>
+           <button
+  class="control-btn"
+  :class="{ 'active': preset === 'current-month' }"
+  @click="preset = 'current-month'; handlePresetChange('current-month'); handleGenerateReport()"
+>
+  Current Month
+</button>
                 <button
                   class="control-btn"
                   :class="{ 'active': preset === 'next-month' }"
-                  @click="preset = 'next-month'; handlePresetChange('next-month'); handleGenerateReport(granularity)"
+                  @click="preset = 'next-month'; handlePresetChange('next-month'); handleGenerateReport()"
                 >
                   Next Month
                 </button>
                 <button
                   class="control-btn"
                   :class="{ 'active': preset === 'this-year' }"
-                  @click="preset = 'this-year'; handlePresetChange('this-year'); handleGenerateReport(granularity)"
+                  @click="preset = 'this-year'; handlePresetChange('this-year'); handleGenerateReport()"
                 >
                   This Year
                 </button>
@@ -386,20 +426,24 @@
                         class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
                       ></div
                     ></label>
-                    <label
-                      for="include-taxes-toggle"
-                      class="flex items-center justify-between cursor-pointer"
-                      ><span class="font-medium text-gray-800 text-xs"
-                        >Show Tax-Inclusive Values</span
-                      ><input
-                        type="checkbox"
-                        id="include-taxes-toggle"
-                        @change="handleGenerateReport(granularity)"
-                        class="sr-only peer" />
-                      <div
-                        class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
-                      ></div
-                    ></label>
+        
+
+<label
+  for="include-taxes-toggle"
+  class="flex items-center justify-between cursor-pointer"
+>
+  <span class="font-medium text-gray-800 text-xs">Show Tax-Inclusive Values</span>
+  <input
+    type="checkbox"
+    id="include-taxes-toggle"
+    x-model="includeTaxes"
+    @change="handleGenerateReport()"
+    class="sr-only peer"
+  />
+  <div
+    class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
+  ></div>
+</label>
                     <div class="pt-6 border-t">
                       <label
                         for="add-comparisons-toggle"
@@ -1056,6 +1100,9 @@
           isInitialized: false,
           propertyId: null, // Add a new state variable to hold the current property ID.
           isScheduleModalOpen: false,
+           propertyTaxRate: null,     
+      propertyTaxType: null,     
+      includeTaxes: true,        
           isManageModalOpen: false,
           addComparisons: false,
           displayTotals: true,
@@ -1067,40 +1114,72 @@
           newSchedulePeriod: "current-month",
           newScheduleFrequency: "Weekly",
           newScheduleFormats: ["csv"],
+           propertyTaxName: 'VAT', // Add this, with 'VAT' as a default
+      currencyCode: 'USD',    // Add this, with 'USD' as a default
+
+// public/app/reports.html
+
+          // --- INIT ---
+   // --- INIT ---
+      // public/app/reports.html
 
           // --- INIT ---
           async init() {
-            // Set up the listener for property changes first
-            window.addEventListener("property-changed", (event) => {
+            // --- FIX: Wait for the reports logic module to load FIRST ---
+            // This ensures that functions like `handlePresetChange` are defined on the `window`
+            // object before any other code attempts to call them. This resolves the race condition.
+            await import('/app/reports.js');
+
+            // Now that the script is loaded, we can safely set the initial date range.
+            this.handlePresetChange("current-month");
+
+            // Set up the listener for property changes from the header. This is safe to do now.
+            window.addEventListener("property-changed", async (event) => {
               if (event.detail.propertyId) {
                 this.propertyId = event.detail.propertyId;
-                this.handleGenerateReport(); // Generate report on property change
+
+                try {
+                  const response = await fetch(`/api/hotel-details/${this.propertyId}`);
+                  if (!response.ok) {
+                    throw new Error('Could not fetch property details.');
+                  }
+                  const details = await response.json();
+                  
+                  this.propertyTaxRate = parseFloat(details.tax_rate);
+                  this.propertyTaxType = details.tax_type;
+                  this.propertyTaxName = details.tax_name;
+                  this.currencyCode = details.currency_code;
+                  this.includeTaxes = (this.propertyTaxType === 'inclusive');
+
+                } catch (error) {
+                  console.error("Could not fetch property tax/currency details:", error);
+                  this.propertyTaxRate = 0;
+                  this.propertyTaxName = 'Tax';
+                  this.currencyCode = 'USD';
+                  this.includeTaxes = true;
+                }
+                // Now, generate the report *after* property details are known.
+                this.handleGenerateReport();
               }
             });
 
-            // Dynamically import all necessary modules
+            // Dynamically import the rest of the necessary modules.
             const { loadComponent } = await import("/app/utils.mjs");
-            const { default: pageHeader } = await import(
-              "/app/_shared/header.mjs"
-            );
-            const { default: sidebar } = await import(
-              "/app/_shared/sidebar.mjs"
-            ); // NEW: Import sidebar logic
+            const { default: pageHeader } = await import("/app/_shared/header.mjs");
+            const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
 
-            // Register the Alpine.js components
+            // Register the Alpine.js components.
             Alpine.data("pageHeader", pageHeader);
-            Alpine.data("sidebar", sidebar); // NEW: Register the sidebar component
+            Alpine.data("sidebar", sidebar);
 
-            // Load the shared HTML components into their placeholders
-           // Load the shared HTML components into their placeholders
-await loadComponent("header", "header-placeholder");
-await loadComponent("sidebar", "sidebar-placeholder");
+            // Load the shared HTML components into their placeholders.
+            await loadComponent("header", "header-placeholder");
+            await loadComponent("sidebar", "sidebar-placeholder");
 
-// Show the page content now that components are loaded
-this.isInitialized = true;
+            // Show the page content now that components are loaded.
+            this.isInitialized = true;
 
-// Proceed with the rest of the page initialization
-this.handlePresetChange("current-month");
+            // The rest of the initialization can happen now.
             this.handleFrequencyChange();
             this.schedules = await window.fetchSchedules();
           },

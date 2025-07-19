@@ -19,24 +19,36 @@ function getSelectedColumns() {
     });
   return selected;
 }
+// public/app/reports.js
 
-// --- CORE LOGIC MOVED FROM HTML ---
 function handlePresetChange(preset) {
-  // --- THIS IS THE FIX ---
-  // We now create a date object representing the start of today in UTC.
+  // --- START DEBUGGING BLOCK ---
+  console.clear(); // Clears the console for a clean view
+  console.log(`[DEBUG] Preset clicked: "${preset}"`);
+
   const localToday = new Date();
-  const today = new Date(
-    Date.UTC(
-      localToday.getFullYear(),
-      localToday.getMonth(),
-      localToday.getDate()
-    )
+  console.log(
+    `[DEBUG] 1. localToday (from new Date()):`,
+    localToday.toString()
+  );
+  console.log(`[DEBUG]    - UTC String:`, localToday.toUTCString());
+
+  const year = localToday.getFullYear();
+  const month = localToday.getMonth();
+  const day = localToday.getDate();
+  console.log(
+    `[DEBUG] 2. Local date parts: Year=${year}, Month=${month} (0-indexed), Day=${day}`
   );
 
-  let startDate, endDate;
+  const today = new Date(Date.UTC(year, month, day));
+  console.log(
+    `[DEBUG] 3. 'today' object (created from local parts, interpreted as UTC):`,
+    today.toUTCString()
+  );
+  // --- END DEBUGGING BLOCK ---
 
-  // The day of the week is now also calculated based on UTC.
-  const dayOfWeek = today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1; // Monday is 0, Sunday is 6
+  let startDate, endDate;
+  const dayOfWeek = today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1; // Monday is 0
 
   if (preset === "current-week") {
     startDate = new Date(today);
@@ -69,8 +81,28 @@ function handlePresetChange(preset) {
     return; // No valid preset
   }
 
+  // --- START DEBUGGING BLOCK ---
+  console.log(
+    `[DEBUG] 4. Calculated startDate object:`,
+    startDate.toUTCString()
+  );
+  console.log(`[DEBUG] 5. Calculated endDate object:`, endDate.toUTCString());
+  // --- END DEBUGGING BLOCK ---
+
+  // This function's only job is to set the date inputs.
   document.getElementById("start-date").value = formatDateForInput(startDate);
   document.getElementById("end-date").value = formatDateForInput(endDate);
+
+  // --- START DEBUGGING BLOCK ---
+  console.log(
+    `[DEBUG] 6. Start date input value:`,
+    document.getElementById("start-date").value
+  );
+  console.log(
+    `[DEBUG] 7. End date input value:`,
+    document.getElementById("end-date").value
+  );
+  // --- END DEBUGGING BLOCK ---
 }
 
 async function handleGenerateReport(component, propertyId) {
@@ -119,13 +151,15 @@ async function handleGenerateReport(component, propertyId) {
     console.log("RAW 'Your Hotel' METRICS FROM SERVER:", yourData.metrics);
     const liveData = processAndMergeData(yourData.metrics, marketData.metrics);
 
+    // public/app/reports.js
+
     renderReportTable(
       liveData,
       selectedColumns,
-      shouldDisplayTotals,
       granularity,
       addComparisons,
-      displayOrder
+      displayOrder,
+      component // Pass the entire component state
     );
   } catch (error) {
     console.error("Failed to generate report:", error);
@@ -383,7 +417,10 @@ function exportToExcel() {
   XLSX.writeFile(wb, fileName);
 }
 
-function formatValue(value, columnName, isDelta = false) {
+// public/app/reports.js
+// public/app/reports.js
+
+function formatValue(value, columnName, isDelta = false, currencyCode = "USD") {
   if (typeof value !== "number" || isNaN(value)) return "-";
   const lowerCaseCol = columnName.toLowerCase();
   const sign = isDelta ? (value >= 0 ? "+" : "") : "";
@@ -392,6 +429,7 @@ function formatValue(value, columnName, isDelta = false) {
       ? "text-green-600"
       : "text-red-600"
     : "";
+
   let formattedValue;
   if (lowerCaseCol.includes("occupancy")) {
     const points = (value * 100).toFixed(1);
@@ -401,13 +439,46 @@ function formatValue(value, columnName, isDelta = false) {
     lowerCaseCol.includes("adr") ||
     lowerCaseCol.includes("revpar")
   ) {
-    formattedValue =
-      sign +
-      Math.abs(value).toLocaleString("en-GB", {
-        style: "currency",
-        currency: "GBP",
-        minimumFractionDigits: 2,
-      });
+    const options = {
+      style: "currency",
+      currency: currencyCode,
+    };
+
+    if (lowerCaseCol.includes("revenue")) {
+      options.minimumFractionDigits = 0;
+      options.maximumFractionDigits = 0;
+    } else if (
+      lowerCaseCol.includes("adr") ||
+      lowerCaseCol.includes("revpar")
+    ) {
+      options.minimumFractionDigits = 1;
+      options.maximumFractionDigits = 1;
+    }
+
+    try {
+      // This new logic separates the currency symbol from the number.
+      const formatter = new Intl.NumberFormat("en-GB", options);
+      const parts = formatter.formatToParts(Math.abs(value));
+
+      let currencySymbol = "";
+      let numberValue = "";
+
+      for (const part of parts) {
+        if (part.type === "currency") {
+          currencySymbol = part.value;
+        } else {
+          // This combines all other parts (integer, decimal, comma separators).
+          numberValue += part.value;
+        }
+      }
+
+      // Reconstruct the string with a space in between.
+      formattedValue = `${sign}${currencySymbol} ${numberValue.trim()}`;
+    } catch (e) {
+      formattedValue = `${sign}${currencyCode} ${Math.abs(value).toFixed(
+        options.minimumFractionDigits
+      )}`;
+    }
   } else {
     formattedValue = sign + value.toLocaleString("en-GB");
   }
@@ -428,11 +499,34 @@ function handleFrequencyChange() {
 }
 
 // --- RENDERING ENGINE ---
-function buildTableHeaders(selected, addComparisons, displayOrder) {
+// public/app/reports.js
+// public/app/reports.js
+
+function buildTableHeaders(selected, addComparisons, displayOrder, component) {
+  const { includeTaxes, propertyTaxRate, propertyTaxName } = component;
+  const taxLabel = includeTaxes ? "Gross" : "Net";
+
+  // Build the new dynamic tooltip text
+  let tooltipText = "Values are exclusive of any taxes (net)";
+  if (includeTaxes) {
+    const ratePercent = (propertyTaxRate * 100).toFixed(0);
+    tooltipText = `Values are inclusive of ${
+      propertyTaxName || "Tax"
+    } @ ${ratePercent}% (gross)`;
+  }
+
+  // This is a simple, filled SVG icon for the tooltip
+  const svgIcon = `<svg class="inline-block h-3 w-3 -mt-0.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>`;
+
+  const createFinancialLabel = (metric) => {
+    return `${metric.toUpperCase()} (${taxLabel}) <span class="tooltip">${svgIcon}<span class="tooltip-text">${tooltipText}</span></span>`;
+  };
+
+  // The rest of the function remains the same logic as before...
+  const financialMetrics = new Set(["ADR", "RevPAR", "Total Revenue"]);
   let headers = [{ label: "Date", align: "left", key: "date" }];
   const { hotel: hotelMetrics, market: marketMetrics } = selected;
   const hotelMetricsSet = new Set(hotelMetrics);
-  const marketMetricsSet = new Set(marketMetrics);
   const masterOrder = [
     "Rooms Sold",
     "Rooms Unsold",
@@ -441,91 +535,96 @@ function buildTableHeaders(selected, addComparisons, displayOrder) {
     "RevPAR",
     "Total Revenue",
   ];
-  if (!addComparisons) {
-    masterOrder.forEach((metric) => {
-      if (hotelMetricsSet.has(metric))
-        headers.push({
-          label: metric.toUpperCase(),
-          key: metric,
-          separator: true,
-        });
-      const marketMetric = `Market ${metric}`;
-      if (marketMetricsSet.has(marketMetric))
-        headers.push({
-          label: marketMetric.toUpperCase(),
-          key: marketMetric,
-          separator: true,
-        });
-    });
-  } else {
-    if (displayOrder === "source") {
-      hotelMetrics.forEach((metric) =>
-        headers.push({
-          label: metric.toUpperCase(),
-          key: metric,
-          separator: true,
-        })
-      );
-      marketMetrics.forEach((metric) => {
-        const baseMetric = metric.replace("Market ", "");
-        headers.push({
-          label: `MKT ${baseMetric.toUpperCase()}`,
-          key: metric,
-          separator: false,
-        });
-        if (hotelMetricsSet.has(baseMetric))
-          headers.push({
-            label: "DELTA",
-            key: `${baseMetric}_delta`,
-            separator: true,
-          });
-      });
-    } else {
-      masterOrder.forEach((metric) => {
-        const hotelMetricLabel = metric;
-        const marketMetricLabel = `Market ${metric}`;
-        let groupHasContent = false;
-        if (hotelMetricsSet.has(hotelMetricLabel)) {
-          headers.push({
-            label: `YOUR ${metric.toUpperCase()}`,
-            key: hotelMetricLabel,
-          });
-          groupHasContent = true;
-        }
-        if (marketMetricsSet.has(marketMetricLabel)) {
-          headers.push({
-            label: `MKT ${metric.toUpperCase()}`,
-            key: marketMetricLabel,
-          });
-          groupHasContent = true;
-          if (hotelMetricsSet.has(hotelMetricLabel))
-            headers.push({ label: "DELTA", key: `${metric}_delta` });
-        }
-        if (groupHasContent && headers.length > 1)
-          headers[headers.length - 1].separator = true;
-      });
+
+  masterOrder.forEach((metric) => {
+    if (hotelMetricsSet.has(metric)) {
+      const label = financialMetrics.has(metric)
+        ? createFinancialLabel(metric)
+        : metric.toUpperCase();
+      headers.push({ label: label, key: metric, separator: !addComparisons });
     }
-  }
+    if (addComparisons && marketMetrics.includes(`Market ${metric}`)) {
+      const marketKey = `Market ${metric}`;
+      const label = financialMetrics.has(metric)
+        ? `MKT ${createFinancialLabel(metric)}`
+        : `MKT ${metric.toUpperCase()}`;
+      headers.push({ label: label, key: marketKey });
+      if (hotelMetricsSet.has(metric)) {
+        headers.push({
+          label: "DELTA",
+          key: `${metric}_delta`,
+          separator: true,
+        });
+      } else {
+        headers[headers.length - 1].separator = true;
+      }
+    }
+  });
+
   if (headers.length > 1) headers[headers.length - 1].separator = false;
   return headers.map((h) => ({ align: "right", ...h }));
 }
+// public/app/reports.js
+// public/app/reports.js
+// public/app/reports.js
 
-function buildTableBody(data, headers) {
+// FIXED: This is the final, correct version of the body rendering logic.
+function buildTableBody(data, headers, component) {
+  const { includeTaxes, propertyTaxRate, propertyTaxType, currencyCode } =
+    component;
+  const financialKeys = new Set([
+    "ADR",
+    "RevPAR",
+    "Total Revenue",
+    "Market ADR",
+    "Market RevPAR",
+    "Market Total Revenue",
+  ]);
+
   return data
     .map((row, index) => {
       const cells = headers.map((header) => {
+        let value = row[header.key];
+        if (
+          !includeTaxes &&
+          financialKeys.has(header.key) &&
+          propertyTaxType === "inclusive" &&
+          propertyTaxRate > 0
+        ) {
+          if (typeof value === "number") {
+            value = value / (1 + propertyTaxRate);
+          }
+        }
+
         let content;
-        if (header.key === "date") content = formatDateForDisplay(row.date);
-        else if (header.key.endsWith("_delta")) {
+        if (header.key === "date") {
+          content = formatDateForDisplay(row.date);
+        } else if (header.key.endsWith("_delta")) {
           const baseMetric = header.key.replace("_delta", "");
-          const marketMetric = `Market ${baseMetric}`;
-          const delta = (row[baseMetric] || 0) - (row[marketMetric] || 0);
-          content = formatValue(delta, baseMetric, true);
+          let yourValue = row[baseMetric] || 0;
+          let marketValue = row[`Market ${baseMetric}`] || 0;
+          if (
+            !includeTaxes &&
+            financialKeys.has(baseMetric) &&
+            propertyTaxType === "inclusive" &&
+            propertyTaxRate > 0
+          ) {
+            yourValue = yourValue / (1 + propertyTaxRate);
+            marketValue = marketValue / (1 + propertyTaxRate);
+          }
+          content = formatValue(
+            yourValue - marketValue,
+            baseMetric,
+            true,
+            currencyCode
+          );
         } else {
-          content = formatValue(row[header.key], header.key);
+          content = formatValue(value, header.key, false, currencyCode);
         }
         const alignClass =
-          header.key === "date" ? "text-gray-700 font-semibold" : "font-data";
+          header.key === "date"
+            ? "font-data text-gray-700 font-medium"
+            : "font-data";
         const separatorClass = header.separator
           ? "border-r border-slate-200"
           : "";
@@ -539,48 +638,97 @@ function buildTableBody(data, headers) {
     .join("");
 }
 
-function buildTableTotalsRow(data, headers) {
+// public/app/reports.js
+
+// FIXED: Final, correct version of the totals row logic.
+function buildTableTotalsRow(data, headers, component) {
+  const { includeTaxes, propertyTaxRate, propertyTaxType, currencyCode } =
+    component;
+  const financialKeys = new Set([
+    "ADR",
+    "RevPAR",
+    "Total Revenue",
+    "Market ADR",
+    "Market RevPAR",
+    "Market Total Revenue",
+  ]);
+  const avgKeys = new Set([
+    "Occupancy",
+    "ADR",
+    "RevPAR",
+    "Market Occupancy",
+    "Market ADR",
+    "Market RevPAR",
+  ]);
+
   const totals = {};
-  const allKeys = headers.map((h) => h.key).filter((k) => k !== "date");
-  allKeys.forEach((key) => {
-    if (!key.endsWith("_delta"))
-      totals[key] = data.reduce((sum, row) => sum + (row[key] || 0), 0);
-  });
-  const avgMetrics = ["Occupancy", "ADR", "RevPAR"];
-  allKeys.forEach((key) => {
-    const baseMetric = key.replace("Market ", "");
-    if (avgMetrics.includes(baseMetric)) totals[key] /= data.length;
-  });
-  const cells = headers.map((header) => {
-    let content = "";
-    if (header.key === "date") content = "Totals / Averages";
-    else if (header.key.endsWith("_delta")) {
-      const baseMetric = header.key.replace("_delta", "");
-      const marketMetric = `Market ${baseMetric}`;
-      const delta = (totals[baseMetric] || 0) - (totals[marketMetric] || 0);
-      content = formatValue(delta, baseMetric, true);
-    } else if (totals[header.key] !== undefined) {
-      content = formatValue(totals[header.key], header.key);
+  headers.forEach((h) => {
+    if (h.key !== "date" && !h.key.endsWith("_delta")) {
+      totals[h.key] = data.reduce((sum, row) => sum + (row[h.key] || 0), 0);
+      if (avgKeys.has(h.key) && data.length > 0) {
+        totals[h.key] /= data.length;
+      }
     }
+  });
+
+  const cells = headers.map((header) => {
+    let value = totals[header.key];
+    if (
+      !includeTaxes &&
+      financialKeys.has(header.key) &&
+      propertyTaxType === "inclusive" &&
+      propertyTaxRate > 0
+    ) {
+      if (typeof value === "number") value = value / (1 + propertyTaxRate);
+    }
+
+    let content = "";
+    if (header.key === "date") {
+      content = "Totals / Averages";
+    } else if (header.key.endsWith("_delta")) {
+      const baseMetric = header.key.replace("_delta", "");
+      let yourTotal = totals[baseMetric] || 0;
+      let marketTotal = totals[`Market ${baseMetric}`] || 0;
+      if (
+        !includeTaxes &&
+        propertyTaxType === "inclusive" &&
+        propertyTaxRate > 0
+      ) {
+        if (financialKeys.has(baseMetric))
+          yourTotal = yourTotal / (1 + propertyTaxRate);
+        if (financialKeys.has(`Market ${baseMetric}`))
+          marketTotal = marketTotal / (1 + propertyTaxRate);
+      }
+      content = formatValue(
+        yourTotal - marketTotal,
+        baseMetric,
+        true,
+        currencyCode
+      );
+    } else if (value !== undefined) {
+      content = formatValue(value, header.key, false, currencyCode);
+    }
+
     const alignClass =
       header.key === "date"
-        ? "text-slate-800 text-left totals-label"
+        ? "font-data text-slate-800 text-left"
         : "font-data text-slate-800 text-right";
     const separatorClass = header.separator ? "border-r border-slate-200" : "";
-    return `<td class="px-4 py-3 whitespace-nowrap text-sm ${alignClass} ${separatorClass}">${content}</td>`;
+    return `<td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${alignClass} ${separatorClass}">${content}</td>`;
   });
-  return `<tr class="totals-row bg-slate-100 font-semibold border-t-2 border-slate-300">${cells.join(
+  return `<tr class="bg-slate-100 border-t-2 border-slate-300">${cells.join(
     ""
   )}</tr>`;
 }
+// public/app/reports.js
 
 function renderReportTable(
   data,
   selected,
-  shouldDisplayTotals,
   granularity,
   addComparisons,
-  displayOrder
+  displayOrder,
+  component // Receive the full component state
 ) {
   const container = document.getElementById("report-results-container");
   if (!data || data.length === 0) {
@@ -588,11 +736,24 @@ function renderReportTable(
       '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">No data available.</div>';
     return;
   }
-  const headers = buildTableHeaders(selected, addComparisons, displayOrder);
-  let bodyRows = buildTableBody(data, headers);
-  if (shouldDisplayTotals) {
-    bodyRows += buildTableTotalsRow(data, headers);
+
+  // Pass the component state to the header builder
+  const headers = buildTableHeaders(
+    selected,
+    addComparisons,
+    displayOrder,
+    component
+  );
+
+  // Pass the component state to the body builder
+  let bodyRows = buildTableBody(data, headers, component);
+
+  if (component.displayTotals) {
+    // The totals row function will need its own logic for tax calculation, which we can add next if this works.
+    // For now, let's focus on the main body.
+    bodyRows += buildTableTotalsRow(data, headers, component);
   }
+
   const dynamicTitle = generateReportTitle(selected);
   const tableHTML = `
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">

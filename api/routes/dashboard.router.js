@@ -17,12 +17,18 @@ const getPeriod = (granularity) => {
 
 // --- DASHBOARD API ENDPOINTS ---
 
+// /api/routes/dashboard.router.js
+// api/routes/dashboard.router.js
+
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
+    // This query now only gets the ID and name, as intended for the header.
     const query = `
-      SELECT up.property_id, h.property_name
+      SELECT 
+        up.property_id, 
+        h.property_name
       FROM user_properties up
-      JOIN hotels h ON up.property_id = h.hotel_id
+      LEFT JOIN hotels h ON up.property_id::text = h.hotel_id::text
       WHERE up.user_id = $1
       ORDER BY h.property_name;
     `;
@@ -31,6 +37,37 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error("Error in /api/my-properties:", error);
     res.status(500).json({ error: "Failed to fetch user properties." });
+  }
+});
+
+// /api/routes/dashboard.router.js
+
+// NEW: A simple, dedicated route to get details for a single property.
+// api/routes/dashboard.router.js
+
+router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const accessCheck = await pgPool.query(
+      "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied to this property." });
+    }
+
+    // The query now selects the hotel's currency code and tax name as well.
+    const hotelResult = await pgPool.query(
+      "SELECT property_name, currency_code, tax_rate, tax_type, tax_name FROM hotels WHERE hotel_id::text = $1",
+      [propertyId]
+    );
+    if (hotelResult.rows.length === 0) {
+      return res.status(404).json({ error: "Hotel details not found." });
+    }
+    res.json(hotelResult.rows[0]);
+  } catch (error) {
+    console.error("Error in /api/hotel-details:", error);
+    res.status(500).json({ error: "Failed to fetch hotel details." });
   }
 });
 
@@ -128,11 +165,15 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
       return res.status(403).json({ error: "Access denied to this property." });
 
     const period = getPeriod(granularity);
+    // api/routes/dashboard.router.js
+
+    // api/routes/dashboard.router.js
+
     const query = `
       SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar,
       SUM(total_revenue) as total_revenue, SUM(rooms_sold) as rooms_sold, SUM(capacity_count) as capacity_count
       FROM daily_metrics_snapshots
-      WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3
+      WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
     `;
     const result = await pgPool.query(query, [propertyId, startDate, endDate]);
@@ -171,12 +212,14 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     // Store the category for the queries
     const category = hotelCategoryResult.rows[0].category;
     const period = getPeriod(granularity);
+    // api/routes/dashboard.router.js
+
     const query = `
       SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar,
       SUM(dms.total_revenue) as market_total_revenue, SUM(dms.rooms_sold) as market_rooms_sold, SUM(dms.capacity_count) as market_capacity_count
       FROM daily_metrics_snapshots dms
       JOIN hotels h ON dms.hotel_id = h.hotel_id
-WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date >= $3 AND dms.stay_date <= $4
+WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date >= $3::date AND dms.stay_date <= $4::date
   GROUP BY period ORDER BY period ASC;
 `;
     // Update the query to use the new 'category' variable

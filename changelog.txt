@@ -365,3 +365,36 @@ Date: July 16, 2025 (Part 4)
       * The "Manual Action Triggers" section was removed. The "Initial Sync" action was moved directly into the main "Hotel Management" table as a per-row button, streamlining the admin workflow and eliminating the need to manually enter a property ID.
       * The API Explorer was redesigned with a tabbed interface to separate the "Insights API" and "General API" endpoints, making the tool more intuitive.
       * Outcome: The dashboard is now more informative with contextual subtitles. The historical data bug has been resolved, ensuring all metrics are accurate. The Admin Panel has been transformed into a professional, efficient, and user-friendly interface.
+Date: July 17, 2025
+      * Objective: Implement a feature on the Advanced Reporting page to allow users to toggle financial metrics between Gross (tax-inclusive) and Net (tax-exclusive) values, complete with dynamic UI updates and tooltips.
+      * Summary: A full-stack feature was implemented to handle tax calculations on the reports page. This involved extending the database schema, adding new API endpoints, and building the frontend logic for the toggle. The process included an extensive, iterative debugging session to fix a subtle data-type bug in the calculation logic and a recurring timezone issue in the date-period calculations.
+      * Key Changes:
+      * Database Schema:
+      * The hotels table was modified with an ALTER TABLE script to add three new columns: tax_rate (numeric), tax_type (varchar), and tax_name (varchar) to store per-property tax details.
+      * Backend API:
+      * A new utility function, syncHotelTaxInfoToDb, was added to cloudbeds.js to fetch and save tax details from the Cloudbeds API.
+      * The /api/sync-hotel-info endpoint in admin.router.js was updated to call this new function, allowing admins to sync all hotel metadata at once.
+      * A new, dedicated endpoint, GET /api/hotel-details/:propertyId, was created in dashboard.router.js to reliably serve all metadata (including tax and currency info) for a single property.
+      * The old /api/my-properties endpoint was simplified to remove a faulty JOIN and now serves only the data required by the header.
+      * Frontend Reporting Feature:
+      * The reportsPage component was refactored to fetch its own metadata from the new /api/hotel-details endpoint, decoupling it from the header.
+      * The "Show Tax-Inclusive Values" toggle is now functional. When toggled, the report instantly recalculates all financial metrics (for both the user's hotel and the market) to show either Gross or Net values.
+      * The table headers are now dynamic, updating to show "(Gross)" or "(Net)" based on the toggle's state.
+      * An improved tooltip was implemented using an SVG icon and dynamic text that displays the property's specific tax name and rate (e.g., "Values are inclusive of VAT @ 20% (gross)").
+      * Bug Fixes:
+      * Tax Calculation: A critical bug causing incorrect Net values was traced to a JavaScript type coercion issue. The tax_rate string ("0.2000") was being concatenated with the number 1, resulting in an incorrect divisor ("10.2"). This was fixed by using parseFloat() on the tax rate as soon as it's received from the API.
+      * Date Period: A recurring bug that caused date presets to start a day early was resolved. The init() logic in reports.html was re-architected to fix a race condition, and the handlePresetChange function in reports.js was updated to work exclusively in UTC, preventing timezone-related shifts.
+      * Outcome: The Advanced Reporting page now has a fully functional and accurate Gross/Net tax toggle, providing more flexible financial analysis. The UI is more informative with dynamic headers and improved tooltips, and a persistent date-handling bug has been resolved.
+Date: July 17, 2025 (Part 2)
+      * Objective: Implement a feature to automatically determine and store a hotel's neighborhood using its coordinates, and resolve the subsequent database persistence bugs.
+      * Summary: A new feature was developed to enrich hotel data by reverse geocoding its coordinates to find the neighborhood name. The initial implementation failed silently, which led to a deep debugging session that uncovered and fixed a subtle but critical database transaction issue.
+      * Key Changes:
+      * Neighborhood Lookup Feature:
+      * The hotels table was updated with an ALTER TABLE script to add a new neighborhood column.
+      * A new utility function, getNeighborhoodFromCoords, was created to connect to the free Nominatim (OpenStreetMap) reverse geocoding API.
+      * This function was integrated into the existing POST /api/sync-hotel-info endpoint, enhancing the "Sync Hotel Info" action rather than adding a new button to the UI.
+      * Database Transaction Debugging:
+      * Problem: After the initial implementation, the backend logs showed a successful API call and a successful database update, but the neighborhood column in the database remained empty.
+      * Discovery: Through a "trail of breadcrumbs" debugging strategy, it was confirmed the UPDATE query was executing correctly. The root cause was identified as a silent ROLLBACK being issued by the database driver at the end of a request if any unhandled error occurred later in the same route handler.
+      * Resolution: The POST /sync-hotel-info endpoint in admin.router.js was refactored to use explicit transaction control. The entire logic is now wrapped in a manual BEGIN...COMMIT block, which ensures that all database operations are atomically saved, fixing the data persistence issue.
+      * Outcome: The neighborhood lookup feature is now functionally complete on the backend and successfully saves the correct neighborhood data to the database. A minor known issue remains where the Admin Panel table does not yet display this new data, which is scheduled to be resolved in a future session.
