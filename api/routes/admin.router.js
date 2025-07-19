@@ -273,7 +273,13 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageSize=1`;
         break;
       case "sample-rate":
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${propertyId}&pageSize=1`;
+        // Get today's and tomorrow's date in YYYY-MM-DD format.
+        const today = new Date().toISOString().split("T")[0];
+        const tomorrow = new Date(Date.now() + 86400000)
+          .toISOString()
+          .split("T")[0]; // 86400000ms = 24 hours
+        // Add the required startDate and endDate parameters to the URL.
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${propertyId}&pageSize=1&startDate=${today}&endDate=${tomorrow}`;
         break;
       case "taxes-fees":
         targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyId}`;
