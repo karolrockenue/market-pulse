@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings - Market Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --text-primary: #445165;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        /* The main page accent is still the soft blue for tabs/links */
+        --accent-primary: #8fb0e5;
+        /* CHANGE 1: New variable for the dark button color */
+        --button-primary-bg: #1e293b;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+      }
+      .control-btn {
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 6px;
+        transition: all 0.2s;
+      }
+      /* CHANGE 2: The primary button now uses the new dark background and white text */
+      .control-btn.primary {
+        background-color: var(--button-primary-bg);
+        color: white;
+        font-weight: 500;
+      }
+      .control-btn.primary:hover {
+        filter: brightness(120%);
+      }
+      .control-btn.disabled {
+        background-color: #d1d5db;
+        color: #6b7280;
+        cursor: not-allowed;
+      }
+      [x-cloak] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div class="flex flex-col lg:flex-row min-h-screen" x-data="settingsPage">
+      <div id="sidebar-placeholder"></div>
+
+      <div class="flex-1 flex flex-col min-w-0">
+        <div id="header-placeholder"></div>
+
+        <main x-show="isInitialized" x-cloak class="flex-1 p-8">
+          <header class="mb-8">
+            <h1 class="text-3xl font-bold">Settings</h1>
+            <p class="text-slate-500 mt-1">
+              Manage your profile, team members, and property connections.
+            </p>
+          </header>
+
+          <div>
+            <div class="hidden sm:block">
+              <div class="border-b border-slate-200">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                  <a
+                    href="#"
+                    @click.prevent="activeTab = 'profile'"
+                    :class="activeTab === 'profile' ? 'border-[#8FB0E5] text-[#8FB0E5] font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors"
+                  >
+                    My Profile
+                  </a>
+                  <a
+                    href="#"
+                    @click.prevent="activeTab = 'users'"
+                    :class="activeTab === 'users' ? 'border-[#8FB0E5] text-[#8FB0E5] font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors"
+                  >
+                    User Management
+                  </a>
+                  <a
+                    href="#"
+                    @click.prevent="activeTab = 'properties'"
+                    :class="activeTab === 'properties' ? 'border-[#8FB0E5] text-[#8FB0E5] font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors"
+                  >
+                    Connected Properties
+                  </a>
+                </nav>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5">
+            <div x-show="activeTab === 'profile'" class="card">
+              <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
+                My Profile
+              </h2>
+              <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label
+                    for="first-name"
+                    class="block text-sm font-medium text-slate-600"
+                    >First Name</label
+                  >
+                  <input
+                    type="text"
+                    id="first-name"
+                    value="Karol"
+                    disabled
+                    class="mt-1 block w-full bg-slate-100 rounded-md border-slate-300 shadow-sm text-slate-500 py-2.5 px-3 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="last-name"
+                    class="block text-sm font-medium text-slate-600"
+                    >Last Name</label
+                  >
+                  <input
+                    type="text"
+                    id="last-name"
+                    value=""
+                    disabled
+                    class="mt-1 block w-full bg-slate-100 rounded-md border-slate-300 shadow-sm text-slate-500 py-2.5 px-3 cursor-not-allowed"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <label
+                    for="email"
+                    class="block text-sm font-medium text-slate-600"
+                    >Email Address</label
+                  >
+                  <input
+                    type="email"
+                    id="email"
+                    value="your-email@market-pulse.io"
+                    disabled
+                    class="mt-1 block w-full bg-slate-100 rounded-md border-slate-300 shadow-sm text-slate-500 py-2.5 px-3 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+              <div class="mt-6 text-right border-t border-slate-200 pt-4">
+                <button class="control-btn primary disabled">
+                  Save Changes
+                </button>
+              </div>
+            </div>
+
+            <div x-show="activeTab === 'users'" class="card">
+              <div
+                class="flex justify-between items-center border-b border-slate-200 pb-4"
+              >
+                <h2 class="text-lg font-semibold">User Management</h2>
+                <button class="control-btn primary inline-flex items-center">
+                  <svg
+                    class="w-4 h-4 mr-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M11 5a3 3 0 11-6 0 3 3 0 016 0zM2 12.5a.5.5 0 01.5-.5h15a.5.5 0 010 1H2.5a.5.5 0 01-.5-.5zM11 15a3 3 0 100-6 3 3 0 000 6z"
+                    />
+                    <path
+                      d="M15.5 8.5a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1a.5.5 0 01.5-.5z"
+                    />
+                  </svg>
+                  Invite User
+                </button>
+              </div>
+              <div class="overflow-x-auto mt-4">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th class="text-left px-4 py-3 font-semibold">Name</th>
+                      <th class="text-left px-4 py-3 font-semibold">Email</th>
+                      <th class="text-left px-4 py-3 font-semibold">Role</th>
+                      <th class="text-left px-4 py-3 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200">
+                    <tr class="hover:bg-slate-50 transition-colors">
+                      <td class="px-4 py-3 font-medium">Jane Doe</td>
+                      <td class="px-4 py-3 text-slate-600">
+                        jane.doe@hotel.com
+                      </td>
+                      <td class="px-4 py-3 text-slate-600">Property Manager</td>
+                      <td class="px-4 py-3">
+                        <span
+                          class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800"
+                          >Active</span
+                        >
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                      <td class="px-4 py-3 font-medium">John Smith</td>
+                      <td class="px-4 py-3 text-slate-600">
+                        john.smith@hotel.com
+                      </td>
+                      <td class="px-4 py-3 text-slate-600">Viewer</td>
+                      <td class="px-4 py-3">
+                        <span
+                          class="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800"
+                          >Invitation Pending</span
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div x-show="activeTab === 'properties'" class="card">
+              <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
+                Connected Properties
+              </h2>
+              <div class="overflow-x-auto mt-4">
+                <table class="w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th class="text-left px-4 py-3 font-semibold">
+                        Property Name
+                      </th>
+                      <th class="text-left px-4 py-3 font-semibold">PMS</th>
+                      <th class="text-left px-4 py-3 font-semibold">Status</th>
+                      <th class="text-left px-4 py-3 font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200">
+                    <tr class="hover:bg-slate-50 transition-colors">
+                      <td class="px-4 py-3 font-medium">Rockenue Hotel</td>
+                      <td class="px-4 py-3 text-slate-600">Cloudbeds</td>
+                      <td class="px-4 py-3">
+                        <span
+                          class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800"
+                          >Connected</span
+                        >
+                      </td>
+                      <td class="px-4 py-3">
+                        <button
+                          class="font-semibold text-red-500 hover:text-red-700"
+                        >
+                          Disconnect
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module">
+      import settingsPage from "/app/settings.mjs";
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("settingsPage", settingsPage);
+      });
+    </script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+  </body>
+</html>

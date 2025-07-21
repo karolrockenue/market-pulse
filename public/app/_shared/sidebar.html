@@ -1,11 +1,11 @@
 <aside
-  class="w-full lg:w-64 lg:flex-shrink-0 flex flex-col bg-white border-r h-full"
+  class="w-full lg:w-64 lg:flex-shrink-0 flex flex-col bg-slate-800 h-full"
   x-data="sidebar()"
   x-cloak
 >
   <div class="h-20 flex items-center px-6 flex-shrink-0">
     <svg
-      class="h-8 w-auto text-blue-500"
+      class="h-8 w-auto text-sky-400"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -17,7 +17,7 @@
       <line x1="18" y1="20" x2="18" y2="4"></line>
       <line x1="6" y1="20" x2="6" y2="16"></line>
     </svg>
-    <span class="ml-3 text-lg font-bold text-slate-800 tracking-wide"
+    <span class="ml-3 text-lg font-bold text-white tracking-wide"
       >Market Pulse</span
     >
   </div>
@@ -27,8 +27,8 @@
       href="/app/"
       class="flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200"
       :class="{
-        'bg-blue-100 text-blue-600 font-semibold': window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'),
-        'text-slate-500 hover:bg-slate-100 hover:text-slate-900 font-medium': !(window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'))
+        'bg-slate-900 text-white font-semibold': window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'),
+        'text-slate-300 hover:bg-slate-700 hover:text-white font-medium': !(window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'))
       }"
     >
       <svg
@@ -40,9 +40,10 @@
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <path
-          d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-        ></path>
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
       </svg>
       Dashboard
     </a>
@@ -50,8 +51,8 @@
       href="/app/reports.html"
       class="flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200"
       :class="{
-        'bg-blue-100 text-blue-600 font-semibold': window.location.pathname.endsWith('reports.html'),
-        'text-slate-500 hover:bg-slate-100 hover:text-slate-900 font-medium': !window.location.pathname.endsWith('reports.html')
+        'bg-slate-900 text-white font-semibold': window.location.pathname.endsWith('reports.html'),
+        'text-slate-300 hover:bg-slate-700 hover:text-white font-medium': !window.location.pathname.endsWith('reports.html')
       }"
     >
       <svg
@@ -64,17 +65,56 @@
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <path d="M3 3v18h18" />
-        <path d="m19 9-5 5-4-4-3 3" />
+        <path
+          d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"
+        ></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="12" y1="18" x2="12" y2="12"></line>
+        <line x1="9" y1="18" x2="9" y2="15"></line>
+        <line x1="15" y1="18" x2="15" y2="9"></line>
       </svg>
       Reports
     </a>
     <a
+      href="/app/settings.html"
+      class="flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200"
+      :class="{
+        'bg-slate-900 text-white font-semibold': window.location.pathname.endsWith('settings.html'),
+        'text-slate-300 hover:bg-slate-700 hover:text-white font-medium': !window.location.pathname.endsWith('settings.html')
+      }"
+    >
+      <svg
+        class="h-5 w-5 mr-3"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M12.22 2h-4.44a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8.36L18.88 4 12.22 2z"
+        ></path>
+        <path d="M18 2l-3.4 3.4"></path>
+        <path d="M12 12l-4 4"></path>
+        <path d="m22 2-3 3"></path>
+        <path d="M15 15l-3 3"></path>
+        <path d="M22 8l-3 3"></path>
+        <path d="M9 9l-3 3"></path>
+      </svg>
+      Settings
+    </a>
+    <a
       id="admin-nav-link"
       href="/admin/"
-      class="flex items-center px-3 py-3 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors duration-200"
+      class="flex items-center px-3 py-3 text-sm rounded-lg transition-colors duration-200"
       x-show="isAdmin"
       style="display: none"
+      :class="{
+        'bg-slate-900 text-white font-semibold': window.location.pathname.startsWith('/admin'),
+        'text-slate-300 hover:bg-slate-700 hover:text-white font-medium': !window.location.pathname.startsWith('/admin')
+      }"
     >
       <svg
         class="h-5 w-5 mr-3"
@@ -97,9 +137,9 @@
       x-show="isAdmin"
       style="display: none"
       :class="{
-    'bg-blue-100 text-blue-600 font-semibold': window.location.pathname.endsWith('market-explorer.html'),
-    'text-slate-500 hover:bg-slate-100 hover:text-slate-900 font-medium': !window.location.pathname.endsWith('market-explorer.html')
-  }"
+        'bg-slate-900 text-white font-semibold': window.location.pathname.endsWith('market-explorer.html'),
+        'text-slate-300 hover:bg-slate-700 hover:text-white font-medium': !window.location.pathname.endsWith('market-explorer.html')
+      }"
     >
       <svg
         class="h-5 w-5 mr-3"
@@ -122,10 +162,10 @@
   </nav>
 
   <div class="px-4 py-4 mt-auto">
-    <div class="border-t pt-4">
+    <div class="border-t border-slate-700 pt-4">
       <a
         href="mailto:support@market-pulse.io"
-        class="flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors duration-200"
+        class="flex items-center text-sm font-medium text-slate-300 hover:text-white transition-colors duration-200"
       >
         <svg
           class="h-5 w-5 mr-3"

@@ -133,6 +133,10 @@ app.get("/app/reports.html", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "reports.html"));
 });
 
+app.get("/app/settings.html", requirePageLogin, (req, res) => {
+  res.sendFile(path.join(publicPath, "app", "settings.html"));
+});
+
 app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
