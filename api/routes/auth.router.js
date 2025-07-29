@@ -148,13 +148,15 @@ router.get("/accept-invitation", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // 1. Find and validate the invitation
+    // 1. Find the invitation and JOIN to get the inviter's cloudbeds_user_id
     const inviteResult = await client.query(
-      "SELECT * FROM user_invitations WHERE invitation_token = $1 AND status = 'pending' AND expires_at > NOW()",
+      "SELECT i.*, u.cloudbeds_user_id as inviter_cloudbeds_id FROM user_invitations i JOIN users u ON i.inviter_user_id = u.user_id WHERE i.invitation_token = $1 AND i.status = 'pending' AND i.expires_at > NOW()",
       [token]
     );
     if (inviteResult.rows.length === 0) {
-      throw new Error("Invitation is invalid or has expired.");
+      throw new Error(
+        "Invitation is invalid, has expired, or has already been used."
+      );
     }
     const invitation = inviteResult.rows[0];
 
@@ -165,7 +167,7 @@ router.get("/accept-invitation", async (req, res) => {
     const newUserResult = await client.query(
       `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, auth_mode, pms_type, is_admin)
        VALUES ($1, $2, $3, $4, 'invited', 'cloudbeds', false)
-       RETURNING user_id, cloudbeds_user_id`, // Return both IDs
+       RETURNING user_id, cloudbeds_user_id`,
       [
         newCloudbedsUserId,
         invitation.invitee_email,
@@ -173,47 +175,45 @@ router.get("/accept-invitation", async (req, res) => {
         invitation.invitee_last_name,
       ]
     );
-    const newUserId = newUserResult.rows[0].user_id;
     const finalCloudbedsId = newUserResult.rows[0].cloudbeds_user_id;
 
-    // 3. Grant property access
+    // 3. Get properties using the inviter's cloudbeds_user_id
     const propertiesResult = await client.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
-      [invitation.inviter_user_id]
+      [invitation.inviter_cloudbeds_id]
     );
     const inviterProperties = propertiesResult.rows;
 
     if (inviterProperties.length > 0) {
       for (const prop of inviterProperties) {
+        // 4. Insert the new user's property link using their cloudbeds_user_id
         await client.query(
           "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
-          [newUserId, prop.property_id]
+          [finalCloudbedsId, prop.property_id]
         );
       }
     }
 
-    // 4. Mark invitation as accepted
+    // 5. Mark invitation as accepted
     await client.query(
       "UPDATE user_invitations SET status = 'accepted' WHERE invitation_token = $1",
       [token]
     );
 
-    // 5. Create a login session for the new user
-    req.session.userId = finalCloudbedsId; // Use the new cloudbeds_user_id for the session
+    // 6. Create a login session for the new user
+    req.session.userId = finalCloudbedsId;
     req.session.isAdmin = false;
 
-    // Save the session, then commit the transaction and redirect
     req.session.save(async (err) => {
       if (err) {
         throw new Error("Failed to create user session.");
       }
       await client.query("COMMIT");
-      res.redirect("/app/"); // Redirect to the main application
+      res.redirect("/app/");
     });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error accepting invitation:", error);
-    // Future improvement: redirect to an error page
     res.status(400).send(error.message);
   } finally {
     client.release();
