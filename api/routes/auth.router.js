@@ -326,6 +326,8 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 
 // This single callback handles both standard OAuth and pilot property connections.
 // This single callback handles both standard OAuth and pilot property connections.
+// Located in api/routes/auth.router.js
+
 router.get("/cloudbeds/callback", async (req, res) => {
   try {
     const { code } = req.query;
@@ -333,13 +335,13 @@ router.get("/cloudbeds/callback", async (req, res) => {
       return res.status(400).send("Error: No authorization code provided.");
     }
 
+    // ... (token exchange logic remains the same) ...
     const clientId = process.env.CLOUDBEDS_CLIENT_ID;
     const clientSecret = process.env.CLOUDBEDS_CLIENT_SECRET;
     const redirectUri =
       process.env.VERCEL_ENV === "production"
         ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
         : process.env.CLOUDBEDS_REDIRECT_URI;
-
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: clientId,
@@ -347,31 +349,27 @@ router.get("/cloudbeds/callback", async (req, res) => {
       redirect_uri: redirectUri,
       code: code,
     });
-
     const tokenResponse = await fetch(
       "https://hotels.cloudbeds.com/api/v1.1/access_token",
       { method: "POST", body: tokenParams }
     );
-
     const tokenData = await tokenResponse.json();
     if (!tokenData.access_token) {
       throw new Error(
-        `Failed to get access token from Cloudbeds. Response: ${JSON.stringify(
-          tokenData
-        )}`
+        `Failed to get access token. Response: ${JSON.stringify(tokenData)}`
       );
     }
-
     const { access_token, refresh_token, expires_in } = tokenData;
     const tokenExpiry = new Date(Date.now() + expires_in * 1000);
 
+    // --- DIAGNOSTIC LOG 1: User Info ---
     const userInfoResponse = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const userInfo = await userInfoResponse.json();
+    console.log("DIAGNOSTIC LOG 1: Fetched User Info:", userInfo);
 
-    // MODIFICATION: Added RETURNING user_id to get our internal numeric ID back from the database.
     const userQuery = `
       INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
       VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
@@ -380,39 +378,42 @@ router.get("/cloudbeds/callback", async (req, res) => {
           status = 'active', auth_mode = 'oauth', pms_type = 'cloudbeds'
       RETURNING user_id;
     `;
-
-    // MODIFICATION: Captured the full user record from our database.
     const savedUserResult = await pgPool.query(userQuery, [
       userInfo.user_id,
       userInfo.email,
       userInfo.first_name,
       userInfo.last_name,
     ]);
-
-    // MODIFICATION: Extracted the numeric localUserId from the query result.
     const localUserId = savedUserResult.rows[0].user_id;
 
+    // --- DIAGNOSTIC LOG 2: Property Info ---
     const propertyInfoResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const propertyInfo = await propertyInfoResponse.json();
+    console.log("DIAGNOSTIC LOG 2: Fetched Property Info:", propertyInfo);
+
     const properties = Array.isArray(propertyInfo)
       ? propertyInfo
       : [propertyInfo];
 
+    // --- DIAGNOSTIC LOG 3: Loop Check ---
+    console.log(
+      `DIAGNOSTIC LOG 3: Found ${properties.length} properties. Entering loop...`
+    );
+
     for (const property of properties) {
+      // --- DIAGNOSTIC LOG 4: Inside Loop ---
+      console.log("DIAGNOSTIC LOG 4: Processing property:", property);
+
       if (property && property.id) {
         await syncHotelDetailsToDb(access_token, property.id);
-
-        // MODIFICATION: Storing a more complete credentials object, including the access token and its expiry.
         const pmsCredentials = {
           access_token,
           refresh_token,
           token_expiry: tokenExpiry.toISOString(),
         };
-
-        // BUG FIX: Using the correct numeric localUserId for the INSERT statement.
         await pgPool.query(
           `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
            VALUES ($1, $2, 'connected', $3) 
@@ -420,8 +421,16 @@ router.get("/cloudbeds/callback", async (req, res) => {
            DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
           [localUserId, property.id, pmsCredentials]
         );
+      } else {
+        // --- DIAGNOSTIC LOG 5: Invalid Property ---
+        console.log(
+          "DIAGNOSTIC LOG 5: Skipped invalid property object:",
+          property
+        );
       }
     }
+
+    console.log("DIAGNOSTIC LOG 6: Loop finished.");
 
     req.session.userId = userInfo.user_id;
     req.session.isAdmin = userInfo.is_admin || false;
@@ -433,16 +442,12 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
       res.redirect("/app/");
     });
-    // Located in api/routes/auth.router.js
   } catch (error) {
-    // MODIFICATION: Added more detailed logging to see the exact error.
     console.error("CRITICAL ERROR in OAuth callback:", error.stack);
-    // MODIFICATION: Sending the actual error message in the response.
-    // This will make the error visible in the browser's network tab during testing.
     res.status(500).json({
       message: "An error occurred during authentication.",
       error: error.message,
-      stack: error.stack, // Also sending stack trace for full context
+      stack: error.stack,
     });
   }
 });
