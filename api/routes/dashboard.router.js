@@ -25,7 +25,7 @@ router.get("/user/profile", requireUserApi, async (req, res) => {
     console.log("DEBUG: Session User ID is:", req.session.userId);
 
     const result = await pgPool.query(
-      "SELECT first_name, last_name, email FROM users WHERE user_id = $1",
+      "SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
 
@@ -57,7 +57,7 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
     }
 
     const result = await pgPool.query(
-      "UPDATE users SET first_name = $1, last_name = $2 WHERE user_id = $3 RETURNING first_name, last_name",
+      "UPDATE users SET first_name = $1, last_name = $2 WHERE cloudbeds_user_id = $3 RETURNING first_name, last_name",
       [firstName, lastName, req.session.userId]
     );
 
