@@ -115,6 +115,11 @@ router.post("/invite", requireAdminApi, async (req, res) => {
  * @description Fetches all active users and pending invitations for the user's account.
  * @access User
  */
+/**
+ * @route GET /api/users/team
+ * @description Fetches all active users and pending invitations for the user's account.
+ * @access User
+ */
 router.get("/team", requireUserApi, async (req, res) => {
   // The cloudbeds_user_id of the person making the request.
   const requesterCloudbedsId = req.session.userId;
