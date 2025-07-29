@@ -67,7 +67,7 @@
       <div class="flex-1 flex flex-col min-w-0">
         <div id="header-placeholder"></div>
 
-        <main x-show="isInitialized" x-cloak class="flex-1 p-4 md:p-8">
+        <main x-show="isInitialized" x-cloak class="flex-1 p-4 md:p-8 relative">
           <header class="mb-8">
             <h1 class="text-3xl font-bold">Settings</h1>
             <p class="text-slate-500 mt-1">
@@ -147,24 +147,39 @@
                 class="flex flex-col md:flex-row justify-between md:items-center border-b border-slate-200 pb-4 gap-4"
               >
                 <h2 class="text-lg font-semibold">User Management</h2>
-                <button
-                  class="control-btn primary inline-flex items-center justify-center"
-                >
-                  <svg
-                    class="w-4 h-4 mr-2"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+                <div class="flex items-center gap-4">
+                  <span
+                    x-show="inviteMessage"
+                    x-transition
+                    class="text-sm font-medium text-green-600"
+                    x-text="inviteMessage.includes('success') ? inviteMessage : ''"
+                  ></span>
+                  <span
+                    x-show="inviteMessage"
+                    x-transition
+                    class="text-sm font-medium text-red-600"
+                    x-text="!inviteMessage.includes('success') ? inviteMessage : ''"
+                  ></span>
+                  <button
+                    @click="isInviteModalOpen = true"
+                    class="control-btn primary inline-flex items-center justify-center"
                   >
-                    <path
-                      d="M11 5a3 3 0 11-6 0 3 3 0 016 0zM2 12.5a.5.5 0 01.5-.5h15a.5.5 0 010 1H2.5a.5.5 0 01-.5-.5zM11 15a3 3 0 100-6 3 3 0 000 6z"
-                    />
-                    <path
-                      d="M15.5 8.5a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1a.5.5 0 01.5-.5z"
-                    />
-                  </svg>
-                  Invite User
-                </button>
+                    <svg
+                      class="w-4 h-4 mr-2"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M11 5a3 3 0 11-6 0 3 3 0 016 0zM2 12.5a.5.5 0 01.5-.5h15a.5.5 0 010 1H2.5a.5.5 0 01-.5-.5zM11 15a3 3 0 100-6 3 3 0 000 6z"
+                      />
+                      <path
+                        d="M15.5 8.5a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1a.5.5 0 01.5-.5z"
+                      />
+                    </svg>
+                    Invite User
+                  </button>
+                </div>
               </div>
               <div class="overflow-x-auto mt-4">
                 <table class="w-full text-sm">
@@ -172,7 +187,6 @@
                     <tr>
                       <th class="text-left px-4 py-3 font-semibold">Name</th>
                       <th class="text-left px-4 py-3 font-semibold">Email</th>
-                      <th class="text-left px-4 py-3 font-semibold">Role</th>
                       <th class="text-left px-4 py-3 font-semibold">Status</th>
                     </tr>
                   </thead>
@@ -182,7 +196,6 @@
                       <td class="px-4 py-3 text-slate-600">
                         jane.doe@hotel.com
                       </td>
-                      <td class="px-4 py-3 text-slate-600">Property Manager</td>
                       <td class="px-4 py-3">
                         <span
                           class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800"
@@ -195,7 +208,6 @@
                       <td class="px-4 py-3 text-slate-600">
                         john.smith@hotel.com
                       </td>
-                      <td class="px-4 py-3 text-slate-600">Viewer</td>
                       <td class="px-4 py-3">
                         <span
                           class="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800"
@@ -208,51 +220,86 @@
               </div>
             </section>
 
-            <section id="properties" class="card p-6">
-              <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
-                Connected Properties
-              </h2>
-              <div class="overflow-x-auto mt-4">
-                <table class="w-full text-sm">
-                  <thead class="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th class="text-left px-4 py-3 font-semibold">
-                        Property Name
-                      </th>
-                      <th class="text-left px-4 py-3 font-semibold">PMS</th>
-                      <th class="text-left px-4 py-3 font-semibold">Status</th>
-                      <th class="text-left px-4 py-3 font-semibold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-200">
-                    <tr class="hover:bg-slate-50 transition-colors">
-                      <td class="px-4 py-3 font-medium">Rockenue Hotel</td>
-                      <td class="px-4 py-3 text-slate-600">Cloudbeds</td>
-                      <td class="px-4 py-3">
-                        <span
-                          class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800"
-                          >Connected</span
-                        >
-                      </td>
-                      <td class="px-4 py-3">
-                        <button
-                          class="font-semibold text-red-500 hover:text-red-700"
-                        >
-                          Disconnect
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            <section id="properties" class="card p-6"></section>
+          </div>
+
+          <div
+            x-show="isInviteModalOpen"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75"
+            style="display: none"
+          >
+            <div
+              @click.away="isInviteModalOpen = false"
+              class="relative bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+            >
+              <h3 class="text-lg font-semibold mb-4">Invite a New User</h3>
+              <div class="space-y-4">
+                <div>
+                  <label
+                    for="invite-first-name"
+                    class="block text-sm font-medium text-slate-600"
+                    >First Name</label
+                  >
+                  <input
+                    type="text"
+                    id="invite-first-name"
+                    x-model="invitation.firstName"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm py-2.5 px-3"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="invite-last-name"
+                    class="block text-sm font-medium text-slate-600"
+                    >Last Name</label
+                  >
+                  <input
+                    type="text"
+                    id="invite-last-name"
+                    x-model="invitation.lastName"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm py-2.5 px-3"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="invite-email"
+                    class="block text-sm font-medium text-slate-600"
+                    >Email Address</label
+                  >
+                  <input
+                    type="email"
+                    id="invite-email"
+                    x-model="invitation.email"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm py-2.5 px-3"
+                  />
+                </div>
               </div>
-            </section>
+              <div class="mt-6 flex justify-end gap-4">
+                <button @click="isInviteModalOpen = false" class="control-btn">
+                  Cancel
+                </button>
+                <button
+                  @click="sendInvitation()"
+                  :disabled="isSendingInvite"
+                  class="control-btn primary"
+                >
+                  <span x-show="!isSendingInvite">Send Invitation</span>
+                  <span x-show="isSendingInvite">Sending...</span>
+                </button>
+              </div>
+            </div>
           </div>
         </main>
       </div>
     </div>
 
     <script type="module">
-      // This script section remains unchanged
       import settingsPage from "/app/settings.mjs";
       import pageHeader from "/app/_shared/header.mjs";
       import sidebar from "/app/_shared/sidebar.mjs";
