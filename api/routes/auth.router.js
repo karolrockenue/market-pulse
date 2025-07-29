@@ -164,7 +164,7 @@ router.get("/accept-invitation", async (req, res) => {
       .toString("hex")}`;
     const newUserResult = await client.query(
       `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, auth_mode, pms_type, is_admin)
-       VALUES ($1, $2, $3, $4, 'oauth', 'cloudbeds', false)
+       VALUES ($1, $2, $3, $4, 'invited', 'cloudbeds', false)
        RETURNING user_id, cloudbeds_user_id`, // Return both IDs
       [
         newCloudbedsUserId,

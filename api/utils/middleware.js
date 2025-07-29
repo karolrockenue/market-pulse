@@ -11,7 +11,6 @@ async function requireUserApi(req, res, next) {
   console.log(`[DEBUG 1] Session found for userId: ${req.session.userId}`);
 
   try {
-    // This query now only selects columns that exist in the 'users' table.
     const userResult = await pgPool.query(
       "SELECT user_id, auth_mode, needs_property_sync FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
@@ -29,24 +28,20 @@ async function requireUserApi(req, res, next) {
       `[DEBUG 2] User found. Mode: ${user.auth_mode}, Needs Sync: ${user.needs_property_sync}`
     );
 
-    // /api/utils/middleware.js
-
-    // /api/utils/middleware.js
-
-    if (user.auth_mode === "manual") {
-      // --- FIX: Define paths that DON'T need a property ID ---
+    // NEW LOGIC BLOCK TO HANDLE DIFFERENT USER TYPES
+    if (user.auth_mode === "invited") {
+      // Invited users are team members who view existing data.
+      // They don't have their own PMS connection, so we don't need to check for tokens.
+      // We simply verify their session is valid and let them pass through.
+      console.log(`[DEBUG] User is 'invited'. Allowing access to view data.`);
+    } else if (user.auth_mode === "manual") {
       const allowedPaths = ["/my-properties", "/last-refresh-time"];
 
-      // If the request is for a general, non-property-specific endpoint,
-      // we can skip the property ID header check.
       if (allowedPaths.includes(req.path)) {
         console.log(
           `[DEBUG] Path ${req.path} is allowed without X-Property-ID. Skipping header check.`
         );
-        // We still call next() at the end, so we just let this block pass.
       } else {
-        // For all other data-intensive endpoints, enforce the header requirement.
-        // --- FIX: Look for the property ID in the query string, not the header ---
         const propertyId = req.query.propertyId;
         if (!propertyId) {
           return res.status(400).json({
@@ -54,8 +49,6 @@ async function requireUserApi(req, res, next) {
           });
         }
 
-        // Retrieve the permanently stored API key for the requested property.
-        // Read the generic credentials object from the database.
         const credsResult = await pgPool.query(
           "SELECT pms_credentials FROM user_properties WHERE user_id = $1 AND property_id = $2",
           [req.user.cloudbedsId, propertyId]
@@ -69,10 +62,12 @@ async function requireUserApi(req, res, next) {
           });
         }
 
-        // Attach the API key from the JSON object as the 'accessToken'.
         req.user.accessToken = credentials.api_key;
       }
     }
+    // Note: 'oauth' users will fall through this block and proceed,
+    // as their token refresh is handled by the data sync scripts, not here.
+
     console.log(
       `[DEBUG FINAL] Middleware success for path: ${req.path}. Calling next().`
     );
