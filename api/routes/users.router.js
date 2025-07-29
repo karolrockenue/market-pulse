@@ -110,33 +110,24 @@ router.post("/invite", requireAdminApi, async (req, res) => {
  * @description Fetches all active users and pending invitations for the user's account.
  * @access User
  */
-/**
- * @route GET /api/users/team
- * @description Fetches all active users and pending invitations for the user's account.
- * @access User
- */
-/**
- * @route GET /api/users/team
- * @description Fetches all active users and pending invitations for the user's account.
- * @access User
- */
 router.get("/team", requireUserApi, async (req, res) => {
-  // The cloudbeds_user_id of the person making the request.
+  console.log("--- [DEBUG] START /api/users/team ---");
   const requesterCloudbedsId = req.session.userId;
+  console.log(
+    `[DEBUG] 1. Requester cloudbeds_user_id from session: ${requesterCloudbedsId}`
+  );
 
   const client = await pgPool.connect();
   try {
-    // --- Step 1: Define the "team" ---
-    // A team consists of all users who share access to at least one property with the requester.
-    // Start by finding the requester's properties.
+    // --- Step 1: Find properties for the requester
     const propertiesResult = await client.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
       [requesterCloudbedsId]
     );
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
+    console.log(`[DEBUG] 2. Found property IDs for requester:`, propertyIds);
 
     let teamCloudbedsIds = [];
-
     if (propertyIds.length > 0) {
       // If the user has properties, the team is everyone who shares them.
       const teamResult = await client.query(
@@ -147,6 +138,16 @@ router.get("/team", requireUserApi, async (req, res) => {
     } else {
       // If the user has no properties, the "team" is just themself for now.
       teamCloudbedsIds.push(requesterCloudbedsId);
+    }
+    console.log(
+      `[DEBUG] 3. Defined team members by cloudbeds_user_id:`,
+      teamCloudbedsIds
+    );
+
+    // If teamCloudbedsIds is empty for some reason, we can't proceed.
+    if (teamCloudbedsIds.length === 0) {
+      console.log("[DEBUG] 3a. No team members found, returning empty array.");
+      return res.json([]);
     }
 
     // --- Step 2: Fetch all active users on the team ---
@@ -159,14 +160,15 @@ router.get("/team", requireUserApi, async (req, res) => {
       email: user.email,
       status: "Active",
     }));
+    console.log(`[DEBUG] 4. Fetched active users:`, activeUsers);
 
     // --- Step 3: Fetch all pending invitations sent by anyone on the team ---
-    // First, get the integer primary keys for all team members.
     const teamPksResult = await client.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = ANY($1::text[])",
       [teamCloudbedsIds]
     );
     const teamMemberPks = teamPksResult.rows.map((u) => u.user_id);
+    console.log(`[DEBUG] 5. Fetched team member primary keys:`, teamMemberPks);
 
     let pendingInvites = [];
     if (teamMemberPks.length > 0) {
@@ -184,12 +186,19 @@ router.get("/team", requireUserApi, async (req, res) => {
         status: "Pending",
       }));
     }
+    console.log(`[DEBUG] 6. Fetched pending invites:`, pendingInvites);
 
     // --- Step 4: Combine and send the final list ---
     const allMembers = [...activeUsers, ...pendingInvites];
+    console.log(`[DEBUG] 7. Final combined list to be sent:`, allMembers);
+    console.log("--- [DEBUG] END /api/users/team ---");
+
     res.json(allMembers);
   } catch (error) {
-    console.error("Error fetching team members:", error);
+    console.error(
+      "--- [CRITICAL DEBUG] Error fetching team members: ---",
+      error
+    );
     res.status(500).json({ error: "Failed to retrieve team data." });
   } finally {
     client.release();
