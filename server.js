@@ -19,6 +19,7 @@ const authRoutes = require("./api/routes/auth.router.js");
 const dashboardRoutes = require("./api/routes/dashboard.router.js");
 const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js"); // NEW: Import admin router
+const publicPath = path.join(process.cwd(), "public");
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
@@ -83,6 +84,10 @@ app.use(
   })
 );
 
+// Serve static files from the "public" directory.
+// This must come BEFORE any of the page-serving routes.
+app.use(express.static(path.join(process.cwd(), "public")));
+
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
   app.post("/api/dev-login", (req, res) => {
@@ -111,7 +116,6 @@ app.use("/api", reportsRoutes);
 app.use("/api", adminRoutes); // NEW: Use the admin router
 
 // --- STATIC AND FALLBACK ROUTES ---
-const publicPath = path.join(process.cwd(), "public");
 
 app.get("/", (req, res) => {
   if (req.session.userId) {
@@ -140,8 +144,6 @@ app.get("/app/settings.html", requirePageLogin, (req, res) => {
 app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
-
-app.use(express.static(publicPath));
 
 // --- SERVER START ---
 const PORT = process.env.PORT || 3000;
