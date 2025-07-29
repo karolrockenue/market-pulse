@@ -40,7 +40,8 @@ market-pulse/
 │   │   ├── admin.router.js
 │   │   ├── auth.router.js
 │   │   ├── dashboard.router.js
-│   │   └── reports.router.js
+│   │   ├── reports.router.js
+│   │   └── users.router.js 
 │   ├── utils/
 │   │   ├── cloudbeds.js
 │   │   ├── db.js
@@ -67,12 +68,18 @@ market-pulse/
 │   │   ├── settings.html
 │   │   ├── settings.mjs
 │   │   └── utils.mjs
+│   ├── favicon.png
 │   ├── constants.mjs
 │   └── login.html
-├── changelog.md
+├── changelog.txt
 ├── package-lock.json
 ├── package.json
 ├── server.js
+└── vercel.json
+
+
+
+
 └── vercel.json
 
 
@@ -445,3 +452,22 @@ Date: July 29, 2025
       * Data Inconsistency Debugging: A critical bug preventing profile data from loading was traced to a data inconsistency between the session ID and the database schema. The issue was resolved by correcting the new API endpoints to query the users table by cloudbeds_user_id instead of the internal user_id, aligning the feature with the application's established user identification strategy.
       * Frontend Implementation: The "My Profile" card in settings.html and the settings.mjs component were wired up to the new backend API. The UI now dynamically fetches and displays the user's name and email, enables the form fields for editing, and handles saving the changes back to the database with user feedback.
       * Outcome: The "My Profile" section is fully functional and stable. Users can now successfully view and update their first and last names, establishing the first core feature of the new Settings page.
+
+
+Date: July 29, 2025 (Part 2)
+      * Objective: Implement a full-stack "User Invitation & Team Management" feature, allowing admins to invite new users who can seamlessly access shared property data.
+      * Summary: This was a complex, multi-stage development process that involved building the entire user invitation lifecycle, from sending the initial email to creating the new user's account. The work was punctuated by a deep and iterative debugging session that uncovered a critical, system-wide data inconsistency. The resolution of this bug was key to making the feature functional and improving the overall stability of the application.
+      * Key Changes:
+      * Architectural Decision: Based on user feedback, an initial plan for a two-step invitation acceptance page was discarded in favor of a superior, seamless, one-click flow. The final design allows a new user to click the link in their invitation email and be instantly logged in and redirected to a fully functional dashboard.
+      * Database Schema: A new user_invitations table was created to store and track invitation tokens, statuses, and expiration dates.
+      * Backend Implementation:
+      * A new, dedicated router, /api/routes/users.router.js, was created to handle sending invitations, including generating a secure token and sending a transactional email via SendGrid.
+      * The /api/routes/auth.router.js file was updated with a new GET /accept-invitation endpoint. This endpoint validates the token, creates the new user in the users table, and, crucially, links them to the correct properties.
+      * Frontend Implementation:
+      * The "User Management" section in settings.html was enhanced with a pop-up modal, allowing admins to enter the new user's name and email.
+      * The settings.mjs component was updated with the logic to call the new invite API and provide user feedback.
+      * Critical Bug Discovery & Resolution:
+      * Problem: Newly invited users were successfully created but would land on a blank dashboard, unable to load any property data.
+      * Discovery: Through a systematic debugging process involving log analysis and database exports, the root cause was identified as a fundamental inconsistency in how user IDs were being handled. The user_properties table was being populated with the string-based cloudbeds_user_id, while some new API endpoints were incorrectly attempting to query it using the internal, numeric user_id.
+      * Resolution: The bug was resolved with a two-part fix. First, the GET /accept-invitation endpoint was corrected to ensure it consistently uses the cloudbeds_user_id when linking properties to the new user. Second, the dashboard.router.js file was reverted to its original, correct logic, ensuring all data-fetching endpoints also use the cloudbeds_user_id for lookups. This restored consistency across the entire application.
+      * Outcome: The user invitation feature is now fully functional, stable, and provides a seamless onboarding experience. The resolution of the underlying ID inconsistency has significantly improved the robustness of the application's data layer.

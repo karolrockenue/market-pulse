@@ -5,7 +5,11 @@ const crypto = require("crypto"); // Built-in Node.js module for cryptography
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const { requireAdminApi } = require("../utils/middleware"); // Only admins can invite users
+// Import shared utilities
+const pgPool = require("../utils/db");
+// requireUserApi allows any logged-in user, requireAdminApi is for admin-only actions.
+const { requireUserApi, requireAdminApi } = require("../utils/middleware");
+const sgMail = require("@sendgrid/mail");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -103,6 +107,67 @@ router.post("/invite", requireAdminApi, async (req, res) => {
   } catch (error) {
     console.error("Error sending invitation:", error);
     res.status(500).json({ error: "Failed to send invitation." });
+  }
+});
+/**
+ * @route GET /api/users/team
+ * @description Fetches all active users and pending invitations for the user's account.
+ * @access User
+ */
+router.get("/team", requireUserApi, async (req, res) => {
+  // The user's primary account identifier is stored in the session.
+  const accountId = req.session.userId; // This is the cloudbeds_user_id
+
+  try {
+    // --- 1. Fetch all active users associated with this account ---
+    const activeUsersResult = await pgPool.query(
+      `SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = $1`,
+      [accountId]
+    );
+
+    // Map to a consistent format
+    const activeUsers = activeUsersResult.rows.map((user) => ({
+      name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+      email: user.email,
+      status: "Active",
+    }));
+
+    // --- 2. Fetch all user IDs associated with the account to find their invitations ---
+    const teamUserIdsResult = await pgPool.query(
+      `SELECT user_id FROM users WHERE cloudbeds_user_id = $1`,
+      [accountId]
+    );
+    const teamUserIds = teamUserIdsResult.rows.map((row) => row.user_id);
+
+    let pendingInvites = [];
+    if (teamUserIds.length > 0) {
+      // --- 3. Fetch all pending invitations sent by anyone on the team ---
+      const pendingInvitesResult = await pgPool.query(
+        `
+        SELECT invitee_first_name, invitee_last_name, invitee_email
+        FROM user_invitations 
+        WHERE inviter_user_id = ANY($1::int[]) AND status = 'pending'
+      `,
+        [teamUserIds]
+      );
+
+      // Map to the same consistent format
+      pendingInvites = pendingInvitesResult.rows.map((invite) => ({
+        name: `${invite.invitee_first_name || ""} ${
+          invite.invitee_last_name || ""
+        }`.trim(),
+        email: invite.invitee_email,
+        status: "Pending",
+      }));
+    }
+
+    // --- 4. Combine and send the final list ---
+    const allMembers = [...activeUsers, ...pendingInvites];
+
+    res.json(allMembers);
+  } catch (error) {
+    console.error("Error fetching team members:", error);
+    res.status(500).json({ error: "Failed to retrieve team data." });
   }
 });
 

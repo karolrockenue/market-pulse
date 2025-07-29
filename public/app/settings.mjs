@@ -10,6 +10,17 @@ export default function settingsPage() {
     originalProfile: {},
     isSaving: false,
     saveMessage: "",
+    // --- STATE ---
+    isInitialized: false,
+
+    // Profile section state
+    profile: { firstName: "", lastName: "", email: "" },
+    originalProfile: {},
+    isSaving: false,
+    saveMessage: "",
+
+    // NEW: State for User Management table
+    teamMembers: [],
 
     // NEW: State for the User Management section
     isInviteModalOpen: false,
@@ -31,18 +42,41 @@ export default function settingsPage() {
     },
 
     // --- INITIALIZATION ---
+    // --- INITIALIZATION ---
     async init() {
-      await loadComponent("header", "header-placeholder");
-      await loadComponent("sidebar", "sidebar-placeholder");
-      await this.fetchProfile();
+      // Fetch all data in parallel for a faster load
+      await Promise.all([
+        this.fetchProfile(),
+        this.fetchTeamMembers(), // Fetch team data on page load
+      ]);
 
+      // We no longer need to manually load components here,
+      // the new `initPage` function in the HTML handles it.
       this.$nextTick(() => {
         this.isInitialized = true;
       });
     },
 
     // --- METHODS ---
+    // --- METHODS ---
 
+    /**
+     * @description Fetches the list of active users and pending invitations.
+     */
+    async fetchTeamMembers() {
+      try {
+        // This new endpoint will combine active users and pending invites
+        const response = await fetch("/api/users/team");
+        if (!response.ok) {
+          throw new Error("Could not fetch team members.");
+        }
+        this.teamMembers = await response.json();
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+        // Silently fail for now, the UI will just show an empty table
+        this.teamMembers = [];
+      }
+    },
     // Profile Methods
     async fetchProfile() {
       try {

@@ -144,42 +144,29 @@
 
             <section id="users" class="card p-6">
               <div
-                class="flex flex-col md:flex-row justify-between md:items-center border-b border-slate-200 pb-4 gap-4"
+                class="flex justify-between items-center border-b border-slate-200 pb-4"
               >
                 <h2 class="text-lg font-semibold">User Management</h2>
-                <div class="flex items-center gap-4">
-                  <span
-                    x-show="inviteMessage"
-                    x-transition
-                    class="text-sm font-medium text-green-600"
-                    x-text="inviteMessage.includes('success') ? inviteMessage : ''"
-                  ></span>
-                  <span
-                    x-show="inviteMessage"
-                    x-transition
-                    class="text-sm font-medium text-red-600"
-                    x-text="!inviteMessage.includes('success') ? inviteMessage : ''"
-                  ></span>
-                  <button
-                    @click="isInviteModalOpen = true"
-                    class="control-btn primary inline-flex items-center justify-center"
+                <button
+                  @click="isInviteModalOpen = true"
+                  class="control-btn primary inline-flex items-center"
+                >
+                  <svg
+                    class="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
                   >
-                    <svg
-                      class="w-4 h-4 mr-2"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        d="M11 5a3 3 0 11-6 0 3 3 0 016 0zM2 12.5a.5.5 0 01.5-.5h15a.5.5 0 010 1H2.5a.5.5 0 01-.5-.5zM11 15a3 3 0 100-6 3 3 0 000 6z"
-                      />
-                      <path
-                        d="M15.5 8.5a.5.5 0 01.5.5v1a.5.5 0 01-1 0v-1a.5.5 0 01.5-.5z"
-                      />
-                    </svg>
-                    Invite User
-                  </button>
-                </div>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                    ></path>
+                  </svg>
+                  Invite User
+                </button>
               </div>
               <div class="overflow-x-auto mt-4">
                 <table class="w-full text-sm">
@@ -191,30 +178,35 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-200">
-                    <tr class="hover:bg-slate-50 transition-colors">
-                      <td class="px-4 py-3 font-medium">Jane Doe</td>
-                      <td class="px-4 py-3 text-slate-600">
-                        jane.doe@hotel.com
-                      </td>
-                      <td class="px-4 py-3">
-                        <span
-                          class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800"
-                          >Active</span
-                        >
-                      </td>
-                    </tr>
-                    <tr class="hover:bg-slate-50 transition-colors">
-                      <td class="px-4 py-3 font-medium">John Smith</td>
-                      <td class="px-4 py-3 text-slate-600">
-                        john.smith@hotel.com
-                      </td>
-                      <td class="px-4 py-3">
-                        <span
-                          class="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800"
-                          >Invitation Pending</span
-                        >
-                      </td>
-                    </tr>
+                    <template x-if="teamMembers.length === 0">
+                      <tr>
+                        <td colspan="3" class="text-center py-8 text-slate-500">
+                          You haven't invited any team members yet.
+                        </td>
+                      </tr>
+                    </template>
+                    <template x-for="member in teamMembers" :key="member.email">
+                      <tr class="hover:bg-slate-50 transition-colors">
+                        <td
+                          class="px-4 py-3 font-medium"
+                          x-text="member.name"
+                        ></td>
+                        <td
+                          class="px-4 py-3 text-slate-600"
+                          x-text="member.email"
+                        ></td>
+                        <td class="px-4 py-3">
+                          <span
+                            class="px-2 py-0.5 text-xs font-semibold rounded-full"
+                            :class="{
+            'bg-green-100 text-green-800': member.status === 'Active',
+            'bg-amber-100 text-amber-800': member.status === 'Pending'
+          }"
+                            x-text="member.status"
+                          ></span>
+                        </td>
+                      </tr>
+                    </template>
                   </tbody>
                 </table>
               </div>
@@ -309,11 +301,6 @@
         Alpine.data("settingsPage", settingsPage);
         Alpine.data("pageHeader", pageHeader);
         Alpine.data("sidebar", sidebar);
-      });
-
-      document.addEventListener("DOMContentLoaded", async () => {
-        await loadComponent("header", "header-placeholder");
-        await loadComponent("sidebar", "sidebar-placeholder");
       });
     </script>
     <script
