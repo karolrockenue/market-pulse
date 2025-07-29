@@ -13,17 +13,10 @@ const getPeriod = (granularity) => {
   return "stay_date";
 };
 
-// --- NEW: USER PROFILE API ENDPOINTS ---
-
-/**
- * @route GET /api/user/profile
- * @description Fetches the profile information for the currently logged-in user.
- * @access Private
- */
+// --- USER PROFILE API ENDPOINTS ---
+// These endpoints correctly query by the cloudbeds_user_id. No changes needed here.
 router.get("/user/profile", requireUserApi, async (req, res) => {
   try {
-    console.log("DEBUG: Session User ID is:", req.session.userId);
-
     const result = await pgPool.query(
       "SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
@@ -40,31 +33,21 @@ router.get("/user/profile", requireUserApi, async (req, res) => {
   }
 });
 
-/**
- * @route PUT /api/user/profile
- * @description Updates the first and last name for the currently logged-in user.
- * @access Private
- */
 router.put("/user/profile", requireUserApi, async (req, res) => {
   try {
     const { firstName, lastName } = req.body;
-
-    // Basic validation
     if (typeof firstName !== "string" || typeof lastName !== "string") {
       return res
         .status(400)
         .json({ error: "First name and last name must be strings." });
     }
-
     const result = await pgPool.query(
       "UPDATE users SET first_name = $1, last_name = $2 WHERE cloudbeds_user_id = $3 RETURNING first_name, last_name",
       [firstName, lastName, req.session.userId]
     );
-
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "User not found to update." });
     }
-
     res.status(200).json({
       message: "Profile updated successfully.",
       user: result.rows[0],
@@ -88,7 +71,8 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
       WHERE up.user_id = $1
       ORDER BY h.property_name;
     `;
-    const result = await pgPool.query(query, [req.session.userId]);
+    // FIXED: Use req.user.internalId, which is the correct primary key for the 'users' table.
+    const result = await pgPool.query(query, [req.user.internalId]);
     res.json(result.rows);
   } catch (error) {
     console.error("Error in /api/my-properties:", error);
@@ -99,9 +83,10 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
 router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
+    // FIXED: Use req.user.internalId for the access check query.
     const accessCheck = await pgPool.query(
       "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
-      [req.session.userId, propertyId]
+      [req.user.internalId, propertyId]
     );
     if (accessCheck.rows.length === 0) {
       return res.status(403).json({ error: "Access denied to this property." });
@@ -141,9 +126,10 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
+    // FIXED: Use req.user.internalId for the access check query.
     const accessCheck = await pgPool.query(
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
+      [req.user.internalId, propertyId]
     );
     if (accessCheck.rows.length === 0)
       return res.status(403).json({ error: "Access denied to this property." });
@@ -203,9 +189,10 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
+    // FIXED: Use req.user.internalId for the access check query.
     const accessCheck = await pgPool.query(
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
+      [req.user.internalId, propertyId]
     );
     if (accessCheck.rows.length === 0)
       return res.status(403).json({ error: "Access denied to this property." });
@@ -232,9 +219,10 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
+    // FIXED: Use req.user.internalId for the access check query.
     const accessCheck = await pgPool.query(
       "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
+      [req.user.internalId, propertyId]
     );
     if (accessCheck.rows.length === 0)
       return res.status(403).json({ error: "Access denied to this property." });
