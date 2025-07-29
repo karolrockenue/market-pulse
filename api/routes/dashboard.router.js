@@ -107,6 +107,33 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   }
 });
 
+// --- ADD THIS NEW ENDPOINT ---
+router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    // First, perform an access check to ensure the user can view this property.
+    const accessCheck = await pgPool.query(
+      "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
+      [req.session.userId, propertyId]
+    );
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Access denied." });
+    }
+
+    // Now, check if any metrics exist for this hotel. A count > 0 means a sync has run.
+    const syncCheck = await pgPool.query(
+      "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1 LIMIT 1",
+      [propertyId]
+    );
+
+    res.json({ isSyncComplete: syncCheck.rows.length > 0 });
+  } catch (error) {
+    console.error("Error in /api/sync-status:", error);
+    res.status(500).json({ error: "Failed to fetch sync status." });
+  }
+});
+
 router.get("/last-refresh-time", requireUserApi, async (req, res) => {
   try {
     const result = await pgPool.query(

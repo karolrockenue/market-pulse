@@ -186,6 +186,9 @@ export default function () {
     // --- STATE PROPERTIES (No chart properties anymore) ---
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     hasProperties: false,
+    isSyncing: true, // Default to true; we'll verify status on load
+    syncStatusInterval: null, // To hold our polling timer
+    isLoading: { kpis: true, chart: true, tables: true, properties: true },
     isLegalModalOpen: false,
     yourHotelSubtitle: "",
     propertyDropdownOpen: false,
@@ -247,6 +250,39 @@ export default function () {
           chartManager.resize();
         });
       });
+    },
+
+    // located in public/app/dashboard.mjs
+
+    // --- ADD THIS NEW METHOD ---
+    async checkSyncStatus(propertyId) {
+      if (!propertyId) {
+        this.isSyncing = false;
+        return;
+      }
+      try {
+        const response = await fetch(`/api/sync-status/${propertyId}`);
+        const data = await response.json();
+
+        if (data.isSyncComplete) {
+          // If the sync is complete, stop polling and reload the page to show the data.
+          this.isSyncing = false;
+          if (this.syncStatusInterval) {
+            clearInterval(this.syncStatusInterval);
+            // Use location.replace() for a clean reload without adding to history
+            window.location.replace(
+              window.location.pathname + window.location.search
+            );
+          }
+        } else {
+          // If not complete, ensure the syncing message is shown.
+          this.isSyncing = true;
+        }
+      } catch (error) {
+        console.error("Error checking sync status:", error);
+        // If the check fails, assume it's done so the user isn't stuck.
+        this.isSyncing = false;
+      }
     },
 
     // --- STARTUP LOGIC (Unchanged) ---
@@ -505,23 +541,38 @@ export default function () {
       });
     },
     // This function now receives both the ID and the name directly from the event.
+    // located in public/app/dashboard.mjs
+
+    // REPLACE the existing handlePropertyChange method with this one
     handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
 
-      // If there's no ID or the ID hasn't changed, do nothing.
       if (!propertyId || this.currentPropertyId === propertyId) {
         return;
       }
 
-      // Set the dashboard's state directly from the event data.
       this.currentPropertyId = propertyId;
-      this.currentPropertyName = propertyName; // No more lookups needed!
+      this.currentPropertyName = propertyName;
       this.isLoading.properties = false;
       this.hasProperties = true;
 
-      // Trigger a full data refresh for the new property.
-      this.setPreset("current-month");
+      // Stop any previous polling timers.
+      if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
+
+      // Check the sync status immediately for the new property.
+      this.checkSyncStatus(propertyId).then(() => {
+        if (this.isSyncing) {
+          // If the first check shows we are still syncing, start polling every 15 seconds.
+          this.syncStatusInterval = setInterval(() => {
+            this.checkSyncStatus(propertyId);
+          }, 15000); // 15 seconds
+        } else {
+          // If sync is already complete, load the reports.
+          this.setPreset("current-month");
+        }
+      });
     },
+
     logout() {
       fetch("/api/auth/logout", { method: "POST" })
         .then((res) => {
