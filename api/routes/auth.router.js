@@ -137,6 +137,88 @@ router.get("/magic-link-callback", async (req, res) => {
   }
 });
 
+// --- NEW: INVITATION ACCEPTANCE ENDPOINT ---
+router.post("/accept-invitation", async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "Invitation token is required." });
+  }
+
+  const client = await pgPool.connect();
+  try {
+    // Start a database transaction to ensure all or no changes are made
+    await client.query("BEGIN");
+
+    // 1. Find and validate the invitation token
+    const inviteResult = await client.query(
+      "SELECT * FROM user_invitations WHERE invitation_token = $1 AND status = 'pending' AND expires_at > NOW()",
+      [token]
+    );
+    if (inviteResult.rows.length === 0) {
+      throw new Error(
+        "Invitation is invalid, has expired, or has already been used."
+      );
+    }
+    const invitation = inviteResult.rows[0];
+
+    // 2. Create the new user record
+    const newCloudbedsUserId = `invited-${crypto
+      .randomBytes(8)
+      .toString("hex")}`;
+    const newUserResult = await client.query(
+      `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, auth_mode, pms_type, is_admin)
+       VALUES ($1, $2, $3, $4, 'oauth', 'cloudbeds', false)
+       RETURNING user_id`,
+      [
+        newCloudbedsUserId,
+        invitation.invitee_email,
+        invitation.invitee_first_name,
+        invitation.invitee_last_name,
+      ]
+    );
+    const newUserId = newUserResult.rows[0].user_id;
+
+    // 3. Find the properties of the user who sent the invitation
+    const propertiesResult = await client.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1",
+      [invitation.inviter_user_id]
+    );
+    const inviterProperties = propertiesResult.rows;
+
+    // 4. Grant the new user access to the same properties
+    if (inviterProperties.length > 0) {
+      for (const prop of inviterProperties) {
+        await client.query(
+          "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
+          [newUserId, prop.property_id]
+        );
+      }
+    }
+
+    // 5. Mark the invitation as 'accepted' so it cannot be reused
+    await client.query(
+      "UPDATE user_invitations SET status = 'accepted' WHERE invitation_token = $1",
+      [token]
+    );
+
+    // If all steps succeeded, commit the changes to the database
+    await client.query("COMMIT");
+    res
+      .status(200)
+      .json({
+        message: "Invitation accepted successfully! You can now log in.",
+      });
+  } catch (error) {
+    // If any step failed, roll back all changes
+    await client.query("ROLLBACK");
+    console.error("Error accepting invitation:", error);
+    res.status(400).json({ error: error.message });
+  } finally {
+    // Release the database client back to the pool
+    client.release();
+  }
+});
+
 router.get("/session-info", async (req, res) => {
   if (req.session.userId) {
     try {
