@@ -1,5 +1,6 @@
 // /api/routes/auth.router.js
 const express = require("express");
+const { spawn } = require("child_process"); // <-- ADD THIS LINE
 const router = express.Router();
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -7,6 +8,8 @@ const sgMail = require("@sendgrid/mail");
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
 const { syncHotelDetailsToDb } = require("../utils/cloudbeds");
+
+//...
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -331,6 +334,8 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 // Located in api/routes/auth.router.js
 // Located in api/routes/auth.router.js
 
+// Located in api/routes/auth.router.js
+
 router.get("/cloudbeds/callback", async (req, res) => {
   try {
     const { code } = req.query;
@@ -364,10 +369,8 @@ router.get("/cloudbeds/callback", async (req, res) => {
       );
     }
 
-    // FINAL FIX: Extract the propertyId directly from the token response resources.
     const propertyId = tokenData.resources?.[0]?.id;
 
-    // FINAL FIX: Add validation to ensure we received the property ID from Cloudbeds.
     if (!propertyId) {
       throw new Error(
         "Could not determine Property ID from Cloudbeds token response."
@@ -399,9 +402,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
     ]);
     const localUserId = savedUserResult.rows[0].user_id;
 
-    // FINAL FIX: The entire property discovery API call and loop are no longer needed.
-    // We now operate directly on the single property that was authorized.
-
     await syncHotelDetailsToDb(access_token, propertyId);
 
     const pmsCredentials = {
@@ -410,17 +410,34 @@ router.get("/cloudbeds/callback", async (req, res) => {
       token_expiry: tokenExpiry.toISOString(),
     };
 
-    // Located in api/routes/auth.router.js within the /cloudbeds/callback route
-
-    // FINAL BUG FIX: Using the correct STRING-BASED cloudbeds_user_id (`userInfo.user_id`)
-    // for the INSERT, which matches what the rest of the application expects.
     await pgPool.query(
       `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
-           VALUES ($1, $2, 'connected', $3) 
-           ON CONFLICT (user_id, property_id) 
-           DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
+       VALUES ($1, $2, 'connected', $3) 
+       ON CONFLICT (user_id, property_id) 
+       DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
       [userInfo.user_id, propertyId, pmsCredentials]
     );
+
+    // CORRECTED PLACEMENT: The auto-sync logic now runs here, after all DB operations are complete.
+    console.log(
+      `[Auto-Sync] Spawning initial-sync.js for propertyId: ${propertyId}`
+    );
+    const syncProcess = spawn("node", [
+      "api/initial-sync.js",
+      String(propertyId),
+    ]);
+
+    syncProcess.stdout.on("data", (data) => {
+      console.log(`[Auto-Sync] stdout: ${data}`);
+    });
+
+    syncProcess.stderr.on("data", (data) => {
+      console.error(`[Auto-Sync] stderr: ${data}`);
+    });
+
+    syncProcess.on("close", (code) => {
+      console.log(`[Auto-Sync] child process exited with code ${code}`);
+    });
 
     req.session.userId = userInfo.user_id;
     req.session.isAdmin = userInfo.is_admin || false;
