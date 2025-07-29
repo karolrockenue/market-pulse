@@ -1,6 +1,8 @@
 // /api/routes/auth.router.js
 const express = require("express");
 const { spawn } = require("child_process"); // <-- ADD THIS LINE
+const path = require("path"); // <-- ADD THIS LINE
+
 const router = express.Router();
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -335,9 +337,11 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 // Located in api/routes/auth.router.js
 
 // Located in api/routes/auth.router.js
+// Located in api/routes/auth.router.js
 
 router.get("/cloudbeds/callback", async (req, res) => {
   try {
+    // ... (all the logic for getting tokens, user info, and propertyId remains the same) ...
     const { code } = req.query;
     if (!code) {
       return res.status(400).send("Error: No authorization code provided.");
@@ -418,14 +422,10 @@ router.get("/cloudbeds/callback", async (req, res) => {
       [userInfo.user_id, propertyId, pmsCredentials]
     );
 
-    // CORRECTED PLACEMENT: The auto-sync logic now runs here, after all DB operations are complete.
-    console.log(
-      `[Auto-Sync] Spawning initial-sync.js for propertyId: ${propertyId}`
-    );
-    const syncProcess = spawn("node", [
-      "api/initial-sync.js",
-      String(propertyId),
-    ]);
+    // FINAL PATH FIX: Use path.join to create a reliable, absolute path to the script.
+    const scriptPath = path.join(__dirname, "../initial-sync.js");
+    console.log(`[Auto-Sync] Spawning script at path: ${scriptPath}`);
+    const syncProcess = spawn("node", [scriptPath, String(propertyId)]);
 
     syncProcess.stdout.on("data", (data) => {
       console.log(`[Auto-Sync] stdout: ${data}`);
