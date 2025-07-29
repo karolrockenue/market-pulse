@@ -22,6 +22,8 @@ const getPeriod = (granularity) => {
  */
 router.get("/user/profile", requireUserApi, async (req, res) => {
   try {
+    console.log("DEBUG: Session User ID is:", req.session.userId);
+
     const result = await pgPool.query(
       "SELECT first_name, last_name, email FROM users WHERE user_id = $1",
       [req.session.userId]
