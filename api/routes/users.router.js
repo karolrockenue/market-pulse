@@ -5,11 +5,7 @@ const crypto = require("crypto"); // Built-in Node.js module for cryptography
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-// Import shared utilities
-const pgPool = require("../utils/db");
-// requireUserApi allows any logged-in user, requireAdminApi is for admin-only actions.
 const { requireUserApi, requireAdminApi } = require("../utils/middleware");
-const sgMail = require("@sendgrid/mail");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -144,11 +140,11 @@ router.get("/team", requireUserApi, async (req, res) => {
       // --- 3. Fetch all pending invitations sent by anyone on the team ---
       const pendingInvitesResult = await pgPool.query(
         `
-        SELECT invitee_first_name, invitee_last_name, invitee_email
-        FROM user_invitations 
-        WHERE inviter_user_id = ANY($1::int[]) AND status = 'pending'
-      `,
-        [teamUserIds]
+  SELECT invitee_first_name, invitee_last_name, invitee_email
+  FROM user_invitations 
+  WHERE inviter_user_id = ANY($1::int[]) AND status = 'pending'
+`,
+        [teamUserIds] // This is the bug fix - passing the array directly
       );
 
       // Map to the same consistent format
