@@ -329,17 +329,11 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 // Located in api/routes/auth.router.js
 
 // Located in api/routes/auth.router.js
+// Located in api/routes/auth.router.js
 
 router.get("/cloudbeds/callback", async (req, res) => {
   try {
-    const { code, state } = req.query;
-
-    // --- SUPER-DIAGNOSTIC LOG A: Initial Callback Query Params ---
-    console.log("SUPER-DIAGNOSTIC A: Initial Callback Query Params:", {
-      code,
-      state,
-    });
-
+    const { code } = req.query;
     if (!code) {
       return res.status(400).send("Error: No authorization code provided.");
     }
@@ -350,6 +344,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
       process.env.VERCEL_ENV === "production"
         ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
         : process.env.CLOUDBEDS_REDIRECT_URI;
+
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: clientId,
@@ -363,17 +358,22 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
     const tokenData = await tokenResponse.json();
 
-    // --- SUPER-DIAGNOSTIC LOG B: Full Token Response ---
-    console.log(
-      "SUPER-DIAGNOSTIC B: Full Token Response from Cloudbeds:",
-      tokenData
-    );
-
     if (!tokenData.access_token) {
       throw new Error(
         `Failed to get access token. Response: ${JSON.stringify(tokenData)}`
       );
     }
+
+    // FINAL FIX: Extract the propertyId directly from the token response resources.
+    const propertyId = tokenData.resources?.[0]?.id;
+
+    // FINAL FIX: Add validation to ensure we received the property ID from Cloudbeds.
+    if (!propertyId) {
+      throw new Error(
+        "Could not determine Property ID from Cloudbeds token response."
+      );
+    }
+
     const { access_token, refresh_token, expires_in } = tokenData;
     const tokenExpiry = new Date(Date.now() + expires_in * 1000);
 
@@ -399,33 +399,24 @@ router.get("/cloudbeds/callback", async (req, res) => {
     ]);
     const localUserId = savedUserResult.rows[0].user_id;
 
-    const propertyInfoResponse = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
-      { headers: { Authorization: `Bearer ${access_token}` } }
+    // FINAL FIX: The entire property discovery API call and loop are no longer needed.
+    // We now operate directly on the single property that was authorized.
+
+    await syncHotelDetailsToDb(access_token, propertyId);
+
+    const pmsCredentials = {
+      access_token,
+      refresh_token,
+      token_expiry: tokenExpiry.toISOString(),
+    };
+
+    await pgPool.query(
+      `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
+       VALUES ($1, $2, 'connected', $3) 
+       ON CONFLICT (user_id, property_id) 
+       DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
+      [localUserId, propertyId, pmsCredentials]
     );
-    const propertyInfo = await propertyInfoResponse.json();
-
-    const properties = Array.isArray(propertyInfo)
-      ? propertyInfo
-      : [propertyInfo];
-
-    for (const property of properties) {
-      if (property && property.id) {
-        await syncHotelDetailsToDb(access_token, property.id);
-        const pmsCredentials = {
-          access_token,
-          refresh_token,
-          token_expiry: tokenExpiry.toISOString(),
-        };
-        await pgPool.query(
-          `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
-           VALUES ($1, $2, 'connected', $3) 
-           ON CONFLICT (user_id, property_id) 
-           DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
-          [localUserId, property.id, pmsCredentials]
-        );
-      }
-    }
 
     req.session.userId = userInfo.user_id;
     req.session.isAdmin = userInfo.is_admin || false;
