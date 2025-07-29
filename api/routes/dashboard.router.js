@@ -59,9 +59,24 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
 });
 
 // --- DASHBOARD API ENDPOINTS ---
-
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
+    // --- BREADCRUMB LOGS ---
+    console.log(
+      "[BREADCRUMB A] Entered /my-properties handler. Received req.user object:",
+      req.user
+    );
+    // Check if the internalId we need is present.
+    if (!req.user || !req.user.internalId) {
+      console.error("[BREADCRUMB B] ERROR: req.user.internalId is missing!");
+      return res.status(500).json({ error: "Internal ID missing." });
+    }
+    console.log(
+      "[BREADCRUMB C] Querying for properties with user_id:",
+      req.user.internalId
+    );
+    // --- END BREADCRUMB LOGS ---
+
     const query = `
       SELECT 
         up.property_id, 
@@ -71,14 +86,15 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
       WHERE up.user_id = $1
       ORDER BY h.property_name;
     `;
-    // FIXED: Use req.user.internalId, which is the correct primary key for the 'users' table.
     const result = await pgPool.query(query, [req.user.internalId]);
+
+    // --- BREADCRUMB LOG ---
+    console.log(
+      `[BREADCRUMB D] Database query returned ${result.rows.length} properties.`
+    );
+    // --- END BREADCRUMB LOG ---
+
     res.json(result.rows);
-  } catch (error) {
-    console.error("Error in /api/my-properties:", error);
-    res.status(500).json({ error: "Failed to fetch user properties." });
-  }
-});
 
 router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   try {

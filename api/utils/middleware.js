@@ -68,6 +68,12 @@ async function requireUserApi(req, res, next) {
     // Note: 'oauth' users will fall through this block and proceed,
     // as their token refresh is handled by the data sync scripts, not here.
 
+    // This new log will show us exactly what is being passed to the router.
+    console.log(
+      "[DEBUG 3] Middleware passing this user object to the router:",
+      req.user
+    );
+
     console.log(
       `[DEBUG FINAL] Middleware success for path: ${req.path}. Calling next().`
     );
