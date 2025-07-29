@@ -148,7 +148,7 @@
               >
                 <h2 class="text-lg font-semibold">User Management</h2>
                 <button
-                  @click="isInviteModalOpen = true"
+                  @click="openInviteModal()"
                   class="control-btn primary inline-flex items-center"
                 >
                   <svg
@@ -231,6 +231,16 @@
               class="relative bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
             >
               <h3 class="text-lg font-semibold mb-4">Invite a New User</h3>
+
+              <div
+                x-show="invitation.message"
+                x-text="invitation.message"
+                :class="{
+    'bg-green-100 text-green-700 p-3 rounded-md text-sm mb-4': invitation.messageType === 'success',
+    'bg-red-100 text-red-700 p-3 rounded-md text-sm mb-4': invitation.messageType === 'error'
+  }"
+                x-transition
+              ></div>
               <div class="space-y-4">
                 <div>
                   <label

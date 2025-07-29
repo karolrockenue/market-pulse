@@ -195,8 +195,9 @@ router.get("/accept-invitation", async (req, res) => {
     }
 
     // 5. Mark invitation as accepted
+    // 5. Delete the used invitation from the database
     await client.query(
-      "UPDATE user_invitations SET status = 'accepted' WHERE invitation_token = $1",
+      "DELETE FROM user_invitations WHERE invitation_token = $1",
       [token]
     );
 

@@ -13,8 +13,13 @@ export default function settingsPage() {
     teamMembers: [],
     isInviteModalOpen: false,
     isSendingInvite: false,
-    inviteMessage: "",
-    invitation: { firstName: "", lastName: "", email: "" },
+    invitation: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      message: "", // For displaying success/error messages inside the modal
+      messageType: "error", // 'success' or 'error'
+    },
 
     // --- COMPUTED PROPERTIES ---
     get isProfileDirty() {
@@ -65,7 +70,7 @@ export default function settingsPage() {
      */
     async sendInvitation() {
       this.isSendingInvite = true;
-      this.inviteMessage = "";
+      this.invitation.message = ""; // Clear previous messages
 
       try {
         const response = await fetch("/api/users/invite", {
@@ -84,19 +89,38 @@ export default function settingsPage() {
           throw new Error(result.error || "Failed to send invitation.");
         }
 
-        this.inviteMessage = "Invitation sent successfully!";
-        await this.fetchTeamMembers(); // Refresh the list after sending invite
+        // --- Success ---
+        this.invitation.message = "Invitation sent successfully!";
+        this.invitation.messageType = "success";
 
-        // Close the modal and reset the form on success
-        this.isInviteModalOpen = false;
-        this.invitation = { firstName: "", lastName: "", email: "" };
+        // Clear the form fields but keep the modal open to show the success message
+        this.invitation.firstName = "";
+        this.invitation.lastName = "";
+        this.invitation.email = "";
+
+        await this.fetchTeamMembers(); // Refresh the user list in the background
       } catch (error) {
+        // --- Error ---
         console.error("Error sending invitation:", error);
-        this.inviteMessage = error.message;
+        this.invitation.message = error.message;
+        this.invitation.messageType = "error";
       } finally {
         this.isSendingInvite = false;
-        // Don't clear the message here, we'll move it to the modal
       }
+    },
+
+    /**
+     * @description Resets the invitation form and opens the modal.
+     */
+    openInviteModal() {
+      this.invitation = {
+        firstName: "",
+        lastName: "",
+        email: "",
+        message: "",
+        messageType: "error",
+      };
+      this.isInviteModalOpen = true;
     },
 
     // Profile Methods
