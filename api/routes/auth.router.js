@@ -433,11 +433,17 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
       res.redirect("/app/");
     });
+    // Located in api/routes/auth.router.js
   } catch (error) {
-    console.error("CRITICAL ERROR in OAuth callback:", error);
-    res
-      .status(500)
-      .send(`An error occurred during authentication: ${error.message}`);
+    // MODIFICATION: Added more detailed logging to see the exact error.
+    console.error("CRITICAL ERROR in OAuth callback:", error.stack);
+    // MODIFICATION: Sending the actual error message in the response.
+    // This will make the error visible in the browser's network tab during testing.
+    res.status(500).json({
+      message: "An error occurred during authentication.",
+      error: error.message,
+      stack: error.stack, // Also sending stack trace for full context
+    });
   }
 });
 
