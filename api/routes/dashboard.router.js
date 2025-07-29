@@ -58,7 +58,6 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
   }
 });
 
-// --- DASHBOARD API ENDPOINTS ---
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
     // --- BREADCRUMB LOGS ---
@@ -95,6 +94,11 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
     // --- END BREADCRUMB LOG ---
 
     res.json(result.rows);
+  } catch (error) {
+    console.error("Error in /api/my-properties:", error);
+    res.status(500).json({ error: "Failed to fetch user properties." });
+  }
+});
 
 router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   try {
