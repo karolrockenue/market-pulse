@@ -131,7 +131,7 @@ router.get("/team", requireUserApi, async (req, res) => {
     if (propertyIds.length > 0) {
       // If the user has properties, the team is everyone who shares them.
       const teamResult = await client.query(
-        "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::text[])",
+        "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
         [propertyIds]
       );
       teamCloudbedsIds = teamResult.rows.map((u) => u.user_id);
