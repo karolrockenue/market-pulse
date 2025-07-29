@@ -81,7 +81,7 @@ router.post("/invite", requireAdminApi, async (req, res) => {
     );
 
     // --- Send Invitation Email ---
-    const invitationLink = `https://www.market-pulse.io/accept-invitation?token=${invitation_token}`;
+    const invitationLink = `https://www.market-pulse.io/api/auth/accept-invitation?token=${invitation_token}`;
     const msg = {
       to: invitee_email,
       from: "support@market-pulse.io", // Use a verified sender
@@ -96,12 +96,10 @@ router.post("/invite", requireAdminApi, async (req, res) => {
 
     await sgMail.send(msg);
 
-    res
-      .status(201)
-      .json({
-        message: "Invitation sent successfully.",
-        invite: newInvite.rows[0],
-      });
+    res.status(201).json({
+      message: "Invitation sent successfully.",
+      invite: newInvite.rows[0],
+    });
   } catch (error) {
     console.error("Error sending invitation:", error);
     res.status(500).json({ error: "Failed to send invitation." });
