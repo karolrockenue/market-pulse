@@ -136,39 +136,36 @@ router.get("/magic-link-callback", async (req, res) => {
     res.status(500).send("An internal error occurred.");
   }
 });
-
-// --- NEW: INVITATION ACCEPTANCE ENDPOINT ---
-router.post("/accept-invitation", async (req, res) => {
-  const { token } = req.body;
+// --- NEW: INVITATION ACCEPTANCE ENDPOINT (Seamless Flow) ---
+router.get("/accept-invitation", async (req, res) => {
+  const { token } = req.query; // Read token from URL query
   if (!token) {
-    return res.status(400).json({ error: "Invitation token is required." });
+    // You can redirect to an error page in the future
+    return res.status(400).send("Invitation token is required.");
   }
 
   const client = await pgPool.connect();
   try {
-    // Start a database transaction to ensure all or no changes are made
     await client.query("BEGIN");
 
-    // 1. Find and validate the invitation token
+    // 1. Find and validate the invitation
     const inviteResult = await client.query(
       "SELECT * FROM user_invitations WHERE invitation_token = $1 AND status = 'pending' AND expires_at > NOW()",
       [token]
     );
     if (inviteResult.rows.length === 0) {
-      throw new Error(
-        "Invitation is invalid, has expired, or has already been used."
-      );
+      throw new Error("Invitation is invalid or has expired.");
     }
     const invitation = inviteResult.rows[0];
 
-    // 2. Create the new user record
+    // 2. Create the new user
     const newCloudbedsUserId = `invited-${crypto
       .randomBytes(8)
       .toString("hex")}`;
     const newUserResult = await client.query(
       `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, auth_mode, pms_type, is_admin)
        VALUES ($1, $2, $3, $4, 'oauth', 'cloudbeds', false)
-       RETURNING user_id`,
+       RETURNING user_id, cloudbeds_user_id`, // Return both IDs
       [
         newCloudbedsUserId,
         invitation.invitee_email,
@@ -177,15 +174,15 @@ router.post("/accept-invitation", async (req, res) => {
       ]
     );
     const newUserId = newUserResult.rows[0].user_id;
+    const finalCloudbedsId = newUserResult.rows[0].cloudbeds_user_id;
 
-    // 3. Find the properties of the user who sent the invitation
+    // 3. Grant property access
     const propertiesResult = await client.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
       [invitation.inviter_user_id]
     );
     const inviterProperties = propertiesResult.rows;
 
-    // 4. Grant the new user access to the same properties
     if (inviterProperties.length > 0) {
       for (const prop of inviterProperties) {
         await client.query(
@@ -195,30 +192,33 @@ router.post("/accept-invitation", async (req, res) => {
       }
     }
 
-    // 5. Mark the invitation as 'accepted' so it cannot be reused
+    // 4. Mark invitation as accepted
     await client.query(
       "UPDATE user_invitations SET status = 'accepted' WHERE invitation_token = $1",
       [token]
     );
 
-    // If all steps succeeded, commit the changes to the database
-    await client.query("COMMIT");
-    res
-      .status(200)
-      .json({
-        message: "Invitation accepted successfully! You can now log in.",
-      });
+    // 5. Create a login session for the new user
+    req.session.userId = finalCloudbedsId; // Use the new cloudbeds_user_id for the session
+    req.session.isAdmin = false;
+
+    // Save the session, then commit the transaction and redirect
+    req.session.save(async (err) => {
+      if (err) {
+        throw new Error("Failed to create user session.");
+      }
+      await client.query("COMMIT");
+      res.redirect("/app/"); // Redirect to the main application
+    });
   } catch (error) {
-    // If any step failed, roll back all changes
     await client.query("ROLLBACK");
     console.error("Error accepting invitation:", error);
-    res.status(400).json({ error: error.message });
+    // Future improvement: redirect to an error page
+    res.status(400).send(error.message);
   } finally {
-    // Release the database client back to the pool
     client.release();
   }
 });
-
 router.get("/session-info", async (req, res) => {
   if (req.session.userId) {
     try {
