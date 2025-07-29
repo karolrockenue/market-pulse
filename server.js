@@ -20,6 +20,7 @@ const dashboardRoutes = require("./api/routes/dashboard.router.js");
 const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js"); // NEW: Import admin router
 const publicPath = path.join(process.cwd(), "public");
+const userRoutes = require("./api/routes/users.router.js"); // Add this line
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
@@ -114,6 +115,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api", reportsRoutes);
 app.use("/api", adminRoutes); // NEW: Use the admin router
+app.use("/api/users", userRoutes); // Add this line
 
 // --- STATIC AND FALLBACK ROUTES ---
 
