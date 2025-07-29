@@ -50,7 +50,7 @@
       .control-btn.primary:hover {
         filter: brightness(120%);
       }
-      .control-btn.disabled {
+      .control-btn:disabled {
         background-color: #d1d5db;
         color: #6b7280;
         cursor: not-allowed;
@@ -90,9 +90,8 @@
                   <input
                     type="text"
                     id="first-name"
-                    value="Karol"
-                    disabled
-                    class="mt-1 block w-full bg-slate-100 rounded-md border-slate-300 shadow-sm text-slate-500 py-2.5 px-3 cursor-not-allowed"
+                    x-model="profile.firstName"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3"
                   />
                 </div>
                 <div>
@@ -104,9 +103,8 @@
                   <input
                     type="text"
                     id="last-name"
-                    value=""
-                    disabled
-                    class="mt-1 block w-full bg-slate-100 rounded-md border-slate-300 shadow-sm text-slate-500 py-2.5 px-3 cursor-not-allowed"
+                    x-model="profile.lastName"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3"
                   />
                 </div>
                 <div class="sm:col-span-2">
@@ -118,15 +116,28 @@
                   <input
                     type="email"
                     id="email"
-                    value="your-email@market-pulse.io"
+                    x-model="profile.email"
                     disabled
                     class="mt-1 block w-full bg-slate-100 rounded-md border-slate-300 shadow-sm text-slate-500 py-2.5 px-3 cursor-not-allowed"
                   />
                 </div>
               </div>
-              <div class="mt-6 text-right border-t border-slate-200 pt-4">
-                <button class="control-btn primary disabled">
-                  Save Changes
+              <div
+                class="mt-6 flex items-center justify-end border-t border-slate-200 pt-4"
+              >
+                <span
+                  x-show="saveMessage"
+                  x-transition
+                  class="text-sm font-medium text-green-600 mr-4"
+                  x-text="saveMessage"
+                ></span>
+                <button
+                  @click="saveProfile()"
+                  :disabled="!isProfileDirty || isSaving"
+                  class="control-btn primary"
+                >
+                  <span x-show="!isSaving">Save Changes</span>
+                  <span x-show="isSaving">Saving...</span>
                 </button>
               </div>
             </section>
@@ -241,7 +252,7 @@
     </div>
 
     <script type="module">
-      // Import and register all necessary Alpine components
+      // This script section remains unchanged
       import settingsPage from "/app/settings.mjs";
       import pageHeader from "/app/_shared/header.mjs";
       import sidebar from "/app/_shared/sidebar.mjs";
@@ -253,7 +264,6 @@
         Alpine.data("sidebar", sidebar);
       });
 
-      // Component loading logic
       document.addEventListener("DOMContentLoaded", async () => {
         await loadComponent("header", "header-placeholder");
         await loadComponent("sidebar", "sidebar-placeholder");
