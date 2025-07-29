@@ -437,3 +437,11 @@ Date: July 20, 2025
       * Planned Functionality:
       * The UI was built with placeholders for features including editing user profile information, inviting and managing team members with different roles, and viewing and disconnecting integrated properties.
       * Outcome: The visual design and file structure for the new settings page are complete. However, the page is currently in a non-functional state due to an unresolved bugs. The page is blank and throws multiple ReferenceError exceptions in the console upon loading. This bug needs to be the top priority for the next development session before any further functionality can be built.
+Date: July 29, 2025
+      * Objective: Build the foundational "My Profile" feature on the new Settings page, allowing users to view and edit their own names.
+      * Key Changes:
+      * UI Redesign: Based on user feedback, the initial tabbed layout of the Settings page was discarded and redesigned into a more intuitive, full-width, single-page layout with stacked content cards.
+      * Backend API: New endpoints, GET /api/user/profile and PUT /api/user/profile, were created in dashboard.router.js to allow fetching and updating of the logged-in user's first and last name from the users table.
+      * Data Inconsistency Debugging: A critical bug preventing profile data from loading was traced to a data inconsistency between the session ID and the database schema. The issue was resolved by correcting the new API endpoints to query the users table by cloudbeds_user_id instead of the internal user_id, aligning the feature with the application's established user identification strategy.
+      * Frontend Implementation: The "My Profile" card in settings.html and the settings.mjs component were wired up to the new backend API. The UI now dynamically fetches and displays the user's name and email, enables the form fields for editing, and handles saving the changes back to the database with user feedback.
+      * Outcome: The "My Profile" section is fully functional and stable. Users can now successfully view and update their first and last names, establishing the first core feature of the new Settings page.
