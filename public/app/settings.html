@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="scroll-behavior: smooth">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -18,12 +18,10 @@
       :root {
         --bg-primary: #f8fafc;
         --bg-secondary: #ffffff;
-        --text-primary: #445165;
+        --text-primary: #0f172a;
         --text-secondary: #64748b;
         --border-color: #e2e8f0;
-        /* The main page accent is still the soft blue for tabs/links */
-        --accent-primary: #8fb0e5;
-        /* CHANGE 1: New variable for the dark button color */
+        --accent-primary: #3b82f6;
         --button-primary-bg: #1e293b;
       }
       body {
@@ -36,7 +34,6 @@
         border: 1px solid var(--border-color);
         box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
         border-radius: 0.75rem;
-        padding: 1.5rem;
       }
       .control-btn {
         padding: 8px 16px;
@@ -45,7 +42,6 @@
         border-radius: 6px;
         transition: all 0.2s;
       }
-      /* CHANGE 2: The primary button now uses the new dark background and white text */
       .control-btn.primary {
         background-color: var(--button-primary-bg);
         color: white;
@@ -71,7 +67,7 @@
       <div class="flex-1 flex flex-col min-w-0">
         <div id="header-placeholder"></div>
 
-        <main x-show="isInitialized" x-cloak class="flex-1 p-8">
+        <main x-show="isInitialized" x-cloak class="flex-1 p-4 md:p-8">
           <header class="mb-8">
             <h1 class="text-3xl font-bold">Settings</h1>
             <p class="text-slate-500 mt-1">
@@ -79,41 +75,8 @@
             </p>
           </header>
 
-          <div>
-            <div class="hidden sm:block">
-              <div class="border-b border-slate-200">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                  <a
-                    href="#"
-                    @click.prevent="activeTab = 'profile'"
-                    :class="activeTab === 'profile' ? 'border-[#8FB0E5] text-[#8FB0E5] font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors"
-                  >
-                    My Profile
-                  </a>
-                  <a
-                    href="#"
-                    @click.prevent="activeTab = 'users'"
-                    :class="activeTab === 'users' ? 'border-[#8FB0E5] text-[#8FB0E5] font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors"
-                  >
-                    User Management
-                  </a>
-                  <a
-                    href="#"
-                    @click.prevent="activeTab = 'properties'"
-                    :class="activeTab === 'properties' ? 'border-[#8FB0E5] text-[#8FB0E5] font-semibold' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors"
-                  >
-                    Connected Properties
-                  </a>
-                </nav>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-5">
-            <div x-show="activeTab === 'profile'" class="card">
+          <div class="space-y-8">
+            <section id="profile" class="card p-6">
               <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
                 My Profile
               </h2>
@@ -166,14 +129,16 @@
                   Save Changes
                 </button>
               </div>
-            </div>
+            </section>
 
-            <div x-show="activeTab === 'users'" class="card">
+            <section id="users" class="card p-6">
               <div
-                class="flex justify-between items-center border-b border-slate-200 pb-4"
+                class="flex flex-col md:flex-row justify-between md:items-center border-b border-slate-200 pb-4 gap-4"
               >
                 <h2 class="text-lg font-semibold">User Management</h2>
-                <button class="control-btn primary inline-flex items-center">
+                <button
+                  class="control-btn primary inline-flex items-center justify-center"
+                >
                   <svg
                     class="w-4 h-4 mr-2"
                     xmlns="http://www.w3.org/2000/svg"
@@ -230,9 +195,9 @@
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
 
-            <div x-show="activeTab === 'properties'" class="card">
+            <section id="properties" class="card p-6">
               <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
                 Connected Properties
               </h2>
@@ -269,16 +234,29 @@
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
           </div>
         </main>
       </div>
     </div>
 
     <script type="module">
+      // Import and register all necessary Alpine components
       import settingsPage from "/app/settings.mjs";
+      import pageHeader from "/app/_shared/header.mjs";
+      import sidebar from "/app/_shared/sidebar.mjs";
+      import { loadComponent } from "/app/utils.mjs";
+
       document.addEventListener("alpine:init", () => {
         Alpine.data("settingsPage", settingsPage);
+        Alpine.data("pageHeader", pageHeader);
+        Alpine.data("sidebar", sidebar);
+      });
+
+      // Component loading logic
+      document.addEventListener("DOMContentLoaded", async () => {
+        await loadComponent("header", "header-placeholder");
+        await loadComponent("sidebar", "sidebar-placeholder");
       });
     </script>
     <script
