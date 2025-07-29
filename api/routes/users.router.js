@@ -126,79 +126,66 @@ router.get("/team", requireUserApi, async (req, res) => {
 
   const client = await pgPool.connect();
   try {
-    // --- Step 1: Find all properties the current user has access to. ---
+    // --- Step 1: Define the "team" ---
+    // A team consists of all users who share access to at least one property with the requester.
+    // Start by finding the requester's properties.
     const propertiesResult = await client.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
       [requesterCloudbedsId]
     );
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
 
-    let activeUsers = [];
-    let pendingInvites = [];
+    let teamCloudbedsIds = [];
 
     if (propertyIds.length > 0) {
-      // --- Step 2: Find all cloudbeds_user_ids that have access to ANY of these properties. This defines the "team". ---
-      const teamMemberCloudbedsIdsResult = await client.query(
+      // If the user has properties, the team is everyone who shares them.
+      const teamResult = await client.query(
         "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::text[])",
         [propertyIds]
       );
-      const teamCloudbedsIds = teamMemberCloudbedsIdsResult.rows.map(
-        (u) => u.user_id
-      );
-
-      if (teamCloudbedsIds.length > 0) {
-        // --- Step 3: Fetch the full user details for everyone on the team. ---
-        const activeUsersResult = await client.query(
-          `SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
-          [teamCloudbedsIds]
-        );
-        activeUsers = activeUsersResult.rows.map((user) => ({
-          name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-          email: user.email,
-          status: "Active",
-        }));
-
-        // --- Step 4: Fetch pending invitations sent by anyone on the team. ---
-        // First, get the primary keys (user_id) of the team members.
-        const teamMemberPksResult = await client.query(
-          "SELECT user_id FROM users WHERE cloudbeds_user_id = ANY($1::text[])",
-          [teamCloudbedsIds]
-        );
-        const teamMemberPks = teamMemberPksResult.rows.map((u) => u.user_id);
-
-        if (teamMemberPks.length > 0) {
-          const pendingInvitesResult = await client.query(
-            `SELECT invitee_first_name, invitee_last_name, invitee_email
-             FROM user_invitations 
-             WHERE inviter_user_id = ANY($1::int[]) AND status = 'pending'`,
-            [teamMemberPks]
-          );
-          pendingInvites = pendingInvitesResult.rows.map((invite) => ({
-            name: `${invite.invitee_first_name || ""} ${
-              invite.invitee_last_name || ""
-            }`.trim(),
-            email: invite.invitee_email,
-            status: "Pending",
-          }));
-        }
-      }
+      teamCloudbedsIds = teamResult.rows.map((u) => u.user_id);
     } else {
-      // If the user has no properties, they can only see themselves.
-      const selfResult = await client.query(
-        "SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = $1",
-        [requesterCloudbedsId]
-      );
-      if (selfResult.rows.length > 0) {
-        const self = selfResult.rows[0];
-        activeUsers.push({
-          name: `${self.first_name || ""} ${self.last_name || ""}`.trim(),
-          email: self.email,
-          status: "Active",
-        });
-      }
+      // If the user has no properties, the "team" is just themself for now.
+      teamCloudbedsIds.push(requesterCloudbedsId);
     }
 
-    // --- Step 5: Combine and send the final list ---
+    // --- Step 2: Fetch all active users on the team ---
+    const activeUsersResult = await client.query(
+      `SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
+      [teamCloudbedsIds]
+    );
+    const activeUsers = activeUsersResult.rows.map((user) => ({
+      name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+      email: user.email,
+      status: "Active",
+    }));
+
+    // --- Step 3: Fetch all pending invitations sent by anyone on the team ---
+    // First, get the integer primary keys for all team members.
+    const teamPksResult = await client.query(
+      "SELECT user_id FROM users WHERE cloudbeds_user_id = ANY($1::text[])",
+      [teamCloudbedsIds]
+    );
+    const teamMemberPks = teamPksResult.rows.map((u) => u.user_id);
+
+    let pendingInvites = [];
+    if (teamMemberPks.length > 0) {
+      const pendingInvitesResult = await client.query(
+        `SELECT invitee_first_name, invitee_last_name, invitee_email
+         FROM user_invitations 
+         WHERE inviter_user_id = ANY($1::int[]) AND status = 'pending'`,
+        [teamMemberPks]
+      );
+      pendingInvites = pendingInvitesResult.rows.map((invite) => ({
+        name: `${invite.invitee_first_name || ""} ${
+          invite.invitee_last_name || ""
+        }`.trim(),
+        email: invite.invitee_email,
+        status: "Pending",
+      }));
+    }
+
+    // --- Step 4: Combine and send the final list ---
     const allMembers = [...activeUsers, ...pendingInvites];
     res.json(allMembers);
   } catch (error) {
