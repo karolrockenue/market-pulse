@@ -318,21 +318,21 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 });
 
 // This single callback handles both standard OAuth and pilot property connections.
+// This single callback handles both standard OAuth and pilot property connections.
 router.get("/cloudbeds/callback", async (req, res) => {
   try {
-    const { code, state } = req.query;
+    const { code } = req.query;
     if (!code) {
       return res.status(400).send("Error: No authorization code provided.");
     }
 
-    // This logic is now simplified, as this callback only handles the standard OAuth flow.
     const clientId = process.env.CLOUDBEDS_CLIENT_ID;
     const clientSecret = process.env.CLOUDBEDS_CLIENT_SECRET;
-
     const redirectUri =
       process.env.VERCEL_ENV === "production"
         ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
         : process.env.CLOUDBEDS_REDIRECT_URI;
+
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: clientId,
@@ -340,10 +340,12 @@ router.get("/cloudbeds/callback", async (req, res) => {
       redirect_uri: redirectUri,
       code: code,
     });
+
     const tokenResponse = await fetch(
       "https://hotels.cloudbeds.com/api/v1.1/access_token",
       { method: "POST", body: tokenParams }
     );
+
     const tokenData = await tokenResponse.json();
     if (!tokenData.access_token) {
       throw new Error(
@@ -356,27 +358,32 @@ router.get("/cloudbeds/callback", async (req, res) => {
     const { access_token, refresh_token, expires_in } = tokenData;
     const tokenExpiry = new Date(Date.now() + expires_in * 1000);
 
-    // --- Standard OAuth Flow Logic ---
     const userInfoResponse = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const userInfo = await userInfoResponse.json();
 
-    // This query now only saves user info, not tokens.
+    // MODIFICATION: Added RETURNING user_id to get our internal numeric ID back from the database.
     const userQuery = `
-  INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
-  VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
-  ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
-      email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-      status = 'active', auth_mode = 'oauth', pms_type = 'cloudbeds';
-`;
-    await pgPool.query(userQuery, [
+      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
+      VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
+      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
+          email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+          status = 'active', auth_mode = 'oauth', pms_type = 'cloudbeds'
+      RETURNING user_id;
+    `;
+
+    // MODIFICATION: Captured the full user record from our database.
+    const savedUserResult = await pgPool.query(userQuery, [
       userInfo.user_id,
       userInfo.email,
       userInfo.first_name,
       userInfo.last_name,
     ]);
+
+    // MODIFICATION: Extracted the numeric localUserId from the query result.
+    const localUserId = savedUserResult.rows[0].user_id;
 
     const propertyInfoResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/me/properties",
@@ -387,21 +394,24 @@ router.get("/cloudbeds/callback", async (req, res) => {
       ? propertyInfo
       : [propertyInfo];
 
-    // api/routes/auth.router.js
-
     for (const property of properties) {
       if (property && property.id) {
-        // This single function call now replaces the old, basic INSERT query.
         await syncHotelDetailsToDb(access_token, property.id);
 
-        // This part remains the same - it links the user to the property.
-        // This query now also saves the refresh_token into the new pms_credentials column.
+        // MODIFICATION: Storing a more complete credentials object, including the access token and its expiry.
+        const pmsCredentials = {
+          access_token,
+          refresh_token,
+          token_expiry: tokenExpiry.toISOString(),
+        };
+
+        // BUG FIX: Using the correct numeric localUserId for the INSERT statement.
         await pgPool.query(
           `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
-   VALUES ($1, $2, 'connected', $3) 
-   ON CONFLICT (user_id, property_id) 
-   DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
-          [userInfo.user_id, property.id, { refresh_token }]
+           VALUES ($1, $2, 'connected', $3) 
+           ON CONFLICT (user_id, property_id) 
+           DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
+          [localUserId, property.id, pmsCredentials]
         );
       }
     }

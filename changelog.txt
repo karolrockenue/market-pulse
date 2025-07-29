@@ -471,3 +471,18 @@ Date: July 29, 2025 (Part 2)
       * Discovery: Through a systematic debugging process involving log analysis and database exports, the root cause was identified as a fundamental inconsistency in how user IDs were being handled. The user_properties table was being populated with the string-based cloudbeds_user_id, while some new API endpoints were incorrectly attempting to query it using the internal, numeric user_id.
       * Resolution: The bug was resolved with a two-part fix. First, the GET /accept-invitation endpoint was corrected to ensure it consistently uses the cloudbeds_user_id when linking properties to the new user. Second, the dashboard.router.js file was reverted to its original, correct logic, ensuring all data-fetching endpoints also use the cloudbeds_user_id for lookups. This restored consistency across the entire application.
       * Outcome: The user invitation feature is now fully functional, stable, and provides a seamless onboarding experience. The resolution of the underlying ID inconsistency has significantly improved the robustness of the application's data layer.
+Date: July 29, 2025 (Part 3)
+      * Objective: Overhaul the "User Management" feature to provide a complete and accurate view of the team, improve the invitation workflow, and add user removal capabilities.
+      * Summary: This session was dedicated to fixing a series of critical bugs and adding new functionality to the User Management section on the Settings page. The work began with a deep debugging session to resolve an issue where the user list was not displaying correctly, which was traced to a flawed data-fetching strategy. Once resolved, the invitation workflow and UI were polished, and a secure user removal feature was implemented.
+      * Key Changes:
+      * Team Data-Fetching Rework:
+      * Problem: The user management table was not displaying all team members correctly. After a user accepted an invitation, they would disappear from the list.
+      * Discovery: The root cause was identified as an incorrect backend query that only searched for users sharing the exact same cloudbeds_user_id as the requester. This failed to find newly invited users who are assigned their own unique ID.
+      * Resolution: The GET /api/users/team endpoint was completely refactored. The new logic correctly defines a "team" as all users who share access to at least one common property. This ensures that all active users are always displayed. The fix also involved resolving a secondary 500 Internal Server Error caused by a data type mismatch (integer = text) in the database query.
+      * Invitation Workflow Enhancements:
+      * The user_invitations table is now cleaned automatically; when a user accepts an invitation, the corresponding record is deleted.
+      * The "Invite User" modal UI was improved. Success and error messages are now displayed directly within the modal for a better user experience, rather than appearing elsewhere on the page.
+      * User Removal Feature:
+      * A "Remove" button was added to the user list, allowing administrators to remove team members.
+      * A new secure backend endpoint, DELETE /api/users/remove, was created. This endpoint uses a database transaction to safely delete the user and all of their associated data (property links, pending invitations) and includes a security check to prevent an administrator from deleting their own account.
+      * Outcome: The User Management feature is now stable, accurate, and functionally complete. Administrators can clearly see all active and pending team members, invite new users with a polished UI, and securely remove users from the account.
