@@ -275,8 +275,61 @@ async function getUpcomingMetrics(accessToken, propertyId) {
 }
 
 // Export all public functions.
+/**
+ * Gets a valid access token for a given user and property, handling both
+ * manual (API key) and OAuth (refresh token) authentication modes.
+ * @param {object} credentials - The pms_credentials object from the database.
+ * @param {string} auth_mode - The user's authentication mode ('manual' or 'oauth').
+ * @returns {Promise<string>} A valid access token.
+ */
+async function getAccessToken(credentials = {}, auth_mode) {
+  if (auth_mode === "manual") {
+    if (!credentials.api_key) {
+      throw new Error(
+        "Authentication failed: No api_key found in credentials for manual mode user."
+      );
+    }
+    return credentials.api_key;
+  }
+
+  // This is for 'oauth' mode
+  if (!credentials.refresh_token) {
+    throw new Error(
+      "Authentication failed: No refresh_token found in credentials for OAuth user."
+    );
+  }
+
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    refresh_token: credentials.refresh_token,
+  });
+
+  const tokenRes = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    {
+      method: "POST",
+      body: params,
+    }
+  );
+
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) {
+    throw new Error(
+      "Token refresh failed. Response from Cloudbeds: " +
+        JSON.stringify(tokenData)
+    );
+  }
+
+  return tokenData.access_token;
+}
+
+// Export all public functions.
 module.exports = {
+  getAccessToken, // <-- Export the new function
   getNeighborhoodFromCoords,
   getHistoricalMetrics,
-  getUpcomingMetrics, // Export the new function
+  getUpcomingMetrics,
 };

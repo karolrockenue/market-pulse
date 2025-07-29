@@ -1,14 +1,9 @@
-// api/daily-refresh.js (Refactored to use Adapter)
+// /api/daily-refresh.js (Refactored to use Adapter for Auth)
 const pgPool = require("./utils/db");
-const fetch = require("node-fetch"); // Still needed for OAuth token refresh
-const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js"); // Import the adapter
+const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 
-// The getCloudbedsAccessToken and aggregateForecastData helpers are removed from this file.
-
-// Main handler for the Vercel Serverless Function
 module.exports = async (request, response) => {
   console.log("Starting daily FORECAST refresh job for ALL USERS...");
-
   let totalRecordsUpdated = 0;
 
   try {
@@ -23,7 +18,6 @@ module.exports = async (request, response) => {
         `--- Processing user: ${user.cloudbeds_user_id} (Mode: ${user.auth_mode}) ---`
       );
       try {
-        // Fetch all connected properties for the user, now including their credentials.
         const propertiesResult = await pgPool.query(
           "SELECT property_id, pms_credentials FROM user_properties WHERE user_id = $1 AND status = 'connected'",
           [user.cloudbeds_user_id]
@@ -32,54 +26,19 @@ module.exports = async (request, response) => {
 
         for (const prop of userProperties) {
           const propertyId = prop.property_id;
-          const credentials = prop.pms_credentials || {};
-          let propertySpecificAccessToken;
 
-          if (user.auth_mode === "manual") {
-            if (credentials.api_key) {
-              propertySpecificAccessToken = credentials.api_key;
-            } else {
-              console.log(
-                `-- Skipping property ${propertyId}: No api_key found in pms_credentials. --`
-              );
-              continue;
-            }
-          } else {
-            // This is for 'oauth' mode
-            if (credentials.refresh_token) {
-              const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } =
-                process.env;
-              const params = new URLSearchParams({
-                grant_type: "refresh_token",
-                client_id: CLOUDBEDS_CLIENT_ID,
-                client_secret: CLOUDBEDS_CLIENT_SECRET,
-                refresh_token: credentials.refresh_token,
-              });
-              const tokenRes = await fetch(
-                "https://hotels.cloudbeds.com/api/v1.1/access_token",
-                { method: "POST", body: params }
-              );
-              const tokenData = await tokenRes.json();
-              propertySpecificAccessToken = tokenData.access_token;
-            }
-
-            if (!propertySpecificAccessToken) {
-              console.log(
-                `-- Skipping property ${propertyId} due to OAuth token refresh failure. --`
-              );
-              continue;
-            }
-          }
+          // Get the access token using the adapter.
+          const accessToken = await cloudbedsAdapter.getAccessToken(
+            prop.pms_credentials,
+            user.auth_mode
+          );
 
           console.log(`-- Starting refresh for property: ${propertyId} --`);
 
-          // --- REFACTORED LOGIC ---
-          // Replace the API call logic with a single call to the adapter.
           const processedData = await cloudbedsAdapter.getUpcomingMetrics(
-            propertySpecificAccessToken,
+            accessToken,
             propertyId
           );
-          // --- END REFACTORED LOGIC ---
 
           const datesToUpdate = Object.keys(processedData);
 
@@ -124,16 +83,7 @@ module.exports = async (request, response) => {
       }
     }
 
-    const updateTimestampQuery = `
-      INSERT INTO system_state (key, value)
-      VALUES ('last_successful_refresh', $1)
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-    `;
-    await pgPool.query(updateTimestampQuery, [
-      JSON.stringify({ timestamp: new Date().toISOString() }),
-    ]);
-    console.log("Successfully updated the last refresh timestamp.");
-
+    console.log("✅ Daily refresh job complete.");
     response.status(200).json({
       status: "Success",
       processedUsers: activeUsers.length,
