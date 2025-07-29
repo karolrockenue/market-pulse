@@ -4,33 +4,17 @@ export default function settingsPage() {
   return {
     // --- STATE ---
     isInitialized: false,
-
-    // Profile section state
+    // Profile section
     profile: { firstName: "", lastName: "", email: "" },
     originalProfile: {},
     isSaving: false,
     saveMessage: "",
-    // --- STATE ---
-    isInitialized: false,
-
-    // Profile section state
-    profile: { firstName: "", lastName: "", email: "" },
-    originalProfile: {},
-    isSaving: false,
-    saveMessage: "",
-
-    // NEW: State for User Management table
+    // User Management section
     teamMembers: [],
-
-    // NEW: State for the User Management section
     isInviteModalOpen: false,
     isSendingInvite: false,
     inviteMessage: "",
-    invitation: {
-      firstName: "",
-      lastName: "",
-      email: "",
-    },
+    invitation: { firstName: "", lastName: "", email: "" },
 
     // --- COMPUTED PROPERTIES ---
     get isProfileDirty() {
@@ -42,30 +26,30 @@ export default function settingsPage() {
     },
 
     // --- INITIALIZATION ---
-    // --- INITIALIZATION ---
     async init() {
-      // Fetch all data in parallel for a faster load
+      // Load shared components first
       await Promise.all([
-        this.fetchProfile(),
-        this.fetchTeamMembers(), // Fetch team data on page load
+        loadComponent("header", "header-placeholder"),
+        loadComponent("sidebar", "sidebar-placeholder"),
       ]);
 
-      // We no longer need to manually load components here,
-      // the new `initPage` function in the HTML handles it.
+      // Then fetch page-specific data
+      await Promise.all([this.fetchProfile(), this.fetchTeamMembers()]);
+
+      // Finally, show the page content
       this.$nextTick(() => {
         this.isInitialized = true;
       });
     },
 
     // --- METHODS ---
-    // --- METHODS ---
 
+    // User Management Methods
     /**
      * @description Fetches the list of active users and pending invitations.
      */
     async fetchTeamMembers() {
       try {
-        // This new endpoint will combine active users and pending invites
         const response = await fetch("/api/users/team");
         if (!response.ok) {
           throw new Error("Could not fetch team members.");
@@ -73,10 +57,48 @@ export default function settingsPage() {
         this.teamMembers = await response.json();
       } catch (error) {
         console.error("Error fetching team members:", error);
-        // Silently fail for now, the UI will just show an empty table
         this.teamMembers = [];
       }
     },
+    /**
+     * @description Sends a user invitation via the API.
+     */
+    async sendInvitation() {
+      this.isSendingInvite = true;
+      this.inviteMessage = "";
+
+      try {
+        const response = await fetch("/api/users/invite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            invitee_first_name: this.invitation.firstName,
+            invitee_last_name: this.invitation.lastName,
+            invitee_email: this.invitation.email,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to send invitation.");
+        }
+
+        this.inviteMessage = "Invitation sent successfully!";
+        await this.fetchTeamMembers(); // Refresh the list after sending invite
+
+        // Close the modal and reset the form on success
+        this.isInviteModalOpen = false;
+        this.invitation = { firstName: "", lastName: "", email: "" };
+      } catch (error) {
+        console.error("Error sending invitation:", error);
+        this.inviteMessage = error.message;
+      } finally {
+        this.isSendingInvite = false;
+        // Don't clear the message here, we'll move it to the modal
+      }
+    },
+
     // Profile Methods
     async fetchProfile() {
       try {
@@ -127,46 +149,6 @@ export default function settingsPage() {
       } finally {
         this.isSaving = false;
         setTimeout(() => (this.saveMessage = ""), 3000);
-      }
-    },
-
-    // NEW: User Management Methods
-    /**
-     * @description Sends a user invitation via the API.
-     */
-    async sendInvitation() {
-      this.isSendingInvite = true;
-      this.inviteMessage = "";
-
-      try {
-        const response = await fetch("/api/users/invite", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            invitee_first_name: this.invitation.firstName,
-            invitee_last_name: this.invitation.lastName,
-            invitee_email: this.invitation.email,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          // Use the specific error message from the API if available
-          throw new Error(result.error || "Failed to send invitation.");
-        }
-
-        this.inviteMessage = "Invitation sent successfully!";
-        // Close the modal and reset the form on success
-        this.isInviteModalOpen = false;
-        this.invitation = { firstName: "", lastName: "", email: "" };
-      } catch (error) {
-        console.error("Error sending invitation:", error);
-        this.inviteMessage = error.message;
-      } finally {
-        this.isSendingInvite = false;
-        // Clear the message after a few seconds
-        setTimeout(() => (this.inviteMessage = ""), 4000);
       }
     },
   };
