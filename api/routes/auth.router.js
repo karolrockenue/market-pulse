@@ -410,12 +410,16 @@ router.get("/cloudbeds/callback", async (req, res) => {
       token_expiry: tokenExpiry.toISOString(),
     };
 
+    // Located in api/routes/auth.router.js within the /cloudbeds/callback route
+
+    // FINAL BUG FIX: Using the correct STRING-BASED cloudbeds_user_id (`userInfo.user_id`)
+    // for the INSERT, which matches what the rest of the application expects.
     await pgPool.query(
       `INSERT INTO user_properties (user_id, property_id, status, pms_credentials) 
-       VALUES ($1, $2, 'connected', $3) 
-       ON CONFLICT (user_id, property_id) 
-       DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
-      [localUserId, propertyId, pmsCredentials]
+           VALUES ($1, $2, 'connected', $3) 
+           ON CONFLICT (user_id, property_id) 
+           DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
+      [userInfo.user_id, propertyId, pmsCredentials]
     );
 
     req.session.userId = userInfo.user_id;
