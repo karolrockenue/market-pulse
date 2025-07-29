@@ -175,6 +175,9 @@
                       <th class="text-left px-4 py-3 font-semibold">Name</th>
                       <th class="text-left px-4 py-3 font-semibold">Email</th>
                       <th class="text-left px-4 py-3 font-semibold">Status</th>
+                      <th class="text-right px-4 py-3 font-semibold">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-200">
@@ -204,6 +207,17 @@
           }"
                             x-text="member.status"
                           ></span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                          <template x-if="member.email !== profile.email">
+                            <button
+                              @click="removeUser(member.email)"
+                              class="text-slate-400 hover:text-red-600 font-medium transition-colors"
+                              title="Remove User"
+                            >
+                              Remove
+                            </button>
+                          </template>
                         </td>
                       </tr>
                     </template>

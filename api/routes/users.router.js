@@ -167,4 +167,81 @@ router.get("/team", requireUserApi, async (req, res) => {
   }
 });
 
+/**
+ * @route DELETE /api/users/remove
+ * @description Deletes a user and all their associated data from the account.
+ * @access Admin
+ */
+router.delete("/remove", requireAdminApi, async (req, res) => {
+  const { email: emailToRemove } = req.body;
+  const adminCloudbedsId = req.session.userId; // The cloudbeds_user_id of the admin performing the action.
+
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // --- Security Check 1: Get admin's email to prevent self-deletion ---
+    const adminResult = await client.query(
+      "SELECT email FROM users WHERE cloudbeds_user_id = $1",
+      [adminCloudbedsId]
+    );
+
+    if (adminResult.rows.length === 0) {
+      throw new Error("Admin account not found.");
+    }
+
+    if (adminResult.rows[0].email === emailToRemove) {
+      throw new Error("You cannot remove your own account.");
+    }
+
+    // --- Security Check 2: Find the user to be deleted ---
+    const userToRemoveResult = await client.query(
+      "SELECT user_id, cloudbeds_user_id FROM users WHERE email = $1",
+      [emailToRemove]
+    );
+
+    if (userToRemoveResult.rows.length === 0) {
+      throw new Error("User to be removed not found.");
+    }
+    const {
+      user_id: userPkToRemove,
+      cloudbeds_user_id: userCloudbedsIdToRemove,
+    } = userToRemoveResult.rows[0];
+
+    // --- Data Deletion ---
+
+    // 1. Delete any property links associated with the user
+    [cite_start]; // Note: The user_properties table uses the string-based cloudbeds_user_id as the foreign key [cite: 350, 353]
+    await client.query("DELETE FROM user_properties WHERE user_id = $1", [
+      userCloudbedsIdToRemove,
+    ]);
+
+    // 2. Delete any pending invitations sent by this user
+    await client.query(
+      "DELETE FROM user_invitations WHERE inviter_user_id = $1",
+      [userPkToRemove]
+    );
+
+    // 3. Delete the user record itself
+    await client.query("DELETE FROM users WHERE user_id = $1", [
+      userPkToRemove,
+    ]);
+
+    await client.query("COMMIT");
+
+    res
+      .status(200)
+      .json({
+        message: `User ${emailToRemove} has been successfully removed.`,
+      });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error removing user:", error);
+    // Send back a specific error message from our checks or a generic one
+    res.status(400).json({ error: error.message || "Failed to remove user." });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;

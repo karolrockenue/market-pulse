@@ -110,6 +110,43 @@ export default function settingsPage() {
     },
 
     /**
+     * @description Removes a user from the account.
+     * @param {string} userEmail - The email of the user to remove.
+     */
+    async removeUser(userEmail) {
+      // Confirm with the admin before deleting a user
+      if (
+        !window.confirm(
+          `Are you sure you want to remove the user ${userEmail}? This action cannot be undone.`
+        )
+      ) {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/users/remove", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          // Display the specific error from the backend
+          throw new Error(result.error || "Failed to remove user.");
+        }
+
+        // Show a temporary success message
+        alert(result.message); // A simple alert for now
+        await this.fetchTeamMembers(); // Refresh the user list
+      } catch (error) {
+        console.error("Error removing user:", error);
+        alert(error.message); // Show error in an alert
+      }
+    },
+
+    /**
      * @description Resets the invitation form and opens the modal.
      */
     openInviteModal() {
