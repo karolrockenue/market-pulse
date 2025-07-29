@@ -12,6 +12,8 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // --- AUTHENTICATION ENDPOINTS ---
 
+// /api/routes/auth.router.js
+
 router.post("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -20,7 +22,12 @@ router.post("/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-    res.clearCookie("connect.sid", { path: "/" });
+    // FIX: Added the domain attribute to ensure the cookie is cleared
+    // correctly, matching the session configuration in server.js.
+    res.clearCookie("connect.sid", {
+      path: "/",
+      domain: ".market-pulse.io",
+    });
     res.status(200).json({ message: "Logged out successfully" });
   });
 });
