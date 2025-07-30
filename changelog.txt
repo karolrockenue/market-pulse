@@ -504,3 +504,15 @@ Date: July 29, 2025
       * Backend: A new endpoint, GET /api/sync-status/:propertyId, was created in dashboard.router.js. It checks for the existence of data in daily_metrics_snapshots to determine if a sync has completed.
       * Frontend: The main dashboard (dashboard.mjs and index.html) was updated to display a full-page "Sync in Progress" message and poll the new status endpoint every 15 seconds, automatically refreshing the page upon completion.
       * Outcome: The primary OAuth 2.0 onboarding flow is now fully functional and robust. New users can connect their property, have their account created, and have the initial 15-year data sync triggered automatically. The new "Sync Status Indicator" provides clear feedback to the user during this process. A minor known issue is the momentary flicker of the sync status indicator on page refresh; this needs to be debugged and styled better in a future session.
+Date: July 30, 2025
+      * Objective: Fix a UI bug with the initial sync indicator, reduce the historical data pull duration, and improve the indicator's visual styling.
+      * Summary: This session addressed user feedback on the post-connection experience. The initial data sync period was reduced from 15 to 5 years. A bug causing the "syncing" indicator to flash on every page load was fixed by implementing a one-time URL parameter signal. Finally, the indicator itself was restyled to be more professional, using a consistent spinner from the admin panel and cleaner fonts.
+      * Key Changes:
+      * Data Sync Duration: The initial-sync.js script was modified to fetch 5 years of historical data instead of 15, and the corresponding text in public/app/index.html was updated.
+      * Sync Indicator Bug Fix:
+      * The /api/auth/cloudbeds/callback route in auth.router.js was updated to redirect to /app/?newConnection=true after a successful connection.
+      * The dashboard.mjs component was refactored: the isSyncing flag now defaults to false. New logic was added to check for the newConnection=true URL parameter, show the indicator, and clean the URL to prevent the indicator from reappearing on refresh.
+      * UI/UX Improvement:
+      * The sync indicator modal in index.html was updated. The previous SVG spinner was replaced with the div-based spinner from the admin panel for UI consistency.
+      * The indicator's text was updated with smaller, cleaner fonts (text-lg and text-sm) for a more polished appearance.
+      * Outcome: The initial user experience after connecting a new property is significantly improved. The sync period is more reasonable, the distracting UI flicker bug is resolved, and the loading indicator is now visually appealing and consistent with the rest of the application.

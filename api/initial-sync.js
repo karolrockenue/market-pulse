@@ -1,7 +1,9 @@
-// /api/initial-sync.js (Refactored to be runnable as a script)
+// /api/initial-sync.js (Refactored for Bulk Insert)
 const fetch = require("node-fetch");
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
+// --- NEW: Import the pg-format library ---
+const format = require("pg-format");
 
 /**
  * The core logic for the initial sync process.
@@ -52,16 +54,12 @@ async function runSync(propertyId) {
 
   const datesToUpdate = Object.keys(processedData);
   if (datesToUpdate.length > 0) {
-    for (const date of datesToUpdate) {
+    // --- REFACTORED: The inefficient loop has been replaced by this bulk insert logic ---
+
+    // 1. Map all the data into a single nested array for the bulk insert.
+    const bulkInsertValues = datesToUpdate.map((date) => {
       const metrics = processedData[date];
-      const query = `
-        INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
-            adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
-            capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
-      `;
-      const values = [
+      return [
         date,
         propertyId,
         metrics.adr || 0,
@@ -72,8 +70,23 @@ async function runSync(propertyId) {
         metrics.total_revenue || 0,
         user.cloudbeds_user_id,
       ];
-      await pgPool.query(query, values);
-    }
+    });
+
+    // 2. Use pg-format to safely create a single, massive INSERT query.
+    // The %L placeholder correctly formats the nested array into a VALUES list.
+    const query = format(
+      `
+      INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+      VALUES %L
+      ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+          adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+          capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
+    `,
+      bulkInsertValues
+    );
+
+    // 3. Execute the single, highly efficient query.
+    await pgPool.query(query);
   }
 
   console.log(
