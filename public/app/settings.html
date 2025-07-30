@@ -225,8 +225,46 @@
                 </table>
               </div>
             </section>
+            <section id="properties" class="card p-6">
+              <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
+                Connected Properties
+              </h2>
+              <div class="mt-4">
+                <template x-if="connectedProperties.length === 0">
+                  <p
+                    class="text-center py-4 text-slate-500"
+                    x-text="propertiesMessage"
+                  ></p>
+                </template>
 
-            <section id="properties" class="card p-6"></section>
+                <ul class="divide-y divide-slate-200">
+                  <template
+                    x-for="property in connectedProperties"
+                    :key="property.property_id"
+                  >
+                    <li class="flex items-center justify-between py-3">
+                      <div>
+                        <p
+                          class="font-medium text-slate-800"
+                          x-text="property.property_name"
+                        ></p>
+                        <p
+                          class="text-sm text-slate-500"
+                          x-text="'Property ID: ' + property.property_id"
+                        ></p>
+                      </div>
+                      <button
+                        @click="disconnectProperty(property.property_id)"
+                        class="control-btn bg-red-600 text-white hover:bg-red-700 transition-colors"
+                        title="Disconnect Property"
+                      >
+                        Disconnect
+                      </button>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </section>
           </div>
 
           <div

@@ -10,7 +10,11 @@ export default function settingsPage() {
     isSaving: false,
     saveMessage: "",
     // User Management section
+    // User Management section
     teamMembers: [],
+    // New state for the Connected Properties section
+    connectedProperties: [],
+    propertiesMessage: "",
     isInviteModalOpen: false,
     isSendingInvite: false,
     invitation: {
@@ -39,7 +43,12 @@ export default function settingsPage() {
       ]);
 
       // Then fetch page-specific data
-      await Promise.all([this.fetchProfile(), this.fetchTeamMembers()]);
+      // Then fetch page-specific data
+      await Promise.all([
+        this.fetchProfile(),
+        this.fetchTeamMembers(),
+        this.fetchConnectedProperties(),
+      ]);
 
       // Finally, show the page content
       this.$nextTick(() => {
@@ -48,6 +57,79 @@ export default function settingsPage() {
     },
 
     // --- METHODS ---
+
+    // Property Management Methods
+    /**
+     * @description Fetches the list of properties connected to the user's account.
+     */
+    async fetchConnectedProperties() {
+      // Set a loading message while we fetch the data
+      this.propertiesMessage = "Loading properties...";
+      try {
+        // This existing endpoint provides the list of properties for the logged-in user.
+        const response = await fetch("/api/my-properties");
+        if (!response.ok) {
+          throw new Error("Could not fetch connected properties.");
+        }
+        this.connectedProperties = await response.json();
+        // If the list is empty, update the message to inform the user.
+        if (this.connectedProperties.length === 0) {
+          this.propertiesMessage =
+            "No properties are connected to your account.";
+        }
+      } catch (error) {
+        console.error("Error fetching properties:", error);
+        this.propertiesMessage =
+          "Failed to load properties. Please refresh the page.";
+        this.connectedProperties = [];
+      }
+    },
+
+    /**
+     * @description Disconnects a property from the user's account after confirmation.
+     * @param {string} propertyId The ID of the property to disconnect.
+     */
+    async disconnectProperty(propertyId) {
+      // Show a confirmation dialog to prevent accidental disconnection.
+      if (
+        !window.confirm(
+          "Are you sure you want to disconnect this property? This will remove your access permanently and cannot be undone."
+        )
+      ) {
+        return; // Stop if the user clicks "Cancel"
+      }
+
+      try {
+        // Call the new backend endpoint we just created.
+        const response = await fetch("/api/users/disconnect-property", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ propertyId }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to disconnect property.");
+        }
+
+        // Show the success message from the API.
+        alert(result.message);
+
+        // Check the response to see if any properties remain.
+        if (result.remainingProperties === 0) {
+          // If the last property was disconnected, the user has no more data to access.
+          // Redirect them to the login page for a clean exit.
+          window.location.href = "/login.html";
+        } else {
+          // If they still have other properties, just refresh the list on the page.
+          await this.fetchConnectedProperties();
+        }
+      } catch (error) {
+        console.error("Error disconnecting property:", error);
+        alert(error.message); // Show any errors in an alert.
+      }
+    },
 
     // User Management Methods
     /**

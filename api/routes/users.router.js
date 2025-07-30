@@ -280,4 +280,75 @@ router.delete("/remove", requireAdminApi, async (req, res) => {
   }
 });
 
+/**
+ * @route POST /api/users/disconnect-property
+ * @description Disconnects a property from a user's account, removing their access.
+ * @access User
+ */
+router.post("/disconnect-property", requireUserApi, async (req, res) => {
+  // Extract propertyId from the request body
+  const { propertyId } = req.body;
+  // Get the user's unique ID from their session
+  const userCloudbedsId = req.session.userId;
+
+  // Basic validation to ensure a property ID was sent
+  if (!propertyId) {
+    return res.status(400).json({ error: "Property ID is required." });
+  }
+
+  // Get a client from the connection pool to run the database transaction
+  const client = await pgPool.connect();
+  try {
+    // Start a database transaction
+    await client.query("BEGIN");
+
+    // Execute the DELETE query to remove the specific link between the user and the property.
+    // This is the core action that "disconnects" the property.
+    const deleteResult = await client.query(
+      "DELETE FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [userCloudbedsId, propertyId]
+    );
+
+    // If no rows were deleted, it means the connection didn't exist or the user
+    // doesn't have permission. This prevents accidental success messages.
+    if (deleteResult.rowCount === 0) {
+      throw new Error(
+        "Property connection not found or you do not have permission."
+      );
+    }
+
+    // After deleting, check how many properties the user has left.
+    const remainingPropsResult = await client.query(
+      "SELECT COUNT(*) FROM user_properties WHERE user_id = $1",
+      [userCloudbedsId]
+    );
+
+    // Parse the count of remaining properties
+    const remainingProperties = parseInt(
+      remainingPropsResult.rows[0].count,
+      10
+    );
+
+    // If all queries were successful, commit the transaction to save the changes
+    await client.query("COMMIT");
+
+    // Send a success response back to the frontend, including the number of remaining properties.
+    // The frontend will use this to decide whether to redirect the user.
+    res.status(200).json({
+      message: "Property disconnected successfully.",
+      remainingProperties: remainingProperties,
+    });
+  } catch (error) {
+    // If any error occurred, roll back the transaction to undo any changes
+    await client.query("ROLLBACK");
+    console.error("Error disconnecting property:", error);
+    res.status(400).json({
+      error: error.message || "Failed to disconnect property.",
+    });
+  } finally {
+    // Always release the client back to the pool
+    client.release();
+  }
+});
+
 module.exports = router;
