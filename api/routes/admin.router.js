@@ -31,24 +31,36 @@ async function getAdminRefreshToken(adminUserId) {
 
 // This is the main helper we will now use in all admin routes.
 // This is the main helper we will now use in all admin routes.
+// This is the new, corrected version of the function.
 async function getAdminAccessToken(adminUserId) {
-  const refreshToken = await getAdminRefreshToken(adminUserId);
-  if (!refreshToken) {
-    throw new Error(
-      "Could not find a valid refresh token for this admin user."
-    );
-  }
-
-  // Get the admin's default property ID to use for API calls.
+  // Step 1: Find a property this admin has access to.
   const propertyResult = await pgPool.query(
     "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
     [adminUserId]
   );
+
   if (propertyResult.rows.length === 0) {
-    throw new Error("No properties are associated with this admin account.");
+    throw new Error("This admin user is not associated with any properties.");
   }
   const propertyId = propertyResult.rows[0].property_id;
 
+  // Step 2: Find the credentials for that property. They might belong to the
+  // original user who connected the account, not the current admin.
+  // This query specifically looks for a record that HAS a refresh token.
+  const credsResult = await pgPool.query(
+    `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
+    [propertyId]
+  );
+
+  const refreshToken = credsResult.rows[0]?.pms_credentials?.refresh_token;
+
+  if (!refreshToken) {
+    throw new Error(
+      "Could not find a valid refresh token for the property this admin has access to."
+    );
+  }
+
+  // --- The rest of the function remains the same ---
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
