@@ -230,8 +230,8 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
 
     const period = getPeriod(granularity);
     const query = `
-      SELECT ${period} as period, AVG(adr) as adr, AVG(occupancy_direct) as occupancy_direct, AVG(revpar) as revpar,
-      SUM(total_revenue) as total_revenue, SUM(rooms_sold) as rooms_sold, SUM(capacity_count) as capacity_count
+      SELECT ${period} as period, AVG(adr::numeric) as adr, AVG(occupancy_direct::numeric) as occupancy_direct, AVG(revpar::numeric) as revpar,
+    SUM(total_revenue::numeric)   as total_revenue, SUM(rooms_sold) as rooms_sold, SUM(capacity_count) as capacity_count
       FROM daily_metrics_snapshots
       WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
@@ -273,8 +273,8 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     const period = getPeriod(granularity);
 
     const query = `
-      SELECT ${period} as period, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy, AVG(dms.revpar) as market_revpar,
-      SUM(dms.total_revenue) as market_total_revenue, SUM(dms.rooms_sold) as market_rooms_sold, SUM(dms.capacity_count) as market_capacity_count
+      SELECT ${period} as period, AVG(dms.adr::numeric) as market_adr, AVG(dms.occupancy_direct::numeric) as market_occupancy, AVG(dms.revpar::numeric) as market_revpar,
+      SUM(dms.total_revenue::numeric) as market_total_revenue, SUM(dms.rooms_sold) as market_rooms_sold, SUM(dms.capacity_count) as market_capacity_count
       FROM daily_metrics_snapshots dms
       JOIN hotels h ON dms.hotel_id = h.hotel_id
       WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date >= $3::date AND dms.stay_date <= $4::date
