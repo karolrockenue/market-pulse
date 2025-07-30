@@ -420,30 +420,35 @@ router.get("/cloudbeds/callback", async (req, res) => {
       [userInfo.user_id, propertyId, pmsCredentials]
     );
 
-    // --- REFACTORED: Replace spawn with a direct, non-blocking call ---
+    // --- FINAL FIX: Delegate the sync to its own serverless function ---
+    // Instead of running the sync in the same process as the login, we make an
+    // internal HTTP request to the dedicated /api/initial-sync endpoint. This
+    // gives the long-running sync its own process and timeout, mirroring the
+    // successful manual trigger from the Admin Panel.
     console.log(
-      `[Auto-Sync] Triggering background sync for property: ${propertyId}`
+      `[Auto-Sync] Delegating sync for property ${propertyId} to its dedicated endpoint.`
     );
-    try {
-      // FIX: Move the 'require' statement inside the function to prevent a
-      // circular dependency race condition on server startup.
-      const { runSync } = require("../initial-sync");
-      runSync(propertyId).catch((error) => {
-        // This internal catch ensures that even if the sync script itself
-        // throws an error, it won't crash the user's login flow.
-        console.error(
-          `[Auto-Sync] Background sync failed for property ${propertyId}:`,
-          error
-        );
-      });
-    } catch (importError) {
-      // This outer catch will log an error if the 'initial-sync' module
-      // itself fails to load, which is the problem we are fixing.
+
+    // Construct the full internal URL for the API endpoint.
+    const syncUrl = `${req.protocol}://${req.get("host")}/api/initial-sync`;
+
+    // This is a "fire-and-forget" request. We don't wait for it to finish.
+    // The user gets redirected immediately while the sync runs in a separate,
+    // dedicated serverless function instance.
+    fetch(syncUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ propertyId: propertyId }),
+    }).catch((error) => {
+      // This will only catch network errors in firing the request itself,
+      // not errors within the sync script (which are logged separately).
       console.error(
-        `[Auto-Sync] Failed to import and trigger runSync. This is a critical error.`,
-        importError
+        `[Auto-Sync] CRITICAL: Failed to fire request to dedicated sync endpoint for property ${propertyId}:`,
+        error
       );
-    }
+    });
 
     req.session.userId = userInfo.user_id;
     req.session.isAdmin = userInfo.is_admin || false;
