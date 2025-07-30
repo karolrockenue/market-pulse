@@ -447,7 +447,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
           .status(500)
           .send("An error occurred during authentication session save.");
       }
-      res.redirect("/app/");
+      // Add ?newConnection=true to the redirect URL.
+      // This is the one-time signal to the frontend to show the sync status indicator.
+      res.redirect("/app/?newConnection=true");
     });
   } catch (error) {
     console.error("CRITICAL ERROR in OAuth callback:", error.stack);

@@ -186,7 +186,7 @@ export default function () {
     // --- STATE PROPERTIES (No chart properties anymore) ---
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     hasProperties: false,
-    isSyncing: true, // Default to true; we'll verify status on load
+    isSyncing: false, // Default to true; we'll verify status on load
     syncStatusInterval: null, // To hold our polling timer
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     isLegalModalOpen: false,
@@ -252,9 +252,7 @@ export default function () {
       });
     },
 
-    // located in public/app/dashboard.mjs
-
-    // --- ADD THIS NEW METHOD ---
+    // Find and replace the entire checkSyncStatus method
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -269,10 +267,9 @@ export default function () {
           this.isSyncing = false;
           if (this.syncStatusInterval) {
             clearInterval(this.syncStatusInterval);
-            // Use location.replace() for a clean reload without adding to history
-            window.location.replace(
-              window.location.pathname + window.location.search
-            );
+            // This now reloads the page WITHOUT the old "?newConnection=true" parameter,
+            // preventing a loop and ensuring a clean state.
+            window.location.replace(window.location.pathname);
           }
         } else {
           // If not complete, ensure the syncing message is shown.
@@ -284,7 +281,6 @@ export default function () {
         this.isSyncing = false;
       }
     },
-
     // --- STARTUP LOGIC (Unchanged) ---
     async checkUserRoleAndSetupNav() {
       try {
@@ -542,7 +538,6 @@ export default function () {
     },
     // This function now receives both the ID and the name directly from the event.
     // located in public/app/dashboard.mjs
-
     // REPLACE the existing handlePropertyChange method with this one
     handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
@@ -558,6 +553,23 @@ export default function () {
 
       // Stop any previous polling timers.
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
+
+      // --- NEW LOGIC ---
+      // Check for the one-time signal in the URL.
+      const urlParams = new URLSearchParams(window.location.search);
+      const isNewConnection = urlParams.get("newConnection") === "true";
+
+      if (isNewConnection) {
+        // If the signal is present, immediately show the sync indicator.
+        this.isSyncing = true;
+        // Then, clean the URL so this doesn't run again on a refresh.
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+      }
+      // --- END NEW LOGIC ---
 
       // Check the sync status immediately for the new property.
       this.checkSyncStatus(propertyId).then(() => {

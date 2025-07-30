@@ -12,7 +12,7 @@ async function runSync(propertyId) {
     throw new Error("A propertyId is required to run the sync.");
   }
 
-  console.log(`Starting 15-YEAR initial sync for property: ${propertyId}`);
+  console.log(`Starting 5-YEAR initial sync for property: ${propertyId}`);
 
   const result = await pgPool.query(
     `SELECT u.cloudbeds_user_id, u.auth_mode, up.pms_credentials
@@ -36,7 +36,7 @@ async function runSync(propertyId) {
 
   const today = new Date();
   const pastDate = new Date();
-  pastDate.setFullYear(today.getFullYear() - 15);
+  pastDate.setFullYear(today.getFullYear() - 5);
   const futureDate = new Date();
   futureDate.setFullYear(today.getFullYear() + 1);
   const startDate = pastDate.toISOString().split("T")[0];
