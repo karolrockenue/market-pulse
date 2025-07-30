@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Pulse - Support & FAQ Center</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* --- Base Styles & Futuristic Theme from login.html --- */
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #0d1117; /* Dark background */
+        color: #c9d1d9; /* Light text */
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        pointer-events: none;
+        background: radial-gradient(
+            circle at 10% 20%,
+            rgba(22, 93, 255, 0.15),
+            transparent 30%
+          ),
+          radial-gradient(
+            circle at 90% 80%,
+            rgba(138, 43, 226, 0.15),
+            transparent 40%
+          );
+        animation: pulse-aurora 15s infinite ease-in-out;
+      }
+      @keyframes pulse-aurora {
+        0%,
+        100% {
+          transform: scale(1) rotate(0deg);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.2) rotate(5deg);
+          opacity: 1;
+        }
+      }
+      .glass-card {
+        background: rgba(22, 27, 34, 0.75);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <header
+      id="header"
+      class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 glass-card"
+    >
+      <nav
+        class="container mx-auto px-6 py-4 flex justify-between items-center"
+      >
+        <a href="/login.html" class="flex items-center gap-2">
+          <svg
+            class="h-7 w-auto text-blue-400"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="12" y1="20" x2="12" y2="10"></line>
+            <line x1="18" y1="20" x2="18" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="16"></line>
+          </svg>
+          <span class="text-xl font-bold text-white">Market Pulse</span>
+        </a>
+        <div class="hidden md:flex items-center gap-8">
+          <a
+            href="/login.html"
+            class="text-gray-300 hover:text-white transition"
+            >Back to Home</a
+          >
+        </div>
+      </nav>
+    </header>
+
+    <main class="pt-24 pb-20">
+      <section class="container mx-auto px-6">
+        <div class="glass-card rounded-2xl p-8 md:p-12 max-w-4xl mx-auto">
+          <h1 class="text-3xl md:text-4xl font-bold text-white mb-4">
+            Support & FAQ Center
+          </h1>
+          <p class="text-gray-400 mb-8">
+            Your guide to getting the most out of Market Pulse.
+          </p>
+
+          <div class="prose prose-invert text-gray-300 max-w-none space-y-6">
+            <h3
+              class="!text-xl !font-semibold !text-white !pt-8 !mt-8 !border-t !border-gray-700"
+              id="setup"
+            >
+              How to Sign Up & Connect Your PMS
+            </h3>
+            <p>
+              Market Pulse uses a streamlined process where signing up and
+              connecting your first property happen at the same time through
+              your Property Management System (PMS).
+            </p>
+            <p>
+              From the Market Pulse homepage, select your PMS provider from the
+              list below and follow the authorization steps:
+            </p>
+
+            <div class="not-prose my-4">
+              <div class="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                <p class="font-semibold text-white">Connect with Cloudbeds</p>
+                <ol
+                  class="list-decimal list-inside mt-2 text-sm text-gray-400 space-y-2"
+                >
+                  <li>
+                    You will be redirected to the Cloudbeds login page. Log in
+                    to your Cloudbeds account.
+                  </li>
+                  <li>
+                    Cloudbeds will ask you to authorize Market Pulse to access
+                    your property data. Review the permissions and click
+                    <strong>"Approve"</strong>.
+                  </li>
+                  <li>
+                    Once approved, you will be redirected back to the Market
+                    Pulse dashboard. Your account is now created, and your
+                    property is connected.
+                  </li>
+                </ol>
+              </div>
+            </div>
+
+            <p>
+              Your initial data sync will begin automatically. This process
+              pulls up to 5 years of your historical performance data and may
+              take a few minutes to complete.
+            </p>
+
+            <h3
+              class="!text-xl !font-semibold !text-white !pt-8 !mt-8 !border-t !border-gray-700"
+              id="features"
+            >
+              Key Features of the Integration
+            </h3>
+            <ul>
+              <li>
+                <strong>Main Dashboard:</strong> Get an at-a-glance view of your
+                KPIs—Occupancy, ADR, and RevPAR—compared directly against the
+                market average.
+              </li>
+              <li>
+                <strong>Advanced Reporting:</strong> Dive deeper into your data
+                with custom date ranges, flexible "Group By" modes, and
+                Gross/Net tax toggles.
+              </li>
+              <li>
+                <strong>Automated Report Scheduling:</strong> Configure reports
+                to be generated and emailed to you automatically in CSV format.
+              </li>
+              <li>
+                <strong>Team Management:</strong> Invite your team members to
+                access the same property data, perfect for group accounts.
+              </li>
+            </ul>
+
+            <h3
+              class="!text-xl !font-semibold !text-white !pt-8 !mt-8 !border-t !border-gray-700"
+              id="disconnect"
+            >
+              How to Disconnect the App
+            </h3>
+            <p>
+              You can disconnect your property from either the Market Pulse
+              application or from within your PMS.
+            </p>
+            <h4 class="!font-semibold !text-white">
+              Disconnecting from within Market Pulse:
+            </h4>
+            <p>
+              <em
+                >(Note: This feature will be available in the "Profile &
+                Settings" page.)</em
+              >
+            </p>
+            <ol>
+              <li>
+                Navigate to <strong>"Profile & Settings"</strong> from the main
+                menu.
+              </li>
+              <li>
+                Go to the <strong>"Connected Properties"</strong> section and
+                click <strong>"Disconnect"</strong>.
+              </li>
+              <li>
+                Confirm your choice. This will permanently delete the link to
+                this property and its API credentials from our system.
+              </li>
+            </ol>
+            <h4 class="!font-semibold !text-white">
+              Disconnecting from within your PMS:
+            </h4>
+            <p>
+              You can also revoke access directly from your PMS account. For
+              Cloudbeds users, follow the instructions in their official guide:
+              <a
+                href="https://support.cloudbeds.com/s/article/How-to-disconnect-an-app-from-Cloudbeds-Marketplace"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-blue-400 hover:underline"
+                >How to Disconnect an App from Cloudbeds Marketplace</a
+              >.
+            </p>
+
+            <h3
+              class="!text-xl !font-semibold !text-white !pt-8 !mt-8 !border-t !border-gray-700"
+              id="support"
+            >
+              How to Get Support
+            </h3>
+            <p>
+              If you have any questions, encounter any issues, or have feedback,
+              please don't hesitate to reach out to our support team by emailing
+              us at
+              <a
+                href="mailto:support@market-pulse.io"
+                class="text-blue-400 hover:underline"
+                ><strong>support@market-pulse.io</strong></a
+              >.
+            </p>
+
+            <h3
+              class="!text-xl !font-semibold !text-white !pt-8 !mt-8 !border-t !border-gray-700"
+              id="faq"
+            >
+              Frequently Asked Questions
+            </h3>
+
+            <div class="space-y-4">
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  Is my hotel's data secure?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  Absolutely. Your data is isolated and never shared
+                  individually. All competitor data is aggregated and
+                  anonymized, so your specific performance metrics are only
+                  visible to you.
+                </p>
+              </details>
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  Does this app make changes in my PMS?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  No. Market Pulse has read-only access. Our application only
+                  reads the data required for analytics and has no permission to
+                  create, edit, or delete any information in your property
+                  management system.
+                </p>
+              </details>
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  How is "The Market" calculated?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  The market is a competitive set of hotels with a similar
+                  quality tier (e.g., Midscale, Luxury) to your own. This
+                  ensures you're comparing your performance against true,
+                  like-for-like competitors.
+                </p>
+              </details>
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  How often is the data refreshed?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  Your forward-looking data is automatically synced from your
+                  PMS every 24 hours to ensure you have the freshest insights
+                  each morning.
+                </p>
+              </details>
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  Why is the platform free?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  Market Pulse is currently offered completely free as we build
+                  our user base and gather feedback. In the future, we may
+                  introduce optional premium features, but the core dashboard
+                  will remain free for early adopters.
+                </p>
+              </details>
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  How do I add another hotel to my account?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  To connect additional properties, you must initiate the
+                  connection from within the PMS account for that specific
+                  property. Find Market Pulse in your PMS Marketplace for the
+                  new hotel and follow the connection steps. Once connected, it
+                  will automatically appear in your property switcher on the
+                  dashboard.
+                </p>
+              </details>
+              <details
+                class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 cursor-pointer"
+              >
+                <summary class="font-semibold text-white">
+                  Can I request a new PMS integration?
+                </summary>
+                <p class="text-gray-400 mt-2">
+                  Yes! We are always looking to expand our list of supported PMS
+                  providers. Please send your integration requests to our
+                  support email.
+                </p>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="py-8 border-t border-gray-800">
+      <div class="container mx-auto px-6 text-center text-gray-500">
+        <p>&copy; 2025 Market Pulse. All rights reserved.</p>
+      </div>
+    </footer>
+  </body>
+</html>
