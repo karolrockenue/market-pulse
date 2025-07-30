@@ -51,7 +51,7 @@ function initializeAdminPanel() {
   const dbStatusEl = document.getElementById("db-status");
   const runDailyRefreshBtn = document.getElementById("run-daily-refresh-btn");
   const hotelsTableBody = document.getElementById("hotels-table-body");
-  const pilotTableBody = document.getElementById("pilot-hotels-table-body");
+
   const apiResultsContainer = document.getElementById("api-results-container");
 
   // public/admin/admin.mjs
@@ -94,38 +94,6 @@ function initializeAdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ propertyId: hotelId }),
       });
-    }
-  });
-
-  // Event listener for the pilot hotel connection table.
-  pilotTableBody.addEventListener("click", async (event) => {
-    const button = event.target;
-    if (button.classList.contains("connect-btn")) {
-      button.disabled = true;
-      button.textContent = "Activating...";
-      const propertyId = button.dataset.propertyId;
-      const userId = button.dataset.userId;
-      try {
-        const response = await fetch("/api/activate-pilot-property", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ propertyId, userId }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message);
-        fetchAndRenderPilotStatus();
-      } catch (error) {
-        alert(`Activation failed: ${error.message}`);
-        button.disabled = false;
-        button.textContent = "Activate";
-      }
-    }
-
-    if (button.classList.contains("enable-btn")) {
-      button.disabled = true;
-      button.textContent = "Enabling...";
-      const propertyId = button.dataset.propertyId;
-      await enablePilotApp(propertyId);
     }
   });
 
@@ -214,51 +182,6 @@ function initializeAdminPanel() {
     } catch (error) {
       lastRefreshTimeEl.textContent = "Never";
       lastRefreshTimeEl.classList.add("text-yellow-600");
-    }
-  };
-
-  const fetchAndRenderPilotStatus = async () => {
-    try {
-      const response = await fetch("/api/pilot-properties");
-      if (!response.ok) throw new Error("Failed to fetch pilot properties.");
-      const properties = await response.json();
-
-      pilotTableBody.innerHTML = "";
-      if (properties.length === 0) {
-        pilotTableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">No pilot properties provisioned.</td></tr>`;
-        return;
-      }
-
-      properties.forEach((prop) => {
-        const row = document.createElement("tr");
-        const statusClass =
-          prop.status === "connected"
-            ? "bg-blue-100 text-blue-800"
-            : "bg-yellow-100 text-yellow-800";
-        const statusText = prop.status;
-
-        let actionButton = `<span class="font-semibold text-slate-500">✓ Done</span>`;
-        if (prop.status === "pending") {
-          actionButton = `<button data-property-id="${prop.property_id}" data-user-id="${prop.user_id}" class="control-btn connect-btn text-xs">Activate</button>`;
-        } else if (prop.status === "connected") {
-          actionButton = `<button data-property-id="${prop.property_id}" class="control-btn enable-btn text-xs text-green-700 bg-green-100 hover:bg-green-200">Enable App</button>`;
-        }
-
-        row.innerHTML = `
-          <td class="p-3 font-medium text-slate-800">${
-            prop.property_name || "(Activation Pending)"
-          }</td>
-          <td class="p-3">
-            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
-              ${statusText}
-            </span>
-          </td>
-          <td class="p-3 text-right">${actionButton}</td>
-        `;
-        pilotTableBody.appendChild(row);
-      });
-    } catch (error) {
-      pilotTableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">${error.message}</td></tr>`;
     }
   };
 
@@ -355,32 +278,6 @@ function initializeAdminPanel() {
       alert(`Error updating category: ${error.message}`);
     } finally {
       selectElement.disabled = false;
-    }
-  };
-
-  const enablePilotApp = async (propertyId) => {
-    const statusEl = document.getElementById("job-status-message"); // Use a consistent status element
-    statusEl.textContent = `Enabling app for property ${propertyId}...`;
-    statusEl.className = "mt-4 text-sm font-medium text-slate-500";
-    try {
-      const response = await fetch("/api/enable-pilot-app", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ propertyId }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.message || "Failed to enable app.");
-      statusEl.textContent = `✅ ${result.message}`;
-      statusEl.className = "mt-4 text-sm font-medium text-green-600";
-      fetchAndRenderPilotStatus();
-    } catch (err) {
-      statusEl.textContent = `❌ ${err.message}`;
-      statusEl.className = "mt-4 text-sm font-medium text-red-600";
-    } finally {
-      setTimeout(() => {
-        statusEl.textContent = "";
-      }, 5000);
     }
   };
 
@@ -505,51 +402,10 @@ function initializeAdminPanel() {
     );
   };
 
-  // --- Form Submission Logic ---
-  const credentialForm = document.getElementById("credential-form");
-  credentialForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const saveBtn = document.getElementById("save-credentials-btn");
-    const email = document.getElementById("user-email").value;
-    const propertyId = document.getElementById("property-id-input").value;
-    const clientId = document.getElementById("client-id").value;
-    const clientSecret = document.getElementById("client-secret").value;
-    const apiKey = document.getElementById("api-key-input").value;
-
-    if (!confirm(`Provision property ${propertyId} for user ${email}?`)) return;
-
-    saveBtn.disabled = true;
-    saveBtn.textContent = "Saving...";
-
-    try {
-      const response = await fetch("/api/provision-pilot-hotel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          propertyId,
-          clientId,
-          clientSecret,
-          apiKey,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      alert(`Success: ${result.message}`);
-      credentialForm.reset();
-      fetchAndRenderPilotStatus();
-    } catch (error) {
-      alert(`Error: ${error.message}`);
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Provision Hotel";
-    }
-  });
-
   // --- Initial Setup Calls ---
   fetchLastRefreshTime();
   fetchAndRenderHotels();
-  fetchAndRenderPilotStatus();
+
   setupApiExplorer();
 
   // Attach Event Listeners for Core Tools
