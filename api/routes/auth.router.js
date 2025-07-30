@@ -1,8 +1,6 @@
 // /api/routes/auth.router.js
 const express = require("express");
-const { spawn } = require("child_process"); // <-- ADD THIS LINE
-const path = require("path"); // <-- ADD THIS LINE
-
+const { runSync } = require("../initial-sync");
 const router = express.Router();
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -423,20 +421,16 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
 
     // FINAL PATH FIX: Use path.join to create a reliable, absolute path to the script.
-    const scriptPath = path.join(__dirname, "../initial-sync.js");
-    console.log(`[Auto-Sync] Spawning script at path: ${scriptPath}`);
-    const syncProcess = spawn("node", [scriptPath, String(propertyId)]);
-
-    syncProcess.stdout.on("data", (data) => {
-      console.log(`[Auto-Sync] stdout: ${data}`);
-    });
-
-    syncProcess.stderr.on("data", (data) => {
-      console.error(`[Auto-Sync] stderr: ${data}`);
-    });
-
-    syncProcess.on("close", (code) => {
-      console.log(`[Auto-Sync] child process exited with code ${code}`);
+    // --- REFACTORED: Replace spawn with a direct, non-blocking call ---
+    console.log(
+      `[Auto-Sync] Triggering background sync for property: ${propertyId}`
+    );
+    runSync(propertyId).catch((error) => {
+      // We log the error but don't block the user's redirect.
+      console.error(
+        `[Auto-Sync] Background sync failed for property ${propertyId}:`,
+        error
+      );
     });
 
     req.session.userId = userInfo.user_id;

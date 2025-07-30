@@ -98,7 +98,9 @@ async function runSync(propertyId) {
 /**
  * This is the wrapper for when the script is called as a Vercel Serverless Function (e.g., by the manual button).
  */
-module.exports = async (request, response) => {
+// This wrapper is for when the file is called as a Vercel Serverless function.
+const serverlessWrapper = async (request, response) => {
+  // ... (the existing code inside the function remains the same)
   if (request.method !== "POST") {
     return response.status(405).json({ error: "Method Not Allowed" });
   }
@@ -116,6 +118,11 @@ module.exports = async (request, response) => {
     response.status(500).json({ success: false, error: error.message });
   }
 };
+
+// NEW: Attach the runSync function to the export so other files can import it.
+serverlessWrapper.runSync = runSync;
+
+module.exports = serverlessWrapper;
 
 /**
  * This block allows the script to be executed directly from the command line (e.g., by our `spawn` command).
