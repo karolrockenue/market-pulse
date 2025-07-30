@@ -3,6 +3,11 @@ const fetch = require("node-fetch");
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const format = require("pg-format");
+// /api/initial-sync.js (Refactored for Bulk Insert with Transaction Control)
+const fetch = require("node-fetch");
+const pgPool = require("./utils/db");
+const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
+const format = require("pg-format");
 
 /**
  * The core logic for the initial sync process.
@@ -105,6 +110,43 @@ async function runSync(propertyId) {
     `✅ Initial sync job complete for property ${propertyId}. Updated ${datesToUpdate.length} records.`
   );
   return datesToUpdate.length;
+}
+
+// This wrapper is for when the file is called as a Vercel Serverless function.
+const serverlessWrapper = async (request, response) => {
+  if (request.method !== "POST") {
+    return response.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  const { propertyId } = request.body;
+
+  try {
+    const totalRecordsUpdated = await runSync(propertyId);
+    response.status(200).json({ success: true, totalRecordsUpdated });
+  } catch (error) {
+    console.error(
+      `❌ A critical error occurred during the initial sync for property ${propertyId}:`,
+      error
+    );
+    response.status(500).json({ success: false, error: error.message });
+  }
+};
+
+serverlessWrapper.runSync = runSync;
+module.exports = serverlessWrapper;
+
+// This block allows the script to be executed from the command line (remains unchanged).
+if (require.main === module) {
+  const propertyId = process.argv[2];
+  runSync(propertyId)
+    .then(() => {
+      console.log("Script finished successfully.");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("Script failed with an error:", error);
+      process.exit(1);
+    });
 }
 
 // This wrapper is for when the file is called as a Vercel Serverless function.
