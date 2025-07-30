@@ -282,23 +282,22 @@ async function getUpcomingMetrics(accessToken, propertyId) {
  * @param {string} auth_mode - The user's authentication mode ('manual' or 'oauth').
  * @returns {Promise<string>} A valid access token.
  */
-async function getAccessToken(credentials = {}, auth_mode) {
-  if (auth_mode === "manual") {
-    if (!credentials.api_key) {
-      throw new Error(
-        "Authentication failed: No api_key found in credentials for manual mode user."
-      );
-    }
-    return credentials.api_key;
-  }
-
-  // This is for 'oauth' mode
+/**
+ * Gets a valid access token for a given user and property by using
+ * the stored OAuth refresh token.
+ * @param {object} credentials - The pms_credentials object from the database.
+ * @returns {Promise<string>} A valid access token.
+ */
+async function getAccessToken(credentials = {}) {
+  // This is the standard 'oauth' mode logic.
+  // We first check if a refresh token exists in the credentials provided.
   if (!credentials.refresh_token) {
     throw new Error(
-      "Authentication failed: No refresh_token found in credentials for OAuth user."
+      "Authentication failed: No refresh_token found in credentials for the user."
     );
   }
 
+  // Prepare the request to the Cloudbeds token endpoint.
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
@@ -307,6 +306,7 @@ async function getAccessToken(credentials = {}, auth_mode) {
     refresh_token: credentials.refresh_token,
   });
 
+  // Make the API call to get a new access token.
   const tokenRes = await fetch(
     "https://hotels.cloudbeds.com/api/v1.1/access_token",
     {
@@ -316,6 +316,8 @@ async function getAccessToken(credentials = {}, auth_mode) {
   );
 
   const tokenData = await tokenRes.json();
+
+  // If the response from Cloudbeds does not include an access token, something is wrong.
   if (!tokenData.access_token) {
     throw new Error(
       "Token refresh failed. Response from Cloudbeds: " +
@@ -323,6 +325,7 @@ async function getAccessToken(credentials = {}, auth_mode) {
     );
   }
 
+  // Return the new access token.
   return tokenData.access_token;
 }
 
