@@ -5,6 +5,7 @@ export default function pageHeader() {
     propertyDropdownOpen: false,
     userDropdownOpen: false,
     isLegalModalOpen: false,
+    isSupportModalOpen: false, // Add this line to manage the support modal
     properties: [],
     currentPropertyId: null,
     currentPropertyName: "Loading...",

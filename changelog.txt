@@ -516,3 +516,17 @@ Date: July 30, 2025
       * The sync indicator modal in index.html was updated. The previous SVG spinner was replaced with the div-based spinner from the admin panel for UI consistency.
       * The indicator's text was updated with smaller, cleaner fonts (text-lg and text-sm) for a more polished appearance.
       * Outcome: The initial user experience after connecting a new property is significantly improved. The sync period is more reasonable, the distracting UI flicker bug is resolved, and the loading indicator is now visually appealing and consistent with the rest of the application.
+Date: July 30, 2025
+      * Objective: Prepare the application for marketplace certification by creating marketing copy and resolving a critical bug with the initial data sync for new users.
+      * Summary: This session focused on both commercial and technical readiness. Marketplace-ready descriptions and feature lists were drafted. A show-stopping bug that caused the initial data sync to hang was traced to an unreliable child_process.spawn call. The issue was resolved by refactoring the sync to be triggered directly and run as a non-blocking background task within the main OAuth callback process.
+      * Key Changes:
+      * Application Marketing Copy: Created a concise App Summary, a list of feature bullet points, and a compelling App Description, all focused on the "You vs. The Market" value proposition for submission to the Cloudbeds Marketplace.
+      * Initial Sync Bug Fix:
+      * Diagnosis: A persistent "sync in progress" message for new users was diagnosed. The issue occurred only when the sync was triggered automatically after the OAuth flow, not when triggered manually from the Admin Panel.
+      * Root Cause: The problem was traced to child_process.spawn being used to start the sync script. This method was unreliable in a serverless environment, likely failing to pass necessary environment variables to the new process and causing it to crash silently.
+      * Resolution: The architecture was refactored to eliminate spawn. The initial-sync.js script was modified to export its core runSync function. The auth.router.js file was then updated to import and call runSync directly from the /cloudbeds/callback route. The call is non-blocking (.catch() instead of await) to ensure the user is redirected immediately while the sync runs safely in the background.
+      * Database Optimization: The initial-sync.js script's database insertion logic was refactored from a one-by-one query loop to a single, efficient bulk-insert operation using the pg-format library. This dramatically improves performance and prevents potential function timeouts.
+      * Admin Panel API Fix: Corrected a critical bug that prevented invited admin users from using the API Explorer and other tools. The credential lookup logic in admin.router.js was refactored to correctly find the API token associated with the property the admin has access to, rather than searching the invited admin's own record where credentials do not exist.
+
+
+      * Outcome: The application is now technically stable and commercially ready for the certification process. The critical onboarding bug has been resolved, ensuring new users have a smooth and reliable experience.
