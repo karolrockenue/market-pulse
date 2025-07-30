@@ -13,7 +13,7 @@ async function runSync(propertyId) {
     throw new Error("A propertyId is required to run the sync.");
   }
 
-  console.log(`--- STARTING DEBUG SYNC for property: ${propertyId} ---`);
+  console.log(`Starting 5-YEAR initial sync for property: ${propertyId}`);
 
   const result = await pgPool.query(
     `SELECT u.cloudbeds_user_id, u.auth_mode, up.pms_credentials
@@ -42,6 +42,7 @@ async function runSync(propertyId) {
   futureDate.setFullYear(today.getFullYear() + 1);
   const startDate = pastDate.toISOString().split("T")[0];
   const endDate = futureDate.toISOString().split("T")[0];
+  console.log(`Sync script: Fetching data from ${startDate} to ${endDate}`);
 
   const processedData = await cloudbedsAdapter.getHistoricalMetrics(
     accessToken,
@@ -50,19 +51,13 @@ async function runSync(propertyId) {
     endDate
   );
 
-  // --- BREADCRUMB 1: Log a sample of the data received from Cloudbeds ---
-  console.log(
-    `[BREADCRUMB 1] Received ${
-      Object.keys(processedData).length
-    } records from Cloudbeds. Sample record:`,
-    processedData[Object.keys(processedData)[0]]
-  );
-
   const datesToUpdate = Object.keys(processedData);
 
   if (datesToUpdate.length > 0) {
+    // FIX: Get a dedicated client from the pool and wrap the query in a transaction.
     const client = await pgPool.connect();
     try {
+      // Start the transaction
       await client.query("BEGIN");
 
       const bulkInsertValues = datesToUpdate.map((date) => {
@@ -91,36 +86,46 @@ async function runSync(propertyId) {
         bulkInsertValues
       );
 
-      // --- BREADCRUMB 2: Log the first 500 characters of the query we are sending ---
-      console.log(
-        `[BREADCRUMB 2] Executing database query. Start of query: ${query.substring(
-          0,
-          500
-        )}...`
-      );
+      // Execute the query using the dedicated client
+      await client.query(query);
 
-      const insertResult = await client.query(query);
-
-      // --- BREADCRUMB 3: Log what the database reports back ---
-      console.log(
-        "[BREADCRUMB 3] Database query complete. Result rowCount:",
-        insertResult.rowCount
-      );
-
+      // Commit the transaction to permanently save the changes
       await client.query("COMMIT");
     } catch (e) {
+      // If an error occurs, roll back the transaction
       await client.query("ROLLBACK");
-      throw e;
+      throw e; // Re-throw the error to be caught by the caller
     } finally {
+      // Always release the client back to the pool
       client.release();
     }
   }
 
   console.log(
-    `--- DEBUG SYNC COMPLETE for property ${propertyId}. Processed ${datesToUpdate.length} records. ---`
+    `✅ Initial sync job complete for property ${propertyId}. Updated ${datesToUpdate.length} records.`
   );
   return datesToUpdate.length;
 }
+
+// This wrapper is for when the file is called as a Vercel Serverless function.
+const serverlessWrapper = async (request, response) => {
+  if (request.method !== "POST") {
+    return response.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  const { propertyId } = request.body;
+
+  try {
+    const totalRecordsUpdated = await runSync(propertyId);
+    response.status(200).json({ success: true, totalRecordsUpdated });
+  } catch (error) {
+    console.error(
+      `❌ A critical error occurred during the initial sync for property ${propertyId}:`,
+      error
+    );
+    response.status(500).json({ success: false, error: error.message });
+  }
+};
 
 serverlessWrapper.runSync = runSync;
 module.exports = serverlessWrapper;
