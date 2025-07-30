@@ -1,6 +1,6 @@
 // /api/routes/auth.router.js
 const express = require("express");
-const { runSync } = require("../initial-sync");
+
 const router = express.Router();
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -420,18 +420,30 @@ router.get("/cloudbeds/callback", async (req, res) => {
       [userInfo.user_id, propertyId, pmsCredentials]
     );
 
-    // FINAL PATH FIX: Use path.join to create a reliable, absolute path to the script.
     // --- REFACTORED: Replace spawn with a direct, non-blocking call ---
     console.log(
       `[Auto-Sync] Triggering background sync for property: ${propertyId}`
     );
-    runSync(propertyId).catch((error) => {
-      // We log the error but don't block the user's redirect.
+    try {
+      // FIX: Move the 'require' statement inside the function to prevent a
+      // circular dependency race condition on server startup.
+      const { runSync } = require("../initial-sync");
+      runSync(propertyId).catch((error) => {
+        // This internal catch ensures that even if the sync script itself
+        // throws an error, it won't crash the user's login flow.
+        console.error(
+          `[Auto-Sync] Background sync failed for property ${propertyId}:`,
+          error
+        );
+      });
+    } catch (importError) {
+      // This outer catch will log an error if the 'initial-sync' module
+      // itself fails to load, which is the problem we are fixing.
       console.error(
-        `[Auto-Sync] Background sync failed for property ${propertyId}:`,
-        error
+        `[Auto-Sync] Failed to import and trigger runSync. This is a critical error.`,
+        importError
       );
-    });
+    }
 
     req.session.userId = userInfo.user_id;
     req.session.isAdmin = userInfo.is_admin || false;
