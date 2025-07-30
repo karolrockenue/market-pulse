@@ -1,8 +1,7 @@
-// /api/initial-sync.js (Refactored for Bulk Insert)
+// /api/initial-sync.js (Refactored for Bulk Insert with Transaction Control)
 const fetch = require("node-fetch");
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
-// --- NEW: Import the pg-format library ---
 const format = require("pg-format");
 
 /**
@@ -53,40 +52,53 @@ async function runSync(propertyId) {
   );
 
   const datesToUpdate = Object.keys(processedData);
+
   if (datesToUpdate.length > 0) {
-    // --- REFACTORED: The inefficient loop has been replaced by this bulk insert logic ---
+    // FIX: Get a dedicated client from the pool and wrap the query in a transaction.
+    const client = await pgPool.connect();
+    try {
+      // Start the transaction
+      await client.query("BEGIN");
 
-    // 1. Map all the data into a single nested array for the bulk insert.
-    const bulkInsertValues = datesToUpdate.map((date) => {
-      const metrics = processedData[date];
-      return [
-        date,
-        propertyId,
-        metrics.adr || 0,
-        metrics.occupancy || 0,
-        metrics.revpar || 0,
-        metrics.rooms_sold || 0,
-        metrics.capacity_count || 0,
-        metrics.total_revenue || 0,
-        user.cloudbeds_user_id,
-      ];
-    });
+      const bulkInsertValues = datesToUpdate.map((date) => {
+        const metrics = processedData[date];
+        return [
+          date,
+          propertyId,
+          metrics.adr || 0,
+          metrics.occupancy || 0,
+          metrics.revpar || 0,
+          metrics.rooms_sold || 0,
+          metrics.capacity_count || 0,
+          metrics.total_revenue || 0,
+          user.cloudbeds_user_id,
+        ];
+      });
 
-    // 2. Use pg-format to safely create a single, massive INSERT query.
-    // The %L placeholder correctly formats the nested array into a VALUES list.
-    const query = format(
-      `
-      INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
-      VALUES %L
-      ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
-          adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
-          capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
-    `,
-      bulkInsertValues
-    );
+      const query = format(
+        `
+        INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+        VALUES %L
+        ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+            adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+            capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
+      `,
+        bulkInsertValues
+      );
 
-    // 3. Execute the single, highly efficient query.
-    await pgPool.query(query);
+      // Execute the query using the dedicated client
+      await client.query(query);
+
+      // Commit the transaction to permanently save the changes
+      await client.query("COMMIT");
+    } catch (e) {
+      // If an error occurs, roll back the transaction
+      await client.query("ROLLBACK");
+      throw e; // Re-throw the error to be caught by the caller
+    } finally {
+      // Always release the client back to the pool
+      client.release();
+    }
   }
 
   console.log(
@@ -95,12 +107,8 @@ async function runSync(propertyId) {
   return datesToUpdate.length;
 }
 
-/**
- * This is the wrapper for when the script is called as a Vercel Serverless Function (e.g., by the manual button).
- */
 // This wrapper is for when the file is called as a Vercel Serverless function.
 const serverlessWrapper = async (request, response) => {
-  // ... (the existing code inside the function remains the same)
   if (request.method !== "POST") {
     return response.status(405).json({ error: "Method Not Allowed" });
   }
@@ -119,14 +127,10 @@ const serverlessWrapper = async (request, response) => {
   }
 };
 
-// NEW: Attach the runSync function to the export so other files can import it.
 serverlessWrapper.runSync = runSync;
-
 module.exports = serverlessWrapper;
 
-/**
- * This block allows the script to be executed directly from the command line (e.g., by our `spawn` command).
- */
+// This block allows the script to be executed from the command line (remains unchanged).
 if (require.main === module) {
   const propertyId = process.argv[2];
   runSync(propertyId)
