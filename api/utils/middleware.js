@@ -3,82 +3,34 @@ const pgPool = require("./db");
 const cloudbeds = require("./cloudbeds");
 
 async function requireUserApi(req, res, next) {
-  console.log(`[DEBUG 0] Middleware triggered for path: ${req.path}`);
+  // Check for an active session. This part remains the same.
   if (!req.session || !req.session.userId) {
-    console.log("[DEBUG FAIL] No session or userId found.");
     return res.status(401).json({ error: "Authentication required." });
   }
-  console.log(`[DEBUG 1] Session found for userId: ${req.session.userId}`);
 
   try {
+    // The query is now simplified. We just need to check if the user exists.
+    // All references to 'auth_mode' and 'needs_property_sync' are removed.
     const userResult = await pgPool.query(
-      "SELECT user_id, auth_mode, needs_property_sync FROM users WHERE cloudbeds_user_id = $1",
+      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
+
+    // If no user is found for the session ID, deny access.
     if (userResult.rows.length === 0) {
-      console.log(
-        `[DEBUG FAIL] User not found in DB for cloudbeds_user_id: ${req.session.userId}`
-      );
       return res.status(401).json({ error: "User not found." });
     }
 
+    // Attach the user's IDs to the request object for use in other routes.
+    // This is useful for knowing who is making the request.
     const user = userResult.rows[0];
     req.user = { internalId: user.user_id, cloudbedsId: req.session.userId };
-    console.log(
-      `[DEBUG 2] User found. Mode: ${user.auth_mode}, Needs Sync: ${user.needs_property_sync}`
-    );
 
-    // NEW LOGIC BLOCK TO HANDLE DIFFERENT USER TYPES
-    if (user.auth_mode === "invited") {
-      // Invited users are team members who view existing data.
-      // They don't have their own PMS connection, so we don't need to check for tokens.
-      // We simply verify their session is valid and let them pass through.
-      console.log(`[DEBUG] User is 'invited'. Allowing access to view data.`);
-    } else if (user.auth_mode === "manual") {
-      const allowedPaths = ["/my-properties", "/last-refresh-time"];
-
-      if (allowedPaths.includes(req.path)) {
-        console.log(
-          `[DEBUG] Path ${req.path} is allowed without X-Property-ID. Skipping header check.`
-        );
-      } else {
-        const propertyId = req.query.propertyId;
-        if (!propertyId) {
-          return res.status(400).json({
-            error: "An X-Property-ID header is required for this request.",
-          });
-        }
-
-        const credsResult = await pgPool.query(
-          "SELECT pms_credentials FROM user_properties WHERE user_id = $1 AND property_id = $2",
-          [req.user.cloudbedsId, propertyId]
-        );
-
-        const credentials = credsResult.rows[0]?.pms_credentials;
-
-        if (!credentials || !credentials.api_key) {
-          return res.status(403).json({
-            error: "API Key not configured for this property.",
-          });
-        }
-
-        req.user.accessToken = credentials.api_key;
-      }
-    }
-    // Note: 'oauth' users will fall through this block and proceed,
-    // as their token refresh is handled by the data sync scripts, not here.
-
-    // This new log will show us exactly what is being passed to the router.
-    console.log(
-      "[DEBUG 3] Middleware passing this user object to the router:",
-      req.user
-    );
-
-    console.log(
-      `[DEBUG FINAL] Middleware success for path: ${req.path}. Calling next().`
-    );
+    // With the pilot code removed, we no longer need complex checks.
+    // If the user exists in our database, they are valid. We let them proceed.
     return next();
   } catch (error) {
+    // Generic error handling for any unexpected database issues.
     console.error(
       `[CRITICAL ERROR] Middleware failed for path ${req.path}:`,
       error
