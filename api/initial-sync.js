@@ -8,14 +8,16 @@ const format = require("pg-format");
  * The core logic for the initial sync process.
  * @param {string} propertyId The ID of the property to sync.
  */
+// /initial-sync.js
+
+// This new function will fetch data in yearly chunks to avoid API limits.
 async function runSync(propertyId) {
   if (!propertyId) {
     throw new Error("A propertyId is required to run the sync.");
   }
-
   console.log(`Starting 5-YEAR initial sync for property: ${propertyId}`);
 
-  // The database query is now simpler, as we no longer need the 'auth_mode' column.
+  // Get user and credential info (this part is unchanged)
   const result = await pgPool.query(
     `SELECT u.cloudbeds_user_id, up.pms_credentials
      FROM users u
@@ -23,45 +25,47 @@ async function runSync(propertyId) {
      WHERE up.property_id = $1::integer LIMIT 1`,
     [propertyId]
   );
-
   if (result.rows.length === 0) {
-    throw new Error(
-      `No active user or property link found for property ${propertyId}.`
-    );
+    throw new Error(`No user link found for property ${propertyId}.`);
   }
-
   const user = result.rows[0];
-  // The call to getAccessToken is now simpler and no longer passes the auth_mode.
   const accessToken = await cloudbedsAdapter.getAccessToken(
     user.pms_credentials
   );
 
-  // The rest of the function remains the same...
-  const today = new Date();
-  const pastDate = new Date();
-  pastDate.setFullYear(today.getFullYear() - 5);
-  const futureDate = new Date();
-  futureDate.setFullYear(today.getFullYear() + 1);
-  const startDate = pastDate.toISOString().split("T")[0];
-  const endDate = futureDate.toISOString().split("T")[0];
-  console.log(`Sync script: Fetching data from ${startDate} to ${endDate}`);
+  // --- NEW CHUNKING LOGIC ---
+  let allProcessedData = {};
+  const startYear = new Date().getFullYear() - 5;
+  const endYear = new Date().getFullYear();
 
-  const processedData = await cloudbedsAdapter.getHistoricalMetrics(
-    accessToken,
-    propertyId,
-    startDate,
-    endDate
-  );
+  // Loop from the start year to the current year.
+  for (let year = startYear; year <= endYear; year++) {
+    const yearStartDate = `${year}-01-01`;
+    const yearEndDate = `${year}-12-31`;
 
-  const datesToUpdate = Object.keys(processedData);
+    console.log(`Fetching data for ${year}...`);
+
+    // Call the adapter for each one-year chunk.
+    const yearlyData = await cloudbedsAdapter.getHistoricalMetrics(
+      accessToken,
+      propertyId,
+      yearStartDate,
+      yearEndDate
+    );
+
+    // Merge the results from this year into our main data object.
+    allProcessedData = { ...allProcessedData, ...yearlyData };
+  }
+  // --- END OF NEW LOGIC ---
+
+  const datesToUpdate = Object.keys(allProcessedData);
 
   if (datesToUpdate.length > 0) {
     const client = await pgPool.connect();
     try {
       await client.query("BEGIN");
-
       const bulkInsertValues = datesToUpdate.map((date) => {
-        const metrics = processedData[date];
+        const metrics = allProcessedData[date];
         return [
           date,
           propertyId,
@@ -74,15 +78,12 @@ async function runSync(propertyId) {
           user.cloudbeds_user_id,
         ];
       });
-
       const query = format(
-        `
-        INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
-        VALUES %L
-        ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
-            adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
-            capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
-      `,
+        `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+         VALUES %L
+         ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+             adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+             capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;`,
         bulkInsertValues
       );
       await client.query(query);
