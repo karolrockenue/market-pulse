@@ -83,7 +83,7 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
 router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
-
+    const numericPropertyId = parseInt(propertyId, 10);
     // CORRECTED: Ensure access check uses req.session.userId.
     const accessCheck = await pgPool.query(
       "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
@@ -111,6 +111,7 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
 router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
+    const numericPropertyId = parseInt(propertyId, 10);
 
     // First, perform an access check to ensure the user can view this property.
     const accessCheck = await pgPool.query(
@@ -151,6 +152,7 @@ router.get("/last-refresh-time", requireUserApi, async (req, res) => {
 router.get("/kpi-summary", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, propertyId } = req.query;
+    const numericPropertyId = parseInt(propertyId, 10);
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
@@ -214,6 +216,7 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
 router.get("/metrics-from-db", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    const numericPropertyId = parseInt(propertyId, 10);
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
@@ -244,6 +247,7 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
 router.get("/competitor-metrics", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
+    const numericPropertyId = parseInt(propertyId, 10);
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
