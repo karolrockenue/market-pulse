@@ -140,7 +140,6 @@ async function getHistoricalMetrics(
   startDate,
   endDate
 ) {
-  // ... (existing code, no changes)
   const columnsToRequest = [
     "adr",
     "revpar",
@@ -150,6 +149,8 @@ async function getHistoricalMetrics(
     "rooms_sold",
     "capacity_count",
   ].map((column) => ({ cdf: { column }, metrics: ["sum", "mean"] }));
+
+  // This is the first request body we will send to the API.
   const initialInsightsPayload = {
     property_ids: [propertyId],
     dataset_id: 7,
@@ -171,15 +172,29 @@ async function getHistoricalMetrics(
     group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
     settings: { details: true, totals: false },
   };
+
   let allApiData = [];
   let nextToken = null;
   let pageNum = 1;
+
+  console.log("--- STARTING HISTORICAL SYNC ---");
+  console.log(
+    `[DEBUG] Initial Payload for property ${propertyId}:`,
+    JSON.stringify(initialInsightsPayload, null, 2)
+  );
+
   do {
     const insightsPayload = { ...initialInsightsPayload };
-    if (nextToken) insightsPayload.nextToken = nextToken;
-    console.log(
-      `Adapter: Fetching page ${pageNum} for property ${propertyId}...`
-    );
+    if (nextToken) {
+      // If we have a nextToken from a previous page, we use it for the next request.
+      insightsPayload.nextToken = nextToken;
+      console.log(
+        `[DEBUG] Fetching page ${pageNum} using nextToken: ${nextToken}`
+      );
+    } else {
+      console.log(`[DEBUG] Fetching page ${pageNum} (first page).`);
+    }
+
     const apiResponse = await fetch(
       "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
       {
@@ -192,16 +207,30 @@ async function getHistoricalMetrics(
         body: JSON.stringify(insightsPayload),
       }
     );
+
     const responseText = await apiResponse.text();
-    if (!apiResponse.ok)
-      throw new Error(
-        `API Error on page ${pageNum}: ${apiResponse.status}: ${responseText}`
+    if (!apiResponse.ok) {
+      console.error(
+        `[DEBUG] API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`
       );
+      throw new Error(`API Error on page ${pageNum}: ${apiResponse.status}`);
+    }
+
     const pageData = JSON.parse(responseText);
+
+    // Log the summary of the data we received for this page.
+    console.log(
+      `[DEBUG] Page ${pageNum} response received. Record count: ${
+        pageData.records?.rooms_sold?.length || 0
+      }. Has nextToken: ${!!pageData.nextToken}`
+    );
+
     allApiData.push(pageData);
     nextToken = pageData.nextToken || null;
     pageNum++;
   } while (nextToken);
+
+  console.log("--- HISTORICAL SYNC COMPLETE ---");
   return processApiDataForTable(allApiData);
 }
 
