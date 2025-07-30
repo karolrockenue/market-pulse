@@ -1,7 +1,8 @@
 // --- Standalone Helper Function ---
 
 // This function is now independent and can be used by both the Alpine component and the chart manager.
-function formatValue(value, type) {
+function formatValue(value, type, currencyCode = "USD") {
+  // Add a default currency
   if (value === null || typeof value === "undefined") {
     return "-";
   }
@@ -15,9 +16,10 @@ function formatValue(value, type) {
     }).format(num);
   }
   if (type === "currency" || type === "adr" || type === "revpar") {
+    // This now uses the dynamic currencyCode passed into the function
     return new Intl.NumberFormat("en-GB", {
       style: "currency",
-      currency: "GBP",
+      currency: currencyCode,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(num);
@@ -62,7 +64,8 @@ const chartManager = {
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross", label: { backgroundColor: "#6a7985" } },
-        valueFormatter: (value) => formatValue(value, this.activeMetric),
+        valueFormatter: (value) =>
+          formatValue(value, this.activeMetric, this.currencyCode),
       },
       xAxis: {
         type: "time",
@@ -184,6 +187,8 @@ const chartManager = {
 export default function () {
   return {
     // --- STATE PROPERTIES (No chart properties anymore) ---
+    // --- STATE PROPERTIES (No chart properties anymore) ---
+    currencyCode: "USD", // Add this line, with USD as a default
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     hasProperties: false,
     isSyncing: false, // Default to true; we'll verify status on load
@@ -460,6 +465,7 @@ export default function () {
         const marketValue = kpiData.market[metric];
         const delta = yourValue - marketValue;
         let formattedDelta;
+
         if (metric === "occupancy") {
           formattedDelta = isNaN(delta)
             ? ""
@@ -467,17 +473,20 @@ export default function () {
                 1
               )}pts`;
         } else {
-          // Use the new standalone formatValue helper
+          // FIX: Pass the dynamic currency code to format the delta value
           formattedDelta = isNaN(delta)
             ? ""
             : `${delta >= 0 ? "+" : ""}${formatValue(
                 Math.abs(delta),
-                "currency"
+                "currency",
+                this.currencyCode
               )}`;
         }
+
         this.kpi[metric] = {
-          your: formatValue(yourValue, metric), // Use the new standalone formatValue helper
-          market: formatValue(marketValue, metric), // Use the new standalone formatValue helper
+          // FIX: Pass the dynamic currency code for the 'your' and 'market' values
+          your: formatValue(yourValue, metric, this.currencyCode),
+          market: formatValue(marketValue, metric, this.currencyCode),
           delta: formattedDelta,
           deltaClass: isNaN(delta)
             ? ""
@@ -537,7 +546,6 @@ export default function () {
       });
     },
     // This function now receives both the ID and the name directly from the event.
-    // located in public/app/dashboard.mjs
     // REPLACE the existing handlePropertyChange method with this one
     handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
@@ -554,37 +562,42 @@ export default function () {
       // Stop any previous polling timers.
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
-      // --- NEW LOGIC ---
-      // Check for the one-time signal in the URL.
+      // --- NEW: Fetch full property details to get the currency ---
+      fetch(`/api/hotel-details/${propertyId}`)
+        .then((res) => res.json())
+        .then((details) => {
+          // Store the correct currency code from the API response
+          this.currencyCode = details.currency_code || "USD";
+        })
+        .catch((err) => {
+          console.error("Failed to fetch hotel details", err);
+          // Fallback to USD if the call fails
+          this.currencyCode = "USD";
+        });
+      // --- END NEW ---
+
       const urlParams = new URLSearchParams(window.location.search);
       const isNewConnection = urlParams.get("newConnection") === "true";
 
       if (isNewConnection) {
-        // If the signal is present, immediately show the sync indicator.
         this.isSyncing = true;
-        // Then, clean the URL so this doesn't run again on a refresh.
         window.history.replaceState(
           {},
           document.title,
           window.location.pathname
         );
       }
-      // --- END NEW LOGIC ---
 
-      // Check the sync status immediately for the new property.
       this.checkSyncStatus(propertyId).then(() => {
         if (this.isSyncing) {
-          // If the first check shows we are still syncing, start polling every 15 seconds.
           this.syncStatusInterval = setInterval(() => {
             this.checkSyncStatus(propertyId);
-          }, 15000); // 15 seconds
+          }, 15000);
         } else {
-          // If sync is already complete, load the reports.
           this.setPreset("current-month");
         }
       });
     },
-
     logout() {
       fetch("/api/auth/logout", { method: "POST" })
         .then((res) => {
@@ -619,8 +632,9 @@ export default function () {
       } else {
         formattedDelta = `${deltaSign}${formatValue(
           Math.abs(delta),
-          "currency"
-        )}`; // Use standalone helper
+          "currency",
+          this.currencyCode
+        )}`;
       }
       return {
         formattedDelta: formattedDelta,

@@ -1,6 +1,5 @@
 // /api/routes/auth.router.js
 const express = require("express");
-
 const router = express.Router();
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -9,13 +8,9 @@ const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
 const { syncHotelDetailsToDb } = require("../utils/cloudbeds");
 
-//...
-
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // --- AUTHENTICATION ENDPOINTS ---
-
-// /api/routes/auth.router.js
 
 router.post("/logout", (req, res) => {
   req.session.destroy((err) => {
@@ -25,8 +20,6 @@ router.post("/logout", (req, res) => {
         .status(500)
         .json({ error: "Could not log out, please try again." });
     }
-    // FIX: Added the domain attribute to ensure the cookie is cleared
-    // correctly, matching the session configuration in server.js.
     res.clearCookie("connect.sid", {
       path: "/",
       domain: ".market-pulse.io",
@@ -73,20 +66,12 @@ router.post("/login", async (req, res) => {
   }
 });
 
-//
-//
-//
-// /api/routes/auth.router.js
-
-// REPAIRED: This version combines the necessary new user query with the stable,
-// old redirect logic to fix the infinite loop.
 router.get("/magic-link-callback", async (req, res) => {
   const { token } = req.query;
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
   }
   try {
-    // Find the token in the database.
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
@@ -100,7 +85,6 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const validToken = tokenResult.rows[0];
 
-    // This is the NEW user query. It's more detailed and required for pilot mode. We keep this.
     const userQuery = `
       SELECT u.user_id, u.cloudbeds_user_id, u.is_admin, u.auth_mode
       FROM users u
@@ -113,6 +97,8 @@ router.get("/magic-link-callback", async (req, res) => {
     const user = userResult.rows[0];
 
     // Set the session variables.
+    // FIX: This was using an undefined variable 'cloudbedsUserIdToUse'.
+    // It now correctly uses the 'cloudbeds_user_id' from the user we just fetched.
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
 
@@ -121,24 +107,15 @@ router.get("/magic-link-callback", async (req, res) => {
       token,
     ]);
 
-    // This is the OLD, STABLE redirect logic. We are reverting to this.
-    // It waits for the session to save, then performs a standard server-side redirect.
-    // auth.router.js
-
-    // This is the OLD, STABLE redirect logic. We are reverting to this.
-    // It waits for the session to save, then performs a standard server-side redirect.
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
-      // --- BREADCRUMB 1: LOG THE SESSION RIGHT BEFORE REDIRECT ---
       console.log(
         `[BREADCRUMB 1 - auth.router.js] Session saved successfully. Redirecting. Session content:`,
         req.session
       );
-      // The complex destination logic is removed. For now, all successful logins
-      // will go to the main application dashboard, which restores functionality.
       res.redirect("/app/");
     });
   } catch (error) {
@@ -146,11 +123,10 @@ router.get("/magic-link-callback", async (req, res) => {
     res.status(500).send("An internal error occurred.");
   }
 });
-// --- NEW: INVITATION ACCEPTANCE ENDPOINT (Seamless Flow) ---
+
 router.get("/accept-invitation", async (req, res) => {
-  const { token } = req.query; // Read token from URL query
+  const { token } = req.query;
   if (!token) {
-    // You can redirect to an error page in the future
     return res.status(400).send("Invitation token is required.");
   }
 
@@ -158,7 +134,6 @@ router.get("/accept-invitation", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // 1. Find the invitation and JOIN to get the inviter's cloudbeds_user_id
     const inviteResult = await client.query(
       "SELECT i.*, u.cloudbeds_user_id as inviter_cloudbeds_id FROM user_invitations i JOIN users u ON i.inviter_user_id = u.user_id WHERE i.invitation_token = $1 AND i.status = 'pending' AND i.expires_at > NOW()",
       [token]
@@ -170,7 +145,6 @@ router.get("/accept-invitation", async (req, res) => {
     }
     const invitation = inviteResult.rows[0];
 
-    // 2. Create the new user
     const newCloudbedsUserId = `invited-${crypto
       .randomBytes(8)
       .toString("hex")}`;
@@ -187,7 +161,6 @@ router.get("/accept-invitation", async (req, res) => {
     );
     const finalCloudbedsId = newUserResult.rows[0].cloudbeds_user_id;
 
-    // 3. Get properties using the inviter's cloudbeds_user_id
     const propertiesResult = await client.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
       [invitation.inviter_cloudbeds_id]
@@ -196,7 +169,6 @@ router.get("/accept-invitation", async (req, res) => {
 
     if (inviterProperties.length > 0) {
       for (const prop of inviterProperties) {
-        // 4. Insert the new user's property link using their cloudbeds_user_id
         await client.query(
           "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
           [finalCloudbedsId, prop.property_id]
@@ -204,14 +176,11 @@ router.get("/accept-invitation", async (req, res) => {
       }
     }
 
-    // 5. Mark invitation as accepted
-    // 5. Delete the used invitation from the database
     await client.query(
       "DELETE FROM user_invitations WHERE invitation_token = $1",
       [token]
     );
 
-    // 6. Create a login session for the new user
     req.session.userId = finalCloudbedsId;
     req.session.isAdmin = false;
 
@@ -230,6 +199,7 @@ router.get("/accept-invitation", async (req, res) => {
     client.release();
   }
 });
+
 router.get("/session-info", async (req, res) => {
   if (req.session.userId) {
     try {
@@ -259,7 +229,6 @@ router.get("/session-info", async (req, res) => {
   }
 });
 
-// This route starts the standard OAuth flow for new users from the main website.
 router.get("/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
   const redirectUri =
@@ -281,7 +250,6 @@ router.get("/cloudbeds", (req, res) => {
   res.redirect(authorizationUrl);
 });
 
-// This new route starts the connection flow for a specific pilot property.
 router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
   const { propertyId } = req.query;
   if (!propertyId) {
@@ -307,7 +275,7 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
       process.env.VERCEL_ENV === "production"
         ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
         : process.env.CLOUDBEDS_REDIRECT_URI;
-    const state = propertyId; // Pass the propertyId in the state to identify it in the callback
+    const state = propertyId;
     const scopes =
       "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
     const params = new URLSearchParams({
@@ -327,19 +295,8 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
   }
 });
 
-// This single callback handles both standard OAuth and pilot property connections.
-// This single callback handles both standard OAuth and pilot property connections.
-// Located in api/routes/auth.router.js
-
-// Located in api/routes/auth.router.js
-// Located in api/routes/auth.router.js
-
-// Located in api/routes/auth.router.js
-// Located in api/routes/auth.router.js
-
 router.get("/cloudbeds/callback", async (req, res) => {
   try {
-    // ... (all the logic for getting tokens, user info, and propertyId remains the same) ...
     const { code } = req.query;
     if (!code) {
       return res.status(400).send("Error: No authorization code provided.");
@@ -372,7 +329,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
     }
 
     const propertyId = tokenData.resources?.[0]?.id;
-
     if (!propertyId) {
       throw new Error(
         "Could not determine Property ID from Cloudbeds token response."
@@ -388,21 +344,43 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
     const userInfo = await userInfoResponse.json();
 
-    const userQuery = `
-      INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
-      VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
-      ON CONFLICT (cloudbeds_user_id) DO UPDATE SET
-          email = EXCLUDED.email, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
-          status = 'active', auth_mode = 'oauth', pms_type = 'cloudbeds'
-      RETURNING user_id;
-    `;
-    const savedUserResult = await pgPool.query(userQuery, [
-      userInfo.user_id,
-      userInfo.email,
-      userInfo.first_name,
-      userInfo.last_name,
-    ]);
-    const localUserId = savedUserResult.rows[0].user_id;
+    let existingUser;
+    let cloudbedsUserIdToUse;
+
+    const existingUserResult = await pgPool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [userInfo.email]
+    );
+
+    if (existingUserResult.rows.length > 0) {
+      console.log(
+        `[OAuth Callback] Found existing user for email: ${userInfo.email}. Linking new property to this user.`
+      );
+      existingUser = existingUserResult.rows[0];
+      cloudbedsUserIdToUse = existingUser.cloudbeds_user_id;
+
+      await pgPool.query(
+        "UPDATE users SET first_name = $1, last_name = $2 WHERE email = $3",
+        [userInfo.first_name, userInfo.last_name, userInfo.email]
+      );
+    } else {
+      console.log(
+        `[OAuth Callback] No existing user found for email: ${userInfo.email}. Creating a new user.`
+      );
+      const newUserQuery = `
+        INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
+        VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
+        RETURNING *;
+      `;
+      const newUserResult = await pgPool.query(newUserQuery, [
+        userInfo.user_id,
+        userInfo.email,
+        userInfo.first_name,
+        userInfo.last_name,
+      ]);
+      existingUser = newUserResult.rows[0];
+      cloudbedsUserIdToUse = existingUser.cloudbeds_user_id;
+    }
 
     await syncHotelDetailsToDb(access_token, propertyId);
 
@@ -417,49 +395,36 @@ router.get("/cloudbeds/callback", async (req, res) => {
        VALUES ($1, $2, 'connected', $3) 
        ON CONFLICT (user_id, property_id) 
        DO UPDATE SET status = 'connected', pms_credentials = EXCLUDED.pms_credentials;`,
-      [userInfo.user_id, propertyId, pmsCredentials]
+      [cloudbedsUserIdToUse, propertyId, pmsCredentials]
     );
 
-    // --- FINAL FIX: Delegate the sync to its own serverless function ---
-    // Instead of running the sync in the same process as the login, we make an
-    // internal HTTP request to the dedicated /api/initial-sync endpoint. This
-    // gives the long-running sync its own process and timeout, mirroring the
-    // successful manual trigger from the Admin Panel.
     console.log(
       `[Auto-Sync] Delegating sync for property ${propertyId} to its dedicated endpoint.`
     );
-
-    // Construct the full internal URL for the API endpoint.
     const syncUrl = `${req.protocol}://${req.get("host")}/api/initial-sync`;
 
-    // This is a "fire-and-forget" request. We don't wait for it to finish.
-    // The user gets redirected immediately while the sync runs in a separate,
-    // dedicated serverless function instance.
     fetch(syncUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ propertyId: propertyId }),
     }).catch((error) => {
-      // This will only catch network errors in firing the request itself,
-      // not errors within the sync script (which are logged separately).
       console.error(
         `[Auto-Sync] CRITICAL: Failed to fire request to dedicated sync endpoint for property ${propertyId}:`,
         error
       );
     });
 
-    req.session.userId = userInfo.user_id;
-    req.session.isAdmin = userInfo.is_admin || false;
+    // FIX: This section was using the wrong variables. It now uses the corrected
+    // 'cloudbedsUserIdToUse' and pulls the 'is_admin' flag from our database record.
+    req.session.userId = cloudbedsUserIdToUse;
+    req.session.isAdmin = existingUser.is_admin || false;
+
     req.session.save((err) => {
       if (err) {
         return res
           .status(500)
           .send("An error occurred during authentication session save.");
       }
-      // Add ?newConnection=true to the redirect URL.
-      // This is the one-time signal to the frontend to show the sync status indicator.
       res.redirect("/app/?newConnection=true");
     });
   } catch (error) {

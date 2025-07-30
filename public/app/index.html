@@ -365,6 +365,10 @@
                     class="kpi-card p-5 rounded-lg"
                   >
                     <div class="flex justify-between items-start">
+                      <h3
+                        class="text-sm font-semibold uppercase text-slate-500"
+                        x-text="metric"
+                      ></h3>
                       <p
                         class="text-sm font-bold font-data"
                         :class="kpi[metric]?.deltaClass"
