@@ -53,34 +53,50 @@ function processApiDataForTable(allData) {
  * @param {Object} data - Raw data from the API response.
  * @returns {Object} - An object with dates as keys and calculated metrics as values.
  */
-function aggregateForecastData(data) {
+/**
+ * A private helper function to process raw API data for daily forecast syncs.
+ * It now handles an array of paginated responses.
+ * @param {Array} allData - An array of raw data pages from the API response.
+ * @returns {Object} - An object with dates as keys and calculated metrics as values.
+ */
+function processUpcomingApiData(allData) {
   const aggregated = {};
-  if (!data.index || !data.records) return aggregated;
+  if (!allData || allData.length === 0) return aggregated;
+
   const sanitizeMetric = (metric) => {
     const num = parseFloat(metric);
     return isNaN(num) ? 0 : num;
   };
-  for (let i = 0; i < data.index.length; i++) {
-    const date = data.index[i][0].split("T")[0];
-    if (!aggregated[date]) {
-      aggregated[date] = {
-        rooms_sold: 0,
-        capacity_count: 0,
-        total_revenue: 0,
-        total_revenue_for_adr: 0,
-      };
+
+  // Iterate over each page of data from the API response array.
+  for (const page of allData) {
+    if (!page.index || !page.records) continue;
+
+    for (let i = 0; i < page.index.length; i++) {
+      const date = page.index[i][0].split("T")[0];
+      if (!aggregated[date]) {
+        aggregated[date] = {
+          rooms_sold: 0,
+          capacity_count: 0,
+          total_revenue: 0,
+          total_revenue_for_adr: 0, // Used for a more accurate weighted ADR calculation
+        };
+      }
+      const roomsSoldForRow = sanitizeMetric(page.records.rooms_sold?.[i]);
+      aggregated[date].rooms_sold += roomsSoldForRow;
+      aggregated[date].capacity_count += sanitizeMetric(
+        page.records.capacity_count?.[i]
+      );
+      aggregated[date].total_revenue += sanitizeMetric(
+        page.records.total_revenue?.[i]
+      );
+      // To calculate an accurate ADR for the day, we need to sum the (ADR * Rooms Sold) for each room type.
+      aggregated[date].total_revenue_for_adr +=
+        sanitizeMetric(page.records.adr?.[i]) * roomsSoldForRow;
     }
-    const roomsSoldForRow = sanitizeMetric(data.records.rooms_sold?.[i]);
-    aggregated[date].rooms_sold += roomsSoldForRow;
-    aggregated[date].capacity_count += sanitizeMetric(
-      data.records.capacity_count?.[i]
-    );
-    aggregated[date].total_revenue += sanitizeMetric(
-      data.records.total_revenue?.[i]
-    );
-    aggregated[date].total_revenue_for_adr +=
-      sanitizeMetric(data.records.adr?.[i]) * roomsSoldForRow;
   }
+
+  // Final calculations for ADR, Occupancy, and RevPAR after all data is aggregated.
   for (const date in aggregated) {
     const dayData = aggregated[date];
     dayData.adr =
@@ -95,7 +111,6 @@ function aggregateForecastData(data) {
   }
   return aggregated;
 }
-
 /**
  * Gets a neighborhood name from geographic coordinates using the Nominatim API.
  * @param {number} latitude The latitude of the location.
@@ -240,6 +255,13 @@ async function getHistoricalMetrics(
  * @param {string} propertyId - The ID of the property to fetch data for.
  * @returns {Promise<Object>} The processed forecast data in our canonical format.
  */
+/**
+ * Fetches and processes upcoming (forecast) metrics for the next 365 days.
+ * This function now correctly handles API pagination to retrieve all future data.
+ * @param {string} accessToken - A valid Cloudbeds access token or API key.
+ * @param {string} propertyId - The ID of the property to fetch data for.
+ * @returns {Promise<Object>} The processed forecast data in our canonical format.
+ */
 async function getUpcomingMetrics(accessToken, propertyId) {
   const today = new Date();
   const futureDate = new Date();
@@ -256,7 +278,7 @@ async function getUpcomingMetrics(accessToken, propertyId) {
     "total_revenue",
   ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
-  const insightsPayload = {
+  const initialInsightsPayload = {
     property_ids: [propertyId],
     dataset_id: 7,
     filters: {
@@ -278,31 +300,61 @@ async function getUpcomingMetrics(accessToken, propertyId) {
     settings: { details: true, totals: false },
   };
 
-  const apiResponse = await fetch(
-    "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "X-PROPERTY-ID": propertyId,
-      },
-      body: JSON.stringify(insightsPayload),
+  let allApiData = [];
+  let nextToken = null;
+  let pageNum = 1;
+
+  console.log(`--- STARTING FORECAST SYNC for property ${propertyId} ---`);
+
+  // This loop will continue as long as the API provides a 'nextToken', ensuring all pages are fetched.
+  do {
+    const insightsPayload = { ...initialInsightsPayload };
+    if (nextToken) {
+      insightsPayload.nextToken = nextToken;
+      console.log(`[DEBUG] Fetching forecast page ${pageNum} using nextToken.`);
+    } else {
+      console.log(`[DEBUG] Fetching forecast page ${pageNum} (first page).`);
     }
-  );
 
-  if (!apiResponse.ok) {
-    const errorText = await apiResponse.text();
-    throw new Error(
-      `API Error for property ${propertyId}: ${apiResponse.status} - ${errorText}`
+    const apiResponse = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-PROPERTY-ID": propertyId,
+        },
+        body: JSON.stringify(insightsPayload),
+      }
     );
-  }
 
-  const apiData = await apiResponse.json();
-  // Use the private helper to process the raw forecast data.
-  return aggregateForecastData(apiData);
+    const responseText = await apiResponse.text();
+    if (!apiResponse.ok) {
+      console.error(
+        `[DEBUG] Forecast API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`
+      );
+      throw new Error(
+        `Forecast API Error on page ${pageNum}: ${apiResponse.status}`
+      );
+    }
+
+    const pageData = JSON.parse(responseText);
+    console.log(
+      `[DEBUG] Forecast page ${pageNum} received. Record count: ${
+        pageData.records?.rooms_sold?.length || 0
+      }. Has nextToken: ${!!pageData.nextToken}`
+    );
+
+    allApiData.push(pageData);
+    nextToken = pageData.nextToken || null; // Update the token for the next loop iteration.
+    pageNum++;
+  } while (nextToken);
+
+  console.log("--- FORECAST SYNC COMPLETE ---");
+  // Use the new helper function to process all the pages of raw forecast data.
+  return processUpcomingApiData(allApiData);
 }
-
 // Export all public functions.
 /**
  * Gets a valid access token for a given user and property, handling both
