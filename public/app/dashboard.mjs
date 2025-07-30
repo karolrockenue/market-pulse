@@ -220,30 +220,20 @@ export default function () {
     // Find and replace the entire init() method
     // This is the final, correct version of the init() method.
     // This is the final, correct version of the init() method.
-    async init() {
+    init() {
       console.log("Dashboard initializing...");
 
-      // --- NEW LOGIC ---
-      // First, fetch the KPI data which contains the correct currency code for the property.
-      // We use 'await' to ensure this request finishes completely before we proceed.
-      await this.fetchKpiData();
-
-      // Now that we are certain this.currencyCode is correctly set,
-      // we can fetch the data for the chart and tables.
-      this.fetchChartAndTableData();
-      // --- END OF NEW LOGIC ---
-
-      // Watch for changes in the property selector from the header
+      // This listener now correctly calls the handler that updates the component's state.
       window.addEventListener("property-changed", (event) => {
-        this.propertyId = event.detail.propertyId;
-        this.fetchKpiData();
-        this.fetchChartAndTableData();
+        // The event listener's only job is to pass the event data to the existing handler.
+        this.handlePropertyChange(event.detail);
       });
 
-      // Watch for date changes and refetch data
-      this.$watch("startDate", () => this.reloadData());
-      this.$watch("endDate", () => this.reloadData());
+      // These two functions are safe to call on initial load as they don't depend on a property.
+      this.fetchAndDisplayLastRefreshTime();
+      this.initializeDashboard(); // This is crucial for setting up the chart.
     },
+
     initializeDashboard() {
       this.$nextTick(() => {
         const chartContainer = this.$refs.chartContainer;
