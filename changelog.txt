@@ -29,9 +29,8 @@ This document provides a complete technical overview and chronological developme
 When requested by the user (Karol), a new entry detailing the completed work must be appended to the end of the "Development History" section. Each new entry must strictly adhere to the existing format used in previous entries (Date, Objective, Key Changes, and Outcome). Previous historical entries are considered immutable and must not be altered. The only section that should be modified is the "Current Project File Structure" tree, which must be updated if any files or directories are added, modified, or deleted.
 
 
+Current project structure:
 
-
-## 2. Current Project File Structure
 market-pulse/
 ├── api/
 │   ├── adapters/
@@ -70,9 +69,15 @@ market-pulse/
 │   │   └── utils.mjs
 │   ├── favicon.png
 │   ├── constants.mjs
-│   └── login.html
+│   ├── login.html
+│   ├── privacy.html
+│   ├── support.html
+│   └── terms.html
 ├── changelog.txt
 ├── package-lock.json
+├── package.json
+├── server.js
+└── vercel.json
 ├── package.json
 ├── server.js
 └── vercel.json
@@ -529,4 +534,25 @@ Date: July 30, 2025
       * Admin Panel API Fix: Corrected a critical bug that prevented invited admin users from using the API Explorer and other tools. The credential lookup logic in admin.router.js was refactored to correctly find the API token associated with the property the admin has access to, rather than searching the invited admin's own record where credentials do not exist.
 
 
-      * Outcome: The application is now technically stable and commercially ready for the certification process. The critical onboarding bug has been resolved, ensuring new users have a smooth and reliable experience.
+      * Outcome: The application is now technically stable and commercially ready for the certification process. The critical onboarding bug has been resolved, ensuring new users have a smooth and reliable experience. 
+
+
+________________
+
+
+Date: July 30, 2025
+      * Objective: Finalize all public-facing documentation and user support systems to meet marketplace certification requirements, and resolve a series of critical post-implementation bugs.
+      * Summary: This was an extensive session focused on bringing the application to a production-ready state for certification. Three new public, standalone pages were created for the Support/FAQ article, Privacy Policy, and Terms of Service. A sophisticated, maintainable system was implemented to ensure the in-app support modal dynamically loads and correctly re-styles content from the public support page, creating a single source of truth. The session also involved deep debugging to fix a critical initial data sync bug and a follow-on admin panel authentication issue.
+      * Key Changes:
+      * Public Documentation Pages:
+      * Created three new publicly accessible files required for certification: public/support.html, public/privacy.html, and public/terms.html.
+      * Styled all new pages with the dark, "glass" theme from login.html to ensure a consistent brand experience for external visitors.
+      * Refactored login.html to replace all modal triggers with direct links to these new, dedicated pages.
+      * Dynamic In-App Support System:
+      * The "Support & Help" link in the shared header (header.html) now opens a polished, single-panel modal.
+      * A new function was implemented in header.mjs to dynamically fetch content from /support.html. This function intelligently adapts the dark-theme CSS classes from the source file into light-theme styles suitable for the in-app modal, resolving all visual inconsistencies and ensuring the content is perfectly readable.
+      * The user dropdown menu in the shared header was updated to include direct links to the new public Privacy and Terms pages.
+      * Critical Bug Fixes:
+      * Initial Sync Failure: Resolved a bug where the automatic initial data sync for new users would hang indefinitely. The root cause was an unreliable child_process.spawn call in a serverless environment. The fix involved refactoring auth.router.js to trigger the sync by calling the runSync function directly as a non-blocking background task.
+      * Admin Panel Authentication: Fixed a bug that prevented invited (non-OAuth) admin users from using the API Explorer. The logic in admin.router.js was corrected to find API credentials based on the property the admin has access to, rather than their own user record.
+      * Outcome: The application is now fully compliant with the documentation and support requirements for marketplace certification. All known critical bugs have been resolved, and the user support experience is seamless, maintainable, and correctly styled for both public and in-app viewing.

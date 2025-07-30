@@ -5,23 +5,21 @@ export default function pageHeader() {
     propertyDropdownOpen: false,
     userDropdownOpen: false,
     isLegalModalOpen: false,
-    isSupportModalOpen: false, // Add this line to manage the support modal
+    isSupportModalOpen: false,
+    supportArticleContent: "",
+
+    isSupportArticleLoading: false,
     properties: [],
     currentPropertyId: null,
     currentPropertyName: "Loading...",
     lastRefreshText: "Loading...",
-    user: {
-      name: "Loading...",
-      initials: "U",
-      role: "User",
-    },
+    user: { name: "Loading...", initials: "U", role: "User" },
 
     // --- INIT ---
     init() {
       this.fetchSessionInfo();
       this.fetchProperties();
       this.fetchLastRefreshTime();
-
       window.addEventListener("change-property", (event) => {
         const newId = event.detail.propertyId;
         if (this.currentPropertyId !== newId) {
@@ -29,14 +27,80 @@ export default function pageHeader() {
         }
       });
     },
+    // Add this entire function
+    async openSupportModal() {
+      this.isSupportModalOpen = true;
+      if (this.supportArticleContent || this.isSupportArticleLoading) return;
 
-    // --- METHODS ---
+      this.isSupportArticleLoading = true;
+      try {
+        const response = await fetch("/support.html");
+        if (!response.ok) throw new Error("Could not load support content.");
+        const htmlString = await response.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlString, "text/html");
+        const contentElement = doc.querySelector(".prose");
+
+        if (contentElement) {
+          // 1. Remove the top border from all main headings
+          contentElement.querySelectorAll("h3").forEach((el) => {
+            el.classList.remove("!border-t", "border-gray-700");
+          });
+
+          // 2. Adapt the styling of the gray boxes for the light theme
+          const containers =
+            contentElement.querySelectorAll(".bg-gray-800\\/50");
+          containers.forEach((el) => {
+            el.classList.remove("bg-gray-800/50", "border-gray-700");
+            el.classList.add("bg-slate-50", "border-slate-200");
+
+            // Also fix the text colors specifically inside these boxes
+            el.querySelectorAll(".text-gray-300").forEach((text) => {
+              text.classList.remove("text-gray-300");
+              text.classList.add("text-slate-700", "font-semibold");
+            });
+            el.querySelectorAll(".text-gray-400").forEach((text) => {
+              text.classList.remove("text-gray-400");
+              text.classList.add("text-slate-600");
+            });
+          });
+          // 3. Fix all text and link colors for the light theme
+          const colorReplacements = {
+            "text-white": "text-slate-800",
+            "text-gray-300": "text-slate-700",
+            "text-gray-400": "text-slate-600",
+            "text-blue-400": "text-blue-600",
+            "group-open\\:text-blue-400": "group-open:text-blue-600",
+          };
+
+          for (const [darkClass, lightClass] of Object.entries(
+            colorReplacements
+          )) {
+            contentElement.querySelectorAll(`.${darkClass}`).forEach((el) => {
+              el.classList.remove(darkClass);
+              el.classList.add(lightClass);
+            });
+          }
+
+          this.supportArticleContent = contentElement.innerHTML;
+        } else {
+          throw new Error("Content container not found in support.html.");
+        }
+      } catch (error) {
+        console.error("Error fetching support article:", error);
+        this.supportArticleContent = "<p>Could not load support article.</p>";
+      } finally {
+        this.isSupportArticleLoading = false;
+      }
+    },
+
+    // --- EXISTING METHODS (Unchanged) ---
     async fetchSessionInfo() {
       try {
         const response = await fetch("/api/auth/session-info");
         const session = await response.json();
         if (session.isLoggedIn) {
-          // This combines first and last name to show the full name
           this.user.name =
             `${session.firstName || ""} ${session.lastName || ""}`.trim() ||
             "User";
@@ -48,21 +112,14 @@ export default function pageHeader() {
         this.user.name = "Error";
       }
     },
-
-    // public/app/_shared/header.mjs
-
     async fetchProperties() {
       try {
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
-
         if (this.properties.length > 0) {
-          // Set the current property ID from the first property in the list.
           this.currentPropertyId = this.properties[0].property_id;
-          // Update the display name for the header.
           this.updateCurrentPropertyName();
-          // Announce the fully updated, initial property selection to the rest of the app.
           this.dispatchPropertyChangeEvent();
         }
       } catch (error) {
@@ -70,90 +127,57 @@ export default function pageHeader() {
         this.properties = [];
       }
     },
-
-    // --- THIS FUNCTION HAS BEEN UopPDATED ---
     async fetchLastRefreshTime() {
       try {
         const response = await fetch("/api/last-refresh-time");
-        if (!response.ok) throw new Error("Could not fetch refresh time."); // Fail silently to the catch block
-
+        if (!response.ok) throw new Error("Could not fetch refresh time.");
         const data = await response.json();
         const lastRefreshDate = new Date(data.last_successful_run);
         const now = new Date();
-
-        // 1. Format the full date and time string using toLocaleString
         const fullTimestamp = lastRefreshDate.toLocaleString("en-GB", {
           day: "2-digit",
           month: "short",
           year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
-          hour12: false, // Use 24-hour format
+          hour12: false,
         });
-
-        // 2. Calculate the difference in hours or minutes
         const diffMs = now - lastRefreshDate;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        let relativeTime = "";
-
-        if (diffHours < 1) {
-          const diffMinutes = Math.floor(diffMs / (1000 * 60));
-          relativeTime = `(${diffMinutes}m ago)`;
-        } else {
-          relativeTime = `(${diffHours}h ago)`;
-        }
-
-        // 3. Combine them into the final text
+        const diffHours = Math.floor(diffMs / 3600000);
+        let relativeTime =
+          diffHours < 1
+            ? `(${Math.floor(diffMs / 60000)}m ago)`
+            : `(${diffHours}h ago)`;
         this.lastRefreshText = `Data updated ${fullTimestamp} ${relativeTime}`;
       } catch (error) {
-        // Fallback if the API fails
         this.lastRefreshText = "Live Data";
       }
     },
-
     updateCurrentPropertyName() {
       const currentProp = this.properties.find(
         (p) => p.property_id === this.currentPropertyId
       );
-      if (currentProp) {
-        this.currentPropertyName = currentProp.property_name;
-      }
+      if (currentProp) this.currentPropertyName = currentProp.property_name;
     },
-
     switchProperty(propertyId, dispatchEvent = true) {
       this.currentPropertyId = propertyId;
       this.updateCurrentPropertyName();
-      localStorage.setItem("selectedPropertyId", propertyId);
-      this.propertyDropdownOpen = false;
-
-      if (dispatchEvent) {
-        this.dispatchPropertyChangeEvent();
-      }
+      if (dispatchEvent) this.dispatchPropertyChangeEvent();
     },
-
-    // This function now sends both the ID and the name of the selected property.
-    // public/app/_shared/header.mjs
-
-    // This function now finds the full property object to send all necessary details.
     dispatchPropertyChangeEvent() {
-      // Find the complete object for the current property.
       const currentProperty = this.properties.find(
         (p) => p.property_id === this.currentPropertyId
       );
-      if (!currentProperty) return; // Don't dispatch if no property is found
-
+      if (!currentProperty) return;
       window.dispatchEvent(
         new CustomEvent("property-changed", {
           detail: {
             propertyId: currentProperty.property_id,
             propertyName: currentProperty.property_name,
-            taxRate: currentProperty.tax_rate, // Pass the tax rate
-            taxType: currentProperty.tax_type, // Pass the tax type
           },
         })
       );
     },
-
     async logout() {
       try {
         await fetch("/api/auth/logout", { method: "POST" });

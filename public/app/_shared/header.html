@@ -110,17 +110,25 @@
         class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-1 z-10 border"
       >
         <button
-          @click="isSupportModalOpen = true; userDropdownOpen = false"
+          @click="openSupportModal(); userDropdownOpen = false"
           class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
         >
           Support & Help
         </button>
-        <button
-          @click="isLegalModalOpen = true; userDropdownOpen = false"
-          class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+        <a
+          href="/privacy.html"
+          target="_blank"
+          class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
         >
-          Legal
-        </button>
+          Privacy Policy
+        </a>
+        <a
+          href="/terms.html"
+          target="_blank"
+          class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+        >
+          Terms of Service
+        </a>
         <div class="border-t my-1"></div>
         <button
           @click="logout()"
@@ -140,10 +148,10 @@
   >
     <div
       @click.away="isSupportModalOpen = false"
-      class="relative bg-white rounded-lg shadow-xl w-full max-w-4xl m-4 h-[80vh] flex flex-col"
+      class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl m-4 max-h-[80vh] flex flex-col"
     >
       <div class="flex justify-between items-center p-4 border-b">
-        <h2 class="text-xl font-bold text-gray-800">Support Center</h2>
+        <h2 class="text-xl font-bold text-gray-800">Support & FAQ Center</h2>
         <button
           @click="isSupportModalOpen = false"
           class="text-gray-500 hover:text-gray-800"
@@ -163,211 +171,23 @@
           </svg>
         </button>
       </div>
-      <div class="flex-grow flex min-h-0">
-        <div class="w-1/4 border-r p-4">
-          <nav class="flex flex-col space-y-2">
-            <h3
-              class="font-semibold text-gray-500 text-sm uppercase tracking-wider mb-2"
-            >
-              Topics
-            </h3>
-            <a
-              href="#setup"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
-              >Setup Guide</a
-            >
-            <a
-              href="#features"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
-              >Key Features</a
-            >
-            <a
-              href="#disconnect"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
-              >Disconnecting</a
-            >
-            <a
-              href="#support"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
-              >Get Support</a
-            >
-            <a
-              href="#faq"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
-              >FAQs</a
-            >
-          </nav>
-        </div>
-        <div class="w-3/4 p-6 overflow-y-auto">
-          <div
-            class="prose prose-slate max-w-none text-sm prose-headings:mb-2 prose-p:mt-1 prose-p:leading-normal"
-          >
-            <h2 class="text-2xl font-bold">
-              Using Market Pulse with Cloudbeds
-            </h2>
-            <p>
-              Welcome to Market Pulse! This guide will walk you through setting
-              up your account, understanding the features, and how to get help.
-            </p>
-
-            <h3 id="setup">How to Sign Up and Connect to Cloudbeds</h3>
-            <p>
-              Market Pulse uses a streamlined process where signing up and
-              connecting your first property happen at the same time.
-            </p>
-            <ol>
-              <li>
-                From the Market Pulse homepage, click
-                <strong>"Connect with Cloudbeds"</strong>.
-              </li>
-              <li>
-                You will be redirected to the Cloudbeds login page. Log in to
-                your Cloudbeds account.
-              </li>
-              <li>
-                Cloudbeds will ask you to authorize Market Pulse to access your
-                property data. Review the permissions and click
-                <strong>"Approve"</strong>.
-              </li>
-              <li>
-                Once approved, you will be redirected back to the Market Pulse
-                dashboard. Your account is now created, and your property is
-                connected.
-              </li>
-            </ol>
-            <p>
-              Your initial data sync will begin automatically. This process
-              pulls up to 5 years of your historical performance data to build
-              your market comparisons and may take a few minutes to complete. A
-              status indicator will let you know when it's done.
-            </p>
-
-            <h3 id="features">Key Features of the Integration</h3>
-            <p>
-              Market Pulse is designed to give you a clear and actionable view
-              of your hotel's performance against the competitive market.
-            </p>
-            <ul>
-              <li>
-                <strong>Main Dashboard:</strong> Get an at-a-glance view of your
-                most important Key Performance Indicators (KPIs)—Occupancy, ADR,
-                and RevPAR—compared directly against the market average for the
-                same period.
-              </li>
-              <li>
-                <strong>Advanced Reporting:</strong> Dive deeper into your data.
-                Generate detailed reports for any custom date range, and analyze
-                trends using flexible "Group By" modes to see your data from
-                different angles. You can also toggle all financial metrics
-                between Gross (tax-inclusive) and Net (tax-exclusive) values for
-                accurate analysis.
-              </li>
-              <li>
-                <strong>Automated Report Scheduling:</strong> Configure reports
-                to be generated and emailed to you automatically on a recurring
-                schedule. Reports are delivered in CSV format for easy use in
-                Excel or Google Sheets.
-              </li>
-              <li>
-                <strong>Team Management & Group Accounts:</strong> As an account
-                administrator, you can invite your team members to access the
-                Market Pulse dashboard from the "Profile & Settings" page. All
-                invited users will share access to the same property data,
-                making it perfect for group accounts.
-              </li>
-            </ul>
-
-            <h4>(Optional) What are the limitations of the integration?</h4>
-            <ul>
-              <li>
-                The "Market" data is calculated by averaging the performance of
-                other hotels in the Market Pulse system that are in the same
-                quality <strong>category</strong> (e.g., Budget, Midscale,
-                Luxury) as your property. The accuracy of the market set depends
-                on the correct categorization of all hotels.
-              </li>
-              <li>
-                Scheduled reports are currently available in
-                <strong>CSV format only</strong>.
-              </li>
-            </ul>
-
-            <h3 id="disconnect">How to Disconnect the Apps</h3>
-            <p>
-              You can disconnect your property from either the Market Pulse
-              application or from within your Cloudbeds account.
-            </p>
-            <h4>Disconnecting from within Market Pulse:</h4>
-            <p>
-              <em
-                >(Note: This feature will be available in the "Profile &
-                Settings" page.)</em
-              >
-            </p>
-            <ol>
-              <li>
-                Navigate to <strong>"Profile & Settings"</strong> from the main
-                menu.
-              </li>
-              <li>
-                Go to the <strong>"Connected Properties"</strong> section.
-              </li>
-              <li>
-                Click the <strong>"Disconnect"</strong> button next to the
-                property you wish to remove.
-              </li>
-              <li>
-                Confirm your choice. This will permanently delete the link to
-                this property and all of its associated API credentials from our
-                system.
-              </li>
-            </ol>
-            <h4>Disconnecting from within Cloudbeds:</h4>
-            <p>
-              You can also revoke access directly from your Cloudbeds account by
-              following the instructions in the official Cloudbeds guide:
-              <a
-                href="https://support.cloudbeds.com/s/article/How-to-disconnect-an-app-from-Cloudbeds-Marketplace"
-                target="_blank"
-                rel="noopener noreferrer"
-                >How to Disconnect an App from Cloudbeds Marketplace</a
-              >.
-            </p>
-
-            <h3 id="support">How to Get Support</h3>
-            <p>
-              If you have any questions, encounter any issues, or have feedback,
-              please don't hesitate to reach out to our support team by emailing
-              us at
-              <a href="mailto:support@market-pulse.io"
-                ><strong>support@market-pulse.io</strong></a
-              >.
-            </p>
-
-            <h3 id="faq">Frequently Asked Questions (FAQs)</h3>
-            <h4>How is "The Market" calculated?</h4>
-            <p>
-              The market is an aggregated average of anonymized performance data
-              from all other hotels on the Market Pulse platform that share the
-              same quality category as your property.
-            </p>
-            <h4>How often is my data updated?</h4>
-            <p>
-              Your forward-looking data for the next 365 days is refreshed from
-              Cloudbeds automatically every day. Your historical data is synced
-              once during the initial connection.
-            </p>
-            <h4>Can I add more team members?</h4>
-            <p>
-              Yes! The account administrator can invite new users from the "User
-              Management" section on the "Profile & Settings" page.
-            </p>
+      <div class="p-6 overflow-y-auto">
+        <template x-if="isSupportArticleLoading">
+          <div class="flex items-center justify-center h-full py-24">
+            <div
+              class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"
+            ></div>
           </div>
-        </div>
+        </template>
+        <template x-if="!isSupportArticleLoading">
+          <div
+            x-html="supportArticleContent"
+            class="prose prose-sm max-w-none"
+          ></div>
+        </template>
       </div>
     </div>
   </div>
-
   <div
     x-show="isLegalModalOpen"
     x-transition
