@@ -15,10 +15,11 @@ async function runSync(propertyId) {
 
   console.log(`Starting 5-YEAR initial sync for property: ${propertyId}`);
 
+  // The database query is now simpler, as we no longer need the 'auth_mode' column.
   const result = await pgPool.query(
-    `SELECT u.cloudbeds_user_id, u.auth_mode, up.pms_credentials
-     FROM users u 
-     JOIN user_properties up ON u.cloudbeds_user_id = up.user_id 
+    `SELECT u.cloudbeds_user_id, up.pms_credentials
+     FROM users u
+     JOIN user_properties up ON u.cloudbeds_user_id = up.user_id
      WHERE up.property_id = $1::integer LIMIT 1`,
     [propertyId]
   );
@@ -30,11 +31,12 @@ async function runSync(propertyId) {
   }
 
   const user = result.rows[0];
+  // The call to getAccessToken is now simpler and no longer passes the auth_mode.
   const accessToken = await cloudbedsAdapter.getAccessToken(
-    user.pms_credentials,
-    user.auth_mode
+    user.pms_credentials
   );
 
+  // The rest of the function remains the same...
   const today = new Date();
   const pastDate = new Date();
   pastDate.setFullYear(today.getFullYear() - 5);
@@ -54,10 +56,8 @@ async function runSync(propertyId) {
   const datesToUpdate = Object.keys(processedData);
 
   if (datesToUpdate.length > 0) {
-    // FIX: Get a dedicated client from the pool and wrap the query in a transaction.
     const client = await pgPool.connect();
     try {
-      // Start the transaction
       await client.query("BEGIN");
 
       const bulkInsertValues = datesToUpdate.map((date) => {
@@ -85,18 +85,12 @@ async function runSync(propertyId) {
       `,
         bulkInsertValues
       );
-
-      // Execute the query using the dedicated client
       await client.query(query);
-
-      // Commit the transaction to permanently save the changes
       await client.query("COMMIT");
     } catch (e) {
-      // If an error occurs, roll back the transaction
       await client.query("ROLLBACK");
-      throw e; // Re-throw the error to be caught by the caller
+      throw e;
     } finally {
-      // Always release the client back to the pool
       client.release();
     }
   }

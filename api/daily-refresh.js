@@ -1,4 +1,4 @@
-// /api/daily-refresh.js (Refactored to use Adapter for Auth)
+// /api/daily-refresh.js
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 
@@ -7,16 +7,16 @@ module.exports = async (request, response) => {
   let totalRecordsUpdated = 0;
 
   try {
+    // Simplified the query to remove the 'auth_mode' column.
     const usersResult = await pgPool.query(
-      "SELECT cloudbeds_user_id, auth_mode FROM users WHERE status = 'active'"
+      "SELECT cloudbeds_user_id FROM users WHERE status = 'active'"
     );
     const activeUsers = usersResult.rows;
     console.log(`Found ${activeUsers.length} active user(s) to process.`);
 
     for (const user of activeUsers) {
-      console.log(
-        `--- Processing user: ${user.cloudbeds_user_id} (Mode: ${user.auth_mode}) ---`
-      );
+      // Simplified the log message.
+      console.log(`--- Processing user: ${user.cloudbeds_user_id} ---`);
       try {
         const propertiesResult = await pgPool.query(
           "SELECT property_id, pms_credentials FROM user_properties WHERE user_id = $1 AND status = 'connected'",
@@ -27,10 +27,9 @@ module.exports = async (request, response) => {
         for (const prop of userProperties) {
           const propertyId = prop.property_id;
 
-          // Get the access token using the adapter.
+          // Simplified the call to getAccessToken, as it no longer needs auth_mode.
           const accessToken = await cloudbedsAdapter.getAccessToken(
-            prop.pms_credentials,
-            user.auth_mode
+            prop.pms_credentials
           );
 
           console.log(`-- Starting refresh for property: ${propertyId} --`);
