@@ -612,7 +612,14 @@ export default function () {
     },
 
     // --- HELPER METHODS (getDelta uses the standalone helper) ---
+    // --- HELPER METHODS (getDelta uses the standalone helper) ---
     formatValue: formatValue, // Add a reference to the standalone function so the HTML template can find it.
+
+    formatCurrency(value) {
+      // This new helper method is part of the component, so it can access 'this.currencyCode'.
+      // It calls the existing standalone formatValue function but provides the correct, dynamic currency code.
+      return formatValue(value, "currency", this.currencyCode);
+    },
 
     getDelta(day) {
       if (
