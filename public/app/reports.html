@@ -1138,33 +1138,36 @@
             this.handlePresetChange("current-month");
 
             // Set up the listener for property changes from the header. This is safe to do now.
+// MODIFIED: This logic is now simpler and more efficient.
             window.addEventListener("property-changed", async (event) => {
-              if (event.detail.propertyId) {
+              // Check if the event contains the needed details.
+              if (event.detail && event.detail.propertyId && event.detail.propertyName) {
+                
+                // Set the property ID and NAME directly from the event payload.
                 this.propertyId = event.detail.propertyId;
+                this.propertyName = event.detail.propertyName;
 
+                // We still need to fetch tax/currency info, so this part remains.
                 try {
                   const response = await fetch(`/api/hotel-details/${this.propertyId}`);
-                  if (!response.ok) {
-                    throw new Error('Could not fetch property details.');
-                  }
-                  const details = await response.json();
+                  if (!response.ok) throw new Error('Could not fetch property details.');
                   
+                  const details = await response.json();
                   this.propertyTaxRate = parseFloat(details.tax_rate);
                   this.propertyTaxType = details.tax_type;
                   this.propertyTaxName = details.tax_name;
                   this.currencyCode = details.currency_code;
                   this.includeTaxes = (this.propertyTaxType === 'inclusive');
-                  // ADDED: Store the property's name from the API response
-                  this.propertyName = details.hotel_name;
-
                 } catch (error) {
                   console.error("Could not fetch property tax/currency details:", error);
+                  // Set sensible defaults on failure.
                   this.propertyTaxRate = 0;
                   this.propertyTaxName = 'Tax';
                   this.currencyCode = 'USD';
                   this.includeTaxes = true;
                 }
-                // Now, generate the report *after* property details are known.
+                
+                // Generate the report now that all data is set.
                 this.handleGenerateReport();
               }
             });
