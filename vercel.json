@@ -33,6 +33,11 @@
     }
   ],
 
+  "functions": {
+    "api/daily-refresh.js": {
+      "maxDuration": 300
+    }
+  },
   "crons": [
     {
       "path": "/api/daily-refresh",
