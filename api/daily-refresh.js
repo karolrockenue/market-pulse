@@ -118,8 +118,8 @@ module.exports = async (request, response) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // Pass along the cookie to satisfy the requireAdminApi middleware.
-        Cookie: request.headers.cookie,
+        // Send the secret key for authentication instead of a user cookie.
+        Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
       },
       body: JSON.stringify({ jobName: "last_successful_refresh" }),
     }).catch((err) => {
