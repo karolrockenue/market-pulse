@@ -15,14 +15,7 @@
       "src": "/api/initial-sync",
       "dest": "/api/initial-sync.js"
     },
-    {
-      "src": "/api/get-all-datasets",
-      "dest": "/api/get-all-datasets.js"
-    },
-    {
-      "src": "/api/get-dataset-structure",
-      "dest": "/api/get-dataset-structure.js"
-    },
+
     {
       "src": "/api/send-scheduled-reports",
       "dest": "/api/send-scheduled-reports.js"
@@ -33,11 +26,6 @@
     }
   ],
 
-  "functions": {
-    "api/daily-refresh.js": {
-      "maxDuration": 300
-    }
-  },
   "crons": [
     {
       "path": "/api/daily-refresh",
