@@ -17,65 +17,87 @@ async function runSync(propertyId) {
   }
   console.log(`Starting 5-YEAR initial sync for property: ${propertyId}`);
 
-  // Get user and credential info (this part is unchanged)
-  const result = await pgPool.query(
-    `SELECT u.cloudbeds_user_id, up.pms_credentials
-     FROM users u
-     JOIN user_properties up ON u.cloudbeds_user_id = up.user_id
-     WHERE up.property_id = $1::integer LIMIT 1`,
-    [propertyId]
-  );
-  if (result.rows.length === 0) {
-    throw new Error(`No user link found for property ${propertyId}.`);
-  }
-  const user = result.rows[0];
-  const accessToken = await cloudbedsAdapter.getAccessToken(
-    user.pms_credentials
-  );
-
-  // --- NEW CHUNKING LOGIC ---
-  let allProcessedData = {};
-  const startYear = new Date().getFullYear() - 5;
-  const endYear = new Date().getFullYear();
-
-  // Loop from the start year to the current year.
-  for (let year = startYear; year <= endYear; year++) {
-    const yearStartDate = `${year}-01-01`;
-    const yearEndDate = `${year}-12-31`;
-
-    console.log(`Fetching data for ${year}...`);
-
-    // Call the adapter for each one-year chunk.
-    const yearlyData = await cloudbedsAdapter.getHistoricalMetrics(
-      accessToken,
-      propertyId,
-      yearStartDate,
-      yearEndDate
+  // Use a single database client for the entire operation
+  const client = await pgPool.connect();
+  try {
+    // Get user and credential info
+    const result = await client.query(
+      `SELECT u.cloudbeds_user_id, up.pms_credentials
+       FROM users u
+       JOIN user_properties up ON u.cloudbeds_user_id = up.user_id
+       WHERE up.property_id = $1::integer LIMIT 1`,
+      [propertyId]
     );
 
-    // Merge the results from this year into our main data object.
-    allProcessedData = { ...allProcessedData, ...yearlyData };
-  }
+    if (result.rows.length === 0) {
+      throw new Error(`No user link found for property ${propertyId}.`);
+    }
 
-  // --- START: Added for test ---
-  // Fetch forecast data for the next 365 days
-  console.log("Fetching forecast data for the next 365 days...");
-  const futureData = await cloudbedsAdapter.getUpcomingMetrics(
-    accessToken,
-    propertyId
-  );
+    const user = result.rows[0];
+    const accessToken = await cloudbedsAdapter.getAccessToken(
+      user.pms_credentials
+    );
 
-  // Merge the new future data with the historical data we already collected
-  allProcessedData = { ...allProcessedData, ...futureData };
-  // --- END: Added for test ---
-  // --- END OF NEW LOGIC ---
+    // Start the database transaction
+    await client.query("BEGIN");
 
-  const datesToUpdate = Object.keys(allProcessedData);
+    // --- NEW: Sync Hotel Info, Tax, and Neighborhood ---
+    console.log(`Syncing hotel metadata for property ${propertyId}...`);
+    // 1. Sync core details and tax info concurrently
+    await Promise.all([
+      cloudbedsAdapter.syncHotelDetailsToDb(accessToken, propertyId, client),
+      cloudbedsAdapter.syncHotelTaxInfoToDb(accessToken, propertyId, client),
+    ]);
 
-  if (datesToUpdate.length > 0) {
-    const client = await pgPool.connect();
-    try {
-      await client.query("BEGIN");
+    // 2. Sync neighborhood using the details we just saved
+    const hotelRes = await client.query(
+      "SELECT latitude, longitude FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    const coords = hotelRes.rows[0];
+    if (coords && coords.latitude && coords.longitude) {
+      const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
+        coords.latitude,
+        coords.longitude
+      );
+      if (neighborhood) {
+        await client.query(
+          "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
+          [neighborhood, propertyId]
+        );
+      }
+    }
+    console.log("✅ Hotel metadata sync complete.");
+    // --- END OF NEW LOGIC ---
+
+    // --- Fetch historical and forecast metrics (existing logic) ---
+    let allProcessedData = {};
+    const startYear = new Date().getFullYear() - 5;
+    const endYear = new Date().getFullYear();
+
+    for (let year = startYear; year <= endYear; year++) {
+      const yearStartDate = `${year}-01-01`;
+      const yearEndDate = `${year}-12-31`;
+      console.log(`Fetching metric data for ${year}...`);
+      const yearlyData = await cloudbedsAdapter.getHistoricalMetrics(
+        accessToken,
+        propertyId,
+        yearStartDate,
+        yearEndDate
+      );
+      allProcessedData = { ...allProcessedData, ...yearlyData };
+    }
+
+    console.log("Fetching forecast data for the next 365 days...");
+    const futureData = await cloudbedsAdapter.getUpcomingMetrics(
+      accessToken,
+      propertyId
+    );
+    allProcessedData = { ...allProcessedData, ...futureData };
+
+    // --- Save metrics to the database (existing logic) ---
+    const datesToUpdate = Object.keys(allProcessedData);
+    if (datesToUpdate.length > 0) {
       const bulkInsertValues = datesToUpdate.map((date) => {
         const metrics = allProcessedData[date];
         return [
@@ -86,7 +108,6 @@ async function runSync(propertyId) {
           metrics.revpar || 0,
           metrics.rooms_sold || 0,
           metrics.capacity_count || 0,
-          // MODIFIED: Use room_revenue. The DB column is still 'total_revenue'.
           metrics.room_revenue || 0,
           user.cloudbeds_user_id,
         ];
@@ -100,19 +121,23 @@ async function runSync(propertyId) {
         bulkInsertValues
       );
       await client.query(query);
-      await client.query("COMMIT");
-    } catch (e) {
-      await client.query("ROLLBACK");
-      throw e;
-    } finally {
-      client.release();
     }
-  }
 
-  console.log(
-    `✅ Initial sync job complete for property ${propertyId}. Updated ${datesToUpdate.length} records.`
-  );
-  return datesToUpdate.length;
+    // If all steps succeeded, commit the transaction
+    await client.query("COMMIT");
+    console.log(
+      `✅ Initial sync job complete for property ${propertyId}. Synced metadata and ${datesToUpdate.length} metric records.`
+    );
+    return datesToUpdate.length;
+  } catch (e) {
+    // If any step fails, roll back all database changes
+    await client.query("ROLLBACK");
+    // Re-throw the error so it's logged by the wrapper function
+    throw e;
+  } finally {
+    // Always release the database client back to the pool
+    client.release();
+  }
 }
 
 // This wrapper is for when the file is called as a Vercel Serverless function.
