@@ -1,13 +1,14 @@
-// /api/daily-refresh.js
+// /api/daily-refresh.js (Refactored for Bulk Insert)
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
+// Import the pg-format library, which is needed for bulk inserts.
+const format = require("pg-format");
 
 module.exports = async (request, response) => {
   console.log("Starting daily FORECAST refresh job for ALL USERS...");
   let totalRecordsUpdated = 0;
 
   try {
-    // Simplified the query to remove the 'auth_mode' column.
     const usersResult = await pgPool.query(
       "SELECT cloudbeds_user_id FROM users WHERE status = 'active'"
     );
@@ -15,7 +16,6 @@ module.exports = async (request, response) => {
     console.log(`Found ${activeUsers.length} active user(s) to process.`);
 
     for (const user of activeUsers) {
-      // Simplified the log message.
       console.log(`--- Processing user: ${user.cloudbeds_user_id} ---`);
       try {
         const propertiesResult = await pgPool.query(
@@ -26,8 +26,6 @@ module.exports = async (request, response) => {
 
         for (const prop of userProperties) {
           const propertyId = prop.property_id;
-
-          // Simplified the call to getAccessToken, as it no longer needs auth_mode.
           const accessToken = await cloudbedsAdapter.getAccessToken(
             prop.pms_credentials
           );
@@ -42,32 +40,60 @@ module.exports = async (request, response) => {
           const datesToUpdate = Object.keys(processedData);
 
           if (datesToUpdate.length > 0) {
-            for (const date of datesToUpdate) {
-              const metrics = processedData[date];
-              const query = `
-                INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
-                    adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
-                    capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;
-              `;
-              const values = [
-                date,
-                propertyId,
-                metrics.adr,
-                metrics.occupancy,
-                metrics.revpar,
-                metrics.rooms_sold,
-                metrics.capacity_count,
-                metrics.total_revenue,
-                user.cloudbeds_user_id,
-              ];
-              await pgPool.query(query, values);
+            // --- START: Refactored Database Logic ---
+            // Get a dedicated client from the pool to run a transaction.
+            const client = await pgPool.connect();
+            try {
+              // Start the transaction.
+              await client.query("BEGIN");
+
+              // Map all the daily metrics into a single array of arrays for the bulk insert.
+              const bulkInsertValues = datesToUpdate.map((date) => {
+                const metrics = processedData[date];
+                return [
+                  date,
+                  propertyId,
+                  metrics.adr,
+                  metrics.occupancy,
+                  metrics.revpar,
+                  metrics.rooms_sold,
+                  metrics.capacity_count,
+                  metrics.total_revenue,
+                  user.cloudbeds_user_id,
+                ];
+              });
+
+              // Create the single, formatted bulk-insert query.
+              // This is far more efficient than sending hundreds of individual queries.
+              const query = format(
+                `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+                 VALUES %L
+                 ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+                     adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+                     capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;`,
+                bulkInsertValues
+              );
+
+              // Execute the single query.
+              await client.query(query);
+
+              // Commit the transaction to save all changes.
+              await client.query("COMMIT");
+
+              totalRecordsUpdated += datesToUpdate.length;
+              console.log(
+                `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId} using bulk insert. --`
+              );
+            } catch (e) {
+              // If any error occurs, roll back the entire transaction.
+              await client.query("ROLLBACK");
+              // Re-throw the error to be caught by the outer catch block.
+              throw e;
+            } finally {
+              // ALWAYS release the client back to the pool.
+              client.release();
             }
-            totalRecordsUpdated += datesToUpdate.length;
-            console.log(
-              `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId}. --`
-            );
+            // --- END: Refactored Database Logic ---
           } else {
             console.log(
               `-- No new records to update for property ${propertyId}. --`
