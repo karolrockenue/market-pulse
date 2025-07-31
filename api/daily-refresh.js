@@ -107,8 +107,29 @@ module.exports = async (request, response) => {
         );
       }
     }
+    console.log("✅ Daily refresh job complete. Recording success...");
 
-    console.log("✅ Daily refresh job complete.");
+    // --- ADDED ---
+    // Make a "fire-and-forget" call to our new endpoint to record the successful run.
+    // We don't use 'await' because we don't need to wait for the response before finishing this job.
+    fetch(
+      `${request.protocol}://${request.get("host")}/api/record-job-success`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Pass along the cookie to satisfy the requireAdminApi middleware.
+          Cookie: request.headers.cookie,
+        },
+        body: JSON.stringify({ jobName: "last_successful_refresh" }),
+      }
+    ).catch((err) => {
+      // Log an error if the call fails, but don't block the job's success response.
+      console.error("Failed to record job success:", err);
+    });
+    // --- END ---
+
+    // Send the final success response for the daily-refresh job itself.
     response.status(200).json({
       status: "Success",
       processedUsers: activeUsers.length,

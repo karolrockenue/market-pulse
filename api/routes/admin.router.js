@@ -350,5 +350,44 @@ router.post("/update-hotel-category", requireAdminApi, async (req, res) => {
     res.status(500).json({ error: "Failed to update category." });
   }
 });
+// --- ADD THIS NEW ENDPOINT ---
+
+// NEW: Endpoint to record the successful completion of a background job.
+router.post("/record-job-success", requireAdminApi, async (req, res) => {
+  // Get the job_name from the request body.
+  const { jobName } = req.body;
+  if (!jobName) {
+    return res.status(400).json({ error: "A jobName is required." });
+  }
+
+  try {
+    // Create the JSON object that will be stored in the database.
+    const jobData = {
+      timestamp: new Date().toISOString(),
+    };
+
+    // This is an "UPSERT" query.
+    // It tries to INSERT a new row. If a row with the same 'key' already exists,
+    // it will UPDATE the existing row instead. This is perfect for our use case.
+    const query = `
+      INSERT INTO system_state (key, value) 
+      VALUES ($1, $2) 
+      ON CONFLICT (key) 
+      DO UPDATE SET value = $2;
+    `;
+
+    // Execute the query with the job name (e.g., 'last_successful_refresh') and the JSON data.
+    await pgPool.query(query, [jobName, jobData]);
+
+    res
+      .status(200)
+      .json({ success: true, message: `Job ${jobName} recorded.` });
+  } catch (error) {
+    console.error(`Error recording job success for ${jobName}:`, error);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to record job success." });
+  }
+});
 
 module.exports = router;
