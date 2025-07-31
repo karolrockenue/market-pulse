@@ -144,24 +144,31 @@ router.post("/initial-sync", requireAdminApi, async (req, res) => {
 });
 
 // /api/routes/admin.router.js
+// /api/routes/admin.router.js
 router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
   const { propertyId } = req.body;
   if (!propertyId) {
     return res.status(400).json({ error: "A propertyId is required." });
   }
 
+  const client = await pgPool.connect(); // Use a single client for the transaction
   try {
-    // Use the new helper to get a valid token for the logged-in admin.
-    const accessToken = await getAdminAccessToken(req.session.userId);
+    // --- FIX: Correctly destructure the object from getAdminAccessToken ---
+    // The function returns { accessToken, propertyId }, so we need to get the token string.
+    const { accessToken } = await getAdminAccessToken(req.session.userId);
 
-    // Execute all sync functions concurrently.
+    // Start a database transaction.
+    await client.query("BEGIN");
+
+    // Execute all Cloudbeds sync functions concurrently.
+    // --- FIX: Use the consistent 'cloudbedsAdapter' module for all calls. ---
     await Promise.all([
-      cloudbeds.syncHotelDetailsToDb(accessToken, propertyId),
-      cloudbeds.syncHotelTaxInfoToDb(accessToken, propertyId),
+      cloudbedsAdapter.syncHotelDetailsToDb(accessToken, propertyId, client),
+      cloudbedsAdapter.syncHotelTaxInfoToDb(accessToken, propertyId, client),
     ]);
 
     // Sync neighborhood after core details are saved to ensure lat/lon exist.
-    const hotelRes = await pgPool.query(
+    const hotelRes = await client.query(
       "SELECT latitude, longitude FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
@@ -173,18 +180,23 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
         coords.longitude
       );
       if (neighborhood) {
-        await pgPool.query(
+        await client.query(
           "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
           [neighborhood, propertyId]
         );
       }
     }
 
+    // Commit the transaction if all operations were successful.
+    await client.query("COMMIT");
+
     res.status(200).json({
       success: true,
       message: `Successfully synced all hotel information for property ${propertyId}.`,
     });
   } catch (error) {
+    // If any error occurs, roll back the entire transaction.
+    await client.query("ROLLBACK");
     console.error(
       `Error syncing hotel info for property ${propertyId}:`,
       error
@@ -192,6 +204,9 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
     res
       .status(500)
       .json({ error: error.message || "An internal server error occurred." });
+  } finally {
+    // ALWAYS release the client back to the pool.
+    client.release();
   }
 });
 

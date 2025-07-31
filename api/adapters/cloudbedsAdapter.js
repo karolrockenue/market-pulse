@@ -2,6 +2,7 @@
 // This file houses all logic specific to interacting with the Cloudbeds API.
 
 const fetch = require("node-fetch");
+const pgPool = require("../utils/db");
 
 /**
  * A private helper function to process raw API data for historical syncs.
@@ -413,10 +414,147 @@ async function getAccessToken(credentials = {}) {
   return tokenData.access_token;
 }
 
-// Export all public functions.
+// --- NEW FUNCTIONS MOVED FROM /api/utils/cloudbeds.js ---
+
+/**
+ * Fetches general details for a single hotel from the Cloudbeds API.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The ID of the property to get details for.
+ * @returns {Promise<object|null>} The hotel details object or null on failure.
+ */
+async function getHotelDetails(accessToken, propertyId) {
+  const url = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    console.error(`Failed to fetch details for property ${propertyId}:`, data);
+    return null;
+  }
+  return data.data; // Return the nested 'data' object
+}
+
+/**
+ * Fetches hotel details and saves them to our local database.
+ * @param {string} accessToken - A valid Cloudbeds access token or API key.
+ * @param {string} propertyId - The ID of the property to sync.
+ * @param {object} dbClient - An active pg database client for transactions.
+ * @returns {Promise<void>}
+ */
+async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
+  console.log(
+    `[Sync Function] Starting detail sync for property ${propertyId}...`
+  );
+
+  const hotelDetails = await getHotelDetails(accessToken, propertyId);
+  if (!hotelDetails) {
+    console.error(`[Sync Function] Could not fetch details for ${propertyId}.`);
+    return; // Do not throw error, to avoid breaking Promise.all
+  }
+
+  const query = `
+    INSERT INTO hotels (
+      hotel_id, property_name, city, address_1, country, currency_code,
+      property_type, zip_postal_code, latitude, longitude, primary_language
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    ON CONFLICT (hotel_id) DO UPDATE SET
+      property_name = EXCLUDED.property_name,
+      city = EXCLUDED.city,
+      address_1 = EXCLUDED.address_1,
+      country = EXCLUDED.country,
+      currency_code = EXCLUDED.currency_code,
+      property_type = EXCLUDED.property_type,
+      zip_postal_code = EXCLUDED.zip_postal_code,
+      latitude = EXCLUDED.latitude,
+      longitude = EXCLUDED.longitude,
+      primary_language = EXCLUDED.primary_language;
+  `;
+  const values = [
+    hotelDetails.propertyID,
+    hotelDetails.propertyName,
+    hotelDetails.propertyAddress.propertyCity,
+    hotelDetails.propertyAddress.propertyAddress1,
+    hotelDetails.propertyAddress.propertyCountry,
+    hotelDetails.propertyCurrency.currencyCode,
+    hotelDetails.propertyType,
+    hotelDetails.propertyAddress.propertyZip,
+    hotelDetails.propertyAddress.propertyLatitude,
+    hotelDetails.propertyAddress.propertyLongitude,
+    hotelDetails.propertyPrimaryLanguage,
+  ];
+
+  await dbClient.query(query, values); // Use the provided dbClient
+  console.log(
+    `[Sync Function] Successfully synced details for property ${propertyId}.`
+  );
+}
+
+/**
+ * Fetches tax details and saves them to our local database.
+ * @param {string} accessToken - A valid Cloudbeds access token or API key.
+ * @param {string} propertyId - The ID of the property to sync.
+ * @param {object} dbClient - An active pg database client for transactions.
+ * @returns {Promise<void>}
+ */
+async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
+  console.log(`[Tax Sync] Starting tax sync for property ${propertyId}...`);
+  const url = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyId}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const taxData = await response.json();
+
+  if (
+    !response.ok ||
+    !taxData.success ||
+    !taxData.data ||
+    taxData.data.length === 0
+  ) {
+    console.warn(
+      `[Tax Sync] No tax data found for property ${propertyId}. Skipping.`
+    );
+    return; // Fail gracefully
+  }
+
+  // --- FIX: Prioritize finding the 'inclusive' tax ---
+  const primaryTax = taxData.data.find(
+    (t) => t.inclusiveOrExclusive === "inclusive"
+  );
+
+  if (!primaryTax) {
+    console.warn(
+      `[Tax Sync] No INCLUSIVE tax found for property ${propertyId}.`
+    );
+    return; // Fail gracefully
+  }
+
+  const taxRate = parseFloat(primaryTax.amount) / 100;
+  const taxType = primaryTax.inclusiveOrExclusive;
+  const taxName = primaryTax.name || "Tax";
+
+  if (isNaN(taxRate) || !taxType) {
+    console.error(`[Tax Sync] Invalid tax data parsed for ${propertyId}.`);
+    return; // Fail gracefully
+  }
+
+  await dbClient.query(
+    // Use the provided dbClient
+    `UPDATE hotels SET tax_rate = $1, tax_type = $2, tax_name = $3 WHERE hotel_id::text = $4`,
+    [taxRate, taxType, taxName, propertyId]
+  );
+  console.log(
+    `[Tax Sync] Successfully synced tax info for property ${propertyId}.`
+  );
+}
+
 module.exports = {
-  getAccessToken, // <-- Export the new function
+  getAccessToken,
   getNeighborhoodFromCoords,
   getHistoricalMetrics,
   getUpcomingMetrics,
+  // --- ADD THE NEWLY MOVED FUNCTIONS ---
+  syncHotelDetailsToDb,
+  syncHotelTaxInfoToDb,
 };
