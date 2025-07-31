@@ -56,6 +56,18 @@ async function runSync(propertyId) {
     // Merge the results from this year into our main data object.
     allProcessedData = { ...allProcessedData, ...yearlyData };
   }
+
+  // --- START: Added for test ---
+  // Fetch forecast data for the next 365 days
+  console.log("Fetching forecast data for the next 365 days...");
+  const futureData = await cloudbedsAdapter.getUpcomingMetrics(
+    accessToken,
+    propertyId
+  );
+
+  // Merge the new future data with the historical data we already collected
+  allProcessedData = { ...allProcessedData, ...futureData };
+  // --- END: Added for test ---
   // --- END OF NEW LOGIC ---
 
   const datesToUpdate = Object.keys(allProcessedData);
