@@ -124,7 +124,10 @@ module.exports = async (request, response) => {
       body: JSON.stringify({ jobName: "last_successful_refresh" }),
     }).catch((err) => {
       // Log an error if the call fails, but don't block the job's success response.
-      console.error("Failed to record job success:", err);
+      console.error(
+        "CRITICAL: The call to /api/record-job-success failed.",
+        err
+      );
     });
     // --- END ---
 
