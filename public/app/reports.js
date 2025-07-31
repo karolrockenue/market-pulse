@@ -342,8 +342,8 @@ function parseDateFromInput(dateString) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-function generateReportTitle(selected) {
-  const hotelName = "Rockenue Partner Account";
+// MODIFIED: The function now accepts hotelName as an argument instead of hardcoding it.
+function generateReportTitle(selected, hotelName = "Your Hotel") {
   let title = `${hotelName} Report`;
   if (
     selected &&
@@ -357,14 +357,17 @@ function generateReportTitle(selected) {
   return title;
 }
 
-function exportToCSV() {
+// MODIFIED: The function now accepts the dynamic propertyName.
+function exportToCSV(propertyName) {
   const table = document.querySelector("#report-results-container table");
   if (!table) {
     alert("No report table found to export.");
     return;
   }
+  // MODIFIED: Pass the propertyName to generate a dynamic title.
   const reportTitle = window.generateReportTitle(
-    window.getSelectedColumnsForExport()
+    window.getSelectedColumnsForExport(),
+    propertyName
   );
   const fileName = `${reportTitle
     .replace(/[^a-z0-9]/gi, "-")
@@ -393,14 +396,17 @@ function exportToCSV() {
   document.body.removeChild(link);
 }
 
-function exportToExcel() {
+// MODIFIED: The function now accepts the dynamic propertyName.
+function exportToExcel(propertyName) {
   const table = document.querySelector("#report-results-container table");
   if (!table) {
     alert("No report table found to export.");
     return;
   }
+  // MODIFIED: Pass the propertyName to generate a dynamic title.
   const reportTitle = window.generateReportTitle(
-    window.getSelectedColumnsForExport()
+    window.getSelectedColumnsForExport(),
+    propertyName
   );
   const fileName = `${reportTitle
     .replace(/[^a-z0-9]/gi, "-")
@@ -754,7 +760,8 @@ function renderReportTable(
     bodyRows += buildTableTotalsRow(data, headers, component);
   }
 
-  const dynamicTitle = generateReportTitle(selected);
+  // MODIFIED: Use the property name from the component state for the on-screen caption.
+  const dynamicTitle = generateReportTitle(selected, component.propertyName);
   const tableHTML = `
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
       <table class="min-w-full">

@@ -1107,6 +1107,7 @@
       propertyTaxType: null,     
       includeTaxes: true,        
           isManageModalOpen: false,
+          propertyName: "Your Hotel", // Add a state variable for the property name
           addComparisons: false,
           displayTotals: true,
           granularity: "daily",
@@ -1153,6 +1154,8 @@
                   this.propertyTaxName = details.tax_name;
                   this.currencyCode = details.currency_code;
                   this.includeTaxes = (this.propertyTaxType === 'inclusive');
+                  // ADDED: Store the property's name from the API response
+                  this.propertyName = details.hotel_name;
 
                 } catch (error) {
                   console.error("Could not fetch property tax/currency details:", error);
@@ -1233,11 +1236,13 @@
           parseDateFromInput(dateString) {
             return window.parseDateFromInput(dateString);
           },
-          exportToCSV() {
-            window.exportToCSV();
+    exportToCSV() {
+            // MODIFIED: Pass the dynamic property name to the export function.
+            window.exportToCSV(this.propertyName);
           },
           exportToExcel() {
-            window.exportToExcel();
+            // MODIFIED: Pass the dynamic property name to the export function.
+            window.exportToExcel(this.propertyName);
           },
           handleFrequencyChange() {
             window.handleFrequencyChange();

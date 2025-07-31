@@ -251,8 +251,8 @@ module.exports = async (req, res) => {
     const currentDayOfMonth = now.getUTCDate();
 
     const { rows: dueReports } = await pgPool.query(
-      // Select the new 'category' column instead of 'star_rating'
-      `SELECT sr.*, h.category
+      // MODIFIED: Also select h.hotel_name to use for dynamic filenames.
+      `SELECT sr.*, h.category, h.hotel_name
    FROM scheduled_reports sr
    JOIN hotels h ON sr.property_id::integer = h.hotel_id
    WHERE sr.time_of_day = $1 AND (
@@ -295,11 +295,15 @@ module.exports = async (req, res) => {
 
       const attachments = [];
       const formats = report.attachment_formats || ["csv"]; // Default to csv if not set
+      // Replaces all spaces with underscores for clean filenames.
+      const cleanHotelName = report.hotel_name.replace(/\s/g, "_");
+      const cleanReportName = report.report_name.replace(/\s/g, "_");
 
       if (formats.includes("csv")) {
         attachments.push({
           content: generateCSV(processedData, report).toString("base64"),
-          filename: `${report.report_name.replace(/\s/g, "_")}.csv`,
+          // MODIFIED: Create a dynamic filename using the hotel and report name.
+          filename: `${cleanHotelName}_${cleanReportName}.csv`,
           type: "text/csv",
           disposition: "attachment",
         });
@@ -308,7 +312,8 @@ module.exports = async (req, res) => {
         const xlsxBuffer = await generateXLSX(processedData, report);
         attachments.push({
           content: xlsxBuffer.toString("base64"),
-          filename: `${report.report_name.replace(/\s/g, "_")}.xlsx`,
+          // MODIFIED: Create a dynamic filename using the hotel and report name.
+          filename: `${cleanHotelName}_${cleanReportName}.xlsx`,
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           disposition: "attachment",
         });
