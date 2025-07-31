@@ -383,18 +383,24 @@ router.post(
         timestamp: new Date().toISOString(),
       };
 
-      // This is an "UPSERT" query.
-      // It tries to INSERT a new row. If a row with the same 'key' already exists,
-      // it will UPDATE the existing row instead. This is perfect for our use case.
       const query = `
-      INSERT INTO system_state (key, value) 
-      VALUES ($1, $2) 
-      ON CONFLICT (key) 
+      INSERT INTO system_state (key, value)
+      VALUES ($1, $2)
+      ON CONFLICT (key)
       DO UPDATE SET value = $2;
     `;
 
+      // --- ADDED FOR DEBUGGING ---
+      console.log(
+        `[DEBUG] Attempting to update system_state for key: ${jobName}`
+      );
       // Execute the query with the job name (e.g., 'last_successful_refresh') and the JSON data.
-      await pgPool.query(query, [jobName, jobData]);
+      const result = await pgPool.query(query, [jobName, jobData]);
+      // This will log how many rows were affected. It should be 1.
+      console.log(
+        `[DEBUG] system_state update complete. Rows affected: ${result.rowCount}`
+      );
+      // --- END DEBUGGING ---
 
       res
         .status(200)
