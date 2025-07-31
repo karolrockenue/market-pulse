@@ -86,7 +86,8 @@ async function runSync(propertyId) {
           metrics.revpar || 0,
           metrics.rooms_sold || 0,
           metrics.capacity_count || 0,
-          metrics.total_revenue || 0,
+          // MODIFIED: Use room_revenue. The DB column is still 'total_revenue'.
+          metrics.room_revenue || 0,
           user.cloudbeds_user_id,
         ];
       });

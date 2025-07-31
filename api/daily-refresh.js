@@ -52,7 +52,9 @@ module.exports = async (request, response) => {
                   metrics.revpar,
                   metrics.rooms_sold,
                   metrics.capacity_count,
-                  metrics.total_revenue,
+                  // MODIFIED: Use room_revenue instead of total_revenue for the insert.
+                  // The database column remains `total_revenue`, but the value is now from room_revenue.
+                  metrics.room_revenue,
                   user.cloudbeds_user_id,
                 ];
               });

@@ -79,6 +79,7 @@ function processUpcomingApiData(allData) {
           rooms_sold: 0,
           capacity_count: 0,
           total_revenue: 0,
+          room_revenue: 0, // <-- ADDED: Initialize room_revenue
           total_revenue_for_adr: 0, // Used for a more accurate weighted ADR calculation
         };
       }
@@ -87,8 +88,9 @@ function processUpcomingApiData(allData) {
       aggregated[date].capacity_count += sanitizeMetric(
         page.records.capacity_count?.[i]
       );
-      aggregated[date].total_revenue += sanitizeMetric(
-        page.records.total_revenue?.[i]
+      // ADDED: Aggregate the room_revenue from the API response.
+      aggregated[date].room_revenue += sanitizeMetric(
+        page.records.room_revenue?.[i]
       );
       // To calculate an accurate ADR for the day, we need to sum the (ADR * Rooms Sold) for each room type.
       aggregated[date].total_revenue_for_adr +=
@@ -276,6 +278,7 @@ async function getUpcomingMetrics(accessToken, propertyId) {
     "rooms_sold",
     "capacity_count",
     "total_revenue",
+    "room_revenue",
   ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
   const initialInsightsPayload = {
