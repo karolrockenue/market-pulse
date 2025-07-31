@@ -1,7 +1,6 @@
-// /api/daily-refresh.js (Refactored for Bulk Insert)
+// /api/daily-refresh.js (Refactored for Direct DB Update)
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
-// Import the pg-format library, which is needed for bulk inserts.
 const format = require("pg-format");
 
 module.exports = async (request, response) => {
@@ -40,14 +39,9 @@ module.exports = async (request, response) => {
           const datesToUpdate = Object.keys(processedData);
 
           if (datesToUpdate.length > 0) {
-            // --- START: Refactored Database Logic ---
-            // Get a dedicated client from the pool to run a transaction.
             const client = await pgPool.connect();
             try {
-              // Start the transaction.
               await client.query("BEGIN");
-
-              // Map all the daily metrics into a single array of arrays for the bulk insert.
               const bulkInsertValues = datesToUpdate.map((date) => {
                 const metrics = processedData[date];
                 return [
@@ -62,9 +56,6 @@ module.exports = async (request, response) => {
                   user.cloudbeds_user_id,
                 ];
               });
-
-              // Create the single, formatted bulk-insert query.
-              // This is far more efficient than sending hundreds of individual queries.
               const query = format(
                 `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
                  VALUES %L
@@ -73,27 +64,18 @@ module.exports = async (request, response) => {
                      capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;`,
                 bulkInsertValues
               );
-
-              // Execute the single query.
               await client.query(query);
-
-              // Commit the transaction to save all changes.
               await client.query("COMMIT");
-
               totalRecordsUpdated += datesToUpdate.length;
               console.log(
                 `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId} using bulk insert. --`
               );
             } catch (e) {
-              // If any error occurs, roll back the entire transaction.
               await client.query("ROLLBACK");
-              // Re-throw the error to be caught by the outer catch block.
               throw e;
             } finally {
-              // ALWAYS release the client back to the pool.
               client.release();
             }
-            // --- END: Refactored Database Logic ---
           } else {
             console.log(
               `-- No new records to update for property ${propertyId}. --`
@@ -107,31 +89,23 @@ module.exports = async (request, response) => {
         );
       }
     }
-    console.log("✅ Daily refresh job complete. Recording success...");
 
-    // --- ADDED ---
-    // Make a "fire-and-forget" call to our new endpoint to record the successful run.
-    // We don't use 'await' because we don't need to wait for the response before finishing this job.
-    // Construct the URL using the Vercel system environment variable.
-    // This is the robust way to ensure the URL is correct in all contexts (cron, admin panel, direct visit).
-    fetch(`https://${process.env.VERCEL_URL}/api/record-job-success`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Send the secret key for authentication instead of a user cookie.
-        Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
-      },
-      body: JSON.stringify({ jobName: "last_successful_refresh" }),
-    }).catch((err) => {
-      // Log an error if the call fails, but don't block the job's success response.
-      console.error(
-        "CRITICAL: The call to /api/record-job-success failed.",
-        err
-      );
-    });
-    // --- END ---
+    // --- FINAL FIX: Update system_state table directly ---
+    console.log(
+      "✅ Daily refresh job complete. Updating system_state table..."
+    );
+    const jobData = { timestamp: new Date().toISOString() };
+    const systemStateQuery = `
+      INSERT INTO system_state (key, value)
+      VALUES ($1, $2)
+      ON CONFLICT (key)
+      DO UPDATE SET value = $2;
+    `;
+    // Use the main pool for this simple query.
+    await pgPool.query(systemStateQuery, ["last_successful_refresh", jobData]);
+    console.log("System state updated successfully.");
+    // --- END OF FIX ---
 
-    // Send the final success response for the daily-refresh job itself.
     response.status(200).json({
       status: "Success",
       processedUsers: activeUsers.length,
