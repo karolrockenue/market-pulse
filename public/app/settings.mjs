@@ -154,7 +154,7 @@ export default function settingsPage() {
     async fetchOwnedProperties() {
       try {
         // This new endpoint will only return properties for which the user has owner-level credentials.
-        const response = await fetch("/api/user/owned-properties");
+        const response = await fetch("/api/users/owned-properties");
         if (!response.ok) throw new Error("Could not check ownership status.");
 
         this.ownedProperties = await response.json();
