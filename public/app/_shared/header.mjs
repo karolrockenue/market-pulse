@@ -191,8 +191,10 @@ export default function pageHeader() {
       if (dispatchEvent) this.dispatchPropertyChangeEvent();
     },
     dispatchPropertyChangeEvent() {
+      // Find the property using a loose equality check (==) to ensure the
+      // event is dispatched correctly, regardless of type differences.
       const currentProperty = this.properties.find(
-        (p) => p.property_id === this.currentPropertyId
+        (p) => p.property_id == this.currentPropertyId
       );
       if (!currentProperty) return;
       window.dispatchEvent(
