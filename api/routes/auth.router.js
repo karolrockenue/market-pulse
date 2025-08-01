@@ -85,7 +85,6 @@ router.get("/magic-link-callback", async (req, res) => {
 
     const loginToken = tokenResult.rows[0];
     const userResult = await pgPool.query(
-      // --- FIX: Select the new 'role' column instead of 'is_admin' ---
       "SELECT user_id, cloudbeds_user_id, email, role FROM users WHERE user_id = $1",
       [loginToken.user_id]
     );
@@ -96,18 +95,15 @@ router.get("/magic-link-callback", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Mark the token as used
+    // --- FIX: Update the token record using the 'token' column, not 'token_id' ---
     await pgPool.query(
-      "UPDATE magic_login_tokens SET used_at = NOW() WHERE token_id = $1",
-      [loginToken.token_id]
+      "UPDATE magic_login_tokens SET used_at = NOW() WHERE token = $1",
+      [token]
     );
 
-    // Create the user's session
     req.session.userId = user.cloudbeds_user_id;
-    // --- FIX: Set the user's role in the session ---
     req.session.role = user.role;
 
-    // Save the session and then redirect
     req.session.save((err) => {
       if (err) {
         console.error("Session save error:", err);
