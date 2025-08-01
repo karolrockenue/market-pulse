@@ -62,16 +62,18 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
 
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
-    // NEW: Check if the user is a Super Admin
+    // Check if the user is a Super Admin
     if (req.session.isAdmin) {
-      // If they are an admin, fetch ALL properties from the hotels table.
-      // This provides "God Mode" visibility.
+      // If they are an admin, fetch all *connected* properties from the system.
+      // This query now joins with user_properties to ensure we only show hotels
+      // that have been actively connected by at least one user, filtering out dummy data.
       const query = `
-        SELECT 
-          hotel_id AS property_id, 
-          property_name
-        FROM hotels
-        ORDER BY property_name;
+        SELECT DISTINCT
+          h.hotel_id AS property_id, 
+          h.property_name
+        FROM hotels h
+        JOIN user_properties up ON h.hotel_id = up.property_id
+        ORDER BY h.property_name;
       `;
       const result = await pgPool.query(query);
       return res.json(result.rows);
