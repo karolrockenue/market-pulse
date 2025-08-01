@@ -85,8 +85,9 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const validToken = tokenResult.rows[0];
 
+    // FIX: Removed reference to the deleted 'auth_mode' column.
     const userQuery = `
-      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin, u.auth_mode
+      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin
       FROM users u
       WHERE u.user_id = $1
     `;
@@ -97,8 +98,6 @@ router.get("/magic-link-callback", async (req, res) => {
     const user = userResult.rows[0];
 
     // Set the session variables.
-    // FIX: This was using an undefined variable 'cloudbedsUserIdToUse'.
-    // It now correctly uses the 'cloudbeds_user_id' from the user we just fetched.
     req.session.userId = user.cloudbeds_user_id;
     req.session.isAdmin = user.is_admin || false;
 
@@ -148,9 +147,11 @@ router.get("/accept-invitation", async (req, res) => {
     const newCloudbedsUserId = `invited-${crypto
       .randomBytes(8)
       .toString("hex")}`;
+
+    // FIX: Removed reference to the deleted 'auth_mode' column from the INSERT statement.
     const newUserResult = await client.query(
-      `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, auth_mode, pms_type, is_admin)
-       VALUES ($1, $2, $3, $4, 'invited', 'cloudbeds', false)
+      `INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, pms_type, is_admin)
+       VALUES ($1, $2, $3, $4, 'cloudbeds', false)
        RETURNING user_id, cloudbeds_user_id`,
       [
         newCloudbedsUserId,
@@ -251,48 +252,9 @@ router.get("/cloudbeds", (req, res) => {
 });
 
 router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
-  const { propertyId } = req.query;
-  if (!propertyId) {
-    return res.status(400).send("Property ID is required.");
-  }
-  try {
-    const credsResult = await pgPool.query(
-      `SELECT override_client_id FROM user_properties WHERE user_id = $1 AND property_id = $2`,
-      [req.session.userId, propertyId]
-    );
-    if (
-      credsResult.rows.length === 0 ||
-      !credsResult.rows[0].override_client_id
-    ) {
-      return res
-        .status(404)
-        .send(
-          "Credentials for this property not found or you do not have access."
-        );
-    }
-    const clientId = credsResult.rows[0].override_client_id;
-    const redirectUri =
-      process.env.VERCEL_ENV === "production"
-        ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
-        : process.env.CLOUDBEDS_REDIRECT_URI;
-    const state = propertyId;
-    const scopes =
-      "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: scopes,
-      state: state,
-    });
-    const authorizationUrl = `https://hotels.cloudbeds.com/api/v1.2/oauth?${params.toString()}`;
-    res.redirect(authorizationUrl);
-  } catch (error) {
-    console.error("Error starting pilot connection:", error);
-    res
-      .status(500)
-      .send("An error occurred while starting the connection process.");
-  }
+  // This route is now legacy and can be removed, but is kept for historical reference.
+  // It is no longer reachable as the UI elements have been removed.
+  res.status(410).send("This feature has been deprecated.");
 });
 
 router.get("/cloudbeds/callback", async (req, res) => {
@@ -367,9 +329,10 @@ router.get("/cloudbeds/callback", async (req, res) => {
       console.log(
         `[OAuth Callback] No existing user found for email: ${userInfo.email}. Creating a new user.`
       );
+      // FIX: Removed reference to the deleted 'auth_mode' column.
       const newUserQuery = `
-        INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, auth_mode, pms_type)
-        VALUES ($1, $2, $3, $4, 'active', 'oauth', 'cloudbeds')
+        INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, status, pms_type)
+        VALUES ($1, $2, $3, $4, 'active', 'cloudbeds')
         RETURNING *;
       `;
       const newUserResult = await pgPool.query(newUserQuery, [
@@ -414,8 +377,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
       );
     });
 
-    // FIX: This section was using the wrong variables. It now uses the corrected
-    // 'cloudbedsUserIdToUse' and pulls the 'is_admin' flag from our database record.
     req.session.userId = cloudbedsUserIdToUse;
     req.session.isAdmin = existingUser.is_admin || false;
 
