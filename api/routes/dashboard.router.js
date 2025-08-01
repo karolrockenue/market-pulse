@@ -62,18 +62,33 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
 
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
-    const query = `
-      SELECT 
-        up.property_id, 
-        h.property_name
-      FROM user_properties up
-      LEFT JOIN hotels h ON up.property_id::text = h.hotel_id::text
-      WHERE up.user_id = $1
-      ORDER BY h.property_name;
-    `;
-    // CORRECTED: Use req.session.userId, which holds the cloudbeds_user_id.
-    const result = await pgPool.query(query, [req.session.userId]);
-    res.json(result.rows);
+    // NEW: Check if the user is a Super Admin
+    if (req.session.isAdmin) {
+      // If they are an admin, fetch ALL properties from the hotels table.
+      // This provides "God Mode" visibility.
+      const query = `
+        SELECT 
+          hotel_id AS property_id, 
+          property_name
+        FROM hotels
+        ORDER BY property_name;
+      `;
+      const result = await pgPool.query(query);
+      return res.json(result.rows);
+    } else {
+      // If they are a regular user, run the original query to get only their linked properties.
+      const query = `
+        SELECT 
+          up.property_id, 
+          h.property_name
+        FROM user_properties up
+        LEFT JOIN hotels h ON up.property_id::text = h.hotel_id::text
+        WHERE up.user_id = $1
+        ORDER BY h.property_name;
+      `;
+      const result = await pgPool.query(query, [req.session.userId]);
+      return res.json(result.rows);
+    }
   } catch (error) {
     console.error("Error in /api/my-properties:", error);
     res.status(500).json({ error: "Failed to fetch user properties." });
