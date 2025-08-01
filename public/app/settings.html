@@ -148,6 +148,27 @@
               >
                 <h2 class="text-lg font-semibold">User Management</h2>
                 <button
+                  x-show="isAccountOwner"
+                  @click="openLinkModal()"
+                  class="control-btn primary inline-flex items-center mr-4"
+                >
+                  <svg
+                    class="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                    ></path>
+                  </svg>
+                  Grant Access
+                </button>
+                <button
                   @click="openInviteModal()"
                   class="control-btn primary inline-flex items-center"
                 >
@@ -345,6 +366,85 @@
                 >
                   <span x-show="!isSendingInvite">Send Invitation</span>
                   <span x-show="isSendingInvite">Sending...</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            x-show="isLinkModalOpen"
+            x-transition
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75"
+            style="display: none"
+          >
+            <div
+              @click.away="isLinkModalOpen = false"
+              class="relative bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+            >
+              <h3 class="text-lg font-semibold mb-4">Grant Property Access</h3>
+              <p class="text-sm text-slate-500 mb-4">
+                Grant an existing Market Pulse user access to one of your
+                properties.
+              </p>
+
+              <div
+                x-show="linkAccess.message"
+                x-text="linkAccess.message"
+                :class="{
+        'bg-green-100 text-green-700 p-3 rounded-md text-sm mb-4': linkAccess.messageType === 'success',
+        'bg-red-100 text-red-700 p-3 rounded-md text-sm mb-4': linkAccess.messageType === 'error'
+      }"
+                x-transition
+              ></div>
+
+              <div class="space-y-4">
+                <div>
+                  <label
+                    for="link-email"
+                    class="block text-sm font-medium text-slate-600"
+                    >User's Email Address</label
+                  >
+                  <input
+                    type="email"
+                    id="link-email"
+                    x-model="linkAccess.email"
+                    placeholder="user@example.com"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm py-2.5 px-3"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="link-property"
+                    class="block text-sm font-medium text-slate-600"
+                    >Property to Share</label
+                  >
+                  <select
+                    id="link-property"
+                    x-model="linkAccess.propertyId"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm py-2.5 px-3"
+                  >
+                    <template
+                      x-for="prop in ownedProperties"
+                      :key="prop.property_id"
+                    >
+                      <option
+                        :value="prop.property_id"
+                        x-text="prop.property_name"
+                      ></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-6 flex justify-end gap-4">
+                <button @click="isLinkModalOpen = false" class="control-btn">
+                  Cancel
+                </button>
+                <button
+                  @click="grantAccess()"
+                  :disabled="isLinking"
+                  class="control-btn primary"
+                >
+                  <span x-show="!isLinking">Grant Access</span>
+                  <span x-show="isLinking">Granting...</span>
                 </button>
               </div>
             </div>

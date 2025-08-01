@@ -5,7 +5,11 @@ const crypto = require("crypto"); // Built-in Node.js module for cryptography
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const { requireUserApi, requireAdminApi } = require("../utils/middleware");
+const {
+  requireUserApi,
+  requireAdminApi,
+  requireAccountOwner,
+} = require("../utils/middleware");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -348,6 +352,119 @@ router.post("/disconnect-property", requireUserApi, async (req, res) => {
   } finally {
     // Always release the client back to the pool
     client.release();
+  }
+});
+
+/**
+ * @route POST /api/users/link-property
+ * @description Links an existing user to a property owned by the requester.
+ * @access Account Owner
+ */
+router.post(
+  "/link-property",
+  [requireUserApi, requireAccountOwner],
+  async (req, res) => {
+    // requireUserApi confirms the user is logged in.
+    // requireAccountOwner confirms they own the property they're trying to share.
+
+    const { email, propertyId } = req.body; // The email of the user to grant access to, and the property to share.
+
+    // --- Validation ---
+    if (!email || !propertyId) {
+      return res
+        .status(400)
+        .json({ error: "Email and propertyId are required." });
+    }
+
+    const client = await pgPool.connect();
+    try {
+      // Start a database transaction for safety.
+      await client.query("BEGIN");
+
+      // --- Find the user to be linked ---
+      const userToLinkResult = await client.query(
+        "SELECT cloudbeds_user_id FROM users WHERE email = $1",
+        [email]
+      );
+
+      if (userToLinkResult.rows.length === 0) {
+        // If the user doesn't exist in our system, we can't link them.
+        throw new Error(
+          "User not found. Please ensure the user has an existing Market Pulse account."
+        );
+      }
+      const userCloudbedsIdToLink = userToLinkResult.rows[0].cloudbeds_user_id;
+
+      // --- Check if the user is already linked to this property ---
+      const existingLinkCheck = await client.query(
+        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [userCloudbedsIdToLink, propertyId]
+      );
+
+      if (existingLinkCheck.rows.length > 0) {
+        throw new Error("This user already has access to this property.");
+      }
+
+      // --- Create the new property link ---
+      // The status is 'connected' and pms_credentials will be null by default,
+      // which correctly marks them as a Team Member for this property.
+      await client.query(
+        "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
+        [userCloudbedsIdToLink, propertyId]
+      );
+
+      // If all steps succeed, commit the transaction.
+      await client.query("COMMIT");
+
+      res
+        .status(200)
+        .json({ message: `Successfully granted access to ${email}.` });
+    } catch (error) {
+      // If any error occurs, roll back all changes.
+      await client.query("ROLLBACK");
+      console.error("Error linking property to user:", error);
+      // Send back a specific error message from our checks or a generic one.
+      res
+        .status(400)
+        .json({ error: error.message || "Failed to grant access." });
+    } finally {
+      // Always release the database client back to the pool.
+      client.release();
+    }
+  }
+);
+
+/**
+ * @route GET /api/user/owned-properties
+ * @description Fetches properties for which the user is the Account Owner.
+ * @access User
+ */
+router.get("/owned-properties", requireUserApi, async (req, res) => {
+  // Get the logged-in user's ID from the session.
+  const userCloudbedsId = req.session.userId;
+
+  try {
+    // This query joins user_properties with the hotels table to get property names.
+    // The key is "WHERE up.pms_credentials IS NOT NULL", which is our definition of an Account Owner.
+    const query = `
+      SELECT
+        up.property_id,
+        h.property_name
+      FROM
+        user_properties up
+      JOIN
+        hotels h ON up.property_id = h.hotel_id
+      WHERE
+        up.user_id = $1 AND up.pms_credentials IS NOT NULL
+    `;
+
+    const result = await pgPool.query(query, [userCloudbedsId]);
+
+    // Return the list of owned properties. The frontend will use this to populate the dropdown.
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching owned properties:", error);
+    res.status(500).json({ error: "Failed to fetch owned properties." });
   }
 });
 

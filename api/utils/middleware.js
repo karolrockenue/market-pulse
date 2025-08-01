@@ -77,8 +77,62 @@ const requirePageLogin = (req, res, next) => {
   next();
 };
 
+// /api/utils/middleware.js
+
+/**
+ * New Middleware: requireAccountOwner
+ * This function checks if the logged-in user is the "owner" of a specific property.
+ * Ownership is defined by having non-null credentials stored in the user_properties table.
+ * This prevents a delegated user (Team Member) from managing other users' access.
+ */
+async function requireAccountOwner(req, res, next) {
+  // Extract the propertyId from the request body. This is the property the user is trying to manage.
+  const { propertyId } = req.body;
+  // Get the ID of the user making the request from their session.
+  const requesterCloudbedsId = req.session.userId;
+
+  // Ensure a propertyId was provided in the request.
+  if (!propertyId) {
+    return res.status(400).json({ error: "A propertyId is required." });
+  }
+
+  try {
+    // Query the user_properties table to check the user's link to the specified property.
+    const ownerCheck = await pgPool.query(
+      "SELECT pms_credentials FROM user_properties WHERE user_id = $1 AND property_id = $2",
+      [requesterCloudbedsId, propertyId]
+    );
+
+    // Case 1: The user has no link to this property at all.
+    if (ownerCheck.rows.length === 0) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: You do not have access to this property." });
+    }
+
+    // Case 2: The user is linked, but their credentials are null. This means they are a Team Member, not the owner.
+    if (ownerCheck.rows[0].pms_credentials === null) {
+      return res
+        .status(403)
+        .json({
+          error:
+            "Forbidden: You do not have permission to manage this property.",
+        });
+    }
+
+    // If both checks pass, the user is the Account Owner. Allow the request to proceed.
+    next();
+  } catch (error) {
+    console.error("Error in requireAccountOwner middleware:", error);
+    return res
+      .status(500)
+      .json({ error: "Internal server error during permission check." });
+  }
+}
+
 module.exports = {
   requireUserApi,
   requireAdminApi,
   requirePageLogin,
+  requireAccountOwner, // Export the new middleware
 };

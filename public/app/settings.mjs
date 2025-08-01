@@ -12,6 +12,17 @@ export default function settingsPage() {
     // User Management section
     // User Management section
     teamMembers: [],
+    isAccountOwner: false, // NEW: Flag to show/hide the grant access UI
+    ownedProperties: [], // NEW: List of properties the user owns
+    isLinkModalOpen: false, // NEW: Controls the new modal
+    isLinking: false, // NEW: For showing a loading state on the button
+    linkAccess: {
+      // NEW: Object to hold form data and messages
+      email: "",
+      propertyId: "",
+      message: "",
+      messageType: "error",
+    },
     // New state for the Connected Properties section
     connectedProperties: [],
     propertiesMessage: "",
@@ -48,6 +59,7 @@ export default function settingsPage() {
         this.fetchProfile(),
         this.fetchTeamMembers(),
         this.fetchConnectedProperties(),
+        this.fetchOwnedProperties(), // NEW: Check if user is an account owner
       ]);
 
       // Finally, show the page content
@@ -132,6 +144,85 @@ export default function settingsPage() {
     },
 
     // User Management Methods
+
+    // User Management Methods
+
+    /**
+     * @description Fetches properties the user OWNS to determine if they are an Account Owner.
+     * NOTE: This relies on a new endpoint we will create in the next step.
+     */
+    async fetchOwnedProperties() {
+      try {
+        // This new endpoint will only return properties for which the user has owner-level credentials.
+        const response = await fetch("/api/user/owned-properties");
+        if (!response.ok) throw new Error("Could not check ownership status.");
+
+        this.ownedProperties = await response.json();
+
+        // If the user owns one or more properties, mark them as an account owner.
+        if (this.ownedProperties.length > 0) {
+          this.isAccountOwner = true;
+          // Set a default value for the dropdown in the modal
+          this.linkAccess.propertyId = this.ownedProperties[0].property_id;
+        }
+      } catch (error) {
+        console.error("Error fetching owned properties:", error);
+        // Fail safely: if we can't verify ownership, don't show the UI.
+        this.isAccountOwner = false;
+      }
+    },
+
+    /**
+     * @description Resets the "Grant Access" form and opens the modal.
+     */
+    openLinkModal() {
+      // Clear any previous form data or messages
+      this.linkAccess = {
+        email: "",
+        propertyId:
+          this.ownedProperties.length > 0
+            ? this.ownedProperties[0].property_id
+            : "",
+        message: "",
+        messageType: "error",
+      };
+      this.isLinkModalOpen = true;
+    },
+
+    /**
+     * @description Calls the backend to grant an existing user access to a property.
+     */
+    async grantAccess() {
+      this.isLinking = true;
+      this.linkAccess.message = ""; // Clear previous messages
+
+      try {
+        const response = await fetch("/api/users/link-property", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: this.linkAccess.email,
+            propertyId: this.linkAccess.propertyId,
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+
+        // --- Success ---
+        this.linkAccess.messageType = "success";
+        this.linkAccess.message = result.message;
+        this.linkAccess.email = ""; // Clear the email field on success
+        await this.fetchTeamMembers(); // Refresh the team list to show the change
+      } catch (error) {
+        // --- Error ---
+        console.error("Error granting access:", error);
+        this.linkAccess.messageType = "error";
+        this.linkAccess.message = error.message;
+      } finally {
+        this.isLinking = false;
+      }
+    },
     /**
      * @description Fetches the list of active users and pending invitations.
      */
