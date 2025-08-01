@@ -244,11 +244,9 @@ router.delete("/remove", requireAdminApi, async (req, res) => {
         [emailToRemove]
       );
       await client.query("COMMIT");
-      return res
-        .status(200)
-        .json({
-          message: `Invitation for ${emailToRemove} has been successfully removed.`,
-        });
+      return res.status(200).json({
+        message: `Invitation for ${emailToRemove} has been successfully removed.`,
+      });
     }
 
     const userToRemove = userToRemoveResult.rows[0];
@@ -450,35 +448,52 @@ router.post(
  * @access User
  */
 router.get("/owned-properties", requireUserApi, async (req, res) => {
-  // Get the logged-in user's ID from the session.
   const userCloudbedsId = req.session.userId;
 
   try {
-    // This query joins user_properties with the hotels table to get property names.
-    // The key is "WHERE up.pms_credentials IS NOT NULL", which is our definition of an Account Owner.
-    // --- FIX ---
-    // The previous logic was too restrictive. An admin should be able to grant access
-    // to ANY property they have access to, not just ones where their specific user
-    // record contains the credentials. This query now fetches all properties linked to the user.
-    const query = `
-      SELECT
-        up.property_id,
-        h.property_name
-      FROM
-        user_properties up
-      JOIN
-        hotels h ON up.property_id = h.hotel_id
-      WHERE
-        up.user_id = $1
-    `;
+    // First, check if the logged-in user is a Super Admin.
+    const userRoleResult = await pgPool.query(
+      "SELECT is_super_admin FROM users WHERE cloudbeds_user_id = $1",
+      [userCloudbedsId]
+    );
+    const isSuperAdmin = userRoleResult.rows[0]?.is_super_admin || false;
 
-    const result = await pgPool.query(query, [userCloudbedsId]);
+    let propertiesResult;
 
-    // Return the list of owned properties. The frontend will use this to populate the dropdown.
-    res.json(result.rows);
+    if (isSuperAdmin) {
+      // --- LOGIC FOR SUPER ADMIN ---
+      // A Super Admin can see every property in the system, unconditionally.
+      propertiesResult = await pgPool.query(`
+        SELECT hotel_id AS property_id, property_name FROM hotels ORDER BY property_name
+      `);
+    } else {
+      // --- LOGIC FOR SCOPED ADMINS AND REGULAR USERS ---
+      // Fetches all properties belonging to the user's team.
+      const query = `
+        SELECT DISTINCT
+          h.hotel_id AS property_id,
+          h.property_name
+        FROM hotels h
+        JOIN user_properties up ON h.hotel_id = up.property_id
+        WHERE up.user_id IN (
+          -- This subquery finds all user_ids on the team
+          SELECT DISTINCT user_id
+          FROM user_properties
+          WHERE property_id IN (
+            -- This subquery finds all property_ids for the current user
+            SELECT property_id FROM user_properties WHERE user_id = $1
+          )
+        )
+        ORDER BY h.property_name;
+      `;
+      propertiesResult = await pgPool.query(query, [userCloudbedsId]);
+    }
+
+    // Return the final list of properties.
+    res.json(propertiesResult.rows);
   } catch (error) {
-    console.error("Error fetching owned properties:", error);
-    res.status(500).json({ error: "Failed to fetch owned properties." });
+    console.error("Error fetching properties for grant access:", error);
+    res.status(500).json({ error: "Failed to fetch properties." });
   }
 });
 
