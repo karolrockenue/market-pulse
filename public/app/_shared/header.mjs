@@ -118,7 +118,21 @@ export default function pageHeader() {
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
         if (this.properties.length > 0) {
-          this.currentPropertyId = this.properties[0].property_id;
+          // Check browser's local storage for a previously selected property ID.
+          const savedPropertyId = localStorage.getItem("selectedPropertyId");
+
+          // Check if the saved ID is valid and actually exists in the user's list of properties.
+          // This prevents errors if a user's permissions have changed.
+          const isValidSavedProperty =
+            savedPropertyId &&
+            this.properties.some((p) => p.property_id === savedPropertyId);
+
+          // If a valid saved property exists, use it. Otherwise, default to the first property in the list.
+          this.currentPropertyId = isValidSavedProperty
+            ? savedPropertyId
+            : this.properties[0].property_id;
+
+          // Update the UI and notify other components of the active property.
           this.updateCurrentPropertyName();
           this.dispatchPropertyChangeEvent();
         }
@@ -160,8 +174,17 @@ export default function pageHeader() {
       if (currentProp) this.currentPropertyName = currentProp.property_name;
     },
     switchProperty(propertyId, dispatchEvent = true) {
+      // Set the new property ID in the component's state.
       this.currentPropertyId = propertyId;
+
+      // Save the newly selected property ID to the browser's local storage.
+      // This ensures it will be remembered on the next page load.
+      localStorage.setItem("selectedPropertyId", propertyId);
+
+      // Update the UI with the new property's name.
       this.updateCurrentPropertyName();
+
+      // If needed, dispatch an event to notify other parts of the application about the change.
       if (dispatchEvent) this.dispatchPropertyChangeEvent();
     },
     dispatchPropertyChangeEvent() {
