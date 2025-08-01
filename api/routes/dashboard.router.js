@@ -100,14 +100,18 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
 router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const numericPropertyId = parseInt(propertyId, 10);
-    // CORRECTED: Ensure access check uses req.session.userId.
-    const accessCheck = await pgPool.query(
-      "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0) {
-      return res.status(403).json({ error: "Access denied to this property." });
+
+    // --- NEW: Bypass access check for Admins ---
+    if (!req.session.isAdmin) {
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
+        [req.session.userId, propertyId]
+      );
+      if (accessCheck.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property." });
+      }
     }
 
     const hotelResult = await pgPool.query(
@@ -128,15 +132,16 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
 router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const numericPropertyId = parseInt(propertyId, 10);
 
-    // First, perform an access check to ensure the user can view this property.
-    const accessCheck = await pgPool.query(
-      "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0) {
-      return res.status(403).json({ error: "Access denied." });
+    // --- NEW: Bypass access check for Admins ---
+    if (!req.session.isAdmin) {
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
+        [req.session.userId, propertyId]
+      );
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({ error: "Access denied." });
+      }
     }
 
     // Now, check if any metrics exist for this hotel. A count > 0 means a sync has run.
@@ -169,17 +174,20 @@ router.get("/last-refresh-time", requireUserApi, async (req, res) => {
 router.get("/kpi-summary", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, propertyId } = req.query;
-    const numericPropertyId = parseInt(propertyId, 10);
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // CORRECTED: Ensure access check uses req.session.userId.
-    const accessCheck = await pgPool.query(
-      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0)
-      return res.status(403).json({ error: "Access denied to this property." });
+    // --- NEW: Bypass access check for Admins ---
+    if (!req.session.isAdmin) {
+      const accessCheck = await pgPool.query(
+        "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [req.session.userId, propertyId]
+      );
+      if (accessCheck.rows.length === 0)
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property." });
+    }
 
     const hotelCategoryResult = await pgPool.query(
       "SELECT category FROM hotels WHERE hotel_id = $1",
@@ -233,17 +241,20 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
 router.get("/metrics-from-db", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
-    const numericPropertyId = parseInt(propertyId, 10);
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // CORRECTED: Ensure access check uses req.session.userId.
-    const accessCheck = await pgPool.query(
-      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0)
-      return res.status(403).json({ error: "Access denied to this property." });
+    // --- NEW: Bypass access check for Admins ---
+    if (!req.session.isAdmin) {
+      const accessCheck = await pgPool.query(
+        "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [req.session.userId, propertyId]
+      );
+      if (accessCheck.rows.length === 0)
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property." });
+    }
 
     const period = getPeriod(granularity);
     const query = `
@@ -264,17 +275,20 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
 router.get("/competitor-metrics", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
-    const numericPropertyId = parseInt(propertyId, 10);
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // CORRECTED: Ensure access check uses req.session.userId.
-    const accessCheck = await pgPool.query(
-      "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [req.session.userId, propertyId]
-    );
-    if (accessCheck.rows.length === 0)
-      return res.status(403).json({ error: "Access denied to this property." });
+    // --- NEW: Bypass access check for Admins ---
+    if (!req.session.isAdmin) {
+      const accessCheck = await pgPool.query(
+        "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [req.session.userId, propertyId]
+      );
+      if (accessCheck.rows.length === 0)
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property." });
+    }
 
     const hotelCategoryResult = await pgPool.query(
       "SELECT category FROM hotels WHERE hotel_id = $1",
