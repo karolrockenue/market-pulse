@@ -147,47 +147,49 @@
                 class="flex justify-between items-center border-b border-slate-200 pb-4"
               >
                 <h2 class="text-lg font-semibold">User Management</h2>
-                <button
-                  x-show="isAccountOwner"
-                  @click="openLinkModal()"
-                  class="control-btn primary inline-flex items-center mr-4"
-                >
-                  <svg
-                    class="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
+                <div class="flex items-center gap-4">
+                  <button
+                    x-show="isAccountOwner"
+                    @click="openLinkModal()"
+                    class="control-btn primary inline-flex items-center"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                    ></path>
-                  </svg>
-                  Grant Access
-                </button>
-                <button
-                  @click="openInviteModal()"
-                  class="control-btn primary inline-flex items-center"
-                >
-                  <svg
-                    class="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
+                    <svg
+                      class="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                      ></path>
+                    </svg>
+                    Grant Access
+                  </button>
+                  <button
+                    @click="openInviteModal()"
+                    class="control-btn primary inline-flex items-center"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                    ></path>
-                  </svg>
-                  Invite User
-                </button>
+                    <svg
+                      class="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                      ></path>
+                    </svg>
+                    Invite User
+                  </button>
+                </div>
               </div>
               <div class="overflow-x-auto mt-4">
                 <table class="w-full text-sm">

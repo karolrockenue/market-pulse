@@ -37,7 +37,8 @@ router.post("/invite", requireAdminApi, async (req, res) => {
     );
     if (existingUser.rows.length > 0) {
       return res.status(409).json({
-        error: "A user with this email address already exists.",
+        error:
+          "A user with this email address already exists. Please use the 'Grant Access' button instead.",
       });
     }
 
