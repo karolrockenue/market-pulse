@@ -85,9 +85,9 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const validToken = tokenResult.rows[0];
 
-    // FIX: Removed reference to the deleted 'auth_mode' column.
+    // --- FIX: Select is_super_admin as well ---
     const userQuery = `
-      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin
+      SELECT u.user_id, u.cloudbeds_user_id, u.is_admin, u.is_super_admin
       FROM users u
       WHERE u.user_id = $1
     `;
@@ -99,7 +99,8 @@ router.get("/magic-link-callback", async (req, res) => {
 
     // Set the session variables.
     req.session.userId = user.cloudbeds_user_id;
-    req.session.isAdmin = user.is_admin || false;
+    // --- FIX: A Super Admin is always an Admin for session purposes ---
+    req.session.isAdmin = user.is_admin || user.is_super_admin || false;
 
     // Delete the used token.
     await pgPool.query("DELETE FROM magic_login_tokens WHERE token = $1", [
@@ -111,10 +112,6 @@ router.get("/magic-link-callback", async (req, res) => {
         console.error("Session save error after magic link login:", err);
         return res.status(500).send("An error occurred during login.");
       }
-      console.log(
-        `[BREADCRUMB 1 - auth.router.js] Session saved successfully. Redirecting. Session content:`,
-        req.session
-      );
       res.redirect("/app/");
     });
   } catch (error) {
@@ -378,11 +375,15 @@ router.get("/cloudbeds/callback", async (req, res) => {
     });
 
     req.session.userId = cloudbedsUserIdToUse;
-    req.session.isAdmin = existingUser.is_admin || false;
+    // --- FIX: A Super Admin is always an Admin for session purposes ---
+    // The `existingUser` object comes from a `SELECT *` so it already includes the is_super_admin flag.
+    req.session.isAdmin =
+      existingUser.is_admin || existingUser.is_super_admin || false;
 
     req.session.save((err) => {
       if (err) {
         return res
+
           .status(500)
           .send("An error occurred during authentication session save.");
       }
