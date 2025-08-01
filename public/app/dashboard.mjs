@@ -546,12 +546,13 @@ export default function () {
       });
     },
     // This function now receives both the ID and the name directly from the event.
-    // REPLACE the existing handlePropertyChange method with this one
+    // dashboard.mjs
+
     handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
 
       if (!propertyId || this.currentPropertyId === propertyId) {
-        return;
+        return; // Do nothing if the property hasn't changed
       }
 
       this.currentPropertyId = propertyId;
@@ -559,44 +560,46 @@ export default function () {
       this.isLoading.properties = false;
       this.hasProperties = true;
 
-      // Stop any previous polling timers.
+      // Always stop any previous polling timers when switching properties.
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
-      // --- NEW: Fetch full property details to get the currency ---
+      // Fetch hotel details like currency every time you switch.
       fetch(`/api/hotel-details/${propertyId}`)
         .then((res) => res.json())
         .then((details) => {
-          // Store the correct currency code from the API response
           this.currencyCode = details.currency_code || "USD";
         })
         .catch((err) => {
           console.error("Failed to fetch hotel details", err);
-          // Fallback to USD if the call fails
           this.currencyCode = "USD";
         });
-      // --- END NEW ---
 
       const urlParams = new URLSearchParams(window.location.search);
       const isNewConnection = urlParams.get("newConnection") === "true";
 
+      // --- RESTRUCTURED LOGIC TO FIX THE BUG ---
       if (isNewConnection) {
-        this.isSyncing = true;
+        // This block ONLY runs for a brand new connection.
+        this.isSyncing = true; // Show the sync screen.
+        // Clean the URL so this doesn't run again on refresh.
         window.history.replaceState(
           {},
           document.title,
           window.location.pathname
         );
-      }
 
-      this.checkSyncStatus(propertyId).then(() => {
-        if (this.isSyncing) {
-          this.syncStatusInterval = setInterval(() => {
-            this.checkSyncStatus(propertyId);
-          }, 15000);
-        } else {
-          this.setPreset("current-month");
-        }
-      });
+        // Start the polling process to check for sync completion.
+        this.syncStatusInterval = setInterval(() => {
+          this.checkSyncStatus(propertyId);
+        }, 15000);
+        // Also run an initial check immediately.
+        this.checkSyncStatus(propertyId);
+      } else {
+        // This block runs for a normal property switch.
+        // We assume the data is already synced.
+        this.isSyncing = false; // Ensure the sync screen is hidden.
+        this.setPreset("current-month"); // Immediately load the dashboard data.
+      }
     },
     logout() {
       fetch("/api/auth/logout", { method: "POST" })
