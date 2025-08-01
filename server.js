@@ -90,20 +90,18 @@ app.use(
 app.use(express.static(path.join(process.cwd(), "public")));
 
 // /server.js
-
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
   app.post("/api/dev-login", async (req, res) => {
-    // <-- Made this async
-    const { email, isAdmin = false } = req.body;
+    const { email } = req.body;
     if (!email) {
       return res.status(400).json({ error: "An email is required." });
     }
 
     try {
-      // --- NEW: Look up the real user ID from the database ---
+      // --- FIX: Look up the user's ID and their role from the database ---
       const userResult = await pgPool.query(
-        "SELECT cloudbeds_user_id FROM users WHERE email = $1",
+        "SELECT cloudbeds_user_id, role FROM users WHERE email = $1",
         [email]
       );
 
@@ -113,22 +111,20 @@ if (process.env.VERCEL_ENV !== "production") {
           .json({ error: "User with that email not found in the database." });
       }
 
-      // Get the correct internal ID to store in the session.
-      const realUserId = userResult.rows[0].cloudbeds_user_id;
+      const user = userResult.rows[0];
 
-      // --- Original logic now uses the correct ID ---
-      req.session.userId = realUserId;
-      req.session.isAdmin = isAdmin;
+      // --- FIX: Create the session using the new role system ---
+      req.session.userId = user.cloudbeds_user_id;
+      req.session.role = user.role; // Set the role from the database
+
       req.session.save((err) => {
         if (err) {
           return res.status(500).json({ error: "Failed to save session." });
         }
-        res
-          .status(200)
-          .json({
-            message: `Session created for user ${realUserId}.`,
-            isAdmin,
-          });
+        res.status(200).json({
+          message: `Session created for user ${user.cloudbeds_user_id}.`,
+          role: user.role, // Return the role in the response
+        });
       });
     } catch (error) {
       console.error("Error during dev-login:", error);

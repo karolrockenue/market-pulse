@@ -101,11 +101,25 @@ export default function pageHeader() {
         const response = await fetch("/api/auth/session-info");
         const session = await response.json();
         if (session.isLoggedIn) {
+          // Set user name and initials (this logic is unchanged)
           this.user.name =
             `${session.firstName || ""} ${session.lastName || ""}`.trim() ||
             "User";
           this.user.initials = (session.firstName || "U").charAt(0);
-          this.user.role = session.isAdmin ? "Administrator" : "User";
+
+          // --- FIX: Use the new 'role' property from the API to set the display text ---
+          // This provides a user-friendly name for each role key.
+          switch (session.role) {
+            case "super_admin":
+              this.user.role = "Super Admin";
+              break;
+            case "owner":
+              this.user.role = "Owner";
+              break;
+            default:
+              this.user.role = "User";
+              break;
+          }
         }
       } catch (error) {
         console.error("Error fetching session info:", error);

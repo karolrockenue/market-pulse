@@ -4,7 +4,7 @@ const router = express.Router();
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const { requireUserApi } = require("../utils/middleware"); // Only need user auth for this router
+const { requireUserApi } = require("../utils/middleware");
 
 // Helper function to get the period for SQL queries
 const getPeriod = (granularity) => {
@@ -14,18 +14,15 @@ const getPeriod = (granularity) => {
 };
 
 // --- USER PROFILE API ENDPOINTS ---
-// These endpoints correctly query by the cloudbeds_user_id.
 router.get("/user/profile", requireUserApi, async (req, res) => {
   try {
     const result = await pgPool.query(
       "SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
-
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "User profile not found." });
     }
-
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Error in /api/user/profile:", error);
@@ -62,23 +59,21 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
 
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
-    // Check if the user is a Super Admin
-    if (req.session.isAdmin) {
-      // If they are an admin, fetch all *connected* properties from the system.
-      // This query now joins with user_properties to ensure we only show hotels
-      // that have been actively connected by at least one user, filtering out dummy data.
+    // --- FIX: Check for the 'super_admin' role instead of the old isAdmin flag ---
+    if (req.session.role === "super_admin") {
+      // If the user is a super_admin, fetch all hotels directly from the hotels table.
+      // This ensures they can see every property in the system.
       const query = `
-        SELECT DISTINCT
-          h.hotel_id AS property_id, 
-          h.property_name
-        FROM hotels h
-        JOIN user_properties up ON h.hotel_id = up.property_id
-        ORDER BY h.property_name;
+        SELECT 
+          hotel_id AS property_id, 
+          property_name
+        FROM hotels
+        ORDER BY property_name;
       `;
       const result = await pgPool.query(query);
       return res.json(result.rows);
     } else {
-      // If they are a regular user, run the original query to get only their linked properties.
+      // If they are a regular user ('owner' or 'user'), get only their linked properties.
       const query = `
         SELECT 
           up.property_id, 
@@ -101,8 +96,8 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
 
-    // --- NEW: Bypass access check for Admins ---
-    if (!req.session.isAdmin) {
+    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
         [req.session.userId, propertyId]
@@ -128,13 +123,12 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
   }
 });
 
-// --- ADD THIS NEW ENDPOINT ---
 router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
 
-    // --- NEW: Bypass access check for Admins ---
-    if (!req.session.isAdmin) {
+    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
         [req.session.userId, propertyId]
@@ -144,12 +138,10 @@ router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
       }
     }
 
-    // Now, check if any metrics exist for this hotel. A count > 0 means a sync has run.
     const syncCheck = await pgPool.query(
       "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1 LIMIT 1",
       [propertyId]
     );
-
     res.json({ isSyncComplete: syncCheck.rows.length > 0 });
   } catch (error) {
     console.error("Error in /api/sync-status:", error);
@@ -171,15 +163,14 @@ router.get("/last-refresh-time", requireUserApi, async (req, res) => {
   }
 });
 
-// /api/routes/dashboard.router.js
-
 router.get("/kpi-summary", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    if (!req.session.isAdmin) {
+    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
         "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [req.session.userId, propertyId]
@@ -190,25 +181,21 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
           .json({ error: "Access denied to this property." });
     }
 
-    // --- NEW COMP SET LOGIC ---
-    // 1. Check for a custom comp set first.
-    let compSetResult = await pgPool.query(
+    const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
       [propertyId]
     );
     let competitorIds;
 
     if (compSetResult.rows.length > 0) {
-      // 2. If a custom set exists, use those IDs.
       competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
     } else {
-      // 3. If not, fall back to getting competitors by category.
       const categoryResult = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
         [propertyId]
       );
       const category = categoryResult.rows[0]?.category;
-      if (!category) return res.json({ yourHotel: {}, market: {} }); // No category, no market.
+      if (!category) return res.json({ yourHotel: {}, market: {} });
 
       const categoryCompSetResult = await pgPool.query(
         "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
@@ -218,7 +205,6 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     }
 
     if (competitorIds.length === 0) {
-      // If there are no competitors, we can still fetch data for the user's hotel.
       const yourHotelQuery = `
           SELECT
             (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) AS your_adr,
@@ -234,7 +220,6 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       ]);
       return res.json({ yourHotel: yourHotelResult.rows[0] || {}, market: {} });
     }
-    // --- END NEW COMP SET LOGIC ---
 
     const kpiQuery = `
       SELECT
@@ -251,7 +236,7 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       propertyId,
       startDate,
       endDate,
-      competitorIds, // Use the determined list of competitor IDs
+      competitorIds,
     ]);
     const kpis = result.rows[0] || {};
 
@@ -279,8 +264,8 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // --- NEW: Bypass access check for Admins ---
-    if (!req.session.isAdmin) {
+    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
         "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [req.session.userId, propertyId]
@@ -307,15 +292,14 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
   }
 });
 
-// /api/routes/dashboard.router.js
-
 router.get("/competitor-metrics", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    if (!req.session.isAdmin) {
+    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
         "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [req.session.userId, propertyId]
@@ -326,7 +310,6 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
           .json({ error: "Access denied to this property." });
     }
 
-    // --- NEW COMP SET LOGIC (same as in /kpi-summary) ---
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
       [propertyId]
@@ -354,7 +337,6 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     if (competitorIds.length === 0) {
       return res.json({ metrics: [], competitorCount: 0, totalRooms: 0 });
     }
-    // --- END NEW COMP SET LOGIC ---
 
     const period = getPeriod(granularity);
 

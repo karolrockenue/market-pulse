@@ -43,16 +43,20 @@ async function requireUserApi(req, res, next) {
 
 // --- EXISTING UNCHANGED MIDDLEWARE ---
 const requireAdminApi = (req, res, next) => {
+  // First, check if the user is logged in at all.
   if (!req.session.userId) {
     return res
       .status(401)
       .json({ error: "Unauthorized: User session required." });
   }
-  if (!req.session.isAdmin) {
+  // Second, check if the user's role in the session is 'super_admin'.
+  // This is the core of our security fix.
+  if (req.session.role !== "super_admin") {
     return res
       .status(403)
-      .json({ error: "Forbidden: Administrator access required." });
+      .json({ error: "Forbidden: Super administrator access required." });
   }
+  // If both checks pass, allow the request to proceed.
   next();
 };
 
@@ -112,12 +116,9 @@ async function requireAccountOwner(req, res, next) {
 
     // Case 2: The user is linked, but their credentials are null. This means they are a Team Member, not the owner.
     if (ownerCheck.rows[0].pms_credentials === null) {
-      return res
-        .status(403)
-        .json({
-          error:
-            "Forbidden: You do not have permission to manage this property.",
-        });
+      return res.status(403).json({
+        error: "Forbidden: You do not have permission to manage this property.",
+      });
     }
 
     // If both checks pass, the user is the Account Owner. Allow the request to proceed.

@@ -9,13 +9,14 @@ export default function sidebar() {
     },
 
     // Fetches session info from the server to check for admin status
+    // Fetches session info from the server to check for admin status
     async checkUserRole() {
       try {
         const response = await fetch("/api/auth/session-info");
         const sessionInfo = await response.json();
 
-        // If the session indicates the user is an admin, set the property to true
-        if (sessionInfo.isAdmin) {
+        // --- FIX: Check if the user's role from the API is 'super_admin' ---
+        if (sessionInfo.role === "super_admin") {
           this.isAdmin = true;
         }
       } catch (error) {

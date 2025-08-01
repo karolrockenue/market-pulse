@@ -14,9 +14,13 @@ async function checkAdminSessionAndInitialize() {
     if (!response.ok) throw new Error("Session check failed");
     const sessionInfo = await response.json();
 
-    if (sessionInfo.isAdmin) {
+    // --- FIX: Check for the new 'super_admin' role instead of the old 'isAdmin' flag ---
+    if (sessionInfo.role === "super_admin") {
+      // If the user has the correct role, show the main admin content.
       showAdminContent();
     } else {
+      // If the user is not a super_admin, show the login form.
+      // This is correct behavior for non-admin users trying to access this page.
       loginForm.classList.remove("hidden");
     }
   } catch (error) {

@@ -1,115 +1,103 @@
 // /api/routes/users.router.js
 const express = require("express");
 const router = express.Router();
-const crypto = require("crypto"); // Built-in Node.js module for cryptography
+const crypto = require("crypto");
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const {
-  requireUserApi,
-  requireAdminApi,
-  requireAccountOwner,
-} = require("../utils/middleware");
+const { requireUserApi, requireAccountOwner } = require("../utils/middleware");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// --- NEW: Custom middleware to check if user can invite others ---
+// This allows both 'owner' and 'super_admin' roles to send invitations.
+const requireInvitePermission = (req, res, next) => {
+  if (
+    !req.session.role ||
+    !["owner", "super_admin"].includes(req.session.role)
+  ) {
+    return res.status(403).json({
+      error: "Forbidden: You do not have permission to invite users.",
+    });
+  }
+  next();
+};
 
 /**
  * @route POST /api/users/invite
  * @description Creates an invitation for a new user and sends an email.
- * @access Admin
+ * @access Owner or Super Admin
  */
-router.post("/invite", requireAdminApi, async (req, res) => {
-  try {
-    const { invitee_first_name, invitee_last_name, invitee_email } = req.body;
-    const inviter_user_id = req.session.userId; // This is the cloudbeds_user_id of the admin
+// --- FIX: Use the new, more specific middleware ---
+router.post(
+  "/invite",
+  [requireUserApi, requireInvitePermission],
+  async (req, res) => {
+    try {
+      const { invitee_first_name, invitee_last_name, invitee_email } = req.body;
+      const inviter_user_id = req.session.userId;
 
-    // --- Validation ---
-    if (!invitee_first_name || !invitee_last_name || !invitee_email) {
-      return res.status(400).json({
-        error: "First name, last name, and email are required.",
+      if (!invitee_first_name || !invitee_last_name || !invitee_email) {
+        return res
+          .status(400)
+          .json({ error: "First name, last name, and email are required." });
+      }
+
+      const existingUser = await pgPool.query(
+        "SELECT user_id FROM users WHERE email = $1",
+        [invitee_email]
+      );
+      if (existingUser.rows.length > 0) {
+        return res
+          .status(409)
+          .json({ error: "A user with this email address already exists." });
+      }
+
+      const pendingInvite = await pgPool.query(
+        "SELECT invitation_id FROM user_invitations WHERE invitee_email = $1 AND status = 'pending'",
+        [invitee_email]
+      );
+      if (pendingInvite.rows.length > 0) {
+        return res.status(409).json({
+          error: "An invitation has already been sent to this email address.",
+        });
+      }
+
+      const invitation_token = crypto.randomBytes(32).toString("hex");
+      const expires_at = new Date();
+      expires_at.setDate(expires_at.getDate() + 7);
+
+      const newInvite = await pgPool.query(
+        `INSERT INTO user_invitations (invited_by_user_id, invitee_email, invitee_first_name, invitee_last_name, invitation_token, expires_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [
+          inviter_user_id,
+          invitee_email,
+          invitee_first_name,
+          invitee_last_name,
+          invitation_token,
+          expires_at,
+        ]
+      );
+
+      const invitationLink = `https://www.market-pulse.io/api/auth/accept-invitation?token=${invitation_token}`;
+      const msg = {
+        to: invitee_email,
+        from: { name: "Market Pulse", email: "support@market-pulse.io" },
+        subject: "You've been invited to join Market Pulse",
+        html: `<p>Hello ${invitee_first_name},</p><p>You have been invited to join Market Pulse. Click the link below to accept the invitation and set up your account.</p><a href="${invitationLink}">Accept Invitation</a><p>This link will expire in 7 days.</p>`,
+      };
+      await sgMail.send(msg);
+      res.status(201).json({
+        message: "Invitation sent successfully.",
+        invite: newInvite.rows[0],
       });
+    } catch (error) {
+      console.error("Error sending invitation:", error);
+      res.status(500).json({ error: "Failed to send invitation." });
     }
-
-    // Check if user already exists
-    const existingUser = await pgPool.query(
-      "SELECT user_id FROM users WHERE email = $1",
-      [invitee_email]
-    );
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({
-        error:
-          "A user with this email address already exists. Please use the 'Grant Access' button instead.",
-      });
-    }
-
-    // Check for a pending invitation
-    const pendingInvite = await pgPool.query(
-      "SELECT invitation_id FROM user_invitations WHERE invitee_email = $1 AND status = 'pending'",
-      [invitee_email]
-    );
-    if (pendingInvite.rows.length > 0) {
-      return res.status(409).json({
-        error: "An invitation has already been sent to this email address.",
-      });
-    }
-
-    // --- Create Invitation ---
-    const invitation_token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date();
-    expires_at.setDate(expires_at.getDate() + 7); // Invitation expires in 7 days
-
-    // Get the inviter's user_id (primary key) from their cloudbeds_user_id
-    const inviterResult = await pgPool.query(
-      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [inviter_user_id]
-    );
-    if (inviterResult.rows.length === 0) {
-      return res.status(404).json({ error: "Inviting user not found." });
-    }
-    const inviterPrimaryKey = inviterResult.rows[0].user_id;
-
-    const newInvite = await pgPool.query(
-      `
-        INSERT INTO user_invitations 
-          (inviter_user_id, invitee_email, invitee_first_name, invitee_last_name, invitation_token, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-      `,
-      [
-        inviterPrimaryKey,
-        invitee_email,
-        invitee_first_name,
-        invitee_last_name,
-        invitation_token,
-        expires_at,
-      ]
-    );
-
-    // --- Send Invitation Email ---
-    const invitationLink = `https://www.market-pulse.io/api/auth/accept-invitation?token=${invitation_token}`;
-    const msg = {
-      to: invitee_email,
-      from: "support@market-pulse.io", // Use a verified sender
-      subject: "You've been invited to join Market Pulse",
-      html: `
-        <p>Hello ${invitee_first_name},</p>
-        <p>You have been invited to join Market Pulse. Click the link below to accept the invitation and set up your account.</p>
-        <a href="${invitationLink}">Accept Invitation</a>
-        <p>This link will expire in 7 days.</p>
-      `,
-    };
-
-    await sgMail.send(msg);
-
-    res.status(201).json({
-      message: "Invitation sent successfully.",
-      invite: newInvite.rows[0],
-    });
-  } catch (error) {
-    console.error("Error sending invitation:", error);
-    res.status(500).json({ error: "Failed to send invitation." });
   }
-});
+);
+
 /**
  * @route GET /api/users/team
  * @description Fetches all active users and pending invitations for the user's account.
@@ -117,180 +105,161 @@ router.post("/invite", requireAdminApi, async (req, res) => {
  */
 router.get("/team", requireUserApi, async (req, res) => {
   const requesterCloudbedsId = req.session.userId;
-  const client = await pgPool.connect();
   try {
-    // --- Step 1: Find properties for the requester
-    const propertiesResult = await client.query(
+    const propertiesResult = await pgPool.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
       [requesterCloudbedsId]
     );
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
 
-    let teamCloudbedsIds = [];
-    if (propertyIds.length > 0) {
-      // Find all users who share any of those properties.
-      const teamResult = await client.query(
-        "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
-        [propertyIds]
+    if (propertyIds.length === 0) {
+      const selfResult = await pgPool.query(
+        "SELECT first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = $1",
+        [requesterCloudbedsId]
       );
-      teamCloudbedsIds = teamResult.rows.map((u) => u.user_id);
-    } else {
-      // If the user has no properties, the "team" is just themself.
-      teamCloudbedsIds.push(requesterCloudbedsId);
-    }
-
-    if (teamCloudbedsIds.length === 0) {
-      return res.json([]);
-    }
-
-    // --- Step 2: Fetch all active users on the team, now including their roles ---
-    const activeUsersResult = await client.query(
-      // Add both is_admin and is_super_admin to the SELECT statement.
-      `SELECT first_name, last_name, email, is_admin, is_super_admin FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
-      [teamCloudbedsIds]
-    );
-    const activeUsers = activeUsersResult.rows.map((user) => {
-      // Determine the role string based on the flags.
-      let role = "User"; // Default role
-      if (user.is_super_admin) {
-        role = "Super Admin";
-      } else if (user.is_admin) {
-        role = "Admin";
-      }
-
-      return {
-        name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-        email: user.email,
-        status: "Active",
-        // Assign the determined role.
-        role: role,
+      if (selfResult.rows.length === 0) return res.json([]);
+      const self = selfResult.rows[0];
+      const roleMap = {
+        super_admin: "Super Admin",
+        owner: "Owner",
+        user: "User",
       };
-    });
-
-    // --- Step 3: Fetch all pending invitations sent by anyone on the team ---
-    const teamPksResult = await client.query(
-      "SELECT user_id FROM users WHERE cloudbeds_user_id = ANY($1::text[])",
-      [teamCloudbedsIds]
-    );
-    const teamMemberPks = teamPksResult.rows.map((u) => u.user_id);
-
-    let pendingInvites = [];
-    if (teamMemberPks.length > 0) {
-      const pendingInvitesResult = await client.query(
-        `SELECT invitee_first_name, invitee_last_name, invitee_email
-         FROM user_invitations 
-         WHERE inviter_user_id = ANY($1::int[]) AND status = 'pending'`,
-        [teamMemberPks]
-      );
-      pendingInvites = pendingInvitesResult.rows.map((invite) => ({
-        name: `${invite.invitee_first_name || ""} ${
-          invite.invitee_last_name || ""
-        }`.trim(),
-        email: invite.invitee_email,
-        status: "Pending",
-        // Pending users do not have a role yet, so we default to 'User'.
-        role: "User",
-      }));
+      return res.json([
+        {
+          name: `${self.first_name || ""} ${self.last_name || ""}`.trim(),
+          email: self.email,
+          status: "Active",
+          role: roleMap[self.role] || "User",
+        },
+      ]);
     }
 
-    // --- Step 4: Combine and send the final list ---
+    const teamResult = await pgPool.query(
+      "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
+      [propertyIds]
+    );
+    const teamCloudbedsIds = teamResult.rows.map((u) => u.user_id);
+    if (teamCloudbedsIds.length === 0) return res.json([]);
+
+    const activeUsersResult = await pgPool.query(
+      `SELECT first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
+      [teamCloudbedsIds]
+    );
+    const roleMap = {
+      super_admin: "Super Admin",
+      owner: "Owner",
+      user: "User",
+    };
+    const activeUsers = activeUsersResult.rows.map((user) => ({
+      name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+      email: user.email,
+      status: "Active",
+      role: roleMap[user.role] || "User",
+    }));
+
+    // --- FIX: Corrected column name from 'invited_by_user_id' to 'inviter_user_id' ---
+    const pendingInvitesResult = await pgPool.query(
+      `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE inviter_user_id = ANY(SELECT user_id FROM users WHERE cloudbeds_user_id = ANY($1::text[])) AND status = 'pending'`,
+      [teamCloudbedsIds]
+    );
+    const pendingInvites = pendingInvitesResult.rows.map((invite) => ({
+      name: `${invite.invitee_first_name || ""} ${
+        invite.invitee_last_name || ""
+      }`.trim(),
+      email: invite.invitee_email,
+      status: "Pending",
+      role: "User",
+    }));
+
     const allMembers = [...activeUsers, ...pendingInvites];
     res.json(allMembers);
   } catch (error) {
     console.error("Error fetching team members:", error);
-    res.status(500).json({ error: "Failed to retrieve team data." });
-  } finally {
-    client.release();
+    res.status(500).json({ error: "Could not fetch team members." });
   }
 });
 
 /**
  * @route DELETE /api/users/remove
  * @description Deletes a user and all their associated data from the account.
- * @access Admin
+ * @access Owner or Super Admin
  */
-router.delete("/remove", requireAdminApi, async (req, res) => {
-  const { email: emailToRemove } = req.body;
-  const adminCloudbedsId = req.session.userId;
+router.delete(
+  "/remove",
+  [requireUserApi, requireInvitePermission],
+  async (req, res) => {
+    const { email: emailToRemove } = req.body;
+    const adminCloudbedsId = req.session.userId;
 
-  const client = await pgPool.connect();
-  try {
-    await client.query("BEGIN");
+    const client = await pgPool.connect();
+    try {
+      await client.query("BEGIN");
 
-    // Security Check 1: Prevent self-deletion
-    const adminResult = await client.query(
-      "SELECT email FROM users WHERE cloudbeds_user_id = $1",
-      [adminCloudbedsId]
-    );
-    if (
-      adminResult.rows.length > 0 &&
-      adminResult.rows[0].email === emailToRemove
-    ) {
-      throw new Error("You cannot remove your own account.");
-    }
+      const adminResult = await client.query(
+        "SELECT email FROM users WHERE cloudbeds_user_id = $1",
+        [adminCloudbedsId]
+      );
+      if (
+        adminResult.rows.length > 0 &&
+        adminResult.rows[0].email === emailToRemove
+      ) {
+        throw new Error("You cannot remove your own account.");
+      }
 
-    // Security Check 2: Find the user to be deleted and check their roles
-    const userToRemoveResult = await client.query(
-      // Also select the is_super_admin flag for the user being removed.
-      "SELECT user_id, cloudbeds_user_id, is_super_admin FROM users WHERE email = $1",
-      [emailToRemove]
-    );
-
-    if (userToRemoveResult.rows.length === 0) {
-      // This also handles cases where the user is just a pending invitation, not a full user yet.
-      // We can just delete the invitation record directly.
-      await client.query(
-        "DELETE FROM user_invitations WHERE invitee_email = $1",
+      // --- FIX: Fetch the user's role to check permissions ---
+      const userToRemoveResult = await client.query(
+        "SELECT user_id, cloudbeds_user_id, role FROM users WHERE email = $1",
         [emailToRemove]
       );
+
+      if (userToRemoveResult.rows.length === 0) {
+        await client.query(
+          "DELETE FROM user_invitations WHERE invitee_email = $1",
+          [emailToRemove]
+        );
+        await client.query("COMMIT");
+        return res.status(200).json({
+          message: `Invitation for ${emailToRemove} has been successfully removed.`,
+        });
+      }
+
+      const userToRemove = userToRemoveResult.rows[0];
+
+      // --- FIX: Check the role property to prevent deletion of a super admin ---
+      if (userToRemove.role === "super_admin") {
+        throw new Error("This user is a Super Admin and cannot be removed.");
+      }
+
+      const {
+        user_id: userPkToRemove,
+        cloudbeds_user_id: userCloudbedsIdToRemove,
+      } = userToRemove;
+      await client.query("DELETE FROM user_properties WHERE user_id = $1", [
+        userCloudbedsIdToRemove,
+      ]);
+      await client.query(
+        "DELETE FROM user_invitations WHERE inviter_user_id = $1",
+        [userPkToRemove]
+      );
+      await client.query("DELETE FROM users WHERE user_id = $1", [
+        userPkToRemove,
+      ]);
+
       await client.query("COMMIT");
-      return res.status(200).json({
-        message: `Invitation for ${emailToRemove} has been successfully removed.`,
+      res.status(200).json({
+        message: `User ${emailToRemove} has been successfully removed.`,
       });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error removing user:", error);
+      res
+        .status(400)
+        .json({ error: error.message || "Failed to remove user." });
+    } finally {
+      client.release();
     }
-
-    const userToRemove = userToRemoveResult.rows[0];
-
-    // --- NEW: Security Check 3: Prevent deletion of a Super Admin ---
-    if (userToRemove.is_super_admin) {
-      throw new Error("This user is a Super Admin and cannot be removed.");
-    }
-
-    const {
-      user_id: userPkToRemove,
-      cloudbeds_user_id: userCloudbedsIdToRemove,
-    } = userToRemove;
-
-    // --- Data Deletion ---
-    // 1. Delete property links
-    await client.query("DELETE FROM user_properties WHERE user_id = $1", [
-      userCloudbedsIdToRemove,
-    ]);
-
-    // 2. Delete pending invitations sent by this user
-    await client.query(
-      "DELETE FROM user_invitations WHERE inviter_user_id = $1",
-      [userPkToRemove]
-    );
-
-    // 3. Delete the user record itself
-    await client.query("DELETE FROM users WHERE user_id = $1", [
-      userPkToRemove,
-    ]);
-
-    await client.query("COMMIT");
-
-    res.status(200).json({
-      message: `User ${emailToRemove} has been successfully removed.`,
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error removing user:", error);
-    res.status(400).json({ error: error.message || "Failed to remove user." });
-  } finally {
-    client.release();
   }
-});
+);
 
 /**
  * @route POST /api/users/disconnect-property
@@ -298,67 +267,45 @@ router.delete("/remove", requireAdminApi, async (req, res) => {
  * @access User
  */
 router.post("/disconnect-property", requireUserApi, async (req, res) => {
-  // Extract propertyId from the request body
   const { propertyId } = req.body;
-  // Get the user's unique ID from their session
   const userCloudbedsId = req.session.userId;
 
-  // Basic validation to ensure a property ID was sent
   if (!propertyId) {
     return res.status(400).json({ error: "Property ID is required." });
   }
 
-  // Get a client from the connection pool to run the database transaction
   const client = await pgPool.connect();
   try {
-    // Start a database transaction
     await client.query("BEGIN");
-
-    // Execute the DELETE query to remove the specific link between the user and the property.
-    // This is the core action that "disconnects" the property.
     const deleteResult = await client.query(
       "DELETE FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [userCloudbedsId, propertyId]
     );
-
-    // If no rows were deleted, it means the connection didn't exist or the user
-    // doesn't have permission. This prevents accidental success messages.
     if (deleteResult.rowCount === 0) {
       throw new Error(
         "Property connection not found or you do not have permission."
       );
     }
-
-    // After deleting, check how many properties the user has left.
     const remainingPropsResult = await client.query(
       "SELECT COUNT(*) FROM user_properties WHERE user_id = $1",
       [userCloudbedsId]
     );
-
-    // Parse the count of remaining properties
     const remainingProperties = parseInt(
       remainingPropsResult.rows[0].count,
       10
     );
-
-    // If all queries were successful, commit the transaction to save the changes
     await client.query("COMMIT");
-
-    // Send a success response back to the frontend, including the number of remaining properties.
-    // The frontend will use this to decide whether to redirect the user.
     res.status(200).json({
       message: "Property disconnected successfully.",
       remainingProperties: remainingProperties,
     });
   } catch (error) {
-    // If any error occurred, roll back the transaction to undo any changes
     await client.query("ROLLBACK");
     console.error("Error disconnecting property:", error);
-    res.status(400).json({
-      error: error.message || "Failed to disconnect property.",
-    });
+    res
+      .status(400)
+      .json({ error: error.message || "Failed to disconnect property." });
   } finally {
-    // Always release the client back to the pool
     client.release();
   }
 });
@@ -372,128 +319,81 @@ router.post(
   "/link-property",
   [requireUserApi, requireAccountOwner],
   async (req, res) => {
-    // requireUserApi confirms the user is logged in.
-    // requireAccountOwner confirms they own the property they're trying to share.
-
-    const { email, propertyId } = req.body; // The email of the user to grant access to, and the property to share.
-
-    // --- Validation ---
+    const { email, propertyId } = req.body;
     if (!email || !propertyId) {
       return res
         .status(400)
         .json({ error: "Email and propertyId are required." });
     }
-
     const client = await pgPool.connect();
     try {
-      // Start a database transaction for safety.
       await client.query("BEGIN");
-
-      // --- Find the user to be linked ---
       const userToLinkResult = await client.query(
         "SELECT cloudbeds_user_id FROM users WHERE email = $1",
         [email]
       );
-
       if (userToLinkResult.rows.length === 0) {
-        // If the user doesn't exist in our system, we can't link them.
         throw new Error(
           "User not found. Please ensure the user has an existing Market Pulse account."
         );
       }
-      const userCloudbedsIdToLink = userToLinkResult.rows[0].cloudbeds_user_id;
-
-      // --- Check if the user is already linked to this property ---
+      const userCloudbedsIdToLink = userToLinkResult.rows[0].cloudbeds_id;
       const existingLinkCheck = await client.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [userCloudbedsIdToLink, propertyId]
       );
-
       if (existingLinkCheck.rows.length > 0) {
         throw new Error("This user already has access to this property.");
       }
-
-      // --- Create the new property link ---
-      // The status is 'connected' and pms_credentials will be null by default,
-      // which correctly marks them as a Team Member for this property.
       await client.query(
         "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
         [userCloudbedsIdToLink, propertyId]
       );
-
-      // If all steps succeed, commit the transaction.
       await client.query("COMMIT");
-
       res
         .status(200)
         .json({ message: `Successfully granted access to ${email}.` });
     } catch (error) {
-      // If any error occurs, roll back all changes.
       await client.query("ROLLBACK");
       console.error("Error linking property to user:", error);
-      // Send back a specific error message from our checks or a generic one.
       res
         .status(400)
         .json({ error: error.message || "Failed to grant access." });
     } finally {
-      // Always release the database client back to the pool.
       client.release();
     }
   }
 );
 
 /**
- * @route GET /api/user/owned-properties
- * @description Fetches properties for which the user is the Account Owner.
+ * @route GET /api/users/owned-properties
+ * @description Fetches properties for which the user is the Account Owner, or all properties for a Super Admin.
  * @access User
  */
 router.get("/owned-properties", requireUserApi, async (req, res) => {
   const userCloudbedsId = req.session.userId;
-
   try {
-    // First, check if the logged-in user is a Super Admin.
-    const userRoleResult = await pgPool.query(
-      "SELECT is_super_admin FROM users WHERE cloudbeds_user_id = $1",
-      [userCloudbedsId]
-    );
-    const isSuperAdmin = userRoleResult.rows[0]?.is_super_admin || false;
-
-    let propertiesResult;
-
-    if (isSuperAdmin) {
-      // --- LOGIC FOR SUPER ADMIN ---
-      // A Super Admin can see every property in the system, unconditionally.
-      propertiesResult = await pgPool.query(`
-        SELECT hotel_id AS property_id, property_name FROM hotels ORDER BY property_name
-      `);
+    // --- FIX: Check the user's role from the session ---
+    if (req.session.role === "super_admin") {
+      const propertiesResult = await pgPool.query(
+        `SELECT hotel_id AS property_id, property_name FROM hotels ORDER BY property_name`
+      );
+      res.json(propertiesResult.rows);
     } else {
-      // --- LOGIC FOR SCOPED ADMINS AND REGULAR USERS ---
-      // Fetches all properties belonging to the user's team.
+      // Logic for 'owner' role to find all properties they can manage.
       const query = `
-        SELECT DISTINCT
-          h.hotel_id AS property_id,
-          h.property_name
-        FROM hotels h
-        JOIN user_properties up ON h.hotel_id = up.property_id
-        WHERE up.user_id IN (
-          -- This subquery finds all user_ids on the team
-          SELECT DISTINCT user_id
-          FROM user_properties
-          WHERE property_id IN (
-            -- This subquery finds all property_ids for the current user
-            SELECT property_id FROM user_properties WHERE user_id = $1
-          )
-        )
-        ORDER BY h.property_name;
+          SELECT up.property_id, h.property_name
+          FROM user_properties up
+          JOIN hotels h ON up.property_id = h.hotel_id
+          WHERE up.user_id = $1 AND up.pms_credentials IS NOT NULL
+          ORDER BY h.property_name;
       `;
-      propertiesResult = await pgPool.query(query, [userCloudbedsId]);
+      const propertiesResult = await pgPool.query(query, [userCloudbedsId]);
+      res.json(propertiesResult.rows);
     }
-
-    // Return the final list of properties.
-    res.json(propertiesResult.rows);
   } catch (error) {
-    console.error("Error fetching properties for grant access:", error);
-    res.status(500).json({ error: "Failed to fetch properties." });
+    console.error("Error fetching owned properties:", error);
+    res.status(500).json({ error: "Could not check ownership status." });
   }
 });
 

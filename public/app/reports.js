@@ -24,28 +24,14 @@ function getSelectedColumns() {
 function handlePresetChange(preset) {
   // --- START DEBUGGING BLOCK ---
   console.clear(); // Clears the console for a clean view
-  console.log(`[DEBUG] Preset clicked: "${preset}"`);
 
   const localToday = new Date();
-  console.log(
-    `[DEBUG] 1. localToday (from new Date()):`,
-    localToday.toString()
-  );
-  console.log(`[DEBUG]    - UTC String:`, localToday.toUTCString());
 
   const year = localToday.getFullYear();
   const month = localToday.getMonth();
   const day = localToday.getDate();
-  console.log(
-    `[DEBUG] 2. Local date parts: Year=${year}, Month=${month} (0-indexed), Day=${day}`
-  );
 
   const today = new Date(Date.UTC(year, month, day));
-  console.log(
-    `[DEBUG] 3. 'today' object (created from local parts, interpreted as UTC):`,
-    today.toUTCString()
-  );
-  // --- END DEBUGGING BLOCK ---
 
   let startDate, endDate;
   const dayOfWeek = today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1; // Monday is 0
@@ -81,27 +67,10 @@ function handlePresetChange(preset) {
     return; // No valid preset
   }
 
-  // --- START DEBUGGING BLOCK ---
-  console.log(
-    `[DEBUG] 4. Calculated startDate object:`,
-    startDate.toUTCString()
-  );
-  console.log(`[DEBUG] 5. Calculated endDate object:`, endDate.toUTCString());
-  // --- END DEBUGGING BLOCK ---
-
   // This function's only job is to set the date inputs.
   document.getElementById("start-date").value = formatDateForInput(startDate);
   document.getElementById("end-date").value = formatDateForInput(endDate);
 
-  // --- START DEBUGGING BLOCK ---
-  console.log(
-    `[DEBUG] 6. Start date input value:`,
-    document.getElementById("start-date").value
-  );
-  console.log(
-    `[DEBUG] 7. End date input value:`,
-    document.getElementById("end-date").value
-  );
   // --- END DEBUGGING BLOCK ---
 }
 
@@ -148,7 +117,7 @@ async function handleGenerateReport(component, propertyId) {
       fetchYourHotelMetrics(propertyId, startDate, endDate, granularity),
       fetchMarketMetrics(propertyId, startDate, endDate, granularity),
     ]);
-    console.log("RAW 'Your Hotel' METRICS FROM SERVER:", yourData.metrics);
+
     const liveData = processAndMergeData(yourData.metrics, marketData.metrics);
 
     // public/app/reports.js
