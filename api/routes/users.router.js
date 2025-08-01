@@ -116,12 +116,7 @@ router.post("/invite", requireAdminApi, async (req, res) => {
  * @access User
  */
 router.get("/team", requireUserApi, async (req, res) => {
-  console.log("--- [DEBUG] START /api/users/team ---");
   const requesterCloudbedsId = req.session.userId;
-  console.log(
-    `[DEBUG] 1. Requester cloudbeds_user_id from session: ${requesterCloudbedsId}`
-  );
-
   const client = await pgPool.connect();
   try {
     // --- Step 1: Find properties for the requester
@@ -130,42 +125,37 @@ router.get("/team", requireUserApi, async (req, res) => {
       [requesterCloudbedsId]
     );
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
-    console.log(`[DEBUG] 2. Found property IDs for requester:`, propertyIds);
 
     let teamCloudbedsIds = [];
     if (propertyIds.length > 0) {
-      // If the user has properties, the team is everyone who shares them.
+      // Find all users who share any of those properties.
       const teamResult = await client.query(
         "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
         [propertyIds]
       );
       teamCloudbedsIds = teamResult.rows.map((u) => u.user_id);
     } else {
-      // If the user has no properties, the "team" is just themself for now.
+      // If the user has no properties, the "team" is just themself.
       teamCloudbedsIds.push(requesterCloudbedsId);
     }
-    console.log(
-      `[DEBUG] 3. Defined team members by cloudbeds_user_id:`,
-      teamCloudbedsIds
-    );
 
-    // If teamCloudbedsIds is empty for some reason, we can't proceed.
     if (teamCloudbedsIds.length === 0) {
-      console.log("[DEBUG] 3a. No team members found, returning empty array.");
       return res.json([]);
     }
 
-    // --- Step 2: Fetch all active users on the team ---
+    // --- Step 2: Fetch all active users on the team, now including their admin status ---
     const activeUsersResult = await client.query(
-      `SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
+      // Add the is_admin column to the SELECT statement.
+      `SELECT first_name, last_name, email, is_admin FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
       [teamCloudbedsIds]
     );
     const activeUsers = activeUsersResult.rows.map((user) => ({
       name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
       email: user.email,
       status: "Active",
+      // Add the new role property based on the is_admin flag.
+      role: user.is_admin ? "Admin" : "User",
     }));
-    console.log(`[DEBUG] 4. Fetched active users:`, activeUsers);
 
     // --- Step 3: Fetch all pending invitations sent by anyone on the team ---
     const teamPksResult = await client.query(
@@ -173,7 +163,6 @@ router.get("/team", requireUserApi, async (req, res) => {
       [teamCloudbedsIds]
     );
     const teamMemberPks = teamPksResult.rows.map((u) => u.user_id);
-    console.log(`[DEBUG] 5. Fetched team member primary keys:`, teamMemberPks);
 
     let pendingInvites = [];
     if (teamMemberPks.length > 0) {
@@ -189,21 +178,16 @@ router.get("/team", requireUserApi, async (req, res) => {
         }`.trim(),
         email: invite.invitee_email,
         status: "Pending",
+        // Pending users do not have a role yet, so we default to 'User'.
+        role: "User",
       }));
     }
-    console.log(`[DEBUG] 6. Fetched pending invites:`, pendingInvites);
 
     // --- Step 4: Combine and send the final list ---
     const allMembers = [...activeUsers, ...pendingInvites];
-    console.log(`[DEBUG] 7. Final combined list to be sent:`, allMembers);
-    console.log("--- [DEBUG] END /api/users/team ---");
-
     res.json(allMembers);
   } catch (error) {
-    console.error(
-      "--- [CRITICAL DEBUG] Error fetching team members: ---",
-      error
-    );
+    console.error("Error fetching team members:", error);
     res.status(500).json({ error: "Failed to retrieve team data." });
   } finally {
     client.release();
@@ -217,49 +201,65 @@ router.get("/team", requireUserApi, async (req, res) => {
  */
 router.delete("/remove", requireAdminApi, async (req, res) => {
   const { email: emailToRemove } = req.body;
-  const adminCloudbedsId = req.session.userId; // The cloudbeds_user_id of the admin performing the action.
+  const adminCloudbedsId = req.session.userId;
 
   const client = await pgPool.connect();
   try {
     await client.query("BEGIN");
 
-    // --- Security Check 1: Get admin's email to prevent self-deletion ---
+    // Security Check 1: Prevent self-deletion
     const adminResult = await client.query(
       "SELECT email FROM users WHERE cloudbeds_user_id = $1",
       [adminCloudbedsId]
     );
-
-    if (adminResult.rows.length === 0) {
-      throw new Error("Admin account not found.");
-    }
-
-    if (adminResult.rows[0].email === emailToRemove) {
+    if (
+      adminResult.rows.length > 0 &&
+      adminResult.rows[0].email === emailToRemove
+    ) {
       throw new Error("You cannot remove your own account.");
     }
 
-    // --- Security Check 2: Find the user to be deleted ---
+    // Security Check 2: Find the user to be deleted and check their roles
     const userToRemoveResult = await client.query(
-      "SELECT user_id, cloudbeds_user_id FROM users WHERE email = $1",
+      // Also select the is_super_admin flag for the user being removed.
+      "SELECT user_id, cloudbeds_user_id, is_super_admin FROM users WHERE email = $1",
       [emailToRemove]
     );
 
     if (userToRemoveResult.rows.length === 0) {
-      throw new Error("User to be removed not found.");
+      // This also handles cases where the user is just a pending invitation, not a full user yet.
+      // We can just delete the invitation record directly.
+      await client.query(
+        "DELETE FROM user_invitations WHERE invitee_email = $1",
+        [emailToRemove]
+      );
+      await client.query("COMMIT");
+      return res
+        .status(200)
+        .json({
+          message: `Invitation for ${emailToRemove} has been successfully removed.`,
+        });
     }
+
+    const userToRemove = userToRemoveResult.rows[0];
+
+    // --- NEW: Security Check 3: Prevent deletion of a Super Admin ---
+    if (userToRemove.is_super_admin) {
+      throw new Error("This user is a Super Admin and cannot be removed.");
+    }
+
     const {
       user_id: userPkToRemove,
       cloudbeds_user_id: userCloudbedsIdToRemove,
-    } = userToRemoveResult.rows[0];
+    } = userToRemove;
 
     // --- Data Deletion ---
-
-    // 1. Delete any property links associated with the user
-    [cite_start]; // Note: The user_properties table uses the string-based cloudbeds_user_id as the foreign key [cite: 350, 353]
+    // 1. Delete property links
     await client.query("DELETE FROM user_properties WHERE user_id = $1", [
       userCloudbedsIdToRemove,
     ]);
 
-    // 2. Delete any pending invitations sent by this user
+    // 2. Delete pending invitations sent by this user
     await client.query(
       "DELETE FROM user_invitations WHERE inviter_user_id = $1",
       [userPkToRemove]
@@ -278,7 +278,6 @@ router.delete("/remove", requireAdminApi, async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error removing user:", error);
-    // Send back a specific error message from our checks or a generic one
     res.status(400).json({ error: error.message || "Failed to remove user." });
   } finally {
     client.release();

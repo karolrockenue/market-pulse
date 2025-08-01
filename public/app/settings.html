@@ -197,6 +197,7 @@
                     <tr>
                       <th class="text-left px-4 py-3 font-semibold">Name</th>
                       <th class="text-left px-4 py-3 font-semibold">Email</th>
+                      <th class="text-left px-4 py-3 font-semibold">Role</th>
                       <th class="text-left px-4 py-3 font-semibold">Status</th>
                       <th class="text-right px-4 py-3 font-semibold">
                         Actions
@@ -206,7 +207,7 @@
                   <tbody class="divide-y divide-slate-200">
                     <template x-if="teamMembers.length === 0">
                       <tr>
-                        <td colspan="3" class="text-center py-8 text-slate-500">
+                        <td colspan="5" class="text-center py-8 text-slate-500">
                           You haven't invited any team members yet.
                         </td>
                       </tr>
@@ -221,13 +222,23 @@
                           class="px-4 py-3 text-slate-600"
                           x-text="member.email"
                         ></td>
+                        <td class="px-4 py-3 text-slate-600">
+                          <span
+                            class="px-2 py-0.5 text-xs font-semibold rounded-full"
+                            :class="{
+              'bg-blue-100 text-blue-800': member.role === 'Admin',
+              'bg-slate-100 text-slate-800': member.role === 'User'
+            }"
+                            x-text="member.role"
+                          ></span>
+                        </td>
                         <td class="px-4 py-3">
                           <span
                             class="px-2 py-0.5 text-xs font-semibold rounded-full"
                             :class="{
-            'bg-green-100 text-green-800': member.status === 'Active',
-            'bg-amber-100 text-amber-800': member.status === 'Pending'
-          }"
+              'bg-green-100 text-green-800': member.status === 'Active',
+              'bg-amber-100 text-amber-800': member.status === 'Pending'
+            }"
                             x-text="member.status"
                           ></span>
                         </td>
