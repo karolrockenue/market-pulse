@@ -169,8 +169,10 @@ export default function pageHeader() {
       }
     },
     updateCurrentPropertyName() {
+      // Find the property using a loose equality check (==) to match the
+      // string ID from localStorage against the number ID from the API.
       const currentProp = this.properties.find(
-        (p) => p.property_id === this.currentPropertyId
+        (p) => p.property_id == this.currentPropertyId
       );
       if (currentProp) this.currentPropertyName = currentProp.property_name;
     },
