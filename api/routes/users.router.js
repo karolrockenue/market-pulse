@@ -143,19 +143,29 @@ router.get("/team", requireUserApi, async (req, res) => {
       return res.json([]);
     }
 
-    // --- Step 2: Fetch all active users on the team, now including their admin status ---
+    // --- Step 2: Fetch all active users on the team, now including their roles ---
     const activeUsersResult = await client.query(
-      // Add the is_admin column to the SELECT statement.
-      `SELECT first_name, last_name, email, is_admin FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
+      // Add both is_admin and is_super_admin to the SELECT statement.
+      `SELECT first_name, last_name, email, is_admin, is_super_admin FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
       [teamCloudbedsIds]
     );
-    const activeUsers = activeUsersResult.rows.map((user) => ({
-      name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-      email: user.email,
-      status: "Active",
-      // Add the new role property based on the is_admin flag.
-      role: user.is_admin ? "Admin" : "User",
-    }));
+    const activeUsers = activeUsersResult.rows.map((user) => {
+      // Determine the role string based on the flags.
+      let role = "User"; // Default role
+      if (user.is_super_admin) {
+        role = "Super Admin";
+      } else if (user.is_admin) {
+        role = "Admin";
+      }
+
+      return {
+        name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+        email: user.email,
+        status: "Active",
+        // Assign the determined role.
+        role: role,
+      };
+    });
 
     // --- Step 3: Fetch all pending invitations sent by anyone on the team ---
     const teamPksResult = await client.query(
