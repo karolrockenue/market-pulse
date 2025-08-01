@@ -447,6 +447,10 @@ router.get("/owned-properties", requireUserApi, async (req, res) => {
   try {
     // This query joins user_properties with the hotels table to get property names.
     // The key is "WHERE up.pms_credentials IS NOT NULL", which is our definition of an Account Owner.
+    // --- FIX ---
+    // The previous logic was too restrictive. An admin should be able to grant access
+    // to ANY property they have access to, not just ones where their specific user
+    // record contains the credentials. This query now fetches all properties linked to the user.
     const query = `
       SELECT
         up.property_id,
@@ -456,7 +460,7 @@ router.get("/owned-properties", requireUserApi, async (req, res) => {
       JOIN
         hotels h ON up.property_id = h.hotel_id
       WHERE
-        up.user_id = $1 AND up.pms_credentials IS NOT NULL
+        up.user_id = $1
     `;
 
     const result = await pgPool.query(query, [userCloudbedsId]);
