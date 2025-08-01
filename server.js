@@ -89,23 +89,51 @@ app.use(
 // This must come BEFORE any of the page-serving routes.
 app.use(express.static(path.join(process.cwd(), "public")));
 
+// /server.js
+
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
-  app.post("/api/dev-login", (req, res) => {
-    const { userId, isAdmin = false } = req.body;
-    if (!userId) {
-      return res.status(400).json({ error: "A userId is required." });
+  app.post("/api/dev-login", async (req, res) => {
+    // <-- Made this async
+    const { email, isAdmin = false } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "An email is required." });
     }
-    req.session.userId = userId;
-    req.session.isAdmin = isAdmin;
-    req.session.save((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to save session." });
+
+    try {
+      // --- NEW: Look up the real user ID from the database ---
+      const userResult = await pgPool.query(
+        "SELECT cloudbeds_user_id FROM users WHERE email = $1",
+        [email]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res
+          .status(404)
+          .json({ error: "User with that email not found in the database." });
       }
-      res
-        .status(200)
-        .json({ message: `Session created for user ${userId}.`, isAdmin });
-    });
+
+      // Get the correct internal ID to store in the session.
+      const realUserId = userResult.rows[0].cloudbeds_user_id;
+
+      // --- Original logic now uses the correct ID ---
+      req.session.userId = realUserId;
+      req.session.isAdmin = isAdmin;
+      req.session.save((err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to save session." });
+        }
+        res
+          .status(200)
+          .json({
+            message: `Session created for user ${realUserId}.`,
+            isAdmin,
+          });
+      });
+    } catch (error) {
+      console.error("Error during dev-login:", error);
+      res.status(500).json({ error: "An internal server error occurred." });
+    }
   });
 }
 
@@ -114,7 +142,7 @@ if (process.env.VERCEL_ENV !== "production") {
 app.use("/api/auth", authRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api", reportsRoutes);
-app.use("/api", adminRoutes); // NEW: Use the admin router
+app.use("/api/admin", adminRoutes); // FIX: Use a specific path for the admin router
 app.use("/api/users", userRoutes); // Add this line
 
 // --- STATIC AND FALLBACK ROUTES ---

@@ -171,13 +171,14 @@ router.get("/last-refresh-time", requireUserApi, async (req, res) => {
   }
 });
 
+// /api/routes/dashboard.router.js
+
 router.get("/kpi-summary", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // --- NEW: Bypass access check for Admins ---
     if (!req.session.isAdmin) {
       const accessCheck = await pgPool.query(
         "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
@@ -189,17 +190,51 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
           .json({ error: "Access denied to this property." });
     }
 
-    const hotelCategoryResult = await pgPool.query(
-      "SELECT category FROM hotels WHERE hotel_id = $1",
+    // --- NEW COMP SET LOGIC ---
+    // 1. Check for a custom comp set first.
+    let compSetResult = await pgPool.query(
+      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
       [propertyId]
     );
-    if (
-      hotelCategoryResult.rows.length === 0 ||
-      !hotelCategoryResult.rows[0].category
-    ) {
-      return res.json({ yourHotel: {}, market: {} });
+    let competitorIds;
+
+    if (compSetResult.rows.length > 0) {
+      // 2. If a custom set exists, use those IDs.
+      competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+    } else {
+      // 3. If not, fall back to getting competitors by category.
+      const categoryResult = await pgPool.query(
+        "SELECT category FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+      const category = categoryResult.rows[0]?.category;
+      if (!category) return res.json({ yourHotel: {}, market: {} }); // No category, no market.
+
+      const categoryCompSetResult = await pgPool.query(
+        "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
+        [category, propertyId]
+      );
+      competitorIds = categoryCompSetResult.rows.map((row) => row.hotel_id);
     }
-    const category = hotelCategoryResult.rows[0].category;
+
+    if (competitorIds.length === 0) {
+      // If there are no competitors, we can still fetch data for the user's hotel.
+      const yourHotelQuery = `
+          SELECT
+            (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) AS your_adr,
+            (SUM(rooms_sold)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS your_occupancy,
+            (SUM(total_revenue)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS your_revpar
+          FROM daily_metrics_snapshots
+          WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3;
+        `;
+      const yourHotelResult = await pgPool.query(yourHotelQuery, [
+        propertyId,
+        startDate,
+        endDate,
+      ]);
+      return res.json({ yourHotel: yourHotelResult.rows[0] || {}, market: {} });
+    }
+    // --- END NEW COMP SET LOGIC ---
 
     const kpiQuery = `
       SELECT
@@ -210,16 +245,16 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
           (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
           (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.total_revenue ELSE 0 END)::NUMERIC / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_revpar
       FROM daily_metrics_snapshots dms
-      JOIN hotels h ON dms.hotel_id = h.hotel_id
-      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND h.category = $4;
-`;
+      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND (dms.hotel_id = $1 OR dms.hotel_id = ANY($4::int[]));
+    `;
     const result = await pgPool.query(kpiQuery, [
       propertyId,
       startDate,
       endDate,
-      category,
+      competitorIds, // Use the determined list of competitor IDs
     ]);
     const kpis = result.rows[0] || {};
+
     res.json({
       yourHotel: {
         occupancy: kpis.your_occupancy,
@@ -272,13 +307,14 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
   }
 });
 
+// /api/routes/dashboard.router.js
+
 router.get("/competitor-metrics", requireUserApi, async (req, res) => {
   try {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // --- NEW: Bypass access check for Admins ---
     if (!req.session.isAdmin) {
       const accessCheck = await pgPool.query(
         "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
@@ -290,53 +326,65 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
           .json({ error: "Access denied to this property." });
     }
 
-    const hotelCategoryResult = await pgPool.query(
-      "SELECT category FROM hotels WHERE hotel_id = $1",
+    // --- NEW COMP SET LOGIC (same as in /kpi-summary) ---
+    const compSetResult = await pgPool.query(
+      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
       [propertyId]
     );
-    if (
-      hotelCategoryResult.rows.length === 0 ||
-      !hotelCategoryResult.rows[0].category
-    ) {
-      return res.json({ metrics: [], competitorCount: 0 });
+    let competitorIds;
+
+    if (compSetResult.rows.length > 0) {
+      competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+    } else {
+      const categoryResult = await pgPool.query(
+        "SELECT category FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+      const category = categoryResult.rows[0]?.category;
+      if (!category)
+        return res.json({ metrics: [], competitorCount: 0, totalRooms: 0 });
+
+      const categoryCompSetResult = await pgPool.query(
+        "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
+        [category, propertyId]
+      );
+      competitorIds = categoryCompSetResult.rows.map((row) => row.hotel_id);
     }
-    const category = hotelCategoryResult.rows[0].category;
+
+    if (competitorIds.length === 0) {
+      return res.json({ metrics: [], competitorCount: 0, totalRooms: 0 });
+    }
+    // --- END NEW COMP SET LOGIC ---
+
     const period = getPeriod(granularity);
 
-    const query = `
+    const metricsQuery = `
       SELECT ${period} as period, AVG(dms.adr::numeric) as market_adr, AVG(dms.occupancy_direct::numeric) as market_occupancy, AVG(dms.revpar::numeric) as market_revpar,
       SUM(dms.total_revenue::numeric) as market_total_revenue, SUM(dms.rooms_sold) as market_rooms_sold, SUM(dms.capacity_count) as market_capacity_count
       FROM daily_metrics_snapshots dms
-      JOIN hotels h ON dms.hotel_id = h.hotel_id
-      WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date >= $3::date AND dms.stay_date <= $4::date
+      WHERE dms.hotel_id = ANY($1::int[]) AND dms.stay_date >= $2::date AND dms.stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
     `;
-    const result = await pgPool.query(query, [
-      propertyId,
-      category,
+    const result = await pgPool.query(metricsQuery, [
+      competitorIds,
       startDate,
       endDate,
     ]);
-    const competitorCountResult = await pgPool.query(
-      "SELECT COUNT(DISTINCT hotel_id) FROM hotels WHERE category = $1 AND hotel_id != $2",
-      [category, propertyId]
-    );
 
     const competitorRoomsResult = await pgPool.query(
       `WITH latest_snapshots AS (
         SELECT DISTINCT ON (dms.hotel_id) dms.capacity_count
         FROM daily_metrics_snapshots dms
-        JOIN hotels h ON dms.hotel_id = h.hotel_id
-        WHERE h.category = $1 AND h.hotel_id != $2
+        WHERE dms.hotel_id = ANY($1::int[])
         ORDER BY dms.hotel_id, dms.stay_date DESC
       )
       SELECT SUM(capacity_count)::integer as total_rooms FROM latest_snapshots;`,
-      [category, propertyId]
+      [competitorIds]
     );
 
     res.json({
       metrics: result.rows,
-      competitorCount: parseInt(competitorCountResult.rows[0]?.count || 0, 10),
+      competitorCount: competitorIds.length,
       totalRooms: competitorRoomsResult.rows[0]?.total_rooms || 0,
     });
   } catch (error) {

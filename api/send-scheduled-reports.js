@@ -73,23 +73,44 @@ async function getHotelMetrics(propertyId, startDate, endDate) {
   return rows;
 }
 
-// The function now accepts 'category' instead of 'starRating'
-// The function now accepts 'category' instead of 'starRating'
+// /api/send-scheduled-reports.js
+
+// The function now accepts 'propertyId' and 'category' for fallback.
 async function getMarketMetrics(propertyId, category, startDate, endDate) {
-  const query = `
-    SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
-    FROM daily_metrics_snapshots dms
-    JOIN hotels h ON dms.hotel_id = h.hotel_id
-    WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date::date >= $3 AND dms.stay_date::date <= $4
-    GROUP BY stay_date::date ORDER BY stay_date::date ASC;
-`;
-  // Use the 'category' variable in the query
-  const { rows } = await pgPool.query(query, [
-    propertyId,
-    category,
-    startDate,
-    endDate,
-  ]);
+  // --- NEW COMP SET LOGIC ---
+  const compSetResult = await pgPool.query(
+    "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+    [propertyId]
+  );
+  let query;
+  let queryParams;
+
+  if (compSetResult.rows.length > 0) {
+    // A custom comp set exists. Build the query to use the specific list of competitor IDs.
+    const competitorIds = compSetResult.rows.map(
+      (row) => row.competitor_hotel_id
+    );
+    query = `
+      SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
+      FROM daily_metrics_snapshots dms
+      WHERE dms.hotel_id = ANY($1::int[]) AND dms.stay_date::date >= $2 AND dms.stay_date::date <= $3
+      GROUP BY stay_date::date ORDER BY stay_date::date ASC;
+    `;
+    queryParams = [competitorIds, startDate, endDate];
+  } else {
+    // No custom comp set. Fall back to the original category-based query.
+    query = `
+      SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON dms.hotel_id = h.hotel_id
+      WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date::date >= $3 AND dms.stay_date::date <= $4
+      GROUP BY stay_date::date ORDER BY stay_date::date ASC;
+    `;
+    queryParams = [propertyId, category, startDate, endDate];
+  }
+  // --- END NEW COMP SET LOGIC ---
+
+  const { rows } = await pgPool.query(query, queryParams);
   return rows;
 }
 

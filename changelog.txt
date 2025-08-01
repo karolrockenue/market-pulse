@@ -579,3 +579,51 @@ Date: July 30, 2025
       * Strategic Pivot: A final decision was made to abandon the previous "Pilot Mode" feature, which relied on manually entered API credentials. This feature is no longer necessary now that OAuth connections are permitted for the pilot.
       * First Pilot Connection: The "Cleveland Hotel" was successfully connected to the application using the standard OAuth 2.0 flow.
       * Outcome: The application is now officially certified for a pilot release, a major project milestone. However, a critical bug was discovered post-connection where the dashboard for the newly added hotel displays all zero values for its metrics, despite a successful data sync. The application is currently in a non-functional state for new hotels. The top priorities for the next session are to debug this "all zeros" issue and to perform a full-stack removal of all legacy code related to the manual API connection functionality.
+
+
+
+
+
+
+
+
+
+
+Date: August 1, 2025
+      * Objective: Implement a "Competitive Set Manager" in the Admin Panel to allow super-admins to view and manually curate the specific list of market competitors for any given hotel.
+      * Summary: A full-stack development effort was undertaken to move from a purely automatic, category-based market definition to an optional, manually defined competitive set. The process began with database schema modifications, followed by the creation and successful testing of new backend API endpoints to manage these custom lists. The core application logic for the main dashboard and scheduled reports was then updated to correctly utilize either the custom list or fall back to the category-based default. The final stage involved building a new, interactive modal UI within the Admin Panel for a visual editing experience. This final stage was halted by a persistent, critical frontend bug that prevented the new UI from launching, leaving the feature in a partially completed state.
+      * Key Changes:
+      * Database Schema:
+      * A new table, hotel_comp_sets, was created with a composite primary key (hotel_id, competitor_hotel_id) to store the many-to-many relationships of custom competitive sets.
+      * Backend API & Routing:
+      * The admin.router.js file was updated with two new endpoints:
+      * GET /api/admin/hotel/:hotelId/compset: Fetches the effective comp set for a hotel, correctly falling back from a custom list to a category-based list.
+      * POST /api/admin/hotel/:hotelId/compset: A transactional endpoint to create, update, or clear a hotel's custom competitor list.
+      * A routing bug was fixed in server.js by changing the admin router's mount point from /api to the more specific /api/admin, resolving a 404 error.
+      * Core Application Logic:
+      * The /api/kpi-summary and /api/competitor-metrics endpoints in dashboard.router.js were refactored. Their database queries now detect and prioritize a hotel's custom comp set before falling back to the category-based logic.
+      * The getMarketMetrics helper function in send-scheduled-reports.js was updated with the same fallback logic to ensure data consistency in email reports.
+      * Admin Panel Frontend:
+      * The /public/admin/index.html file was modified to include the complete HTML structure for a new, hidden modal dialog for the Comp Set Manager.
+      * The /public/admin/admin.mjs file underwent an extensive, multi-stage refactor. This included adding logic to open the modal, fetch all necessary data from the new APIs, render the "Current" and "Available" competitor lists, and handle user interactions like moving hotels between lists, searching, and saving changes. All API call paths were updated to use the corrected /api/admin/ prefix.
+      * Step-by-Step Testing:
+      * The backend was tested incrementally using an API client (Insomnia). This confirmed that GET and POST requests worked, session authentication was handled correctly, and the fallback logic was functional.
+      * The core application logic was tested by using the browser's developer console to log in and verify that the main dashboard correctly displayed data based on both a custom comp set and the category-based fallback.
+      * The final stage of testing on the Admin Panel UI failed due to the bug detailed below.
+      * Outcome: The database and all backend logic for the Competitive Set Manager feature are complete, tested, and fully functional. An administrator can successfully manage a custom list via the API, and the rest of the application correctly uses that data. However, the feature is not usable by an end-user because the frontend Admin Panel UI is in a non-working state. A persistent bug prevents the management modal from opening. Clicking the "Manage Comp Set" button results in the following fatal error in the browser console:
+Uncaught (in promise) TypeError: Cannot set properties of undefined (setting 'disabled')
+    at openCompSetManager (admin.mjs:79:29)
+    at HTMLTableSectionElement.<anonymous> (admin.mjs:416:7)
+
+
+### **Date: August 1, 2025 (Part 2)**
+- **Objective**: Debug and finalize the "Competitive Set Manager" feature to ensure it is fully operational from the Admin Panel UI to the main application dashboard.
+- **Summary**: This session focused on resolving a critical frontend bug that made the new Comp Set Manager UI unusable[cite: 526]. After fixing the bug, a full, end-to-end test was conducted to verify that the entire feature, including the backend and core application logic, was working as intended.
+- **Key Changes**:
+    - **Bug Resolution**:
+        - **Problem**: The management modal was non-functional due to a recurring `TypeError: Cannot set properties of undefined` error when trying to open the modal or save changes[cite: 526].
+        - **Root Cause**: The error was traced to two separate typos (`comsetSaveBtn` instead of `compsetSaveBtn`) within the `/public/admin/admin.mjs` file, which prevented JavaScript from correctly referencing the modal's UI elements.
+        - **Resolution**: Both typos were corrected, restoring full functionality to the modal's open and save actions.
+    - **Full-Stack Verification**:
+        - The feature was tested end-to-end. This confirmed that a custom competitive set created in the Admin Panel is correctly saved to the database. It also verified that the main dashboard immediately uses this new list to calculate "The Market" metrics, correctly overriding the category-based default logic[cite: 514, 515].
+- **Outcome**: The "Competitive Set Manager" feature is now stable and functionally complete. The bug that blocked its release has been resolved, providing administrators with a powerful and intuitive tool for market curation[cite: 523].

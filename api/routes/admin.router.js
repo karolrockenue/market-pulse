@@ -5,6 +5,7 @@ console.log("[SERVER STARTUP] Admin router file is being loaded."); // Add this 
 const express = require("express");
 const router = express.Router();
 const fetch = require("node-fetch");
+const format = require("pg-format"); // <-- Add this line
 
 // Import shared utilities
 const pgPool = require("../utils/db");
@@ -428,5 +429,117 @@ router.post(
     }
   }
 );
+
+// --- Comp Set Management Endpoints ---
+
+/**
+ * Gets the effective competitive set for a given hotel.
+ *
+ * It first checks for a manually defined comp set in the `hotel_comp_sets` table.
+ * If found, it returns that list.
+ * If not found, it falls back to finding all other hotels in the same category.
+ */
+router.get("/hotel/:hotelId/compset", requireAdminApi, async (req, res) => {
+  const { hotelId } = req.params;
+
+  try {
+    // First, try to find a custom comp set for this hotel.
+    const customCompSetQuery = `
+      SELECT h.hotel_id, h.property_name, h.category, h.city
+      FROM hotels h
+      JOIN hotel_comp_sets cs ON h.hotel_id = cs.competitor_hotel_id
+      WHERE cs.hotel_id = $1
+      ORDER BY h.property_name;
+    `;
+    const { rows: customCompSet } = await pgPool.query(customCompSetQuery, [
+      hotelId,
+    ]);
+
+    // If a custom comp set exists (even if empty), return it.
+    if (customCompSet.length > 0) {
+      console.log(
+        `[Compset] Found ${customCompSet.length} custom competitors for hotel ${hotelId}.`
+      );
+      return res.json(customCompSet);
+    }
+
+    // If no custom comp set exists, fall back to category-based logic.
+    // First, get the category of the primary hotel.
+    const hotelInfo = await pgPool.query(
+      "SELECT category FROM hotels WHERE hotel_id = $1",
+      [hotelId]
+    );
+    if (hotelInfo.rows.length === 0) {
+      return res.status(404).json({ error: "Primary hotel not found." });
+    }
+    const category = hotelInfo.rows[0].category;
+
+    // Then, find all other hotels in that same category.
+    const categoryCompSetQuery = `
+      SELECT hotel_id, property_name, category, city
+      FROM hotels
+      WHERE category = $1 AND hotel_id != $2
+      ORDER BY property_name;
+    `;
+    const { rows: categoryCompSet } = await pgPool.query(categoryCompSetQuery, [
+      category,
+      hotelId,
+    ]);
+    console.log(
+      `[Compset] No custom set for hotel ${hotelId}. Falling back to category '${category}', found ${categoryCompSet.length} competitors.`
+    );
+    res.json(categoryCompSet);
+  } catch (error) {
+    console.error(`Error fetching comp set for hotel ${hotelId}:`, error);
+    res.status(500).json({ error: "Failed to fetch competitive set." });
+  }
+});
+
+/**
+ * Sets the manual competitive set for a hotel.
+ * This operation is transactional: it deletes all old entries and inserts all new ones.
+ * Sending an empty array for competitorIds will simply clear the custom comp set.
+ */
+router.post("/hotel/:hotelId/compset", requireAdminApi, async (req, res) => {
+  const { hotelId } = req.params;
+  const { competitorIds } = req.body; // Expect an array of hotel IDs
+
+  if (!Array.isArray(competitorIds)) {
+    return res.status(400).json({ error: "competitorIds must be an array." });
+  }
+
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN"); // Start transaction
+
+    // First, delete all existing comp set entries for this hotel.
+    await client.query("DELETE FROM hotel_comp_sets WHERE hotel_id = $1", [
+      hotelId,
+    ]);
+
+    // If there are new competitors to add, insert them.
+    if (competitorIds.length > 0) {
+      // Prepare the data for a bulk insert. Each inner array is a row: [hotel_id, competitor_hotel_id]
+      const values = competitorIds.map((id) => [hotelId, id]);
+      // Use pg-format to create a safe, multi-row INSERT statement.
+      const insertQuery = format(
+        "INSERT INTO hotel_comp_sets (hotel_id, competitor_hotel_id) VALUES %L",
+        values
+      );
+      await client.query(insertQuery);
+    }
+
+    await client.query("COMMIT"); // Commit transaction
+    res.status(200).json({
+      message: `Successfully updated competitive set for hotel ${hotelId}.`,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK"); // Rollback on error
+    console.error(`Error setting comp set for hotel ${hotelId}:`, error);
+    res.status(500).json({ error: "Failed to update competitive set." });
+  } finally {
+    client.release(); // ALWAYS release client
+  }
+});
 
 module.exports = router;
