@@ -122,10 +122,11 @@ export default function pageHeader() {
           const savedPropertyId = localStorage.getItem("selectedPropertyId");
 
           // Check if the saved ID is valid and actually exists in the user's list of properties.
-          // This prevents errors if a user's permissions have changed.
+          // Check if the saved ID is valid by comparing it loosely (==) to handle
+          // a string from localStorage vs a number from the API.
           const isValidSavedProperty =
             savedPropertyId &&
-            this.properties.some((p) => p.property_id === savedPropertyId);
+            this.properties.some((p) => p.property_id == savedPropertyId);
 
           // If a valid saved property exists, use it. Otherwise, default to the first property in the list.
           this.currentPropertyId = isValidSavedProperty
