@@ -261,7 +261,31 @@ router.get("/cloudbeds/callback", async (req, res) => {
   }
 
   try {
-    const tokenResponse = await cloudbedsAdapter.exchangeCodeForToken(code);
+    const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+    const redirectUri =
+      process.env.VERCEL_ENV === "production"
+        ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+        : process.env.CLOUDBEDS_REDIRECT_URI;
+    const params = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: CLOUDBEDS_CLIENT_ID,
+      client_secret: CLOUDBEDS_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      code: code,
+    });
+    const tokenRes = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      {
+        method: "POST",
+        body: params,
+      }
+    );
+    const tokenResponse = await tokenRes.json();
+    if (!tokenResponse.access_token) {
+      throw new Error(
+        "Token exchange failed: " + JSON.stringify(tokenResponse)
+      );
+    }
     const { access_token, refresh_token, expires_in } = tokenResponse;
 
     const pmsCredentials = {
@@ -270,51 +294,48 @@ router.get("/cloudbeds/callback", async (req, res) => {
       token_expiry: new Date(Date.now() + expires_in * 1000),
     };
 
-    const cloudbedsUser = await cloudbedsAdapter.getUserInfo(access_token);
+    const userInfoRes = await fetch(
+      "https://api.cloudbeds.com/api/v1.3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${access_token}` },
+      }
+    );
+    const cloudbedsUser = await userInfoRes.json();
 
-    // This is the fix. The property info is in the 'tokenResponse' object we already have.
-    // We are extracting the property ID and name from the 'resources' array within it.
     const userProperties = tokenResponse.resources.map((resource) => ({
-      property_id: resource.property_id,
-      property_name: resource.property_name,
+      property_id: resource.propertyID.toString(),
+      property_name: resource.propertyName,
     }));
 
     const client = await pgPool.connect();
     try {
       await client.query("BEGIN");
 
-      // --- FIX: Use UPSERT (INSERT ... ON CONFLICT) to handle user creation ---
-      // This creates the user with the 'owner' role if they don't exist,
-      // or does nothing if they already do. It also fetches the final role.
-      // This query now correctly handles conflicts on the 'email' column.
-      // If the user exists, it updates their details. If not, it creates them.
-      // It also returns the user's role in the same step for efficiency.
       const userUpsertQuery = `
         INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, role, pms_type)
         VALUES ($1, $2, $3, $4, 'owner', 'cloudbeds')
-        ON CONFLICT (email) DO UPDATE SET
-            cloudbeds_user_id = EXCLUDED.cloudbeds_user_id,
-            first_name = EXCLUDED.first_name,
-            last_name = EXCLUDED.last_name,
-            updated_at = NOW()
-        RETURNING role;
+        ON CONFLICT (cloudbeds_user_id) DO NOTHING;
       `;
-      const userResult = await client.query(userUpsertQuery, [
+      await client.query(userUpsertQuery, [
         cloudbedsUser.user_id,
         cloudbedsUser.email,
         cloudbedsUser.first_name,
         cloudbedsUser.last_name,
       ]);
 
+      const userResult = await client.query(
+        "SELECT role FROM users WHERE cloudbeds_user_id = $1",
+        [cloudbedsUser.user_id]
+      );
       const userRole = userResult.rows[0].role;
 
-      // Link properties to the user
       for (const property of userProperties) {
+        await syncHotelDetailsToDb(access_token, property.property_id);
+
         const linkQuery = `
-          INSERT INTO user_properties (user_id, property_id, property_name, pms_type, pms_credentials, status)
-          VALUES ($1, $2, $3, 'cloudbeds', $4, 'connected')
+          INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
+          VALUES ($1, $2, $3, 'connected')
           ON CONFLICT (user_id, property_id) DO UPDATE SET
-            property_name = EXCLUDED.property_name,
             pms_credentials = EXCLUDED.pms_credentials,
             status = 'connected',
             updated_at = NOW();
@@ -322,31 +343,36 @@ router.get("/cloudbeds/callback", async (req, res) => {
         await client.query(linkQuery, [
           cloudbedsUser.user_id,
           property.property_id,
-          property.property_name,
           pmsCredentials,
         ]);
       }
 
       await client.query("COMMIT");
 
-      // Set session data
       req.session.userId = cloudbedsUser.user_id;
-      // --- FIX: Set the user's role from the database ---
       req.session.role = userRole;
 
       req.session.save((err) => {
         if (err) throw err;
-        // Trigger the initial sync in the background
-        fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/initial-sync`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
-          },
-          body: JSON.stringify({ userId: cloudbedsUser.user_id }),
-        }).catch((syncErr) =>
-          console.error("Failed to trigger initial sync:", syncErr)
-        );
+
+        const primaryPropertyId = userProperties[0]?.property_id;
+        if (primaryPropertyId) {
+          const syncUrl =
+            process.env.VERCEL_ENV === "production"
+              ? "https://www.market-pulse.io/api/initial-sync"
+              : "http://localhost:3000/api/initial-sync";
+
+          fetch(syncUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
+            },
+            body: JSON.stringify({ propertyId: primaryPropertyId }),
+          }).catch((syncErr) =>
+            console.error("Failed to trigger initial sync:", syncErr)
+          );
+        }
         res.redirect("/app/?newConnection=true");
       });
     } catch (error) {

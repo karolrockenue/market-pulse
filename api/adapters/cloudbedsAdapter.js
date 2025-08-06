@@ -628,8 +628,10 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
 }
 
 module.exports = {
-  exchangeCodeForToken,
-  getUserInfo,
   getAccessToken,
-  //...
+  getNeighborhoodFromCoords,
+  getHistoricalMetrics,
+  getUpcomingMetrics,
+  syncHotelDetailsToDb,
+  syncHotelTaxInfoToDb,
 };
