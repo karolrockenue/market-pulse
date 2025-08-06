@@ -253,9 +253,14 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
   // It is no longer reachable as the UI elements have been removed.
   res.status(410).send("This feature has been deprecated.");
 });
+// /api/routes/auth.router.js
+
 router.get("/cloudbeds/callback", async (req, res) => {
+  // BREADCRUMB 1: Log that the callback has been initiated.
+  console.log("[BREADCRUMB 1] OAuth callback started.");
   const { code } = req.query;
   if (!code) {
+    console.error("[BREADCRUMB FAIL] No authorization code provided.");
     return res.status(400).send("Authorization code is missing.");
   }
 
@@ -283,7 +288,15 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
     );
     const tokenResponse = await tokenRes.json();
+
+    // BREADCRUMB 2: Log the entire token response from Cloudbeds. This is the most critical log.
+    console.log(
+      "[BREADCRUMB 2] Full token response from Cloudbeds:",
+      JSON.stringify(tokenResponse, null, 2)
+    );
+
     if (!tokenResponse.access_token) {
+      console.error("[BREADCRUMB FAIL] Token exchange failed.");
       throw new Error(
         "Token exchange failed: " + JSON.stringify(tokenResponse)
       );
@@ -298,16 +311,35 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
     );
     const cloudbedsUser = await userInfoRes.json();
+    // BREADCRUMB 3: Log the user info we received.
+    console.log(
+      "[BREADCRUMB 3] User info response:",
+      JSON.stringify(cloudbedsUser, null, 2)
+    );
 
+    // This is the key logic we are testing. We need to see if this array is populated.
     const userProperties = tokenResponse.resources
       .filter((r) => typeof r === "string" && r.startsWith("property:"))
       .map((r) => ({
         property_id: r.split(":")[1],
       }));
 
+    // BREADCRUMB 4: Log the results of our property parsing logic.
+    console.log(
+      "[BREADCRUMB 4] Parsed userProperties array:",
+      JSON.stringify(userProperties, null, 2)
+    );
+    if (userProperties.length === 0) {
+      console.warn(
+        "[BREADCRUMB WARN] No properties found in tokenResponse.resources. The hotel sync loop will be skipped."
+      );
+    }
+
     // Step 3: Perform all database operations in a single transaction
     const client = await pgPool.connect();
     try {
+      // BREADCRUMB 5: Announce that we are starting the database transaction.
+      console.log("[BREADCRUMB 5] Starting database transaction.");
       await client.query("BEGIN");
 
       // Upsert the user (create if not exist, update if exist)
@@ -328,6 +360,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
         cloudbedsUser.last_name,
       ]);
       const userRole = userResult.rows[0].role;
+      console.log(
+        `[BREADCRUMB 6] User ${cloudbedsUser.email} upserted successfully.`
+      );
 
       const pmsCredentials = {
         access_token,
@@ -337,10 +372,16 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       // Sync hotel details and link properties to the user
       for (const property of userProperties) {
+        console.log(
+          `[BREADCRUMB 7] LOOP START: Syncing property ID: ${property.property_id}`
+        );
         await cloudbedsAdapter.syncHotelDetailsToDb(
           access_token,
           property.property_id,
           client
+        );
+        console.log(
+          `[BREADCRUMB 8] LOOP: syncHotelDetailsToDb completed for ${property.property_id}.`
         );
 
         const linkQuery = `
@@ -356,9 +397,15 @@ router.get("/cloudbeds/callback", async (req, res) => {
           property.property_id,
           pmsCredentials,
         ]);
+        console.log(
+          `[BREADCRUMB 9] LOOP END: User linked to property ${property.property_id}.`
+        );
       }
 
       await client.query("COMMIT");
+      console.log(
+        "[BREADCRUMB 10] Database transaction committed successfully."
+      );
 
       // Step 4: Handle session and redirect AFTER the database transaction is safely committed
       req.session.userId = cloudbedsUser.user_id;
@@ -377,6 +424,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
             );
         }
 
+        console.log(
+          "[BREADCRUMB 11] Session saved. Triggering initial sync and redirecting user."
+        );
         const primaryPropertyId = userProperties[0]?.property_id;
         if (primaryPropertyId) {
           const syncUrl =
@@ -400,7 +450,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
     } catch (dbError) {
       await client.query("ROLLBACK");
       console.error(
-        "Error during OAuth DB transaction, rolling back:",
+        "[BREADCRUMB FAIL] Error during OAuth DB transaction, rolling back:",
         dbError
       );
       res
@@ -410,7 +460,10 @@ router.get("/cloudbeds/callback", async (req, res) => {
       client.release();
     }
   } catch (error) {
-    console.error("Error during Cloudbeds OAuth callback:", error);
+    console.error(
+      "[BREADCRUMB FAIL] A critical error occurred in OAuth callback:",
+      error
+    );
     res.status(500).send("An internal server error occurred.");
   }
 });
