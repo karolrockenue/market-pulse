@@ -467,6 +467,49 @@ async function getAccessToken(credentials = {}) {
   return tokenData.access_token;
 }
 
+/**
+ * Fetches the profile information for the authenticated user.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @returns {Promise<object>} The user profile object from Cloudbeds.
+ */
+async function getUserInfo(accessToken) {
+  // Make a GET request to the Cloudbeds userinfo endpoint.
+  const response = await fetch("https://api.cloudbeds.com/api/v1.3/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const userInfo = await response.json();
+  // If the request was not successful, throw an error.
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user info: ${JSON.stringify(userInfo)}`);
+  }
+  return userInfo;
+}
+
+/**
+ * Fetches the list of properties associated with a user account.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} userId - The user's cloudbeds_user_id.
+ * @returns {Promise<Array>} An array of property objects.
+ */
+async function getUserProperties(accessToken, userId) {
+  // Make a GET request to the Cloudbeds properties endpoint for the specified user.
+  const response = await fetch(
+    `https://api.cloudbeds.com/api/v1.1/properties?userID=${userId}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+  const propertiesData = await response.json();
+  // If the request was not successful, throw an error.
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch user properties: ${JSON.stringify(propertiesData)}`
+    );
+  }
+  // The API returns an object with a 'data' key containing the array of properties.
+  return propertiesData.data;
+}
+
 // --- NEW FUNCTIONS MOVED FROM /api/utils/cloudbeds.js ---
 
 /**
@@ -603,7 +646,9 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
 }
 
 module.exports = {
-  exchangeCodeForToken, // Add the new function here
+  exchangeCodeForToken,
+  getUserInfo, // Add this line
+  getUserProperties, // Add this line
   getAccessToken,
   getNeighborhoodFromCoords,
   getHistoricalMetrics,
