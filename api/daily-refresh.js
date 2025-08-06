@@ -133,10 +133,10 @@ module.exports = async (request, response) => {
     await pgPool.query(systemStateQuery, ["last_successful_refresh", jobData]);
     console.log("System state updated successfully.");
     // --- END OF FIX ---
-
+    // The response should reflect the new property-centric logic.
     response.status(200).json({
       status: "Success",
-      processedUsers: activeUsers.length,
+      processedProperties: connectedProperties.length,
       totalRecordsUpdated: totalRecordsUpdated,
     });
   } catch (error) {
