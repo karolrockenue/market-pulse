@@ -7,6 +7,7 @@ const sgMail = require("@sendgrid/mail");
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
 const { syncHotelDetailsToDb } = require("../utils/cloudbeds");
+const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
