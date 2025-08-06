@@ -395,8 +395,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
           VALUES ($1, $2, $3, 'connected')
           ON CONFLICT (user_id, property_id) DO UPDATE SET
             pms_credentials = EXCLUDED.pms_credentials,
-            status = 'connected',
-            updated_at = NOW();
+            status = 'connected';
         `;
         await client.query(linkQuery, [
           cloudbedsUser.user_id,
