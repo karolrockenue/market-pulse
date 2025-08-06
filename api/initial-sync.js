@@ -33,17 +33,13 @@ async function runSync(propertyId) {
       throw new Error(`No user link found for property ${propertyId}.`);
     }
     // /initial-sync.js
-
-    // ... (previous code)
+    // ...
     const user = result.rows[0];
 
     // ** THE FIX **
-    // The original code was passing the entire credentials object to getAccessToken.
-    // We now pass the definitive `propertyId` string, which allows our refactored
-    // adapter function to work correctly.
+    // Pass the correct `propertyId` string instead of the credentials object.
     const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
-
-    // Start the database transaction
+    // ...
     // ... (subsequent code)
 
     // Start the database transaction
