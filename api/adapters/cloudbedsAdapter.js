@@ -500,17 +500,29 @@ async function getUserInfo(accessToken) {
  * @param {string} propertyId - The ID of the property to get details for.
  * @returns {Promise<object|null>} The hotel details object or null on failure.
  */
+// /api/adapters/cloudbedsAdapter.js
+
 async function getHotelDetails(accessToken, propertyId) {
   const url = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      // Add the Authorization header with the Bearer token for authentication.
+      Authorization: `Bearer ${accessToken}`,
+      // CRITICAL FIX: Add the X-PROPERTY-ID header. Many Cloudbeds property-specific
+      // endpoints require this header to be explicitly set, even if the ID is in the URL.
+      "X-PROPERTY-ID": propertyId,
+    },
   });
   const data = await response.json();
+  // Check if the HTTP response was not OK, or if the API's own success flag is false.
   if (!response.ok || !data.success) {
+    // Log the failure for debugging purposes.
     console.error(`Failed to fetch details for property ${propertyId}:`, data);
+    // Return null to indicate failure without crashing the entire sync process.
     return null;
   }
-  return data.data; // Return the nested 'data' object
+  // If successful, return the nested 'data' object which contains the hotel details.
+  return data.data;
 }
 
 /**

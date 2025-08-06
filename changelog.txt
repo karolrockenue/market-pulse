@@ -821,3 +821,29 @@ Date: August 5, 2025
                * Final Component Refactor: The design_sidebar prototype component was promoted to production. All references across the application were updated, and the old, now-obsolete header and sidebar component files were removed.
                * Backend Dependency Audit: A full scan of the backend codebase was conducted to confirm that no services or API endpoints had any lingering dependencies on the deleted header component, ensuring the refactor was safe and complete.
                * Outcome: The application's user interface has been completely and successfully overhauled. All authenticated pages now share a single, consistent, and modern "headerless" design. The new, feature-rich dashboard is fully functional, and the project's architecture is clean and robust. The next step for the next session will be to move these changes to the live environment on Git.
+Date: August 6, 2025
+               * Objective: Deploy the new "headerless" UI design to production and conduct a full-stack debugging session to resolve a critical, latent bug in the user onboarding flow.
+               * Summary: This was an exceptionally complex session that began with resolving a series of Git and environment issues during the initial deployment attempt. This was followed by a deep, iterative debugging of the entire OAuth 2.0 callback, which was found to be completely non-functional in the live environment. After a series of targeted fixes failed to produce a stable result, a full repository rollback was executed to a previously stable version. This rollback surprisingly revealed that the OAuth bug was a pre-existing, latent issue, not a regression from the new UI. The session concluded by rolling the repository forward again to restore the new design and applying a final, comprehensive patch, which ultimately did not resolve the core problem.
+               * Key Changes:
+               * Deployment & Environment Fixes:
+               * Resolved a fatal: Authentication failed error by regenerating an expired GitHub Personal Access Token.
+               * Bypassed GitHub's Push Protection, which was blocking a commit containing a secret OPENAI_API_KEY, by removing the .env file from the Git history using git rm --cached and git rebase -i.
+               * Fixed a local server crash (Error: secret option required for sessions) by restoring a missing .env file.
+               * Iterative OAuth Debugging:
+               * A series of cascading errors in the /api/auth/cloudbeds/callback route were diagnosed and fixed in sequence. This included multiple ReferenceError and TypeError exceptions for missing functions in the cloudbedsAdapter (exchangeCodeForToken, getUserInfo), and several database errors, including a duplicate key violation and a column does not exist error.
+               * Repository Rollback & Redeployment:
+               * When the iterative fixes did not immediately stabilize the system, a decision was made to roll back. The repository was reverted to a known-good commit from before the UI overhaul using git reset --hard and git push --force.
+               * Resolved a subsequent Vercel deployment issue by creating and pushing an empty commit to manually trigger a new build.
+               * Final State Restoration & Patch:
+               * After the rollback proved the bug was pre-existing, the repository was rolled forward to the latest version (with the new UI) using git reflog.
+               * A final, consolidated patch was created by comparing the broken code with a working backup, and the entire /cloudbeds/callback function in auth.router.js was replaced.
+               * Outcome: The final patch did not resolve the underlying issue. The application remains in a non-functional state for new user onboarding via the Cloudbeds OAuth 2.0 flow.
+________________
+
+
+Note: Current Unresolved Issue
+The symptoms of the current bug are as follows:
+               * The Cloudbeds OAuth authorization flow completes successfully from the end-user's perspective, with no visible errors in the browser.
+               * The user is correctly redirected back to the Market Pulse dashboard after authorization.
+               * The newly connected hotel's details are not being saved to the hotels table in the database.
+               * The dashboard loads with a pre-existing property selected, not the property that was just connected.
