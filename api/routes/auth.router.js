@@ -318,10 +318,16 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
 
     // This is the key logic we are testing. We need to see if this array is populated.
+    // /api/routes/auth.router.js
+
+    // CRITICAL FIX: The parsing logic has been updated to match the new API response format.
+    // The 'resources' array now contains objects, not strings.
     const userProperties = tokenResponse.resources
-      .filter((r) => typeof r === "string" && r.startsWith("property:"))
+      // Filter the array to only include objects where the 'type' is 'property'.
+      .filter((r) => r && r.type === "property" && r.id)
+      // Map the filtered array to our desired format, extracting the 'id'.
       .map((r) => ({
-        property_id: r.split(":")[1],
+        property_id: r.id,
       }));
 
     // BREADCRUMB 4: Log the results of our property parsing logic.
