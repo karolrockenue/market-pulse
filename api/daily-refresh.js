@@ -27,80 +27,93 @@ module.exports = async (request, response) => {
       const propertyId = prop.property_id;
       console.log(`--- Processing property: ${propertyId} ---`);
       try {
-        // ...
+        // Get the user_id associated with this property. We need this for the INSERT query.
+        // We take the first one found, assuming any user linked to the property is valid for this purpose.
+        const userResult = await pgPool.query(
+          "SELECT user_id FROM user_properties WHERE property_id = $1 LIMIT 1",
+          [propertyId]
+        );
 
-        // ... (previous code)
-
-        for (const prop of userProperties) {
-          const propertyId = prop.property_id;
-
-          // ** THE FIX **
-          // We are now calling the refactored getAccessToken function.
-          // Instead of passing in a potentially incomplete credentials object, we pass
-          // the definitive propertyId. The adapter will now handle finding the correct
-          // credentials and refreshing the token, fixing the sync failure.
-          const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
-
-          console.log(`-- Starting refresh for property: ${propertyId} --`);
-
-          const processedData = await cloudbedsAdapter.getUpcomingMetrics(
-            accessToken,
-            propertyId
+        if (userResult.rows.length === 0) {
+          // If no user is linked, we can't get credentials. Log and skip.
+          console.error(
+            `-- Could not find a user for property ${propertyId}. Skipping. --`
           );
-          // ... (subsequent code)
-
-          const datesToUpdate = Object.keys(processedData);
-
-          if (datesToUpdate.length > 0) {
-            const client = await pgPool.connect();
-            try {
-              await client.query("BEGIN");
-              const bulkInsertValues = datesToUpdate.map((date) => {
-                const metrics = processedData[date];
-                return [
-                  date,
-                  propertyId,
-                  metrics.adr,
-                  metrics.occupancy,
-                  metrics.revpar,
-                  metrics.rooms_sold,
-                  metrics.capacity_count,
-                  // MODIFIED: Use room_revenue instead of total_revenue for the insert.
-                  // The database column remains `total_revenue`, but the value is now from room_revenue.
-                  metrics.room_revenue,
-                  user.cloudbeds_user_id,
-                ];
-              });
-              const query = format(
-                `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
-                 VALUES %L
-                 ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
-                     adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
-                     capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;`,
-                bulkInsertValues
-              );
-              await client.query(query);
-              await client.query("COMMIT");
-              totalRecordsUpdated += datesToUpdate.length;
-              console.log(
-                `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId} using bulk insert. --`
-              );
-            } catch (e) {
-              await client.query("ROLLBACK");
-              throw e;
-            } finally {
-              client.release();
-            }
-          } else {
-            console.log(
-              `-- No new records to update for property ${propertyId}. --`
-            );
-          }
+          continue; // Move to the next property in the loop
         }
-      } catch (userError) {
+        const cloudbedsUserId = userResult.rows[0].user_id;
+
+        // Get a valid access token for the property using the adapter
+        const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
+
+        // Fetch the upcoming metrics data from the Cloudbeds API
+        const processedData = await cloudbedsAdapter.getUpcomingMetrics(
+          accessToken,
+          propertyId
+        );
+
+        const datesToUpdate = Object.keys(processedData);
+
+        if (datesToUpdate.length > 0) {
+          // Use a dedicated client for the transaction
+          const client = await pgPool.connect();
+          try {
+            // Start the transaction
+            await client.query("BEGIN");
+
+            // Prepare the values for the bulk insert/update operation
+            const bulkInsertValues = datesToUpdate.map((date) => {
+              const metrics = processedData[date];
+              return [
+                date,
+                propertyId,
+                metrics.adr,
+                metrics.occupancy,
+                metrics.revpar,
+                metrics.rooms_sold,
+                metrics.capacity_count,
+                metrics.room_revenue, // Using room_revenue for the total_revenue column
+                cloudbedsUserId, // Use the user ID we fetched earlier
+              ];
+            });
+
+            // Format the query to handle bulk insertion and update on conflict
+            const query = format(
+              `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+               VALUES %L
+               ON CONFLICT (hotel_id, stay_date, cloudbeds_user_id) DO UPDATE SET
+                   adr = EXCLUDED.adr, occupancy_direct = EXCLUDED.occupancy_direct, revpar = EXCLUDED.revpar, rooms_sold = EXCLUDED.rooms_sold,
+                   capacity_count = EXCLUDED.capacity_count, total_revenue = EXCLUDED.total_revenue;`,
+              bulkInsertValues
+            );
+
+            // Execute the query
+            await client.query(query);
+            // Commit the transaction
+            await client.query("COMMIT");
+
+            totalRecordsUpdated += datesToUpdate.length;
+            console.log(
+              `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId}. --`
+            );
+          } catch (e) {
+            // If any error occurs, roll back the transaction
+            await client.query("ROLLBACK");
+            throw e; // Re-throw the error to be caught by the outer catch block
+          } finally {
+            // Always release the client back to the pool
+            client.release();
+          }
+        } else {
+          console.log(
+            `-- No new records to update for property ${propertyId}. --`
+          );
+        }
+      } catch (propertyError) {
+        // Catch any error for a specific property and log it, so the main job can continue
         console.error(
-          `Failed to process user ${user.cloudbeds_user_id}. Error:`,
-          userError.message
+          `-- Failed to process property ${propertyId}. Error: --`,
+          propertyError.message
         );
       }
     }
