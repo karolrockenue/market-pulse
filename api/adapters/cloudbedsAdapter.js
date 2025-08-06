@@ -373,6 +373,59 @@ async function getUpcomingMetrics(accessToken, propertyId) {
  * @param {object} credentials - The pms_credentials object from the database.
  * @returns {Promise<string>} A valid access token.
  */
+
+/**
+ * Exchanges an authorization code for a full token set.
+ * This is the first step of the OAuth2 flow.
+ * @param {string} code - The authorization code from the Cloudbeds redirect.
+ * @returns {Promise<object>} The full token response object from Cloudbeds.
+ */
+async function exchangeCodeForToken(code) {
+  // Get the necessary credentials and redirect URI from environment variables.
+  const {
+    CLOUDBEDS_CLIENT_ID,
+    CLOUDBEDS_CLIENT_SECRET,
+    CLOUDBEDS_REDIRECT_URI,
+  } = process.env;
+
+  // Determine the correct redirect URI based on the environment (production or local).
+  const redirectUri =
+    process.env.VERCEL_ENV === "production"
+      ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
+      : CLOUDBEDS_REDIRECT_URI;
+
+  // Prepare the parameters for the token exchange API call.
+  const params = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    redirect_uri: redirectUri,
+    code: code,
+  });
+
+  // Make the POST request to the Cloudbeds access token endpoint.
+  const tokenRes = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    {
+      method: "POST",
+      body: params,
+    }
+  );
+
+  const tokenData = await tokenRes.json();
+
+  // If the response from Cloudbeds does not include an access token, something went wrong.
+  if (!tokenData.access_token) {
+    throw new Error(
+      "Authorization code exchange failed. Response from Cloudbeds: " +
+        JSON.stringify(tokenData)
+    );
+  }
+
+  // Return the entire token object, which includes the access token, refresh token, and expiry time.
+  return tokenData;
+}
+
 async function getAccessToken(credentials = {}) {
   // This is the standard 'oauth' mode logic.
   // We first check if a refresh token exists in the credentials provided.
@@ -550,11 +603,11 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
 }
 
 module.exports = {
+  exchangeCodeForToken, // Add the new function here
   getAccessToken,
   getNeighborhoodFromCoords,
   getHistoricalMetrics,
   getUpcomingMetrics,
-  // --- ADD THE NEWLY MOVED FUNCTIONS ---
   syncHotelDetailsToDb,
   syncHotelTaxInfoToDb,
 };
