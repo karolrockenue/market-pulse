@@ -449,8 +449,14 @@ router.get("/cloudbeds/callback", async (req, res) => {
             console.error("Failed to trigger initial sync:", syncErr)
           );
         }
+        // /api/routes/auth.router.js
 
-        res.redirect("/app/?newConnection=true");
+        // CRITICAL FIX: Add the new propertyId to the redirect URL.
+        // This allows the frontend to know exactly which property to select
+        // and check the sync status for.
+        res.redirect(
+          `/app/?newConnection=true&propertyId=${primaryPropertyId}`
+        );
       });
     } catch (dbError) {
       await client.query("ROLLBACK");

@@ -237,13 +237,42 @@ export default function () {
     // chart and chartUpdateTimeout have been removed.
 
     // --- INITIALIZATION ---
+    // public/app/dashboard.mjs
+
     init() {
-      // Sets up the event listener that will trigger all data loading once the sidebar is ready.
+      // This new logic runs once when the page first loads.
+      const urlParams = new URLSearchParams(window.location.search);
+      const newPropertyId = urlParams.get("propertyId");
+      const isNewConnection = urlParams.get("newConnection") === "true";
+
+      // If a new propertyId is found in the URL from the redirect,
+      // we immediately set it in localStorage. This tells the sidebar component
+      // to select this property as the default when it loads.
+      if (newPropertyId) {
+        localStorage.setItem("currentPropertyId", newPropertyId);
+      }
+
+      // If it's a new connection, we must show the sync indicator immediately.
+      if (isNewConnection) {
+        this.isSyncing = true;
+        // The propertyId from the URL is the one we need to check.
+        const propertyToCheck =
+          newPropertyId || localStorage.getItem("currentPropertyId");
+
+        // Start polling the sync status endpoint every 15 seconds.
+        this.syncStatusInterval = setInterval(() => {
+          this.checkSyncStatus(propertyToCheck);
+        }, 15000);
+        // Also run an initial check right away.
+        this.checkSyncStatus(propertyToCheck);
+      }
+
+      // The event listener for 'property-changed' remains. It will be triggered
+      // by the sidebar after it initializes and reads the correct propertyId from localStorage.
       window.addEventListener("property-changed", (event) => {
         this.handlePropertyChange(event.detail);
       });
 
-      // Initializes the chart containers on the page.
       this.initializeDashboard();
     },
     initializeDashboard() {
@@ -498,17 +527,21 @@ export default function () {
       });
     },
 
-    // --- EVENT HANDLERS & HELPERS ---
+    // public/app/dashboard.mjs
+
     handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
+      // Prevent reloading if the property is already selected.
       if (!propertyId || this.currentPropertyId === propertyId) {
         return;
       }
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
 
+      // Clear any previous sync interval when the user manually changes properties.
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
+      // Fetch currency details for the newly selected property.
       fetch(`/api/hotel-details/${propertyId}`)
         .then((res) => res.json())
         .then((details) => {
@@ -516,23 +549,12 @@ export default function () {
         })
         .catch((err) => {
           console.error("Failed to fetch hotel details", err);
-          this.currencyCode = "USD";
+          this.currencyCode = "USD"; // Default currency on error
         });
 
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get("newConnection") === "true") {
-        this.isSyncing = true;
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
-        this.syncStatusInterval = setInterval(() => {
-          this.checkSyncStatus(propertyId);
-        }, 15000);
-        this.checkSyncStatus(propertyId);
-      } else {
-        this.isSyncing = false;
+      // The logic to check for 'newConnection' has been moved to init().
+      // If we are not in the middle of a sync, load the report for the selected property.
+      if (!this.isSyncing) {
         this.setPreset("current-month");
       }
     },
