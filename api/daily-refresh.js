@@ -22,12 +22,19 @@ module.exports = async (request, response) => {
           [user.cloudbeds_user_id]
         );
         const userProperties = propertiesResult.rows;
+        // /api/daily-refresh.js
+
+        // ... (previous code)
 
         for (const prop of userProperties) {
           const propertyId = prop.property_id;
-          const accessToken = await cloudbedsAdapter.getAccessToken(
-            prop.pms_credentials
-          );
+
+          // ** THE FIX **
+          // We are now calling the refactored getAccessToken function.
+          // Instead of passing in a potentially incomplete credentials object, we pass
+          // the definitive propertyId. The adapter will now handle finding the correct
+          // credentials and refreshing the token, fixing the sync failure.
+          const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
 
           console.log(`-- Starting refresh for property: ${propertyId} --`);
 
@@ -35,6 +42,7 @@ module.exports = async (request, response) => {
             accessToken,
             propertyId
           );
+          // ... (subsequent code)
 
           const datesToUpdate = Object.keys(processedData);
 

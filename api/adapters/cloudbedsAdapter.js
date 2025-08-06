@@ -426,16 +426,49 @@ async function exchangeCodeForToken(code) {
   return tokenData;
 }
 
-async function getAccessToken(credentials = {}) {
-  // This is the standard 'oauth' mode logic.
-  // We first check if a refresh token exists in the credentials provided.
-  if (!credentials.refresh_token) {
+// /api/adapters/cloudbedsAdapter.js
+
+// ... (previous code)
+
+/**
+ * NEW: A robust, centralized function to find the valid PMS credentials for a property.
+ * This is the single source of truth for getting credentials.
+ * @param {string} propertyId The ID of the property.
+ * @returns {Promise<object>} The pms_credentials object.
+ */
+async function getCredentialsForProperty(propertyId) {
+  // This query finds the user_properties record for the given property that contains
+  // a non-null refresh_token. This correctly handles the scenario where an invited admin
+  // has a link to a property, but the credentials belong to the original owner.
+  const credsResult = await pgPool.query(
+    `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
+    [propertyId]
+  );
+
+  const credentials = credsResult.rows[0]?.pms_credentials;
+
+  // If no record is found, it means we have no way to authenticate for this property.
+  if (!credentials || !credentials.refresh_token) {
     throw new Error(
-      "Authentication failed: No refresh_token found in credentials for the user."
+      `Could not find valid credentials with a refresh_token for property ${propertyId}.`
     );
   }
 
-  // Prepare the request to the Cloudbeds token endpoint.
+  return credentials;
+}
+
+/**
+ * REFACTORED: Gets a valid access token for a property.
+ * It now takes a propertyId, uses the new centralized function to get credentials,
+ * and then refreshes the token.
+ * @param {string} propertyId The ID of the property to get a token for.
+ * @returns {Promise<string>} A valid access token.
+ */
+async function getAccessToken(propertyId) {
+  // Step 1: Get the correct credentials using our new centralized function.
+  const credentials = await getCredentialsForProperty(propertyId);
+
+  // Step 2: Use the refresh token from the credentials to get a new access token.
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
@@ -444,7 +477,6 @@ async function getAccessToken(credentials = {}) {
     refresh_token: credentials.refresh_token,
   });
 
-  // Make the API call to get a new access token.
   const tokenRes = await fetch(
     "https://hotels.cloudbeds.com/api/v1.1/access_token",
     {
@@ -455,7 +487,6 @@ async function getAccessToken(credentials = {}) {
 
   const tokenData = await tokenRes.json();
 
-  // If the response from Cloudbeds does not include an access token, something is wrong.
   if (!tokenData.access_token) {
     throw new Error(
       "Token refresh failed. Response from Cloudbeds: " +
@@ -466,6 +497,8 @@ async function getAccessToken(credentials = {}) {
   // Return the new access token.
   return tokenData.access_token;
 }
+
+// ... (subsequent code)
 
 /**
  * Fetches the profile information for the authenticated user.
