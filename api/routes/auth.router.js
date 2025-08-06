@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
-const { syncHotelDetailsToDb } = require("../utils/cloudbeds");
+
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -338,7 +338,11 @@ router.get("/cloudbeds/callback", async (req, res) => {
       const userRole = userResult.rows[0].role;
 
       for (const property of userProperties) {
-        await syncHotelDetailsToDb(access_token, property.property_id);
+        await cloudbedsAdapter.syncHotelDetailsToDb(
+          access_token,
+          property.property_id,
+          client
+        );
 
         const linkQuery = `
           INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
