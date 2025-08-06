@@ -491,24 +491,6 @@ async function getUserInfo(accessToken) {
  * @param {string} userId - The user's cloudbeds_user_id.
  * @returns {Promise<Array>} An array of property objects.
  */
-async function getUserProperties(accessToken, userId) {
-  // Make a GET request to the Cloudbeds properties endpoint for the specified user.
-  const response = await fetch(
-    `https://api.cloudbeds.com/api/v1.1/properties?userID=${userId}`,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    }
-  );
-  const propertiesData = await response.json();
-  // If the request was not successful, throw an error.
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch user properties: ${JSON.stringify(propertiesData)}`
-    );
-  }
-  // The API returns an object with a 'data' key containing the array of properties.
-  return propertiesData.data;
-}
 
 // --- NEW FUNCTIONS MOVED FROM /api/utils/cloudbeds.js ---
 
@@ -647,12 +629,7 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
 
 module.exports = {
   exchangeCodeForToken,
-  getUserInfo, // Add this line
-  getUserProperties, // Add this line
+  getUserInfo,
   getAccessToken,
-  getNeighborhoodFromCoords,
-  getHistoricalMetrics,
-  getUpcomingMetrics,
-  syncHotelDetailsToDb,
-  syncHotelTaxInfoToDb,
+  //...
 };

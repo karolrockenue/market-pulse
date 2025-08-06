@@ -271,10 +271,13 @@ router.get("/cloudbeds/callback", async (req, res) => {
     };
 
     const cloudbedsUser = await cloudbedsAdapter.getUserInfo(access_token);
-    const userProperties = await cloudbedsAdapter.getUserProperties(
-      access_token,
-      cloudbedsUser.user_id
-    );
+
+    // This is the fix. The property info is in the 'tokenResponse' object we already have.
+    // We are extracting the property ID and name from the 'resources' array within it.
+    const userProperties = tokenResponse.resources.map((resource) => ({
+      property_id: resource.property_id,
+      property_name: resource.property_name,
+    }));
 
     const client = await pgPool.connect();
     try {
