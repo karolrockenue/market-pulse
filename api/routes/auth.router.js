@@ -253,7 +253,6 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
   // It is no longer reachable as the UI elements have been removed.
   res.status(410).send("This feature has been deprecated.");
 });
-
 router.get("/cloudbeds/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) {
@@ -261,11 +260,13 @@ router.get("/cloudbeds/callback", async (req, res) => {
   }
 
   try {
+    // Step 1: Exchange the authorization code for an access token
     const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
     const redirectUri =
       process.env.VERCEL_ENV === "production"
         ? "https://www.market-pulse.io/api/auth/cloudbeds/callback"
         : process.env.CLOUDBEDS_REDIRECT_URI;
+
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLOUDBEDS_CLIENT_ID,
@@ -273,6 +274,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
       redirect_uri: redirectUri,
       code: code,
     });
+
     const tokenRes = await fetch(
       "https://hotels.cloudbeds.com/api/v1.1/access_token",
       {
@@ -288,12 +290,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
     }
     const { access_token, refresh_token, expires_in } = tokenResponse;
 
-    const pmsCredentials = {
-      access_token,
-      refresh_token,
-      token_expiry: new Date(Date.now() + expires_in * 1000),
-    };
-
+    // Step 2: Fetch user and property info from Cloudbeds
     const userInfoRes = await fetch(
       "https://api.cloudbeds.com/api/v1.3/userinfo",
       {
@@ -302,22 +299,18 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
     const cloudbedsUser = await userInfoRes.json();
 
-    // This new code correctly handles the string format from the Cloudbeds API.
-    // It filters for resources that start with "property:" and then splits the string
-    // to extract the numeric ID.
     const userProperties = tokenResponse.resources
       .filter((r) => typeof r === "string" && r.startsWith("property:"))
       .map((r) => ({
         property_id: r.split(":")[1],
       }));
 
+    // Step 3: Perform all database operations in a single transaction
     const client = await pgPool.connect();
     try {
       await client.query("BEGIN");
 
-      // This query correctly handles conflicts on the 'email' column.
-      // If a user with the email exists, it updates their details. If not, it creates them.
-      // It also returns the user's role in the same step for efficiency.
+      // Upsert the user (create if not exist, update if exist)
       const userUpsertQuery = `
         INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, role, pms_type)
         VALUES ($1, $2, $3, $4, 'owner', 'cloudbeds')
@@ -334,9 +327,15 @@ router.get("/cloudbeds/callback", async (req, res) => {
         cloudbedsUser.first_name,
         cloudbedsUser.last_name,
       ]);
-
       const userRole = userResult.rows[0].role;
 
+      const pmsCredentials = {
+        access_token,
+        refresh_token,
+        token_expiry: new Date(Date.now() + expires_in * 1000),
+      };
+
+      // Sync hotel details and link properties to the user
       for (const property of userProperties) {
         await cloudbedsAdapter.syncHotelDetailsToDb(
           access_token,
@@ -361,11 +360,22 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       await client.query("COMMIT");
 
+      // Step 4: Handle session and redirect AFTER the database transaction is safely committed
       req.session.userId = cloudbedsUser.user_id;
       req.session.role = userRole;
 
       req.session.save((err) => {
-        if (err) throw err;
+        if (err) {
+          console.error(
+            "CRITICAL: Database commit succeeded but session save failed:",
+            err
+          );
+          return res
+            .status(500)
+            .send(
+              "Your account was connected, but we could not log you in. Please try logging in manually."
+            );
+        }
 
         const primaryPropertyId = userProperties[0]?.property_id;
         if (primaryPropertyId) {
@@ -373,7 +383,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
             process.env.VERCEL_ENV === "production"
               ? "https://www.market-pulse.io/api/initial-sync"
               : "http://localhost:3000/api/initial-sync";
-
           fetch(syncUrl, {
             method: "POST",
             headers: {
@@ -385,11 +394,18 @@ router.get("/cloudbeds/callback", async (req, res) => {
             console.error("Failed to trigger initial sync:", syncErr)
           );
         }
+
         res.redirect("/app/?newConnection=true");
       });
-    } catch (error) {
+    } catch (dbError) {
       await client.query("ROLLBACK");
-      throw error;
+      console.error(
+        "Error during OAuth DB transaction, rolling back:",
+        dbError
+      );
+      res
+        .status(500)
+        .send("A database error occurred during the connection process.");
     } finally {
       client.release();
     }
