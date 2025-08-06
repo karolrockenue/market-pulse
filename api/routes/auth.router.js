@@ -302,10 +302,14 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
     const cloudbedsUser = await userInfoRes.json();
 
-    const userProperties = tokenResponse.resources.map((resource) => ({
-      property_id: resource.propertyID.toString(),
-      property_name: resource.propertyName,
-    }));
+    // This new code correctly handles the string format from the Cloudbeds API.
+    // It filters for resources that start with "property:" and then splits the string
+    // to extract the numeric ID.
+    const userProperties = tokenResponse.resources
+      .filter((r) => typeof r === "string" && r.startsWith("property:"))
+      .map((r) => ({
+        property_id: r.split(":")[1],
+      }));
 
     const client = await pgPool.connect();
     try {
