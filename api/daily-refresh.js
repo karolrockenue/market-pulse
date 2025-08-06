@@ -3,26 +3,31 @@ const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const format = require("pg-format");
 
+// /api/daily-refresh.js
+// ...
 module.exports = async (request, response) => {
-  console.log("Starting daily FORECAST refresh job for ALL USERS...");
+  // ** REFACTORED LOGIC **
+  // The job now fetches all connected properties directly, making it property-centric
+  // instead of user-centric. This is more robust.
+  console.log("Starting daily FORECAST refresh job for ALL PROPERTIES...");
   let totalRecordsUpdated = 0;
 
   try {
-    const usersResult = await pgPool.query(
-      "SELECT cloudbeds_user_id FROM users WHERE status = 'active'"
+    // Step 1: Get a list of all unique, connected properties from the user_properties table.
+    const propertiesResult = await pgPool.query(
+      "SELECT DISTINCT property_id FROM user_properties WHERE status = 'connected'"
     );
-    const activeUsers = usersResult.rows;
-    console.log(`Found ${activeUsers.length} active user(s) to process.`);
+    const connectedProperties = propertiesResult.rows;
+    console.log(
+      `Found ${connectedProperties.length} connected properties to process.`
+    );
 
-    for (const user of activeUsers) {
-      console.log(`--- Processing user: ${user.cloudbeds_user_id} ---`);
+    // Step 2: Loop through each property directly.
+    for (const prop of connectedProperties) {
+      const propertyId = prop.property_id;
+      console.log(`--- Processing property: ${propertyId} ---`);
       try {
-        const propertiesResult = await pgPool.query(
-          "SELECT property_id, pms_credentials FROM user_properties WHERE user_id = $1 AND status = 'connected'",
-          [user.cloudbeds_user_id]
-        );
-        const userProperties = propertiesResult.rows;
-        // /api/daily-refresh.js
+        // ...
 
         // ... (previous code)
 
