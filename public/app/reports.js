@@ -23,7 +23,6 @@ function getSelectedColumns() {
 
 function handlePresetChange(preset) {
   // --- START DEBUGGING BLOCK ---
-  console.clear(); // Clears the console for a clean view
 
   const localToday = new Date();
 
@@ -540,10 +539,7 @@ function buildTableHeaders(selected, addComparisons, displayOrder, component) {
   return headers.map((h) => ({ align: "right", ...h }));
 }
 // public/app/reports.js
-// public/app/reports.js
-// public/app/reports.js
-
-// FIXED: This is the final, correct version of the body rendering logic.
+// FINAL CORRECTED: This version keeps alternating rows and uses the 'Inter' font for all cells.
 function buildTableBody(data, headers, component) {
   const { includeTaxes, propertyTaxRate, propertyTaxType, currencyCode } =
     component;
@@ -596,19 +592,22 @@ function buildTableBody(data, headers, component) {
         } else {
           content = formatValue(value, header.key, false, currencyCode);
         }
+
+        // This class logic now correctly uses the standard font for all data cells.
         const alignClass =
-          header.key === "date"
-            ? "font-data text-gray-700 font-medium"
-            : "font-data";
+          header.key === "date" ? "font-medium" : "font-normal"; // font-data class removed to default to Inter font.
         const separatorClass = header.separator
           ? "border-r border-slate-200"
           : "";
-        return `<td class="px-4 py-3 whitespace-nowrap text-sm text-right ${alignClass} ${separatorClass}">${content}</td>`;
+
+        return `<td class="py-4 px-2 whitespace-nowrap text-sm text-right ${alignClass} ${separatorClass}">${content}</td>`;
       });
       cells[0] = cells[0].replace("text-right", "text-left");
+
+      // This restores the alternating row colors and uses the more subtle hover effect.
       return `<tr class="${
         index % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-      } hover:bg-blue-50">${cells.join("")}</tr>`;
+      } hover:bg-slate-50 transition-colors">${cells.join("")}</tr>`;
     })
     .join("");
 }
@@ -734,9 +733,9 @@ function renderReportTable(
   const tableHTML = `
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
       <table class="min-w-full">
-        <caption class="text-left p-4 bg-white">
-          <h3 class="text-lg font-semibold text-gray-800">${dynamicTitle}</h3>
-          <p class="text-sm text-gray-500 mt-1">Displaying <strong>${
+        <caption class="text-left p-6 bg-white border-b border-gray-200">
+          <h2 class="text-2xl font-bold text-[#13191d]">${dynamicTitle}</h2>
+          <p class="text-sm text-gray-500 mt-2">Displaying <strong>${
             granularity.charAt(0).toUpperCase() + granularity.slice(1)
           }</strong> data from <strong>${formatDateForDisplay(
     data[0].date
@@ -744,19 +743,20 @@ function renderReportTable(
     data[data.length - 1].date
   )}</strong></p>
         </caption>
-        <thead class="bg-white">
-          <tr class="border-y border-gray-200">
+        <thead class="sticky top-0 bg-white">
+          <tr class="border-b border-gray-200">
             ${headers
               .map(
                 (h) =>
-                  `<th class="px-4 py-2.5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider ${
-                    h.separator ? "border-r border-slate-200" : ""
+                  // Styles for padding and text color updated to match the design prototype.
+                  `<th class="py-3 px-2 text-left text-xs font-semibold text-[#a3a5a7] uppercase tracking-wider ${
+                    h.separator ? "border-r border-gray-200" : ""
                   } ${h.align === "right" ? "text-right" : ""}">${h.label}</th>`
               )
               .join("")}
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">${bodyRows}</tbody>
+        <tbody class="text-[#3e4046]">${bodyRows}</tbody>
       </table>
     </div>`;
   container.innerHTML = tableHTML;

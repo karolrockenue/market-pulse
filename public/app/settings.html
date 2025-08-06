@@ -60,13 +60,13 @@
       }
     </style>
   </head>
-  <body class="antialiased">
+  <body class="antialiased bg-[#0b131c] p-[10px] pl-0">
     <div class="flex flex-col lg:flex-row min-h-screen" x-data="settingsPage">
-      <div id="sidebar-placeholder"></div>
+      <div id="sidebar-placeholder" class="sticky top-0 h-screen"></div>
 
-      <div class="flex-1 flex flex-col min-w-0">
-        <div id="header-placeholder"></div>
-
+      <div
+        class="flex-1 flex flex-col min-w-0 bg-white text-[#11191f] rounded-[10px] overflow-hidden"
+      >
         <main x-show="isInitialized" x-cloak class="flex-1 p-4 md:p-8 relative">
           <header class="mb-8">
             <h1 class="text-3xl font-bold">Settings</h1>
@@ -468,15 +468,23 @@
     </div>
 
     <script type="module">
+      // Import the page's own logic.
       import settingsPage from "/app/settings.mjs";
-      import pageHeader from "/app/_shared/header.mjs";
+      // Import the NEW sidebar component logic from the  prototype files.
       import sidebar from "/app/_shared/sidebar.mjs";
+      // Import the utility to load HTML.
       import { loadComponent } from "/app/utils.mjs";
 
+      // Register the Alpine components when Alpine is ready.
       document.addEventListener("alpine:init", () => {
         Alpine.data("settingsPage", settingsPage);
-        Alpine.data("pageHeader", pageHeader);
+        // Note: We only register the new sidebar, not the old header.
         Alpine.data("sidebar", sidebar);
+      });
+
+      // After the page loads, dynamically inject the HTML for the new sidebar.
+      document.addEventListener("DOMContentLoaded", async () => {
+        await loadComponent("sidebar", "sidebar-placeholder");
       });
     </script>
     <script

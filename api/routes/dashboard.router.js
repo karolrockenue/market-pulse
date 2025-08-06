@@ -374,5 +374,80 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch competitor metrics" });
   }
 });
+// Add this new 'require' statement at the top of the file with the others.
+const OpenAI = require("openai");
 
+// ... (keep all the other existing router code) ...
+// --- AI SUMMARY ENDPOINT (FINAL, CONTEXT-AWARE VERSION) ---
+// This endpoint uses the OpenAI API to generate a dynamic performance summary.
+router.post("/generate-summary", requireUserApi, async (req, res) => {
+  // Initialize the OpenAI client with the API key from your environment variables.
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  try {
+    // 1. Destructure the new, richer data object from the request body.
+    const { kpi, dates, preset } = req.body;
+
+    // 2. Create the dynamic "period context" phrase, now including 'this-year'.
+    let periodContext;
+    const today = new Date();
+
+    if (preset === "current-month") {
+      const currentMonthName = today.toLocaleString("en-US", {
+        month: "long",
+      });
+      periodContext = `In ${currentMonthName},`;
+    } else if (preset === "next-month") {
+      const nextMonthDate = new Date(new Date().setMonth(today.getMonth() + 1));
+      const nextMonthName = nextMonthDate.toLocaleString("en-US", {
+        month: "long",
+      });
+      periodContext = `For the upcoming month of ${nextMonthName},`;
+    } else if (preset === "this-year") {
+      const currentYear = today.getFullYear();
+      periodContext = `So far in ${currentYear},`;
+    } else {
+      // Fallback for custom date ranges.
+      const formatDate = (dateString) => {
+        const options = { year: "numeric", month: "short", day: "numeric" };
+        return new Date(dateString).toLocaleDateString("en-GB", options);
+      };
+      periodContext = `For the period of ${formatDate(
+        dates.start
+      )} to ${formatDate(dates.end)},`;
+    }
+
+    const systemPrompt = `You are an AI assistant that summarizes hotel performance data for a hotel manager. Your tone is factual, direct, and uses "you vs. the market" language.
+    Your response MUST be a single paragraph and no more than 40 words.
+    You MUST base your entire analysis strictly on the JSON data provided.
+    Crucially, DO NOT speculate on the reasons for performance. Do not mention "pricing strategy," "revenue management," or any other cause. Only state the results.
+    You MUST ONLY mention ADR and Occupancy performance. DO NOT mention RevPAR in your summary.
+    Start with the most significant finding. For example: "You are outperforming the market in ADR by..." or "the market has the edge on occupancy by...".
+    The delta value is a string like "+£12.50" or "-5.2%". You must use these exact values in your summary.
+    IMPORTANT: You MUST begin your summary with the exact time period phrase (e.g., "In August,") provided at the start of the user's message.`;
+    // 4. Create the new User Prompt, injecting our dynamic context.
+    const userPrompt = `${periodContext} here is how you are performing against the market. Generate a summary based on this data: ${JSON.stringify(
+      kpi
+    )}`;
+
+    // Make the API call to the OpenAI Chat Completions endpoint.
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.2, // Lowered temperature for more deterministic, less speculative output.
+      max_tokens: 80,
+    });
+
+    const summary = completion.choices[0].message.content;
+    res.json({ summary: summary });
+  } catch (error) {
+    console.error("Error calling OpenAI API:", error);
+    res.status(500).json({ error: "Failed to generate AI summary." });
+  }
+});
 module.exports = router;

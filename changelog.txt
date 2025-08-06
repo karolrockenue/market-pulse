@@ -634,4 +634,190 @@ TypeError bugs in /public/admin/admin.mjs that prevented the feature's UI modal 
             * Settings Page Stability: Fixed multiple 500 Internal Server Errors on the Settings page by updating all API endpoints in users.router.js to be compatible with the new database schema.
             * Code Cleanup: Removed extensive console.log statements from the reports script (reports.js) to clean up the browser console.
             * Outcome: The application is now secure and stable. The new role-based system is fully implemented and tested, correctly isolating internal tools and providing appropriate data access for all user types. All identified bugs have been resolved, and the codebase has been cleaned.
-Sources
+
+
+
+
+Date: August 1, 2025
+            * Objective: Diagnose and resolve critical production errors following the deployment of the new role-based authorization system.
+            * Summary: After deploying the latest changes, the application failed in the production environment due to a database schema drift between the local and live databases. This session involved identifying and fixing two distinct schema mismatches that were causing the user login system to crash.
+            * Key Changes:
+            * Diagnosis: The root cause of the production failure was identified as a database schema mismatch. Two columns (used_at and token_id) that existed in the local magic_login_tokens table were missing in the production database.
+            * Production Hotfix 1 (Database): An ALTER TABLE command was run on the production database to add the missing used_at column, which is required to prevent magic link reuse.
+            * Production Hotfix 2 (Code): The logic in /api/routes/auth.router.js was updated to use the token column to identify magic links, aligning the code with the production database schema which lacked a token_id column.
+            * Outcome: The production environment has been stabilized. The database schema mismatches were resolved, restoring all user login functionality. The application is now fully operational in the live environment.
+
+
+
+
+Date: August 2, 2025
+            * Objective: Create a dedicated, static HTML file for UI/UX design experimentation to facilitate a planned visual overhaul of the application without interfering with the production codebase.
+            * Key Changes:
+            * A new file, design.html, was created to serve as a sandboxed environment for all upcoming design work.
+            * To create a high-fidelity replica of the main dashboard, the shared sidebar.html and header.html components were manually inlined into design.html.
+            * All dynamic Alpine.js functionality was removed from the file, and content such as KPI cards, table rows, and titles was hardcoded with sample data.
+            * A small, self-contained JavaScript snippet was added to initialize the ECharts component with sample data, ensuring the critical chart element is visible for design purposes.
+            * Outcome: A stable, single-file static prototype (design.html) is now available. It accurately mirrors the live dashboard's layout, providing a risk-free environment for rapid design iteration and experimentation.
+Date: August 3, 2025
+            * Objective: Prototype a next-generation, sidebar-centric UI/UX for the main dashboard in a safe, isolated design environment, with the goal of eliminating the traditional header.
+            * Summary: A major UI/UX prototyping session was conducted. The process evolved from using a single static design.html file to creating a fully interactive, sandboxed environment by duplicating the core front-end components. This allowed for a complete refactor of the application's layout into a "headerless" design, where all functionality from the header was migrated into a more powerful, multi-functional sidebar. The session concluded with a visually distinct "framed" page layout and a fully functional prototype that is now ready for review.
+            * Key Changes:
+            * Prototyping Architecture:
+            * The approach of editing a single design.html file was abandoned in favor of a more robust, component-based sandbox.
+            * To avoid any risk to the live application, temporary copies of the core shared components were created: design_sidebar.html, design_sidebar.mjs, design_header.html, and design_header.mjs.
+            * The design.html prototype was rewired to load these new temporary components, creating a fully isolated environment for radical design changes.
+            * "Headerless" Design Refactor:
+            * The traditional header was entirely removed from the main content area.
+            * All of its functionality was successfully migrated into the sidebar to create a single point of control for the user:
+            * The Property Selector was moved to the top of the sidebar, directly below the logo.
+            * The User Profile menu was moved to a new sticky footer at the bottom of the sidebar.
+            * The "Data Updated" status indicator was also relocated to the footer.
+            * New Layout and Styling:
+            * A new "framed" page layout was implemented. The main content now appears as a single white "card" with rounded corners, sitting inside a 10px dark frame that provides visual separation from the browser window.
+            * The sidebar was refactored to feature a "sticky footer." The main navigation area now scrolls independently, ensuring the logo, property selector, and user profile footer are always visible regardless of page content length.
+            * The sidebar was made wider and its internal fonts were made larger to improve readability and visual balance.
+            * The original SVG logo was replaced with a new logo.png image file.
+            * Outcome: The prototyping was successful. The application now has a complete, functional, and visually distinct "headerless" design within the design.html sandbox. This new layout is intended to serve as the blueprint for the application's new user experience. If approved, the structure of the "real" application components will be updated to match this new design.
+            * Future Considerations:
+            * Dependency Risk: The original header component was a source of truth for the current property ID and name, and it dispatched global events that other parts of the application may have listened for. Before making this new design live, a full-stack review is critical. We must be extra careful to identify and update any logic in the main application that was grabbing data or listening for events from the old header, ensuring it now correctly interacts with the new, consolidated sidebar component to prevent regressions.
+
+
+
+
+Date: August 4, 2025
+            * Objective: Design and build a complete, interactive, high-fidelity prototype of a next-generation dashboard UI within the isolated design.html environment. The focus was on creating a new two-column layout, a unified data table, and establishing the foundation for a new right-hand summary column, closely following an inspirational design concept.
+            * Key Changes:
+            * New Layout Implementation: A major structural overall was completed, replacing the simple content area with a sophisticated two-column layout. The right-hand column was engineered to be structurally independent, allowing its height to be modified without affecting the main content area. This involved extensive, iterative debugging of the flexbox and positioned layout models to resolve a series of complex vertical alignment issues.
+            * Redesigned Controls: The primary dashboard controls were rebuilt with a new aesthetic.
+            * New dropdown buttons for "Display" and "Presets" were designed with custom styling (pill shape, dashed borders) and fully wired up to the prototype's data logic.
+            * The date pickers were moved from the old design, restyled to match the new look, and connected to the filtering logic.
+            * Unified Data Table: A new, single data table was designed and built to combine the previous "Your Hotel" and "The Market" tables.
+            * A "super-header" was implemented to visually group columns into "Your Hotel", "The Market", and "Delta" sections, separated by full-height vertical dividers.
+            * The table was populated with 30 rows of data and made scrollable with a sticky header.
+            * It was styled iteratively with custom colors, fonts, and alignment, and was fully connected to the prototype's interactive controls.
+            * Right Column Foundation: The initial component for the new right-hand column—a sleek, segmented control for selecting the primary KPI (Occupancy, ADR, RevPAR)—was designed and built, laying the groundwork for the planned summary and chart modules.
+            * Outcome: The prototyping phase was a success. The design.html file now contains a complete, functional, and visually distinct high-fidelity prototype. It successfully validates the new design concept and provides a definitive, interactive blueprint for implementing the new user experience across the live application.
+
+
+
+
+Date: August 4, 2025
+            * Objective: Conduct a rapid, iterative prototyping session within the design.html sandbox to build out the new right-hand summary column, experimenting with multiple chart styles and layouts.
+            * Summary: This was an extensive design and prototyping session focused on the right-hand column. The session began with stylistic refinements to the main data table. This was followed by a series of experiments to find suitable data visualizations, including the implementation and subsequent replacement of radar and line charts. The final layout was built out into a four-module column containing a dynamic KPI grid, a custom-styled bar chart, and a new time-series line chart, which concluded the session with an unresolved bug.
+            * Key Changes:
+            * Initial UI Polish: The main data table in the prototype was refined by adjusting the font weight of the body content to 400 and setting fixed widths on the columns to ensure consistent spacing. The entire right-hand column was also widened to provide more space for new components.
+            * Right Column Restructure: The layout of the column was iteratively rebuilt, moving from a single content area to a structured four-box layout with adjusted heights to accommodate different modules.
+            * KPI Grid Implementation: A "COMPARISON" grid, modeled after an inspirational screenshot, was built in the third box. Its labels were updated to reflect hotel metrics (Occupancy, ADR, RevPAR), and its values were successfully wired up to the main kpi data object to be fully dynamic and responsive to the page's date filters.
+            * RevPAR Bar Chart: A horizontal bar chart was implemented in the second box to provide a direct "You" vs. "The Market" comparison for RevPAR. Its styling was iteratively refined to have thinner, rounded bars with custom colors (#457066 and #df595a), and its axes were hidden in favor of a custom HTML legend below the chart that displays the dynamic RevPAR values.
+            * Summary Line Chart: A fourth box was added to the bottom of the column to house a new ECharts line chart, intended to replicate the style of the main dashboard chart in a more compact format.
+            * Outcome: The design.html prototype's right-hand column has been successfully built out into a complex, four-module layout containing a dynamic KPI grid and a custom RevPAR comparison chart. However, the session concluded with a critical bug: the new ECharts line chart in the fourth box (identified by id="miniLineChart") fails to appear on the page, leaving the container empty.
+
+
+Date: August 4, 2025
+            * Objective: Iteratively design and build out the new right-hand summary column in the design.html prototype, with a focus on implementing a new "Sales statistics" chart. A secondary objective was to debug and fix a static "RevPAR Comparison" bar chart.
+            * Key Changes:
+            * New Chart Implementation: A new ECharts instance ("Sales statistics") was successfully implemented in the fourth position of the right-hand column.
+            * Iterative Styling & Functionality:
+            * The new chart was styled to match a design mockup, including custom colors, smoothed lines, and clean axes.
+            * The chart's data was updated to display 31 days of "You" vs. "The Market" occupancy data.
+            * A custom tooltip was added to show data points on hover.
+            * The chart was made dynamic to automatically switch between a line chart and a bar chart for "monthly" granularity.
+            * The x-axis labels were made context-aware, displaying week numbers (Wk 34) in the weekly view to prevent crowding, while the tooltip shows the full date range.
+            * Live Data Connection: The new "Sales statistics" chart was successfully connected to the main allMetrics data object from the Alpine.js component. It now updates automatically when the date range or granularity is changed.
+            * Layout Maintenance:
+            * The "COMPARISON" KPI box was compressed by adjusting font sizes and gaps to fix a visual overflow issue.
+            * The "OLD CONTENT" reference block was hidden using display: none to prevent it from interfering with the new layout.
+            * RevPAR Chart Debugging: An attempt was made to make the static "RevPAR Comparison" bar chart reactive by connecting it to the updating kpi.revpar data object using an Alpine.js watcher.
+            * Outcome: The new "Sales statistics" chart is fully implemented, styled, and connected to the prototype's data, providing a functional and dynamic component in the new UI. However, the final attempt to fix the RevPAR Comparison chart failed. While its associated legend correctly displays and updates the RevPAR values, the chart itself is no longer being drawn. The reason for this requires further investigation.
+
+
+Date: August 4, 2025
+            * Objective: Design and build a complete, interactive, high-fidelity prototype of a next-generation dashboard UI within the isolated design.html environment. The focus was on creating a new two-column layout, a unified data table, and a feature-rich right-hand summary column, culminating in the integration of a dynamic, AI-powered performance summary.
+            * Key Changes:
+            * New Layout & Unified Table: A two-column layout was implemented, with the main content on the left and a new summary column on the right. The previous two-table view was replaced with a single, unified data table featuring a "super-header" to group "Your Hotel," "The Market," and "Delta" columns.
+            * Interactive Table Highlighting: The main data table was made fully interactive. Clicking on a metric's column header (e.g., "ADR") now sets it as the active metric, highlights both the "Your Hotel" and "The Market" columns with a clean bottom border, and updates the "Delta" column to reflect the selection.
+            * Right-Hand Summary Column: The new right-hand column was built out with four distinct modules:
+            * An AI-powered summary card.
+            * A "RevPAR Comparison" bar chart.
+            * A KPI grid for comparing key metrics at a glance.
+            * A dynamic "Sales statistics" line/bar chart.
+            * AI Summary Card Integration: A full-stack placeholder for an AI-powered summary card was designed and implemented. This involved:
+            * Creating a new secure backend endpoint (POST /api/generate-summary).
+            * Integrating the OpenAI API to generate dynamic text based on live performance data.
+            * Implementing robust error handling, timeout configuration (vercel.json), and local development setup (.env.local).
+            * Adding a dynamic font-sizing function in Alpine.js to ensure the AI's response always fits perfectly within the card.
+            * UI Synchronization: The new metric selectors in the main controls area and the "Charts" panel were synchronized with the main data table. All three components now share and control a single activeMetric state, ensuring a cohesive user experience.
+            * Outcome: The prototyping phase was a major success. The design.html file now contains a complete, functional, and visually distinct high-fidelity prototype. It successfully validates the new design concept and provides a definitive, interactive blueprint for implementing the new user experience across the live application.
+
+
+Date: August 5, 2025
+            * Objective: Evolve the prototype's AI-powered summary from a simple proof-of-concept into an intelligent, context-aware, and tonally appropriate feature.
+            * Summary: This was an iterative, full-stack refinement session focused entirely on the AI summary card in the design.html prototype. The work involved redesigning the UI for clarity, enhancing the API integration to pass more context, and performing several rounds of sophisticated prompt engineering to strictly control the AI's tone, accuracy, and output.
+            * Key Changes:
+            * UI/UX Redesign (design.html):
+            * A new "Summary" component was designed to replace the previous KPI grid.
+            * The new design features a scannable, three-row layout with a central, color-coded delta value for each KPI (Occupancy, ADR), creating a clear visual link between "Your Hotel" and "The Market."
+            * The component's layout and spacing were iteratively adjusted to fix alignment issues and improve visual balance within the right-hand column.
+            * Frontend API Enhancement (design.mjs):
+            * The fetchSummary function was refactored. It now sends a richer JSON object to the backend, including not only the raw KPI numbers but also the dates and activePreset (e.g., 'current-month', 'this-year') to provide essential context.
+            * A bug in the renderKpiCards function was fixed to ensure the occupancy delta was correctly formatted with a % symbol instead of "pts" before being sent to the backend.
+            * Backend Prompt Engineering (dashboard.router.js):
+            * The POST /api/generate-summary endpoint was significantly overhauled.
+            * Context Awareness: The endpoint now reads the incoming dates and preset to generate a dynamic "period context" phrase (e.g., "In August," or "So far in 2025,").
+            * Prompt Refinement: The systemPrompt sent to the OpenAI API was rewritten multiple times to be progressively stricter. The final version explicitly forbids the AI from speculating on the reasons for performance (e.g., "pricing strategy"), instructs it to use a direct "you vs. the market" tone, and limits the summary to only ADR and Occupancy, ignoring RevPAR.
+            * Outcome: The AI summary feature is now significantly more intelligent and polished. It provides summaries that are contextually relevant to the user's selected date range and its tone is now consistently factual, direct, and aligned with the application's competitive analysis goals.
+
+
+Date: August 5, 2025
+            * Objective: Finalize the next-generation dashboard UI in the design.html prototype, including debugging, iterative refinement, and a comprehensive architectural review to prepare for production migration.
+            * Summary: This was a deep, iterative session focused on bringing the new dashboard prototype to a production-ready design. The work involved fixing subtle layout bugs, significantly re-architecting the chart layout, building out new UI components like a custom chart legend, and refining the AI integration. The session concluded with a strategic analysis comparing the prototype to the live application, defining the risks and establishing a clear, incremental plan for the production rollout.
+            * Key Changes:
+            * Layout Finalization & Bug Fixing:
+            * Resolved a layout bug that caused a persistent gap on the right side of the page by removing an obsolete separator div.
+            * Moved the main performance chart from the narrow right-hand column into a new, full-width position above the main data table, creating a more focused user experience.
+            * Iteratively debugged the ECharts instance to fix sizing and padding issues, ensuring it correctly stretched to fill its new, flexible container. This involved adjusting the container's height and updating the chart's grid configuration in design.html.
+            * Right-Hand Column Overhaul:
+            * Replaced the secondary "Sales Statistics" chart with the previously hidden "RevPAR Comparison" bar chart to provide more relevant at-a-glance data.
+            * Re-enabled the value axis on the RevPAR chart to provide a clear scale by modifying its JavaScript options.
+            * Designed and built a new, dynamic HTML legend for the RevPAR chart, driven by Alpine.js state.
+            * Iteratively refined the entire RevPAR component's layout, stacking the new legend vertically and adjusting component spacing and font sizes for visual polish and readability.
+            * AI Feature Refinement:
+            * Corrected the backend prompt engineering for the AI summary feature. The systemPrompt in dashboard.router.js was updated to explicitly instruct the AI to begin its summary with a time-based context (e.g., "In August..."), fixing a missing feature.
+            * Architectural Review & Migration Planning:
+            * Conducted a full code review of the prototype files (design.html, design.mjs, design-overrides.css) against the live application's code.
+            * Identified key architectural regressions in the prototype (e.g., abandoning the chartManager pattern) and unclean code (e.g., !important tags, complex inline JavaScript).
+            * Outcome: The design.html prototype is now a visually complete, polished, and fully functional representation of the next-generation dashboard. All known layout bugs and design inconsistencies have been resolved. 
+
+
+Date: August 5, 2025
+            * Objective: Begin a phased, application-wide UI overhaul to the new "headerless" design, establishing a safe, incremental refactoring process and applying it to the Advanced Reporting page.
+            * Summary: A strategic decision was made to refactor the application's UI on a page-by-page basis. The process involves temporarily pointing pages to the new prototype sidebar component (design_sidebar.html) to ensure full functionality before committing to a final file rename. This methodology was successfully applied to the Advanced Reporting page, which involved an extensive, iterative debugging session to resolve script-loading issues, followed by a full visual restyling.
+            * Key Changes:
+            * Refactoring Strategy: A low-risk, incremental plan was established. Each page (reports, settings, admin) will be individually updated to remove the old header and use the new design_sidebar component. Only after all pages are confirmed to be working will the old header and sidebar files be deleted and the design_ files renamed.
+            * Reports Page Component Refactor:
+            * The script loader in reports.html was modified to remove the old header and load the new design_sidebar component.
+            * A series of complex, cyclical JavaScript errors (including ReferenceError and TypeError) were diagnosed and fixed. The root cause was a timing race condition created by a mix of script types.
+            * The issue was resolved by restoring the page's original, robust script-loading pattern from the pre-changes file, which guarantees that all dependencies are loaded in the correct order before the Alpine components are initialized.
+            * Reports Page Styling Overhaul:
+            * The "framed" layout from the prototype was applied to the page, setting a dark canvas background for the
+<body> and styling the main content area as a white "card" with a border radius.
+            * The new sidebar was made "sticky" (position: sticky), allowing the main page content to scroll independently while the sidebar remains fixed to the viewport.
+            * The "Display" and "Presets" button groups were replaced with the new, pill-shaped dropdown controls to match the dashboard's design.
+               * Outcome: The Advanced Reporting page is now fully functional and its layout and styling are consistent with the new headerless design language. A safe, repeatable process has been established for refactoring the remaining application pages.
+
+
+
+
+Date: August 5, 2025
+               * Objective: Execute a full-stack, application-wide migration to the new "headerless" UI/UX, moving the design.html prototype into production.
+               * Summary: This was a comprehensive session that completed the application's visual overhaul. The work involved a systematic, page-by-page refactor of all authenticated sections (Reports, Settings, Admin) to adopt the new shared sidebar and "framed canvas" layout. The session culminated in a complex, multi-step merge of the interactive dashboard prototype into the live application, followed by a full-stack dependency audit to ensure stability.
+               * Key Changes:
+               * Application-Wide UI Standardization: The Reports, Settings, and Admin pages were successfully refactored to remove the old header, adopt the new shared sidebar, and implement the consistent "framed" visual style.
+               * Dashboard Migration: The core of the session involved a careful, multi-stage migration of the new dashboard design into the production files (/app/index.html, /app/dashboard.mjs). This included:
+               * Merging the new HTML layout, state properties, and UI control logic from the prototype.
+               * Integrating the new two-column layout, unified data table, and AI summary card.
+               * Upgrading the charting system to a dual-manager architecture (mainChartManager for ECharts, revparChartManager for Chart.js) to support the new design.
+               * Systematically debugging and resolving a series of JavaScript race conditions and reference errors that emerged during the merge process.
+               * Final Component Refactor: The design_sidebar prototype component was promoted to production. All references across the application were updated, and the old, now-obsolete header and sidebar component files were removed.
+               * Backend Dependency Audit: A full scan of the backend codebase was conducted to confirm that no services or API endpoints had any lingering dependencies on the deleted header component, ensuring the refactor was safe and complete.
+               * Outcome: The application's user interface has been completely and successfully overhauled. All authenticated pages now share a single, consistent, and modern "headerless" design. The new, feature-rich dashboard is fully functional, and the project's architecture is clean and robust. The next step for the next session will be to move these changes to the live environment on Git.

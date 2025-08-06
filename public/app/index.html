@@ -10,8 +10,10 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.x/dist/typography.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -129,520 +131,597 @@
       }
     </style>
   </head>
-  <body class="antialiased" x-data="dashboard" x-cloak>
-    <div class="flex flex-col lg:flex-row min-h-screen">
+ <body
+    class="antialiased bg-[#0b131c] p-[10px] pl-0"
+    x-data="dashboard"
+    x-cloak
+    x-init="window.alpineInstance = this"
+  >
+
+    <div class="flex flex-col lg:flex-row h-screen">
       <div id="sidebar-placeholder"></div>
 
-      <div class="flex-1 flex flex-col min-w-0">
-        <div id="header-placeholder"></div>
-
-        <main class="flex-1 p-4 md:p-8 relative">
-          <template x-if="isSyncing">
-            <div
-              class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-40"
-            ></div>
-          </template>
-
-          <template x-if="isSyncing">
-            <div
-              class="fixed inset-0 z-50 flex items-center justify-center text-center p-4"
-            >
-              <div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-                <div
-                  class="mx-auto animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"
-                ></div>
-
-                <h3 class="mt-5 text-lg font-medium text-slate-800">
-                  Initial Data Sync in Progress
-                </h3>
-                <p class="mt-2 text-sm text-slate-600">
-                  We are fetching up to 5 years of your historical data. This
-                  can take a few minutes. The page will refresh automatically
-                  when complete.
-                </p>
-              </div>
-            </div>
-          </template>
-          <div
-            x-show="error.show"
-            x-transition
-            class="fixed top-20 right-8 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center"
-          >
-            <svg
-              class="fill-current h-6 w-6 text-red-500 mr-4"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-            >
-              <path
-                d="M12.432 0c1.34 0 2.01 1.29 1.207 2.468L7.12 12.03a.998.998 0 01-1.414.001L.293 6.468A1.5 1.5 0 012.414 4.5L6.414 8.5l4.293-4.293a1 1 0 011.414 0z"
-              />
-            </svg>
-            <span x-text="error.message"></span>
-            <button
-              @click="error.show = false"
-              class="ml-6 font-bold text-xl text-red-700 hover:text-red-900"
-            >
-              &times;
-            </button>
-          </div>
-
-          <template x-if="!isLoading.properties && !hasProperties">
-            <div
-              class="text-center p-12 bg-white rounded-lg border border-gray-200"
-            >
-              <svg
-                class="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
+  <div class="flex-1 flex flex-col min-w-0 bg-white text-[#11191f] rounded-[10px] overflow-hidden">
+        <main class="flex-1 flex flex-col relative">
+          <div class="flex flex-row">
+<div class="flex-1 min-w-0">
+              <div
+                class="p-4 md:p-8 flex flex-col border-b border-gray-200"
+                style="min-height: 220px"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205l3 1m-3-1l-1.5.545m0 0l-2.25 1.318m-2.25-1.318l2.25 1.318m0 0l2.25 1.318m-2.25-1.318L12 12.75l-2.25 1.318m2.25-1.318l-2.25 1.318m0 0l-2.25 1.318m2.25-1.318l2.25 1.318"
-                />
-              </svg>
-              <h3 class="mt-2 text-lg font-medium text-gray-900">
-                No Properties Connected
-              </h3>
-              <p class="mt-1 text-sm text-gray-500">
-                This account does not have any hotel properties linked to it.
-              </p>
-              <div class="mt-6">
-                <a
-                  href="/api/auth/cloudbeds"
-                  class="inline-flex items-center rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
-                >
-                  <svg
-                    class="-ml-0.5 mr-1.5 h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v6a1.5 1.5 0 001.5 1.5z"
+                <div class="flex justify-between items-center">
+                  <h2 class="text-4xl font-bold text-[#13191d]">
+                    You vs The Market
+                  </h2>
+                  <div class="flex items-center gap-x-2">
+                    <input
+                      type="date"
+                      class="text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 focus:border-blue-500"
+                      x-model="dates.start"
+                      @change="activePreset = ''"
                     />
-                  </svg>
-                  Connect with Cloudbeds
-                </a>
-              </div>
-            </div>
-          </template>
-
-          <div
-            id="dashboard-content-wrapper"
-            x-show="!isSyncing"
-            class="opacity-0 transition-opacity duration-500"
-            :class="{ 'opacity-100': !isLoading.properties && hasProperties }"
-          >
-            <div
-              class="bg-white p-4 rounded-xl border border-gray-200 mb-8 flex flex-col gap-4"
-            >
-              <div class="flex flex-wrap items-center gap-4">
-                <div class="flex items-center gap-2">
-                  <svg
-                    class="h-5 w-5 text-gray-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <rect
-                      x="3"
-                      y="4"
-                      width="18"
-                      height="18"
-                      rx="2"
-                      ry="2"
-                    ></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line></svg
-                  ><span class="font-semibold text-gray-600 text-sm"
-                    >Date Range:</span
-                  >
+                    <span class="text-gray-400">-</span>
+                    <input
+                      type="date"
+                      class="text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 focus:border-blue-500"
+                      x-model="dates.end"
+                      @change="activePreset = ''"
+                    />
+                    <button
+                      @click="runReport()"
+                      type="button"
+                      class="inline-flex justify-center items-center rounded-lg bg-[#13191d] text-white font-semibold text-sm shadow-sm hover:opacity-90 px-5 py-2"
+                    >
+                      Run
+                    </button>
+                  </div>
                 </div>
-                <div class="flex items-center gap-3 ml-auto">
-                  <input
-                    type="date"
-                    x-model="dates.start"
-                    @change="activePreset = ''"
-                    class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
-                  /><span class="text-gray-400">-</span
-                  ><input
-                    type="date"
-                    x-model="dates.end"
-                    @change="activePreset = ''"
-                    class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
-                  /><button
-                    @click="runReport()"
-                    class="px-5 py-2 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition flex items-center justify-center"
-                  >
-                    Run
-                  </button>
-                </div>
-              </div>
-              <div
-                class="flex flex-wrap items-center gap-4 border-t border-dashed pt-4 mt-2"
-              >
-                <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-gray-400 uppercase mr-2"
-                    >Display:</span
-                  ><button
-                    @click="setGranularity('daily')"
-                    :class="{'active': granularity === 'daily'}"
-                    class="control-btn"
-                  >
-                    Daily</button
-                  ><button
-                    @click="setGranularity('weekly')"
-                    :class="{'active': granularity === 'weekly'}"
-                    class="control-btn"
-                  >
-                    Weekly</button
-                  ><button
-                    @click="setGranularity('monthly')"
-                    :class="{'active': granularity === 'monthly'}"
-                    class="control-btn"
-                  >
-                    Monthly
-                  </button>
-                </div>
-                <div class="flex items-center gap-2 ml-auto">
-                  <span class="text-xs font-bold text-gray-400 uppercase mr-2"
-                    >Presets:</span
-                  ><button
-                    @click="setPreset('current-month')"
-                    :class="{'active': activePreset === 'current-month'}"
-                    class="control-btn"
-                  >
-                    Current Month</button
-                  ><button
-                    @click="setPreset('next-month')"
-                    :class="{'active': activePreset === 'next-month'}"
-                    class="control-btn"
-                  >
-                    Next Month</button
-                  ><button
-                    @click="setPreset('this-year')"
-                    :class="{'active': activePreset === 'this-year'}"
-                    class="control-btn"
-                  >
-                    This Year
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <template x-if="isLoading.kpis">
-              <div
-                class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-pulse"
-              >
-                <div class="h-[108px] bg-gray-200 rounded-lg"></div>
-                <div class="h-[108px] bg-gray-200 rounded-lg"></div>
-                <div class="h-[108px] bg-gray-200 rounded-lg"></div>
-              </div>
-            </template>
-            <template x-if="!isLoading.kpis">
-              <div
-                id="kpi-card-container"
-                class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
-              >
-                <template
-                  x-for="metric in ['occupancy', 'adr', 'revpar']"
-                  :key="metric"
-                >
+                <div class="flex-1"></div>
+                <div class="flex items-center gap-x-2">
                   <div
-                    :class="{'active': activeMetric === metric}"
-                    @click="setActiveMetric(metric)"
-                    class="kpi-card p-5 rounded-lg"
+                    x-data="{ open: false }"
+                    class="relative inline-block text-left"
                   >
-                    <div class="flex justify-between items-start">
-                      <h3
-                        class="text-sm font-semibold uppercase text-slate-500"
-                        x-text="metric"
-                      ></h3>
-                      <p
-                        class="text-sm font-bold font-data"
-                        :class="kpi[metric]?.deltaClass"
-                        x-text="kpi[metric]?.delta"
-                      ></p>
+                    <div>
+                      <button
+                        @click="open = !open"
+                        type="button"
+                        class="inline-flex justify-center items-center gap-x-1.5 rounded-full bg-white border border-dashed border-gray-300 font-light text-[15px] shadow-sm hover:bg-gray-50"
+                        style="padding: 4px 10px 4px 15px"
+                      >
+                        <span class="text-[#0b131c]">Display:</span>
+                        <span
+                          class="text-[#0b131c]"
+                          x-text="granularity.charAt(0).toUpperCase() + granularity.slice(1)"
+                        ></span>
+                        <svg
+                          class="h-5 w-5 text-gray-400"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                    <div class="mt-2 grid grid-cols-2 gap-4 items-end">
-                      <div>
-                        <p class="text-xs text-gray-400">Your Hotel</p>
-
-                        <p
-                          class="text-3xl font-extrabold text-gray-800 font-data"
-                          x-text="kpi[metric]?.your"
-                        ></p>
-                      </div>
-                      <div class="text-right">
-                        <p class="text-xs text-gray-400">Market</p>
-                        <p
-                          class="text-2xl font-bold text-gray-500 font-data"
-                          x-text="kpi[metric]?.market"
-                        ></p>
+                    <div
+                      x-show="open"
+                      @click.away="open = false"
+                      x-transition
+                      class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                      style="display: none"
+                    >
+                      <div class="py-1">
+                        <a
+                          href="#"
+                          @click.prevent="setGranularity('daily'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'daily', 'hover:bg-gray-200': granularity !== 'daily' }"
+                          >Daily</a
+                        >
+                        <a
+                          href="#"
+                          @click.prevent="setGranularity('weekly'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'weekly', 'hover:bg-gray-200': granularity !== 'weekly' }"
+                          >Weekly</a
+                        >
+                        <a
+                          href="#"
+                          @click.prevent="setGranularity('monthly'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'monthly', 'hover:bg-gray-200': granularity !== 'monthly' }"
+                          >Monthly</a
+                        >
                       </div>
                     </div>
                   </div>
-                </template>
-              </div>
-            </template>
+                  <div
+                    x-data="{ open: false }"
+                    class="relative inline-block text-left"
+                  >
+                    <div>
+                      <button
+                        @click="open = !open"
+                        type="button"
+                        class="inline-flex justify-center items-center gap-x-1.5 rounded-full bg-white border border-dashed border-gray-300 font-light text-[15px] text-[#0b131c] shadow-sm hover:bg-gray-50"
+                        style="padding: 4px 10px 4px 15px"
+                      >
+                        <span
+                          x-text="activePreset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())"
+                        ></span>
+                        <svg
+                          class="h-5 w-5 text-gray-400"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <div
+                      x-show="open"
+                      @click.away="open = false"
+                      x-transition
+                      class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                      style="display: none"
+                    >
+                      <div class="py-1">
+                        <a
+                          href="#"
+                          @click.prevent="setPreset('current-month'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': activePreset === 'current-month', 'hover:bg-gray-200': activePreset !== 'current-month' }"
+                          >Current Month</a
+                        >
+                        <a
+                          href="#"
+                          @click.prevent="setPreset('next-month'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': activePreset === 'next-month', 'hover:bg-gray-200': activePreset !== 'next-month' }"
+                          >Next Month</a
+                        >
+                        <a
+                          href="#"
+                          @click.prevent="setPreset('this-year'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': activePreset === 'this-year', 'hover:bg-gray-200': activePreset !== 'this-year' }"
+                          >This Year</a
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    x-data="{ open: false }"
+                    class="relative inline-block text-left"
+                  >
+                    <div>
+                      <button
+                        @click="open = !open"
+                        type="button"
+                        class="inline-flex justify-center items-center gap-x-1 rounded-lg bg-[#13191d] text-white font-semibold shadow-sm hover:opacity-90"
+                        style="padding: 5px 8px 5px 12px; font-size: 13px"
+                      >
+                        <span class="text-gray-400">Comparison:</span>
+                        <span
+                          class="text-white ml-1"
+                          x-text="activeMetric.toUpperCase()"
+                        ></span>
+                        <svg
+                          class="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
 
-            <div
-              class="bg-white p-6 rounded-xl border border-gray-200 mb-8 transition-all duration-300"
-              :class="{ 'opacity-50 filter blur-sm': isLoading.chart }"
-            >
-              <div x-ref="chartContainer" class="h-[320px] md:h-[350px]"></div>
-            </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div>
-                <div class="flex justify-between items-center mb-4">
-                  <h2
-                    id="your-hotel-table-title"
-                    class="text-xl font-semibold text-gray-800"
-                    x-text="currentPropertyName"
-                  ></h2>
+                    
+                    <div
+                      x-show="open"
+                      @click.away="open = false"
+                      x-transition
+                      class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                    >
+                      <div class="py-1">
+                        <a
+                          href="#"
+                          @click.prevent="setActiveMetric('occupancy'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': activeMetric === 'occupancy' }"
+                          >Occupancy</a
+                        >
+                        <a
+                          href="#"
+                          @click.prevent="setActiveMetric('adr'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': activeMetric === 'adr' }"
+                          >ADR</a
+                        >
+                        <a
+                          href="#"
+                          @click.prevent="setActiveMetric('revpar'); open = false"
+                          class="text-gray-700 block px-4 py-2 text-sm"
+                          :class="{ 'bg-blue-100 text-blue-600 font-semibold': activeMetric === 'revpar' }"
+                          >RevPAR</a
+                        >
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p
-                  class="text-sm text-slate-500 -mt-2 mb-4"
-                  x-text="yourHotelSubtitle"
-                ></p>
-                <template x-if="isLoading.tables">
-                  <div class="space-y-2 animate-pulse">
-                    <div class="h-10 bg-gray-200 rounded-t-lg"></div>
-                    <div class="h-12 bg-gray-200"></div>
-                    <div class="h-12 bg-gray-200"></div>
-                    <div class="h-12 bg-gray-200"></div>
-                    <div class="h-12 bg-gray-200 rounded-b-lg"></div>
-                  </div>
-                </template>
-                <template x-if="!isLoading.tables">
-                  <div class="table-container rounded-lg overflow-x-auto">
-                    <table class="w-full text-sm text-gray-600">
-                      <thead
-                        id="your-hotel-table-header"
-                        class="bg-gray-50 sticky top-0"
-                      >
-                        <tr>
-                          <th
-                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Date
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Occupancy
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            ADR
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            RevPAR
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody
-                        id="yourHotelTableBody"
-                        class="divide-y divide-gray-200"
-                      >
-                        <template x-for="day in allMetrics" :key="day.date">
-                          <tr class="hover:bg-blue-50">
-                            <td
-                              class="px-4 py-3 text-left font-data"
-                              x-text="formatDateLabel(day.date, granularity)"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-data"
-                              x-text="formatValue(day.your.occupancy, 'percent')"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-data"
-                              x-text="formatCurrency(day.your.adr)"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-data"
-                              x-text="formatCurrency(day.your.revpar)"
-                            ></td>
-                          </tr>
-                        </template>
-                        <template x-if="allMetrics.length === 0">
-                          <tr>
-                            <td
-                              colspan="4"
-                              class="text-center p-8 text-gray-500"
-                            >
-                              No data to display
-                            </td>
-                          </tr>
-                        </template>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
               </div>
-              <div>
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">
-                  The Market
-                </h2>
-                <p
-                  class="text-sm text-slate-500 -mt-2 mb-4"
-                  x-text="marketSubtitle"
-                ></p>
-                <template x-if="isLoading.tables">
-                  <div class="space-y-2 animate-pulse">
-                    <div class="h-10 bg-gray-200 rounded-t-lg"></div>
-                    <div class="h-12 bg-gray-200"></div>
-                    <div class="h-12 bg-gray-200"></div>
-                    <div class="h-12 bg-gray-200"></div>
-                    <div class="h-12 bg-gray-200 rounded-b-lg"></div>
-                  </div>
-                </template>
-                <template x-if="!isLoading.tables">
-                  <div class="table-container rounded-lg overflow-x-auto">
-                    <table class="w-full text-sm text-gray-600">
-                      <thead
-                        id="market-table-header"
-                        class="bg-gray-50 sticky top-0"
-                      >
-                        <tr>
-                          <th
-                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Date
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Occupancy
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            ADR
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            RevPAR
-                          </th>
-                          <th
-                            class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            Delta
-                          </th>
+
+<div
+                class="h-72 p-4 md:p-8 border-b border-gray-200 flex flex-col"
+          
+              >
+              
+          <div id="main-dashboard-chart" class="flex-1 w-full" x-ref="mainChartContainer"></div>
+              </div>
+          
+
+
+
+              <div class="p-4 md:p-8">
+                <div class="max-h-[75vh] overflow-y-auto">
+                  <table class="w-full">
+                    <thead class="sticky top-0 bg-white">
+                      <tr>
+                        <th
+                          colspan="4"
+                          class="pt-2 pb-5 px-2 text-left font-semibold uppercase text-base text-[#3e4046]"
+                        >
+                          <span
+                            x-text="currentPropertyName.toUpperCase()"
+                          ></span>
+                        </th>
+                        <th
+                          colspan="3"
+                          class="pt-2 pb-5 px-2 text-left font-semibold uppercase text-base text-[#3e4046]"
+                        >
+                          THE MARKET
+                        </th>
+                        <th class="pt-2 pb-8 px-2"></th>
+                      </tr>
+                      <tr>
+                        <th
+                          class="py-3 px-2 text-left text-xs font-semibold text-[#a3a5a7] uppercase tracking-wider w-32"
+                        >
+                          Date
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs text-[#a3a5a7] uppercase tracking-wider w-28 cursor-pointer border-b-2 border-transparent"
+                          @click="setActiveMetric('occupancy')"
+                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'occupancy' }"
+                        >
+                          Occupancy
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs text-[#a3a5a7] uppercase tracking-wider w-24 cursor-pointer border-b-2 border-transparent"
+                          @click="setActiveMetric('adr')"
+                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'adr' }"
+                        >
+                          ADR
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs text-[#a3a5a7] uppercase tracking-wider w-24 border-r border-gray-200 cursor-pointer border-b-2 border-transparent"
+                          @click="setActiveMetric('revpar')"
+                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'revpar' }"
+                        >
+                          RevPAR
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs text-[#a3a5a7] uppercase tracking-wider w-28 cursor-pointer border-b-2 border-transparent"
+                          @click="setActiveMetric('occupancy')"
+                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'occupancy' }"
+                        >
+                          Occupancy
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs text-[#a3a5a7] uppercase tracking-wider w-24 cursor-pointer border-b-2 border-transparent"
+                          @click="setActiveMetric('adr')"
+                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'adr' }"
+                        >
+                          ADR
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs text-[#a3a5a7] uppercase tracking-wider w-24 border-r border-gray-200 cursor-pointer border-b-2 border-transparent"
+                          @click="setActiveMetric('revpar')"
+                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'revpar' }"
+                        >
+                          RevPAR
+                        </th>
+                        <th
+                          class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 font-semibold !text-blue-600 border-b-2 border-blue-500"
+                        >
+                          Delta
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="text-[#3e4046]">
+                      <template x-for="day in allMetrics" :key="day.date">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td
+                            class="py-4 px-2 text-left font-normal text-sm"
+                            x-text="formatDateLabel(day.date, granularity)"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left text-[14px]"
+                            x-text="formatValue(day.your.occupancy, 'percent')"
+                            :class="{ 'font-semibold': activeMetric === 'occupancy', 'font-normal': activeMetric !== 'occupancy' }"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left text-[14px]"
+                            x-text="formatCurrency(day.your.adr)"
+                            :class="{ 'font-semibold': activeMetric === 'adr', 'font-normal': activeMetric !== 'adr' }"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left text-[14px] border-r border-gray-200"
+                            x-text="formatCurrency(day.your.revpar)"
+                            :class="{ 'font-semibold': activeMetric === 'revpar', 'font-normal': activeMetric !== 'revpar' }"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left text-[14px]"
+                            x-text="formatValue(day.market.occupancy, 'percent')"
+                            :class="{ 'font-semibold': activeMetric === 'occupancy', 'font-normal': activeMetric !== 'occupancy' }"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left text-[14px]"
+                            x-text="formatCurrency(day.market.adr)"
+                            :class="{ 'font-semibold': activeMetric === 'adr', 'font-normal': activeMetric !== 'adr' }"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left text-[14px] border-r border-gray-200"
+                            x-text="formatCurrency(day.market.revpar)"
+                            :class="{ 'font-semibold': activeMetric === 'revpar', 'font-normal': activeMetric !== 'revpar' }"
+                          ></td>
+                          <td
+                            class="py-4 px-2 text-left font-semibold text-[14px]"
+                            :class="getDelta(day).deltaClass.replace('text-green-600', 'text-[#179864]').replace('text-red-600', 'text-[#c36063]')"
+                            x-text="getDelta(day).formattedDelta"
+                          ></td>
                         </tr>
-                      </thead>
-                      <tbody
-                        id="marketTableBody"
-                        class="divide-y divide-gray-200"
-                      >
-                        <template x-for="day in allMetrics" :key="day.date">
-                          <tr class="hover:bg-blue-50">
-                            <td
-                              class="px-4 py-3 text-left font-data"
-                              x-text="formatDateLabel(day.date, granularity)"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-data"
-                              x-text="formatValue(day.market.occupancy, 'percent')"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-data"
-                              x-text="formatCurrency(day.market.adr)"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-data"
-                              x-text="formatCurrency(day.market.revpar)"
-                            ></td>
-                            <td
-                              class="px-4 py-3 text-right font-semibold font-data"
-                              :class="getDelta(day).deltaClass"
-                              x-text="getDelta(day).formattedDelta"
-                            ></td>
-                          </tr>
-                        </template>
-                        <template x-if="allMetrics.length === 0">
-                          <tr>
-                            <td
-                              colspan="5"
-                              class="text-center p-8 text-gray-500"
-                            >
-                              No data to display
-                            </td>
-                          </tr>
-                        </template>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        </main>
-        <div
-          x-show="isLegalModalOpen"
-          x-transition:enter="ease-out duration-300"
-          x-transition:enter-start="opacity-0"
-          x-transition:enter-end="opacity-100"
-          x-transition:leave="ease-in duration-200"
-          x-transition:leave-start="opacity-100"
-          x-transition:leave-end="opacity-0"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style="display: none"
-        >
-          <div @click="isLegalModalOpen = false" class="absolute inset-0"></div>
+<div
+  class="h-full w-[480px] border-l border-gray-200 flex flex-col flex-shrink-0"
+>
+              <div
+                class="p-4 md:p-5 border-b border-gray-200"
+                style="height: 340px"
+              >
+                <div
+                  class="h-full w-full rounded-xl flex items-center justify-center text-center p-8 text-white"
+                  style="background-color: #5470c6"
+                >
+                  <template x-if="isLoadingSummary">
+                    <div class="flex flex-col items-center justify-center">
+                      <div
+                        class="w-8 h-8 border-4 border-white border-t-transparent border-solid rounded-full animate-spin"
+                      ></div>
+                      <span class="mt-4 text-sm font-medium"
+                        >Generating Insights...</span
+                      >
+                    </div>
+                  </template>
 
-          <div
-            @click.away="isLegalModalOpen = false"
-            class="relative bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full m-4 max-h-[80vh] overflow-y-auto"
-          ></div>
-        </div>
+                  <template x-if="!isLoadingSummary">
+                    <p
+                      class="font-semibold leading-snug"
+                      style="font-size: 22px"
+                      x-text="summaryText"
+                    ></p>
+                  </template>
+                </div>
+              </div>
+
+
+<div
+                class="p-4 md:px-8 md:pt-6 md:pb-8 border-b border-gray-200"
+                style="height: 320px"
+              >
+             <h3 class="text-base font-bold text-gray-700 mb-4">
+  Summary
+</h3>
+
+                <div class="flex justify-between items-center px-1">
+                  <p class="text-xs font-bold text-gray-400 uppercase">
+                    Your Hotel
+                  </p>
+                  <p class="text-xs font-bold text-gray-400 uppercase">
+                    The Market
+                  </p>
+                </div>
+
+            <div class="mt-4 flex flex-col gap-y-6">
+                  <div class="flex justify-between items-center">
+                    <div class="w-1/3 text-left">
+                      <div class="flex items-center gap-x-2">
+                        <span
+                          class="w-2.5 h-2.5 rounded-sm transition-opacity"
+                          style="background-color: #179864"
+                          :style="{ opacity: kpi.occupancy.your_raw >= kpi.occupancy.market_raw ? 1 : 0 }"
+                        ></span>
+                        <p
+                          class="text-xl font-medium text-slate-800"
+                          x-text="kpi.occupancy.your"
+                        ></p>
+                      </div>
+                    </div>
+                    <div class="flex-grow text-center px-2">
+                      <p
+                        class="text-xs font-semibold"
+                        :class="kpi.occupancy.your_raw >= kpi.occupancy.market_raw ? 'text-green-600' : 'text-red-600'"
+                        x-text="`${(kpi.occupancy.your_raw - kpi.occupancy.market_raw) >= 0 ? '+' : ''}${((kpi.occupancy.your_raw - kpi.occupancy.market_raw) * 100).toFixed(1)}%`"
+                      ></p>
+                      <div
+                        class="border-b border-dashed border-gray-300 mt-1"
+                      ></div>
+                      <p class="text-xs text-gray-400 mt-1">Occupancy</p>
+                    </div>
+                    <div class="w-1/3 text-right">
+                      <div class="flex items-center gap-x-2 justify-end">
+                        <p
+                          class="text-xl font-medium text-slate-800"
+                          x-text="kpi.occupancy.market"
+                        ></p>
+                        <span
+                          class="w-2.5 h-2.5 rounded-sm transition-opacity"
+                          style="background-color: #c36063"
+                          :style="{ opacity: kpi.occupancy.market_raw > kpi.occupancy.your_raw ? 1 : 0 }"
+                        ></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <div class="w-1/3 text-left">
+                      <div class="flex items-center gap-x-2">
+                        <span
+                          class="w-2.5 h-2.5 rounded-sm transition-opacity"
+                          style="background-color: #179864"
+                          :style="{ opacity: kpi.adr.your_raw >= kpi.adr.market_raw ? 1 : 0 }"
+                        ></span>
+                        <p
+                          class="text-xl font-medium text-slate-800"
+                          x-text="kpi.adr.your"
+                        ></p>
+                      </div>
+                    </div>
+                    <div class="flex-grow text-center px-2">
+                      <p
+                        class="text-xs font-semibold"
+                        :class="kpi.adr.your_raw >= kpi.adr.market_raw ? 'text-green-600' : 'text-red-600'"
+                        x-text="`${(kpi.adr.your_raw - kpi.adr.market_raw) >= 0 ? '+' : ''}${formatCurrency(kpi.adr.your_raw - kpi.adr.market_raw)}`"
+                      ></p>
+                      <div
+                        class="border-b border-dashed border-gray-300 mt-1"
+                      ></div>
+                      <p class="text-xs text-gray-400 mt-1">ADR</p>
+                    </div>
+                    <div class="w-1/3 text-right">
+                      <div class="flex items-center gap-x-2 justify-end">
+                        <p
+                          class="text-xl font-medium text-slate-800"
+                          x-text="kpi.adr.market"
+                        ></p>
+                        <span
+                          class="w-2.5 h-2.5 rounded-sm transition-opacity"
+                          style="background-color: #c36063"
+                          :style="{ opacity: kpi.adr.market_raw > kpi.adr.your_raw ? 1 : 0 }"
+                        ></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <div class="w-1/3 text-left">
+                      <div class="flex items-center gap-x-2">
+                        <span
+                          class="w-2.5 h-2.5 rounded-sm transition-opacity"
+                          style="background-color: #179864"
+                          :style="{ opacity: kpi.revpar.your_raw >= kpi.revpar.market_raw ? 1 : 0 }"
+                        ></span>
+                        <p
+                          class="text-xl font-medium text-slate-800"
+                          x-text="kpi.revpar.your"
+                        ></p>
+                      </div>
+                    </div>
+                    <div class="flex-grow text-center px-2">
+                      <p
+                        class="text-xs font-semibold"
+                        :class="kpi.revpar.your_raw >= kpi.revpar.market_raw ? 'text-green-600' : 'text-red-600'"
+                        x-text="`${(kpi.revpar.your_raw - kpi.revpar.market_raw) >= 0 ? '+' : ''}${formatCurrency(kpi.revpar.your_raw - kpi.revpar.market_raw)}`"
+                      ></p>
+                      <div
+                        class="border-b border-dashed border-gray-300 mt-1"
+                      ></div>
+                      <p class="text-xs text-gray-400 mt-1">RevPAR</p>
+                    </div>
+                    <div class="w-1/3 text-right">
+                      <div class="flex items-center gap-x-2 justify-end">
+                        <p
+                          class="text-xl font-medium text-slate-800"
+                          x-text="kpi.revpar.market"
+                        ></p>
+                        <span
+                          class="w-2.5 h-2.5 rounded-sm transition-opacity"
+                          style="background-color: #c36063"
+                          :style="{ opacity: kpi.revpar.market_raw > kpi.revpar.your_raw ? 1 : 0 }"
+                        ></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+  <div
+                class="p-4 md:pt-6 md:pb-8 md:px-8  flex flex-col"
+                style="height: 260px;"
+              >
+            <h3
+  class="text-base font-bold text-gray-600 uppercase tracking-wider"
+>
+  RevPAR Comparison
+</h3>
+                <div class="mt-6 flex-1">
+       <canvas id="revparBarChart" x-ref="revparChartCanvas"></canvas>
+                </div>
+                <div class="mt-6 flex flex-col gap-y-3 text-slate-600" style="font-size: 14px;">
+                  <div class="flex items-center gap-x-2">
+                      <span class="w-3 h-3 rounded-sm" style="background-color: #457066;"></span>
+                      <span class="font-semibold" x-text="currentPropertyName"></span>:
+                      <span class="font-data font-semibold" x-text="kpi.revpar.your"></span>
+                  </div>
+                  <div class="flex items-center gap-x-2">
+                      <span class="w-3 h-3 rounded-sm" style="background-color: #df595a;"></span>
+                      <span class="font-semibold">The Market</span>:
+                      <span class="font-data font-semibold" x-text="kpi.revpar.market"></span>
+                  </div>
+                </div>
+              </div>
+        
+            </div>
+          </main>
+ 
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+   <script type="module">
+  // Import the LIVE dashboard component logic and the NEW sidebar logic.
+  import dashboardComponent from "/app/dashboard.mjs";
+  import sidebar from "/app/_shared/sidebar.mjs";
+  import { loadComponent } from "/app/utils.mjs";
 
-    <script type="module">
-      // Import page-specific and shared component logic
-      import dashboardComponent from "/app/dashboard.mjs";
-      import pageHeader from "/app/_shared/header.mjs";
-      import sidebar from "/app/_shared/sidebar.mjs";
-      import { loadComponent } from "/app/utils.mjs";
+  // Register the Alpine.js components.
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("dashboard", dashboardComponent);
+    Alpine.data("sidebar", sidebar);
+  });
 
-      // Register all Alpine.js components
-      document.addEventListener("alpine:init", () => {
-        Alpine.data("dashboard", dashboardComponent);
-        Alpine.data("pageHeader", pageHeader);
-        Alpine.data("sidebar", sidebar);
-      });
-
-      // This corrected script ensures components load in order, then fixes the chart.
-      document.addEventListener("DOMContentLoaded", async () => {
-        // 1. Wait for the header and sidebar to fully load before proceeding.
-        await loadComponent("header", "header-placeholder");
-        await loadComponent("sidebar", "sidebar-placeholder");
-
-        // 2. Manually trigger a 'resize' event. The chart's existing code
-        // will catch this and redraw the chart correctly within its new, smaller container.
-        window.dispatchEvent(new Event("resize"));
-      });
-    </script>
-
+  // Load the new sidebar's HTML.
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadComponent("sidebar", "sidebar-placeholder");
+  });
+</script>
     <script
       src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
       defer

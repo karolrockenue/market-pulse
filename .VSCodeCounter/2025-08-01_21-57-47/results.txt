@@ -1,0 +1,73 @@
+Date : 2025-08-01 21:57:47
+Directory : /Users/karolmarcu/Documents/market-pulse
+Total : 35 files,  12202 codes, 730 comments, 769 blanks, all 13701 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| JavaScript |         21 |      5,036 |        698 |        596 |      6,330 |
+| HTML       |         11 |      4,828 |         32 |        168 |      5,028 |
+| JSON       |          3 |      2,338 |          0 |          5 |      2,343 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                       | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                          |         35 |     12,202 |        730 |        769 |     13,701 |
+| . (Files)                                                                  |          4 |      2,465 |         26 |         33 |      2,524 |
+| api                                                                        |         12 |      2,704 |        407 |        342 |      3,453 |
+| api (Files)                                                                |          3 |        560 |         45 |         64 |        669 |
+| api/adapters                                                               |          1 |        411 |        101 |         49 |        561 |
+| api/routes                                                                 |          5 |      1,447 |        168 |        181 |      1,796 |
+| api/utils                                                                  |          3 |        286 |         93 |         48 |        427 |
+| public                                                                     |         19 |      7,033 |        297 |        394 |      7,724 |
+| public (Files)                                                             |          5 |      1,362 |         25 |         58 |      1,445 |
+| public/admin                                                               |          3 |      1,227 |         34 |         69 |      1,330 |
+| public/app                                                                 |         11 |      4,444 |        238 |        267 |      4,949 |
+| public/app (Files)                                                         |          7 |      3,857 |        206 |        237 |      4,300 |
+| public/app/_shared                                                         |          4 |        587 |         32 |         30 |        649 |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                                   | language   | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| /Users/karolmarcu/Documents/market-pulse/api/adapters/cloudbedsAdapter.js  | JavaScript |        411 |        101 |         49 |        561 |
+| /Users/karolmarcu/Documents/market-pulse/api/daily-refresh.js              | JavaScript |        104 |          6 |         11 |        121 |
+| /Users/karolmarcu/Documents/market-pulse/api/initial-sync.js               | JavaScript |        138 |         22 |         19 |        179 |
+| /Users/karolmarcu/Documents/market-pulse/api/routes/admin.router.js        | JavaScript |        397 |         87 |         62 |        546 |
+| /Users/karolmarcu/Documents/market-pulse/api/routes/auth.router.js         | JavaScript |        289 |         24 |         45 |        358 |
+| /Users/karolmarcu/Documents/market-pulse/api/routes/dashboard.router.js    | JavaScript |        329 |         14 |         36 |        379 |
+| /Users/karolmarcu/Documents/market-pulse/api/routes/reports.router.js      | JavaScript |        102 |          3 |          7 |        112 |
+| /Users/karolmarcu/Documents/market-pulse/api/routes/users.router.js        | JavaScript |        330 |         40 |         31 |        401 |
+| /Users/karolmarcu/Documents/market-pulse/api/send-scheduled-reports.js     | JavaScript |        318 |         17 |         34 |        369 |
+| /Users/karolmarcu/Documents/market-pulse/api/utils/cloudbeds.js            | JavaScript |        183 |         54 |         24 |        261 |
+| /Users/karolmarcu/Documents/market-pulse/api/utils/db.js                   | JavaScript |         12 |          8 |          6 |         26 |
+| /Users/karolmarcu/Documents/market-pulse/api/utils/middleware.js           | JavaScript |         91 |         31 |         18 |        140 |
+| /Users/karolmarcu/Documents/market-pulse/package-lock.json                 | JSON       |      2,275 |          0 |          1 |      2,276 |
+| /Users/karolmarcu/Documents/market-pulse/package.json                      | JSON       |         26 |          0 |          1 |         27 |
+| /Users/karolmarcu/Documents/market-pulse/public/admin/admin.mjs            | JavaScript |        421 |         21 |         35 |        477 |
+| /Users/karolmarcu/Documents/market-pulse/public/admin/index.html           | HTML       |        341 |          0 |         16 |        357 |
+| /Users/karolmarcu/Documents/market-pulse/public/admin/market-explorer.html | HTML       |        465 |         13 |         18 |        496 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/_shared/header.html    | HTML       |        193 |          0 |          5 |        198 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/_shared/header.mjs     | JavaScript |        188 |         27 |         18 |        233 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/_shared/sidebar.html   | HTML       |        186 |          0 |          3 |        189 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/_shared/sidebar.mjs    | JavaScript |         20 |          5 |          4 |         29 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/dashboard.mjs          | JavaScript |        554 |         73 |         44 |        671 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/index.html             | HTML       |        630 |          0 |         22 |        652 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/reports.html           | HTML       |      1,230 |          0 |         34 |      1,264 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/reports.js             | JavaScript |        676 |         51 |         74 |        801 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/settings.html          | HTML       |        474 |          0 |         14 |        488 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/settings.mjs           | JavaScript |        277 |         72 |         46 |        395 |
+| /Users/karolmarcu/Documents/market-pulse/public/app/utils.mjs              | JavaScript |         16 |         10 |          3 |         29 |
+| /Users/karolmarcu/Documents/market-pulse/public/constants.mjs              | JavaScript |         53 |          6 |          2 |         61 |
+| /Users/karolmarcu/Documents/market-pulse/public/login.html                 | HTML       |        472 |         19 |         20 |        511 |
+| /Users/karolmarcu/Documents/market-pulse/public/privacy.html               | HTML       |        212 |          0 |         11 |        223 |
+| /Users/karolmarcu/Documents/market-pulse/public/support.html               | HTML       |        368 |          0 |         11 |        379 |
+| /Users/karolmarcu/Documents/market-pulse/public/terms.html                 | HTML       |        257 |          0 |         14 |        271 |
+| /Users/karolmarcu/Documents/market-pulse/server.js                         | JavaScript |        127 |         26 |         28 |        181 |
+| /Users/karolmarcu/Documents/market-pulse/vercel.json                       | JSON       |         37 |          0 |          3 |         40 |
+| Total                                                                      |            |     12,202 |        730 |        769 |     13,701 |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+

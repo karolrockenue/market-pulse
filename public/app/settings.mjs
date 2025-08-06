@@ -47,19 +47,12 @@ export default function settingsPage() {
 
     // --- INITIALIZATION ---
     async init() {
-      // Load shared components first
-      await Promise.all([
-        loadComponent("header", "header-placeholder"),
-        loadComponent("sidebar", "sidebar-placeholder"),
-      ]);
-
-      // Then fetch page-specific data
-      // Then fetch page-specific data
+      // The init function no longer loads component HTML. It goes straight to fetching data.
       await Promise.all([
         this.fetchProfile(),
         this.fetchTeamMembers(),
         this.fetchConnectedProperties(),
-        this.fetchOwnedProperties(), // NEW: Check if user is an account owner
+        this.fetchOwnedProperties(),
       ]);
 
       // Finally, show the page content
@@ -67,7 +60,6 @@ export default function settingsPage() {
         this.isInitialized = true;
       });
     },
-
     // --- METHODS ---
 
     // Property Management Methods
@@ -387,8 +379,3 @@ export default function settingsPage() {
     },
   };
 }
-
-// NOTE: We need to import the shared components here so they can be loaded by the init function.
-import { loadComponent } from "/app/utils.mjs";
-import pageHeader from "/app/_shared/header.mjs";
-import sidebar from "/app/_shared/sidebar.mjs";
