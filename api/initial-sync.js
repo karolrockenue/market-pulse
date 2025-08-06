@@ -49,6 +49,15 @@ async function runSync(propertyId) {
     // Start the database transaction
     await client.query("BEGIN");
 
+    // Clear all existing metric snapshots for this property to ensure a clean import.
+    // This prevents "duplicate key" errors if the sync is run more than once.
+    console.log(`Clearing existing metric data for property ${propertyId}...`);
+    await client.query(
+      "DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1",
+      [propertyId]
+    );
+    console.log("✅ Existing data cleared.");
+
     // --- NEW: Sync Hotel Info, Tax, and Neighborhood ---
     console.log(`Syncing hotel metadata for property ${propertyId}...`);
     // 1. Sync core details and tax info concurrently

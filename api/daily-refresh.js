@@ -59,19 +59,7 @@ module.exports = async (request, response) => {
           const client = await pgPool.connect();
           try {
             // Start the transaction
-            // Start the database transaction
             await client.query("BEGIN");
-
-            // Clear all existing metric snapshots for this property to ensure a clean import.
-            // This prevents "duplicate key" errors if the sync is run more than once.
-            console.log(
-              `Clearing existing metric data for property ${propertyId}...`
-            );
-            await client.query(
-              "DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1",
-              [propertyId]
-            );
-            console.log("✅ Existing data cleared.");
 
             // Prepare the values for the bulk insert/update operation
             const bulkInsertValues = datesToUpdate.map((date) => {
