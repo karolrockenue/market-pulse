@@ -286,23 +286,26 @@ router.get("/cloudbeds/callback", async (req, res) => {
       // --- FIX: Use UPSERT (INSERT ... ON CONFLICT) to handle user creation ---
       // This creates the user with the 'owner' role if they don't exist,
       // or does nothing if they already do. It also fetches the final role.
+      // This query now correctly handles conflicts on the 'email' column.
+      // If the user exists, it updates their details. If not, it creates them.
+      // It also returns the user's role in the same step for efficiency.
       const userUpsertQuery = `
         INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, role, pms_type)
         VALUES ($1, $2, $3, $4, 'owner', 'cloudbeds')
-        ON CONFLICT (cloudbeds_user_id) DO NOTHING;
+        ON CONFLICT (email) DO UPDATE SET
+            cloudbeds_user_id = EXCLUDED.cloudbeds_user_id,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            updated_at = NOW()
+        RETURNING role;
       `;
-      await client.query(userUpsertQuery, [
+      const userResult = await client.query(userUpsertQuery, [
         cloudbedsUser.user_id,
         cloudbedsUser.email,
         cloudbedsUser.first_name,
         cloudbedsUser.last_name,
       ]);
 
-      // --- FIX: Select the user's role, which is now guaranteed to exist ---
-      const userResult = await client.query(
-        "SELECT role FROM users WHERE cloudbeds_user_id = $1",
-        [cloudbedsUser.user_id]
-      );
       const userRole = userResult.rows[0].role;
 
       // Link properties to the user
