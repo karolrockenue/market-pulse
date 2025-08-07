@@ -93,7 +93,7 @@ router.get("/magic-link-callback", async (req, res) => {
     if (userResult.rows.length === 0) {
       return res.status(404).send("User not found.");
     }
-
+    // --- THE FIX: Regenerate the session after successful authentication ---
     const user = userResult.rows[0];
 
     await pgPool.query(
@@ -101,6 +101,7 @@ router.get("/magic-link-callback", async (req, res) => {
       [token]
     );
 
+    // --- THE FIX: Regenerate the session after successful authentication ---
     // --- THE FIX: Regenerate the session after successful authentication ---
     // This destroys the old session and creates a fresh, clean one for the logged-in user.
     // It is the most robust way to prevent session fixation and other login-related bugs.
