@@ -276,25 +276,24 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
             .map((c) => ({ cdf: { column: c.trim() }, metrics: ["sum"] })),
           settings: { details: true, totals: true },
         };
-        // 2. Add date filters to the request body IF they were provided
         if (startDate && endDate) {
-          // FINAL FIX: The API requires a full ISO timestamp, not just a date string.
-          // Convert the start date to the beginning of the day in UTC.
-          const fromTimestamp = new Date(
-            `${startDate}T00:00:00Z`
-          ).toISOString();
-          // Convert the end date to the very end of the day in UTC.
-          const toTimestamp = new Date(
-            `${endDate}T23:59:59.999Z`
-          ).toISOString();
-
-          requestBody.filters = [
-            {
-              cdf: { column: "stay_date" },
-              from: fromTimestamp,
-              to: toTimestamp,
-            },
-          ];
+          // FINAL FIX: This format is confirmed to be correct by the getHistoricalMetrics function.
+          requestBody.filters = {
+            and: [
+              {
+                cdf: { column: "stay_date" },
+                operator: "greater_than_or_equal",
+                value: `${startDate}T00:00:00.000Z`,
+              },
+              {
+                cdf: { column: "stay_date" },
+                operator: "less_than_or_equal",
+                // Note: We use 00:00:00 for the end date as well, as this is the pattern
+                // used by the historical sync. The API treats this as inclusive of the whole day.
+                value: `${endDate}T00:00:00.000Z`,
+              },
+            ],
+          };
         }
         let groupRows = [{ cdf: { column: "stay_date" }, modifier: "day" }];
         if (groupBy) {
