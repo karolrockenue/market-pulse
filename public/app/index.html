@@ -137,13 +137,14 @@
     x-cloak
     x-init="window.alpineInstance = this"
   >
-  <!-- Initial Sync Loading Overlay -->
+<!-- Initial Sync Loading Overlay -->
 <div
   x-show="isSyncing"
   x-cloak
   style="background-color: #0c121c"
   class="fixed inset-0 flex flex-col items-center justify-center z-50 transition-opacity"
-
+>
+  <!-- Blue Spinner (copied from admin panel style) -->
   <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent border-solid rounded-full animate-spin"></div>
   <!-- Text Content -->
   <div class="text-center text-white mt-6">
@@ -151,7 +152,6 @@
     <p class="text-base text-gray-300 mt-2">Syncing up to 5 years of data, this can take a moment.</p>
   </div>
 </div>
-
     <div class="flex flex-col lg:flex-row h-screen">
       <div id="sidebar-placeholder"></div>
 
