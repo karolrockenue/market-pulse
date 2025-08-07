@@ -74,21 +74,28 @@ const requireAdminApi = (req, res, next) => {
 
 // middleware.js
 
+// api/utils/middleware.js
+
 const requirePageLogin = (req, res, next) => {
-  // --- BREADCRUMB 2: LOG THE INCOMING SESSION STATE ---
+  // --- BREADCRUMB 7: LOG THE INCOMING SESSION STATE WHEN A PAGE IS REQUESTED ---
   console.log(
-    `[BREADCRUMB 2 - middleware.js] requirePageLogin triggered for path: ${req.path}. Session content:`,
-    req.session
+    `[BREADCRUMB 7 - middleware.js] requirePageLogin triggered for path: ${req.path}.`
   );
 
-  if (!req.session.userId) {
+  // Check if the session or the userId on the session exists.
+  if (!req.session || !req.session.userId) {
+    // If it doesn't exist, log the failure and the entire (empty) session object for debugging.
     console.error(
-      `[LOGIN FAILURE] Session userId not found. Redirecting to /signin.`
+      `[API AUTH FAILURE] Session or session.userId is missing. Denying access to ${req.path}. Session content:`,
+      req.session
     );
+    // Redirect the user to the sign-in page.
     return res.redirect("/signin");
   }
+
+  // If the session is valid, log the success and allow the request to proceed.
   console.log(
-    `[LOGIN SUCCESS] Session valid for userId: ${req.session.userId}. Allowing access.`
+    `[API AUTH SUCCESS] Session valid for userId: ${req.session.userId}, role: ${req.session.role}. Allowing access to ${req.path}.`
   );
   next();
 };

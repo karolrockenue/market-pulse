@@ -53,16 +53,23 @@ app.use(cors(corsOptions));
 
 // server.js
 
+// server.js
+
+// --- EXPLICITLY DEFINE AND LOG COOKIE CONFIG ---
 const cookieConfig = {
   secure: process.env.VERCEL_ENV === "production",
   httpOnly: true,
   sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
   maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
-  // This line is critical for production to ensure the cookie is valid
-  // for both www.market-pulse.io and market-pulse.io.
   domain:
     process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined,
 };
+
+// This log will run once when the server starts.
+console.log(
+  "[BREADCRUMB 0 - server.js] Using session cookie configuration:",
+  cookieConfig
+);
 
 app.use(
   session({
@@ -74,11 +81,10 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    // Use the correct cookie config object
+    // Use the new config object
     cookie: cookieConfig,
   })
 );
-
 // Serve static files from the "public" directory.
 // This must come BEFORE any of the page-serving routes.
 app.use(express.static(path.join(process.cwd(), "public")));

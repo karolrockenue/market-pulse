@@ -69,17 +69,27 @@ router.post("/login", async (req, res) => {
 
 // api/routes/auth.router.js
 
+// api/routes/auth.router.js
+
 router.get("/magic-link-callback", async (req, res) => {
+  // --- BREADCRUMB 1: LOG THE START OF THE CALLBACK ---
+  console.log(
+    `[BREADCRUMB 1 - auth.router.js] Magic link callback started. Token: ${req.query.token}`
+  );
+
   const { token } = req.query;
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
   }
   try {
-    // Find the token in the database, ensuring it's not expired and hasn't been used.
-    // --- FIX: Check for used_at IS NULL ---
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW() AND used_at IS NULL",
       [token]
+    );
+
+    // --- BREADCRUMB 2: LOG THE TOKEN VALIDATION RESULT ---
+    console.log(
+      `[BREADCRUMB 2 - auth.router.js] Token validation query found ${tokenResult.rows.length} rows.`
     );
 
     if (tokenResult.rows.length === 0) {
@@ -91,8 +101,6 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const loginToken = tokenResult.rows[0];
 
-    // Fetch the user details using the user_id from the token
-    // --- FIX: Query for the new `role` column instead of the old boolean flags ---
     const userResult = await pgPool.query(
       "SELECT user_id, cloudbeds_user_id, email, role FROM users WHERE user_id = $1",
       [loginToken.user_id]
@@ -103,39 +111,45 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const user = userResult.rows[0];
 
-    // Mark the token as used by setting the `used_at` timestamp.
-    // This is a critical security step to prevent token reuse.
-    // api/routes/auth.router.js
+    // --- BREADCRUMB 3: LOG THE USER FOUND ---
+    console.log(
+      `[BREADCRUMB 3 - auth.router.js] Found user: ${user.email}, Role: ${user.role}`
+    );
 
-    // Mark the token as used by setting the `used_at` timestamp.
-    // This is a critical security step to prevent token reuse.
     await pgPool.query(
       "UPDATE magic_login_tokens SET used_at = NOW() WHERE token = $1",
       [loginToken.token]
     );
 
-    // --- THE FIX: Regenerate the session after successful authentication ---
-    // This is a security best practice to prevent session fixation attacks.
+    // --- BREADCRUMB 4: LOG BEFORE SESSION REGENERATION ---
+    console.log(
+      `[BREADCRUMB 4 - auth.router.js] About to regenerate session for user ${user.cloudbeds_user_id}.`
+    );
+
     req.session.regenerate((err) => {
       if (err) {
-        console.error(
-          "Session regeneration error after magic link login:",
-          err
-        );
+        console.error("[CRITICAL] Session regeneration failed:", err);
         return res.status(500).send("An error occurred during login.");
       }
 
-      // Set the session variables based on the NEW role-based system.
       req.session.userId = user.cloudbeds_user_id;
-      req.session.role = user.role; // e.g., 'super_admin', 'owner', 'user'
+      req.session.role = user.role;
 
-      // Save the newly regenerated session before redirecting.
+      // --- BREADCRUMB 5: LOG THE NEWLY CREATED SESSION OBJECT ---
+      console.log(
+        `[BREADCRUMB 5 - auth.router.js] Session regenerated. New session content:`,
+        req.session
+      );
+
       req.session.save((saveErr) => {
         if (saveErr) {
-          console.error("Session save error after magic link login:", saveErr);
+          console.error("[CRITICAL] Session save failed:", saveErr);
           return res.status(500).send("An error occurred during login.");
         }
-        // Redirect to the main application page.
+        // --- BREADCRUMB 6: LOG BEFORE REDIRECT ---
+        console.log(
+          `[BREADCRUMB 6 - auth.router.js] Session saved. Redirecting user to /app/`
+        );
         res.redirect("/app/");
       });
     });
