@@ -217,6 +217,10 @@ export default function () {
     dates: { start: "", end: "" },
     error: { show: false, message: "" },
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
+    // --- ADD THESE LINES ---
+    isSyncing: false, // This flag will control the new overlay's visibility.
+    syncStatusInterval: null, // This will hold the reference to our polling timer.
+    // --- END OF ADDITION ---
     isSyncing: false,
     syncStatusInterval: null,
     isLoadingSummary: true,
@@ -229,22 +233,28 @@ export default function () {
     summaryText: "Generating summary...",
 
     // --- INITIALIZATION ---
+    // --- REPLACE THE OLD init() FUNCTION WITH THIS ---
     init() {
+      // This block checks the URL for parameters that indicate a new connection.
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
 
+      // If a new property ID is in the URL, make it the active one.
       if (newPropertyId) {
         localStorage.setItem("currentPropertyId", newPropertyId);
       }
 
+      // If this is a new connection, show the loading overlay and start checking the status.
       if (isNewConnection) {
         this.isSyncing = true;
         const propertyToCheck =
           newPropertyId || localStorage.getItem("currentPropertyId");
+        // Start polling the backend every 15 seconds.
         this.syncStatusInterval = setInterval(() => {
           this.checkSyncStatus(propertyToCheck);
         }, 15000);
+        // Also check immediately on page load.
         this.checkSyncStatus(propertyToCheck);
       }
 
@@ -254,6 +264,7 @@ export default function () {
 
       this.initializeDashboard();
     },
+    // --- END OF REPLACEMENT ---
     initializeDashboard() {
       this.$nextTick(() => {
         const mainChartContainer = this.$refs.mainChartContainer;
@@ -271,6 +282,39 @@ export default function () {
         });
       });
     },
+
+    // --- ADD THIS NEW FUNCTION ---
+    async checkSyncStatus(propertyId) {
+      // If there's no property ID, we can't check anything, so stop.
+      if (!propertyId) {
+        this.isSyncing = false;
+        if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
+        return;
+      }
+      try {
+        // Call the backend API endpoint to get the sync status.
+        const response = await fetch(`/api/sync-status/${propertyId}`);
+        const data = await response.json();
+
+        // If the backend says the sync is complete...
+        if (data.isSyncComplete) {
+          this.isSyncing = false; // Hide the overlay.
+          if (this.syncStatusInterval) {
+            clearInterval(this.syncStatusInterval); // Stop the polling timer.
+            // Refresh the page, removing the URL parameters to prevent the overlay from showing again.
+            window.location.replace(window.location.pathname);
+          }
+        } else {
+          // If not complete, ensure the overlay stays visible.
+          this.isSyncing = true;
+        }
+      } catch (error) {
+        console.error("Error checking sync status:", error);
+        this.isSyncing = false; // Hide on error to prevent getting stuck.
+        if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
+      }
+    },
+    // --- END OF ADDITION ---
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
