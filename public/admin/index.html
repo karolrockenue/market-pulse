@@ -223,19 +223,18 @@
             </div>
 
             <div class="pt-6">
-              <div x-show="tab === 'insights'" class="space-y-6">
-                <div class="flex items-end gap-4">
-                  <div class="flex-1">
-                    <button
-                      id="fetch-datasets-btn"
-                      class="control-btn bg-slate-100 hover:bg-slate-200"
-                    >
-                      Step 1: List All Available Datasets
-                    </button>
-                  </div>
+          <div x-show="tab === 'insights'" class="space-y-6">
+                <div>
+                  <button
+                    id="fetch-datasets-btn"
+                    class="control-btn bg-slate-100 hover:bg-slate-200"
+                  >
+                    Step 1: List All Available Datasets
+                  </button>
                 </div>
-                <div class="flex items-end gap-4">
-                  <div class="flex-1">
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
                     <label
                       for="dataset-id-input"
                       class="block text-xs font-medium text-slate-600"
@@ -245,33 +244,61 @@
                       type="text"
                       id="dataset-id-input"
                       value="7"
-                      class="mt-1 w-full text-sm"
+                      class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"
                     />
                   </div>
-                  <div class="flex-1">
+                  <div>
                     <label
-                      for="insights-columns-input"
+                      for="insights-start-date"
                       class="block text-xs font-medium text-slate-600"
-                      >Columns (comma-separated)</label
+                      >Start Date</label
                     >
                     <input
-                      type="text"
-                      id="insights-columns-input"
-                      value="adr, revpar, occupancy_direct"
-                      class="mt-1 w-full text-sm"
+                      type="date"
+                      id="insights-start-date"
+                      class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="insights-end-date"
+                      class="block text-xs font-medium text-slate-600"
+                      >End Date</label
+                    >
+                    <input
+                      type="date"
+                      id="insights-end-date"
+                      class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"
                     />
                   </div>
                 </div>
+
                 <div>
                   <button
                     id="fetch-structure-btn"
                     class="control-btn bg-slate-100 hover:bg-slate-200"
                   >
-                    Step 2: Get Dataset Structure
+                    Step 2: Get Dataset Structure & Select Metrics
                   </button>
+                  <div class="mt-4">
+                    <label class="block text-xs font-medium text-slate-600"
+                      >Available Metrics</label
+                    >
+                    <div
+                      id="insights-metrics-container"
+                      class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 p-4 border rounded-md bg-slate-50 min-h-[50px]"
+                    >
+                      <span class="text-slate-400 text-sm"
+                        >Click Step 2 to populate...</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <div>
                   <button
                     id="fetch-insights-data-btn"
-                    class="control-btn bg-slate-100 hover:bg-slate-200 ml-2"
+                    class="control-btn bg-blue-600 text-white hover:bg-blue-700"
                   >
                     Step 3: Get Sample Data
                   </button>

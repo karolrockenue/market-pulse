@@ -313,28 +313,61 @@ const updateHotelCategory = async (hotelId, newCategory, selectElement) => {
 };
 
 const setupApiExplorer = (ui) => {
+  // Helper function to make API calls and display results or errors.
   const exploreApi = async (url, btn) => {
     ui.apiResultsContainer.innerHTML = `<div class="p-4">Fetching from Cloudbeds API...</div>`;
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     try {
       const response = await fetch(url);
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(
           (await response.json()).error || "An unknown server error occurred."
         );
+      }
       const data = await response.json();
-      ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
-        data,
-        null,
-        2
-      )}</pre>`;
+      // This is a special case to handle the dataset structure response
+      if (btn && btn.id === "fetch-structure-btn") {
+        populateMetricsCheckboxes(data.columns, ui); // Call the new function
+        ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
+          data,
+          null,
+          2
+        )}</pre>`;
+      } else {
+        ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
+          data,
+          null,
+          2
+        )}</pre>`;
+      }
     } catch (error) {
       ui.apiResultsContainer.innerHTML = `<div class="p-4 bg-red-100 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
     } finally {
-      btn.disabled = false;
+      if (btn) btn.disabled = false;
     }
   };
 
+  // New helper function to create the checkboxes for metrics
+  const populateMetricsCheckboxes = (columns, ui) => {
+    ui.insightsMetricsContainer.innerHTML = ""; // Clear previous checkboxes
+    if (!columns || columns.length === 0) {
+      ui.insightsMetricsContainer.innerHTML =
+        '<span class="text-slate-400 text-sm">No columns found for this dataset.</span>';
+      return;
+    }
+    // Create a checkbox for each column returned by the API
+    columns.forEach((column) => {
+      const label = document.createElement("label");
+      label.className = "flex items-center space-x-2 text-sm";
+      label.innerHTML = `
+        <input type="checkbox" value="${column.name}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+        <span class="text-slate-700">${column.name}</span>
+      `;
+      ui.insightsMetricsContainer.appendChild(label);
+    });
+  };
+
+  // Event Listeners for the API explorer buttons
   ui.allGeneralApiButtons.forEach((btn) => {
     const endpoint = btn.id.replace("fetch-", "").replace("-btn", "");
     if (
@@ -351,6 +384,7 @@ const setupApiExplorer = (ui) => {
   ui.fetchDatasetsBtn.addEventListener("click", () =>
     exploreApi("/api/admin/explore/datasets", ui.fetchDatasetsBtn)
   );
+
   ui.fetchStructureBtn.addEventListener("click", () => {
     const id = ui.datasetIdInput.value;
     if (id)
@@ -359,16 +393,33 @@ const setupApiExplorer = (ui) => {
         ui.fetchStructureBtn
       );
   });
+
+  // UPDATED: This now reads from the date pickers and checkboxes
   ui.fetchInsightsDataBtn.addEventListener("click", () => {
     const id = ui.datasetIdInput.value;
-    const cols = ui.insightsColumnsInput.value;
-    if (id && cols)
-      exploreApi(
-        `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
-          cols
-        )}`,
-        ui.fetchInsightsDataBtn
-      );
+    const startDate = ui.insightsStartDate.value;
+    const endDate = ui.insightsEndDate.value;
+
+    // Read selected metrics from checkboxes
+    const selectedMetrics = Array.from(
+      ui.insightsMetricsContainer.querySelectorAll(
+        'input[type="checkbox"]:checked'
+      )
+    )
+      .map((cb) => cb.value)
+      .join(",");
+
+    if (id && selectedMetrics) {
+      let url = `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
+        selectedMetrics
+      )}`;
+      // Add dates to the URL only if they are provided
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      exploreApi(url, ui.fetchInsightsDataBtn);
+    } else {
+      alert("Please provide a Dataset ID and select at least one metric.");
+    }
   });
 };
 
@@ -405,7 +456,12 @@ function initializeAdminPanel() {
     datasetIdInput: document.getElementById("dataset-id-input"),
     fetchStructureBtn: document.getElementById("fetch-structure-btn"),
     fetchInsightsDataBtn: document.getElementById("fetch-insights-data-btn"),
-    insightsColumnsInput: document.getElementById("insights-columns-input"),
+    insightsColumnsInput: document.getElementById("insights-columns-input"), // This will be removed by the next step, but let's keep it for now.
+    insightsStartDate: document.getElementById("insights-start-date"),
+    insightsEndDate: document.getElementById("insights-end-date"),
+    insightsMetricsContainer: document.getElementById(
+      "insights-metrics-container"
+    ),
   };
   const state = { currentEditingHotelId: null };
 
