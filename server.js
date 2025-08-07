@@ -51,24 +51,18 @@ app.use(cors(corsOptions));
 // --- NEW: EXPLICITLY DEFINE AND LOG COOKIE CONFIG ---
 // server.js
 
+// server.js
+
 const cookieConfig = {
   secure: process.env.VERCEL_ENV === "production",
   httpOnly: true,
   sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
   maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
-  // --- FIX: Explicitly set the parent domain for the cookie ---
-  // This ensures the cookie is sent for both market-pulse.io and www.market-pulse.io
+  // This line is critical for production to ensure the cookie is valid
+  // for both www.market-pulse.io and market-pulse.io.
   domain:
     process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined,
 };
-
-console.log(
-  "[BREADCRUMB 3 - server.js] Using session cookie configuration:",
-  cookieConfig
-);
-// --- END NEW BLOCK ---
-
-// server.js
 
 app.use(
   session({
@@ -80,7 +74,7 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    // Use the new config object
+    // Use the correct cookie config object
     cookie: cookieConfig,
   })
 );
