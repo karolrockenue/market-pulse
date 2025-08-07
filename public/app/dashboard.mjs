@@ -283,27 +283,33 @@ export default function () {
       });
     },
 
-    // --- ADD THIS NEW FUNCTION ---
+    // --- REPLACED FUNCTION ---
     async checkSyncStatus(propertyId) {
-      // If there's no property ID, we can't check anything, so stop.
       if (!propertyId) {
         this.isSyncing = false;
         if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
         return;
       }
       try {
-        // Call the backend API endpoint to get the sync status.
         const response = await fetch(`/api/sync-status/${propertyId}`);
         const data = await response.json();
 
-        // If the backend says the sync is complete...
         if (data.isSyncComplete) {
-          this.isSyncing = false; // Hide the overlay.
+          // Sync is complete. Stop polling.
           if (this.syncStatusInterval) {
-            clearInterval(this.syncStatusInterval); // Stop the polling timer.
-            // Refresh the page, removing the URL parameters to prevent the overlay from showing again.
-            window.location.replace(window.location.pathname);
+            clearInterval(this.syncStatusInterval);
           }
+
+          // --- NEW LOGIC FOR SMOOTH TRANSITION ---
+          // 1. Silently clean the URL so the overlay doesn't reappear on a manual refresh.
+          history.pushState({}, "", window.location.pathname);
+
+          // 2. Trigger the data load for the dashboard. This will happen behind the overlay.
+          this.setPreset("current-month");
+
+          // 3. Set isSyncing to false. Alpine.js will see this change and
+          // automatically trigger the fade-out transition you defined in the HTML.
+          this.isSyncing = false;
         } else {
           // If not complete, ensure the overlay stays visible.
           this.isSyncing = true;
