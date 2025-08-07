@@ -679,61 +679,56 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
  * @param {string} propertyId - The ID of the property to disable.
  * @returns {Promise<void>}
  */
+/**
+ * Sets the application state to 'disabled' for a given property in Cloudbeds.
+ * This is used when a user disconnects their property from our application.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The ID of the property to disable.
+ * @returns {Promise<void>}
+ */
 async function setAppDisabled(accessToken, propertyId) {
-  // Define the endpoint URL for postAppState.
   const url = "https://api.cloudbeds.com/api/v1.1/postAppState";
 
-  // Prepare the form data for the POST request.
   const params = new URLSearchParams();
   params.append("propertyID", propertyId);
-  // Per the documentation, 'application:off' will disable the integration.
-  params.append("app_state", "application:off");
+  // CORRECTED: Use the 'disabled' value as specified in the new documentation screenshot.
+  params.append("app_state", "disabled");
 
-  // Log the action for debugging and auditing purposes.
   console.log(
     `[Adapter] Setting app_state to 'disabled' for property ${propertyId} in Cloudbeds.`
   );
 
-  try {
-    // Make the POST request to the Cloudbeds API.
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        // The Authorization header is required to authenticate the request.
-        Authorization: `Bearer ${accessToken}`,
-        // The X-PROPERTY-ID header is often required for property-specific actions.
-        "X-PROPERTY-ID": propertyId,
-        // The Content-Type must be specified for form data.
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      // The body of the request contains the form data.
-      body: params,
-    });
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "X-PROPERTY-ID": propertyId,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params,
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    // Check if the API call was successful from both an HTTP and application perspective.
-    if (!response.ok || !data.success) {
-      // Log the error but do not throw an exception.
-      // Failing to disable the app should not prevent the user from disconnecting on our end.
-      console.error(
-        `[Adapter] Failed to disable app for property ${propertyId}. Response: ${JSON.stringify(
-          data
-        )}`
-      );
-    } else {
-      // Log that the API call was successful.
-      console.log(
-        `[Adapter] Successfully disabled app for property ${propertyId} in Cloudbeds.`
-      );
-    }
-  } catch (error) {
-    // Catch any network or other unexpected errors during the fetch call.
+  // If the API call was not successful, we now throw an error.
+  // This will be caught by the route handler, which will prevent the disconnection
+  // from completing in our database. This makes the entire operation atomic.
+  if (!response.ok || !data.success) {
     console.error(
-      `[Adapter] Error calling postAppState for property ${propertyId}:`,
-      error
+      `[Adapter] Failed to disable app for property ${propertyId}. Response: ${JSON.stringify(
+        data
+      )}`
+    );
+    throw new Error(
+      `Cloudbeds API Error: Failed to set app state to disabled. ${
+        data.message || ""
+      }`
     );
   }
+
+  console.log(
+    `[Adapter] Successfully disabled app for property ${propertyId} in Cloudbeds.`
+  );
 }
 
 module.exports = {

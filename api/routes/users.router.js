@@ -278,41 +278,28 @@ router.post("/disconnect-property", requireUserApi, async (req, res) => {
 
   const client = await pgPool.connect();
   try {
-    // NEW: Before committing to any changes, call the Cloudbeds API to disable the app.
-    // This is wrapped in its own try/catch block to ensure that a failure to communicate
-    // with Cloudbeds does not prevent the user from disconnecting the property in our system.
-    try {
-      // Step 1: Get a fresh access token for the property using the adapter.
-      const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
-      // Step 2: Call the new adapter function to set the app_state to disabled.
-      await cloudbedsAdapter.setAppDisabled(accessToken, propertyId);
-    } catch (cbError) {
-      // Log the error for debugging, but do not stop the disconnection process.
-      // This makes our application more resilient.
-      console.error(
-        `[Disconnect Route] Failed to disable app in Cloudbeds for property ${propertyId}, but proceeding with local disconnection. Error: ${cbError.message}`
-      );
-    }
+    // Step 1: Call the Cloudbeds API BEFORE starting our local database transaction.
+    // If this fails, the 'catch' block will be executed immediately, and we won't
+    // make any changes to our database.
+    const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
+    await cloudbedsAdapter.setAppDisabled(accessToken, propertyId);
 
-    // --- Original database logic continues below ---
-
-    // Start the database transaction.
+    // Step 2: If the Cloudbeds API call was successful, proceed with our database changes.
     await client.query("BEGIN");
 
-    // Delete the link between the user and the property.
     const deleteResult = await client.query(
       "DELETE FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [userCloudbedsId, propertyId]
     );
 
-    // If no record was deleted, it means the user didn't have access, so we throw an error.
     if (deleteResult.rowCount === 0) {
+      // If no record was found to delete, we throw an error which will trigger the ROLLBACK.
       throw new Error(
         "Property connection not found or you do not have permission."
       );
     }
 
-    // Check how many properties the user has left after this disconnection.
+    // Check for remaining properties to inform the frontend if a redirect is needed.
     const remainingPropsResult = await client.query(
       "SELECT COUNT(*) FROM user_properties WHERE user_id = $1",
       [userCloudbedsId]
@@ -322,23 +309,23 @@ router.post("/disconnect-property", requireUserApi, async (req, res) => {
       10
     );
 
-    // If all database operations were successful, commit the transaction.
+    // If everything is successful, commit the transaction.
     await client.query("COMMIT");
 
-    // Send a success response to the frontend.
     res.status(200).json({
       message: "Property disconnected successfully.",
       remainingProperties: remainingProperties,
     });
   } catch (error) {
-    // If any error occurs in our database logic, roll back the transaction.
+    // This single catch block now handles failures from BOTH the Cloudbeds API call
+    // and our own database operations.
     await client.query("ROLLBACK");
-    console.error("Error disconnecting property:", error);
+    console.error("Error during property disconnection:", error);
     res
       .status(400)
       .json({ error: error.message || "Failed to disconnect property." });
   } finally {
-    // ALWAYS release the database client back to the pool.
+    // Finally, always release the database client.
     client.release();
   }
 });
