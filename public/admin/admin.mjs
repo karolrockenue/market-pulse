@@ -593,8 +593,8 @@ function initializeAdminPanel() {
   );
 
   setupApiExplorer(ui);
-
   // --- Initial Page Load Calls ---
+  setupPropertySelector(ui); // <-- This was the missing line
   fetchLastRefreshTime(ui);
   fetchAndRenderHotels(ui);
 }
