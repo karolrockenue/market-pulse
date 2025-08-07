@@ -141,16 +141,41 @@ router.get("/magic-link-callback", async (req, res) => {
         req.session
       );
 
+      // api/routes/auth.router.js
+
       req.session.save((saveErr) => {
         if (saveErr) {
           console.error("[CRITICAL] Session save failed:", saveErr);
           return res.status(500).send("An error occurred during login.");
         }
-        // --- BREADCRUMB 6: LOG BEFORE REDIRECT ---
+
+        // Instead of a server-side redirect, send a simple HTML page
+        // that performs a client-side redirect using JavaScript.
         console.log(
-          `[BREADCRUMB 6 - auth.router.js] Session saved. Redirecting user to /app/`
+          `[BREADCRUMB 6 - auth.router.js] Session saved. Sending client-side redirect page.`
         );
-        res.redirect("/app/");
+        res.status(200).send(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Logging in...</title>
+                        <style>
+                            body { font-family: sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                            .container { text-align: center; }
+                        </style>
+                        <script>
+                            // This script will run in the browser, redirecting to the dashboard.
+                            window.location.href = '/app/';
+                        </script>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <h1>Login Successful</h1>
+                            <p>Redirecting you to the dashboard...</p>
+                        </div>
+                    </body>
+                    </html>
+                `);
       });
     });
   } catch (error) {
