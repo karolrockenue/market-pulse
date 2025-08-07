@@ -325,9 +325,12 @@ const setupApiExplorer = (ui) => {
         );
       }
       const data = await response.json();
-      // This is a special case to handle the dataset structure response
+
+      // FIX: This now correctly parses the nested 'cdfs' structure
       if (btn && btn.id === "fetch-structure-btn") {
-        populateMetricsCheckboxes(data.columns, ui); // Call the new function
+        // Flatten the nested arrays of columns into a single array
+        const allColumns = data.cdfs.flatMap((category) => category.cdfs);
+        populateMetricsCheckboxes(allColumns, ui); // Pass the corrected, flattened array
         ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
           data,
           null,
@@ -359,10 +362,11 @@ const setupApiExplorer = (ui) => {
     columns.forEach((column) => {
       const label = document.createElement("label");
       label.className = "flex items-center space-x-2 text-sm";
+      // FIX: Uses `column.column` for the value and `column.name` for the label
       label.innerHTML = `
-        <input type="checkbox" value="${column.name}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-        <span class="text-slate-700">${column.name}</span>
-      `;
+            <input type="checkbox" value="${column.column}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+            <span class="text-slate-700">${column.name}</span>
+          `;
       ui.insightsMetricsContainer.appendChild(label);
     });
   };
