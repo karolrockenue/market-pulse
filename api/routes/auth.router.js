@@ -143,14 +143,17 @@ router.get("/magic-link-callback", async (req, res) => {
 
       // api/routes/auth.router.js
 
+      // api/routes/auth.router.js
+
       req.session.save((saveErr) => {
         if (saveErr) {
           console.error("[CRITICAL] Session save failed:", saveErr);
           return res.status(500).send("An error occurred during login.");
         }
 
-        // Instead of a server-side redirect, send a simple HTML page
-        // that performs a client-side redirect using JavaScript.
+        // --- THE FIX: Proactively clear the HOST-ONLY cookie by NOT specifying a domain. ---
+        res.clearCookie("connect.sid", { path: "/" });
+
         console.log(
           `[BREADCRUMB 6 - auth.router.js] Session saved. Sending client-side redirect page.`
         );
@@ -164,7 +167,6 @@ router.get("/magic-link-callback", async (req, res) => {
                             .container { text-align: center; }
                         </style>
                         <script>
-                            // This script will run in the browser, redirecting to the dashboard.
                             window.location.href = '/app/';
                         </script>
                     </head>

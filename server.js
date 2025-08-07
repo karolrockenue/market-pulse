@@ -91,8 +91,12 @@ console.log(
   cookieConfig
 );
 
+// server.js
+
 app.use(
   session({
+    // --- FIX: The name of the cookie is a top-level option ---
+    name: "connect.sid",
     store: new pgSession({
       pool: pgPool,
       tableName: "user_sessions",
@@ -101,8 +105,18 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    // Use the new config object
-    cookie: cookieConfig,
+    cookie: {
+      // name is no longer here
+      secure: process.env.VERCEL_ENV === "production",
+      httpOnly: true,
+      sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
+      domain:
+        process.env.VERCEL_ENV === "production"
+          ? ".market-pulse.io"
+          : undefined,
+      path: "/",
+    },
   })
 );
 // Serve static files from the "public" directory.
