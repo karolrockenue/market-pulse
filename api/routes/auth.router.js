@@ -105,9 +105,13 @@ router.get("/magic-link-callback", async (req, res) => {
 
     // Mark the token as used by setting the `used_at` timestamp.
     // This is a critical security step to prevent token reuse.
+    // api/routes/auth.router.js
+
+    // Mark the token as used by setting the `used_at` timestamp.
+    // This is a critical security step to prevent token reuse.
     await pgPool.query(
-      "UPDATE magic_login_tokens SET used_at = NOW() WHERE token_id = $1",
-      [loginToken.token_id]
+      "UPDATE magic_login_tokens SET used_at = NOW() WHERE token = $1",
+      [loginToken.token]
     );
 
     // --- THE FIX: Regenerate the session after successful authentication ---
