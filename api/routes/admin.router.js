@@ -278,12 +278,21 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         };
         // 2. Add date filters to the request body IF they were provided
         if (startDate && endDate) {
-          // FIX: The filter must be an array of objects, with the column specified inside a 'cdf' object.
+          // FINAL FIX: The API requires a full ISO timestamp, not just a date string.
+          // Convert the start date to the beginning of the day in UTC.
+          const fromTimestamp = new Date(
+            `${startDate}T00:00:00Z`
+          ).toISOString();
+          // Convert the end date to the very end of the day in UTC.
+          const toTimestamp = new Date(
+            `${endDate}T23:59:59.999Z`
+          ).toISOString();
+
           requestBody.filters = [
             {
               cdf: { column: "stay_date" },
-              from: startDate,
-              to: endDate,
+              from: fromTimestamp,
+              to: toTimestamp,
             },
           ];
         }
