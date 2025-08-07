@@ -96,15 +96,11 @@
 <div id="sidebar-placeholder" class="sticky top-0 h-screen"></div>
 
   <main class="flex-1 min-w-0 bg-white text-[#11191f] rounded-[10px] overflow-hidden p-8">
-     <div class="flex justify-between items-center mb-8">
+  
     <h1 class="text-3xl font-bold text-slate-800">
         Admin Dashboard
     </h1>
-    <div>
-        <label for="admin-property-selector" class="text-sm font-medium text-slate-600 mr-2">Viewing Data For:</label>
-        <select id="admin-property-selector" class="w-64 p-2 text-sm border-slate-300 rounded-md bg-white"></select>
-    </div>
-</div>
+
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div class="bg-white p-6 rounded-xl border border-slate-200">
@@ -209,6 +205,39 @@
             <h2 class="text-lg font-semibold text-slate-800">
               Cloudbeds API Explorer
             </h2>
+            <div
+    x-data="{ tab: 'insights' }"
+    class="bg-white p-6 rounded-xl border border-slate-200"
+>
+    <div class="flex justify-between items-center">
+         <h2 class="text-lg font-semibold text-slate-800">
+            Cloudbeds API Explorer
+         </h2>
+         <div>
+            <label for="admin-property-selector" class="text-sm font-medium text-slate-600 mr-2">API Target Property:</label>
+            <select id="admin-property-selector" class="w-64 p-2 text-sm border-slate-300 rounded-md bg-white"></select>
+        </div>
+    </div>
+
+    <div class="border-b border-slate-200 mt-2">
+        <nav class="-mb-px flex space-x-6">
+            <button
+                @click="tab = 'insights'"
+                :class="{'border-blue-500 text-blue-600': tab === 'insights', 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300': tab !== 'insights'}"
+                class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm"
+            >
+                Insights API
+            </button>
+            <button
+                @click="tab = 'general'"
+                :class="{'border-blue-500 text-blue-600': tab === 'general', 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300': tab !== 'general'}"
+                class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm"
+            >
+                General API
+            </button>
+        </nav>
+    </div>
+  
             <div class="border-b border-slate-200 mt-2">
               <nav class="-mb-px flex space-x-6">
                 <button

@@ -219,15 +219,18 @@ const fetchAndRenderHotels = async (ui) => {
 
 async function setupPropertySelector(ui) {
   try {
-    const response = await fetch("/api/my-properties");
-    if (!response.ok) throw new Error("Failed to fetch properties");
-    const properties = await response.json();
+    // FIX: Use the correct admin endpoint to get all hotels
+    const response = await fetch("/api/admin/get-all-hotels");
+    if (!response.ok) throw new Error("Failed to fetch hotels");
+    const hotels = await response.json();
 
     ui.propertySelector.innerHTML = ""; // Clear any existing options
-    properties.forEach((prop) => {
+
+    // FIX: Use the correct property names from the new endpoint ('hotel_id', 'property_name')
+    hotels.forEach((hotel) => {
       const option = document.createElement("option");
-      option.value = prop.property_id;
-      option.textContent = prop.property_name;
+      option.value = hotel.hotel_id;
+      option.textContent = hotel.property_name;
       ui.propertySelector.appendChild(option);
     });
 
