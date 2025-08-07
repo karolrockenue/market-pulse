@@ -40,7 +40,7 @@ const mainChartManager = {
       echarts.init(containerElement);
     this.chartInstance.setOption({
       grid: {
-        top: "8%",
+        top: "5%",
         right: "3%",
         bottom: "12%",
         left: "2%",
@@ -205,28 +205,21 @@ const revparChartManager = {
 export default function () {
   return {
     // --- STATE PROPERTIES ---
-    // Property and session states from the original production script
     currentPropertyId: null,
     currentPropertyName: "Loading...",
     properties: [],
     hasProperties: false,
     lastRefreshText: "Loading...",
     currencyCode: "USD",
-
-    // UI control states for the new design
     activeMetric: "occupancy",
     granularity: "daily",
     activePreset: "current-month",
     dates: { start: "", end: "" },
     error: { show: false, message: "" },
-
-    // Loading states from both original and prototype scripts
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
     isSyncing: false,
     syncStatusInterval: null,
     isLoadingSummary: true,
-
-    // Data holders using the new, richer structures from the prototype
     kpi: {
       occupancy: { your: "-", market: "-", your_raw: 0, market_raw: 0 },
       adr: { your: "-", market: "-", your_raw: 0, market_raw: 0 },
@@ -234,41 +227,27 @@ export default function () {
     },
     allMetrics: [],
     summaryText: "Generating summary...",
-    // chart and chartUpdateTimeout have been removed.
 
     // --- INITIALIZATION ---
-    // public/app/dashboard.mjs
-
     init() {
-      // This new logic runs once when the page first loads.
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
 
-      // If a new propertyId is found in the URL from the redirect,
-      // we immediately set it in localStorage. This tells the sidebar component
-      // to select this property as the default when it loads.
       if (newPropertyId) {
         localStorage.setItem("currentPropertyId", newPropertyId);
       }
 
-      // If it's a new connection, we must show the sync indicator immediately.
       if (isNewConnection) {
         this.isSyncing = true;
-        // The propertyId from the URL is the one we need to check.
         const propertyToCheck =
           newPropertyId || localStorage.getItem("currentPropertyId");
-
-        // Start polling the sync status endpoint every 15 seconds.
         this.syncStatusInterval = setInterval(() => {
           this.checkSyncStatus(propertyToCheck);
         }, 15000);
-        // Also run an initial check right away.
         this.checkSyncStatus(propertyToCheck);
       }
 
-      // The event listener for 'property-changed' remains. It will be triggered
-      // by the sidebar after it initializes and reads the correct propertyId from localStorage.
       window.addEventListener("property-changed", (event) => {
         this.handlePropertyChange(event.detail);
       });
@@ -277,15 +256,10 @@ export default function () {
     },
     initializeDashboard() {
       this.$nextTick(() => {
-        // Get the containers for both charts from the new HTML structure.
         const mainChartContainer = this.$refs.mainChartContainer;
         const revparChartCanvas = this.$refs.revparChartCanvas;
-
-        // Initialize both chart managers.
         mainChartManager.init(mainChartContainer);
         revparChartManager.init(revparChartCanvas);
-
-        // The ResizeObserver only needs to watch the main, flexible ECharts instance.
         const resizeObserver = new ResizeObserver(() => {
           mainChartManager.resize();
         });
@@ -297,8 +271,6 @@ export default function () {
         });
       });
     },
-
-    // Find and replace the entire checkSyncStatus method
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -307,27 +279,20 @@ export default function () {
       try {
         const response = await fetch(`/api/sync-status/${propertyId}`);
         const data = await response.json();
-
         if (data.isSyncComplete) {
-          // If the sync is complete, stop polling and reload the page to show the data.
           this.isSyncing = false;
           if (this.syncStatusInterval) {
             clearInterval(this.syncStatusInterval);
-            // This now reloads the page WITHOUT the old "?newConnection=true" parameter,
-            // preventing a loop and ensuring a clean state.
             window.location.replace(window.location.pathname);
           }
         } else {
-          // If not complete, ensure the syncing message is shown.
           this.isSyncing = true;
         }
       } catch (error) {
         console.error("Error checking sync status:", error);
-        // If the check fails, assume it's done so the user isn't stuck.
         this.isSyncing = false;
       }
     },
-    // --- STARTUP LOGIC (Unchanged) ---
 
     // --- CORE DATA LOGIC ---
     async loadKpis(startDate, endDate) {
@@ -345,7 +310,6 @@ export default function () {
         this.isLoading.kpis = false;
       }
     },
-
     async loadChartAndTables(startDate, endDate, granularity) {
       this.isLoading.chart = true;
       this.isLoading.tables = true;
@@ -368,7 +332,6 @@ export default function () {
           yourHotelData.metrics,
           marketData.metrics
         );
-
         mainChartManager.update({
           metrics: this.allMetrics,
           activeMetric: this.activeMetric,
@@ -377,16 +340,11 @@ export default function () {
           currencyCode: this.currencyCode,
           formatDateLabel: this.formatDateLabel,
         });
-
-        // This call updates the new RevPAR bar chart.
         revparChartManager.update(this.kpi.revpar, this.currencyCode);
-
-        // After all data is processed, trigger the AI summary generation.
         this.fetchSummary();
       } catch (error) {
         this.showError(error.message);
         this.allMetrics = [];
-        // This fixes the bug by calling the correct chart manager.
         mainChartManager.update({
           metrics: [],
           activeMetric: this.activeMetric,
@@ -400,7 +358,6 @@ export default function () {
         this.isLoading.tables = false;
       }
     },
-
     async fetchSummary() {
       this.isLoadingSummary = true;
       try {
@@ -453,7 +410,6 @@ export default function () {
       });
       return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
     },
-
     renderKpiCards(kpiData) {
       if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
         this.kpi = {
@@ -475,6 +431,19 @@ export default function () {
       }
     },
 
+    // --- GETTERS ---
+    get chartTitle() {
+      if (
+        !this.currentPropertyName ||
+        this.currentPropertyName === "Loading..."
+      ) {
+        return "Loading...";
+      }
+      const metricName =
+        this.activeMetric.charAt(0).toUpperCase() + this.activeMetric.slice(1);
+      return `${metricName} of ${this.currentPropertyName} vs The Market`;
+    },
+
     // --- UI CONTROL METHODS ---
     runReport() {
       if (!this.dates.start || !this.dates.end || !this.granularity) return;
@@ -486,12 +455,10 @@ export default function () {
         this.granularity
       );
     },
-
     setGranularity(newGranularity) {
       this.granularity = newGranularity;
       this.runReport();
     },
-
     setPreset(preset) {
       this.activePreset = preset;
       const today = new Date();
@@ -514,7 +481,6 @@ export default function () {
       this.granularity = preset === "this-year" ? "monthly" : "daily";
       this.runReport();
     },
-
     setActiveMetric(metric) {
       this.activeMetric = metric;
       mainChartManager.update({
@@ -526,52 +492,39 @@ export default function () {
         formatDateLabel: this.formatDateLabel,
       });
     },
-
-    // public/app/dashboard.mjs
-
-    // public/app/dashboard.mjs
-
     async handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
-      // Prevent reloading if the property is already selected.
       if (!propertyId || this.currentPropertyId === propertyId) {
         return;
       }
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
 
-      // Clear any previous sync interval when the user manually changes properties.
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
       try {
-        // Wait for the hotel's currency and other details to be fetched.
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
-        this.currencyCode = details.currency_code || "USD"; // Set the correct currency.
+        this.currencyCode = details.currency_code || "USD";
       } catch (err) {
         console.error("Failed to fetch hotel details", err);
-        this.currencyCode = "USD"; // Default to USD on error.
+        this.currencyCode = "USD";
       }
 
-      // The logic to check for 'newConnection' has been moved to init().
-      // If we are not in the middle of a sync, load the report for the selected property.
-      // This now runs AFTER the currency has been set.
       if (!this.isSyncing) {
         this.setPreset("current-month");
       }
     },
 
+    // --- HELPER METHODS ---
     showError(message) {
       this.error.message = message;
       this.error.show = true;
     },
-
     formatValue: formatValue,
-
     formatCurrency(value) {
       return formatValue(value, "currency", this.currencyCode);
     },
-
     getDelta(day) {
       if (
         !day.your ||
@@ -600,7 +553,6 @@ export default function () {
         deltaClass: delta >= 0 ? "text-green-600" : "text-red-600",
       };
     },
-
     formatDateLabel(dateString, granularity) {
       if (!dateString) return "";
       const date = new Date(dateString);
@@ -612,7 +564,6 @@ export default function () {
         });
       }
       if (granularity === "weekly") {
-        // This helper function needs to be available on the window for the chart manager to use it.
         if (!window.getWeekNumber) {
           window.getWeekNumber = function (d) {
             d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
