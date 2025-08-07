@@ -873,3 +873,23 @@ Date: August 7, 2025
                * Problem: A new hotel's ADR was being saved as a net (tax-exclusive) value, while all other hotels were stored as gross. This was traced to the Cloudbeds API providing room_revenue as a net value for this specific hotel.
                * Resolution: Refactored the cloudbedsAdapter to be "tax-aware." The getHistoricalMetrics function now fetches a hotel's specific tax rate from our database and passes it to the processApiDataForTable function. This processing function was updated to use the tax rate to convert the incoming net room_revenue into a gross value before performing any calculations or database insertions.
                * Outcome: Both the daily-refresh and initial-sync scripts are now fully functional and stable. The critical data integrity bug with tax calculations has been resolved, and the data ingestion pipeline is now robust enough to handle inconsistencies in the source API data, ensuring all financial metrics are stored correctly as gross values.
+
+
+
+
+Date: August 7, 2025
+               * Objective: Conduct a comprehensive UI/UX refinement of the main dashboard, resolve a critical data synchronization bug, and execute a full-stack overhaul of the Admin Panel's API Explorer tool.
+               * Summary: This was a multi-faceted session that addressed user feedback on the main dashboard's design, involved a deep, iterative debugging of the daily-refresh cron job to ensure data integrity, and completely transformed the Admin Panel's API Explorer from a basic utility into a powerful, interactive tool with robust filtering and data scoping capabilities.
+               * Key Changes:
+               * Dashboard UI/UX Enhancements:
+               * The right-hand summary column's width was reduced, and the font size for KPI values was decreased to create a less cluttered layout.
+               * A dynamic title was added above the main chart to provide clear context on the data being displayed (e.g., "Occupancy of Cleveland Hotel vs The Market").
+               * Fixed a UI regression where the interactive highlighting (blue text and a bottom border) for the active metric in the main data table's headers was not appearing.
+               * Critical Bug Fixes:
+               * Resolved a race condition that caused dashboard components to display the wrong currency (USD instead of GBP). The data loading sequence was corrected to ensure the property's currency is fetched before any financial metrics are rendered.
+               * Fixed a fatal duplicate key error in the daily-refresh script. This was a deep debugging process that first identified an incorrect ON CONFLICT clause and then a NOT NULL violation, culminating in a final, robust UPSERT query that correctly handles duplicate data from the source API and satisfies all database constraints.
+               * Admin Panel API Explorer Overhaul:
+               * New Features: The tool was completely rebuilt with a new, intuitive multi-step UI. It now includes date pickers to filter by a specific range, a multi-select dropdown to group data by dimensions (e.g., room_type), and dynamically generated checkboxes for selecting metrics, preventing user error.
+               * Property Scoping: A critical bug causing the explorer to show data from a random hotel was fixed by adding a new "API Target Property" dropdown to the tool. This allows super admins to precisely select which property they want to query, ensuring correct data scoping.
+               * Backend Fixes: The backend router for the explorer was significantly refactored to correctly handle and apply the new startDate, endDate, and groupBy parameters to the final Cloudbeds API request. This involved a multi-stage debugging of the API's specific request body format for filters, which was resolved by analyzing the existing cloudbedsAdapter.js file.
+               * Outcome: The application is now more polished, stable, and powerful. The dashboard UI is more refined and addresses key user feedback. The critical daily-refresh job is now robust against data inconsistencies. The Admin Panel's API Explorer has been transformed into a production-grade debugging tool that is significantly more usable, powerful, and secure.

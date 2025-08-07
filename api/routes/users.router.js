@@ -8,6 +8,8 @@ const pgPool = require("../utils/db");
 const { requireUserApi, requireAccountOwner } = require("../utils/middleware");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Add this line with the other require statements at the top of the file.
+const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 
 // --- NEW: Custom middleware to check if user can invite others ---
 // This allows both 'owner' and 'super_admin' roles to send invitations.
@@ -276,16 +278,41 @@ router.post("/disconnect-property", requireUserApi, async (req, res) => {
 
   const client = await pgPool.connect();
   try {
+    // NEW: Before committing to any changes, call the Cloudbeds API to disable the app.
+    // This is wrapped in its own try/catch block to ensure that a failure to communicate
+    // with Cloudbeds does not prevent the user from disconnecting the property in our system.
+    try {
+      // Step 1: Get a fresh access token for the property using the adapter.
+      const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
+      // Step 2: Call the new adapter function to set the app_state to disabled.
+      await cloudbedsAdapter.setAppDisabled(accessToken, propertyId);
+    } catch (cbError) {
+      // Log the error for debugging, but do not stop the disconnection process.
+      // This makes our application more resilient.
+      console.error(
+        `[Disconnect Route] Failed to disable app in Cloudbeds for property ${propertyId}, but proceeding with local disconnection. Error: ${cbError.message}`
+      );
+    }
+
+    // --- Original database logic continues below ---
+
+    // Start the database transaction.
     await client.query("BEGIN");
+
+    // Delete the link between the user and the property.
     const deleteResult = await client.query(
       "DELETE FROM user_properties WHERE user_id = $1 AND property_id = $2",
       [userCloudbedsId, propertyId]
     );
+
+    // If no record was deleted, it means the user didn't have access, so we throw an error.
     if (deleteResult.rowCount === 0) {
       throw new Error(
         "Property connection not found or you do not have permission."
       );
     }
+
+    // Check how many properties the user has left after this disconnection.
     const remainingPropsResult = await client.query(
       "SELECT COUNT(*) FROM user_properties WHERE user_id = $1",
       [userCloudbedsId]
@@ -294,22 +321,27 @@ router.post("/disconnect-property", requireUserApi, async (req, res) => {
       remainingPropsResult.rows[0].count,
       10
     );
+
+    // If all database operations were successful, commit the transaction.
     await client.query("COMMIT");
+
+    // Send a success response to the frontend.
     res.status(200).json({
       message: "Property disconnected successfully.",
       remainingProperties: remainingProperties,
     });
   } catch (error) {
+    // If any error occurs in our database logic, roll back the transaction.
     await client.query("ROLLBACK");
     console.error("Error disconnecting property:", error);
     res
       .status(400)
       .json({ error: error.message || "Failed to disconnect property." });
   } finally {
+    // ALWAYS release the database client back to the pool.
     client.release();
   }
 });
-
 /**
  * @route POST /api/users/link-property
  * @description Links an existing user to a property owned by the requester.
