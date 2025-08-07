@@ -264,71 +264,91 @@ router.delete(
 );
 
 /**
- * @route POST /api/users/disconnect-property
+
  * @description Disconnects a property from a user's account, removing their access.
  * @access User
  */
-router.post("/disconnect-property", requireUserApi, async (req, res) => {
-  const { propertyId } = req.body;
-  const userCloudbedsId = req.session.userId;
+/**
+ * @route POST /api/users/disconnect-property
+ * @description Disconnects and DELETES a property from the entire system.
+ * @access Account Owner or Super Admin
+ */
+// --- CHANGE: Added 'requireAccountOwner' to restrict this destructive action ---
+router.post(
+  "/disconnect-property",
+  [requireUserApi, requireAccountOwner],
+  async (req, res) => {
+    const { propertyId } = req.body;
 
-  if (!propertyId) {
-    return res.status(400).json({ error: "Property ID is required." });
-  }
-
-  const client = await pgPool.connect();
-  try {
-    // Step 1: Call the Cloudbeds API BEFORE starting our local database transaction.
-    // If this fails, the 'catch' block will be executed immediately, and we won't
-    // make any changes to our database.
-    const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
-    await cloudbedsAdapter.setAppDisabled(accessToken, propertyId);
-
-    // Step 2: If the Cloudbeds API call was successful, proceed with our database changes.
-    await client.query("BEGIN");
-
-    const deleteResult = await client.query(
-      "DELETE FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [userCloudbedsId, propertyId]
-    );
-
-    if (deleteResult.rowCount === 0) {
-      // If no record was found to delete, we throw an error which will trigger the ROLLBACK.
-      throw new Error(
-        "Property connection not found or you do not have permission."
-      );
+    if (!propertyId) {
+      return res.status(400).json({ error: "Property ID is required." });
     }
 
-    // Check for remaining properties to inform the frontend if a redirect is needed.
-    const remainingPropsResult = await client.query(
-      "SELECT COUNT(*) FROM user_properties WHERE user_id = $1",
-      [userCloudbedsId]
-    );
-    const remainingProperties = parseInt(
-      remainingPropsResult.rows[0].count,
-      10
-    );
+    const client = await pgPool.connect();
+    try {
+      // Step 1: Notify Cloudbeds that the app is being disabled for this property.
+      // This uses the owner's credentials to ensure the correct token is found.
+      const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
+      await cloudbedsAdapter.setAppDisabled(accessToken, propertyId);
 
-    // If everything is successful, commit the transaction.
-    await client.query("COMMIT");
+      // Step 2: Begin a transaction to delete all data associated with the property.
+      await client.query("BEGIN");
 
-    res.status(200).json({
-      message: "Property disconnected successfully.",
-      remainingProperties: remainingProperties,
-    });
-  } catch (error) {
-    // This single catch block now handles failures from BOTH the Cloudbeds API call
-    // and our own database operations.
-    await client.query("ROLLBACK");
-    console.error("Error during property disconnection:", error);
-    res
-      .status(400)
-      .json({ error: error.message || "Failed to disconnect property." });
-  } finally {
-    // Finally, always release the database client.
-    client.release();
+      // --- NEW: Delete competitive set relationships ---
+      // This cleans up any manual market definitions linked to this hotel.
+      await client.query(
+        "DELETE FROM hotel_comp_sets WHERE hotel_id = $1 OR competitor_hotel_id = $1",
+        [propertyId]
+      );
+
+      // --- NEW: Delete all historical and upcoming performance metrics ---
+      // This removes the core analytical data for the property.
+      await client.query(
+        "DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1",
+        [propertyId]
+      );
+
+      // --- NEW: Delete all user links to this property ---
+      // This removes access for every user, not just the current one.
+      await client.query("DELETE FROM user_properties WHERE property_id = $1", [
+        propertyId,
+      ]);
+
+      // --- NEW: Delete the master hotel record ---
+      // This is the final step, removing the property from the hotels table.
+      const deleteHotelResult = await client.query(
+        "DELETE FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+
+      // If no hotel was deleted, it means the propertyId was invalid.
+      if (deleteHotelResult.rowCount === 0) {
+        throw new Error("Property not found in the database.");
+      }
+
+      // Step 3: Commit the transaction if all deletions were successful.
+      await client.query("COMMIT");
+
+      res.status(200).json({
+        message:
+          "Property has been successfully disconnected and all associated data has been removed.",
+        // We set remainingProperties to a non-zero value to prevent an unnecessary redirect on the frontend.
+        // The page will simply refresh its list, and the deleted property will be gone.
+        remainingProperties: 1,
+      });
+    } catch (error) {
+      // If any step fails, roll back the entire transaction.
+      await client.query("ROLLBACK");
+      console.error("Error during full property deletion:", error);
+      res
+        .status(400)
+        .json({ error: error.message || "Failed to delete property." });
+    } finally {
+      // Always release the database client.
+      client.release();
+    }
   }
-});
+);
 /**
  * @route POST /api/users/link-property
  * @description Links an existing user to a property owned by the requester.

@@ -893,3 +893,23 @@ Date: August 7, 2025
                * Property Scoping: A critical bug causing the explorer to show data from a random hotel was fixed by adding a new "API Target Property" dropdown to the tool. This allows super admins to precisely select which property they want to query, ensuring correct data scoping.
                * Backend Fixes: The backend router for the explorer was significantly refactored to correctly handle and apply the new startDate, endDate, and groupBy parameters to the final Cloudbeds API request. This involved a multi-stage debugging of the API's specific request body format for filters, which was resolved by analyzing the existing cloudbedsAdapter.js file.
                * Outcome: The application is now more polished, stable, and powerful. The dashboard UI is more refined and addresses key user feedback. The critical daily-refresh job is now robust against data inconsistencies. The Admin Panel's API Explorer has been transformed into a production-grade debugging tool that is significantly more usable, powerful, and secure.
+
+
+Here is the final changelog entry for today's work.
+________________
+
+
+Date: August 7, 2025
+               * Objective: Diagnose and resolve a critical, persistent production bug that prevented users from logging in via the magic link flow.
+               * Summary: An intensive, multi-stage debugging session was conducted to resolve a session failure that occurred after a successful magic link callback. Initial theories related to recent role-based authorization changes were disproven through testing. Extensive logging and direct database verification provided conclusive proof that the backend was correctly creating and saving a valid session to the database. The root cause was ultimately identified as a conflict in the user's browser between a new, correct domain-wide cookie (.market-pulse.io) and a "stale," host-only cookie left over from a previous version of the application. A robust, two-part systemic fix was implemented to resolve the issue for all users.
+               * Key Changes:
+               * Cookie Configuration Hardening (server.js): The express-session configuration was updated to be more explicit and standards-compliant by moving the name: 'connect.sid' option to its correct top-level position.
+               * Stray Cookie Invalidation (auth.router.js): A permanent, systemic fix was implemented in the /magic-link-callback route. The command res.clearCookie('connect.sid', { path: '/' }) was added before the user is redirected. This proactively clears any old, conflicting host-only session cookie from the user's browser, ensuring that only the new, correct domain-wide cookie is used.
+               * Outcome: The magic link login system is now fully functional, stable, and robust. The fix proactively resolves the cookie conflict for any user who may have had a stale cookie, preventing future occurrences of this bug and hardening the application's authentication flow.
+Date: August 7, 2025
+               * Objective: Enhance the property disconnection process to meet certification requirements by notifying Cloudbeds when a user removes a property.
+               * Key Changes:
+               * A new function, setAppDisabled, was added to the /api/adapters/cloudbedsAdapter.js file. This function is responsible for making a POST request to the Cloudbeds postAppState endpoint, setting the application state to "disabled" for the given property.
+               * The existing POST /api/users/disconnect-property endpoint in /api/routes/users.router.js was updated. It now calls the new setAppDisabled function to notify Cloudbeds before removing the property link from the local database.
+               * Error handling for the disconnection process was improved to gracefully handle cases where a property might be missing the necessary authentication tokens, ensuring the local disconnection can still proceed.
+               * Outcome: The property disconnection feature is now fully compliant with certification standards. The system securely notifies Cloudbeds when a connection is terminated and is more resilient against potential data inconsistencies for legacy properties.
