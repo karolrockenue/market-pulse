@@ -529,7 +529,9 @@ export default function () {
 
     // public/app/dashboard.mjs
 
-    handlePropertyChange(eventDetail) {
+    // public/app/dashboard.mjs
+
+    async handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
       // Prevent reloading if the property is already selected.
       if (!propertyId || this.currentPropertyId === propertyId) {
@@ -541,19 +543,19 @@ export default function () {
       // Clear any previous sync interval when the user manually changes properties.
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
-      // Fetch currency details for the newly selected property.
-      fetch(`/api/hotel-details/${propertyId}`)
-        .then((res) => res.json())
-        .then((details) => {
-          this.currencyCode = details.currency_code || "USD";
-        })
-        .catch((err) => {
-          console.error("Failed to fetch hotel details", err);
-          this.currencyCode = "USD"; // Default currency on error
-        });
+      try {
+        // Wait for the hotel's currency and other details to be fetched.
+        const response = await fetch(`/api/hotel-details/${propertyId}`);
+        const details = await response.json();
+        this.currencyCode = details.currency_code || "USD"; // Set the correct currency.
+      } catch (err) {
+        console.error("Failed to fetch hotel details", err);
+        this.currencyCode = "USD"; // Default to USD on error.
+      }
 
       // The logic to check for 'newConnection' has been moved to init().
       // If we are not in the middle of a sync, load the report for the selected property.
+      // This now runs AFTER the currency has been set.
       if (!this.isSyncing) {
         this.setPreset("current-month");
       }
