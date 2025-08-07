@@ -54,8 +54,8 @@ app.use(cors(corsOptions));
 // server.js
 
 // server.js
+// server.js
 
-// --- EXPLICITLY DEFINE AND LOG COOKIE CONFIG ---
 const cookieConfig = {
   secure: process.env.VERCEL_ENV === "production",
   httpOnly: true,
@@ -63,6 +63,26 @@ const cookieConfig = {
   maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
   domain:
     process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined,
+  // --- NEW: Add a custom serializer function ---
+  // This function manually builds the cookie string to ensure it is formatted correctly.
+  serialize: (name, val) => {
+    const parts = [`${name}=${val}`];
+    parts.push(`Max-Age=${Math.floor(cookieConfig.maxAge / 1000)}`);
+    parts.push(`Path=/`);
+    if (cookieConfig.domain) {
+      parts.push(`Domain=${cookieConfig.domain}`);
+    }
+    if (cookieConfig.sameSite) {
+      parts.push(`SameSite=${cookieConfig.sameSite}`);
+    }
+    if (cookieConfig.secure) {
+      parts.push(`Secure`);
+    }
+    if (cookieConfig.httpOnly) {
+      parts.push(`HttpOnly`);
+    }
+    return parts.join("; ");
+  },
 };
 
 // This log will run once when the server starts.
