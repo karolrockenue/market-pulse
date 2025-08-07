@@ -96,21 +96,32 @@ router.get("/magic-link-callback", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // --- FIX: Update the token record using the 'token' column, not 'token_id' ---
     await pgPool.query(
       "UPDATE magic_login_tokens SET used_at = NOW() WHERE token = $1",
       [token]
     );
 
-    req.session.userId = user.cloudbeds_user_id;
-    req.session.role = user.role;
-
-    req.session.save((err) => {
+    // --- THE FIX: Regenerate the session after successful authentication ---
+    // This destroys the old session and creates a fresh, clean one for the logged-in user.
+    // It is the most robust way to prevent session fixation and other login-related bugs.
+    req.session.regenerate((err) => {
       if (err) {
-        console.error("Session save error:", err);
+        console.error("Session regeneration error:", err);
         return res.status(500).send("Could not log you in.");
       }
-      res.redirect("/app/");
+
+      // Now, on this new, clean session, set the user's data.
+      req.session.userId = user.cloudbeds_user_id;
+      req.session.role = user.role;
+
+      // And finally, save the newly populated session before redirecting.
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("Session save error after regenerate:", saveErr);
+          return res.status(500).send("Could not log you in.");
+        }
+        res.redirect("/app/");
+      });
     });
   } catch (error) {
     console.error("Error during magic link callback:", error);
