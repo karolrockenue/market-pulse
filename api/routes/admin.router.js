@@ -29,25 +29,11 @@ async function getAdminRefreshToken(adminUserId) {
   // Optional chaining (?.) safely handles cases where credentials or the token might be missing.
   return result.rows[0]?.pms_credentials?.refresh_token;
 }
-
-// This is the main helper we will now use in all admin routes.
-// This is the main helper we will now use in all admin routes.
-// This is the new, corrected version of the function.
-async function getAdminAccessToken(adminUserId) {
-  // Step 1: Find a property this admin has access to.
-  const propertyResult = await pgPool.query(
-    "SELECT property_id FROM user_properties WHERE user_id = $1 LIMIT 1",
-    [adminUserId]
-  );
-
-  if (propertyResult.rows.length === 0) {
-    throw new Error("This admin user is not associated with any properties.");
+async function getAdminAccessToken(adminUserId, propertyId) {
+  if (!propertyId) {
+    throw new Error("A propertyId is required to get an access token.");
   }
-  const propertyId = propertyResult.rows[0].property_id;
 
-  // Step 2: Find the credentials for that property. They might belong to the
-  // original user who connected the account, not the current admin.
-  // This query specifically looks for a record that HAS a refresh token.
   const credsResult = await pgPool.query(
     `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
     [propertyId]
@@ -57,11 +43,10 @@ async function getAdminAccessToken(adminUserId) {
 
   if (!refreshToken) {
     throw new Error(
-      "Could not find a valid refresh token for the property this admin has access to."
+      `Could not find a valid refresh token for property ${propertyId}.`
     );
   }
 
-  // --- The rest of the function remains the same ---
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
@@ -81,8 +66,7 @@ async function getAdminAccessToken(adminUserId) {
     throw new Error("Cloudbeds authentication failed for admin user.");
   }
 
-  // Return an object containing both the token and the property ID.
-  return { accessToken: tokenData.access_token, propertyId };
+  return { accessToken: tokenData.access_token, propertyId: propertyId };
 }
 
 // --- ADMIN API ENDPOINTS ---
@@ -238,10 +222,17 @@ router.get("/run-endpoint-tests", requireAdminApi, (req, res) => {
 router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
   try {
     const { endpoint } = req.params;
-    const { id, columns, startDate, endDate, groupBy } = req.query;
+    const { id, columns, startDate, endDate, groupBy, propertyId } = req.query; // <-- Now reads propertyId
 
-    const { accessToken, propertyId } = await getAdminAccessToken(
-      req.session.userId
+    if (!propertyId) {
+      return res
+        .status(400)
+        .json({ error: "A propertyId is required for API explorer calls." });
+    }
+
+    const { accessToken } = await getAdminAccessToken(
+      req.session.userId,
+      propertyId // <-- Pass the propertyId
     );
 
     let targetUrl;
@@ -249,27 +240,18 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "X-PROPERTY-ID": propertyId,
+        "X-PROPERTY-ID": propertyId, // <-- Use the correct propertyId here
       },
     };
 
     switch (endpoint) {
-      // Insights API
-      case "datasets":
-        targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
-        break;
-      case "dataset-structure":
-        if (!id)
-          return res.status(400).json({ error: "Dataset ID is required." });
-        targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
-        break;
       case "insights-data":
         if (!id || !columns)
           return res
             .status(400)
             .json({ error: "Dataset ID and columns are required." });
         const requestBody = {
-          property_ids: [propertyId],
+          property_ids: [propertyId], // <-- Use the correct propertyId here
           dataset_id: parseInt(id, 10),
           columns: columns
             .split(",")
@@ -277,7 +259,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
           settings: { details: true, totals: true },
         };
         if (startDate && endDate) {
-          // FINAL FIX: This format is confirmed to be correct by the getHistoricalMetrics function.
           requestBody.filters = {
             and: [
               {
@@ -288,8 +269,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
               {
                 cdf: { column: "stay_date" },
                 operator: "less_than_or_equal",
-                // Note: We use 00:00:00 for the end date as well, as this is the pattern
-                // used by the historical sync. The API treats this as inclusive of the whole day.
                 value: `${endDate}T00:00:00.000Z`,
               },
             ],
@@ -310,7 +289,7 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         options.body = JSON.stringify(requestBody);
         break;
 
-      // General API
+      // General API cases
       case "sample-hotel":
         targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
         break;
@@ -337,6 +316,16 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         targetUrl = "https://api.cloudbeds.com/api/v1.3/userinfo";
         break;
 
+      // Insights API (non-data) cases
+      case "datasets":
+        targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
+        break;
+      case "dataset-structure":
+        if (!id)
+          return res.status(400).json({ error: "Dataset ID is required." });
+        targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
+        break;
+
       default:
         return res.status(404).json({ error: "Unknown explorer endpoint." });
     }
@@ -351,7 +340,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
 // /api/routes/admin.router.js
 
 // NEW: Endpoint to update a hotel's category

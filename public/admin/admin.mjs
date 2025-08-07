@@ -217,6 +217,31 @@ const fetchAndRenderHotels = async (ui) => {
   }
 };
 
+async function setupPropertySelector(ui) {
+  try {
+    const response = await fetch("/api/my-properties");
+    if (!response.ok) throw new Error("Failed to fetch properties");
+    const properties = await response.json();
+
+    ui.propertySelector.innerHTML = ""; // Clear any existing options
+    properties.forEach((prop) => {
+      const option = document.createElement("option");
+      option.value = prop.property_id;
+      option.textContent = prop.property_name;
+      ui.propertySelector.appendChild(option);
+    });
+
+    // Set the selector to the property currently active in the main app
+    const currentPropertyId = localStorage.getItem("currentPropertyId");
+    if (currentPropertyId) {
+      ui.propertySelector.value = currentPropertyId;
+    }
+  } catch (error) {
+    console.error("Could not load properties for admin selector:", error);
+    ui.propertySelector.innerHTML = `<option>Error loading properties</option>`;
+  }
+}
+
 const fetchLastRefreshTime = async (ui) => {
   try {
     const response = await fetch("/api/last-refresh-time");
@@ -328,7 +353,6 @@ const setupApiExplorer = (ui) => {
         2
       )}</pre>`;
 
-      // Workflow management
       if (action === "fetchDatasets") {
         ui.insightsStep2.classList.remove("hidden");
       } else if (action === "fetchStructure") {
@@ -375,18 +399,27 @@ const setupApiExplorer = (ui) => {
     });
   };
 
+  const getExplorerUrlWithProperty = (baseUrl) => {
+    const propertyId = ui.propertySelector.value;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}propertyId=${propertyId}`;
+  };
+
   ui.fetchDatasetsBtn.addEventListener("click", () =>
     exploreApi(
-      "/api/admin/explore/datasets",
+      getExplorerUrlWithProperty("/api/admin/explore/datasets"),
       ui.fetchDatasetsBtn,
       "fetchDatasets"
     )
   );
+
   ui.fetchStructureBtn.addEventListener("click", () => {
     const id = ui.datasetIdInput.value;
     if (id)
       exploreApi(
-        `/api/admin/explore/dataset-structure?id=${id}`,
+        getExplorerUrlWithProperty(
+          `/api/admin/explore/dataset-structure?id=${id}`
+        ),
         ui.fetchStructureBtn,
         "fetchStructure"
       );
@@ -412,18 +445,21 @@ const setupApiExplorer = (ui) => {
       return;
     }
 
-    let url = `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
+    let baseUrl = `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
       selectedMetrics
     )}`;
-    if (startDate) url += `&startDate=${startDate}`;
-    if (endDate) url += `&endDate=${endDate}`;
+    if (startDate) baseUrl += `&startDate=${startDate}`;
+    if (endDate) baseUrl += `&endDate=${endDate}`;
     if (selectedDimensions)
-      url += `&groupBy=${encodeURIComponent(selectedDimensions)}`;
+      baseUrl += `&groupBy=${encodeURIComponent(selectedDimensions)}`;
 
-    exploreApi(url, ui.fetchInsightsDataBtn, "fetchData");
+    exploreApi(
+      getExplorerUrlWithProperty(baseUrl),
+      ui.fetchInsightsDataBtn,
+      "fetchData"
+    );
   });
 
-  // General API buttons - This part is unchanged
   ui.allGeneralApiButtons.forEach((btn) => {
     const endpoint = btn.id.replace("fetch-", "").replace("-btn", "");
     if (
@@ -432,7 +468,10 @@ const setupApiExplorer = (ui) => {
       endpoint.startsWith("user-")
     ) {
       btn.addEventListener("click", () =>
-        exploreApi(`/api/admin/explore/${endpoint}`, btn)
+        exploreApi(
+          getExplorerUrlWithProperty(`/api/admin/explore/${endpoint}`),
+          btn
+        )
       );
     }
   });
@@ -443,6 +482,8 @@ const setupApiExplorer = (ui) => {
 function initializeAdminPanel() {
   const ui = {
     lastRefreshTimeEl: document.getElementById("last-refresh-time"),
+    propertySelector: document.getElementById("admin-property-selector"), // <-- Add this line
+
     testCloudbedsBtn: document.getElementById("test-cloudbeds-btn"),
     cloudbedsStatusEl: document.getElementById("cloudbeds-status"),
     testDbBtn: document.getElementById("test-db-btn"),
