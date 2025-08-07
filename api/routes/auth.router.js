@@ -67,60 +67,71 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// api/routes/auth.router.js
+
 router.get("/magic-link-callback", async (req, res) => {
   const { token } = req.query;
-
   if (!token) {
-    return res.status(400).send("Magic link token is required.");
+    return res.status(400).send("Invalid or missing login token.");
   }
-
   try {
+    // Find the token in the database, ensuring it's not expired and hasn't been used.
+    // --- FIX: Check for used_at IS NULL ---
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW() AND used_at IS NULL",
       [token]
     );
 
     if (tokenResult.rows.length === 0) {
-      return res.status(400).send("Magic link is invalid or has expired.");
+      return res
+        .status(400)
+        .send(
+          "Login link is invalid, has expired, or has already been used. Please request a new one."
+        );
     }
-
     const loginToken = tokenResult.rows[0];
+
+    // Fetch the user details using the user_id from the token
+    // --- FIX: Query for the new `role` column instead of the old boolean flags ---
     const userResult = await pgPool.query(
       "SELECT user_id, cloudbeds_user_id, email, role FROM users WHERE user_id = $1",
       [loginToken.user_id]
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).send("User not found.");
+      return res.status(404).send("Could not find a matching user account.");
     }
-    // --- THE FIX: Regenerate the session after successful authentication ---
     const user = userResult.rows[0];
 
+    // Mark the token as used by setting the `used_at` timestamp.
+    // This is a critical security step to prevent token reuse.
     await pgPool.query(
-      "UPDATE magic_login_tokens SET used_at = NOW() WHERE token = $1",
-      [token]
+      "UPDATE magic_login_tokens SET used_at = NOW() WHERE token_id = $1",
+      [loginToken.token_id]
     );
 
     // --- THE FIX: Regenerate the session after successful authentication ---
-    // --- THE FIX: Regenerate the session after successful authentication ---
-    // This destroys the old session and creates a fresh, clean one for the logged-in user.
-    // It is the most robust way to prevent session fixation and other login-related bugs.
+    // This is a security best practice to prevent session fixation attacks.
     req.session.regenerate((err) => {
       if (err) {
-        console.error("Session regeneration error:", err);
-        return res.status(500).send("Could not log you in.");
+        console.error(
+          "Session regeneration error after magic link login:",
+          err
+        );
+        return res.status(500).send("An error occurred during login.");
       }
 
-      // Now, on this new, clean session, set the user's data.
+      // Set the session variables based on the NEW role-based system.
       req.session.userId = user.cloudbeds_user_id;
-      req.session.role = user.role;
+      req.session.role = user.role; // e.g., 'super_admin', 'owner', 'user'
 
-      // And finally, save the newly populated session before redirecting.
+      // Save the newly regenerated session before redirecting.
       req.session.save((saveErr) => {
         if (saveErr) {
-          console.error("Session save error after regenerate:", saveErr);
-          return res.status(500).send("Could not log you in.");
+          console.error("Session save error after magic link login:", saveErr);
+          return res.status(500).send("An error occurred during login.");
         }
+        // Redirect to the main application page.
         res.redirect("/app/");
       });
     });
