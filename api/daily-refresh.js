@@ -73,13 +73,16 @@ module.exports = async (request, response) => {
                 metrics.rooms_sold,
                 metrics.capacity_count,
                 metrics.room_revenue, // Using room_revenue for the total_revenue column
+                cloudbedsUserId, // Add the user ID back
               ];
             });
 
             // Format the query to handle bulk insertion and update on conflict
             // Format the query to handle bulk insertion and update on conflict
+            // Format the query to handle bulk insertion and update on conflict
+            // Format the query to handle bulk insertion and update on conflict
             const query = format(
-              `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue)
+              `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
                VALUES %L
                ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
                    adr = EXCLUDED.adr,
