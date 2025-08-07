@@ -256,39 +256,60 @@ router.get("/accept-invitation", async (req, res) => {
   }
 });
 
+// api/routes/auth.router.js
+
 router.get("/session-info", async (req, res) => {
-  // Check if a user is logged in by looking for their ID in the session.
-  if (req.session.userId) {
+  // --- BREADCRUMB 8: LOG THE START OF THE SESSION-INFO REQUEST ---
+  console.log("[BREADCRUMB 8 - auth.router.js] /session-info endpoint hit.");
+  console.log(
+    "[BREADCRUMB 8a - auth.router.js] Full session object on request:",
+    req.session
+  );
+
+  if (req.session && req.session.userId) {
+    // --- BREADCRUMB 8b: LOG THAT A VALID SESSION WAS FOUND ---
+    console.log(
+      `[BREADCRUMB 8b - auth.router.js] Valid session found for userId: ${req.session.userId}. Fetching user details.`
+    );
     try {
-      // --- FIX: Query for the 'role' column instead of the deleted 'is_admin' column. ---
       const userResult = await pgPool.query(
         "SELECT first_name, last_name, role FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
       );
-
       if (userResult.rows.length === 0) {
+        // This case should not happen if the session is valid, but it's good practice to handle it.
+        console.error("[CRITICAL] User from session not found in DB.");
         return res.json({ isLoggedIn: false });
       }
-
       const user = userResult.rows[0];
 
-      // --- FIX: Return the user's actual role in the response. ---
-      // The frontend components will use this to decide what to show.
-      res.json({
+      const responsePayload = {
         isLoggedIn: true,
-        role: user.role, // e.g., 'super_admin', 'owner', 'user'
+        // --- FIX: Send both the new 'role' and the old 'isAdmin' flag for compatibility ---
+        role: user.role,
+        isAdmin: user.role === "super_admin" || user.role === "owner", // Re-create the isAdmin flag for the old header code
         firstName: user.first_name,
         lastName: user.last_name,
-      });
+      };
+
+      // --- BREADCRUMB 8c: LOG THE RESPONSE BEING SENT TO THE FRONTEND ---
+      console.log(
+        "[BREADCRUMB 8c - auth.router.js] Sending session-info payload to frontend:",
+        responsePayload
+      );
+      res.json(responsePayload);
     } catch (error) {
       console.error(
-        "CRITICAL ERROR in /api/auth/session-info endpoint:",
+        "[CRITICAL] Error in /api/auth/session-info endpoint:",
         error
       );
       res.status(500).json({ error: "Could not retrieve session info." });
     }
   } else {
-    // If there's no session ID, the user is not logged in.
+    // --- BREADCRUMB 8d: LOG THE SESSION FAILURE CASE ---
+    console.error(
+      "[CRITICAL] /session-info endpoint hit, but session or userId was missing."
+    );
     res.json({ isLoggedIn: false });
   }
 });
