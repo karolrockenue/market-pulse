@@ -330,7 +330,7 @@ const setupApiExplorer = (ui) => {
       if (btn && btn.id === "fetch-structure-btn") {
         // Flatten the nested arrays of columns into a single array
         const allColumns = data.cdfs.flatMap((category) => category.cdfs);
-        populateMetricsCheckboxes(allColumns, ui); // Pass the corrected, flattened array
+        populateSelectors(allColumns, ui);
         ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
           data,
           null,
@@ -350,24 +350,43 @@ const setupApiExplorer = (ui) => {
     }
   };
 
-  // New helper function to create the checkboxes for metrics
-  const populateMetricsCheckboxes = (columns, ui) => {
-    ui.insightsMetricsContainer.innerHTML = ""; // Clear previous checkboxes
+  const populateSelectors = (columns, ui) => {
+    // Clear previous options
+    ui.insightsMetricsContainer.innerHTML = "";
+    ui.insightsDimensionsSelect.innerHTML = "";
+
     if (!columns || columns.length === 0) {
       ui.insightsMetricsContainer.innerHTML =
-        '<span class="text-slate-400 text-sm">No columns found for this dataset.</span>';
+        '<span class="text-slate-400 text-sm">No fields found.</span>';
       return;
     }
-    // Create a checkbox for each column returned by the API
+
+    const metricKinds = [
+      "DynamicCurrency",
+      "Currency",
+      "DynamicPercentage",
+      "Number",
+    ];
+    const dimensionKinds = ["String", "Date", "Identifier"];
+
     columns.forEach((column) => {
-      const label = document.createElement("label");
-      label.className = "flex items-center space-x-2 text-sm";
-      // FIX: Uses `column.column` for the value and `column.name` for the label
-      label.innerHTML = `
-            <input type="checkbox" value="${column.column}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-            <span class="text-slate-700">${column.name}</span>
-          `;
-      ui.insightsMetricsContainer.appendChild(label);
+      // If it's a metric, create a checkbox
+      if (metricKinds.includes(column.kind)) {
+        const label = document.createElement("label");
+        label.className = "flex items-center space-x-2 text-sm";
+        label.innerHTML = `
+          <input type="checkbox" value="${column.column}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+          <span class="text-slate-700">${column.name}</span>
+        `;
+        ui.insightsMetricsContainer.appendChild(label);
+      }
+      // If it's a dimension, create a dropdown option
+      if (dimensionKinds.includes(column.kind)) {
+        const option = document.createElement("option");
+        option.value = column.column;
+        option.textContent = column.name;
+        ui.insightsDimensionsSelect.appendChild(option);
+      }
     });
   };
 
@@ -398,7 +417,6 @@ const setupApiExplorer = (ui) => {
       );
   });
 
-  // UPDATED: This now reads from the date pickers and checkboxes
   ui.fetchInsightsDataBtn.addEventListener("click", () => {
     const id = ui.datasetIdInput.value;
     const startDate = ui.insightsStartDate.value;
@@ -413,13 +431,23 @@ const setupApiExplorer = (ui) => {
       .map((cb) => cb.value)
       .join(",");
 
+    // Read selected dimensions from the new dropdown
+    const selectedDimensions = Array.from(
+      ui.insightsDimensionsSelect.selectedOptions
+    )
+      .map((opt) => opt.value)
+      .join(",");
+
     if (id && selectedMetrics) {
       let url = `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
         selectedMetrics
       )}`;
-      // Add dates to the URL only if they are provided
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
+      // Add dimensions to the URL only if they are selected
+      if (selectedDimensions)
+        url += `&groupBy=${encodeURIComponent(selectedDimensions)}`;
+
       exploreApi(url, ui.fetchInsightsDataBtn);
     } else {
       alert("Please provide a Dataset ID and select at least one metric.");
@@ -466,6 +494,9 @@ function initializeAdminPanel() {
     insightsMetricsContainer: document.getElementById(
       "insights-metrics-container"
     ),
+    insightsDimensionsSelect: document.getElementById(
+      "insights-dimensions-select"
+    ), // <
   };
   const state = { currentEditingHotelId: null };
 
