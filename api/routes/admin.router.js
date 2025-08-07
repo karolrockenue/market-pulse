@@ -276,8 +276,16 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
             .map((c) => ({ cdf: { column: c.trim() }, metrics: ["sum"] })),
           settings: { details: true, totals: true },
         };
+        // 2. Add date filters to the request body IF they were provided
         if (startDate && endDate) {
-          requestBody.filters = { stay_date: { from: startDate, to: endDate } };
+          // FIX: The filter must be an array of objects, with the column specified inside a 'cdf' object.
+          requestBody.filters = [
+            {
+              cdf: { column: "stay_date" },
+              from: startDate,
+              to: endDate,
+            },
+          ];
         }
         let groupRows = [{ cdf: { column: "stay_date" }, modifier: "day" }];
         if (groupBy) {
