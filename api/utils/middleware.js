@@ -3,8 +3,20 @@ const pgPool = require("./db");
 const cloudbeds = require("./cloudbeds");
 
 async function requireUserApi(req, res, next) {
+  // --- NEW DIAGNOSTIC LOG ---
+  // We are logging the session content at the very start of the middleware.
+  // This will tell us if the session is missing entirely or if the userId is missing.
+  console.log(
+    `[BREADCRUMB - requireUserApi] Triggered for path: ${req.path}. Session content:`,
+    req.session
+  );
+
   // Check for an active session. This part remains the same.
   if (!req.session || !req.session.userId) {
+    // We are adding a log here to know exactly why the 401 is being sent.
+    console.error(
+      `[API AUTH FAILURE] Session or session.userId is missing. Denying access to ${req.path}.`
+    );
     return res.status(401).json({ error: "Authentication required." });
   }
 
