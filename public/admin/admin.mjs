@@ -313,35 +313,28 @@ const updateHotelCategory = async (hotelId, newCategory, selectElement) => {
 };
 
 const setupApiExplorer = (ui) => {
-  // Helper function to make API calls and display results or errors.
-  const exploreApi = async (url, btn) => {
+  const exploreApi = async (url, btn, action) => {
     ui.apiResultsContainer.innerHTML = `<div class="p-4">Fetching from Cloudbeds API...</div>`;
     if (btn) btn.disabled = true;
+
     try {
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(
-          (await response.json()).error || "An unknown server error occurred."
-        );
-      }
       const data = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(data));
 
-      // FIX: This now correctly parses the nested 'cdfs' structure
-      if (btn && btn.id === "fetch-structure-btn") {
-        // Flatten the nested arrays of columns into a single array
+      ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
+        data,
+        null,
+        2
+      )}</pre>`;
+
+      // Workflow management
+      if (action === "fetchDatasets") {
+        ui.insightsStep2.classList.remove("hidden");
+      } else if (action === "fetchStructure") {
         const allColumns = data.cdfs.flatMap((category) => category.cdfs);
         populateSelectors(allColumns, ui);
-        ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
-          data,
-          null,
-          2
-        )}</pre>`;
-      } else {
-        ui.apiResultsContainer.innerHTML = `<pre class="whitespace-pre-wrap break-all">${JSON.stringify(
-          data,
-          null,
-          2
-        )}</pre>`;
+        ui.insightsStep3.classList.remove("hidden");
       }
     } catch (error) {
       ui.apiResultsContainer.innerHTML = `<div class="p-4 bg-red-100 text-red-700 rounded-lg"><strong>Error:</strong> ${error.message}</div>`;
@@ -351,16 +344,13 @@ const setupApiExplorer = (ui) => {
   };
 
   const populateSelectors = (columns, ui) => {
-    // Clear previous options
     ui.insightsMetricsContainer.innerHTML = "";
     ui.insightsDimensionsSelect.innerHTML = "";
-
     if (!columns || columns.length === 0) {
       ui.insightsMetricsContainer.innerHTML =
         '<span class="text-slate-400 text-sm">No fields found.</span>';
       return;
     }
-
     const metricKinds = [
       "DynamicCurrency",
       "Currency",
@@ -370,17 +360,12 @@ const setupApiExplorer = (ui) => {
     const dimensionKinds = ["String", "Date", "Identifier"];
 
     columns.forEach((column) => {
-      // If it's a metric, create a checkbox
       if (metricKinds.includes(column.kind)) {
         const label = document.createElement("label");
         label.className = "flex items-center space-x-2 text-sm";
-        label.innerHTML = `
-          <input type="checkbox" value="${column.column}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-          <span class="text-slate-700">${column.name}</span>
-        `;
+        label.innerHTML = `<input type="checkbox" value="${column.column}" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"> <span class="text-slate-700">${column.name}</span>`;
         ui.insightsMetricsContainer.appendChild(label);
       }
-      // If it's a dimension, create a dropdown option
       if (dimensionKinds.includes(column.kind)) {
         const option = document.createElement("option");
         option.value = column.column;
@@ -390,7 +375,55 @@ const setupApiExplorer = (ui) => {
     });
   };
 
-  // Event Listeners for the API explorer buttons
+  ui.fetchDatasetsBtn.addEventListener("click", () =>
+    exploreApi(
+      "/api/admin/explore/datasets",
+      ui.fetchDatasetsBtn,
+      "fetchDatasets"
+    )
+  );
+  ui.fetchStructureBtn.addEventListener("click", () => {
+    const id = ui.datasetIdInput.value;
+    if (id)
+      exploreApi(
+        `/api/admin/explore/dataset-structure?id=${id}`,
+        ui.fetchStructureBtn,
+        "fetchStructure"
+      );
+  });
+
+  ui.fetchInsightsDataBtn.addEventListener("click", () => {
+    const id = ui.datasetIdInput.value;
+    const startDate = ui.insightsStartDate.value;
+    const endDate = ui.insightsEndDate.value;
+    const selectedMetrics = Array.from(
+      ui.insightsMetricsContainer.querySelectorAll("input:checked")
+    )
+      .map((cb) => cb.value)
+      .join(",");
+    const selectedDimensions = Array.from(
+      ui.insightsDimensionsSelect.selectedOptions
+    )
+      .map((opt) => opt.value)
+      .join(",");
+
+    if (!id || !selectedMetrics) {
+      alert("Please provide a Dataset ID and select at least one metric.");
+      return;
+    }
+
+    let url = `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
+      selectedMetrics
+    )}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+    if (selectedDimensions)
+      url += `&groupBy=${encodeURIComponent(selectedDimensions)}`;
+
+    exploreApi(url, ui.fetchInsightsDataBtn, "fetchData");
+  });
+
+  // General API buttons - This part is unchanged
   ui.allGeneralApiButtons.forEach((btn) => {
     const endpoint = btn.id.replace("fetch-", "").replace("-btn", "");
     if (
@@ -401,56 +434,6 @@ const setupApiExplorer = (ui) => {
       btn.addEventListener("click", () =>
         exploreApi(`/api/admin/explore/${endpoint}`, btn)
       );
-    }
-  });
-
-  ui.fetchDatasetsBtn.addEventListener("click", () =>
-    exploreApi("/api/admin/explore/datasets", ui.fetchDatasetsBtn)
-  );
-
-  ui.fetchStructureBtn.addEventListener("click", () => {
-    const id = ui.datasetIdInput.value;
-    if (id)
-      exploreApi(
-        `/api/admin/explore/dataset-structure?id=${id}`,
-        ui.fetchStructureBtn
-      );
-  });
-
-  ui.fetchInsightsDataBtn.addEventListener("click", () => {
-    const id = ui.datasetIdInput.value;
-    const startDate = ui.insightsStartDate.value;
-    const endDate = ui.insightsEndDate.value;
-
-    // Read selected metrics from checkboxes
-    const selectedMetrics = Array.from(
-      ui.insightsMetricsContainer.querySelectorAll(
-        'input[type="checkbox"]:checked'
-      )
-    )
-      .map((cb) => cb.value)
-      .join(",");
-
-    // Read selected dimensions from the new dropdown
-    const selectedDimensions = Array.from(
-      ui.insightsDimensionsSelect.selectedOptions
-    )
-      .map((opt) => opt.value)
-      .join(",");
-
-    if (id && selectedMetrics) {
-      let url = `/api/admin/explore/insights-data?id=${id}&columns=${encodeURIComponent(
-        selectedMetrics
-      )}`;
-      if (startDate) url += `&startDate=${startDate}`;
-      if (endDate) url += `&endDate=${endDate}`;
-      // Add dimensions to the URL only if they are selected
-      if (selectedDimensions)
-        url += `&groupBy=${encodeURIComponent(selectedDimensions)}`;
-
-      exploreApi(url, ui.fetchInsightsDataBtn);
-    } else {
-      alert("Please provide a Dataset ID and select at least one metric.");
     }
   });
 };
@@ -497,6 +480,12 @@ function initializeAdminPanel() {
     insightsDimensionsSelect: document.getElementById(
       "insights-dimensions-select"
     ), // <
+    insightsDimensionsSelect: document.getElementById(
+      "insights-dimensions-select"
+    ),
+    insightsStep1: document.getElementById("insights-step-1"), // <-- Add this
+    insightsStep2: document.getElementById("insights-step-2"), // <-- Add this
+    insightsStep3: document.getElementById("insights-step-3"), // <-- Add this
   };
   const state = { currentEditingHotelId: null };
 

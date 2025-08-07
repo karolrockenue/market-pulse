@@ -223,67 +223,54 @@
             </div>
 
             <div class="pt-6">
-          <div x-show="tab === 'insights'" class="space-y-6">
-                <div>
-                  <button
-                    id="fetch-datasets-btn"
-                    class="control-btn bg-slate-100 hover:bg-slate-200"
-                  >
-                    Step 1: List All Available Datasets
-                  </button>
-                </div>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label for="dataset-id-input" class="block text-xs font-medium text-slate-600">Dataset ID</label>
-                    <input type="text" id="dataset-id-input" value="7" class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"/>
-                  </div>
-                  <div>
-                    <label for="insights-dimensions-select" class="block text-xs font-medium text-slate-600">Group By (Optional)</label>
-                    <select id="insights-dimensions-select" multiple class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md bg-white h-24">
-                       <option disabled>Click Step 2 to populate...</option>
-                    </select>
-                  </div>
-                   <div>
-                    <label for="insights-start-date" class="block text-xs font-medium text-slate-600">Start Date</label>
-                    <input type="date" id="insights-start-date" class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"/>
-                  </div>
-                  <div>
-                    <label for="insights-end-date" class="block text-xs font-medium text-slate-600">End Date</label>
-                    <input type="date" id="insights-end-date" class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"/>
-                  </div>
-                </div>
+      <div x-show="tab === 'insights'" class="space-y-6">
+    <div id="insights-step-1">
+        <h3 class="font-medium text-slate-700">Step 1: Get Started</h3>
+        <p class="text-sm text-slate-500 mt-1 mb-4">Fetch the list of all available data reports from Cloudbeds.</p>
+        <button id="fetch-datasets-btn" class="control-btn bg-slate-100 hover:bg-slate-200">
+            List All Available Datasets
+        </button>
+    </div>
 
-                <div>
-                  <button
-                    id="fetch-structure-btn"
-                    class="control-btn bg-slate-100 hover:bg-slate-200"
-                  >
-                    Step 2: Get Dataset Structure & Select Metrics
-                  </button>
-                  <div class="mt-4">
-                    <label class="block text-xs font-medium text-slate-600"
-                      >Available Metrics</label
-                    >
-                    <div
-                      id="insights-metrics-container"
-                      class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 p-4 border rounded-md bg-slate-50 min-h-[50px]"
-                    >
-                      <span class="text-slate-400 text-sm"
-                        >Click Step 2 to populate...</span
-                      >
-                    </div>
-                  </div>
-                </div>
+    <div id="insights-step-2" class="hidden space-y-4">
+        <h3 class="font-medium text-slate-700">Step 2: Configure Your Report</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div>
+                <label for="dataset-id-input" class="block text-xs font-medium text-slate-600">Dataset ID</label>
+                <input type="text" id="dataset-id-input" value="7" class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"/>
+            </div>
+            <div>
+                 <label for="insights-dimensions-select" class="block text-xs font-medium text-slate-600">Group By (Optional)</label>
+                 <select id="insights-dimensions-select" multiple class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md bg-white h-24">
+                       <option disabled>Populated after getting structure...</option>
+                 </select>
+            </div>
+            <div>
+                <label for="insights-start-date" class="block text-xs font-medium text-slate-600">Start Date</label>
+                <input type="date" id="insights-start-date" class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"/>
+            </div>
+            <div>
+                <label for="insights-end-date" class="block text-xs font-medium text-slate-600">End Date</label>
+                <input type="date" id="insights-end-date" class="mt-1 w-full text-sm p-2 border border-slate-300 rounded-md"/>
+            </div>
+        </div>
+        <button id="fetch-structure-btn" class="control-btn bg-slate-100 hover:bg-slate-200">
+            Get Structure & Select Metrics
+        </button>
+    </div>
 
-                <div>
-                  <button
-                    id="fetch-insights-data-btn"
-                    class="control-btn bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    Step 3: Get Sample Data
-                  </button>
-                </div>
-              </div>
+    <div id="insights-step-3" class="hidden space-y-4">
+        <h3 class="font-medium text-slate-700">Step 3: Select Metrics & Fetch Data</h3>
+        <div class="mt-2">
+            <label class="block text-xs font-medium text-slate-600">Available Metrics</label>
+            <div id="insights-metrics-container" class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 p-4 border rounded-md bg-slate-50 min-h-[50px]">
+            </div>
+        </div>
+        <button id="fetch-insights-data-btn" class="control-btn bg-blue-600 text-white hover:bg-blue-700">
+            Get Sample Data
+        </button>
+    </div>
+</div>
 
               <div x-show="tab === 'general'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <button id="fetch-sample-hotel-btn" class="control-btn bg-slate-100 hover:bg-slate-200">Get Hotel Info</button>
