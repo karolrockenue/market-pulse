@@ -220,6 +220,13 @@ export default function () {
     isSyncing: false,
     syncStatusInterval: null,
     isLoadingSummary: true,
+    // This will hold all the data for our new Market Composition card.
+    market: {
+      competitorCount: 0,
+      totalRooms: 0,
+      breakdown: { categories: {}, neighborhoods: {} },
+      source: "",
+    },
     kpi: {
       occupancy: { your: "-", market: "-", your_raw: 0, market_raw: 0 },
       adr: { your: "-", market: "-", your_raw: 0, market_raw: 0 },
@@ -254,6 +261,14 @@ export default function () {
         this.handlePropertyChange(event.detail)
       );
       this.initializeDashboard();
+
+      // NEW: Watch for changes to the 'market' object.
+      // Whenever it's updated with new data, this will automatically
+      // call our rendering function to redraw the visual bars.
+      this.$watch("market", () => {
+        // Use $nextTick to ensure the DOM is ready before we try to draw.
+        this.$nextTick(() => this.renderBreakdownCharts());
+      });
     },
 
     initializeDashboard() {
@@ -270,6 +285,43 @@ export default function () {
         }
         window.addEventListener("resize", () => mainChartManager.resize());
       });
+    },
+
+    // --- NEW: Renders the visual breakdown bars ---
+    renderBreakdownCharts() {
+      // A small color palette for our charts.
+      const colors = ["#4E6688", "#71C0BB", "#A3A5A7", "#2D3D57", "#E3EEB2"];
+
+      const render = (container, data) => {
+        // Clear any previous chart segments.
+        container.innerHTML = "";
+        const total = Object.values(data).reduce(
+          (sum, count) => sum + count,
+          0
+        );
+        if (total === 0) return;
+
+        let colorIndex = 0;
+        // Create a colored div for each item (e.g., each category or neighborhood).
+        for (const [name, count] of Object.entries(data)) {
+          const segment = document.createElement("div");
+          // The width is proportional to the item's percentage of the total.
+          segment.style.width = `${(count / total) * 100}%`;
+          // Assign a color from our palette.
+          segment.style.backgroundColor = colors[colorIndex % colors.length];
+          // Add a tooltip to show the name and count on hover.
+          segment.title = `${name}: ${count} hotel(s)`;
+          container.appendChild(segment);
+          colorIndex++;
+        }
+      };
+
+      // Render both charts using the data from our 'market' state object.
+      render(this.$refs.categoryBreakdown, this.market.breakdown.categories);
+      render(
+        this.$refs.neighborhoodBreakdown,
+        this.market.breakdown.neighborhoods
+      );
     },
 
     // --- STUCK SPINNER HARDENING ---
@@ -377,6 +429,15 @@ export default function () {
           throw new Error("Could not load chart/table data.");
         const yourHotelData = await yourHotelResponse.json();
         const marketData = await marketResponse.json();
+
+        // NEW: Populate our new market object with the data from the API response.
+        this.market = {
+          competitorCount: marketData.competitorCount,
+          totalRooms: marketData.totalRooms,
+          breakdown: marketData.breakdown,
+          source: marketData.source,
+        };
+
         this.allMetrics = this.processAndMergeData(
           yourHotelData.metrics,
           marketData.metrics

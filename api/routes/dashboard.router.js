@@ -309,7 +309,6 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
     if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
         "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
@@ -321,22 +320,32 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
           .json({ error: "Access denied to this property." });
     }
 
+    let competitorIds;
+    let compsetSource = "Automatic Category Match"; // Default source
+
+    // Check for a manual comp set first
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
       [propertyId]
     );
-    let competitorIds;
 
     if (compSetResult.rows.length > 0) {
       competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+      compsetSource = "Curated Comp Set"; // Update source if manual set is found
     } else {
+      // Fallback to category-based comp set
       const categoryResult = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
         [propertyId]
       );
       const category = categoryResult.rows[0]?.category;
       if (!category)
-        return res.json({ metrics: [], competitorCount: 0, totalRooms: 0 });
+        return res.json({
+          metrics: [],
+          competitorCount: 0,
+          totalRooms: 0,
+          breakdown: {},
+        });
 
       const categoryCompSetResult = await pgPool.query(
         "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
@@ -346,14 +355,51 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     }
 
     if (competitorIds.length === 0) {
-      return res.json({ metrics: [], competitorCount: 0, totalRooms: 0 });
+      return res.json({
+        metrics: [],
+        competitorCount: 0,
+        totalRooms: 0,
+        breakdown: {},
+      });
     }
 
-    const period = getPeriod(granularity);
+    // --- NEW LOGIC START ---
+    // Fetch details for the breakdown card (category, neighborhood, room count) for all competitors
+    const competitorDetailsQuery = `
+        SELECT category, neighborhood, capacity_count 
+        FROM hotels 
+        WHERE hotel_id = ANY($1::int[]);
+    `;
+    const { rows: competitorDetails } = await pgPool.query(
+      competitorDetailsQuery,
+      [competitorIds]
+    );
 
+    // Process the details into the required breakdown format
+    const breakdown = {
+      categories: {},
+      neighborhoods: {},
+    };
+    let totalRooms = 0;
+    competitorDetails.forEach((hotel) => {
+      // Aggregate category counts
+      if (hotel.category) {
+        breakdown.categories[hotel.category] =
+          (breakdown.categories[hotel.category] || 0) + 1;
+      }
+      // Aggregate neighborhood counts
+      if (hotel.neighborhood) {
+        breakdown.neighborhoods[hotel.neighborhood] =
+          (breakdown.neighborhoods[hotel.neighborhood] || 0) + 1;
+      }
+      // Sum up total rooms
+      totalRooms += hotel.capacity_count || 0;
+    });
+    // --- NEW LOGIC END ---
+
+    const period = getPeriod(granularity);
     const metricsQuery = `
-      SELECT ${period} as period, AVG(dms.adr::numeric) as market_adr, AVG(dms.occupancy_direct::numeric) as market_occupancy, AVG(dms.revpar::numeric) as market_revpar,
-      SUM(dms.total_revenue::numeric) as market_total_revenue, SUM(dms.rooms_sold) as market_rooms_sold, SUM(dms.capacity_count) as market_capacity_count
+      SELECT ${period} as period, AVG(dms.adr::numeric) as market_adr, AVG(dms.occupancy_direct::numeric) as market_occupancy, AVG(dms.revpar::numeric) as market_revpar
       FROM daily_metrics_snapshots dms
       WHERE dms.hotel_id = ANY($1::int[]) AND dms.stay_date >= $2::date AND dms.stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
@@ -364,21 +410,14 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
       endDate,
     ]);
 
-    const competitorRoomsResult = await pgPool.query(
-      `WITH latest_snapshots AS (
-        SELECT DISTINCT ON (dms.hotel_id) dms.capacity_count
-        FROM daily_metrics_snapshots dms
-        WHERE dms.hotel_id = ANY($1::int[])
-        ORDER BY dms.hotel_id, dms.stay_date DESC
-      )
-      SELECT SUM(capacity_count)::integer as total_rooms FROM latest_snapshots;`,
-      [competitorIds]
-    );
-
     res.json({
       metrics: result.rows,
       competitorCount: competitorIds.length,
-      totalRooms: competitorRoomsResult.rows[0]?.total_rooms || 0,
+      // We now get totalRooms from our new query, which is more accurate
+      totalRooms: totalRooms,
+      // Add the new breakdown data and source to the response
+      breakdown: breakdown,
+      source: compsetSource,
     });
   } catch (error) {
     console.error("Error in /api/competitor-metrics:", error);

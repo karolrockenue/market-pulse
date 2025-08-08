@@ -1018,3 +1018,17 @@ public/app/dashboard.mjs component was updated with an isInitialLoad flag and ro
                                                 * Problem: The application was crashing on load, with the browser console showing a fatal Uncaught SyntaxError: Identifier 'dashboardComponent' has already been declared.
                                                 * Resolution: The error was traced to a duplicate import statement in the primary <script type="module"> block of public/app/index.html. The entire script block was replaced with a single, clean version, which resolved the crash and restored all dashboard functionality.
                                                 * Outcome: The dashboard now features a professional, polished loading experience that provides clear feedback to the user. The critical JavaScript crash has been resolved, and the loading logic is robust enough to handle potential data-fetching errors without getting stuck.
+
+
+Date: August 8, 2025
+                                                * Objective: Refine the neighborhood lookup feature to provide more relevant, higher-level location names and resolve a critical bug preventing the sync from running.
+                                                * Summary: The existing reverse geocoding feature was returning overly specific location names (e.g., "The Boltons" instead of "Earl's Court"). This session focused on tuning the API call to the external Nominatim service to fetch data at a more appropriate geographic level. The core logic, which was located in the /api/adapters/cloudbedsAdapter.js file, was updated to use a different zoom level and a more robust parsing method. A secondary bug that was blocking the sync process was also identified and fixed.
+                                                * Key Changes:
+                                                * Neighborhood Data Tuning:
+                                                * The getNeighborhoodFromCoords function in /api/adapters/cloudbedsAdapter.js was identified as the source of the neighborhood data.
+                                                * The API call to nominatim.openstreetmap.org was modified by adding the &zoom=16 parameter. This instructs the service to return a broader area (e.g., suburb or district) instead of the most granular one.
+                                                * The function's parsing logic was enhanced to prioritize address components in the order of suburb, city_district, and then neighbourhood to ensure the most relevant name is selected.
+                                                * Critical Bug Fix:
+                                                * Resolved a fatal error in the /api/admin/sync-hotel-info endpoint located in admin.router.js.
+                                                * The call to the getAdminAccessToken function was missing the required propertyId, which caused the entire hotel info sync to fail. The call was corrected to pass the propertyId, restoring functionality.
+                                                * Outcome: The neighborhood data is now significantly more accurate and user-friendly. The "Sync Hotel Info" feature in the Admin Panel is fully functional, allowing administrators to refresh hotel data and receive the correct neighborhood information.
