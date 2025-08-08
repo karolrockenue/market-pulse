@@ -120,21 +120,41 @@ function processUpcomingApiData(allData) {
  * @param {number} longitude The longitude of the location.
  * @returns {Promise<string|null>} The neighborhood name or null if not found.
  */
+/**
+ * Gets a neighborhood name from geographic coordinates using the Nominatim API.
+ * @param {number} latitude The latitude of the location.
+ * @param {number} longitude The longitude of the location.
+ * @returns {Promise<string|null>} The neighborhood name or null if not found.
+ */
 async function getNeighborhoodFromCoords(latitude, longitude) {
-  // ... (existing code, no changes)
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+  // Return null if coordinates are missing.
+  if (!latitude || !longitude) return null;
+
+  // --- FIX: Added the '&zoom=16' parameter to the URL ---
+  // This tells the API to return a higher-level geographic area (like a suburb or district)
+  // instead of the most specific one (like a tiny named block).
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=16`;
+
   try {
     const response = await fetch(url, {
       method: "GET",
+      // It's good practice to set a User-Agent for public APIs.
       headers: { "User-Agent": "MarketPulseApp/1.0 (karol@rockvenue.com)" },
     });
+
     if (!response.ok) {
       throw new Error(`Nominatim API returned status: ${response.status}`);
     }
+
     const data = await response.json();
+
+    // --- FIX: Improved address parsing ---
+    // This logic now checks for the desired address component in a specific, prioritized order
+    // to get the most consistent and useful neighborhood name.
     return (
-      data.address.neighbourhood ||
       data.address.suburb ||
+      data.address.city_district ||
+      data.address.neighbourhood ||
       data.address.quarter ||
       null
     );
