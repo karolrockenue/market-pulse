@@ -117,7 +117,9 @@ async function getMarketMetrics(propertyId, category, startDate, endDate) {
 function processData(hotelData, marketData) {
   const dataMap = new Map();
   const processRow = (row, isMarket = false) => {
-    const date = row.stay_date.toISOString().substring(0, 10);
+    // FIX: Treat stay_date as a string, which is how the database returns it.
+    // We just need the first 10 characters (the 'YYYY-MM-DD' part).
+    const date = row.stay_date.substring(0, 10);
     if (!dataMap.has(date)) dataMap.set(date, { date: date });
     const entry = dataMap.get(date);
     const prefix = isMarket ? "market_" : "";
