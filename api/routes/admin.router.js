@@ -89,12 +89,11 @@ router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
 // New endpoint to fetch all scheduled reports for the admin panel dropdown.
 router.get("/get-scheduled-reports", requireAdminApi, async (req, res) => {
   try {
-    // FIX: This query is now more robust. It includes a WHERE clause
-    // to ensure we only process rows where 'property_id' is a valid number,
-    // preventing the ::integer cast from failing on bad data.
+    // FINAL FIX: The primary key column is 'id', not 'report_id'.
+    // We select `sr.id` and alias it as `report_id` for clean output.
     const query = `
         SELECT 
-            sr.report_id, 
+            sr.id AS report_id, 
             sr.report_name,
             h.property_name
         FROM scheduled_reports sr
