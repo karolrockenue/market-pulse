@@ -179,6 +179,7 @@ export default function () {
 
     // This new flag tracks the very first time the dashboard loads.
     isInitialLoad: true,
+    ranking: null,
 
     // --- INITIALIZATION ---
     init() {
@@ -507,6 +508,42 @@ export default function () {
       }
     },
 
+    // --- NEW: Function to load ranking data from our new API endpoint ---
+    async loadRankingData(startDate, endDate) {
+      // Don't try to fetch if we don't have a property ID.
+      if (!this.currentPropertyId) return;
+
+      try {
+        const url = `/api/market-ranking?startDate=${startDate}&endDate=${endDate}&propertyId=${this.currentPropertyId}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          // If the API fails, set ranking to null so the component hides.
+          this.ranking = null;
+          throw new Error("Could not load ranking data.");
+        }
+        const rankingData = await response.json();
+        // Store the successfully fetched data in our new state property.
+        this.ranking = rankingData;
+      } catch (error) {
+        console.error("Error fetching ranking data:", error);
+        this.ranking = null;
+      }
+    },
+
+    // --- NEW: Helper functions for display logic ---
+    getOrdinal(n) {
+      if (n === null || typeof n === "undefined") return "";
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    },
+
+    getRankColor(rank, total) {
+      if (rank === 1) return "#10B981"; // Brand Green for 1st place
+      if (rank / total > 0.75) return "#C24435"; // Custom Red for bottom 25%
+      return "#4E6688"; // Accent Blue for everything else
+    },
+
     get chartTitle() {
       if (
         !this.currentPropertyName ||
@@ -523,7 +560,10 @@ export default function () {
     async runReport() {
       if (!this.dates.start || !this.dates.end || !this.granularity) return;
       this.error.show = false;
-      // **MODIFIED**: Await both data fetches to complete.
+      // Reset ranking to null to show a loading state
+      this.ranking = null;
+
+      // The new function is now called in parallel with the others.
       await Promise.all([
         this.loadKpis(this.dates.start, this.dates.end),
         this.loadChartAndTables(
@@ -531,6 +571,8 @@ export default function () {
           this.dates.end,
           this.granularity
         ),
+        // --- NEW: Add this call to the array ---
+        this.loadRankingData(this.dates.start, this.dates.end),
       ]);
     },
 

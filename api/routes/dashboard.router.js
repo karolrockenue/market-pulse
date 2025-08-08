@@ -321,7 +321,10 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     }
 
     let competitorIds;
-    let compsetSource = "Automatic Category Match";
+    // This new text clarifies what the automatic matching is based on.
+    // This new text is universal for all users and removes the conditional logic.
+    const compsetSource =
+      "a comp set of local hotels in a similar quality class";
 
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
@@ -330,7 +333,7 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
 
     if (compSetResult.rows.length > 0) {
       competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
-      compsetSource = "Curated Comp Set";
+      // The line that reassigned the compsetSource has been removed.
     } else {
       const categoryResult = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
@@ -438,6 +441,131 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error("Error in /api/competitor-metrics:", error);
     res.status(500).json({ error: "Failed to fetch competitor metrics" });
+  }
+});
+
+// --- NEW: MARKET RANKING ENDPOINT ---
+router.get("/market-ranking", requireUserApi, async (req, res) => {
+  try {
+    const { startDate, endDate, propertyId } = req.query;
+    if (!propertyId) {
+      return res.status(400).json({ error: "A propertyId is required." });
+    }
+
+    // Security: Ensure the user has access to the requested property
+    if (req.session.role !== "super_admin") {
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        [req.session.userId, propertyId]
+      );
+      if (accessCheck.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property." });
+      }
+    }
+
+    // Step 1: Determine the competitive set (reusing existing logic)
+    let competitorIds;
+    const compSetResult = await pgPool.query(
+      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+      [propertyId]
+    );
+
+    if (compSetResult.rows.length > 0) {
+      competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+    } else {
+      const categoryResult = await pgPool.query(
+        "SELECT category FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+      const category = categoryResult.rows[0]?.category;
+      if (!category) {
+        return res.json({}); // No category, no comp set
+      }
+      const categoryCompSetResult = await pgPool.query(
+        "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
+        [category, propertyId]
+      );
+      competitorIds = categoryCompSetResult.rows.map((row) => row.hotel_id);
+    }
+
+    if (competitorIds.length === 0) {
+      // If no competitors, ranking is always 1 of 1
+      const result = {
+        occupancy: { rank: 1, total: 1 },
+        adr: { rank: 1, total: 1 },
+        revpar: { rank: 1, total: 1 },
+      };
+      return res.json(result);
+    }
+
+    // Combine the main property with its competitors for the query
+    const allHotelIds = [propertyId, ...competitorIds];
+    const totalHotels = allHotelIds.length;
+
+    // Step 2: Calculate performance for all hotels and rank them using window functions
+    const rankingQuery = `
+      WITH HotelPerformance AS (
+        -- First, calculate the average performance for each hotel in the set
+        SELECT
+          hotel_id,
+          (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) AS adr,
+          (SUM(rooms_sold)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS occupancy,
+          (SUM(total_revenue)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS revpar
+        FROM daily_metrics_snapshots
+        WHERE
+          hotel_id = ANY($1::int[]) AND
+          stay_date BETWEEN $2 AND $3
+        GROUP BY hotel_id
+      ),
+      Rankings AS (
+        -- Then, use RANK() to assign a rank to each hotel for each metric
+        SELECT
+          hotel_id,
+          RANK() OVER (ORDER BY occupancy DESC NULLS LAST) as occupancy_rank,
+          RANK() OVER (ORDER BY adr DESC NULLS LAST) as adr_rank,
+          RANK() OVER (ORDER BY revpar DESC NULLS LAST) as revpar_rank
+        FROM HotelPerformance
+      )
+      -- Finally, select only the ranks for our subject property
+      SELECT occupancy_rank, adr_rank, revpar_rank
+      FROM Rankings
+      WHERE hotel_id = $4;
+    `;
+
+    const rankingResult = await pgPool.query(rankingQuery, [
+      allHotelIds,
+      startDate,
+      endDate,
+      propertyId,
+    ]);
+
+    if (rankingResult.rows.length === 0) {
+      // This can happen if the main hotel had no data in the selected period.
+      // Default to last place.
+      const total = competitorIds.length + 1;
+      return res.json({
+        occupancy: { rank: total, total: total },
+        adr: { rank: total, total: total },
+        revpar: { rank: total, total: total },
+      });
+    }
+
+    const ranks = rankingResult.rows[0];
+    const result = {
+      occupancy: {
+        rank: parseInt(ranks.occupancy_rank, 10),
+        total: totalHotels,
+      },
+      adr: { rank: parseInt(ranks.adr_rank, 10), total: totalHotels },
+      revpar: { rank: parseInt(ranks.revpar_rank, 10), total: totalHotels },
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error in /api/market-ranking:", error);
+    res.status(500).json({ error: "Failed to fetch market ranking." });
   }
 });
 

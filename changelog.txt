@@ -1055,3 +1055,25 @@ Date: August 8, 2025
                                                 * Fixed a data presentation bug in the "Summary" card where the "winner" dot and delta color were incorrect for certain metrics. The root cause was identified as a string-based comparison of numbers; this was resolved by applying parseFloat() in the renderKpiCards function in dashboard.mjs to ensure all comparisons are numerical.
                                                 * The "Market Composition" card's rendering logic was made more robust to correctly display data for comp sets with single or multiple competitors, including those with missing neighborhood data.
                                                 * Outcome: The dashboard is now significantly more polished, stable, and insightful. The user experience is improved from the very first load, critical data accuracy bugs have been resolved, and the new "Market Composition" feature provides users with valuable, at-a-glance context about their market.
+
+
+Date: August 8, 2025
+                                                * Objective: Design and implement a new "Market Ranking" component on the main dashboard to replace the deprecated "RevPAR Comparison" chart, providing users with at-a-glance competitive insights.
+                                                * Key Changes:
+                                                * UI/UX Design & Prototyping:
+                                                * The "RevPAR Comparison" chart and its related JavaScript manager were completely removed from the dashboard.
+                                                * A new "Market Ranking" component was designed through an iterative process, culminating in a final card-based design that mimics the style of the "Market Composition" card for a cohesive UI.
+                                                * The final design was refined with specific styling for font sizes (19px rank), custom colors for rank indication, and a disclaimer clarifying that the ranking is based on the selected date range.
+                                                * Backend API:
+                                                * A new, secure API endpoint,
+GET /api/market-ranking, was created in api/routes/dashboard.router.js.
+                                                * The endpoint was engineered with a robust SQL query using Common Table Expressions and the
+RANK() window function to calculate a hotel's precise rank for Occupancy, ADR, and RevPAR against its full competitive set for a given period.
+                                                   * Frontend Implementation:
+                                                   * The main dashboard component (
+public/app/dashboard.mjs) was updated with a new ranking state property and a loadRankingData function to call the new API endpoint.
+                                                   * Helper functions (
+getOrdinal, getRankColor) were added to the component to handle presentation logic for number formatting and dynamic, rank-based coloring.
+                                                   * The static HTML mockup in
+public/app/index.html was replaced with a dynamic Alpine.js template that uses an x-for loop to render the ranking cards and a :style binding to apply the dynamic colors.
+                                                      * Outcome: The "Market Ranking" feature is now fully implemented on the dashboard. It is data-driven, visually consistent with the application's design, and dynamically updates with the page's date controls, providing users with a clear and valuable summary of their competitive performance.
