@@ -269,7 +269,10 @@ export default function () {
       });
     },
 
-    // --- STUCK SPINNER FIX ---
+    // --- STUCK SPINNER HARDENING ---
+    // If /api/sync-status stays 'false' but KPI endpoints already serve data,
+    // we consider sync complete (backend status is lagging). We also cache-bust
+    // the status call to dodge any proxy/browser staleness.
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -277,34 +280,67 @@ export default function () {
         return;
       }
       try {
-        // 1) add cache-buster to avoid any stale responses
-        const response = await fetch(
+        // 1) Ask the server if it thinks sync is done
+        const statusRes = await fetch(
           `/api/sync-status/${propertyId}?t=${Date.now()}`
         );
-        const data = await response.json();
+        const status = await statusRes.json();
 
-        if (data.isSyncComplete) {
+        const considerDone = async () => {
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
-
-          // 2) ensure the dashboard has a propertyId before loading data
-          // (sidebar may not have emitted the property-changed event yet)
+          // Ensure we have a property selected before loading data
           if (!this.currentPropertyId) this.currentPropertyId = propertyId;
-
-          // clean URL (remove ?newConnection & ?propertyId)
+          // Clean URL (?newConnection=...&propertyId=...)
           history.pushState({}, "", window.location.pathname);
-
-          // load initial report fully before hiding spinner
+          // Load a real preset before hiding spinner
           await this.setPreset("current-month");
-
           this.isSyncing = false;
+        };
+
+        if (status?.isSyncComplete) {
+          await considerDone();
+          return;
         }
-      } catch (error) {
-        console.error("Error checking sync status:", error);
+
+        // 2) Fallback probe: if KPI summary works, data exists -> treat as done
+        // Use a very small date window to keep the call cheap.
+        const today = new Date();
+        const start = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
+        const fmt = (d) =>
+          new Date(
+            Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+          )
+            .toISOString()
+            .split("T")[0];
+
+        const probeUrl = `/api/kpi-summary?startDate=${fmt(
+          start
+        )}&endDate=${fmt(today)}&propertyId=${propertyId}`;
+        const probeRes = await fetch(probeUrl, {
+          headers: { "x-probe": "sync-bypass" },
+        });
+        if (probeRes.ok) {
+          const probe = await probeRes.json();
+          // If we get any numeric KPI back, we know snapshots exist and queries work.
+          const hasData =
+            probe?.yourHotel &&
+            (Number.isFinite(probe.yourHotel.occupancy) ||
+              Number.isFinite(probe.yourHotel.revpar) ||
+              Number.isFinite(probe.yourHotel.adr));
+          if (hasData) {
+            await considerDone();
+            return;
+          }
+        }
+
+        // 3) Otherwise keep polling
+      } catch (err) {
+        console.error("Error checking sync status (with fallback):", err);
+        // Fail safe: stop spinner instead of trapping user forever
         this.isSyncing = false;
         if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
       }
     },
-
     // --- CORE DATA LOGIC ---
     async loadKpis(startDate, endDate) {
       this.isLoading.kpis = true;
