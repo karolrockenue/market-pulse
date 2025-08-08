@@ -139,7 +139,9 @@ router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
     }
 
     const syncCheck = await pgPool.query(
-      "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1 LIMIT 1",
+      // **THE FIX**: Explicitly cast the incoming propertyId parameter to an integer.
+      // This ensures we are comparing a number to a number, fixing the bug.
+      "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1::integer LIMIT 1",
       [propertyId]
     );
     res.json({ isSyncComplete: syncCheck.rows.length > 0 });
