@@ -650,19 +650,18 @@
     </div>
 
 </div> <script type="module">
-  // Import the LIVE dashboard component logic and the NEW sidebar logic.
-  import dashboardComponent from "/app/dashboard.mjs";
+  // Import the dashboard and sidebar component logic.
   import dashboardComponent from "/app/dashboard.mjs";
   import sidebar from "/app/_shared/sidebar.mjs";
   import { loadComponent } from "/app/utils.mjs";
 
-  // Register the Alpine.js components.
+  // Register the Alpine.js components once Alpine is ready.
   document.addEventListener("alpine:init", () => {
     Alpine.data("dashboard", dashboardComponent);
     Alpine.data("sidebar", sidebar);
   });
 
-  // Load the new sidebar's HTML.
+  // Load the sidebar's HTML into its placeholder.
   document.addEventListener("DOMContentLoaded", async () => {
     await loadComponent("sidebar", "sidebar-placeholder");
   });
