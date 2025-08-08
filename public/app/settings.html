@@ -335,6 +335,29 @@
               <div class="space-y-4">
                 <div>
                   <label
+                    for="inviteProperty"
+                    class="block text-sm font-medium text-slate-600"
+                  >
+                    Invite to Property
+                  </label>
+                  <select
+                    id="inviteProperty"
+                    x-model="invitation.propertyId"
+                    class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3"
+                  >
+                    <template
+                      x-for="prop in ownedProperties"
+                      :key="prop.property_id"
+                    >
+                      <option
+                        :value="prop.property_id"
+                        x-text="prop.property_name"
+                      ></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label
                     for="invite-first-name"
                     class="block text-sm font-medium text-slate-600"
                     >First Name</label

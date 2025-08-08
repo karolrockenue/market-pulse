@@ -197,25 +197,20 @@ router.get("/accept-invitation", async (req, res) => {
     const newDbUser = userInsertResult.rows[0];
 
     // --- FIX: Find the inviter's cloudbeds_user_id to correctly look up their properties. ---
-    const inviterUserResult = await client.query(
-      "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
-      [invitation.inviter_user_id]
-    );
-    const inviterCloudbedsId = inviterUserResult.rows[0].cloudbeds_user_id;
-
-    // Find the properties linked to the inviter.
-    const propertiesResult = await client.query(
-      "SELECT property_id FROM user_properties WHERE user_id = $1",
-      [inviterCloudbedsId]
-    );
-
-    // Link the new user to the same properties as the inviter.
-    for (const prop of propertiesResult.rows) {
-      await client.query(
-        "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
-        [newDbUser.cloudbeds_user_id, prop.property_id]
+    // --- FIX: Grant access only to the specific property stored with the invitation. ---
+    // This ensures a super_admin invitation only grants access to the intended property.
+    if (!invitation.property_id) {
+      // This is a data integrity issue. If an invitation has no property, we cannot proceed.
+      throw new Error(
+        `Invitation record (ID: ${invitation.invitation_id}) is missing a property_id.`
       );
     }
+
+    // Link the new user to the single, specific property from the invitation.
+    await client.query(
+      "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
+      [newDbUser.cloudbeds_user_id, invitation.property_id]
+    );
 
     // --- FIX: Delete the invitation after it has been successfully used. ---
     await client.query(

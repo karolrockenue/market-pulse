@@ -36,7 +36,12 @@ router.post(
   [requireUserApi, requireInvitePermission],
   async (req, res) => {
     try {
-      const { invitee_first_name, invitee_last_name, invitee_email } = req.body;
+      const {
+        invitee_first_name,
+        invitee_last_name,
+        invitee_email,
+        property_id,
+      } = req.body;
       const inviter_cloudbeds_id = req.session.userId; // Get the cloudbeds_user_id from the session.
 
       // Look up the internal user_id (primary key) using the cloudbeds_user_id from the session.
@@ -57,7 +62,12 @@ router.post(
       // Use the correct internal user_id for the database INSERT operation.
       const inviter_user_id = inviterResult.rows[0].user_id;
 
-      if (!invitee_first_name || !invitee_last_name || !invitee_email) {
+      if (
+        !invitee_first_name ||
+        !invitee_last_name ||
+        !invitee_email ||
+        !property_id
+      ) {
         return res
           .status(400)
           .json({ error: "First name, last name, and email are required." });
@@ -89,7 +99,7 @@ router.post(
 
       const newInvite = await pgPool.query(
         // --- FIX: Corrected column name from 'invited_by_user_id' to 'inviter_user_id' ---
-        `INSERT INTO user_invitations (inviter_user_id, invitee_email, invitee_first_name, invitee_last_name, invitation_token, expires_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        `INSERT INTO user_invitations (inviter_user_id, invitee_email, invitee_first_name, invitee_last_name, invitation_token, expires_at, property_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [
           inviter_user_id,
           invitee_email,
@@ -97,6 +107,7 @@ router.post(
           invitee_last_name,
           invitation_token,
           expires_at,
+          property_id,
         ]
       );
 

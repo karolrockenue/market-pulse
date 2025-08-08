@@ -32,6 +32,7 @@ export default function settingsPage() {
       firstName: "",
       lastName: "",
       email: "",
+      propertyId: "",
       message: "", // For displaying success/error messages inside the modal
       messageType: "error", // 'success' or 'error'
     },
@@ -245,6 +246,8 @@ export default function settingsPage() {
             invitee_first_name: this.invitation.firstName,
             invitee_last_name: this.invitation.lastName,
             invitee_email: this.invitation.email,
+            // NEW: Send the selected property ID to the backend.
+            property_id: this.invitation.propertyId,
           }),
         });
 
@@ -319,6 +322,12 @@ export default function settingsPage() {
         firstName: "",
         lastName: "",
         email: "",
+        // NEW: Set the default property for the invitation.
+        // This will be the first property in the list of properties the admin owns.
+        propertyId:
+          this.ownedProperties.length > 0
+            ? this.ownedProperties[0].property_id
+            : "",
         message: "",
         messageType: "error",
       };
