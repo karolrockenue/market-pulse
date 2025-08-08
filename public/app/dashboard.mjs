@@ -540,7 +540,10 @@ export default function () {
       if (!propertyId || this.currentPropertyId === propertyId) return;
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
-      if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
+      if (!this.isSyncing && this.syncStatusInterval) {
+        clearInterval(this.syncStatusInterval);
+        this.syncStatusInterval = null;
+      }
       try {
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
