@@ -357,47 +357,47 @@
                         <th
                           class="py-3 px-2 text-left text-xs uppercase tracking-wider w-28 cursor-pointer border-b-2"
                           @click="setActiveMetric('occupancy')"
-                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'occupancy', 'text-[#a3a5a7] border-transparent': activeMetric !== 'occupancy' }"
+                          :class="{ 'font-semibold !text-blue-600 border-[#71c0bb]': activeMetric === 'occupancy', 'text-[#a3a5a7] border-transparent': activeMetric !== 'occupancy' }"
                         >
                           Occupancy
                         </th>
                         <th
                           class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 cursor-pointer border-b-2"
                           @click="setActiveMetric('adr')"
-                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'adr', 'text-[#a3a5a7] border-transparent': activeMetric !== 'adr' }"
+                          :class="{ 'font-semibold !text-blue-600 border-[#71c0bb]': activeMetric === 'adr', 'text-[#a3a5a7] border-transparent': activeMetric !== 'adr' }"
                         >
                           ADR
                         </th>
                         <th
                           class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 border-r border-gray-200 cursor-pointer border-b-2"
                           @click="setActiveMetric('revpar')"
-                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'revpar', 'text-[#a3a5a7] border-transparent': activeMetric !== 'revpar' }"
+                          :class="{ 'font-semibold !text-blue-600 border-[#71c0bb]': activeMetric === 'revpar', 'text-[#a3a5a7] border-transparent': activeMetric !== 'revpar' }"
                         >
                           RevPAR
                         </th>
                         <th
                           class="py-3 px-2 text-left text-xs uppercase tracking-wider w-28 cursor-pointer border-b-2"
                           @click="setActiveMetric('occupancy')"
-                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'occupancy', 'text-[#a3a5a7] border-transparent': activeMetric !== 'occupancy' }"
+                          :class="{ 'font-semibold !text-blue-600 border-[#71c0bb]': activeMetric === 'occupancy', 'text-[#a3a5a7] border-transparent': activeMetric !== 'occupancy' }"
                         >
                           Occupancy
                         </th>
                         <th
                           class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 cursor-pointer border-b-2"
                           @click="setActiveMetric('adr')"
-                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'adr', 'text-[#a3a5a7] border-transparent': activeMetric !== 'adr' }"
+                          :class="{ 'font-semibold !text-blue-600 border-[#71c0bb]': activeMetric === 'adr', 'text-[#a3a5a7] border-transparent': activeMetric !== 'adr' }"
                         >
                           ADR
                         </th>
                         <th
                           class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 border-r border-gray-200 cursor-pointer border-b-2"
                           @click="setActiveMetric('revpar')"
-                          :class="{ 'font-semibold !text-blue-600 border-blue-500': activeMetric === 'revpar', 'text-[#a3a5a7] border-transparent': activeMetric !== 'revpar' }"
+                          :class="{ 'font-semibold !text-blue-600 border-[#71c0bb]': activeMetric === 'revpar', 'text-[#a3a5a7] border-transparent': activeMetric !== 'revpar' }"
                         >
                           RevPAR
                         </th>
                         <th
-                          class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 font-semibold !text-blue-600 border-b-2 border-blue-500"
+                          class="py-3 px-2 text-left text-xs uppercase tracking-wider w-24 font-semibold !text-blue-600 border-b-2 border-[#71c0bb]"
                         >
                           Delta
                         </th>
@@ -455,34 +455,11 @@
 <div
   class="h-full w-[400px] border-l border-gray-200 flex flex-col flex-shrink-0"
 >
-              <div
+   <div
                 class="p-4 md:p-5 border-b border-gray-200"
                 style="height: 340px"
               >
-                <div
-                  class="h-full w-full rounded-xl flex items-center justify-center text-center p-8 text-white"
-                  style="background-color: #fafafa"
-                >
-                  <template x-if="isLoadingSummary">
-                    <div class="flex flex-col items-center justify-center">
-                      <div
-                        class="w-8 h-8 border-4 border-white border-t-transparent border-solid rounded-full animate-spin"
-                      ></div>
-                      <span class="mt-4 text-sm font-medium"
-                        >Generating Insights...</span
-                      >
-                    </div>
-                  </template>
-
-                  <template x-if="!isLoadingSummary">
-                    <p
-                      class="font-semibold leading-snug"
-                      style="font-size: 22px"
-                      x-text="summaryText"
-                    ></p>
-                  </template>
                 </div>
-              </div>
 
 
 <div

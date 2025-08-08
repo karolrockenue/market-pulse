@@ -950,4 +950,18 @@ Date: August 8, 2025
 
                                           * Outcome: The initial connection experience is now fully reliable. The spinner and loading overlay clear automatically as soon as the initial sync finishes, without requiring the user to refresh or open a new tab. The fix also hardens the system against stale sync-status responses, ensuring new properties transition smoothly to a usable dashboard state.
 
-Ask ChatGPT
+Changelog Entry for August 8, 2025
+Objective: To establish a new brand identity by implementing a consistent, modern color scheme across the entire application and resolving related UI bugs.
+Summary: A full-stack UI refactor was completed to apply a new, professionally chosen color palette to all user-facing pages. The process involved systematically updating styles across the Dashboard, Reports, and Settings pages, as well as shared components. The main data visualization charts were also updated to align with the new brand colors, and a functional bug with the dashboard controls, discovered during the process, was resolved.
+Key Changes:
+                                             * A new, official brand color palette has been established:
+                                             * Primary Dark (#332D56): Used for the main canvas and sidebar backgrounds.
+                                             * Secondary Dark (#2D3D57): Used for all major page and table headings.
+                                             * Accent (#4E6688): Used for active UI elements, such as the selected link in the sidebar.
+                                             * Highlight (#E3EEB2): A contrasting color used for all primary button backgrounds.
+                                             * Chart Green (#10B981): Used for "Your Hotel" data in charts.
+                                             * Chart Red (#F43F5E): Used for "The Market" data in charts.
+                                             * The new color scheme was permanently applied by updating the Tailwind CSS classes across all major pages (index.html, reports.html, settings.html) and the shared sidebar component (sidebar.html).
+                                             * The data visualization colors were updated in dashboard.mjs for both the main dashboard's monthly bar chart and the "RevPAR Comparison" chart to use the new brand colors.
+                                             * Bug Fix: A critical bug that made the "Display" dropdown (Daily/Weekly/Monthly) non-functional was resolved by restoring the missing setGranularity function in dashboard.mjs.
+Outcome: The application now has a consistent and professional brand identity. The updated UI is more visually appealing and cohesive across all pages, significantly improving the overall user experience.
