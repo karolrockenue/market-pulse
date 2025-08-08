@@ -208,7 +208,10 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
   try {
     // --- FIX: Correctly destructure the object from getAdminAccessToken ---
     // The function returns { accessToken, propertyId }, so we need to get the token string.
-    const { accessToken } = await getAdminAccessToken(req.session.userId);
+    const { accessToken } = await getAdminAccessToken(
+      req.session.userId,
+      propertyId
+    );
 
     // Start a database transaction.
     await client.query("BEGIN");
