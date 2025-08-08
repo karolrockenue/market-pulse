@@ -199,15 +199,19 @@
                     </svg>
                   </button>
                 </div>
-                <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" style="display: none">
-                  <div class="py-1">
-                    <a href="#" @click.prevent="preset = 'last-week'; handlePresetChange('last-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-week', 'hover:bg-gray-200': preset !== 'last-week' }">Last Week</a>
-                    <a href="#" @click.prevent="preset = 'current-week'; handlePresetChange('current-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-week', 'hover:bg-gray-200': preset !== 'current-week' }">Current Week</a>
-                    <a href="#" @click.prevent="preset = 'current-month'; handlePresetChange('current-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-month', 'hover:bg-gray-200': preset !== 'current-month' }">Current Month</a>
-                    <a href="#" @click.prevent="preset = 'next-month'; handlePresetChange('next-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'next-month', 'hover:bg-gray-200': preset !== 'next-month' }">Next Month</a>
-                    <a href="#" @click.prevent="preset = 'this-year'; handlePresetChange('this-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'this-year', 'hover:bg-gray-200': preset !== 'this-year' }">This Year</a>
-                  </div>
-                </div>
+       <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" style="display: none">
+  <div class="py-1">
+    <a href="#" @click.prevent="preset = 'last-week'; handlePresetChange('last-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-week', 'hover:bg-gray-200': preset !== 'last-week' }">Last Week</a>
+    <a href="#" @click.prevent="preset = 'current-week'; handlePresetChange('current-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-week', 'hover:bg-gray-200': preset !== 'current-week' }">Current Week</a>
+    <div class="border-t border-gray-200 my-1"></div>
+    <a href="#" @click.prevent="preset = 'current-month'; handlePresetChange('current-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-month', 'hover:bg-gray-200': preset !== 'current-month' }">Current Month</a>
+    <a href="#" @click.prevent="preset = 'next-month'; handlePresetChange('next-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'next-month', 'hover:bg-gray-200': preset !== 'next-month' }">Next Month</a>
+    <div class="border-t border-gray-200 my-1"></div>
+    <a href="#" @click.prevent="preset = 'year-to-date'; handlePresetChange('year-to-date'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'year-to-date', 'hover:bg-gray-200': preset !== 'year-to-date' }">Year-to-Date</a>
+    <a href="#" @click.prevent="preset = 'this-year'; handlePresetChange('this-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'this-year', 'hover:bg-gray-200': preset !== 'this-year' }">This Year</a>
+    <a href="#" @click.prevent="preset = 'last-year'; handlePresetChange('last-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-year', 'hover:bg-gray-200': preset !== 'last-year' }">Last Year</a>
+  </div>
+</div>
               </div>
             </div>
           </div>

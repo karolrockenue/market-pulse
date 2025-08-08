@@ -22,8 +22,6 @@ function getSelectedColumns() {
 // public/app/reports.js
 
 function handlePresetChange(preset) {
-  // --- START DEBUGGING BLOCK ---
-
   const localToday = new Date();
 
   const year = localToday.getFullYear();
@@ -33,7 +31,7 @@ function handlePresetChange(preset) {
   const today = new Date(Date.UTC(year, month, day));
 
   let startDate, endDate;
-  const dayOfWeek = today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1; // Monday is 0
+  const dayOfWeek = today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1;
 
   if (preset === "current-week") {
     startDate = new Date(today);
@@ -62,15 +60,21 @@ function handlePresetChange(preset) {
   } else if (preset === "this-year") {
     startDate = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
     endDate = new Date(Date.UTC(today.getUTCFullYear(), 11, 31));
+  } else if (preset === "year-to-date") {
+    // --- NEW: Logic for Year-to-Date ---
+    startDate = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+    endDate = today; // Uses today's date as the end date
+  } else if (preset === "last-year") {
+    // --- NEW: Logic for the previous full year ---
+    const lastYear = today.getUTCFullYear() - 1;
+    startDate = new Date(Date.UTC(lastYear, 0, 1));
+    endDate = new Date(Date.UTC(lastYear, 11, 31));
   } else {
-    return; // No valid preset
+    return;
   }
 
-  // This function's only job is to set the date inputs.
   document.getElementById("start-date").value = formatDateForInput(startDate);
   document.getElementById("end-date").value = formatDateForInput(endDate);
-
-  // --- END DEBUGGING BLOCK ---
 }
 
 async function handleGenerateReport(component, propertyId) {
