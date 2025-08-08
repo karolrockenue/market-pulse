@@ -114,8 +114,8 @@ const mainChartManager = {
             type: chartType,
             smooth: true,
             symbol: "none",
-            lineStyle: { color: "#1f2937", width: 2 },
-            itemStyle: { color: "#1f2937", borderRadius: [4, 4, 0, 0] },
+            lineStyle: { color: "#71C0BB", width: 2 },
+            itemStyle: { color: "#71C0BB", borderRadius: [4, 4, 0, 0] },
             barWidth: "25%",
             data: data.metrics.map((d) => d.your[data.activeMetric]),
           },
@@ -157,7 +157,7 @@ const revparChartManager = {
         datasets: [
           {
             data: [0, 0],
-            backgroundColor: ["#457066", "#df595a"],
+            backgroundColor: ["#71C0BB", "#d1d5db"],
             borderRadius: 4,
             barThickness: 12,
           },
@@ -387,7 +387,7 @@ export default function () {
           formatDateLabel: this.formatDateLabel,
         });
         revparChartManager.update(this.kpi.revpar, this.currencyCode);
-        this.fetchSummary();
+        //   this.fetchSummary();
       } catch (error) {
         this.showError(error.message);
         this.allMetrics = [];
@@ -500,6 +500,14 @@ export default function () {
         ),
       ]);
     },
+
+    // --- FUNCTION ADDED BACK ---
+    // This function was missing. It updates the granularity and re-runs the report.
+    setGranularity(newGranularity) {
+      this.granularity = newGranularity;
+      this.runReport();
+    },
+
     // **MODIFIED**: Make setPreset async so we can await it.
     async setPreset(preset) {
       this.activePreset = preset;

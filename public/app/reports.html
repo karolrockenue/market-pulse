@@ -123,7 +123,7 @@
       }
     </style>
   </head>
-<body class="antialiased bg-[#222831] p-[10px] pl-0">
+<body class="antialiased bg-[#332D56] p-[10px] pl-0">
 <div class="flex flex-col lg:flex-row min-h-screen" x-data="reportsPage">
 <div id="sidebar-placeholder" class="sticky top-0 h-screen"></div>
 
@@ -170,13 +170,13 @@
                 />
               </div>
             </div>
-        <div class="flex items-center gap-x-2 border-t border-dashed pt-4 mt-2">
+   <div class="flex items-center gap-x-2 border-t border-dashed pt-4 mt-2">
               <div x-data="{ open: false }" class="relative inline-block text-left">
                 <div>
-                  <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 rounded-full bg-white border border-dashed border-gray-300 font-light text-[15px] shadow-sm hover:bg-gray-50" style="padding: 4px 10px 4px 15px">
-                    <span class="text-[#0b131c]">Display:</span>
-                    <span class="text-[#0b131c]" x-text="granularity.charAt(0).toUpperCase() + granularity.slice(1)"></span>
-                    <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                  <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90" style="padding: 5px 8px 5px 12px;">
+                    <span>Display:</span>
+                    <span class="ml-1" x-text="granularity.charAt(0).toUpperCase() + granularity.slice(1)"></span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                     </svg>
                   </button>
@@ -191,10 +191,10 @@
               </div>
               <div x-data="{ open: false }" class="relative inline-block text-left">
                 <div>
-                  <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 rounded-full bg-white border border-dashed border-gray-300 font-light text-[15px] text-[#0b131c] shadow-sm hover:bg-gray-50" style="padding: 4px 10px 4px 15px">
-                    <span class="text-[#0b131c]">Presets:</span>
-                    <span class="text-[#0b131c]" x-text="preset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())"></span>
-                    <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                  <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90" style="padding: 5px 8px 5px 12px;">
+                    <span>Presets:</span>
+                    <span class="ml-1" x-text="preset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())"></span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                     </svg>
                   </button>
@@ -218,7 +218,7 @@
           >
             <details open>
               <summary class="flex justify-between items-center cursor-pointer">
-                <h2 class="text-lg font-semibold text-gray-900">
+                <h2 class="text-lg font-semibold text-[#2D3D57]">
                   Report Options
                 </h2>
                 <svg

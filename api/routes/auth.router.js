@@ -72,11 +72,6 @@ router.post("/login", async (req, res) => {
 // api/routes/auth.router.js
 
 router.get("/magic-link-callback", async (req, res) => {
-  // --- BREADCRUMB 1: LOG THE START OF THE CALLBACK ---
-  console.log(
-    `[BREADCRUMB 1 - auth.router.js] Magic link callback started. Token: ${req.query.token}`
-  );
-
   const { token } = req.query;
   if (!token) {
     return res.status(400).send("Invalid or missing login token.");
@@ -85,11 +80,6 @@ router.get("/magic-link-callback", async (req, res) => {
     const tokenResult = await pgPool.query(
       "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW() AND used_at IS NULL",
       [token]
-    );
-
-    // --- BREADCRUMB 2: LOG THE TOKEN VALIDATION RESULT ---
-    console.log(
-      `[BREADCRUMB 2 - auth.router.js] Token validation query found ${tokenResult.rows.length} rows.`
     );
 
     if (tokenResult.rows.length === 0) {
@@ -111,19 +101,9 @@ router.get("/magic-link-callback", async (req, res) => {
     }
     const user = userResult.rows[0];
 
-    // --- BREADCRUMB 3: LOG THE USER FOUND ---
-    console.log(
-      `[BREADCRUMB 3 - auth.router.js] Found user: ${user.email}, Role: ${user.role}`
-    );
-
     await pgPool.query(
       "UPDATE magic_login_tokens SET used_at = NOW() WHERE token = $1",
       [loginToken.token]
-    );
-
-    // --- BREADCRUMB 4: LOG BEFORE SESSION REGENERATION ---
-    console.log(
-      `[BREADCRUMB 4 - auth.router.js] About to regenerate session for user ${user.cloudbeds_user_id}.`
     );
 
     req.session.regenerate((err) => {
@@ -134,12 +114,6 @@ router.get("/magic-link-callback", async (req, res) => {
 
       req.session.userId = user.cloudbeds_user_id;
       req.session.role = user.role;
-
-      // --- BREADCRUMB 5: LOG THE NEWLY CREATED SESSION OBJECT ---
-      console.log(
-        `[BREADCRUMB 5 - auth.router.js] Session regenerated. New session content:`,
-        req.session
-      );
 
       // api/routes/auth.router.js
 
@@ -154,9 +128,6 @@ router.get("/magic-link-callback", async (req, res) => {
         // --- THE FIX: Proactively clear the HOST-ONLY cookie by NOT specifying a domain. ---
         res.clearCookie("connect.sid", { path: "/" });
 
-        console.log(
-          `[BREADCRUMB 6 - auth.router.js] Session saved. Sending client-side redirect page.`
-        );
         res.status(200).send(`
                     <!DOCTYPE html>
                     <html>
@@ -261,18 +232,7 @@ router.get("/accept-invitation", async (req, res) => {
 // api/routes/auth.router.js
 
 router.get("/session-info", async (req, res) => {
-  // --- BREADCRUMB 8: LOG THE START OF THE SESSION-INFO REQUEST ---
-  console.log("[BREADCRUMB 8 - auth.router.js] /session-info endpoint hit.");
-  console.log(
-    "[BREADCRUMB 8a - auth.router.js] Full session object on request:",
-    req.session
-  );
-
   if (req.session && req.session.userId) {
-    // --- BREADCRUMB 8b: LOG THAT A VALID SESSION WAS FOUND ---
-    console.log(
-      `[BREADCRUMB 8b - auth.router.js] Valid session found for userId: ${req.session.userId}. Fetching user details.`
-    );
     try {
       const userResult = await pgPool.query(
         "SELECT first_name, last_name, role FROM users WHERE cloudbeds_user_id = $1",
@@ -294,11 +254,6 @@ router.get("/session-info", async (req, res) => {
         lastName: user.last_name,
       };
 
-      // --- BREADCRUMB 8c: LOG THE RESPONSE BEING SENT TO THE FRONTEND ---
-      console.log(
-        "[BREADCRUMB 8c - auth.router.js] Sending session-info payload to frontend:",
-        responsePayload
-      );
       res.json(responsePayload);
     } catch (error) {
       console.error(
@@ -346,7 +301,7 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 
 router.get("/cloudbeds/callback", async (req, res) => {
   // BREADCRUMB 1: Log that the callback has been initiated.
-  console.log("[BREADCRUMB 1] OAuth callback started.");
+
   const { code } = req.query;
   if (!code) {
     console.error("[BREADCRUMB FAIL] No authorization code provided.");
@@ -378,12 +333,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
     );
     const tokenResponse = await tokenRes.json();
 
-    // BREADCRUMB 2: Log the entire token response from Cloudbeds. This is the most critical log.
-    console.log(
-      "[BREADCRUMB 2] Full token response from Cloudbeds:",
-      JSON.stringify(tokenResponse, null, 2)
-    );
-
     if (!tokenResponse.access_token) {
       console.error("[BREADCRUMB FAIL] Token exchange failed.");
       throw new Error(
@@ -400,11 +349,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
     );
     const cloudbedsUser = await userInfoRes.json();
-    // BREADCRUMB 3: Log the user info we received.
-    console.log(
-      "[BREADCRUMB 3] User info response:",
-      JSON.stringify(cloudbedsUser, null, 2)
-    );
 
     // This is the key logic we are testing. We need to see if this array is populated.
     // /api/routes/auth.router.js
@@ -419,11 +363,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
         property_id: r.id,
       }));
 
-    // BREADCRUMB 4: Log the results of our property parsing logic.
-    console.log(
-      "[BREADCRUMB 4] Parsed userProperties array:",
-      JSON.stringify(userProperties, null, 2)
-    );
     if (userProperties.length === 0) {
       console.warn(
         "[BREADCRUMB WARN] No properties found in tokenResponse.resources. The hotel sync loop will be skipped."
@@ -433,8 +372,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
     // Step 3: Perform all database operations in a single transaction
     const client = await pgPool.connect();
     try {
-      // BREADCRUMB 5: Announce that we are starting the database transaction.
-      console.log("[BREADCRUMB 5] Starting database transaction.");
       await client.query("BEGIN");
 
       // Upsert the user (create if not exist, update if exist)
@@ -455,9 +392,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
         cloudbedsUser.last_name,
       ]);
       const userRole = userResult.rows[0].role;
-      console.log(
-        `[BREADCRUMB 6] User ${cloudbedsUser.email} upserted successfully.`
-      );
 
       const pmsCredentials = {
         access_token,
@@ -467,16 +401,10 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       // Sync hotel details and link properties to the user
       for (const property of userProperties) {
-        console.log(
-          `[BREADCRUMB 7] LOOP START: Syncing property ID: ${property.property_id}`
-        );
         await cloudbedsAdapter.syncHotelDetailsToDb(
           access_token,
           property.property_id,
           client
-        );
-        console.log(
-          `[BREADCRUMB 8] LOOP: syncHotelDetailsToDb completed for ${property.property_id}.`
         );
 
         const linkQuery = `
@@ -491,15 +419,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
           property.property_id,
           pmsCredentials,
         ]);
-        console.log(
-          `[BREADCRUMB 9] LOOP END: User linked to property ${property.property_id}.`
-        );
       }
 
       await client.query("COMMIT");
-      console.log(
-        "[BREADCRUMB 10] Database transaction committed successfully."
-      );
 
       // Step 4: Handle session and redirect AFTER the database transaction is safely committed
       req.session.userId = cloudbedsUser.user_id;
@@ -518,9 +440,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
             );
         }
 
-        console.log(
-          "[BREADCRUMB 11] Session saved. Triggering initial sync and redirecting user."
-        );
         const primaryPropertyId = userProperties[0]?.property_id;
         if (primaryPropertyId) {
           const syncUrl =

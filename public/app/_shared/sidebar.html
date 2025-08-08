@@ -1,5 +1,5 @@
 <aside
-  class="w-72 min-w-72 lg:flex-shrink-0 flex flex-col bg-[#222831] text-white font-medium border-r border-[#2c333a] h-full"
+  class="w-72 min-w-72 lg:flex-shrink-0 flex flex-col bg-[#332D56] text-white font-medium border-r border-[#2c333a] h-full"
   x-data="sidebar"
   x-cloak
 >
@@ -52,8 +52,8 @@
       href="/app/"
       class="flex items-center w-full px-[10px] py-3 text-base rounded-lg transition-colors duration-200"
       :class="{
-        'bg-[#393E46] text-white font-semibold': window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'),
-        'text-[#555e61] hover:bg-[#393E46] hover:text-white font-medium': !(window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'))
+        'bg-[#4E6688] text-white font-semibold': window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'),
+        'text-[#555e61] hover:bg-[#4E6688] hover:text-white font-medium': !(window.location.pathname.endsWith('/app/') || window.location.pathname.endsWith('index.html'))
       }"
     >
       <svg
@@ -76,8 +76,8 @@
       href="/app/reports.html"
       class="flex items-center w-full px-[10px] py-3 text-base rounded-lg transition-colors duration-200"
       :class="{
-        'bg-[#393E46] text-white font-semibold': window.location.pathname.endsWith('reports.html'),
-        'text-[#555e61] hover:bg-[#393E46] hover:text-white font-medium': !window.location.pathname.endsWith('reports.html')
+        'bg-[#4E6688] text-white font-semibold': window.location.pathname.endsWith('reports.html'),
+        'text-[#555e61] hover:bg-[#4E6688] hover:text-white font-medium': !window.location.pathname.endsWith('reports.html')
       }"
     >
       <svg
@@ -104,8 +104,8 @@
       href="/app/settings.html"
       class="flex items-center w-full px-[10px] py-3 text-base rounded-lg transition-colors duration-200"
       :class="{
-        'bg-[#393E46] text-white font-semibold': window.location.pathname.endsWith('settings.html'),
-        'text-[#555e61] hover:bg-[#393E46] hover:text-white font-medium': !window.location.pathname.endsWith('settings.html')
+        'bg-[#4E6688] text-white font-semibold': window.location.pathname.endsWith('settings.html'),
+        'text-[#555e61] hover:bg-[#4E6688] hover:text-white font-medium': !window.location.pathname.endsWith('settings.html')
       }"
     >
       <svg
@@ -136,7 +136,7 @@
       class="flex items-center w-full px-[10px] py-3 text-base rounded-lg transition-colors duration-200"
       x-show="isAdmin"
       style="display: none"
-      :class="{ 'bg-[#393E46] text-white font-semibold': window.location.pathname.startsWith('/admin'), 'text-[#555e61] hover:bg-[#393E46] hover:text-white font-medium': !window.location.pathname.startsWith('/admin') }"
+      :class="{ 'bg-[#4E6688] text-white font-semibold': window.location.pathname.startsWith('/admin'), 'text-[#555e61] hover:bg-[#4E6688] hover:text-white font-medium': !window.location.pathname.startsWith('/admin') }"
     >
       <svg
         class="h-5 w-5 mr-3"

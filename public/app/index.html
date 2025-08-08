@@ -130,9 +130,10 @@
         display: none !important;
       }
     </style>
+  
   </head>
 <body
-    class="antialiased bg-[#222831] p-[10px] pl-0"
+    class="antialiased bg-[#332D56] p-[10px] pl-0"
     x-data="dashboard"
     x-cloak
     x-init="window.alpineInstance = this"
@@ -163,8 +164,8 @@
                 class="p-4 md:p-8 flex flex-col border-b border-gray-200"
                 style="min-height: 220px"
               >
-                <div class="flex justify-between items-center">
-                  <h2 class="text-4xl font-bold text-[#13191d]">
+            <div class="flex justify-between items-center">
+                  <h2 class="text-4xl font-bold text-[#2D3D57]">
                     You vs The Market
                   </h2>
                   <div class="flex items-center gap-x-2">
@@ -180,18 +181,18 @@
                       class="text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 focus:border-blue-500"
                       x-model="dates.end"
                       @change="activePreset = ''"
-                    />
+                   />
              <button
   @click="runReport()"
   type="button"
-  class="inline-flex justify-center items-center rounded-lg bg-[#3E4A5C] text-white font-semibold text-sm shadow-sm hover:opacity-90 px-5 py-2"
+  class="inline-flex justify-center items-center rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90 px-5 py-2"
 >
   Run
 </button>
                   </div>
                 </div>
                 <div class="flex-1"></div>
-             <div class="flex items-center gap-x-2">
+             <div id="dashboard-controls" class="flex items-center gap-x-2">
   <div
     x-data="{ open: false }"
     class="relative inline-block text-left"
@@ -200,16 +201,16 @@
       <button
         @click="open = !open"
         type="button"
-        class="inline-flex justify-center items-center gap-x-1 rounded-lg bg-[#3E4A5C] text-white font-semibold shadow-sm hover:opacity-90"
+        class="inline-flex justify-center items-center gap-x-1 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold shadow-sm hover:opacity-90"
         style="padding: 5px 8px 5px 12px; font-size: 13px"
       >
-        <span class="text-gray-400">Display:</span>
+        <span>Display:</span>
         <span
-          class="text-white ml-1"
+          class="ml-1"
           x-text="granularity.charAt(0).toUpperCase() + granularity.slice(1)"
         ></span>
         <svg
-          class="h-5 w-5 text-white"
+          class="h-5 w-5"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -245,14 +246,14 @@
         type="button"
         class="inline-flex justify-center items-center gap-x-1.5 shadow-sm hover:opacity-90"
         :class="{
-            'rounded-lg bg-[#3E4A5C] text-white font-semibold': activePreset,
-            'rounded-full bg-white border border-dashed border-gray-300 font-light text-[#081420]': !activePreset
+            'rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold': activePreset,
+            'rounded-full bg-white border border-dashed border-gray-300 font-light text-[#332D56]': !activePreset
         }"
         :style="activePreset ? 'padding: 5px 8px 5px 12px; font-size: 13px' : 'padding: 4px 10px 4px 15px;'"
       >
-        <span :class="{'text-gray-400': activePreset, 'text-[#081420]': !activePreset}">Presets:</span>
-        <span :class="{'ml-1 text-white': activePreset, 'text-[#081420]': !activePreset}" x-text="activePreset ? activePreset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''"></span>
-        <svg class="h-5 w-5" :class="{'text-white': activePreset, 'text-gray-400': !activePreset}" viewBox="0 0 20 20" fill="currentColor">
+        <span>Presets:</span>
+        <span class="ml-1" x-text="activePreset ? activePreset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''"></span>
+        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
         </svg>
       </button>
@@ -279,16 +280,16 @@
       <button
         @click="open = !open"
         type="button"
-        class="inline-flex justify-center items-center gap-x-1 rounded-lg bg-[#3E4A5C] text-white font-semibold shadow-sm hover:opacity-90"
+        class="inline-flex justify-center items-center gap-x-1 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold shadow-sm hover:opacity-90"
         style="padding: 5px 8px 5px 12px; font-size: 13px"
       >
-        <span class="text-gray-400">Comparison:</span>
+        <span>Comparison:</span>
         <span
-          class="text-white ml-1"
+          class="ml-1"
           x-text="activeMetric.toUpperCase()"
         ></span>
         <svg
-          class="h-5 w-5 text-white"
+          class="h-5 w-5"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -329,11 +330,11 @@
               <div class="p-4 md:p-8">
                 <div class="max-h-[75vh] overflow-y-auto">
                   <table class="w-full">
-                    <thead class="sticky top-0 bg-white">
+              <thead class="sticky top-0 bg-white">
                       <tr>
                         <th
                           colspan="4"
-                          class="pt-2 pb-5 px-2 text-left font-semibold uppercase text-base text-[#3e4046]"
+                          class="pt-2 pb-5 px-2 text-left font-semibold uppercase text-base text-[#2D3D57]"
                         >
                           <span
                             x-text="currentPropertyName.toUpperCase()"
@@ -341,7 +342,7 @@
                         </th>
                         <th
                           colspan="3"
-                          class="pt-2 pb-5 px-2 text-left font-semibold uppercase text-base text-[#3e4046]"
+                          class="pt-2 pb-5 px-2 text-left font-semibold uppercase text-base text-[#2D3D57]"
                         >
                           THE MARKET
                         </th>
@@ -460,7 +461,7 @@
               >
                 <div
                   class="h-full w-full rounded-xl flex items-center justify-center text-center p-8 text-white"
-                  style="background-color: #5470c6"
+                  style="background-color: #fafafa"
                 >
                   <template x-if="isLoadingSummary">
                     <div class="flex flex-col items-center justify-center">
@@ -638,12 +639,12 @@
                 </div>
                <div class="mt-6 flex flex-col gap-y-3 text-slate-600 pl-4" style="font-size: 14px;">
                   <div class="flex items-center gap-x-2">
-                      <span class="w-3 h-3 rounded-sm" style="background-color: #457066;"></span>
+                      <span class="w-3 h-3 rounded-sm" style="background-color: #71C0BB;"></span>
                       <span class="font-semibold" x-text="currentPropertyName"></span>:
                       <span class="font-data font-semibold" x-text="kpi.revpar.your"></span>
                   </div>
                   <div class="flex items-center gap-x-2">
-                      <span class="w-3 h-3 rounded-sm" style="background-color: #df595a;"></span>
+                      <span class="w-3 h-3 rounded-sm" style="background-color: #d1d5db;"></span>
                       <span class="font-semibold">The Market</span>:
                       <span class="font-data font-semibold" x-text="kpi.revpar.market"></span>
                   </div>

@@ -913,3 +913,41 @@ Date: August 7, 2025
                * The existing POST /api/users/disconnect-property endpoint in /api/routes/users.router.js was updated. It now calls the new setAppDisabled function to notify Cloudbeds before removing the property link from the local database.
                * Error handling for the disconnection process was improved to gracefully handle cases where a property might be missing the necessary authentication tokens, ensuring the local disconnection can still proceed.
                * Outcome: The property disconnection feature is now fully compliant with certification standards. The system securely notifies Cloudbeds when a connection is terminated and is more resilient against potential data inconsistencies for legacy properties.
+Date: August 7, 2025
+               * Objective: Implement a full-stack property deletion feature, allowing authorized admins to completely remove a hotel and all its associated data from the system.
+               * Summary: This session addressed a critical flaw in the property disconnection logic. The feature was elevated from a simple user-link removal to a complete, transactional data deletion process. This involved adding role-based security to the API endpoint and expanding the database transaction to perform a cascading delete of all related records (metrics, comp sets, user links) before removing the master hotel record. This ensures data integrity and provides a secure method for administrators to fully remove a property from the application.
+               * Key Changes:
+               * Role-Based Security: The POST /api/users/disconnect-property endpoint in users.router.js was secured with the requireAccountOwner middleware, restricting this destructive action to owner and super_admin roles.
+               * Transactional Deletion: The database logic within the endpoint was completely overhauled. It now executes a multi-step, cascading delete within a single transaction:
+               1. Deletes all competitive set data from hotel_comp_sets.
+               2. Deletes all metric snapshots from daily_metrics_snapshots.
+               3. Deletes all property links from user_properties for all users.
+               4. Deletes the master record from the hotels table.
+               * API Notification: The existing call to cloudbedsAdapter.setAppDisabled was preserved, ensuring Cloudbeds is notified before the local data is deleted.
+               * Outcome: The property disconnection feature is now a robust and secure administrative tool. It correctly performs a full and safe deletion of a property and all its associated data from the database, preventing orphaned records and aligning the functionality with business requirements for permanent data removal.
+Date: August 8, 2025
+               * Objective: Resolve a persistent UX bug where the “Initial Sync” loading screen and spinner did not clear after a new property was connected via OAuth, even though the sync had completed and data was available.
+
+               * Summary: The spinner issue was traced to a premature clearing of the /api/sync-status polling interval when the sidebar emitted its property-changed event. This resulted in only a single sync-status check being made, leaving the UI in a perpetual “loading” state. Additional hardening was applied to ensure reliable detection of sync completion, even if backend status reporting lags.
+
+               * Key Changes:
+
+                  * Frontend – Polling Interval Fix (public/app/dashboard.mjs):
+
+                     * Updated handlePropertyChange to avoid clearing the syncStatusInterval if the dashboard is still in the isSyncing state during the first-connection workflow. This ensures /api/sync-status/:propertyId continues polling until the sync is confirmed complete.
+
+                        * Frontend – Cache Busting (public/app/dashboard.mjs):
+
+                           * Added a timestamp query parameter to /api/sync-status fetch calls to bypass any browser or CDN caching and guarantee fresh responses.
+
+                              * Frontend – Robust Completion Check (public/app/dashboard.mjs):
+
+                                 * Added a safety fallback in checkSyncStatus to immediately end the loading state if KPI summary data for the property is successfully fetched, covering scenarios where backend sync-status reporting lags or fails.
+
+                                    * Backend – No-Cache Headers (api/routes/dashboard.router.js):
+
+                                       * Updated /api/sync-status/:propertyId to send Cache-Control: no-store and related headers, preventing stale responses from any intermediary caches.
+
+                                          * Outcome: The initial connection experience is now fully reliable. The spinner and loading overlay clear automatically as soon as the initial sync finishes, without requiring the user to refresh or open a new tab. The fix also hardens the system against stale sync-status responses, ensuring new properties transition smoothly to a usable dashboard state.
+
+Ask ChatGPT

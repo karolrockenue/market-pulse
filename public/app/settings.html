@@ -22,7 +22,8 @@
         --text-secondary: #64748b;
         --border-color: #e2e8f0;
         --accent-primary: #3b82f6;
-        --button-primary-bg: #1e293b;
+        /* BUTTON BG COLOR UPDATED */
+        --button-primary-bg: #e3eeb2;
       }
       body {
         font-family: "Inter", sans-serif;
@@ -44,7 +45,8 @@
       }
       .control-btn.primary {
         background-color: var(--button-primary-bg);
-        color: white;
+        /* BUTTON TEXT COLOR UPDATED */
+        color: #332d56;
         font-weight: 500;
       }
       .control-btn.primary:hover {
@@ -60,7 +62,7 @@
       }
     </style>
   </head>
-  <body class="antialiased bg-[#222831] p-[10px] pl-0">
+  <body class="antialiased bg-[#332D56] p-[10px] pl-0">
     <div class="flex flex-col lg:flex-row min-h-screen" x-data="settingsPage">
       <div id="sidebar-placeholder" class="sticky top-0 h-screen"></div>
 
@@ -69,7 +71,7 @@
       >
         <main x-show="isInitialized" x-cloak class="flex-1 p-4 md:p-8 relative">
           <header class="mb-8">
-            <h1 class="text-3xl font-bold">Settings</h1>
+            <h1 class="text-3xl font-bold text-[#2D3D57]">Settings</h1>
             <p class="text-slate-500 mt-1">
               Manage your profile, team members, and property connections.
             </p>
@@ -77,7 +79,9 @@
 
           <div class="space-y-8">
             <section id="profile" class="card p-6">
-              <h2 class="text-lg font-semibold border-b border-slate-200 pb-4">
+              <h2
+                class="text-lg font-semibold border-b border-slate-200 pb-4 text-[#2D3D57]"
+              >
                 My Profile
               </h2>
               <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
