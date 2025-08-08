@@ -127,6 +127,15 @@ router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
 
+    // --- IMPORTANT: prevent any edge/proxy/browser caching of sync status.
+    // Stale 'false' here causes the spinner to never clear even though data exists.
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "Surrogate-Control": "no-store",
+    });
+
     // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
     if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
