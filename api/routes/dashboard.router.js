@@ -393,15 +393,24 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     };
     let totalRooms = 0;
     competitorDetails.forEach((hotel) => {
+      // Aggregate category counts
       if (hotel.category) {
         breakdown.categories[hotel.category] =
           (breakdown.categories[hotel.category] || 0) + 1;
       }
-      if (hotel.neighborhood) {
-        breakdown.neighborhoods[hotel.neighborhood] =
-          (breakdown.neighborhoods[hotel.neighborhood] || 0) + 1;
+
+      // --- NEW, MORE ROBUST CHECK FOR NEIGHBORHOODS ---
+      // 1. Use optional chaining (?.) to safely access the property.
+      // 2. Trim any whitespace from the beginning and end.
+      const neighborhood = hotel.neighborhood?.trim();
+
+      // 3. Only count the neighborhood if it's a valid, non-empty string.
+      if (neighborhood) {
+        breakdown.neighborhoods[neighborhood] =
+          (breakdown.neighborhoods[neighborhood] || 0) + 1;
       }
-      // Use the capacity_count from our corrected query.
+
+      // Sum up total rooms
       totalRooms += hotel.capacity_count || 0;
     });
     // --- CORRECTED QUERY LOGIC END ---

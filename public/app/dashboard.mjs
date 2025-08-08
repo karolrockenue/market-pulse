@@ -288,40 +288,62 @@ export default function () {
     },
 
     // --- NEW: Renders the visual breakdown bars ---
+    // --- Renders the visual breakdown bars and their legends ---
     renderBreakdownCharts() {
-      // A small color palette for our charts.
+      // A color palette for our charts.
       const colors = ["#4E6688", "#71C0BB", "#A3A5A7", "#2D3D57", "#E3EEB2"];
 
-      const render = (container, data) => {
-        // Clear any previous chart segments.
-        container.innerHTML = "";
-        const total = Object.values(data).reduce(
-          (sum, count) => sum + count,
-          0
-        );
-        if (total === 0) return;
+      const render = (barContainer, legendContainer, data) => {
+        // Clear any previous content.
+        barContainer.innerHTML = "";
+        legendContainer.innerHTML = "";
+
+        const entries = Object.entries(data);
+        const total = entries.reduce((sum, [, count]) => sum + count, 0);
+
+        if (total === 0) {
+          barContainer.innerHTML = `<div class="text-xs text-center text-gray-400 w-full">N/A</div>`;
+          return;
+        }
 
         let colorIndex = 0;
-        // Create a colored div for each item (e.g., each category or neighborhood).
-        for (const [name, count] of Object.entries(data)) {
+        for (const [name, count] of entries) {
+          const color = colors[colorIndex % colors.length];
+
+          // --- Part 1: Draw the colored bar segment ---
           const segment = document.createElement("div");
-          // The width is proportional to the item's percentage of the total.
           segment.style.width = `${(count / total) * 100}%`;
-          // Assign a color from our palette.
-          segment.style.backgroundColor = colors[colorIndex % colors.length];
-          // Add a tooltip to show the name and count on hover.
+          segment.style.backgroundColor = color;
           segment.title = `${name}: ${count} hotel(s)`;
-          container.appendChild(segment);
+          barContainer.appendChild(segment);
+
+          // --- Part 2: Create the corresponding legend item ---
+          const legendItem = document.createElement("div");
+          legendItem.className = "flex items-center";
+          // The legend contains a colored dot, the name, and the count.
+          legendItem.innerHTML = `
+                    <span class="w-2 h-2 rounded-full mr-2" style="background-color: ${color};"></span>
+                    <span class="text-xs text-gray-600">${name} (${count})</span>
+                `;
+          legendContainer.appendChild(legendItem);
+
           colorIndex++;
         }
       };
 
-      // Render both charts using the data from our 'market' state object.
-      render(this.$refs.categoryBreakdown, this.market.breakdown.categories);
-      render(
-        this.$refs.neighborhoodBreakdown,
-        this.market.breakdown.neighborhoods
-      );
+      // Render both charts, now passing the new legend containers.
+      if (this.$refs.categoryBreakdown && this.$refs.neighborhoodBreakdown) {
+        render(
+          this.$refs.categoryBreakdown,
+          this.$refs.categoryLegend,
+          this.market.breakdown.categories
+        );
+        render(
+          this.$refs.neighborhoodBreakdown,
+          this.$refs.neighborhoodLegend,
+          this.market.breakdown.neighborhoods
+        );
+      }
     },
 
     // --- STUCK SPINNER HARDENING ---
@@ -527,11 +549,16 @@ export default function () {
         return;
       }
       for (const metric of ["occupancy", "adr", "revpar"]) {
-        const yourValue = kpiData.yourHotel[metric] || 0;
-        const marketValue = kpiData.market[metric] || 0;
+        // --- FIX: Use parseFloat to convert string-based numbers from the API ---
+        // This ensures that all comparisons are numerical, not text-based.
+        const yourValue = parseFloat(kpiData.yourHotel[metric]) || 0;
+        const marketValue = parseFloat(kpiData.market[metric]) || 0;
+
         this.kpi[metric] = {
+          // The formatted values are for display only.
           your: formatValue(yourValue, metric, this.currencyCode),
           market: formatValue(marketValue, metric, this.currencyCode),
+          // The raw values (now guaranteed to be numbers) are used for all logic and comparisons.
           your_raw: yourValue,
           market_raw: marketValue,
         };
