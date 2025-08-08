@@ -321,9 +321,8 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     }
 
     let competitorIds;
-    let compsetSource = "Automatic Category Match"; // Default source
+    let compsetSource = "Automatic Category Match";
 
-    // Check for a manual comp set first
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
       [propertyId]
@@ -331,9 +330,8 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
 
     if (compSetResult.rows.length > 0) {
       competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
-      compsetSource = "Curated Comp Set"; // Update source if manual set is found
+      compsetSource = "Curated Comp Set";
     } else {
-      // Fallback to category-based comp set
       const categoryResult = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
         [propertyId]
@@ -363,39 +361,50 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
       });
     }
 
-    // --- NEW LOGIC START ---
-    // Fetch details for the breakdown card (category, neighborhood, room count) for all competitors
+    // --- CORRECTED QUERY LOGIC START ---
+    // This new query correctly gets the data for the breakdown card.
     const competitorDetailsQuery = `
-        SELECT category, neighborhood, capacity_count 
-        FROM hotels 
-        WHERE hotel_id = ANY($1::int[]);
+        WITH latest_snapshots AS (
+            -- This part first finds the MOST RECENT daily snapshot for each competitor hotel
+            -- to get its latest 'capacity_count' (total rooms).
+            SELECT DISTINCT ON (hotel_id) hotel_id, capacity_count
+            FROM daily_metrics_snapshots
+            WHERE hotel_id = ANY($1::int[])
+            ORDER BY hotel_id, stay_date DESC
+        )
+        -- Then, it joins that information back to the main 'hotels' table
+        -- to get the static info like category and neighborhood.
+        SELECT 
+            h.category, 
+            h.neighborhood, 
+            ls.capacity_count
+        FROM hotels h
+        LEFT JOIN latest_snapshots ls ON h.hotel_id = ls.hotel_id
+        WHERE h.hotel_id = ANY($1::int[]);
     `;
     const { rows: competitorDetails } = await pgPool.query(
       competitorDetailsQuery,
       [competitorIds]
     );
 
-    // Process the details into the required breakdown format
     const breakdown = {
       categories: {},
       neighborhoods: {},
     };
     let totalRooms = 0;
     competitorDetails.forEach((hotel) => {
-      // Aggregate category counts
       if (hotel.category) {
         breakdown.categories[hotel.category] =
           (breakdown.categories[hotel.category] || 0) + 1;
       }
-      // Aggregate neighborhood counts
       if (hotel.neighborhood) {
         breakdown.neighborhoods[hotel.neighborhood] =
           (breakdown.neighborhoods[hotel.neighborhood] || 0) + 1;
       }
-      // Sum up total rooms
+      // Use the capacity_count from our corrected query.
       totalRooms += hotel.capacity_count || 0;
     });
-    // --- NEW LOGIC END ---
+    // --- CORRECTED QUERY LOGIC END ---
 
     const period = getPeriod(granularity);
     const metricsQuery = `
@@ -413,9 +422,7 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     res.json({
       metrics: result.rows,
       competitorCount: competitorIds.length,
-      // We now get totalRooms from our new query, which is more accurate
       totalRooms: totalRooms,
-      // Add the new breakdown data and source to the response
       breakdown: breakdown,
       source: compsetSource,
     });
