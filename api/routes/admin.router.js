@@ -89,8 +89,9 @@ router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
 // New endpoint to fetch all scheduled reports for the admin panel dropdown.
 router.get("/get-scheduled-reports", requireAdminApi, async (req, res) => {
   try {
-    // This query joins with the hotels table to get the property name,
-    // which makes the dropdown list much more user-friendly.
+    // FIX: This query is now more robust. It includes a WHERE clause
+    // to ensure we only process rows where 'property_id' is a valid number,
+    // preventing the ::integer cast from failing on bad data.
     const query = `
         SELECT 
             sr.report_id, 
@@ -98,6 +99,7 @@ router.get("/get-scheduled-reports", requireAdminApi, async (req, res) => {
             h.property_name
         FROM scheduled_reports sr
         JOIN hotels h ON sr.property_id::integer = h.hotel_id
+        WHERE sr.property_id ~ '^[0-9]+$'
         ORDER BY h.property_name, sr.report_name;
     `;
     const { rows } = await pgPool.query(query);
