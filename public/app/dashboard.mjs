@@ -277,19 +277,23 @@ export default function () {
         return;
       }
       try {
-        // Add a cache-busting query param to avoid any stale edge/proxy responses.
+        // 1) add cache-buster to avoid any stale responses
         const response = await fetch(
           `/api/sync-status/${propertyId}?t=${Date.now()}`
         );
-
         const data = await response.json();
 
         if (data.isSyncComplete) {
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
+
+          // 2) ensure the dashboard has a propertyId before loading data
+          // (sidebar may not have emitted the property-changed event yet)
+          if (!this.currentPropertyId) this.currentPropertyId = propertyId;
+
+          // clean URL (remove ?newConnection & ?propertyId)
           history.pushState({}, "", window.location.pathname);
 
-          // **THE FIX**: We now explicitly `await` for the report data to load
-          // before we set `isSyncing` to false. This prevents the race condition.
+          // load initial report fully before hiding spinner
           await this.setPreset("current-month");
 
           this.isSyncing = false;
