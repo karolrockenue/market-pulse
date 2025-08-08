@@ -505,19 +505,20 @@ const setupApiExplorer = (ui) => {
 function initializeAdminPanel() {
   const ui = {
     lastRefreshTimeEl: document.getElementById("last-refresh-time"),
-    propertySelector: document.getElementById("admin-property-selector"), // <-- Add this line
+    propertySelector: document.getElementById("admin-property-selector"),
 
     testCloudbedsBtn: document.getElementById("test-cloudbeds-btn"),
     cloudbedsStatusEl: document.getElementById("cloudbeds-status"),
     testDbBtn: document.getElementById("test-db-btn"),
     dbStatusEl: document.getElementById("db-status"),
     runDailyRefreshBtn: document.getElementById("run-daily-refresh-btn"),
-    runScheduledReportsBtn: document.getElementById(
-      "run-scheduled-reports-btn"
+    // NEW: Add references for the new report trigger UI
+    reportSelectDropdown: document.getElementById("report-select-dropdown"),
+    sendSingleReportBtn: document.getElementById("send-single-report-btn"),
+    singleReportStatusMessage: document.getElementById(
+      "single-report-status-message"
     ),
-    reportsJobStatusEl: document.getElementById("reports-job-status-message"),
     hotelsTableBody: document.getElementById("hotels-table-body"),
-
     initialSyncStatus: document.getElementById("initial-sync-status"),
     apiResultsContainer: document.getElementById("api-results-container"),
     compsetModal: document.getElementById("compset-modal"),
@@ -539,7 +540,6 @@ function initializeAdminPanel() {
     datasetIdInput: document.getElementById("dataset-id-input"),
     fetchStructureBtn: document.getElementById("fetch-structure-btn"),
     fetchInsightsDataBtn: document.getElementById("fetch-insights-data-btn"),
-    insightsColumnsInput: document.getElementById("insights-columns-input"), // This will be removed by the next step, but let's keep it for now.
     insightsStartDate: document.getElementById("insights-start-date"),
     insightsEndDate: document.getElementById("insights-end-date"),
     insightsMetricsContainer: document.getElementById(
@@ -547,13 +547,10 @@ function initializeAdminPanel() {
     ),
     insightsDimensionsSelect: document.getElementById(
       "insights-dimensions-select"
-    ), // <
-    insightsDimensionsSelect: document.getElementById(
-      "insights-dimensions-select"
     ),
-    insightsStep1: document.getElementById("insights-step-1"), // <-- Add this
-    insightsStep2: document.getElementById("insights-step-2"), // <-- Add this
-    insightsStep3: document.getElementById("insights-step-3"), // <-- Add this
+    insightsStep1: document.getElementById("insights-step-1"),
+    insightsStep2: document.getElementById("insights-step-2"),
+    insightsStep3: document.getElementById("insights-step-3"),
   };
   const state = { currentEditingHotelId: null };
 
@@ -618,44 +615,92 @@ function initializeAdminPanel() {
     runJob(ui, "daily-refresh", null, ui.runDailyRefreshBtn)
   );
   // Event listener for the new "Send Scheduled Reports" button.
-  ui.runScheduledReportsBtn.addEventListener("click", async () => {
-    const btn = ui.runScheduledReportsBtn;
-    const statusEl = ui.reportsJobStatusEl;
+  // --- New Scheduled Report Trigger Logic ---
 
-    // Disable the button and provide immediate feedback to the user.
-    btn.disabled = true;
-    btn.textContent = "Sending...";
-    statusEl.textContent = "Job started, preparing emails...";
-    statusEl.className = "text-sm font-medium text-slate-500";
-
+  // This function fetches reports from our new API endpoint and populates the dropdown.
+  const populateReportsDropdown = async () => {
     try {
-      // Call the new API endpoint we created in Step 1.
-      const response = await fetch("/api/admin/run-scheduled-reports");
-      const data = await response.json();
+      const response = await fetch("/api/admin/get-scheduled-reports");
+      if (!response.ok) throw new Error("Server error fetching reports.");
+      const reports = await response.json();
 
-      if (!response.ok) {
-        // If the server responded with an error, throw it to be handled by the catch block.
-        throw new Error(data.error || "An unknown error occurred.");
+      // Clear the "loading..." text
+      ui.reportSelectDropdown.innerHTML = "";
+
+      if (reports.length === 0) {
+        ui.reportSelectDropdown.innerHTML =
+          '<option value="">No reports found</option>';
+        ui.sendSingleReportBtn.disabled = true; // Disable button if no reports
+        return;
       }
 
-      // If successful, display the success message from the API response.
-      statusEl.textContent = `✅ ${data.message}`;
-      statusEl.className = "text-sm font-medium text-green-600";
-    } catch (error) {
-      // If any error occurs, display the error message.
-      statusEl.textContent = `❌ Error: ${error.message}`;
-      statusEl.className = "text-sm font-medium text-red-600";
-    } finally {
-      // After everything is done, re-enable the button.
-      btn.disabled = false;
-      btn.textContent = "Send Scheduled Reports Now";
+      // Add a default, non-selectable option
+      ui.reportSelectDropdown.innerHTML =
+        '<option value="">-- Select a report to send --</option>';
 
-      // Clear the status message after 8 seconds to keep the UI clean.
+      // Create and append an <option> for each report
+      reports.forEach((report) => {
+        const option = document.createElement("option");
+        option.value = report.report_id;
+        // Format the text to be descriptive, e.g., "The Jade Hotel - Weekly"
+        option.textContent = `${report.property_name} - ${report.report_name}`;
+        ui.reportSelectDropdown.appendChild(option);
+      });
+    } catch (error) {
+      console.error("Failed to populate reports dropdown:", error);
+      ui.reportSelectDropdown.innerHTML =
+        '<option value="">Error loading reports</option>';
+    }
+  };
+
+  // Event listener for the "Send Now" button.
+  ui.sendSingleReportBtn.addEventListener("click", async () => {
+    const reportId = ui.reportSelectDropdown.value;
+    const btn = ui.sendSingleReportBtn;
+    const statusEl = ui.singleReportStatusMessage;
+
+    // First, validate that a report has been selected.
+    if (!reportId) {
+      statusEl.textContent = "Please select a report first.";
+      statusEl.className = "text-sm font-medium text-yellow-600 h-4 block";
+      return;
+    }
+
+    // Standard UI feedback: disable button, show status message.
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    statusEl.textContent = "Sending report...";
+    statusEl.className = "text-sm font-medium text-slate-500 h-4 block";
+
+    try {
+      // Call our new POST endpoint with the selected reportId in the body.
+      const response = await fetch("/api/admin/run-scheduled-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unknown error.");
+
+      // Display success message from the server.
+      statusEl.textContent = `✅ ${data.message}`;
+      statusEl.className = "text-sm font-medium text-green-600 h-4 block";
+    } catch (error) {
+      // Display error message.
+      statusEl.textContent = `❌ Error: ${error.message}`;
+      statusEl.className = "text-sm font-medium text-red-600 h-4 block";
+    } finally {
+      // Re-enable the button and clear the message after a delay.
+      btn.disabled = false;
+      btn.textContent = "Send Now";
       setTimeout(() => {
         statusEl.textContent = "";
       }, 8000);
     }
   });
+
+  // Call the function to populate the dropdown when the admin panel loads.
+  populateReportsDropdown();
 
   setupApiExplorer(ui);
   // --- Initial Page Load Calls ---
