@@ -982,3 +982,11 @@ Date: August 8, 2025
                                              * The /api/generate-summary backend endpoint and its OpenAI dependency were removed from dashboard.router.js.
                                              * The openai npm package was uninstalled, and the corresponding OPENAI_API_KEY was removed from the environment configuration.
                                              * Outcome: The database is now cleaner and free of legacy test data. The dashboard UI has been simplified, and the application's codebase and dependencies have been reduced by removing the unused AI feature, improving maintainability.
+
+
+Date: August 8, 2025
+                                             * Objective: To resolve a critical production bug preventing the scheduled reports cron job from running and to build a manual trigger in the Admin Panel for on-demand testing.
+                                             * Key Changes:
+                                             * Cron Job Bug Fix: A fatal database error (column h.hotel_name does not exist) in the /api/send-scheduled-reports.js script was resolved. The failing SQL query was corrected to use the standard h.property_name column, restoring the core functionality of the report generation job.
+                                             * Manual Trigger Implementation: A new, secure API endpoint, GET /api/admin/run-scheduled-reports, was created in admin.router.js. A corresponding "Send Scheduled Reports Now" button was added to the Admin Panel UI (index.html) and wired up in admin.mjs, allowing administrators to run the job on-demand for the first time.
+                                             * Outcome: The scheduled reports feature is now stable and functional, and the new manual trigger is not yet tested. It needs to be edited so that it forces all scheduled reports to go out regardless of when they were scheduled for

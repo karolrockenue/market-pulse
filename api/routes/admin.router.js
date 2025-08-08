@@ -85,6 +85,31 @@ router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch hotels." });
   }
 });
+
+// New endpoint to fetch all scheduled reports for the admin panel dropdown.
+router.get("/get-scheduled-reports", requireAdminApi, async (req, res) => {
+  try {
+    // This query joins with the hotels table to get the property name,
+    // which makes the dropdown list much more user-friendly.
+    const query = `
+        SELECT 
+            sr.report_id, 
+            sr.report_name,
+            h.property_name
+        FROM scheduled_reports sr
+        JOIN hotels h ON sr.property_id::integer = h.hotel_id
+        ORDER BY h.property_name, sr.report_name;
+    `;
+    const { rows } = await pgPool.query(query);
+    res.json(rows);
+  } catch (error) {
+    // Standard error handling if the database query fails.
+    console.error("Error fetching scheduled reports for admin panel:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch scheduled reports from the database." });
+  }
+});
 router.get("/test-database", requireAdminApi, async (req, res) => {
   try {
     const client = await pgPool.connect();
@@ -155,8 +180,13 @@ router.post("/initial-sync", requireAdminApi, async (req, res) => {
 });
 // NEW: Route to manually trigger the scheduled reports job
 router.get("/run-scheduled-reports", requireAdminApi, async (req, res) => {
-  // This log helps confirm in the Vercel console that the trigger was initiated.
-  console.log("Admin panel manually triggering scheduled reports job...");
+  console.log(
+    "Admin panel manually triggering scheduled reports job (force mode)..."
+  );
+
+  // Add a flag to the request object to signal a manual override.
+  // The scheduled reports script will use this flag to bypass its normal time check.
+  req.isManualTrigger = true;
 
   // We call the handler from send-scheduled-reports.js directly,
   // passing along the request and response objects.
