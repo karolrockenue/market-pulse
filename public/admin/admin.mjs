@@ -512,6 +512,10 @@ function initializeAdminPanel() {
     testDbBtn: document.getElementById("test-db-btn"),
     dbStatusEl: document.getElementById("db-status"),
     runDailyRefreshBtn: document.getElementById("run-daily-refresh-btn"),
+    runScheduledReportsBtn: document.getElementById(
+      "run-scheduled-reports-btn"
+    ),
+    reportsJobStatusEl: document.getElementById("reports-job-status-message"),
     hotelsTableBody: document.getElementById("hotels-table-body"),
 
     initialSyncStatus: document.getElementById("initial-sync-status"),
@@ -613,6 +617,45 @@ function initializeAdminPanel() {
   ui.runDailyRefreshBtn.addEventListener("click", () =>
     runJob(ui, "daily-refresh", null, ui.runDailyRefreshBtn)
   );
+  // Event listener for the new "Send Scheduled Reports" button.
+  ui.runScheduledReportsBtn.addEventListener("click", async () => {
+    const btn = ui.runScheduledReportsBtn;
+    const statusEl = ui.reportsJobStatusEl;
+
+    // Disable the button and provide immediate feedback to the user.
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    statusEl.textContent = "Job started, preparing emails...";
+    statusEl.className = "text-sm font-medium text-slate-500";
+
+    try {
+      // Call the new API endpoint we created in Step 1.
+      const response = await fetch("/api/admin/run-scheduled-reports");
+      const data = await response.json();
+
+      if (!response.ok) {
+        // If the server responded with an error, throw it to be handled by the catch block.
+        throw new Error(data.error || "An unknown error occurred.");
+      }
+
+      // If successful, display the success message from the API response.
+      statusEl.textContent = `✅ ${data.message}`;
+      statusEl.className = "text-sm font-medium text-green-600";
+    } catch (error) {
+      // If any error occurs, display the error message.
+      statusEl.textContent = `❌ Error: ${error.message}`;
+      statusEl.className = "text-sm font-medium text-red-600";
+    } finally {
+      // After everything is done, re-enable the button.
+      btn.disabled = false;
+      btn.textContent = "Send Scheduled Reports Now";
+
+      // Clear the status message after 8 seconds to keep the UI clean.
+      setTimeout(() => {
+        statusEl.textContent = "";
+      }, 8000);
+    }
+  });
 
   setupApiExplorer(ui);
   // --- Initial Page Load Calls ---

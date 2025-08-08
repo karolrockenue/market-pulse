@@ -273,7 +273,7 @@ module.exports = async (req, res) => {
 
     const { rows: dueReports } = await pgPool.query(
       // MODIFIED: Also select h.hotel_name to use for dynamic filenames.
-      `SELECT sr.*, h.category, h.hotel_name
+      `SELECT sr.*, h.category, h.property_name
    FROM scheduled_reports sr
    JOIN hotels h ON sr.property_id::integer = h.hotel_id
    WHERE sr.time_of_day = $1 AND (
@@ -317,7 +317,7 @@ module.exports = async (req, res) => {
       const attachments = [];
       const formats = report.attachment_formats || ["csv"]; // Default to csv if not set
       // Replaces all spaces with underscores for clean filenames.
-      const cleanHotelName = report.hotel_name.replace(/\s/g, "_");
+      const cleanHotelName = report.property_name.replace(/\s/g, "_");
       const cleanReportName = report.report_name.replace(/\s/g, "_");
 
       if (formats.includes("csv")) {

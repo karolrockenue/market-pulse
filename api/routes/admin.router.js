@@ -14,6 +14,8 @@ const { requireAdminApi } = require("../utils/middleware");
 // NEW: Import the handlers for the serverless cron jobs
 const dailyRefreshHandler = require("../daily-refresh.js");
 const initialSyncHandler = require("../initial-sync.js");
+// NEW: Import the handler for the scheduled reports job.
+const scheduledReportsHandler = require("../send-scheduled-reports.js");
 
 // Add this line with the other require statements
 const cloudbeds = require("../utils/cloudbeds");
@@ -103,12 +105,10 @@ router.get("/test-cloudbeds", requireAdminApi, async (req, res) => {
     const { propertyId } = req.query;
     if (!propertyId) {
       // If no propertyId is provided in the request, return a 400 Bad Request error.
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "Query parameter 'propertyId' is required.",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "Query parameter 'propertyId' is required.",
+      });
     }
 
     // Call the helper function with both the admin's session ID and the target propertyId.
@@ -152,6 +152,15 @@ router.post("/initial-sync", requireAdminApi, async (req, res) => {
   console.log("Admin panel manually triggering initial-sync job...");
   // We call the handler directly, passing the request and response objects.
   await initialSyncHandler(req, res);
+});
+// NEW: Route to manually trigger the scheduled reports job
+router.get("/run-scheduled-reports", requireAdminApi, async (req, res) => {
+  // This log helps confirm in the Vercel console that the trigger was initiated.
+  console.log("Admin panel manually triggering scheduled reports job...");
+
+  // We call the handler from send-scheduled-reports.js directly,
+  // passing along the request and response objects.
+  await scheduledReportsHandler(req, res);
 });
 
 // /api/routes/admin.router.js
