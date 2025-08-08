@@ -202,6 +202,7 @@ const revparChartManager = {
 // --- The Refactored Alpine.js Component ---
 // --- The Refactored Alpine.js Component ---
 // The export is now a function that returns the component object.
+// The export is now a function that returns the component object.
 export default function () {
   return {
     // --- STATE PROPERTIES ---
@@ -217,12 +218,8 @@ export default function () {
     dates: { start: "", end: "" },
     error: { show: false, message: "" },
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
-    // --- ADD THESE LINES ---
     isSyncing: false, // This flag will control the new overlay's visibility.
     syncStatusInterval: null, // This will hold the reference to our polling timer.
-    // --- END OF ADDITION ---
-    isSyncing: false,
-    syncStatusInterval: null,
     isLoadingSummary: true,
     kpi: {
       occupancy: { your: "-", market: "-", your_raw: 0, market_raw: 0 },
@@ -233,39 +230,43 @@ export default function () {
     summaryText: "Generating summary...",
 
     // --- INITIALIZATION ---
-    // --- REPLACE THE OLD init() FUNCTION WITH THIS ---
     init() {
-      // This block checks the URL for parameters that indicate a new connection.
+      // Create a URLSearchParams object to easily read the URL's query string.
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
 
-      // If a new property ID is in the URL, make it the active one.
+      // **FIX for ISSUE #2: Select correct hotel**
+      // If a new property ID is found in the URL, we make it the active property.
+      // This ensures the dashboard loads with the newly connected hotel selected.
       if (newPropertyId) {
         localStorage.setItem("currentPropertyId", newPropertyId);
       }
 
-      // If this is a new connection, show the loading overlay and start checking the status.
-      if (isNewConnection) {
+      // **FIX for ISSUE #1: Stuck loading screen**
+      // If this is a new connection, show the loading overlay and start checking the sync status.
+      if (isNewConnection && newPropertyId) {
         this.isSyncing = true;
-        const propertyToCheck =
-          newPropertyId || localStorage.getItem("currentPropertyId");
-        // Start polling the backend every 15 seconds.
+        // Start polling the backend every 15 seconds to check if the sync is done.
         this.syncStatusInterval = setInterval(() => {
-          this.checkSyncStatus(propertyToCheck);
+          this.checkSyncStatus(newPropertyId);
         }, 15000);
-        // Also check immediately on page load.
-        this.checkSyncStatus(propertyToCheck);
+        // Also check immediately on page load so the user doesn't have to wait 15s for the first check.
+        this.checkSyncStatus(newPropertyId);
       }
 
+      // This is an existing event listener that allows other components (like the sidebar)
+      // to tell the dashboard that the property has changed.
       window.addEventListener("property-changed", (event) => {
         this.handlePropertyChange(event.detail);
       });
 
+      // Initialize the charts and other dashboard elements.
       this.initializeDashboard();
     },
-    // --- END OF REPLACEMENT ---
+
     initializeDashboard() {
+      // This function ensures the charts are drawn correctly and are responsive.
       this.$nextTick(() => {
         const mainChartContainer = this.$refs.mainChartContainer;
         const revparChartCanvas = this.$refs.revparChartCanvas;
@@ -283,7 +284,7 @@ export default function () {
       });
     },
 
-    // --- REPLACED FUNCTION ---
+    // --- NEW, CORRECTED FUNCTION to check sync status ---
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -295,52 +296,28 @@ export default function () {
         const data = await response.json();
 
         if (data.isSyncComplete) {
-          // Sync is complete. Stop polling.
+          // Sync is complete! Stop polling the server.
           if (this.syncStatusInterval) {
             clearInterval(this.syncStatusInterval);
           }
 
-          // --- NEW LOGIC FOR SMOOTH TRANSITION ---
-          // 1. Silently clean the URL so the overlay doesn't reappear on a manual refresh.
+          // **THE FIX for the stuck loading screen**
+          // 1. Silently clean the URL parameters (?newConnection=true&...)
+          //    This prevents the loading screen from reappearing if the user manually refreshes.
           history.pushState({}, "", window.location.pathname);
 
-          // 2. Trigger the data load for the dashboard. This will happen behind the overlay.
+          // 2. Load the dashboard data in the background *before* hiding the spinner.
           this.setPreset("current-month");
 
-          // 3. Set isSyncing to false. Alpine.js will see this change and
-          // automatically trigger the fade-out transition you defined in the HTML.
+          // 3. Set isSyncing to false. This will trigger the fade-out transition
+          //    on the loading screen, revealing the fully-loaded dashboard.
           this.isSyncing = false;
-        } else {
-          // If not complete, ensure the overlay stays visible.
-          this.isSyncing = true;
         }
+        // If sync is not complete, we do nothing and let the next poll check again.
       } catch (error) {
         console.error("Error checking sync status:", error);
-        this.isSyncing = false; // Hide on error to prevent getting stuck.
+        this.isSyncing = false; // Hide on error to prevent it from getting stuck.
         if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
-      }
-    },
-    // --- END OF ADDITION ---
-    async checkSyncStatus(propertyId) {
-      if (!propertyId) {
-        this.isSyncing = false;
-        return;
-      }
-      try {
-        const response = await fetch(`/api/sync-status/${propertyId}`);
-        const data = await response.json();
-        if (data.isSyncComplete) {
-          this.isSyncing = false;
-          if (this.syncStatusInterval) {
-            clearInterval(this.syncStatusInterval);
-            window.location.replace(window.location.pathname);
-          }
-        } else {
-          this.isSyncing = true;
-        }
-      } catch (error) {
-        console.error("Error checking sync status:", error);
-        this.isSyncing = false;
       }
     },
 
