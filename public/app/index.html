@@ -126,8 +126,18 @@
         margin-top: 8px;
         padding: 8px 0;
       }
-      [x-cloak] {
+[x-cloak] {
         display: none !important;
+      }
+
+      /* Styles for the new loading screen transition */
+      #main-loader {
+        /* Defines the speed of the fade-out effect */
+        transition: opacity 0.5s ease-out;
+      }
+      #dashboard-wrapper {
+        /* Defines the speed of the fade-in effect */
+        transition: opacity 0.7s ease-in;
       }
     </style>
   
@@ -138,6 +148,11 @@
     x-cloak
     x-init="window.alpineInstance = this"
 >
+<div id="main-loader" class="fixed inset-0 flex items-center justify-center bg-[#332D56] z-50">
+    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+</div>
+
+<div id="dashboard-wrapper" class="opacity-0">
 <!-- Initial Sync Loading Overlay -->
 <div
   x-show="isSyncing"
@@ -634,8 +649,9 @@
       </div>
     </div>
 
-   <script type="module">
+</div> <script type="module">
   // Import the LIVE dashboard component logic and the NEW sidebar logic.
+  import dashboardComponent from "/app/dashboard.mjs";
   import dashboardComponent from "/app/dashboard.mjs";
   import sidebar from "/app/_shared/sidebar.mjs";
   import { loadComponent } from "/app/utils.mjs";
