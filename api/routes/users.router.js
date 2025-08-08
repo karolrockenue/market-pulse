@@ -70,7 +70,8 @@ router.post(
       expires_at.setDate(expires_at.getDate() + 7);
 
       const newInvite = await pgPool.query(
-        `INSERT INTO user_invitations (invited_by_user_id, invitee_email, invitee_first_name, invitee_last_name, invitation_token, expires_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        // --- FIX: Corrected column name from 'invited_by_user_id' to 'inviter_user_id' ---
+        `INSERT INTO user_invitations (inviter_user_id, invitee_email, invitee_first_name, invitee_last_name, invitation_token, expires_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           inviter_user_id,
           invitee_email,
