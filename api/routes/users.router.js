@@ -37,7 +37,25 @@ router.post(
   async (req, res) => {
     try {
       const { invitee_first_name, invitee_last_name, invitee_email } = req.body;
-      const inviter_user_id = req.session.userId;
+      const inviter_cloudbeds_id = req.session.userId; // Get the cloudbeds_user_id from the session.
+
+      // Look up the internal user_id (primary key) using the cloudbeds_user_id from the session.
+      // This is necessary because the user_invitations table has a foreign key constraint
+      // that references the internal user_id, not the cloudbeds_user_id.
+      const inviterResult = await pgPool.query(
+        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+        [inviter_cloudbeds_id]
+      );
+
+      // If no user is found for the session ID, it's a server error or invalid session.
+      if (inviterResult.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Forbidden: Inviter account not found." });
+      }
+
+      // Use the correct internal user_id for the database INSERT operation.
+      const inviter_user_id = inviterResult.rows[0].user_id;
 
       if (!invitee_first_name || !invitee_last_name || !invitee_email) {
         return res
