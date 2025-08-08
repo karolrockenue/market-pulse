@@ -99,17 +99,43 @@ router.get("/test-database", requireAdminApi, async (req, res) => {
 
 router.get("/test-cloudbeds", requireAdminApi, async (req, res) => {
   try {
-    // The new helper function handles all the logic.
-    const accessToken = await getAdminAccessToken(req.session.userId);
+    // Get the propertyId from the query string sent by the frontend.
+    const { propertyId } = req.query;
+    if (!propertyId) {
+      // If no propertyId is provided in the request, return a 400 Bad Request error.
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "Query parameter 'propertyId' is required.",
+        });
+    }
+
+    // Call the helper function with both the admin's session ID and the target propertyId.
+    // The helper returns an object { accessToken, propertyId }, so we destructure it.
+    const { accessToken } = await getAdminAccessToken(
+      req.session.userId,
+      propertyId
+    );
+
+    // Check if the token was successfully obtained.
     if (accessToken) {
+      // If successful, return a 200 OK response.
       res.status(200).json({
         success: true,
         message: "Cloudbeds authentication successful.",
       });
     } else {
+      // This case should theoretically not be reached if getAdminAccessToken throws an error,
+      // but it's good practice to handle it.
       throw new Error("Failed to obtain access token.");
     }
   } catch (error) {
+    // If any part of the process fails, return a 500 Internal Server Error.
+    console.error(
+      `[Admin Test] Cloudbeds test failed for property ${req.query.propertyId}:`,
+      error
+    );
     res.status(500).json({ success: false, error: error.message });
   }
 });
