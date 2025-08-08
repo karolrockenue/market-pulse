@@ -180,17 +180,19 @@ router.post("/initial-sync", requireAdminApi, async (req, res) => {
   await initialSyncHandler(req, res);
 });
 // NEW: Route to manually trigger the scheduled reports job
-router.get("/run-scheduled-reports", requireAdminApi, async (req, res) => {
-  console.log(
-    "Admin panel manually triggering scheduled reports job (force mode)..."
-  );
+// UPDATED: Route to manually trigger a *single* scheduled report.
+// It's now a POST request to accept a reportId in the body.
+router.post("/run-scheduled-report", requireAdminApi, async (req, res) => {
+  const { reportId } = req.body;
+  if (!reportId) {
+    return res.status(400).json({ error: "A reportId is required." });
+  }
 
-  // Add a flag to the request object to signal a manual override.
-  // The scheduled reports script will use this flag to bypass its normal time check.
-  req.isManualTrigger = true;
+  console.log(`Admin panel manually triggering report ID: ${reportId}`);
 
-  // We call the handler from send-scheduled-reports.js directly,
-  // passing along the request and response objects.
+  // We call the handler from send-scheduled-reports.js directly.
+  // The handler will see the reportId in the req.body and run the
+  // logic for a single report.
   await scheduledReportsHandler(req, res);
 });
 

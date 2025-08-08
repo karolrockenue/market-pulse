@@ -260,38 +260,65 @@ async function generateXLSX(data, report) {
 
 // --- MAIN HANDLER ---
 module.exports = async (req, res) => {
-  console.log("Cron job started: Checking for scheduled reports to send.");
-
   try {
-    const now = new Date();
-    const currentTime = `${now.getUTCHours().toString().padStart(2, "0")}:${now
-      .getUTCMinutes()
-      .toString()
-      .padStart(2, "0")}`;
-    const currentDayOfWeek = now.getUTCDay();
-    const currentDayOfMonth = now.getUTCDate();
+    let dueReports;
+    const { reportId } = req.body; // Check for a specific reportId from the request body.
 
-    const { rows: dueReports } = await pgPool.query(
-      // MODIFIED: Also select h.hotel_name to use for dynamic filenames.
-      `SELECT sr.*, h.category, h.property_name
-   FROM scheduled_reports sr
-   JOIN hotels h ON sr.property_id::integer = h.hotel_id
-   WHERE sr.time_of_day = $1 AND (
-         (sr.frequency = 'Daily') OR
-         (sr.frequency = 'Weekly' AND sr.day_of_week = $2) OR
-         (sr.frequency = 'Monthly' AND sr.day_of_month = $3)
-       )`,
-      [currentTime, currentDayOfWeek, currentDayOfMonth]
-    );
+    // If a reportId is provided, this is a manual trigger for a single report.
+    if (reportId) {
+      console.log(`Manual trigger: Fetching report with ID: ${reportId}`);
+      // This query fetches only the specific report by its ID, ignoring the schedule.
+      // We use sr.id because that's the correct column name for the primary key.
+      const result = await pgPool.query(
+        `SELECT sr.*, h.category, h.property_name
+         FROM scheduled_reports sr
+         JOIN hotels h ON sr.property_id::integer = h.hotel_id
+         WHERE sr.id = $1`,
+        [reportId]
+      );
+      dueReports = result.rows;
+    } else {
+      // If no reportId is provided, this is a normal cron job run.
+      console.log("Cron job: Checking for reports based on schedule.");
+      const now = new Date();
+      const currentTime = `${now
+        .getUTCHours()
+        .toString()
+        .padStart(2, "0")}:${now.getUTCMinutes().toString().padStart(2, "0")}`;
+      const currentDayOfWeek = now.getUTCDay();
+      const currentDayOfMonth = now.getUTCDate();
 
-    if (dueReports.length === 0) {
-      console.log(`No reports due at this time (${currentTime} UTC).`);
-      return res.status(200).send("No reports due.");
+      // This is the original query to find all reports that are due at the current time.
+      const result = await pgPool.query(
+        `SELECT sr.*, h.category, h.property_name
+         FROM scheduled_reports sr
+         JOIN hotels h ON sr.property_id::integer = h.hotel_id
+         WHERE sr.time_of_day = $1 AND (
+           (sr.frequency = 'Daily') OR
+           (sr.frequency = 'Weekly' AND sr.day_of_week = $2) OR
+           (sr.frequency = 'Monthly' AND sr.day_of_month = $3)
+         )`,
+        [currentTime, currentDayOfWeek, currentDayOfMonth]
+      );
+      dueReports = result.rows;
     }
 
-    console.log(`Found ${dueReports.length} report(s) to send.`);
+    // The rest of the logic is the same for both cases. It processes the
+    // `dueReports` array, which will have one report for a manual trigger
+    // or multiple reports for a scheduled run.
+    if (dueReports.length === 0) {
+      const message = reportId
+        ? `Report with ID ${reportId} not found.`
+        : `No reports due at this time.`;
+      console.log(message);
+      return res.status(reportId ? 404 : 200).send(message);
+    }
+
+    console.log(`Found ${dueReports.length} report(s) to process.`);
+    let sentCount = 0;
 
     for (const report of dueReports) {
+      // ... (The entire 'for' loop and its contents are identical to the original file)
       const { startDate, endDate } = calculateDateRange(report.report_period);
       const hotelData = await getHotelMetrics(
         report.property_id,
@@ -299,8 +326,7 @@ module.exports = async (req, res) => {
         endDate
       );
       const marketData = report.add_comparisons
-        ? // Pass the new 'report.category' field to the updated function
-          await getMarketMetrics(
+        ? await getMarketMetrics(
             report.property_id,
             report.category,
             startDate,
@@ -315,15 +341,13 @@ module.exports = async (req, res) => {
       }
 
       const attachments = [];
-      const formats = report.attachment_formats || ["csv"]; // Default to csv if not set
-      // Replaces all spaces with underscores for clean filenames.
+      const formats = report.attachment_formats || ["csv"];
       const cleanHotelName = report.property_name.replace(/\s/g, "_");
       const cleanReportName = report.report_name.replace(/\s/g, "_");
 
       if (formats.includes("csv")) {
         attachments.push({
           content: generateCSV(processedData, report).toString("base64"),
-          // MODIFIED: Create a dynamic filename using the hotel and report name.
           filename: `${cleanHotelName}_${cleanReportName}.csv`,
           type: "text/csv",
           disposition: "attachment",
@@ -333,7 +357,6 @@ module.exports = async (req, res) => {
         const xlsxBuffer = await generateXLSX(processedData, report);
         attachments.push({
           content: xlsxBuffer.toString("base64"),
-          // MODIFIED: Create a dynamic filename using the hotel and report name.
           filename: `${cleanHotelName}_${cleanReportName}.xlsx`,
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           disposition: "attachment",
@@ -355,14 +378,15 @@ module.exports = async (req, res) => {
         console.log(
           `Successfully sent report "${report.report_name}" to ${report.recipients}`
         );
+        sentCount++;
       }
     }
 
     res
       .status(200)
-      .send(`Successfully processed ${dueReports.length} reports.`);
+      .json({ message: `Successfully sent ${sentCount} report(s).` });
   } catch (error) {
-    console.error("Cron job failed:", error);
+    console.error("Report job failed:", error);
     res.status(500).json({ error: "Failed to process scheduled reports." });
   }
 };
