@@ -228,6 +228,9 @@ export default function () {
     allMetrics: [],
     summaryText: "Generating summary...",
 
+    // This new flag tracks the very first time the dashboard loads.
+    isInitialLoad: true,
+
     // --- INITIALIZATION ---
     init() {
       const urlParams = new URLSearchParams(window.location.search);
