@@ -965,3 +965,20 @@ Key Changes:
                                              * The data visualization colors were updated in dashboard.mjs for both the main dashboard's monthly bar chart and the "RevPAR Comparison" chart to use the new brand colors.
                                              * Bug Fix: A critical bug that made the "Display" dropdown (Daily/Weekly/Monthly) non-functional was resolved by restoring the missing setGranularity function in dashboard.mjs.
 Outcome: The application now has a consistent and professional brand identity. The updated UI is more visually appealing and cohesive across all pages, significantly improving the overall user experience.
+
+
+
+Date: August 8, 2025
+                                             * Objective: To perform database cleanup by removing legacy dummy data and to refactor the dashboard by completely removing the deprecated AI summary feature.
+                                             * Summary: This session focused on technical debt and application refinement. Five legacy dummy hotels and all their associated data were purged from the database. Subsequently, the AI-powered summary feature was completely removed from the application—including its UI, frontend logic, backend endpoint, and dependencies—to prepare for a new feature in its place.
+                                             * Key Changes:
+                                             * Database Cleanup:
+                                             * An SQL script was executed to delete five dummy hotels (IDs 900001-900005).
+                                             * The script removed all associated records from daily_metrics_snapshots, user_properties, hotel_comp_sets, scheduled_reports, and the hotels table.
+                                             * A data type mismatch (character varying vs. integer) was fixed in the DELETE statement for the scheduled_reports table to ensure the script ran successfully.
+                                             * AI Feature Removal:
+                                             * The AI summary card was removed from the dashboard UI (index.html), leaving an empty container for a future feature.
+                                             * All related logic, including state properties and the fetchSummary() function, was deleted from the frontend component (dashboard.mjs).
+                                             * The /api/generate-summary backend endpoint and its OpenAI dependency were removed from dashboard.router.js.
+                                             * The openai npm package was uninstalled, and the corresponding OPENAI_API_KEY was removed from the environment configuration.
+                                             * Outcome: The database is now cleaner and free of legacy test data. The dashboard UI has been simplified, and the application's codebase and dependencies have been reduced by removing the unused AI feature, improving maintainability.

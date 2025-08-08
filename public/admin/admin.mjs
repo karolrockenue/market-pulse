@@ -261,21 +261,41 @@ const fetchLastRefreshTime = async (ui) => {
   }
 };
 
-const testConnection = async (url, statusEl) => {
-  statusEl.textContent = "Testing...";
-  statusEl.className = "ml-4 text-sm font-semibold text-slate-500";
+const testConnection = async (url, statusEl, ui, requiresProperty = false) => {
+  // A helper function to manage the status display.
+  const setStatus = (text, colorClass) => {
+    statusEl.textContent = text;
+    statusEl.className = `ml-4 text-sm font-semibold ${colorClass}`;
+  };
+
+  setStatus("Testing...", "text-slate-500");
+
+  let finalUrl = url;
+  // If this action requires a property context (like testing Cloudbeds auth),
+  // get the selected property ID and append it to the URL.
+  if (requiresProperty) {
+    const propertyId = ui.propertySelector.value;
+    if (!propertyId) {
+      // If no property is selected, show an error and stop.
+      setStatus("❌ Select a property first", "text-red-600");
+      return;
+    }
+    // Append the propertyId as a query parameter.
+    finalUrl = `${url}?propertyId=${propertyId}`;
+  }
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(finalUrl);
     if (response.ok) {
-      statusEl.textContent = "✅ Connected";
-      statusEl.className = "ml-4 text-sm font-semibold text-green-600";
+      // On success, show the connected status.
+      setStatus("✅ Connected", "text-green-600");
     } else {
-      statusEl.textContent = `❌ Error: ${response.status}`;
-      statusEl.className = "ml-4 text-sm font-semibold text-red-600";
+      // On failure, show the HTTP status code.
+      setStatus(`❌ Error: ${response.status}`, "text-red-600");
     }
   } catch (error) {
-    statusEl.textContent = "❌ Failed";
-    statusEl.className = "ml-4 text-sm font-semibold text-red-600";
+    // If the fetch itself fails (e.g., network error), show a generic failed message.
+    setStatus("❌ Failed", "text-red-600");
   }
 };
 
@@ -583,10 +603,12 @@ function initializeAdminPanel() {
   });
 
   ui.testCloudbedsBtn.addEventListener("click", () =>
-    testConnection("/api/admin/test-cloudbeds", ui.cloudbedsStatusEl)
+    // Call testConnection for Cloudbeds, indicating it requires a property ID.
+    testConnection("/api/admin/test-cloudbeds", ui.cloudbedsStatusEl, ui, true)
   );
   ui.testDbBtn.addEventListener("click", () =>
-    testConnection("/api/admin/test-database", ui.dbStatusEl)
+    // Call testConnection for the database, which does not require a property ID.
+    testConnection("/api/admin/test-database", ui.dbStatusEl, ui, false)
   );
   ui.runDailyRefreshBtn.addEventListener("click", () =>
     runJob(ui, "daily-refresh", null, ui.runDailyRefreshBtn)
