@@ -547,6 +547,7 @@ export default function () {
       });
     },
     // This function is now fully asynchronous to ensure it waits for data loading to complete.
+    // This function is now fully asynchronous and includes a try/finally block for robustness.
     async handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
       if (!propertyId || this.currentPropertyId === propertyId) return;
@@ -554,51 +555,47 @@ export default function () {
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
 
-      // This part handles the initial sync spinner correctly.
       if (!this.isSyncing && this.syncStatusInterval) {
         clearInterval(this.syncStatusInterval);
         this.syncStatusInterval = null;
       }
 
-      // Fetch supporting details for the property.
       try {
+        // Fetch supporting details for the property.
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
         this.currencyCode = details.currency_code || "USD";
-      } catch (err) {
-        console.error("Failed to fetch hotel details", err);
-        this.currencyCode = "USD"; // Default currency on failure.
-      }
 
-      // We only run the main data load if the initial sync isn't active.
-      if (!this.isSyncing) {
-        // --- CHANGE: We now 'await' this call. ---
-        // This pauses the function until setPreset (and all the data it loads) is finished.
-        await this.setPreset("current-month");
-      }
-
-      // --- NEW LOGIC: This block runs only once on the initial page load. ---
-      // It checks the flag you just added.
-      if (this.isInitialLoad) {
-        // Find the loader and the content wrapper elements in the HTML.
-        const loader = document.getElementById("main-loader");
-        const wrapper = document.getElementById("dashboard-wrapper");
-
-        if (loader && wrapper) {
-          // 1. Start the loader's fade-out animation by setting its opacity to 0.
-          loader.style.opacity = "0";
-          // 2. Simultaneously, start the main content's fade-in animation.
-          wrapper.style.opacity = "1";
-
-          // 3. After the animation is done (500ms), hide the loader completely
-          //    so it doesn't block mouse clicks on the content below it.
-          setTimeout(() => {
-            loader.style.display = "none";
-          }, 500); // This duration must match the transition time in your CSS.
+        // We only run the main data load if the initial sync isn't active.
+        if (!this.isSyncing) {
+          await this.setPreset("current-month");
         }
+      } catch (error) {
+        // If there's an error, log it, but don't stop execution.
+        console.error("Error during initial data load:", error);
+        this.showError("Failed to load initial dashboard data.");
+      } finally {
+        // --- ROBUST LOGIC: This block now runs regardless of success or failure. ---
+        // It checks the flag to ensure it only runs once.
+        if (this.isInitialLoad) {
+          // Find the loader and the content wrapper elements.
+          const loader = document.getElementById("main-loader");
+          const wrapper = document.getElementById("dashboard-wrapper");
 
-        // 4. Set the flag to false so this logic never runs again on this visit.
-        this.isInitialLoad = false;
+          if (loader && wrapper) {
+            // Start the animations.
+            loader.style.opacity = "0";
+            wrapper.style.opacity = "1";
+
+            // Hide the loader completely after the animation.
+            setTimeout(() => {
+              loader.style.display = "none";
+            }, 500);
+          }
+
+          // Set the flag to false so this never runs again.
+          this.isInitialLoad = false;
+        }
       }
     },
     // --- HELPER METHODS ---
