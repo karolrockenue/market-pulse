@@ -277,7 +277,11 @@ export default function () {
         return;
       }
       try {
-        const response = await fetch(`/api/sync-status/${propertyId}`);
+        // Add a cache-busting query param to avoid any stale edge/proxy responses.
+        const response = await fetch(
+          `/api/sync-status/${propertyId}?t=${Date.now()}`
+        );
+
         const data = await response.json();
 
         if (data.isSyncComplete) {
