@@ -590,6 +590,7 @@ export default function () {
       const yearUTC = today.getUTCFullYear();
       const monthUTC = today.getUTCMonth();
       let startDate, endDate;
+
       if (preset === "current-month") {
         startDate = new Date(Date.UTC(yearUTC, monthUTC, 1));
         endDate = new Date(Date.UTC(yearUTC, monthUTC + 1, 0));
@@ -599,12 +600,24 @@ export default function () {
       } else if (preset === "this-year") {
         startDate = new Date(Date.UTC(yearUTC, 0, 1));
         endDate = new Date(Date.UTC(yearUTC, 11, 31));
+      } else if (preset === "previous-month") {
+        // --- NEW: Logic for the previous full month. ---
+        startDate = new Date(Date.UTC(yearUTC, monthUTC - 1, 1));
+        endDate = new Date(Date.UTC(yearUTC, monthUTC, 0));
+      } else if (preset === "year-to-date") {
+        // --- NEW: Logic for Year-to-Date. ---
+        startDate = new Date(Date.UTC(yearUTC, 0, 1));
+        endDate = today; // Uses today's date as the end date.
       }
+
       const formatDate = (date) => date.toISOString().split("T")[0];
       this.dates.start = formatDate(startDate);
       this.dates.end = formatDate(endDate);
-      this.granularity = preset === "this-year" ? "monthly" : "daily";
-      // **MODIFIED**: Await the report run to complete.
+      this.granularity =
+        preset === "this-year" || preset === "year-to-date"
+          ? "monthly"
+          : "daily";
+
       await this.runReport();
     },
     setActiveMetric(metric) {
