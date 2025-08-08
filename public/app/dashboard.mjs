@@ -143,64 +143,6 @@ const mainChartManager = {
   },
 };
 
-// Manager for the RevPAR Comparison Chart.js instance.
-const revparChartManager = {
-  chartInstance: null, // Holds the Chart.js instance.
-
-  init(containerElement) {
-    if (!containerElement) return;
-    const ctx = containerElement.getContext("2d");
-    this.chartInstance = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: ["Your Hotel", "The Market"],
-        datasets: [
-          {
-            data: [0, 0],
-            backgroundColor: ["#71C0BB", "#d1d5db"],
-            borderRadius: 4,
-            barThickness: 12,
-          },
-        ],
-      },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: {
-            display: true,
-            beginAtZero: true,
-            grid: { drawBorder: false, color: "#e2e8f0" },
-            ticks: { callback: (value) => formatValue(value, "currency") },
-          },
-          y: {
-            grid: { display: false, drawBorder: false },
-            ticks: { display: false },
-          },
-        },
-      },
-    });
-  },
-
-  update(revparData, currencyCode) {
-    if (!this.chartInstance) return;
-    const parseCurrency = (value) =>
-      typeof value !== "string"
-        ? 0
-        : parseFloat(value.replace(/[^0-9.-]+/g, "")) || 0;
-    this.chartInstance.data.datasets[0].data = [
-      parseCurrency(revparData.your),
-      parseCurrency(revparData.market),
-    ];
-    this.chartInstance.options.scales.x.ticks.callback = (value) =>
-      formatValue(value, "currency", currencyCode);
-    this.chartInstance.update();
-  },
-};
-// --- The Refactored Alpine.js Component ---
-// --- The Refactored Alpine.js Component ---
 // The export is now a function that returns the component object.
 export default function () {
   return {
@@ -271,12 +213,12 @@ export default function () {
       });
     },
 
+    // This function now only initializes the main chart.
     initializeDashboard() {
       this.$nextTick(() => {
         const mainChartContainer = this.$refs.mainChartContainer;
-        const revparChartCanvas = this.$refs.revparChartCanvas;
+        // The RevPAR chart initialization has been removed.
         mainChartManager.init(mainChartContainer);
-        revparChartManager.init(revparChartCanvas);
         const resizeObserver = new ResizeObserver(() =>
           mainChartManager.resize()
         );
@@ -472,7 +414,7 @@ export default function () {
           currencyCode: this.currencyCode,
           formatDateLabel: this.formatDateLabel,
         });
-        revparChartManager.update(this.kpi.revpar, this.currencyCode);
+
         //   this.fetchSummary();
       } catch (error) {
         this.showError(error.message);
