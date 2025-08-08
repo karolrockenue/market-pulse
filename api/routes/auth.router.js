@@ -167,8 +167,9 @@ router.get("/accept-invitation", async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // --- FIX: Use the correct column name 'invitation_token' to find the invitation. ---
     const invitationResult = await client.query(
-      "SELECT * FROM user_invitations WHERE token = $1 AND status = 'pending' AND expires_at > NOW()",
+      "SELECT * FROM user_invitations WHERE invitation_token = $1 AND status = 'pending' AND expires_at > NOW()",
       [token]
     );
 
@@ -177,48 +178,75 @@ router.get("/accept-invitation", async (req, res) => {
     }
     const invitation = invitationResult.rows[0];
 
-    // Create the new user
-    const newUserCloudbedsId = `invited-${invitation.token.substring(0, 16)}`;
+    // --- FIX: Create the new user's ID from 'invitation.invitation_token'. ---
+    const newUserCloudbedsId = `invited-${invitation.invitation_token.substring(
+      0,
+      16
+    )}`;
+
+    // Create the new user and return their new cloudbeds_user_id
     const userInsertResult = await client.query(
-      // --- FIX: Explicitly insert the 'user' role ---
-      "INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, role, pms_type) VALUES ($1, $2, $3, $4, 'user', 'cloudbeds') RETURNING user_id",
+      "INSERT INTO users (cloudbeds_user_id, email, first_name, last_name, role, pms_type) VALUES ($1, $2, $3, $4, 'user', 'cloudbeds') RETURNING cloudbeds_user_id",
       [
         newUserCloudbedsId,
-        invitation.email,
-        invitation.first_name,
-        invitation.last_name,
+        invitation.invitee_email,
+        invitation.invitee_first_name,
+        invitation.invitee_last_name,
       ]
     );
+    const newDbUser = userInsertResult.rows[0];
 
-    // Link the new user to the same properties as the inviter
+    // --- FIX: Find the inviter's cloudbeds_user_id to correctly look up their properties. ---
+    const inviterUserResult = await client.query(
+      "SELECT cloudbeds_user_id FROM users WHERE user_id = $1",
+      [invitation.inviter_user_id]
+    );
+    const inviterCloudbedsId = inviterUserResult.rows[0].cloudbeds_user_id;
+
+    // Find the properties linked to the inviter.
     const propertiesResult = await client.query(
-      "SELECT property_id, property_name FROM user_properties WHERE user_id = $1",
-      [invitation.invited_by_user_id]
+      "SELECT property_id FROM user_properties WHERE user_id = $1",
+      [inviterCloudbedsId]
     );
 
+    // Link the new user to the same properties as the inviter.
     for (const prop of propertiesResult.rows) {
       await client.query(
-        "INSERT INTO user_properties (user_id, property_id, property_name, pms_type, status) VALUES ($1, $2, $3, 'cloudbeds', 'connected')",
-        [newUserCloudbedsId, prop.property_id, prop.property_name]
+        "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
+        [newDbUser.cloudbeds_user_id, prop.property_id]
       );
     }
 
-    // Mark invitation as accepted
+    // --- FIX: Delete the invitation after it has been successfully used. ---
     await client.query(
-      "UPDATE user_invitations SET status = 'accepted', accepted_at = NOW() WHERE invitation_id = $1",
+      "DELETE FROM user_invitations WHERE invitation_id = $1",
       [invitation.invitation_id]
     );
 
     await client.query("COMMIT");
 
-    // Set session data for the new user
-    req.session.userId = newUserCloudbedsId;
-    // --- FIX: Set the new user's role in the session ---
-    req.session.role = "user";
+    // Regenerate session to prevent fixation attacks and log the new user in
+    req.session.regenerate((err) => {
+      if (err) {
+        console.error("Error regenerating session for new user:", err);
+        // Even if session fails, the user was created. Redirect them to login.
+        return res.redirect(
+          "/login.html?message=Account created! Please log in."
+        );
+      }
+      req.session.userId = newDbUser.cloudbeds_user_id;
+      req.session.role = "user";
 
-    req.session.save((err) => {
-      if (err) throw err;
-      res.redirect("/app/");
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("Error saving session for new user:", saveErr);
+          return res.redirect(
+            "/login.html?message=Account created! Please log in."
+          );
+        }
+        // Redirect to the dashboard on successful login
+        res.redirect("/app/");
+      });
     });
   } catch (error) {
     await client.query("ROLLBACK");
