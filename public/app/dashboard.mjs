@@ -202,7 +202,6 @@ const revparChartManager = {
 // --- The Refactored Alpine.js Component ---
 // --- The Refactored Alpine.js Component ---
 // The export is now a function that returns the component object.
-// The export is now a function that returns the component object.
 export default function () {
   return {
     // --- STATE PROPERTIES ---
@@ -218,8 +217,8 @@ export default function () {
     dates: { start: "", end: "" },
     error: { show: false, message: "" },
     isLoading: { kpis: true, chart: true, tables: true, properties: true },
-    isSyncing: false, // This flag will control the new overlay's visibility.
-    syncStatusInterval: null, // This will hold the reference to our polling timer.
+    isSyncing: false,
+    syncStatusInterval: null,
     isLoadingSummary: true,
     kpi: {
       occupancy: { your: "-", market: "-", your_raw: 0, market_raw: 0 },
@@ -231,60 +230,46 @@ export default function () {
 
     // --- INITIALIZATION ---
     init() {
-      // Create a URLSearchParams object to easily read the URL's query string.
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
 
-      // **FIX for ISSUE #2: Select correct hotel**
-      // If a new property ID is found in the URL, we make it the active property.
-      // This ensures the dashboard loads with the newly connected hotel selected.
       if (newPropertyId) {
         localStorage.setItem("currentPropertyId", newPropertyId);
       }
 
-      // **FIX for ISSUE #1: Stuck loading screen**
-      // If this is a new connection, show the loading overlay and start checking the sync status.
       if (isNewConnection && newPropertyId) {
         this.isSyncing = true;
-        // Start polling the backend every 15 seconds to check if the sync is done.
-        this.syncStatusInterval = setInterval(() => {
-          this.checkSyncStatus(newPropertyId);
-        }, 15000);
-        // Also check immediately on page load so the user doesn't have to wait 15s for the first check.
+        this.syncStatusInterval = setInterval(
+          () => this.checkSyncStatus(newPropertyId),
+          15000
+        );
         this.checkSyncStatus(newPropertyId);
       }
 
-      // This is an existing event listener that allows other components (like the sidebar)
-      // to tell the dashboard that the property has changed.
-      window.addEventListener("property-changed", (event) => {
-        this.handlePropertyChange(event.detail);
-      });
-
-      // Initialize the charts and other dashboard elements.
+      window.addEventListener("property-changed", (event) =>
+        this.handlePropertyChange(event.detail)
+      );
       this.initializeDashboard();
     },
 
     initializeDashboard() {
-      // This function ensures the charts are drawn correctly and are responsive.
       this.$nextTick(() => {
         const mainChartContainer = this.$refs.mainChartContainer;
         const revparChartCanvas = this.$refs.revparChartCanvas;
         mainChartManager.init(mainChartContainer);
         revparChartManager.init(revparChartCanvas);
-        const resizeObserver = new ResizeObserver(() => {
-          mainChartManager.resize();
-        });
+        const resizeObserver = new ResizeObserver(() =>
+          mainChartManager.resize()
+        );
         if (mainChartContainer) {
           resizeObserver.observe(mainChartContainer);
         }
-        window.addEventListener("resize", () => {
-          mainChartManager.resize();
-        });
+        window.addEventListener("resize", () => mainChartManager.resize());
       });
     },
 
-    // --- NEW, CORRECTED FUNCTION to check sync status ---
+    // --- STUCK SPINNER FIX ---
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -296,27 +281,18 @@ export default function () {
         const data = await response.json();
 
         if (data.isSyncComplete) {
-          // Sync is complete! Stop polling the server.
-          if (this.syncStatusInterval) {
-            clearInterval(this.syncStatusInterval);
-          }
-
-          // **THE FIX for the stuck loading screen**
-          // 1. Silently clean the URL parameters (?newConnection=true&...)
-          //    This prevents the loading screen from reappearing if the user manually refreshes.
+          if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
           history.pushState({}, "", window.location.pathname);
 
-          // 2. Load the dashboard data in the background *before* hiding the spinner.
-          this.setPreset("current-month");
+          // **THE FIX**: We now explicitly `await` for the report data to load
+          // before we set `isSyncing` to false. This prevents the race condition.
+          await this.setPreset("current-month");
 
-          // 3. Set isSyncing to false. This will trigger the fade-out transition
-          //    on the loading screen, revealing the fully-loaded dashboard.
           this.isSyncing = false;
         }
-        // If sync is not complete, we do nothing and let the next poll check again.
       } catch (error) {
         console.error("Error checking sync status:", error);
-        this.isSyncing = false; // Hide on error to prevent it from getting stuck.
+        this.isSyncing = false;
         if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
       }
     },
@@ -350,9 +326,8 @@ export default function () {
         const [yourHotelResponse, marketResponse] = await Promise.all(
           urls.map((url) => fetch(url))
         );
-        if (!yourHotelResponse.ok || !marketResponse.ok) {
+        if (!yourHotelResponse.ok || !marketResponse.ok)
           throw new Error("Could not load chart/table data.");
-        }
         const yourHotelData = await yourHotelResponse.json();
         const marketData = await marketResponse.json();
         this.allMetrics = this.processAndMergeData(
@@ -397,9 +372,7 @@ export default function () {
             preset: this.activePreset,
           }),
         });
-        if (!response.ok) {
-          throw new Error("Failed to fetch summary.");
-        }
+        if (!response.ok) throw new Error("Failed to fetch summary.");
         const result = await response.json();
         this.summaryText = result.summary;
       } catch (error) {
@@ -410,14 +383,12 @@ export default function () {
       }
     },
 
-    // --- DATA PROCESSING & RENDERING ---
     processAndMergeData(yourData, marketData) {
       const dataMap = new Map();
       const processRow = (row, source) => {
         const date = (row.stay_date || row.period).substring(0, 10);
-        if (!dataMap.has(date)) {
+        if (!dataMap.has(date))
           dataMap.set(date, { date, your: {}, market: {} });
-        }
         const entry = dataMap.get(date);
         entry[source] = {
           occupancy:
@@ -437,6 +408,7 @@ export default function () {
       });
       return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
     },
+
     renderKpiCards(kpiData) {
       if (!kpiData || !kpiData.yourHotel || !kpiData.market) {
         this.kpi = {
@@ -458,35 +430,34 @@ export default function () {
       }
     },
 
-    // --- GETTERS ---
     get chartTitle() {
       if (
         !this.currentPropertyName ||
         this.currentPropertyName === "Loading..."
-      ) {
+      )
         return "Loading...";
-      }
       const metricName =
         this.activeMetric.charAt(0).toUpperCase() + this.activeMetric.slice(1);
       return `${metricName} of ${this.currentPropertyName} vs The Market`;
     },
 
     // --- UI CONTROL METHODS ---
-    runReport() {
+    // **MODIFIED**: Make runReport async so we can await it.
+    async runReport() {
       if (!this.dates.start || !this.dates.end || !this.granularity) return;
       this.error.show = false;
-      this.loadKpis(this.dates.start, this.dates.end);
-      this.loadChartAndTables(
-        this.dates.start,
-        this.dates.end,
-        this.granularity
-      );
+      // **MODIFIED**: Await both data fetches to complete.
+      await Promise.all([
+        this.loadKpis(this.dates.start, this.dates.end),
+        this.loadChartAndTables(
+          this.dates.start,
+          this.dates.end,
+          this.granularity
+        ),
+      ]);
     },
-    setGranularity(newGranularity) {
-      this.granularity = newGranularity;
-      this.runReport();
-    },
-    setPreset(preset) {
+    // **MODIFIED**: Make setPreset async so we can await it.
+    async setPreset(preset) {
       this.activePreset = preset;
       const today = new Date();
       const yearUTC = today.getUTCFullYear();
@@ -506,7 +477,8 @@ export default function () {
       this.dates.start = formatDate(startDate);
       this.dates.end = formatDate(endDate);
       this.granularity = preset === "this-year" ? "monthly" : "daily";
-      this.runReport();
+      // **MODIFIED**: Await the report run to complete.
+      await this.runReport();
     },
     setActiveMetric(metric) {
       this.activeMetric = metric;
@@ -521,14 +493,10 @@ export default function () {
     },
     async handlePropertyChange(eventDetail) {
       const { propertyId, propertyName } = eventDetail;
-      if (!propertyId || this.currentPropertyId === propertyId) {
-        return;
-      }
+      if (!propertyId || this.currentPropertyId === propertyId) return;
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
-
       if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
-
       try {
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
@@ -537,7 +505,6 @@ export default function () {
         console.error("Failed to fetch hotel details", err);
         this.currencyCode = "USD";
       }
-
       if (!this.isSyncing) {
         this.setPreset("current-month");
       }
@@ -558,9 +525,8 @@ export default function () {
         !day.market ||
         day.your[this.activeMetric] === undefined ||
         day.market[this.activeMetric] === undefined
-      ) {
+      )
         return { formattedDelta: "-", deltaClass: "" };
-      }
       const delta = day.your[this.activeMetric] - day.market[this.activeMetric];
       if (isNaN(delta)) return { formattedDelta: "-", deltaClass: "" };
       const sign = delta > 0 ? "+" : "";
@@ -583,21 +549,19 @@ export default function () {
     formatDateLabel(dateString, granularity) {
       if (!dateString) return "";
       const date = new Date(dateString);
-      if (granularity === "monthly") {
+      if (granularity === "monthly")
         return date.toLocaleString("en-US", {
           month: "long",
           year: "numeric",
           timeZone: "UTC",
         });
-      }
       if (granularity === "weekly") {
         if (!window.getWeekNumber) {
           window.getWeekNumber = function (d) {
             d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
             d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
             const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-            const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-            return weekNo;
+            return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
           };
         }
         return `Wk of ${date.toLocaleDateString("en-GB", { timeZone: "UTC" })}`;
