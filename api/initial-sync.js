@@ -88,21 +88,40 @@ async function runSync(propertyId) {
     // --- END OF NEW LOGIC ---
 
     // --- Fetch historical and forecast metrics (existing logic) ---
+    // --- Fetch historical and forecast metrics (Refactored to be monthly) ---
     let allProcessedData = {};
     const startYear = new Date().getFullYear() - 5;
     const endYear = new Date().getFullYear();
 
+    // This new nested loop fetches data one month at a time to avoid API limits.
     for (let year = startYear; year <= endYear; year++) {
-      const yearStartDate = `${year}-01-01`;
-      const yearEndDate = `${year}-12-31`;
-      console.log(`Fetching metric data for ${year}...`);
-      const yearlyData = await cloudbedsAdapter.getHistoricalMetrics(
-        accessToken,
-        propertyId,
-        yearStartDate,
-        yearEndDate
-      );
-      allProcessedData = { ...allProcessedData, ...yearlyData };
+      for (let month = 0; month < 12; month++) {
+        // Create start and end dates for the current month in UTC.
+        const monthStartDate = new Date(Date.UTC(year, month, 1))
+          .toISOString()
+          .split("T")[0];
+        const monthEndDate = new Date(Date.UTC(year, month + 1, 0))
+          .toISOString()
+          .split("T")[0];
+
+        console.log(
+          `Fetching metric data for ${year}-${String(month + 1).padStart(
+            2,
+            "0"
+          )}...`
+        );
+
+        // Call the adapter for the monthly chunk.
+        const monthlyData = await cloudbedsAdapter.getHistoricalMetrics(
+          accessToken,
+          propertyId,
+          monthStartDate,
+          monthEndDate
+        );
+
+        // Merge the monthly data into our main object.
+        allProcessedData = { ...allProcessedData, ...monthlyData };
+      }
     }
 
     console.log("Fetching forecast data for the next 365 days...");
