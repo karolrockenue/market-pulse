@@ -56,8 +56,6 @@ market-pulse/
 │   │   └── market-explorer.html
 │   ├── app/
 │   │   ├── _shared/
-│   │   │   ├── header.html
-│   │   │   ├── header.mjs
 │   │   │   ├── sidebar.html
 │   │   │   └── sidebar.mjs
 │   │   ├── dashboard.mjs
@@ -1099,3 +1097,64 @@ Date: August 8, 2025
                                                       * The "Market Composition" source description was updated to a single, professionally worded message that instills confidence in the competitive set for all users.
                                                       * Known Unresolved Issue:
                                                       * A critical bug is currently preventing administrators from sending new user invitations from the Settings page. The action fails with a "Failed to send invitation" error message, and the backend logs indicate a database error. Resolving this user invitation failure is the top priority for the next session.
+
+
+Date: August 8, 2025
+                                                      * Objective: Execute a complete, end-to-end overhaul of the user invitation system, resolving a cascade of critical bugs and rebuilding the feature to be secure, context-aware, and aligned with the application's new brand identity.
+                                                      * Summary: A series of show-stopping bugs that made the user invitation feature completely non-functional were diagnosed and resolved. The investigation uncovered a fundamental architectural flaw where invitations were not linked to a specific property, leading to incorrect access being granted. A full-stack refactor was completed to make the system "property-aware," and the process concluded with a full visual redesign of the invitation UI to match the new brand aesthetic.
+                                                      * Key Changes:
+                                                      * Initial Invitation Failure Fix:
+                                                      * Problem: The invitation process failed with a user_invitations_inviter_user_id_fkey foreign key constraint violation.
+                                                      * Resolution: The POST /api/users/invite endpoint in users.router.js was patched to correctly look up the inviter's internal user_id from the session's cloudbeds_user_id before creating the invitation.
+                                                      * Invitation Acceptance Fix:
+                                                      * Problem: After fixing the sending issue, clicking the magic link failed with an error: column "token" does not exist.
+                                                      * Resolution: The GET /api/auth/accept-invitation endpoint in auth.router.js was refactored to use the correct invitation_token column and to properly handle user creation and session management after acceptance.
+                                                      * Property-Aware Invitation System:
+                                                      * Problem: An invitation sent by a super_admin incorrectly granted the new user access to the wrong property, bypassing the context of the hotel the admin was managing.
+                                                      * Resolution: A comprehensive, four-step refactor was executed:
+                                                      1. Database: The user_invitations table was altered to add a property_id column, linking each invitation to a specific hotel.
+                                                      2. Backend (Invite): The POST /api/users/invite endpoint was updated to accept and save the property_id.
+                                                      3. Frontend: The "Invite User" modal (settings.html and settings.mjs) was enhanced with a dropdown menu to allow the inviter to explicitly select which property the invitation is for.
+                                                      4. Backend (Accept): The GET /api/auth/accept-invitation endpoint was updated to use the stored property_id to grant the new user access to the single, correct property.
+                                                      * UI/UX Overhaul:
+                                                      * Problem: The "Invite User" modal had a default, unstyled appearance that was inconsistent with the new brand identity.
+                                                      * Resolution: The modal in settings.html was completely restyled with the application's official color palette (#2D3D57, #4E6688), modern form controls, improved typography, and a layout consistent with the rest of the application.
+                                                      * Outcome: The user management and invitation system is now fully functional, secure, and robust. Invitations are correctly scoped to specific properties, and the user interface for sending them is polished and professional, providing a seamless experience for administrators.
+
+
+
+
+Date: August 9, 2025
+                                                      * Objective: To design and prototype a next-generation UI for the Advanced Reporting page in a sandboxed environment, focusing on simplifying the complex user interface and aligning its visual design with the new main dashboard.
+                                                      * Summary: This was an iterative UI/UX design session conducted entirely within a safe reports_design.html prototype file. The goal was to de-clutter the complex report configuration panel. Through a series of feedback-driven changes, the three main configuration sections were completely redesigned using consistent, interactive UI patterns established on the main dashboard.
+                                                      * Key Changes:
+                                                      * Sandboxed Prototyping: A reports_design.html file was created as a duplicate of the original to allow for rapid, risk-free experimentation with new UI concepts.
+                                                      * "Visual Report Builder" for Metrics: The long checkbox list for metric selection was replaced with a much more intuitive, two-panel system ("Included in Report" and "Available Metrics"). Metrics are now represented as interactive "pills" that move between the panels when clicked.
+                                                      * "Formatting Pills" for Consistency: The same "pill-based" interactive design was applied to the "Formatting & Display" section. Toggles were replaced with pills that move between "Active" and "Available" states, creating a cohesive user experience across the configuration panel.
+                                                      * "Action Hub" Redesign: The final "Export & Actions" section was simplified. The four separate buttons were replaced with a cleaner "Action Hub" that establishes a clear visual hierarchy:
+                                                      * A primary "Export Report" button with a dropdown for file types.
+                                                      * A dedicated "Scheduling Action Card" below it, featuring a prominent "Create New Schedule" button and a "Manage Schedules" link.
+                                                      * Schedule Count Reinstated: The functionality to display the number of active schedules was restored as a small, colored badge on the "Manage Schedules" link, providing at-a-glance information to the user.
+                                                      * Outcome: The session produced a complete, high-fidelity, and fully interactive prototype of the new Advanced Reporting page. The redesigned interface is significantly cleaner, more intuitive, and visually consistent with the rest of the application. The prototype is now ready for final approval to be moved into production.
+
+
+Date: August 9, 2025
+                                                      * Objective: Redesign and simplify the Advanced Reporting page's user interface, focusing on de-cluttering the configuration panel and modernizing the data table to improve clarity and visual consistency with the new dashboard aesthetic.
+                                                      * Summary: An iterative UI/UX refinement session was conducted on the reports_design.html prototype. The work focused on reducing the visual weight of the report configuration controls and completely redesigning the data table presentation for a cleaner, more readable, and more insightful user experience.
+                                                      * Key Changes:
+                                                      * Configuration Panel Simplification:
+                                                      * To de-emphasize the controls, the main "Select Metrics" and "Formatting & Display" headings were removed.
+                                                      * The vertical line separating the two configuration columns was deleted to create a more open and unified layout.
+                                                      * The "INCLUDED IN REPORT" label was updated to the more direct "REPORT METRICS" for better clarity.
+                                                      * Data Table Redesign:
+                                                      * The report table was re-architected to be borderless internally; all vertical column separators and header underlines were removed.
+                                                      * A single, full-width top border was implemented on the table's container to act as a clean "page splitter" between the controls and the data.
+                                                      * A bug preventing the top border from stretching end-to-end was fixed by restructuring the page's padding.
+                                                      * Internal cell padding was standardized across all headers and data rows to fix alignment issues and ensure content has proper spacing.
+                                                      * Market Data Highlighting:
+                                                      * A new data visualization enhancement was added. When "Market Comparisons" are active, all columns containing market-specific data now have a subtle light-gray background (bg-slate-50).
+                                                      * This highlighting makes the data source immediately obvious and improves the readability of complex comparison reports.
+                                                      * Report Caption Refinement:
+                                                      * The main, large-font report title (e.g., "Your Hotel Report") was removed from the caption area.
+                                                      * The "Displaying..." subtitle was restyled to be more prominent, serving as the primary context header for the report and improving the visual hierarchy.
+                                                      * Outcome: The Advanced Reporting page UI is now significantly cleaner, more intuitive, and visually aligned with the application's modern design language. The data table is easier to read, and the new highlighting for market columns provides an immediate and clear visual distinction for competitive analysis.

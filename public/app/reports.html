@@ -130,943 +130,332 @@
 <div class="flex-1 flex flex-col min-w-0 bg-white text-[#11191f] rounded-[10px] overflow-hidden">
   
     <div x-show="isInitialized" x-cloak class="flex-1 flex flex-col">
-        <main class="flex-1 p-8">
-          <div
-            class="bg-white p-4 rounded-xl border border-gray-200 mb-8 flex flex-col gap-4"
-          >
-            <div class="flex flex-wrap items-center gap-4">
-              <div class="flex items-center gap-2">
-                <svg
-                  class="h-5 w-5 text-gray-400"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-                <span class="font-semibold text-gray-600 text-sm"
-                  >Date Range</span
-                >
-              </div>
-              <div class="flex items-center gap-3 ml-auto">
-                <input
-                  type="date"
-                  id="start-date"
-                  @change="preset = ''; handleGenerateReport(granularity)"
-                  class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
-                />
-                <span class="text-gray-400">-</span>
-                <input
-                  type="date"
-                  id="end-date"
-                  @change="preset = ''; handleGenerateReport(granularity)"
-                  class="date-picker text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
-                />
-              </div>
+<main class="flex-1 flex-col">
+<div class="flex flex-row border-b border-gray-200 px-4 md:px-8" style="min-height: 220px;">
+<div class="flex-1 min-w-0 flex flex-col pr-8 pt-4 md:pt-8 pb-8">
+          <div class="flex justify-between items-center">
+        <h2 class="text-4xl font-bold text-[#2D3D57]">
+          Advanced Reporting
+        </h2>
+        <div class="flex items-center gap-x-2">
+          <input type="date" id="start-date" @change="preset = ''; handleGenerateReport()" class="text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 focus:border-blue-500"/>
+          <span class="text-gray-400">-</span>
+          <input type="date" id="end-date" @change="preset = ''; handleGenerateReport()" class="text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 focus:border-blue-500"/>
+          <button @click="handleGenerateReport()" type="button" class="inline-flex justify-center items-center rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90 px-5 py-2">
+            Run
+          </button>
+        </div>
+      </div>
+      
+      <div class="flex-1"></div>
+
+      <div class="flex items-center gap-x-2">
+        <div x-data="{ open: false }" class="relative inline-block text-left">
+          <div>
+            <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold shadow-sm hover:opacity-90" style="padding: 5px 8px 5px 12px; font-size: 13px">
+              <span>Display:</span>
+              <span class="ml-1" x-text="granularity.charAt(0).toUpperCase() + granularity.slice(1)"></span>
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" style="display: none">
+            <div class="py-1">
+              <a href="#" @click.prevent="granularity = 'daily'; handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'daily', 'hover:bg-gray-200': granularity !== 'daily' }">Daily</a>
+              <a href="#" @click.prevent="granularity = 'weekly'; handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'weekly', 'hover:bg-gray-200': granularity !== 'weekly' }">Weekly</a>
+              <a href="#" @click.prevent="granularity = 'monthly'; handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'monthly', 'hover:bg-gray-200': granularity !== 'monthly' }">Monthly</a>
             </div>
-   <div class="flex items-center gap-x-2 border-t border-dashed pt-4 mt-2">
-              <div x-data="{ open: false }" class="relative inline-block text-left">
-                <div>
-                  <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90" style="padding: 5px 8px 5px 12px;">
-                    <span>Display:</span>
-                    <span class="ml-1" x-text="granularity.charAt(0).toUpperCase() + granularity.slice(1)"></span>
-                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
+          </div>
+        </div>
+        <div x-data="{ open: false }" class="relative inline-block text-left">
+          <div>
+            <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 shadow-sm hover:opacity-90" :class="{'rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold': preset, 'rounded-full bg-white border border-dashed border-gray-300 font-light text-[#332D56]': !preset}" :style="preset ? 'padding: 5px 8px 5px 12px; font-size: 13px' : 'padding: 4px 10px 4px 15px;'">
+              <span>Presets:</span>
+              <span class="ml-1" x-text="preset ? preset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''"></span>
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" style="display: none">
+            <div class="py-1">
+              <a href="#" @click.prevent="preset = 'last-week'; handlePresetChange('last-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-week' }">Last Week</a>
+              <a href="#" @click.prevent="preset = 'current-week'; handlePresetChange('current-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-week' }">Current Week</a>
+              <div class="border-t border-gray-200 my-1"></div>
+              <a href="#" @click.prevent="preset = 'current-month'; handlePresetChange('current-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-month' }">Current Month</a>
+              <a href="#" @click.prevent="preset = 'next-month'; handlePresetChange('next-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'next-month' }">Next Month</a>
+              <div class="border-t border-gray-200 my-1"></div>
+              <a href="#" @click.prevent="preset = 'year-to-date'; handlePresetChange('year-to-date'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'year-to-date' }">Year-to-Date</a>
+              <a href="#" @click.prevent="preset = 'this-year'; handlePresetChange('this-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'this-year' }">This Year</a>
+              <a href="#" @click.prevent="preset = 'last-year'; handlePresetChange('last-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-year' }">Last Year</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="w-[370px] flex-shrink-0 border-l border-gray-200 pl-8 pt-4 md:pt-8 pb-8">
+          <div class="flex flex-col h-full justify-center space-y-4">
+        <div x-data="{ open: false }" class="relative">
+            <button @click="open = !open" type="button" class="w-full inline-flex justify-center items-center gap-x-2 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90 px-5 py-2.5">
+                <svg class="h-5 w-5 -ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.086L6.28 8.28a.75.75 0 00-1.06 1.06l4.25 4.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 00-1.06-1.06L10.75 10.836V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>
+                Export Report
+                <svg class="h-5 w-5 -mr-1 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+            </button>
+            <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 z-10 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div class="py-1">
+                    <a href="#" @click.prevent="exportToCSV(); open = false" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">Download as CSV</a>
+                    <a href="#" @click.prevent="exportToExcel(); open = false" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">Download as Excel (.xlsx)</a>
                 </div>
-                <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" style="display: none">
-                  <div class="py-1">
-                    <a href="#" @click.prevent="granularity = 'daily'; handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'daily', 'hover:bg-gray-200': granularity !== 'daily' }">Daily</a>
-                    <a href="#" @click.prevent="granularity = 'weekly'; handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'weekly', 'hover:bg-gray-200': granularity !== 'weekly' }">Weekly</a>
-                    <a href="#" @click.prevent="granularity = 'monthly'; handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': granularity === 'monthly', 'hover:bg-gray-200': granularity !== 'monthly' }">Monthly</a>
-                  </div>
-                </div>
-              </div>
-              <div x-data="{ open: false }" class="relative inline-block text-left">
-                <div>
-                  <button @click="open = !open" type="button" class="inline-flex justify-center items-center gap-x-1.5 rounded-lg bg-[#E3EEB2] text-[#332D56] font-semibold text-sm shadow-sm hover:opacity-90" style="padding: 5px 8px 5px 12px;">
-                    <span>Presets:</span>
-                    <span class="ml-1" x-text="preset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())"></span>
-                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-       <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-slate-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" style="display: none">
-  <div class="py-1">
-    <a href="#" @click.prevent="preset = 'last-week'; handlePresetChange('last-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-week', 'hover:bg-gray-200': preset !== 'last-week' }">Last Week</a>
-    <a href="#" @click.prevent="preset = 'current-week'; handlePresetChange('current-week'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-week', 'hover:bg-gray-200': preset !== 'current-week' }">Current Week</a>
-    <div class="border-t border-gray-200 my-1"></div>
-    <a href="#" @click.prevent="preset = 'current-month'; handlePresetChange('current-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'current-month', 'hover:bg-gray-200': preset !== 'current-month' }">Current Month</a>
-    <a href="#" @click.prevent="preset = 'next-month'; handlePresetChange('next-month'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'next-month', 'hover:bg-gray-200': preset !== 'next-month' }">Next Month</a>
-    <div class="border-t border-gray-200 my-1"></div>
-    <a href="#" @click.prevent="preset = 'year-to-date'; handlePresetChange('year-to-date'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'year-to-date', 'hover:bg-gray-200': preset !== 'year-to-date' }">Year-to-Date</a>
-    <a href="#" @click.prevent="preset = 'this-year'; handlePresetChange('this-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'this-year', 'hover:bg-gray-200': preset !== 'this-year' }">This Year</a>
-    <a href="#" @click.prevent="preset = 'last-year'; handlePresetChange('last-year'); handleGenerateReport(); open = false" class="text-gray-700 block px-4 py-2 text-sm" :class="{ 'bg-blue-100 text-blue-600 font-semibold': preset === 'last-year', 'hover:bg-gray-200': preset !== 'last-year' }">Last Year</a>
-  </div>
+            </div>
+        </div>
+    
+<div x-data="{ open: false }" class="relative">
+    <button @click="open = !open" type="button" class="w-full inline-flex justify-center items-center gap-x-2 rounded-lg bg-white text-gray-900 font-semibold text-sm shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 px-5 py-2.5">
+        <svg class="h-5 w-5 -ml-1 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.25 8.25A2.25 2.25 0 003 10.5v5.25a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V10.5a2.25 2.25 0 00-2.25-2.25H5.25zM5.25 7a.75.75 0 01.75-.75h10.5a.75.75 0 01.75.75v1.25a.75.75 0 01-.75.75H6a.75.75 0 01-.75-.75V7zM4.5 10.5a.75.75 0 01.75-.75h10.5a.75.75 0 01.75.75v5.25a.75.75 0 01-.75.75H5.25a.75.75 0 01-.75-.75V10.5z" clip-rule="evenodd" /><path d="M7 2.25a.75.75 0 01.75-.75h4.5a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-4.5a.75.75 0 01-.75-.75V2.25z" /></svg>
+        Schedule Delivery
+        <svg class="h-5 w-5 -mr-1 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+    </button>
+    <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 z-10 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <div class="py-1">
+            <a href="#" @click.prevent="isScheduleModalOpen = true; open = false" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">Create New Schedule</a>
+            <a href="#" @click.prevent="isManageModalOpen = true; open = false" class="relative text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
+                Manage Schedules
+                <span x-show="schedules.length > 0" x-text="schedules.length" class="absolute top-1.5 right-3 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold"></span>
+            </a>
+        </div>
+    </div>
 </div>
-              </div>
+      </div>
+    </div>
+  </div>
+
+<div id="report-options-container" class="pt-8 px-4 md:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
+      <div class="lg:col-span-1">
+    
+        <div class="p-4 bg-slate-50 border rounded-lg min-h-[120px]">
+          <p class="text-xs font-semibold text-slate-500 mb-3">REPORT METRICS</p>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="metric in reportMetrics" :key="metric.key"><template x-if="selectedMetricKeys.includes(metric.key)"><button @click="toggleMetric(metric.key)" class="px-3 py-1 text-sm font-semibold text-white rounded-full transition-colors" :class="metric.group === 'Hotel' ? 'bg-[#4E6688]' : 'bg-slate-400'"><span x-text="metric.label"></span> &times;</button></template></template>
+            <p x-show="selectedMetricKeys.length === 0" class="text-xs text-slate-400 p-2">Click a metric below to add it.</p>
+          </div>
+        </div>
+        <div class="mt-4 p-4 border-t">
+          <p class="text-xs font-semibold text-slate-500 mb-3">AVAILABLE METRICS</p>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="metric in reportMetrics" :key="metric.key"><template x-if="!selectedMetricKeys.includes(metric.key)"><button @click="toggleMetric(metric.key)" class="px-3 py-1 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-full hover:bg-slate-100 hover:border-slate-400 transition-colors">+ <span x-text="metric.label"></span></button></template></template>
+          </div>
+        </div>
+      </div>
+<div class="lg:pl-8 border-slate-200">
+        <div class="p-4 bg-slate-50 border rounded-lg min-h-[120px]">
+          <p class="text-xs font-semibold text-slate-500 mb-3">ACTIVE FORMATTING</p>
+          <div class="flex flex-wrap gap-2">
+            <template x-if="displayTotals"><button @click="displayTotals = false; handleGenerateReport()" class="px-3 py-1 text-sm font-semibold text-white bg-[#4E6688] rounded-full transition-colors">Display Totals &times;</button></template>
+            <template x-if="includeTaxes"><button @click="includeTaxes = false; handleGenerateReport()" class="px-3 py-1 text-sm font-semibold text-white bg-[#4E6688] rounded-full transition-colors">Tax-Inclusive &times;</button></template>
+            <template x-if="addComparisons"><div><button @click="addComparisons = false; handleGenerateReport()" class="px-3 py-1 text-sm font-semibold text-white bg-[#4E6688] rounded-full transition-colors">Market Comparisons &times;</button><div class="mt-3"><span class="text-sm font-medium text-slate-600 mr-2">Order:</span><div class="inline-flex rounded-md shadow-sm"><button @click="displayOrder = 'metric'; handleGenerateReport()" class="px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-slate-300" :class="displayOrder === 'metric' ? 'bg-[#4E6688] text-white' : 'bg-white text-slate-700 hover:bg-slate-50'">By Metric</button><button @click="displayOrder = 'source'; handleGenerateReport()" class="px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-slate-300 -ml-px" :class="displayOrder === 'source' ? 'bg-[#4E6688] text-white' : 'bg-white text-slate-700 hover:bg-slate-50'">By Source</button></div></div></div></template>
+            <p x-show="!displayTotals && !includeTaxes && !addComparisons" class="text-xs text-slate-400 p-2">Click an option below to activate it.</p>
+          </div>
+        </div>
+        <div class="mt-4 p-4 border-t">
+          <p class="text-xs font-semibold text-slate-500 mb-3">AVAILABLE FORMATTING</p>
+          <div class="flex flex-wrap gap-2">
+            <template x-if="!displayTotals"><button @click="displayTotals = true; handleGenerateReport()" class="px-3 py-1 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-full hover:bg-slate-100 transition-colors">+ Display Totals</button></template>
+            <template x-if="!includeTaxes"><button @click="includeTaxes = true; handleGenerateReport()" class="px-3 py-1 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-full hover:bg-slate-100 transition-colors">+ Tax-Inclusive</button></template>
+            <template x-if="!addComparisons"><button @click="addComparisons = true; handleGenerateReport()" class="px-3 py-1 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-full hover:bg-slate-100 transition-colors">+ Market Comparisons</button></template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<div id="report-results-container" class="mt-8">
+  <div x-show="isScheduleModalOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center" style="display: none">
+    <div @click="isScheduleModalOpen = false" class="fixed inset-0 w-full h-full"></div>
+    <div class="relative mx-auto p-8 w-full max-w-3xl shadow-2xl rounded-2xl bg-slate-50">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h3 class="text-2xl font-bold text-slate-800">Create a Scheduled Report</h3>
+                <p class="text-sm text-slate-500 mt-1">Configure and save a report to be delivered automatically via email.</p>
             </div>
-          </div>
-
-          <div
-            id="report-options-container"
-            class="bg-white p-6 rounded-xl border border-gray-200"
-          >
-            <details open>
-              <summary class="flex justify-between items-center cursor-pointer">
-                <h2 class="text-lg font-semibold text-[#2D3D57]">
-                  Report Options
-                </h2>
-                <svg
-                  class="h-5 w-5 text-gray-500 chevron"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </summary>
-              <div
-                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 mt-6 border-t pt-6"
-              >
-                <div class="lg:col-span-1">
-                  <h4
-                    class="flex items-center text-sm font-semibold text-slate-800 border-b pb-2 mb-3"
-                  >
-                    <svg
-                      class="h-6 w-6 mr-2 text-blue-500"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke-width="1.5"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Select Metrics
-                  </h4>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                    <div>
-                      <h5 class="text-sm font-semibold text-gray-600 mb-3">
-                        Hotel Metrics
-                      </h5>
-                      <div class="space-y-3">
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="Occupancy"
-                            @change="handleGenerateReport(granularity)"
-                            checked
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >Occupancy</span
-                          ></label
-                        >
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="ADR"
-                            @change="handleGenerateReport(granularity)"
-                            checked
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >ADR</span
-                          ></label
-                        >
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="RevPAR"
-                            @change="handleGenerateReport(granularity)"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >RevPAR</span
-                          ></label
-                        >
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="Total Revenue"
-                            @change="handleGenerateReport(granularity)"
-                            checked
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >Total Revenue</span
-                          ></label
-                        >
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="Rooms Sold"
-                            @change="handleGenerateReport(granularity)"
-                            checked
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >Rooms Sold</span
-                          ></label
-                        >
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="Rooms Unsold"
-                            @change="handleGenerateReport(granularity)"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >Rooms Unsold</span
-                          ></label
-                        >
-                      </div>
-                    </div>
-                    <div>
-                      <h5 class="text-sm font-semibold text-gray-600 mb-3">
-                        Market Metrics
-                      </h5>
-                      <div class="space-y-3">
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="Market Occupancy"
-                            @change="handleGenerateReport(granularity)"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >Market Occupancy</span
-                          ></label
-                        >
-                        <label class="flex items-center"
-                          ><input
-                            type="checkbox"
-                            data-metric-key="Market ADR"
-                            @change="handleGenerateReport(granularity)"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          /><span class="ml-2 text-xs text-gray-700"
-                            >Market ADR</span
-                          ></label
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="lg:border-l lg:pl-6 border-slate-200">
-                  <div class="space-y-6">
-                    <h4
-                      class="flex items-center text-sm font-semibold text-slate-800 border-b pb-2 mb-3"
-                    >
-                      <svg
-                        class="h-6 w-6 mr-2 text-blue-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke-width="1.5"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"
-                        />
-                      </svg>
-                      Formatting & Comparisons
-                    </h4>
-                    <label
-                      for="display-totals-checkbox"
-                      class="flex items-center justify-between cursor-pointer"
-                      ><span class="font-medium text-gray-800 text-xs"
-                        >Display Totals Row</span
-                      ><input
-                        type="checkbox"
-                        id="display-totals-checkbox"
-                        x-model="displayTotals"
-                        @change="handleGenerateReport(granularity)"
-                        class="sr-only peer" />
-                      <div
-                        class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
-                      ></div
-                    ></label>
-        
-
-<label
-  for="include-taxes-toggle"
-  class="flex items-center justify-between cursor-pointer"
->
-  <span class="font-medium text-gray-800 text-xs">Show Tax-Inclusive Values</span>
-  <input
-    type="checkbox"
-    id="include-taxes-toggle"
-    x-model="includeTaxes"
-    @change="handleGenerateReport()"
-    class="sr-only peer"
-  />
-  <div
-    class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
-  ></div>
-</label>
-                    <div class="pt-6 border-t">
-                      <label
-                        for="add-comparisons-toggle"
-                        class="flex items-center justify-between cursor-pointer"
-                        ><span class="font-medium text-gray-800 text-xs"
-                          >Add Market Comparisons</span
-                        ><input
-                          type="checkbox"
-                          id="add-comparisons-toggle"
-                          x-model="addComparisons"
-                          @change="handleGenerateReport(granularity)"
-                          class="sr-only peer" />
-                        <div
-                          class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"
-                        ></div
-                      ></label>
-                      <fieldset
-                        id="comparison-display-options"
-                        :disabled="!addComparisons"
-                        class="mt-4 disabled:opacity-50 transition"
-                      >
-                        <legend class="text-xs text-gray-500 mb-2">
-                          Display Order
-                        </legend>
-                        <div class="flex items-center gap-4">
-                          <label class="flex items-center text-xs"
-                            ><input
-                              type="radio"
-                              name="comparison-order"
-                              value="metric"
-                              @change="handleGenerateReport(granularity)"
-                              checked
-                              class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                            /><span class="ml-2 text-gray-600"
-                              >Group by Metric</span
-                            ></label
-                          >
-                          <label class="flex items-center text-xs"
-                            ><input
-                              type="radio"
-                              name="comparison-order"
-                              value="source"
-                              @change="handleGenerateReport(granularity)"
-                              class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                            /><span class="ml-2 text-gray-600"
-                              >Group by Source</span
-                            ></label
-                          >
-                        </div>
-                      </fieldset>
-                    </div>
-                  </div>
-                </div>
-                <div class="space-y-4 lg:border-l lg:pl-6 border-slate-200">
-                  <h4
-                    class="flex items-center text-sm font-semibold text-slate-800 border-b pb-2 mb-3"
-                  >
-                    <svg
-                      class="h-6 w-6 mr-2 text-blue-500"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke-width="1.5"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                      />
-                    </svg>
-                    Export & Actions
-                  </h4>
-                  <div class="space-y-3">
-                    <button
-                      @click="exportToCSV()"
-                      class="w-full text-left inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <svg
-                        class="h-5 w-5 mr-3 text-gray-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM6.75 9.25a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5z"
-                          clip-rule="evenodd"
-                        />
-                      </svg>
-                      Export to CSV
-                    </button>
-                    <button
-                      @click="exportToExcel()"
-                      class="w-full text-left inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <svg
-                        class="h-5 w-5 mr-3 text-gray-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          d="M10.75 2.75a.75.75 0 00-1.5 0v8.25a.75.75 0 001.5 0V2.75z"
-                        />
-                        <path
-                          d="M3.58 7.08a.75.75 0 001.06.04l3.25-2.5a.75.75 0 00-1-1.12l-3.25 2.5a.75.75 0 00-.06 1.08zM15.36 7.12a.75.75 0 00-1.06-.04l-3.25-2.5a.75.75 0 001-1.12l3.25 2.5a.75.75 0 00.06 1.08z"
-                        />
-                        <path
-                          fill-rule="evenodd"
-                          d="M2 12.5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 12.5z"
-                          clip-rule="evenodd"
-                        />
-                      </svg>
-                      Export to Excel (.xlsx)
-                    </button>
-                    <button
-                      @click="isScheduleModalOpen = true"
-                      class="w-full text-left inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <svg
-                        class="h-5 w-5 mr-3 text-gray-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          d="M6.28 5.22a.75.75 0 00-1.06 1.06l7.22 7.22H6.75a.75.75 0 000 1.5h7.5a.75.75 0 00.75-.75V7.25a.75.75 0 00-1.5 0v5.69L6.28 5.22z"
-                        />
-                      </svg>
-                      Create Scheduled Report
-                    </button>
-                    <button
-                      @click="isManageModalOpen = true"
-                      class="w-full text-left relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <svg
-                        class="h-5 w-5 mr-3 text-gray-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6z"
-                          clip-rule="evenodd"
-                        />
-                        <path
-                          d="M16.707 5.293a1 1 0 010 1.414l-1.5 1.5a1 1 0 01-1.414-1.414l1.5-1.5a1 1 0 011.414 0zM5.293 3.293a1 1 0 011.414 0l1.5 1.5a1 1 0 01-1.414 1.414l-1.5-1.5a1 1 0 010-1.414zM16.707 14.707a1 1 0 010-1.414l-1.5-1.5a1 1 0 01-1.414 1.414l1.5 1.5a1 1 0 011.414 0zM5.293 16.707a1 1 0 011.414 0l1.5-1.5a1 1 0 11-1.414-1.414l-1.5 1.5a1 1 0 010 1.414z"
-                        />
-                      </svg>
-                      Manage Schedules
-                      <span
-                        x-show="schedules.length > 0"
-                        x-text="schedules.length"
-                        class="absolute top-1 right-1 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold"
-                        style="display: none"
-                      ></span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </details>
-          </div>
-
-          <div id="report-results-container" class="mt-8"></div>
-
-          <div
-            x-show="isScheduleModalOpen"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
-            style="display: none"
-          >
-            <div
-              @click="isScheduleModalOpen = false"
-              class="fixed inset-0 w-full h-full"
-            ></div>
-            <div
-              class="relative mx-auto p-8 w-full max-w-3xl shadow-2xl rounded-2xl bg-slate-50"
-            >
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <h3 class="text-2xl font-bold text-slate-800">
-                    Create a Scheduled Report
-                  </h3>
-                  <p class="text-sm text-slate-500 mt-1">
-                    Configure and save a report to be delivered automatically
-                    via email.
-                  </p>
-                </div>
-                <button
-                  @click="isScheduleModalOpen = false"
-                  class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 -mt-2 -mr-2 ml-auto inline-flex items-center"
-                >
-                  <svg
-                    class="w-5 h-5"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                      clip-rule="evenodd"
-                    ></path>
-                  </svg>
-                </button>
-              </div>
-
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
-                <div class="space-y-6">
-                  <fieldset>
-                    <legend
-                      class="block mb-3 text-base font-semibold text-slate-700"
-                    >
-                      Report Period
-                    </legend>
+            <button @click="isScheduleModalOpen = false" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 -mt-2 -mr-2 ml-auto inline-flex items-center">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
+            <div class="space-y-6">
+                <fieldset>
+                    <legend class="block mb-3 text-base font-semibold text-slate-700">Report Period</legend>
                     <div id="modal-preset-group" class="grid grid-cols-2 gap-3">
-                      <div>
-                        <input
-                          type="radio"
-                          id="preset-last-week"
-                          name="modal-preset"
-                          value="last-week"
-                          class="hidden peer"
-                          x-model="newSchedulePeriod"
-                        />
-                        <label
-                          for="preset-last-week"
-                          class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
-                        >
-                          <div class="block">
-                            <div class="w-full text-sm font-semibold">
-                              Previous Week
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                      <div>
-                        <input
-                          type="radio"
-                          id="preset-current-week"
-                          name="modal-preset"
-                          value="current-week"
-                          class="hidden peer"
-                          x-model="newSchedulePeriod"
-                        />
-                        <label
-                          for="preset-current-week"
-                          class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
-                        >
-                          <div class="block">
-                            <div class="w-full text-sm font-semibold">
-                              Current Week
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                      <div>
-                        <input
-                          type="radio"
-                          id="preset-current-month"
-                          name="modal-preset"
-                          value="current-month"
-                          class="hidden peer"
-                          x-model="newSchedulePeriod"
-                        />
-                        <label
-                          for="preset-current-month"
-                          class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
-                        >
-                          <div class="block">
-                            <div class="w-full text-sm font-semibold">
-                              Current Month
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                      <div>
-                        <input
-                          type="radio"
-                          id="preset-next-month"
-                          name="modal-preset"
-                          value="next-month"
-                          class="hidden peer"
-                          x-model="newSchedulePeriod"
-                        />
-                        <label
-                          for="preset-next-month"
-                          class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
-                        >
-                          <div class="block">
-                            <div class="w-full text-sm font-semibold">
-                              Next Month
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                      <div>
-                        <input
-                          type="radio"
-                          id="preset-this-year"
-                          name="modal-preset"
-                          value="this-year"
-                          class="hidden peer"
-                          x-model="newSchedulePeriod"
-                        />
-                        <label
-                          for="preset-this-year"
-                          class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100"
-                        >
-                          <div class="block">
-                            <div class="w-full text-sm font-semibold">
-                              This Year
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-                  </fieldset>
-
-                  <div class="border-t border-slate-200 pt-6">
-                    <fieldset>
-                      <legend
-                        class="block mb-3 text-base font-semibold text-slate-700"
-                      >
-                        Delivery Schedule
-                      </legend>
-                      <div class="grid grid-cols-2 gap-4">
                         <div>
-                          <label
-                            for="schedule-frequency"
-                            class="block mb-2 text-sm font-medium text-slate-600"
-                            >Frequency</label
-                          >
-                          <select
-                            id="schedule-frequency"
-                            x-model="newScheduleFrequency"
-                            @change="handleFrequencyChange"
-                            class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                          >
-                            <option>Daily</option>
-                            <option>Weekly</option>
-                            <option>Monthly</option>
-                          </select>
+                            <input type="radio" id="preset-last-week" name="modal-preset" value="last-week" class="hidden peer" x-model="newSchedulePeriod" />
+                            <label for="preset-last-week" class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100">
+                                <div class="block"><div class="w-full text-sm font-semibold">Previous Week</div></div>
+                            </label>
                         </div>
-                        <div x-show="newScheduleFrequency === 'Weekly'">
-                          <label
-                            for="schedule-weekly-day"
-                            class="block mb-2 text-sm font-medium text-slate-600"
-                            >Day of Week</label
-                          >
-                          <select
-                            id="schedule-weekly-day"
-                            class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                          >
-                            <option value="1">Monday</option>
-                            <option value="2">Tuesday</option>
-                            <option value="3">Wednesday</option>
-                            <option value="4">Thursday</option>
-                            <option value="5">Friday</option>
-                            <option value="6">Saturday</option>
-                            <option value="0">Sunday</option>
-                          </select>
+                        <div>
+                            <input type="radio" id="preset-current-week" name="modal-preset" value="current-week" class="hidden peer" x-model="newSchedulePeriod" />
+                            <label for="preset-current-week" class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100">
+                                <div class="block"><div class="w-full text-sm font-semibold">Current Week</div></div>
+                            </label>
                         </div>
-                        <div x-show="newScheduleFrequency === 'Monthly'">
-                          <label
-                            for="schedule-monthly-day"
-                            class="block mb-2 text-sm font-medium text-slate-600"
-                            >Day of Month</label
-                          >
-                          <select
-                            id="schedule-monthly-day"
-                            class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                          >
-                            <option value="1">1st of the month</option>
-                            <option value="-1">Last day of the month</option>
-                          </select>
+                        <div>
+                            <input type="radio" id="preset-current-month" name="modal-preset" value="current-month" class="hidden peer" x-model="newSchedulePeriod" />
+                            <label for="preset-current-month" class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100">
+                                <div class="block"><div class="w-full text-sm font-semibold">Current Month</div></div>
+                            </label>
                         </div>
-                        <div class="col-span-2">
-                          <label
-                            for="schedule-time"
-                            class="block mb-2 text-sm font-medium text-slate-600"
-                            >Time of Day (UTC)</label
-                          >
-                          <select
-                            id="schedule-time"
-                            class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                          ></select>
+                        <div>
+                            <input type="radio" id="preset-next-month" name="modal-preset" value="next-month" class="hidden peer" x-model="newSchedulePeriod" />
+                            <label for="preset-next-month" class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100">
+                                <div class="block"><div class="w-full text-sm font-semibold">Next Month</div></div>
+                            </label>
                         </div>
-                      </div>
+                        <div>
+                            <input type="radio" id="preset-this-year" name="modal-preset" value="this-year" class="hidden peer" x-model="newSchedulePeriod" />
+                            <label for="preset-this-year" class="inline-flex items-center justify-center w-full p-4 text-slate-600 bg-white border border-slate-200 rounded-lg cursor-pointer peer-checked:border-blue-600 peer-checked:ring-2 peer-checked:ring-blue-500 peer-checked:text-blue-600 hover:text-slate-700 hover:bg-slate-100">
+                                <div class="block"><div class="w-full text-sm font-semibold">This Year</div></div>
+                            </label>
+                        </div>
+                    </div>
+                </fieldset>
+                <div class="border-t border-slate-200 pt-6">
+                    <fieldset>
+                        <legend class="block mb-3 text-base font-semibold text-slate-700">Delivery Schedule</legend>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="schedule-frequency" class="block mb-2 text-sm font-medium text-slate-600">Frequency</label>
+                                <select id="schedule-frequency" x-model="newScheduleFrequency" @change="handleFrequencyChange" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                    <option>Daily</option><option>Weekly</option><option>Monthly</option>
+                                </select>
+                            </div>
+                            <div x-show="newScheduleFrequency === 'Weekly'">
+                                <label for="schedule-weekly-day" class="block mb-2 text-sm font-medium text-slate-600">Day of Week</label>
+                                <select id="schedule-weekly-day" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                    <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+                                </select>
+                            </div>
+                            <div x-show="newScheduleFrequency === 'Monthly'">
+                                <label for="schedule-monthly-day" class="block mb-2 text-sm font-medium text-slate-600">Day of Month</label>
+                                <select id="schedule-monthly-day" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                    <option value="1">1st of the month</option><option value="-1">Last day of the month</option>
+                                </select>
+                            </div>
+                            <div class="col-span-2">
+                                <label for="schedule-time" class="block mb-2 text-sm font-medium text-slate-600">Time of Day (UTC)</label>
+                                <select id="schedule-time" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"></select>
+                            </div>
+                        </div>
                     </fieldset>
-                  </div>
                 </div>
-
-                <div class="space-y-6 lg:border-l lg:pl-8 border-slate-200">
-                  <fieldset>
-                    <legend
-                      class="block mb-3 text-base font-semibold text-slate-700"
-                    >
-                      Report Details
-                    </legend>
+            </div>
+            <div class="space-y-6 lg:border-l lg:pl-8 border-slate-200">
+                <fieldset>
+                    <legend class="block mb-3 text-base font-semibold text-slate-700">Report Details</legend>
                     <div>
-                      <label
-                        for="schedule-name"
-                        class="block mb-2 text-sm font-medium text-slate-600"
-                        >Report Name</label
-                      >
-                      <div class="relative">
-                        <div
-                          class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"
-                        >
-                          <svg
-                            class="w-5 h-5 text-slate-400"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z"
-                            />
-                            <path
-                              d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z"
-                            />
-                          </svg>
+                        <label for="schedule-name" class="block mb-2 text-sm font-medium text-slate-600">Report Name</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                <svg class="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
+                            </div>
+                            <input type="text" id="schedule-name" x-model="newScheduleName" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pl-10" placeholder="E.g., Weekly Occupancy Summary" />
                         </div>
-                        <input
-                          type="text"
-                          id="schedule-name"
-                          x-model="newScheduleName"
-                          class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pl-10"
-                          placeholder="E.g., Weekly Occupancy Summary"
-                        />
-                      </div>
                     </div>
                     <div class="mt-4">
-                      <label
-                        for="schedule-recipients"
-                        class="block mb-2 text-sm font-medium text-slate-600"
-                        >Email Recipients</label
-                      >
-                      <div class="relative">
-                        <div
-                          class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"
-                        >
-                          <svg
-                            class="w-5 h-5 text-slate-400"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z"
-                            />
-                            <path
-                              d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z"
-                            />
-                          </svg>
+                        <label for="schedule-recipients" class="block mb-2 text-sm font-medium text-slate-600">Email Recipients</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                <svg class="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" /><path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" /></svg>
+                            </div>
+                            <input type="text" id="schedule-recipients" x-model="newScheduleRecipients" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pl-10" placeholder="owner@hotel.com, manager@hotel.com" />
                         </div>
-                        <input
-                          type="text"
-                          id="schedule-recipients"
-                          x-model="newScheduleRecipients"
-                          class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pl-10"
-                          placeholder="owner@hotel.com, manager@hotel.com"
-                        />
-                      </div>
-                      <p class="mt-2 text-xs text-slate-500">
-                        Separate multiple email addresses with a comma.
-                      </p>
+                        <p class="mt-2 text-xs text-slate-500">Separate multiple email addresses with a comma.</p>
                     </div>
-                  </fieldset>
-                  <div class="border-t border-slate-200 pt-6">
+                </fieldset>
+                <div class="border-t border-slate-200 pt-6">
                     <fieldset>
-                      <legend class="text-base font-semibold text-slate-700">
-                        Attachment Formats
-                      </legend>
-                      <p class="text-sm text-slate-500 mb-3">
-                        Select at least one file format for the email
-                        attachment.
-                      </p>
-                      <div class="flex items-center gap-4 pt-2">
-                        <label class="flex items-center">
-                          <input
-                            type="checkbox"
-                            value="csv"
-                            x-model="newScheduleFormats"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span class="ml-2 text-sm text-gray-700">CSV</span>
-                        </label>
-                        <label class="flex items-center">
-                          <input
-                            type="checkbox"
-                            value="xlsx"
-                            x-model="newScheduleFormats"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span class="ml-2 text-sm text-gray-700"
-                            >Excel (.xlsx)</span
-                          >
-                        </label>
-                      </div>
+                        <legend class="text-base font-semibold text-slate-700">Attachment Formats</legend>
+                        <p class="text-sm text-slate-500 mb-3">Select at least one file format for the email attachment.</p>
+                        <div class="flex items-center gap-4 pt-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" value="csv" x-model="newScheduleFormats" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span class="ml-2 text-sm text-gray-700">CSV</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="xlsx" x-model="newScheduleFormats" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span class="ml-2 text-sm text-gray-700">Excel (.xlsx)</span>
+                            </label>
+                        </div>
                     </fieldset>
-                  </div>
                 </div>
-              </div>
-
-              <div
-                class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-200"
-              >
-                <button
-                  @click="isScheduleModalOpen = false"
-                  class="text-slate-600 bg-white hover:bg-slate-100 focus:ring-4 focus:outline-none focus:ring-slate-200 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5"
-                >
-                  Cancel
-                </button>
-                <button
-                  @click="saveSchedule()"
-                  :disabled="newScheduleFormats.length === 0"
-                  class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed"
-                >
-                  Save Schedule
-                </button>
-              </div>
             </div>
-          </div>
-          <div
-            x-show="isManageModalOpen"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
-            style="display: none"
-          >
-            <div
-              @click="isManageModalOpen = false"
-              class="fixed inset-0 w-full h-full"
-            ></div>
-            <div
-              class="relative mx-auto p-8 border w-full max-w-2xl shadow-lg rounded-xl bg-white"
-            >
-              <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-semibold text-gray-900">
-                  Manage Schedules
-                </h3>
-                <button
-                  @click="isManageModalOpen = false"
-                  class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
-                >
-                  <svg
-                    class="w-5 h-5"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                      clip-rule="evenodd"
-                    ></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="overflow-x-auto rounded-lg border">
-                <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
+        </div>
+        <div class="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-200">
+            <button @click="isScheduleModalOpen = false" class="text-slate-600 bg-white hover:bg-slate-100 focus:ring-4 focus:outline-none focus:ring-slate-200 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5">Cancel</button>
+            <button @click="saveSchedule()" :disabled="newScheduleFormats.length === 0" class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed">Save Schedule</button>
+        </div>
+    </div>
+</div>
+
+<div x-show="isManageModalOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center" style="display: none">
+    <div @click="isManageModalOpen = false" class="fixed inset-0 w-full h-full"></div>
+    <div class="relative mx-auto p-8 border w-full max-w-2xl shadow-lg rounded-xl bg-white">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold text-gray-900">Manage Schedules</h3>
+            <button @click="isManageModalOpen = false" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+        </div>
+        <div class="overflow-x-auto rounded-lg border">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                      <th
-                        scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Report Details
-                      </th>
-                      <th
-                        scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Frequency
-                      </th>
-                      <th scope="col" class="relative px-6 py-3">
-                        <span class="sr-only">Actions</span>
-                      </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report Details</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
                     </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200">
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
                     <template x-if="schedules.length === 0">
-                      <tr>
-                        <td colspan="3" class="px-6 py-12 text-center">
-                          <div class="text-sm text-gray-500">
-                            You have no scheduled reports.
-                          </div>
-                        </td>
-                      </tr>
+                        <tr><td colspan="3" class="px-6 py-12 text-center"><div class="text-sm text-gray-500">You have no scheduled reports.</div></td></tr>
                     </template>
                     <template x-for="schedule in schedules" :key="schedule.id">
-                      <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                          <div
-                            class="text-sm font-semibold text-slate-800"
-                            x-text="schedule.report_name"
-                          ></div>
-                          <div class="text-xs text-slate-500 mt-1">
-                            For Hotel:
-                            <span
-                              class="font-medium"
-                              x-text="schedule.property_name || 'Unknown Hotel'"
-                            ></span>
-                          </div>
-                          <div
-                            class="text-xs text-slate-500 mt-1"
-                            x-text="`To: ${schedule.recipients}`"
-                          ></div>
-                        </td>
-                        <td
-                          class="px-6 py-4 whitespace-nowrap text-sm text-slate-600"
-                        >
-                          <span x-text="schedule.frequency"></span>
-                        </td>
-                        <td
-                          class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
-                        >
-                          <a
-                            href="#"
-                            @click.prevent="deleteSchedule(schedule.id)"
-                            class="text-red-600 hover:text-red-900"
-                            >Delete</a
-                          >
-                        </td>
-                      </tr>
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-semibold text-slate-800" x-text="schedule.report_name"></div>
+                                <div class="text-xs text-slate-500 mt-1">For Hotel: <span class="font-medium" x-text="schedule.property_name || 'Unknown Hotel'"></span></div>
+                                <div class="text-xs text-slate-500 mt-1" x-text="`To: ${schedule.recipients}`"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600"><span x-text="schedule.frequency"></span></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <a href="#" @click.prevent="deleteSchedule(schedule.id)" class="text-red-600 hover:text-red-900">Delete</a>
+                            </td>
+                        </tr>
                     </template>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </main>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</main>
       </div>
     </div>
 <script>
       function reportsPage() {
         return {
+
+          // --- NEW: State for the visual report builder ---
+          reportMetrics: [
+            { key: 'Occupancy', label: 'Occupancy', group: 'Hotel' },
+            { key: 'ADR', label: 'ADR', group: 'Hotel' },
+            { key: 'RevPAR', label: 'RevPAR', group: 'Hotel' },
+            { key: 'Total Revenue', label: 'Total Revenue', group: 'Hotel' },
+            { key: 'Rooms Sold', label: 'Rooms Sold', group: 'Hotel' },
+            { key: 'Rooms Unsold', label: 'Rooms Unsold', group: 'Hotel' },
+            { key: 'Market Occupancy', label: 'Market Occupancy', group: 'Market' },
+            { key: 'Market ADR', label: 'Market ADR', group: 'Market' },
+          ],
+          selectedMetricKeys: ['Occupancy', 'ADR', 'Total Revenue', 'Rooms Sold'], // Default selections
+
+          // --- EXISTING STATE ---
+          isInitialized: false,
+          propertyId: null,
           // --- STATE ---
           isInitialized: false,
           propertyId: null,
@@ -1074,6 +463,7 @@
           isManageModalOpen: false,
           propertyName: "Your Hotel",
           addComparisons: false,
+        displayOrder: 'metric', // The default selection
           displayTotals: true,
           granularity: "daily",
           preset: "current-month",
@@ -1137,7 +527,21 @@
             this.handleFrequencyChange();
             this.schedules = await window.fetchSchedules();
           },
+// --- NEW: Method for the visual builder ---
+          toggleMetric(metricKey) {
+            const index = this.selectedMetricKeys.indexOf(metricKey);
+            if (index > -1) {
+              // If it's already selected, remove it
+              this.selectedMetricKeys.splice(index, 1);
+            } else {
+              // Otherwise, add it
+              this.selectedMetricKeys.push(metricKey);
+            }
+            // Automatically re-run the report after a change
+            this.handleGenerateReport();
+          },
 
+          // --- PROXY METHODS (Unchanged) ---
           // --- PROXY METHODS (Unchanged) ---
           handleGenerateReport() { window.handleGenerateReport(this, this.propertyId); },
           handlePresetChange(preset) { window.handlePresetChange(preset); },

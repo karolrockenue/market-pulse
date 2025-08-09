@@ -1,22 +1,27 @@
 // public/app/reports.js
 
 // --- HELPER for handleGenerateReport ---
-// Kept private to this module, no need to expose on window
-function getSelectedColumns() {
+// --- HELPER for handleGenerateReport ---
+// This function now correctly accepts the component's state as a parameter.
+function getSelectedColumns(component) {
+  // Use the passed-in component's state, which is much more reliable.
+  const selectedKeys = component.selectedMetricKeys || [];
+
   const selected = { hotel: [], market: [] };
-  document
-    .querySelectorAll(
-      '#report-options-container input[type="checkbox"]:checked'
-    )
-    .forEach((checkbox) => {
-      const key = checkbox.dataset.metricKey;
-      if (!key) return;
-      if (key.startsWith("Market")) {
-        selected.market.push(key);
-      } else {
-        selected.hotel.push(key);
-      }
-    });
+
+  selectedKeys.forEach((key) => {
+    // Find the metric's details from the component's metric list.
+    const metric = component.reportMetrics.find((m) => m.key === key);
+    if (!metric) return; // Skip if the metric isn't found
+
+    // Correctly sort the key into the 'hotel' or 'market' group.
+    if (metric.group === "Market") {
+      selected.market.push(key);
+    } else {
+      selected.hotel.push(key);
+    }
+  });
+
   return selected;
 }
 // public/app/reports.js
@@ -88,8 +93,8 @@ async function handleGenerateReport(component, propertyId) {
         "No property selected. Please choose a property from the header dropdown."
       );
     }
-
-    const selectedColumns = getSelectedColumns();
+    // This fix passes the component state down to the helper function.
+    const selectedColumns = getSelectedColumns(component);
     const allSelected = [...selectedColumns.hotel, ...selectedColumns.market];
 
     if (allSelected.length === 0) {
@@ -104,12 +109,8 @@ async function handleGenerateReport(component, propertyId) {
     const endDate = parseDateFromInput(
       document.getElementById("end-date").value
     );
-    const addComparisons = document.getElementById(
-      "add-comparisons-toggle"
-    )?.checked;
-    const displayOrder = document.querySelector(
-      'input[name="comparison-order"]:checked'
-    )?.value;
+    const addComparisons = component.addComparisons;
+    const displayOrder = component.displayOrder;
 
     const granularity = component.granularity;
     const shouldDisplayTotals = component.displayTotals;
@@ -229,7 +230,8 @@ async function saveSchedule(component) {
     return;
   }
 
-  const selectedColumns = getSelectedColumns();
+  // Pass the component state directly to the helper function.
+  const selectedColumns = getSelectedColumns(component);
 
   const payload = {
     propertyId: component.propertyId,
@@ -480,11 +482,11 @@ function handleFrequencyChange() {
 // public/app/reports.js
 // public/app/reports.js
 
+// This function is updated to handle both 'metric' and 'source' display orders.
+// This function is updated with advanced logic to place separators correctly.
 function buildTableHeaders(selected, addComparisons, displayOrder, component) {
   const { includeTaxes, propertyTaxRate, propertyTaxName } = component;
   const taxLabel = includeTaxes ? "Gross" : "Net";
-
-  // Build the new dynamic tooltip text
   let tooltipText = "Values are exclusive of any taxes (net)";
   if (includeTaxes) {
     const ratePercent = (propertyTaxRate * 100).toFixed(0);
@@ -492,19 +494,15 @@ function buildTableHeaders(selected, addComparisons, displayOrder, component) {
       propertyTaxName || "Tax"
     } @ ${ratePercent}% (gross)`;
   }
-
-  // This is a simple, filled SVG icon for the tooltip
   const svgIcon = `<svg class="inline-block h-3 w-3 -mt-0.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>`;
-
   const createFinancialLabel = (metric) => {
     return `${metric.toUpperCase()} (${taxLabel}) <span class="tooltip">${svgIcon}<span class="tooltip-text">${tooltipText}</span></span>`;
   };
-
-  // The rest of the function remains the same logic as before...
   const financialMetrics = new Set(["ADR", "RevPAR", "Total Revenue"]);
   let headers = [{ label: "Date", align: "left", key: "date" }];
   const { hotel: hotelMetrics, market: marketMetrics } = selected;
   const hotelMetricsSet = new Set(hotelMetrics);
+  const marketMetricsSet = new Set(marketMetrics);
   const masterOrder = [
     "Rooms Sold",
     "Rooms Unsold",
@@ -514,32 +512,81 @@ function buildTableHeaders(selected, addComparisons, displayOrder, component) {
     "Total Revenue",
   ];
 
+  // --- REFACTORED LOGIC ---
+  // First, we build the individual groups of headers.
+  let hotelHeaders = [];
+  let marketHeaders = [];
+  let deltaHeaders = [];
+
   masterOrder.forEach((metric) => {
-    if (hotelMetricsSet.has(metric)) {
+    const isHotelMetricSelected = hotelMetricsSet.has(metric);
+    const isMarketMetricSelected = marketMetricsSet.has(`Market ${metric}`);
+    if (isHotelMetricSelected) {
       const label = financialMetrics.has(metric)
         ? createFinancialLabel(metric)
         : metric.toUpperCase();
-      headers.push({ label: label, key: metric, separator: !addComparisons });
+      hotelHeaders.push({ label: label, key: metric });
     }
-    if (addComparisons && marketMetrics.includes(`Market ${metric}`)) {
+    if (isMarketMetricSelected) {
       const marketKey = `Market ${metric}`;
       const label = financialMetrics.has(metric)
         ? `MKT ${createFinancialLabel(metric)}`
         : `MKT ${metric.toUpperCase()}`;
-      headers.push({ label: label, key: marketKey });
-      if (hotelMetricsSet.has(metric)) {
-        headers.push({
-          label: "DELTA",
-          key: `${metric}_delta`,
-          separator: true,
-        });
-      } else {
-        headers[headers.length - 1].separator = true;
-      }
+      marketHeaders.push({ label: label, key: marketKey });
+    }
+    if (addComparisons && isHotelMetricSelected && isMarketMetricSelected) {
+      deltaHeaders.push({ label: `DELTA (${metric})`, key: `${metric}_delta` });
     }
   });
 
-  if (headers.length > 1) headers[headers.length - 1].separator = false;
+  // Now, we assemble the final headers array based on the displayOrder.
+  if (displayOrder === "source") {
+    // For "Group by Source", we add borders between the main groups.
+    if (addComparisons) {
+      // Add a border after the last hotel metric, if there are market/delta columns following.
+      if (
+        hotelHeaders.length > 0 &&
+        (marketHeaders.length > 0 || deltaHeaders.length > 0)
+      ) {
+        hotelHeaders[hotelHeaders.length - 1].separator = true;
+      }
+      // Add a border after the last market metric, if there are delta columns following.
+      if (marketHeaders.length > 0 && deltaHeaders.length > 0) {
+        marketHeaders[marketHeaders.length - 1].separator = true;
+      }
+    }
+    headers.push(...hotelHeaders, ...marketHeaders, ...deltaHeaders);
+  } else {
+    // For "Group by Metric"
+    masterOrder.forEach((metric) => {
+      const metricGroup = [];
+      const hotelHeader = hotelHeaders.find((h) => h.key === metric);
+      if (hotelHeader) metricGroup.push(hotelHeader);
+
+      const marketHeader = marketHeaders.find(
+        (h) => h.key === `Market ${metric}`
+      );
+      if (marketHeader) metricGroup.push(marketHeader);
+
+      const deltaHeader = deltaHeaders.find((h) => h.key === `${metric}_delta`);
+      if (deltaHeader) metricGroup.push(deltaHeader);
+
+      // Add a border to the end of the group, but only if comparisons are on.
+      if (addComparisons && metricGroup.length > 0) {
+        metricGroup[metricGroup.length - 1].separator = true;
+      }
+      headers.push(...metricGroup);
+    });
+
+    // This ensures the very last column in the table never has a border.
+    if (headers.length > 1) {
+      const lastHeader = headers[headers.length - 1];
+      if (lastHeader.separator) {
+        delete lastHeader.separator;
+      }
+    }
+  }
+
   return headers.map((h) => ({ align: "right", ...h }));
 }
 // public/app/reports.js
@@ -600,11 +647,15 @@ function buildTableBody(data, headers, component) {
         // This class logic now correctly uses the standard font for all data cells.
         const alignClass =
           header.key === "date" ? "font-medium" : "font-normal"; // font-data class removed to default to Inter font.
-        const separatorClass = header.separator
-          ? "border-r border-slate-200"
-          : "";
-
-        return `<td class="py-4 px-2 whitespace-nowrap text-sm text-right ${alignClass} ${separatorClass}">${content}</td>`;
+        // This removes the separatorClass variable and its use in the template literal,
+        // deleting the final vertical borders from the table.
+        // Removed px-4, as the new parent wrapper now handles all horizontal padding.
+        // Added the isMarket check here as well to style the main data cells.
+        // REMOVED: The check for header.isMarket to remove the background color.
+        // This adds the border style if the header has the 'separator' flag.
+        return `<td class="px-4 py-4 whitespace-nowrap text-sm text-right ${alignClass} ${
+          header.separator ? "border-r border-slate-300" : ""
+        }">${content}</td>`;
       });
       cells[0] = cells[0].replace("text-right", "text-left");
 
@@ -691,12 +742,16 @@ function buildTableTotalsRow(data, headers, component) {
       header.key === "date"
         ? "font-data text-slate-800 text-left"
         : "font-data text-slate-800 text-right";
-    const separatorClass = header.separator ? "border-r border-slate-200" : "";
-    return `<td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${alignClass} ${separatorClass}">${content}</td>`;
+    // Removed the separator logic for the totals row.
+    // Added the isMarket check to the totals row for consistency.
+    // REMOVED: The check for header.isMarket to remove the background color.
+    // This adds the same border style to the Totals row for consistency.
+    return `<td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${alignClass} ${
+      header.separator ? "border-r border-slate-300" : ""
+    }">${content}</td>`;
   });
-  return `<tr class="bg-slate-100 border-t-2 border-slate-300">${cells.join(
-    ""
-  )}</tr>`;
+  // Removed the border-t-2 class to delete the line above the totals row.
+  return `<tr class="bg-slate-100">${cells.join("")}</tr>`;
 }
 // public/app/reports.js
 
@@ -734,34 +789,42 @@ function renderReportTable(
 
   // MODIFIED: Use the property name from the component state for the on-screen caption.
   const dynamicTitle = generateReportTitle(selected, component.propertyName);
+  // - The outer div now only handles the full-width top border.
+  // - A new inner div has been added with horizontal padding (px-4) and the overflow-x-auto
+  //   to ensure the table has space on the sides and scrolls correctly.
   const tableHTML = `
-    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-      <table class="min-w-full">
-        <caption class="text-left p-6 bg-white border-b border-gray-200">
-          <h2 class="text-2xl font-bold text-[#13191d]">${dynamicTitle}</h2>
-          <p class="text-sm text-gray-500 mt-2">Displaying <strong>${
-            granularity.charAt(0).toUpperCase() + granularity.slice(1)
-          }</strong> data from <strong>${formatDateForDisplay(
+    <div class="bg-white border-t border-gray-200">
+      <div class="overflow-x-auto px-4 md:px-8">
+        <table class="min-w-full">
+          <caption class="text-left py-4 bg-white">
+            <p class="text-sm font-semibold text-slate-600">Displaying <strong>${
+              granularity.charAt(0).toUpperCase() + granularity.slice(1)
+            }</strong> data from <strong>${formatDateForDisplay(
     data[0].date
   )}</strong> to <strong>${formatDateForDisplay(
     data[data.length - 1].date
   )}</strong></p>
-        </caption>
-        <thead class="sticky top-0 bg-white">
-          <tr class="border-b border-gray-200">
-            ${headers
-              .map(
-                (h) =>
-                  // Styles for padding and text color updated to match the design prototype.
-                  `<th class="py-3 px-2 text-left text-xs font-semibold text-[#a3a5a7] uppercase tracking-wider ${
-                    h.separator ? "border-r border-gray-200" : ""
-                  } ${h.align === "right" ? "text-right" : ""}">${h.label}</th>`
-              )
-              .join("")}
-          </tr>
-        </thead>
-        <tbody class="text-[#3e4046]">${bodyRows}</tbody>
-      </table>
+          </caption>
+          <thead class="sticky top-0 bg-white">
+            <tr>
+              ${headers
+                .map(
+                  (h) =>
+                    // We remove the specific padding from the header cells now,
+                    // as the new parent div is handling it.
+                    // Added a check for h.isMarket to apply a subtle background color.
+                    `<th class="py-3 px-4 text-left text-xs font-semibold text-[#a3a5a7] uppercase tracking-wider ${
+                      h.align === "right" ? "text-right" : ""
+                    } ${h.separator ? "border-r border-slate-300" : ""}">${
+                      h.label
+                    }</th>`
+                )
+                .join("")}
+            </tr>
+          </thead>
+          <tbody class="text-[#3e4046]">${bodyRows}</tbody>
+        </table>
+      </div>
     </div>`;
   container.innerHTML = tableHTML;
 }
