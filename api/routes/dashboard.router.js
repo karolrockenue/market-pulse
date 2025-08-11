@@ -66,7 +66,8 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
       const query = `
         SELECT 
           hotel_id AS property_id, 
-          property_name
+          property_name,
+          city /* Add this line to select the city */
         FROM hotels
         ORDER BY property_name;
       `;
@@ -77,7 +78,8 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
       const query = `
         SELECT 
           up.property_id, 
-          h.property_name
+          h.property_name,
+          h.city /* Add this line to select the city */
         FROM user_properties up
         LEFT JOIN hotels h ON up.property_id::text = h.hotel_id::text
         WHERE up.user_id = $1

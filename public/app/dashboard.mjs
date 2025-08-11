@@ -634,7 +634,10 @@ export default function () {
     // This function is now fully asynchronous to ensure it waits for data loading to complete.
     // This function is now fully asynchronous and includes a try/finally block for robustness.
     async handlePropertyChange(eventDetail) {
-      const { propertyId, propertyName } = eventDetail;
+      // This tells JavaScript to find 'property_id' in the incoming object
+      // and assign its value to a new variable called 'propertyId'.
+      const { property_id: propertyId, property_name: propertyName } =
+        eventDetail;
       if (!propertyId || this.currentPropertyId === propertyId) return;
 
       this.currentPropertyId = propertyId;

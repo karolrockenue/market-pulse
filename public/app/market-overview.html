@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Explorer - Market Pulse</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
+    <style>
+      :root {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --accent-primary: #3b82f6;
+        --font-sans: "Inter", sans-serif;
+        --font-data: "IBM Plex Mono", monospace;
+      }
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+      }
+      .font-data {
+        font-family: var(--font-data);
+      }
+      .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+      }
+      .chart-container {
+        height: 320px; /* Adjusted height for new layout */
+      }
+    </style>
+  </head>
+  <body class="antialiased bg-[#332D56] p-[10px] pl-0">
+    <div class="flex flex-col lg:flex-row h-screen">
+      <div id="sidebar-placeholder"></div>
+
+      <div
+        class="flex-1 flex flex-col min-w-0 bg-white text-[#11191f] rounded-[10px] overflow-y-auto"
+      >
+        <body class="antialiased bg-[#332D56] p-[10px] pl-0">
+          <div class="flex flex-col lg:flex-row h-screen">
+            <div id="sidebar-placeholder"></div>
+
+            <div
+              class="flex-1 flex flex-col min-w-0 bg-white text-[#11191f] rounded-[10px] overflow-y-auto"
+            >
+              <main
+                class="flex-1 flex flex-col"
+                x-data="marketOverview"
+                x-init="init()"
+              >
+     <div
+                  class="border-b border-gray-200 p-8 flex justify-between items-start gap-8"
+                  style="min-height: 220px"
+                >
+                  <header class="flex-1">
+                    <h1
+                      class="text-4xl font-bold text-[#2D3D57]"
+                      x-text="pageTitle"
+                    ></h1>
+                    <p class="text-slate-500 mt-1">
+                      A macro-level view of market health, historical trends,
+                      and future outlook.
+                    </p>
+                  </header>
+
+                  <div class="flex-shrink-0 w-64">
+                    <div
+                      class="rounded-lg p-4 h-full flex flex-col justify-center text-white shadow-lg"
+                      :style="{ backgroundColor: marketKpis.revpar.change >= 0 ? '#71c0bb' : '#c36063' }"
+                    >
+                      <h3 class="text-sm font-medium opacity-80">
+                        Market RevPAR Trend
+                      </h3>
+                      <p class="text-2xl font-semibold mt-2">
+                        <span
+                          x-text="marketKpis.revpar.change >= 0 ? 'Up' : 'Down'"
+                        ></span>
+                        <span
+                          x-text="` ${(Math.abs(marketKpis.revpar.change) * 100).toFixed(1)}%`"
+                        ></span>
+                        <span class="opacity-80"> vs PY</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+        <section id="historical-revpar" class="mb-8">
+<div class="p-4 md:p-8 border-b border-gray-200">
+    <div class="flex flex-col sm:flex-row gap-y-4 sm:gap-x-12">
+    <div>
+        <label class="text-sm font-semibold text-slate-600">Metric</label>
+        <div class="mt-2 flex flex-wrap gap-2">
+        <template x-for="metric in allMetrics" :key="metric">
+            <button
+            @click="setMetric(metric)"
+            :class="{ 'bg-[#4E6688] text-white font-semibold': activeMetric === metric, 'bg-slate-100 text-slate-600 hover:bg-slate-200': activeMetric !== metric }"
+            class="px-3 py-1 text-sm font-medium rounded-full transition-colors"
+            x-text="metric.toUpperCase()"
+            ></button>
+        </template>
+        </div>
+    </div>
+    <div>
+        <label class="text-sm font-semibold text-slate-600">Quality Tiers</label>
+        <div class="mt-2 flex flex-wrap gap-2">
+        <button
+            @click="toggleTier('Entire Market')"
+            :class="{ 'bg-[#4E6688] text-white': isEntireMarketSelected, 'bg-slate-100 text-slate-600 hover:bg-slate-200': !isEntireMarketSelected }"
+            class="px-3 py-1 text-sm font-medium rounded-full transition-colors"
+        >
+            Entire Market
+        </button>
+        <template x-for="tier in allTiers" :key="tier">
+            <button
+            @click="toggleTier(tier)"
+            class="px-3 py-1 text-sm font-medium rounded-full transition-colors border-2"
+            :class="{
+                'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent': !activeTiers.includes(tier) || isEntireMarketSelected,
+                'bg-white font-semibold': activeTiers.includes(tier) && !isEntireMarketSelected,
+                'opacity-50': isEntireMarketSelected
+            }"
+            :style="activeTiers.includes(tier) && !isEntireMarketSelected ? { 
+                borderColor: tierColors[tier], 
+                color: tierColors[tier] 
+            } : {}"
+            x-text="tier"
+            ></button>
+        </template>
+        </div>
+    </div>
+    <div>
+        <label class="text-sm font-semibold text-slate-600">Years</label>
+        <div class="mt-2 flex flex-wrap gap-2">
+        <template x-for="year in allHistoricalYears" :key="year">
+            <button
+            @click="toggleYear(year)"
+            class="px-3 py-1 text-sm font-medium rounded-full transition-colors border-2"
+            :class="{
+                'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent': !activeYears.includes(year),
+                'bg-white text-[#4E6688] border-[#4E6688] font-semibold': activeYears.includes(year)
+            }"
+            :style="activeYears.includes(year) ? { 
+                'borderStyle': yearLineStyles[year] 
+            } : {}"
+            x-text="year"
+            ></button>
+        </template>
+        </div>
+    </div>
+    </div>
+
+    <div id="historical-revpar-chart" class="w-full mt-8" style="height: 350px"></div>
+
+<div class="mt-4 pt-4 border-dashed">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+        <div>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Market Occupancy</p>
+        <div class="flex items-baseline justify-center gap-x-2 mt-1">
+            <p class="text-xl font-bold text-slate-800" x-text="`${(marketKpis.occupancy.current * 100).toFixed(1)}%`"></p>
+            <p class="text-xs font-semibold" :style="marketKpis.occupancy.change >= 0 ? 'color: #16a34a' : 'color: #dc2626'">
+            <span x-text="marketKpis.occupancy.change >= 0 ? '▲' : '▼'"></span>
+            <span x-text="(marketKpis.occupancy.change * 100).toFixed(1)"></span>
+            <span> pts</span>
+            </p>
+        </div>
+        </div>
+        <div>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Market ADR</p>
+        <div class="flex items-baseline justify-center gap-x-2 mt-1">
+            <p class="text-xl font-bold text-slate-800" x-text="`£${marketKpis.adr.current.toFixed(2)}`"></p>
+            <p class="text-xs font-semibold" :style="marketKpis.adr.change >= 0 ? 'color: #16a34a' : 'color: #dc2626'">
+            <span x-text="marketKpis.adr.change >= 0 ? '▲' : '▼'"></span>
+            <span x-text="(marketKpis.adr.change * 100).toFixed(1)"></span>
+            <span>%</span>
+            </p>
+        </div>
+        </div>
+        <div>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Market RevPAR</p>
+        <div class="flex items-baseline justify-center gap-x-2 mt-1">
+            <p class="text-xl font-bold text-slate-800" x-text="`£${marketKpis.revpar.current.toFixed(2)}`"></p>
+            <p class="text-xs font-semibold" :style="marketKpis.revpar.change >= 0 ? 'color: #16a34a' : 'color: #dc2626'">
+            <span x-text="marketKpis.revpar.change >= 0 ? '▲' : '▼'"></span>
+            <span x-text="(marketKpis.revpar.change * 100).toFixed(1)"></span>
+            <span>%</span>
+            </p>
+        </div>
+        </div>
+    </div>
+    </div>
+</div>
+</section>
+
+<div class="py-4 md:py-8 space-y-8">
+
+    <section id="seasonality" class="border-b border-gray-200 pb-8">
+        <div class="px-4 md:px-8">
+            <div class="flex flex-wrap justify-between items-center mb-4">
+                <div>
+                    <h2
+                    class="text-xl font-semibold mb-1"
+                    style="color: #2d3d57"
+                    >
+                    Market Seasonality
+                    </h2>
+                    <p class="text-sm text-slate-500 mt-1">
+                    View the heatmap for a specific year to identify
+                    event-driven spikes.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <template
+                    x-for="year in availableSeasonalityYears"
+                    :key="year"
+                    >
+                    <button
+                        @click="setSeasonalityYear(year)"
+                        :class="{ 'bg-[#4E6688] text-white font-semibold': activeSeasonalityYear === year, 'bg-slate-100 text-slate-600 hover:bg-slate-200': activeSeasonalityYear !== year }"
+                        class="px-3 py-1 text-sm font-medium rounded-full transition-colors"
+                        x-text="year"
+                    ></button>
+                    </template>
+                </div>
+            </div>
+            <div
+            id="seasonality-heatmap"
+            class="w-full"
+            style="height: 200px"
+            ></div>
+        </div>
+    </section>
+    
+    <section id="area-performance" class="px-4 md:px-8">
+        <div class="card">
+            <div class="flex flex-wrap justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-[#2D3D57]">
+                    Area Performance
+                </h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-slate-500">Heatmap:</span>
+                    <template x-for="metric in ['revpar', 'adr', ' occupancy']" :key="metric">
+                        <button @click="setActiveHeatmapMetric(metric)" :class="{ 'bg-[#4E6688] text-white font-semibold': activeHeatmapMetric === metric, 'bg-slate-100 text-slate-600 hover:bg-slate-200': activeHeatmapMetric !== metric }" class="px-3 py-1 text-sm font-medium rounded-full transition-colors" x-text="metric.toUpperCase()"></button>
+                    </template>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="text-[#2D3D57]">
+                            <th @click="sortBy('name')" class="p-3 font-semibold cursor-pointer">
+                                Area
+                            </th>
+                            <th @click="sortBy('revpar')" class="p-3 font-semibold cursor-pointer text-right">
+                                RevPAR
+                            </th>
+                            <th @click="sortBy('adr')" class="p-3 font-semibold cursor-pointer text-right">
+                                ADR
+                            </th>
+                            <th @click="sortBy('occupancy')" class="p-3 font-semibold cursor-pointer text-right">
+                                Occupancy
+                            </th>
+                            <th @click="sortBy('yoy')" class="p-3 font-semibold cursor-pointer text-right">
+                                YoY Change
+                            </th>
+                            <th @click="sortBy('hotel_count')" class="p-3 font-semibold cursor-pointer text-center">
+                                # Hotels
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="item in sortedAreas" :key="item.name">
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 font-medium text-slate-800 rounded-l-lg" x-text="item.name"></td>
+                                <td class="p-3 font-data text-right" :class="getHeatmapClass('revpar', item.revpar)" x-text="`£${item.revpar.toFixed(2)}`"></td>
+                                <td class="p-3 font-data text-right" :class="getHeatmapClass('adr', item.adr)" x-text="`£${item.adr.toFixed(2)}`"></td>
+                                <td class="p-3 font-data text-right" :class="getHeatmapClass('occupancy', item.occupancy)" x-text="`${(item.occupancy * 100).toFixed(1)}%`"></td>
+                                <td class="p-3 font-data text-right">
+                                    <template x-if="item.yoy !== null">
+                                        <span :class="item.yoy >= 0 ? 'text-green-600' : 'text-red-600'">
+                                            <span x-text="item.yoy >= 0 ? '+' : ''"></span>
+                                            <span x-text="item.yoy.toFixed(1)"></span>
+                                            <span x-text="activeHeatmapMetric === 'occupancy' ? ' pts' : '%'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="item.yoy === null">
+                                        <span class="text-slate-400">N/A</span>
+                                    </template>
+                                </td>
+                                <td class="p-3 font-data text-center text-slate-500 rounded-r-lg" x-text="item.hotel_count"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+          
+                </div>
+              </main>
+            </div>
+          </div>
+        </body>
+      </div>
+    </div>
+
+    <script type="module">
+      // Import utility functions and components
+      import { loadComponent } from "/app/utils.mjs";
+      import sidebar from "/app/_shared/sidebar.mjs";
+      // Import the logic for this page from its dedicated module
+      import marketOverviewComponent from "/app/market-overview.mjs";
+
+      // Register Alpine.js components
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("sidebar", sidebar);
+        // Point the 'marketOverview' component to our imported logic
+        Alpine.data("marketOverview", marketOverviewComponent);
+      });
+
+      // Load the shared sidebar component when the DOM is ready
+      document.addEventListener("DOMContentLoaded", async () => {
+        await loadComponent("sidebar", "sidebar-placeholder");
+      });
+    </script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+      defer
+    ></script>
+  </body>
+</html>

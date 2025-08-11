@@ -134,10 +134,8 @@ export default function sidebar() {
       if (!currentProperty) return;
       window.dispatchEvent(
         new CustomEvent("property-changed", {
-          detail: {
-            propertyId: currentProperty.property_id,
-            propertyName: currentProperty.property_name,
-          },
+          // This is the only change. We now pass the whole property object.
+          detail: currentProperty,
         })
       );
     },

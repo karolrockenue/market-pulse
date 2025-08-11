@@ -53,13 +53,14 @@ market-pulse/
 │   ├── admin/
 │   │   ├── admin.mjs
 │   │   ├── index.html
-│   │   └── market-explorer.html
 │   ├── app/
 │   │   ├── _shared/
 │   │   │   ├── sidebar.html
 │   │   │   └── sidebar.mjs
 │   │   ├── dashboard.mjs
 │   │   ├── index.html
+│   │   ├── market-overview..html
+│   │   ├── market-overview.mjs
 │   │   ├── reports.html
 │   │   ├── reports.js
 │   │   ├── settings.html
@@ -1158,3 +1159,132 @@ Date: August 9, 2025
                                                       * The main, large-font report title (e.g., "Your Hotel Report") was removed from the caption area.
                                                       * The "Displaying..." subtitle was restyled to be more prominent, serving as the primary context header for the report and improving the visual hierarchy.
                                                       * Outcome: The Advanced Reporting page UI is now significantly cleaner, more intuitive, and visually aligned with the application's modern design language. The data table is easier to read, and the new highlighting for market columns provides an immediate and clear visual distinction for competitive analysis.
+
+
+Date: August 9, 2025
+                                                      * Objective: Finalize and deploy the complete UI/UX overhaul of the Advanced Reporting page, moving the interactive prototype into production.
+                                                      * Summary: Following a series of iterative design refinements and bug fixes in a sandboxed prototype (reports_design.html), the new reporting page UI was made live. The work focused on improving data presentation, fixing logical bugs in column grouping, and completing the deployment by replacing the original file.
+                                                      * Key Changes:
+                                                      * Deployment: The fully-functional and approved reports_design.html prototype was promoted to public/app/reports.html, and the original file was deleted, officially launching the new design.
+                                                      * Logic & Bug Fixes:
+                                                      * The column rendering logic was refactored to correctly handle the "Group by Source" display order (Our Hotel data -> Market data -> Delta data).
+                                                      * A bug was fixed that prevented market metrics from showing independently; the "Market Comparisons" toggle now correctly controls only the "Delta" columns.
+                                                      * A ReferenceError that occurred during the refactor was diagnosed and resolved.
+                                                      * UI Refinements:
+                                                      * The "Delta" column headers were updated to be more descriptive (e.g., DELTA (Occupancy)).
+                                                      * Conditional vertical borders were implemented to visually separate data groups in comparison views, improving readability for both "Group by Source" and "Group by Metric" modes.
+                                                      * Removed a distracting grey background from market-data columns for a cleaner, borderless table design.
+                                                      * Outcome: The Advanced Reporting page has been successfully migrated to the new, modern design language, ensuring it is visually and functionally consistent with the main dashboard. The interface is significantly more intuitive, and all known bugs related to its layout and data presentation have been resolved.
+Date: August 9, 2025
+                                                      * Objective: Refactor the main dashboard's layout to enable full-page scrolling, improving the user experience when viewing large datasets.
+                                                      * Summary: Based on user feedback that the fixed-height table felt constrained, the dashboard layout was modified to allow the main content to scroll naturally. This removes the "window within a window" feeling and makes navigating long data tables more intuitive, while keeping the main sidebar navigation accessible.
+                                                      * Key Changes:
+                                                      * The dashboard's internal table container was modified in public/app/index.html to allow its height to expand with its content by removing the max-h-[75vh] and overflow-y-auto classes.
+                                                      * The primary content panel was updated to handle overflow by replacing the overflow-hidden class with overflow-y-auto, enabling a vertical scrollbar when the content exceeds the viewport height.
+                                                      * Outcome: The main dashboard now features a natural scrolling behavior that feels more intuitive for exploring large data tables. The change successfully resolves the "constrained" feeling of the previous design and provides a more seamless user experience.
+
+
+Date: August 10, 2025
+                                                      * Objective: To design and prototype a high-fidelity, interactive UI for a new "Market Explorer" page, focusing on establishing the layout and core user interaction patterns for its data visualization tools.
+                                                      * Summary: A high-fidelity prototype for the new market-explorer.html page was designed and built using static dummy data. The prototype was integrated into the application's visual shell to ensure design consistency with the shared sidebar and layout. The core of the session focused on designing a powerful, interactive chart mockup with a three-tier filtering system. The session concluded by replacing a legacy chart placeholder with a visual mockup for a planned "Neighborhood Performance" widget.
+                                                      * Key Changes:
+                                                      * New Page Prototyping: A new market-explorer.html page was created to serve as a design sandbox. The application's standard "framed canvas" layout and shared sidebar were applied to ensure the prototype is visually consistent with the rest of the application.
+                                                      * Interactive Chart Mockup: A new, full-width chart mockup for historical analysis was designed.
+                                                      * A three-group filter panel UI was built to allow for dynamic filtering by Metric (RevPAR, ADR, Occupancy), Quality Tier, and Year.
+                                                      * The prototype's front-end logic was written to make these filters fully interactive, allowing the chart to react to selections using hardcoded mock data.
+                                                      * Neighborhood Widget Placeholder:
+                                                      * The placeholder for the static "YoY Market RevPAR" chart was replaced with a UI mockup for a new "Neighborhood Performance" widget.
+                                                      * The design for this future feature specifies a heatmap table, where rows would display neighborhoods and color-coded cells would show their performance across key metrics. This is currently a non-functional, visual placeholder meant to guide future development.
+                                                      * UI Debugging: A series of front-end bugs in the prototype were resolved, including layout overflow issues and flawed interactive logic in the filter controls.
+                                                      * Outcome: The session produced a stable, high-fidelity interactive prototype of the "Market Explorer" page. This prototype successfully validates the UI/UX design for the historical analysis chart and establishes the visual blueprint for the planned neighborhood performance widget. Next steps - finish neighbourhood widget.
+Date: August 10, 2025
+                                                      * Objective: To design and prototype a high-fidelity, interactive UI for a new "Market Explorer" page, focusing on establishing the layout and core user interaction patterns for its data visualization tools.
+                                                      * Summary: This was an iterative UI/UX design and debugging session focused on bringing the new market-explorer.html page to a production-ready design standard. The work began by building a new "Neighborhood Performance" table and was followed by a deep refactor of the "Market Seasonality" chart to a more analytically powerful multi-year comparison view. The session involved extensive, iterative debugging of the page's layout and JavaScript, culminating in a final structural overhaul to align the page's design with the rest of the application.
+                                                      * Key Changes:
+                                                      * New "Neighborhood Performance" Widget: A new, interactive heatmap table was built to replace a legacy chart placeholder. The widget is fully interactive in its mockup state, featuring dynamic sorting and a metric selector to control the heatmap coloring.
+                                                      * Seasonality Chart Redesign: The original, static calendar chart was redesigned into an interactive, multi-year comparison tool. Year-selection pill buttons were added, and the chart's JavaScript was refactored into a manager object to allow it to be dynamically updated, solving a key design flaw related to one-off market events.
+                                                      * Page Layout Overhaul: The entire page was restructured to match the layout of the Advanced Reporting page. A fixed-height header area with a full-width bottom border was implemented to cleanly separate the page's controls from the scrollable content area below.
+                                                      * Comprehensive Debugging & Styling: A series of critical layout and JavaScript bugs were resolved, including chart overflow issues and component scope conflicts. Obsolete components and scripts were removed, and all page headings were updated to use the official brand color palette for visual consistency.
+                                                      * Dynamic KPI Card: The static "Market Trend Indicator" card was made dynamic; its color and text now change based on a mock year-over-year RevPAR value.
+                                                      * Outcome: The market-explorer.html page is now a stable, visually polished, and highly interactive prototype. Its layout and styling are fully consistent with the application's established design language. The core components are functionally complete in their mockup state and ready to be connected to live backend data in a future session.
+
+
+Date: August 10, 2025
+                                                      * Objective: To bring the new "Market Overview" page to life by connecting its UI to live backend data, starting with a dynamic, location-aware page title, and ensuring full architectural and stylistic consistency with the application.
+                                                      * Summary: This session involved a full-stack effort to refactor the former "Market Explorer" prototype into a live application page. The work began with restructuring the frontend files for architectural consistency. This was followed by a deep, iterative debugging process that traced a data issue from the frontend page, through the shared sidebar component, and back to the backend API, resulting in targeted fixes at each layer of the application.
+                                                      * Key Changes:
+                                                      * Architectural Refactor:
+                                                      * The "Market Explorer" page, originally a prototype in the /admin directory, was officially promoted to a user-facing feature. Its files were moved to /public/app/ and renamed to market-overview.html and market-overview.mjs.
+                                                      * All inline JavaScript logic was moved from the HTML file into the new dedicated .mjs module to align with project standards.
+                                                      * Full-Stack Data Plumbing:
+                                                      * Backend (dashboard.router.js): The /api/my-properties endpoint was updated. Its SQL queries were modified to include the city field for each hotel, making this data available to the frontend for the first time.
+                                                      * Shared Component (sidebar.mjs): A critical bug was fixed in the dispatchPropertyChangeEvent function. It was updated to dispatch the entire property object (now including the city) in the event payload, instead of a limited object with only the ID and name. This makes the sidebar a more robust data source for all other components.
+                                                      * Frontend (market-overview.mjs): The page's component logic was updated to correctly listen for the property-changed event and consume the full property object from the sidebar, using the city field to dynamically generate the page title.
+                                                      * UI Consistency: The header section of the new page was restyled to match the height, padding, and font styles of the main dashboard, ensuring a consistent user experience.
+                                                      * Outcome: The "Market Overview" page is now successfully integrated into the application. Its title is fully dynamic and updates correctly based on the user's property selection in the sidebar, resolving the "Unknown" city bug. The page is now architecturally sound and ready for its remaining components to be connected to live data.
+Date: August 10, 2025
+                                                      * Objective: Wire up the new "Market Overview" page's main historical chart to a live, aggregated backend data source, complete with robust data validation rules.
+                                                      * Summary: A full-stack feature implementation was completed to replace the main chart's mock data with live, aggregated market data. This involved creating a new, dedicated backend architecture for market-level queries and building a sophisticated API endpoint capable of filtering hotels based on data completeness for any given time period. The frontend component was then significantly refactored to connect to this new endpoint, process the live data, and render it in the chart.
+                                                      * Key Changes:
+                                                      * Backend Architecture:
+                                                      * A new router file was created at api/routes/market.router.js to handle all future city-wide and market-level data queries.
+                                                      * The new router was successfully mounted in server.js, establishing the foundation for all subsequent work on this page.
+                                                      * New API Endpoint:
+                                                      * The first endpoint, GET /api/market/trends, was built and tested.
+                                                      * This endpoint accepts dynamic filters from the frontend, including city, years, and an optional array of quality tiers.
+                                                      * A sophisticated SQL query using Common Table Expressions (CTEs) was implemented to enforce a critical data quality rule: only hotels with a complete data history for the selected date range are included in the final market calculations, ensuring statistical accuracy.
+                                                      * Frontend Implementation (market-overview.mjs):
+                                                      * The component was refactored to connect to the new live data source. A new fetchTrendData() function was added to call the /api/market/trends endpoint.
+                                                      * The updateHistoricalChart() function was completely rewritten to process the real-time data from the API and correctly format it for the ECharts instance, replacing the previous generateMockData() function.
+                                                      * The page was also made aware of city changes from the sidebar, triggering an automatic refresh of the chart data.
+                                                      * Outcome: The main historical trends chart on the "Market Overview" page is now fully functional and powered by live, validated data from the database. The core backend and frontend architecture is now in place to efficiently connect the remaining components on the page.
+Date: August 11, 2025
+                                                      * Objective: To complete the "Market Overview" page by connecting all remaining data components (KPI cards, neighborhood table, seasonality heatmap) to live, validated backend data sources.
+                                                      * Summary: This was an intensive full-stack session that finalized the new "Market Overview" page. The work involved creating a suite of new, complex backend endpoints, each with its own specific data completeness and validation rules. A deep, iterative debugging process on an initial data integrity bug led to a significant and necessary data model improvement: the introduction of a go_live_date column in the hotels table. This became the cornerstone for ensuring all market-level analytics are statistically sound. The session also included significant data visualization refinements on the frontend and concluded with a strategic plan to address future performance and scalability challenges.
+                                                      * Key Changes:
+                                                      * Architectural Foundation: The go_live_date A critical data integrity bug, which produced impossible year-over-year figures, was traced back to the system's inability to distinguish between pre-live placeholder data and legitimate post-live data. To resolve this, a permanent architectural fix was implemented:
+                                                      1. An ALTER TABLE script added a go_live_date column to the hotels table.
+                                                      2. A one-time backfill script was run to populate this date for all existing hotels by finding the first day each hotel recorded revenue (adr > 0). This new column now serves as the definitive source of truth for a hotel's history.
+                                                      * Market KPI Cards (Two-Year Lookback):
+                                                      1. Data Rule: This component, which compares the last 365 days to the 365 days prior, requires the strictest validation. Only hotels with a complete two-year (730-day) data history are included in the calculation.
+                                                      2. Filtering Method: The GET /api/market/kpis endpoint enforces this by filtering for hotels where the go_live_date is on or before the start of the prior 365-day period. This guarantees a true "apples-to-apples" comparison and prevents newer hotels from skewing the prior-year average.
+                                                      * Neighborhood Performance Table (Hybrid Lookback):
+                                                      1. Data Rule: This feature was refactored to use a two-tiered data model. To appear in the table, a neighborhood only needs hotels with a complete current-year history (365 days). However, to calculate the "YoY Change" metric, the hotels in that neighborhood must have a complete two-year history.
+                                                      2. Filtering Method: The GET /api/market/neighborhoods endpoint uses a LEFT JOIN in its SQL query. It calculates current-year metrics for all qualifying neighborhoods and then tries to join prior-year data. If a neighborhood consists only of newer hotels, the prior-year data is NULL, which the API returns to the frontend. The UI then intelligently displays "N/A" for the YoY change.
+                                                      * Market Seasonality Heatmap (Single-Year Lookback):
+                                                      1. Data Rule: The heatmap requires a complete, single-year history for the selected year. It was decided that once a hotel is "live," all its data, including legitimate zero-revenue days, is considered valid for this analysis.
+                                                      2. Filtering Method: The GET /api/market/seasonality endpoint validates this by ensuring a hotel's go_live_date is on or before January 1st of the selected year. A second endpoint, /api/market/available-seasonality-years, was also created to dynamically populate the year filter on the frontend, ensuring users can only select years with a valid hotel cohort.
+                                                      * Future-Proofing: Planning for Pre-Aggregation A key outcome of the session was identifying that the current "on-the-fly" data aggregation, while functional, presents a scalability risk. The complex queries that scan and process millions of rows on every page load will eventually create a performance bottleneck. A future refactoring initiative was planned to address this by implementing a pre-aggregation strategy. This will involve:
+                                                      1. Creating new, dedicated summary tables in the database (e.g., daily_market_metrics_by_neighborhood).
+                                                      2. Building a nightly background job responsible for performing the heavy calculations and populating these summary tables.
+                                                      3. Refactoring the API endpoints to run simple, lightning-fast queries against these small summary tables instead of the raw daily_metrics_snapshots table.
+                                                      * Outcome: The "Market Overview" page is now fully functional, data-driven, and complete. All of its components are powered by robust backend endpoints with clear and appropriate data validation rules. A clear architectural path has also been established to transition from real-time calculations to a more scalable, pre-aggregated data model to ensure long-term performance.
+
+
+
+
+Date: August 11, 2025
+                                                      * Objective: Refine the "Market Overview" page by improving the clarity, interactivity, and layout of its main historical chart and controls.
+                                                      * Summary: A UI/UX refinement session was conducted to make the historical trends chart more intuitive. A new visual language was established to link the filter controls directly to the chart data, and the legend was re-architected for better readability, followed by layout fine-tuning.
+                                                      * Key Changes:
+                                                      * Implemented a "Color by Tier, Style by Year" System: The chart was refactored to use a consistent visual system. Line color is now mapped to a hotel's quality tier (e.g., "Midscale" is always blue), while the line style (solid, dashed, dotted) is mapped to the year, making year-over-year comparisons highly intuitive.
+                                                      * Created Interactive Filter Controls: The "Quality Tier" and "Year" filter buttons were updated to reflect the new system. When active, the buttons now feature colored and styled borders that directly correspond to the appearance of the data lines on the chart.
+                                                      * Re-architected the Chart Legend: The legend was moved from the bottom to the right-hand side. The legend's items are now automatically grouped by quality tier with visual separators, significantly improving the clarity of complex views with multiple selected tiers and years.
+                                                      * Refined Chart Layout: The chart's internal padding and the spacing between the plot area and the new legend were iteratively adjusted to optimize the layout and reduce excess whitespace.
+                                                      * Outcome: The main historical chart on the "Market Overview" page is now significantly more intuitive and easier to analyze. The new visual system creates a clear, predictable link between the controls and the data, and the redesigned legend makes complex data views much less cluttered.
+
+
+
+
+Date: August 11, 2025
+                                                      * Objective: Resolve a critical local development login issue and establish a new, responsive layout for the Market Overview page.
+                                                      * Summary: A multi-stage debugging session was conducted to restore local development access, which was blocked by a hanging loading screen on the dashboard. The issue was traced to a JavaScript variable name mismatch between two components. Following this fix, a UI/UX redesign of the Market Overview page was initiated to address layout issues on smaller screens, culminating in a plan for a new two-column layout.
+                                                      * Key Changes:
+                                                      * Local Login Fix:
+                                                      * A bug causing the dashboard's initial loading screen to hang indefinitely was diagnosed. After confirming all API calls were succeeding, the root cause was isolated to a frontend JavaScript error.
+                                                      * A variable name mismatch between sidebar.mjs (which dispatched an event with property_id) and dashboard.mjs (which expected propertyId) was found to be blocking the main data-loading function.
+                                                      * The issue was resolved by correcting the variable name in the handlePropertyChange function within dashboard.mjs, allowing the event to be handled correctly and the loading screen to disappear.
+                                                      * Market Overview Layout Redesign:
+                                                      * In response to feedback that KPI cards and the Area Performance table were "squished" on smaller screens, a layout redesign was planned.
+                                                      * After discussing various options, a final two-column layout was proposed. The new design features a wide main column containing a 2x2 KPI card grid and the Area Performance table, and a narrower secondary column dedicated to the Market Seasonality chart.
+                                                      * Outcome: The local development environment is fully functional again, with the login and dashboard loading issues resolved. A clear, user-approved plan is in place to refactor the Market Overview page for improved responsiveness without losing any features.
