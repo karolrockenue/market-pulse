@@ -489,25 +489,27 @@
             this.handlePresetChange("current-month");
 
             // This listener waits for the new sidebar to send property data.
-            window.addEventListener("property-changed", async (event) => {
-              if (event.detail && event.detail.propertyId) {
-                this.propertyId = event.detail.propertyId;
-                this.propertyName = event.detail.propertyName;
-                try {
-                  const response = await fetch(`/api/hotel-details/${this.propertyId}`);
-                  if (!response.ok) throw new Error('Could not fetch property details.');
-                  const details = await response.json();
-                  this.propertyTaxRate = parseFloat(details.tax_rate);
-                  this.propertyTaxType = details.tax_type;
-                  this.propertyTaxName = details.tax_name;
-                  this.currencyCode = details.currency_code;
-                  this.includeTaxes = (this.propertyTaxType === 'inclusive');
-                } catch (error) {
-                  console.error("Could not fetch details:", error);
-                }
-                this.handleGenerateReport();
-              }
-            });
+         // This listener waits for the new sidebar to send property data.
+window.addEventListener("property-changed", async (event) => {
+  // --- FIX: Now listening for 'property_id' to match other pages ---
+  if (event.detail && event.detail.property_id) {
+    this.propertyId = event.detail.property_id; // Use the correct property name
+    this.propertyName = event.detail.propertyName;
+    try {
+      const response = await fetch(`/api/hotel-details/${this.propertyId}`);
+      if (!response.ok) throw new Error('Could not fetch property details.');
+      const details = await response.json();
+      this.propertyTaxRate = parseFloat(details.tax_rate);
+      this.propertyTaxType = details.tax_type;
+      this.propertyTaxName = details.tax_name;
+      this.currencyCode = details.currency_code;
+      this.includeTaxes = (this.propertyTaxType === 'inclusive');
+    } catch (error) {
+      console.error("Could not fetch details:", error);
+    }
+    this.handleGenerateReport();
+  }
+});
 
             // Dynamically import our component logic.
             const { loadComponent } = await import("/app/utils.mjs");
