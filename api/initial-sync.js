@@ -195,11 +195,10 @@ async function runSync(propertyId) {
 
       // ADD THIS LINE FOR DEBUGGING
       console.log("DEBUG: Data to be updated:", hotelDetails);
-
       await client.query(
         `UPDATE hotels SET 
           property_name = $1, city = $2, currency_code = $3, latitude = $4, longitude = $5, pricing_model = 'gross'
-         WHERE hotel_id = $6`,
+         WHERE hotel_id = $6::integer`, // <-- FIX IS HERE
         [
           hotelDetails.propertyName,
           hotelDetails.city,
