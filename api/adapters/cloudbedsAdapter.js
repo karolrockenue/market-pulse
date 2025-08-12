@@ -3,26 +3,27 @@
 
 const fetch = require("node-fetch");
 const pgPool = require("../utils/db");
-
 /**
  * A private helper function to process raw API data for historical syncs.
  * @param {Array} allData - Raw data from all pages of the API response.
+ * @param {number} taxRate - The hotel's tax rate (e.g., 0.20 for 20%).
+ * @param {string} pricingModel - The hotel's pricing model ('inclusive' or 'exclusive').
  * @returns {Object} - An object with dates as keys and calculated metrics as values.
  */
-function processApiDataForTable(allData) {
-  // ... (existing code, no changes)
+function processApiDataForTable(allData, taxRate, pricingModel) {
   const aggregatedData = {};
   if (!allData || allData.length === 0) return aggregatedData;
+
+  // Step 1: Aggregate the base numbers from the API response.
   for (const page of allData) {
     if (!page.index || !page.records) continue;
     for (let i = 0; i < page.index.length; i++) {
-      // Standardize the date format to YYYY-MM-DD to remove timezone ambiguity.
       const date = page.index[i][0].split("T")[0];
       if (!aggregatedData[date]) {
         aggregatedData[date] = {
           rooms_sold: 0,
           capacity_count: 0,
-          total_revenue: 0,
+          // We only need to aggregate the primary room_revenue figure from the API.
           room_revenue: 0,
         };
       }
@@ -30,37 +31,56 @@ function processApiDataForTable(allData) {
         parseFloat(page.records.rooms_sold?.[i]) || 0;
       aggregatedData[date].capacity_count +=
         parseFloat(page.records.capacity_count?.[i]) || 0;
-      aggregatedData[date].total_revenue +=
-        parseFloat(page.records.total_revenue?.[i]) || 0;
       aggregatedData[date].room_revenue +=
         parseFloat(page.records.room_revenue?.[i]) || 0;
     }
   }
+
+  // Step 2: Perform all financial calculations for each day.
   for (const date in aggregatedData) {
     const metrics = aggregatedData[date];
-    metrics.adr =
-      metrics.rooms_sold > 0 ? metrics.room_revenue / metrics.rooms_sold : 0;
-    metrics.occupancy =
-      metrics.capacity_count > 0
-        ? metrics.rooms_sold / metrics.capacity_count
-        : 0;
-    metrics.revpar = metrics.adr * metrics.occupancy;
+    const rawRevenue = metrics.room_revenue;
+    const roomsSold = metrics.rooms_sold;
+    const capacityCount = metrics.capacity_count;
+
+    // Determine Net and Gross Revenue based on the hotel's pricing model.
+    if (pricingModel === "exclusive") {
+      metrics.net_revenue = rawRevenue;
+      metrics.gross_revenue = rawRevenue * (1 + taxRate);
+    } else {
+      // Default to 'inclusive' if the model is anything else.
+      metrics.gross_revenue = rawRevenue;
+      metrics.net_revenue = rawRevenue / (1 + taxRate);
+    }
+
+    // Calculate Occupancy.
+    metrics.occupancy = capacityCount > 0 ? roomsSold / capacityCount : 0;
+
+    // Calculate Net and Gross versions of ADR and RevPAR.
+    metrics.gross_adr = roomsSold > 0 ? metrics.gross_revenue / roomsSold : 0;
+    metrics.net_adr = roomsSold > 0 ? metrics.net_revenue / roomsSold : 0;
+    metrics.gross_revpar = metrics.gross_adr * metrics.occupancy;
+    metrics.net_revpar = metrics.net_adr * metrics.occupancy;
+
+    // --- For backward compatibility ---
+    // Populate the old fields to prevent breaking the existing application.
+    metrics.adr = metrics.gross_adr;
+    metrics.revpar = metrics.gross_revpar;
+    metrics.total_revenue = metrics.gross_revenue;
+    metrics.room_revenue = metrics.gross_revenue;
   }
+
   return aggregatedData;
 }
 
 /**
- * NEW: A private helper function to process raw API data for daily forecast syncs.
- * @param {Object} data - Raw data from the API response.
- * @returns {Object} - An object with dates as keys and calculated metrics as values.
- */
-/**
  * A private helper function to process raw API data for daily forecast syncs.
- * It now handles an array of paginated responses.
  * @param {Array} allData - An array of raw data pages from the API response.
+ * @param {number} taxRate - The hotel's tax rate (e.g., 0.20 for 20%).
+ * @param {string} pricingModel - The hotel's pricing model ('inclusive' or 'exclusive').
  * @returns {Object} - An object with dates as keys and calculated metrics as values.
  */
-function processUpcomingApiData(allData) {
+function processUpcomingApiData(allData, taxRate, pricingModel) {
   const aggregated = {};
   if (!allData || allData.length === 0) return aggregated;
 
@@ -69,49 +89,63 @@ function processUpcomingApiData(allData) {
     return isNaN(num) ? 0 : num;
   };
 
-  // Iterate over each page of data from the API response array.
+  // Step 1: Aggregate base numbers from the API.
   for (const page of allData) {
     if (!page.index || !page.records) continue;
-
     for (let i = 0; i < page.index.length; i++) {
       const date = page.index[i][0].split("T")[0];
       if (!aggregated[date]) {
         aggregated[date] = {
           rooms_sold: 0,
           capacity_count: 0,
-          total_revenue: 0,
-          room_revenue: 0, // <-- ADDED: Initialize room_revenue
-          total_revenue_for_adr: 0, // Used for a more accurate weighted ADR calculation
+          room_revenue: 0, // This will hold the primary revenue figure.
         };
       }
-      const roomsSoldForRow = sanitizeMetric(page.records.rooms_sold?.[i]);
-      aggregated[date].rooms_sold += roomsSoldForRow;
+      aggregated[date].rooms_sold += sanitizeMetric(
+        page.records.rooms_sold?.[i]
+      );
       aggregated[date].capacity_count += sanitizeMetric(
         page.records.capacity_count?.[i]
       );
-      // ADDED: Aggregate the room_revenue from the API response.
       aggregated[date].room_revenue += sanitizeMetric(
         page.records.room_revenue?.[i]
       );
-      // To calculate an accurate ADR for the day, we need to sum the (ADR * Rooms Sold) for each room type.
-      aggregated[date].total_revenue_for_adr +=
-        sanitizeMetric(page.records.adr?.[i]) * roomsSoldForRow;
     }
   }
 
-  // Final calculations for ADR, Occupancy, and RevPAR after all data is aggregated.
+  // Step 2: Perform all financial calculations for each day.
   for (const date in aggregated) {
-    const dayData = aggregated[date];
-    dayData.adr =
-      dayData.rooms_sold > 0
-        ? dayData.total_revenue_for_adr / dayData.rooms_sold
-        : 0;
-    dayData.occupancy =
-      dayData.capacity_count > 0
-        ? dayData.rooms_sold / dayData.capacity_count
-        : 0;
-    dayData.revpar = dayData.adr * dayData.occupancy;
+    const metrics = aggregated[date];
+    const rawRevenue = metrics.room_revenue;
+    const roomsSold = metrics.rooms_sold;
+    const capacityCount = metrics.capacity_count;
+
+    // Determine Net and Gross Revenue based on the hotel's pricing model.
+    if (pricingModel === "exclusive") {
+      metrics.net_revenue = rawRevenue;
+      metrics.gross_revenue = rawRevenue * (1 + taxRate);
+    } else {
+      // Default to 'inclusive'.
+      metrics.gross_revenue = rawRevenue;
+      metrics.net_revenue = rawRevenue / (1 + taxRate);
+    }
+
+    // Calculate Occupancy.
+    metrics.occupancy = capacityCount > 0 ? roomsSold / capacityCount : 0;
+
+    // Calculate Net and Gross versions of ADR and RevPAR.
+    metrics.gross_adr = roomsSold > 0 ? metrics.gross_revenue / roomsSold : 0;
+    metrics.net_adr = roomsSold > 0 ? metrics.net_revenue / roomsSold : 0;
+    metrics.gross_revpar = metrics.gross_adr * metrics.occupancy;
+    metrics.net_revpar = metrics.net_adr * metrics.occupancy;
+
+    // --- For backward compatibility ---
+    metrics.adr = metrics.gross_adr;
+    metrics.revpar = metrics.gross_revpar;
+    metrics.total_revenue = metrics.gross_revenue;
+    metrics.room_revenue = metrics.gross_revenue;
   }
+
   return aggregated;
 }
 /**

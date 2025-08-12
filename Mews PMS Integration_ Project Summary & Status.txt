@@ -1,0 +1,52 @@
+﻿Mews PMS Integration: Project Summary & Status
+Date: August 12, 2025 Status: Core data adapters complete; architectural review pending.
+This document summarizes the plan, technical details, and current progress for integrating the Mews Property Management System (PMS) into the Market Pulse application.
+1.0 Integration Strategy
+The core strategy is to build a dedicated Mews Adapter (/api/adapters/mewsAdapter.js) that acts as a "translator" between the Mews API and the Market Pulse application. This adapter is responsible for all Mews-specific logic, including authentication, API calls, and transforming Mews data into our application's standard data models. This approach ensures the core application remains PMS-agnostic.
+2.0 Mews Connector API: Final Data Retrieval Plan
+This section consolidates the final, validated research on how to interact with the Mews Connector API for our specific data needs.
+2.1 Authentication & Environments
+* Method: All API requests are HTTP POST with Content-Type: application/json.
+* Tokens: Authentication (ClientToken, AccessToken) is included in the JSON body of every request.
+* Environment: All development and testing uses the Mews Demo environment at https://api.mews-demo.com.
+2.2 Key Endpoints & Data Mapping
+* Hotel Configuration Details
+   * Objective: Get a property's name, city, currency, timezone, and location.
+   * Endpoint: configuration/get
+   * Status: Complete and tested.
+* Daily Occupancy Metrics (Rooms Sold & Hotel Capacity)
+   * Objective: Get the total number of occupied rooms and the total number of available rooms for a given date range.
+   * Endpoint: services/getAvailability (version 2024-01-22)
+   * Logic: This single endpoint provides pre-calculated Occupied and ActiveResources metrics for each room category. The adapter sums these values across all categories to get a hotel-wide total for each day. This revised approach is more efficient and accurate than the initial plan of manual calculation.
+   * Status: Complete and tested.
+* Daily Revenue Metrics (Total Room Revenue)
+   * Objective: Get the total room revenue, both net and gross of tax.
+   * Endpoint: orderItems/getAll
+   * Logic: The adapter filters for items with Type: 'SpaceOrder' to isolate room revenue. It sums the NetValue and GrossValue from the response to get both revenue figures. The function also handles pagination to ensure all data is retrieved.
+   * Status: Complete and tested.
+3.0 Development Log (Completed Work on August 12, 2025)
+* Implemented getOccupancyMetrics function:
+   * Successfully integrated with the services/getAvailability endpoint.
+   * Resolved a critical API error (FirstTimeUnitStartUtc is not start of TimeUnit) by implementing a timezone correction based on the hotel's Europe/Budapest timezone.
+   * Fixed a bug by correcting the response key from ResourceCategories to ResourceCategoryAvailabilities.
+   * Verified functionality via the /api/admin/test-mews-occupancy test route.
+* Implemented getRevenueMetrics function:
+   * Successfully integrated with the orderItems/getAll endpoint.
+   * Confirmed that filtering by Type: 'SpaceOrder' correctly isolates room revenue.
+   * Confirmed that the API provides both NetValue and GrossValue, satisfying our data requirements for the proposed schema change.
+   * Verified functionality via the /api/admin/test-mews-revenue test route.
+* Confirmed getHotelDetails function:
+   * The existing function using the configuration/get endpoint was verified as correct and sufficient for fetching hotel standing data.
+   * Verified functionality via the /api/admin/test-mews-connection test route.
+4.0 Next Steps: Proposed Architectural Enhancement
+Based on the findings during the Mews integration, a significant architectural improvement is proposed to enhance the accuracy and performance of revenue reporting for all PMS integrations.
+* The Problem: The current method of calculating tax on-the-fly for Cloudbeds hotels is inefficient and historically inaccurate if tax rates change.
+* The Solution: Modify the database schema to store both net_revenue and gross_revenue for every daily snapshot. This makes reporting faster, ensures historical accuracy, and simplifies frontend logic.
+Implementation Plan
+1. Database Migration: Alter the daily_metrics_snapshots table to replace total_room_revenue with net_revenue and gross_revenue. Add a pricing_model column to the hotels table.
+2. Backfill Historical Data: Create and run a one-time script to populate the new revenue columns for all existing Cloudbeds data.
+3. Update Daily Sync Logic:
+   * Cloudbeds: The sync job will now calculate and store both net and gross revenue.
+   * Mews: The sync job will map NetValue to net_revenue and GrossValue to gross_revenue.
+4. Update Reporting Page: The UI toggle will be simplified to switch between displaying the net_revenue and gross_revenue columns.
+This architectural change is the next logical step before the Mews adapter can be fully integrated into the production data sync jobs.

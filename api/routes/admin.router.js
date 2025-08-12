@@ -21,6 +21,7 @@ const scheduledReportsHandler = require("../send-scheduled-reports.js");
 const cloudbeds = require("../utils/cloudbeds");
 // Import the entire adapter module.
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js");
+const mewsAdapter = require("../adapters/mewsAdapter.js");
 // In a future step, this could be moved to a shared /api/utils/cloudbeds.js utility
 // This helper finds the admin's refresh token from its new location in the database.
 async function getAdminRefreshToken(adminUserId) {
@@ -263,6 +264,120 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
   } finally {
     // ALWAYS release the client back to the pool.
     client.release();
+  }
+});
+
+// /api/routes/admin.router.js
+// TEMPORARY TEST ROUTE for Mews Connection & Configuration
+router.get("/test-mews-connection", async (req, res) => {
+  console.log("Admin route /test-mews-connection hit.");
+  try {
+    // Use the same hardcoded demo credentials for consistency.
+    const demoCredentials = {
+      clientToken:
+        "E916C341431C4D28A866AD200152DBD3-A046EB5583FFBE94DE1172237763712",
+      accessToken:
+        "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
+    };
+
+    // Call the adapter function to get the hotel's configuration details.
+    const hotelDetails = await mewsAdapter.getHotelDetails(demoCredentials);
+
+    // Send the full response back. The rawResponse contains what we need to inspect.
+    res.status(200).json({
+      message: "Successfully connected to Mews and fetched configuration.",
+      data: hotelDetails,
+    });
+  } catch (error) {
+    console.error("Test Mews connection failed:", error);
+    res.status(500).json({ message: "Test failed.", error: error.message });
+  }
+});
+// TEMPORARY TEST ROUTE for Mews Occupancy Metrics (New Version)
+router.get("/test-mews-occupancy", async (req, res) => {
+  console.log("Admin route /test-mews-occupancy hit.");
+  try {
+    // --- NEW: Set up a default date range for the last 7 days ---
+    // --- FIX: Set up a default date range for a 7-day period ending yesterday ---
+    const endDateObj = new Date();
+    endDateObj.setDate(endDateObj.getDate() - 1); // End date is yesterday
+    const startDateObj = new Date();
+    startDateObj.setDate(startDateObj.getDate() - 8); // Start date is 8 days ago
+
+    // Format dates to YYYY-MM-DD
+    const defaultEndDate = endDateObj.toISOString().split("T")[0];
+    const defaultStartDate = startDateObj.toISOString().split("T")[0];
+
+    // Use dates from query parameters if provided, otherwise use the defaults.
+    const startDate = req.query.startDate || defaultStartDate;
+    const endDate = req.query.endDate || defaultEndDate;
+
+    // Use the same hardcoded demo credentials for consistency.
+    const demoCredentials = {
+      clientToken:
+        "E916C341431C4D28A866AD200152DBD3-A046EB5583FFBE94DE1172237763712",
+      accessToken:
+        "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
+    };
+
+    // Call the REFACTORED adapter function with the date range.
+    const occupancyData = await mewsAdapter.getOccupancyMetrics(
+      demoCredentials,
+      startDate,
+      endDate
+    );
+
+    // Send the full response back for inspection.
+    res.status(200).json({
+      message: `Successfully fetched Mews occupancy data for range: ${startDate} to ${endDate}.`,
+      data: occupancyData,
+    });
+  } catch (error) {
+    console.error("Test Mews occupancy failed:", error);
+    res.status(500).json({ message: "Test failed.", error: error.message });
+  }
+});
+
+// TEMPORARY TEST ROUTE for Mews Revenue Metrics
+router.get("/test-mews-revenue", async (req, res) => {
+  console.log("Admin route /test-mews-revenue hit.");
+  try {
+    // Set up a default date range for a 7-day period ending yesterday.
+    const endDateObj = new Date();
+    endDateObj.setDate(endDateObj.getDate() - 1); // End date is yesterday
+    const startDateObj = new Date();
+    startDateObj.setDate(startDateObj.getDate() - 8); // Start date is 8 days ago
+
+    const defaultEndDate = endDateObj.toISOString().split("T")[0];
+    const defaultStartDate = startDateObj.toISOString().split("T")[0];
+
+    // Use dates from query parameters if provided, otherwise use the defaults.
+    const startDate = req.query.startDate || defaultStartDate;
+    const endDate = req.query.endDate || defaultEndDate;
+
+    // Use the same hardcoded demo credentials.
+    const demoCredentials = {
+      clientToken:
+        "E916C341431C4D28A866AD200152DBD3-A046EB5583FFBE94DE1172237763712",
+      accessToken:
+        "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
+    };
+
+    // Call the new adapter function to get revenue metrics.
+    const revenueData = await mewsAdapter.getRevenueMetrics(
+      demoCredentials,
+      startDate,
+      endDate
+    );
+
+    // Send the full response back for inspection.
+    res.status(200).json({
+      message: `Successfully fetched Mews revenue data for range: ${startDate} to ${endDate}.`,
+      data: revenueData,
+    });
+  } catch (error) {
+    console.error("Test Mews revenue failed:", error);
+    res.status(500).json({ message: "Test failed.", error: error.message });
   }
 });
 

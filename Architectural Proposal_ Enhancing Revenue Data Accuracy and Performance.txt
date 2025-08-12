@@ -1,0 +1,67 @@
+﻿Architectural Proposal: Enhancing Revenue Data Accuracy and Performance
+Date: August 12, 2025 Author: Karol Marcu & Market Pulse AI Assistant Status: Proposed
+1.0 Executive Summary
+This document proposes a critical architectural enhancement to the Market Pulse database schema and data ingestion logic. The current method of calculating tax-inclusive (gross) and tax-exclusive (net) revenue "on-the-fly" for Cloudbeds hotels is flawed, leading to significant risks of historical data inaccuracy and poor application performance.
+The proposed solution is to pre-calculate and store both net and gross revenue in the daily_metrics_snapshots table during the daily data sync. This change will guarantee historical data integrity, dramatically improve reporting speed, and create a more robust and consistent data model for all current and future PMS integrations, including the new Mews adapter. While this requires a one-time data migration, the long-term benefits to accuracy, performance, and maintainability are substantial.
+2.0 The Problem in Detail: Flaws in the Current Architecture
+Our current system was designed around the data structure provided by our first PMS integration, Cloudbeds. This has led to an architectural dependency that is both inefficient and fragile.
+2.1 Current Data Flow (Cloudbeds)
+1. Data Received: For each day, the Cloudbeds API provides a single revenue figure.
+2. Metadata Stored: In our hotels table, we store the hotel's tax rate (e.g., 20%) and its pricing model (e.g., inclusive).
+3. Data Stored: In the daily_metrics_snapshots table, we calculate and store only the net revenue in a single total_room_revenue column.
+4. Calculation on the Fly: When a user on the Advanced Reporting page toggles the "Include Tax" switch, the application must:
+   * Fetch the raw total_room_revenue (net).
+   * Fetch the hotel's current tax_rate and pricing_model.
+   * Perform a real-time calculation to display the gross revenue.
+2.2 Illustrative Scenarios
+Let's analyze two hotels, both with a 20% tax rate:
+* Hotel A (Tax Inclusive): Reports a revenue of £100. This is their gross revenue.
+   * Our sync job calculates and stores the net revenue: £100 / 1.20 = £83.33.
+   * When a user wants to see gross, we calculate it back: £83.33 * 1.20 = £100.
+* Hotel B (Tax Exclusive): Reports a revenue of £100. This is their net revenue.
+   * Our sync job stores this directly: £100.
+   * When a user wants to see gross, we calculate it: £100 * 1.20 = £120.
+2.3 The Critical Flaws
+This "on-the-fly" calculation model has two severe, business-critical flaws:
+Flaw #1: Historical Inaccuracy (The Tax Rate Bug)
+This is the most dangerous flaw. Tax rates change. Let's imagine that on January 1, 2026, Hotel B's local tax rate changes from 20% to 22%. We update this in our hotels table.
+Now, a user runs a report for a date in 2025.
+* The system fetches the stored net revenue for a day in 2025: £100.
+* The system fetches the hotel's current tax rate: 22%.
+* The system calculates the gross revenue on the fly: £100 * 1.22 = £122.
+This is wrong. The gross revenue for that day in 2025 should have been £120. By using the current tax rate to calculate historical data, we are corrupting our historical reports. The data is no longer a reliable record of past performance.
+Flaw #2: Poor Performance and Scalability
+Every time a user loads the reporting page or flips the tax toggle, our application server has to perform calculations for every single data point in the report. For a report spanning a full year, this means hundreds of individual calculations. This is inefficient, slows down the user experience, and does not scale well as we add more users and hotels.
+Flaw #3: Inconsistent Logic (The Mews Problem)
+The Mews API is more advanced and provides pre-calculated NetValue and GrossValue for every transaction. The "on-the-fly" model is completely unnecessary for Mews. Maintaining two separate logical paths—one that calculates and one that doesn't—adds unnecessary complexity to our codebase, making it harder to maintain and increasing the risk of bugs.
+3.0 The Proposed Solution: A Robust, Pre-Calculated Data Model
+The solution is to shift all calculation logic from the reporting layer to the data ingestion layer. The daily sync job should be the single source of truth for calculating and storing final, immutable revenue figures.
+3.1 Proposed Schema Changes
+Table: daily_metrics_snapshots This core table will be modified to store both revenue figures explicitly.
+* REMOVE:
+   * total_room_revenue (numeric)
+* ADD:
+   * net_revenue (numeric) - Stores revenue exclusive of tax.
+   * gross_revenue (numeric) - Stores revenue inclusive of tax.
+Table: hotels A new column will be added to store the hotel's default pricing model.
+* ADD:
+   * pricing_model (varchar) - Stores the hotel's default pricing setting (e.g., 'inclusive' or 'exclusive').
+3.2 The New Data Flow
+During the Daily Sync (/api/daily-refresh.js):
+* For a Cloudbeds Hotel:
+   1. The job fetches the single revenue figure for the day.
+   2. It looks up the hotel's pricing_model and tax_rate.
+   3. It performs the calculation once to determine both the net and gross values.
+   4. It saves these final, accurate values into the net_revenue and gross_revenue columns.
+* For a Mews Hotel:
+   1. The job fetches the NetValue and GrossValue from the Mews API.
+   2. It saves these values directly to the net_revenue and gross_revenue columns. No calculation is needed.
+On the Reporting Page:
+1. The application fetches both the net_revenue and gross_revenue columns.
+2. The "Include Tax" toggle becomes a simple, instantaneous frontend switch that chooses which of the two pre-calculated columns to display. No backend calculations are performed.
+4.0 Benefits of the New Architecture
+1. Guaranteed Historical Accuracy: By calculating revenue at the time of ingestion, the historically correct net and gross values are locked in forever. Future changes to a hotel's tax rate will have no impact on past data.
+2. Superior Performance: Reports will load significantly faster. The application is now performing a simple database read instead of hundreds of calculations, resulting in a much better user experience.
+3. System-wide Consistency: The logic for handling revenue becomes standardized. The reporting layer treats a Cloudbeds hotel and a Mews hotel identically, which simplifies development, reduces complexity, and minimizes the potential for bugs.
+4. Future-Proof Scalability: This model is robust and scales effortlessly. As we add more PMS integrations, we simply need to ensure the adapter provides a net and gross value to the sync job. The rest of the system remains unchanged.
+This architectural change fixes a critical flaw in our current system and provides a more robust, scalable, and performant foundation for the future of Market Pulse.

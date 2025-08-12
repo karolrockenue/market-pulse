@@ -89,14 +89,25 @@ async function runSync(propertyId) {
 
     // --- Fetch historical and forecast metrics (existing logic) ---
     // --- Fetch historical and forecast metrics (Refactored to be monthly) ---
+    // --- NEW: Fetch hotel's tax info before processing metrics ---
+    const hotelInfoResult = await client.query(
+      "SELECT tax_rate, pricing_model FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+    // Set defaults to prevent crashes if data is missing.
+    const taxRate = hotelInfoResult.rows[0]?.tax_rate || 0;
+    const pricingModel = hotelInfoResult.rows[0]?.pricing_model || "inclusive";
+    console.log(
+      `✅ Hotel Info: Tax Rate=${taxRate}, Pricing Model=${pricingModel}`
+    );
+
+    // --- Fetch historical and forecast metrics ---
     let allProcessedData = {};
     const startYear = new Date().getFullYear() - 5;
     const endYear = new Date().getFullYear();
 
-    // This new nested loop fetches data one month at a time to avoid API limits.
     for (let year = startYear; year <= endYear; year++) {
       for (let month = 0; month < 12; month++) {
-        // Create start and end dates for the current month in UTC.
         const monthStartDate = new Date(Date.UTC(year, month, 1))
           .toISOString()
           .split("T")[0];
@@ -111,26 +122,29 @@ async function runSync(propertyId) {
           )}...`
         );
 
-        // Call the adapter for the monthly chunk.
+        // Pass the new tax info to the adapter function.
         const monthlyData = await cloudbedsAdapter.getHistoricalMetrics(
           accessToken,
           propertyId,
           monthStartDate,
-          monthEndDate
+          monthEndDate,
+          taxRate,
+          pricingModel
         );
 
-        // Merge the monthly data into our main object.
         allProcessedData = { ...allProcessedData, ...monthlyData };
       }
     }
 
     console.log("Fetching forecast data for the next 365 days...");
+    // Pass the new tax info to the upcoming metrics function as well.
     const futureData = await cloudbedsAdapter.getUpcomingMetrics(
       accessToken,
-      propertyId
+      propertyId,
+      taxRate,
+      pricingModel
     );
     allProcessedData = { ...allProcessedData, ...futureData };
-
     // --- Save metrics to the database (existing logic) ---
     const datesToUpdate = Object.keys(allProcessedData);
     if (datesToUpdate.length > 0) {

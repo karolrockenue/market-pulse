@@ -43,13 +43,24 @@ module.exports = async (request, response) => {
         }
         const cloudbedsUserId = userResult.rows[0].user_id;
 
+        // NEW: Fetch the hotel's tax info to pass to the adapter.
+        const hotelInfoResult = await pgPool.query(
+          "SELECT tax_rate, pricing_model FROM hotels WHERE hotel_id = $1",
+          [propertyId]
+        );
+        const taxRate = hotelInfoResult.rows[0]?.tax_rate || 0;
+        const pricingModel =
+          hotelInfoResult.rows[0]?.pricing_model || "inclusive";
+
         // Get a valid access token for the property using the adapter
         const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
 
-        // Fetch the upcoming metrics data from the Cloudbeds API
+        // Fetch the upcoming metrics data, passing the new tax info.
         const processedData = await cloudbedsAdapter.getUpcomingMetrics(
           accessToken,
-          propertyId
+          propertyId,
+          taxRate,
+          pricingModel
         );
 
         const datesToUpdate = Object.keys(processedData);
