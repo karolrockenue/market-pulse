@@ -148,6 +148,7 @@ async function runSync(propertyId) {
     // --- Save metrics to the database (existing logic) ---
     const datesToUpdate = Object.keys(allProcessedData);
     if (datesToUpdate.length > 0) {
+      // Map the processed data to the format needed for a bulk database insert.
       const bulkInsertValues = datesToUpdate.map((date) => {
         const metrics = allProcessedData[date];
         return [
@@ -157,11 +158,7 @@ async function runSync(propertyId) {
           metrics.capacity_count || 0,
           metrics.occupancy || 0,
           user.cloudbeds_user_id,
-          // Old columns for backward compatibility
-          metrics.adr || 0,
-          metrics.revpar || 0,
-          metrics.total_revenue || 0,
-          // New columns
+          // NEW, CORRECTED COLUMNS. Legacy values have been removed.
           metrics.net_revenue || 0,
           metrics.gross_revenue || 0,
           metrics.net_adr || 0,
@@ -170,11 +167,10 @@ async function runSync(propertyId) {
           metrics.gross_revpar || 0,
         ];
       });
+      // A new, cleaned-up query that only references the new columns.
       const query = format(
         `INSERT INTO daily_metrics_snapshots (
           stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
-          -- Old columns for backward compatibility
-         adr, revpar, total_revenue,
           -- New columns
           net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
          )

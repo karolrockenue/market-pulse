@@ -96,27 +96,19 @@ module.exports = async (request, response) => {
               ];
             });
 
-            // Format the query to handle bulk insertion and update on conflict
-            // Format the query to handle bulk insertion and update on conflict
-            // Format the query to handle bulk insertion and update on conflict
+            // This query now correctly uses ON CONFLICT and only references the new columns.
             const query = format(
               `INSERT INTO daily_metrics_snapshots (
                 stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
-                -- Old columns for backward compatibility
-       adr, revpar, total_revenue,
                 -- New columns
                 net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
               )
                VALUES %L
-               ON CONGLISH (hotel_id, stay_date) DO UPDATE SET
+               ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
                    rooms_sold = EXCLUDED.rooms_sold,
                    capacity_count = EXCLUDED.capacity_count,
                    occupancy_direct = EXCLUDED.occupancy_direct,
                    cloudbeds_user_id = EXCLUDED.cloudbeds_user_id,
-                   -- Update old columns
-                   adr = EXCLUDED.adr,
-                   revpar = EXCLUDED.revpar,
-                 total_revenue = EXCLUDED.total_revenue,
                    -- Update new columns
                    net_revenue = EXCLUDED.net_revenue,
                    gross_revenue = EXCLUDED.gross_revenue,
