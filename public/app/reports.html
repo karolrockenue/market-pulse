@@ -437,19 +437,122 @@
 </main>
       </div>
     </div>
-<script type="module">
-      // Import all necessary functions and components as modules for consistency.
-      import { loadComponent } from "/app/utils.mjs";
-      import sidebar from "/app/_shared/sidebar.mjs";
-      import { reportsPage } from "/app/reports.js"; // Import the component logic from the newly updated reports.js
+<script>
+      function reportsPage() {
+        return {
+          // --- State for the visual report builder ---
+          reportMetrics: [
+            { key: 'Occupancy', label: 'Occupancy', group: 'Hotel' },
+            { key: 'ADR', label: 'ADR', group: 'Hotel' },
+            { key: 'RevPAR', label: 'RevPAR', group: 'Hotel' },
+            { key: 'Total Revenue', label: 'Total Revenue', group: 'Hotel' },
+            { key: 'Rooms Sold', label: 'Rooms Sold', group: 'Hotel' },
+            { key: 'Rooms Unsold', label: 'Rooms Unsold', group: 'Hotel' },
+            { key: 'Market Occupancy', label: 'Market Occupancy', group: 'Market' },
+            { key: 'Market ADR', label: 'Market ADR', group: 'Market' },
+          ],
+          selectedMetricKeys: ['Occupancy', 'ADR', 'Total Revenue', 'Rooms Sold'],
 
-      // Register all Alpine components once Alpine itself is initialized.
+          // --- Core State Properties ---
+          isInitialized: false,
+          propertyId: null,
+          isScheduleModalOpen: false,
+          isManageModalOpen: false,
+          propertyName: "Your Hotel",
+          addComparisons: false,
+          displayOrder: 'metric',
+          displayTotals: true,
+          granularity: "daily",
+          preset: "current-month",
+          schedules: [],
+          newScheduleName: "",
+          newScheduleRecipients: "",
+          newSchedulePeriod: "current-month",
+          newScheduleFrequency: "Weekly",
+          newScheduleFormats: ["csv"],
+          propertyTaxRate: null,
+          propertyTaxType: null,
+          includeTaxes: true,
+          propertyTaxName: 'VAT',
+          currencyCode: 'USD',
+
+          // --- THE FIX: A much cleaner initialization function ---
+          init() {
+            // Set the initial date range using a helper from reports.js
+            window.handlePresetChange("current-month");
+
+            // Listen for the sidebar to announce a property change
+            window.addEventListener("property-changed", async (event) => {
+              if (event.detail && event.detail.property_id) {
+                this.propertyId = event.detail.property_id;
+                this.propertyName = event.detail.propertyName;
+                try {
+                  const response = await fetch(`/api/hotel-details/${this.propertyId}`);
+                  if (!response.ok) throw new Error('Could not fetch property details.');
+                  const details = await response.json();
+                  this.propertyTaxRate = parseFloat(details.tax_rate);
+                  this.propertyTaxType = details.tax_type;
+                  this.propertyTaxName = details.tax_name;
+                  this.currencyCode = details.currency_code;
+                  this.includeTaxes = (this.propertyTaxType === 'inclusive');
+                } catch (error) {
+                  console.error("Could not fetch details:", error);
+                }
+                // Once we have the new property details, generate the report
+                this.handleGenerateReport();
+              }
+            });
+
+            // This flag is used to prevent content from showing before Alpine is ready
+            this.isInitialized = true;
+
+            // Load schedule data after the page is initialized
+            this.handleFrequencyChange();
+            window.fetchSchedules().then(schedules => {
+                this.schedules = schedules;
+            });
+          },
+
+          // --- Helper Methods ---
+          openScheduleModal() {
+            this.isScheduleModalOpen = true;
+          },
+          openManageModal() {
+            this.isManageModalOpen = true;
+          },
+          toggleMetric(metricKey) {
+            const index = this.selectedMetricKeys.indexOf(metricKey);
+            if (index > -1) {
+              this.selectedMetricKeys.splice(index, 1);
+            } else {
+              this.selectedMetricKeys.push(metricKey);
+            }
+            this.handleGenerateReport();
+          },
+
+          // --- Proxy Methods to call helpers in reports.js ---
+          handleGenerateReport() { window.handleGenerateReport(this, this.propertyId); },
+          handlePresetChange(preset) { window.handlePresetChange(preset); },
+          exportToCSV() { window.exportToCSV(this.propertyName); },
+          exportToExcel() { window.exportToExcel(this.propertyName); },
+          handleFrequencyChange() { window.handleFrequencyChange(); },
+          saveSchedule() { window.saveSchedule(this); },
+          deleteSchedule(id) { window.deleteSchedule(this, id); },
+        };
+      }
+    </script>
+    <script src="/app/reports.js"></script>
+<script type="module">
+      import { loadComponent } from "/app/utils.mjs";
+ import sidebar from "/app/_shared/sidebar.mjs";
+
+      // Register the Alpine components when Alpine is ready.
       document.addEventListener("alpine:init", () => {
-        Alpine.data("reportsPage", reportsPage); // Register the imported component
+        Alpine.data("reportsPage", reportsPage);
         Alpine.data("sidebar", sidebar);
       });
 
-      // Load the shared sidebar HTML into the placeholder div once the main document is ready.
+      // Use the exact same pattern as the working design.html page to load the component HTML.
       document.addEventListener('DOMContentLoaded', async () => {
        await loadComponent("sidebar", "sidebar-placeholder");
       });
