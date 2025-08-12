@@ -544,14 +544,17 @@ router.get("/market-ranking", requireUserApi, async (req, res) => {
     const totalHotels = allHotelIds.length;
 
     // Step 2: Calculate performance for all hotels and rank them using window functions
+    // Step 2: Calculate performance for all hotels and rank them using window functions
     const rankingQuery = `
       WITH HotelPerformance AS (
         -- First, calculate the average performance for each hotel in the set
+        -- THE FIX: This now uses the pre-calculated gross metrics to ensure
+        -- consistency with all other dashboard components.
         SELECT
           hotel_id,
-          (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) AS adr,
-          (SUM(rooms_sold)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS occupancy,
-          (SUM(total_revenue)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS revpar
+          AVG(gross_adr) AS adr,
+          AVG(occupancy_direct) AS occupancy,
+          AVG(gross_revpar) AS revpar
         FROM daily_metrics_snapshots
         WHERE
           hotel_id = ANY($1::int[]) AND
