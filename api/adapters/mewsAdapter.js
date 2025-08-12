@@ -36,26 +36,24 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
 };
 
 /**
- * [FIX] A more robust, library-free timezone helper for European timezones.
- * It correctly calculates the start and end of DST.
+ * [FINAL FIX] A more robust, library-free timezone helper for European timezones.
+ * It correctly calculates the start and end of DST for any given year.
  * @param {string} dateString - A date in 'YYYY-MM-DD' format.
  * @returns {string} An ISO 8601 timestamp string for midnight in the corrected timezone.
  */
 const _getMewsUtcTimestamp = (dateString) => {
-  const date = new Date(dateString + "T12:00:00Z"); // Use midday to avoid off-by-one date issues
+  const date = new Date(dateString + "T12:00:00Z"); // Use midday to avoid date boundary issues
   const year = date.getUTCFullYear();
 
-  // In the EU, DST starts on the last Sunday of March and ends on the last Sunday of October.
-  const dstStart = new Date(Date.UTC(year, 2, 31, 1)); // 1 AM on March 31st
-  dstStart.setUTCDate(dstStart.getUTCDate() - dstStart.getUTCDay());
+  // In the EU, DST starts on the last Sunday of March at 1:00 UTC.
+  const dstStart = new Date(Date.UTC(year, 2, 31, 1)); // Start with March 31st, 1:00 UTC
+  dstStart.setUTCDate(dstStart.getUTCDate() - dstStart.getUTCDay()); // Find the last Sunday
 
-  const dstEnd = new Date(Date.UTC(year, 9, 31, 1)); // 1 AM on Oct 31st
-  dstEnd.setUTCDate(dstEnd.getUTCDate() - dstEnd.getUTCDay());
+  // DST ends on the last Sunday of October at 1:00 UTC.
+  const dstEnd = new Date(Date.UTC(year, 9, 31, 1)); // Start with October 31st, 1:00 UTC
+  dstEnd.setUTCDate(dstEnd.getUTCDate() - dstEnd.getUTCDay()); // Find the last Sunday
 
-  // Check if the given date falls within the DST period
   const isDst = date >= dstStart && date < dstEnd;
-
-  // Apply the correct offset (+02:00 for summer/DST, +01:00 for winter)
   const offsetString = isDst ? "+02:00" : "+01:00";
   const localTime = `${dateString}T00:00:00.000${offsetString}`;
 
@@ -97,8 +95,8 @@ const getOccupancyMetrics = async (credentials, startDate, endDate) => {
 
   const availabilityPayload = {
     ServiceId: serviceId,
-    FirstTimeUnitStartUtc: _getMewsUtcTimestamp(startDate), // Use new robust helper
-    LastTimeUnitStartUtc: _getMewsUtcTimestamp(endDate), // Use new robust helper
+    FirstTimeUnitStartUtc: _getMewsUtcTimestamp(startDate),
+    LastTimeUnitStartUtc: _getMewsUtcTimestamp(endDate),
     Metrics: ["Occupied", "ActiveResources"],
   };
 
@@ -157,8 +155,8 @@ const getRevenueMetrics = async (credentials, startDate, endDate) => {
   do {
     const payload = {
       ConsumedUtc: {
-        StartUtc: _getMewsUtcTimestamp(startDate), // Use new robust helper
-        EndUtc: _getMewsUtcTimestamp(endDate), // Use new robust helper
+        StartUtc: _getMewsUtcTimestamp(startDate),
+        EndUtc: _getMewsUtcTimestamp(endDate),
       },
       Types: ["SpaceOrder"],
       AccountingStates: ["Open", "Closed"],
