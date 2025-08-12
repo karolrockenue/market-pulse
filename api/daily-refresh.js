@@ -73,35 +73,56 @@ module.exports = async (request, response) => {
             await client.query("BEGIN");
 
             // Prepare the values for the bulk insert/update operation
+            // Prepare the values for the bulk insert/update operation
             const bulkInsertValues = datesToUpdate.map((date) => {
               const metrics = processedData[date];
               return [
                 date,
                 propertyId,
-                metrics.adr,
-                metrics.occupancy,
-                metrics.revpar,
-                metrics.rooms_sold,
-                metrics.capacity_count,
-                metrics.room_revenue, // Using room_revenue for the total_revenue column
-                cloudbedsUserId, // Add the user ID back
+                metrics.rooms_sold || 0,
+                metrics.capacity_count || 0,
+                metrics.occupancy || 0,
+                cloudbedsUserId,
+                // Old columns for backward compatibility
+                metrics.adr || 0,
+                metrics.revpar || 0,
+                metrics.total_revenue || 0,
+                // New columns
+                metrics.net_revenue || 0,
+                metrics.gross_revenue || 0,
+                metrics.net_adr || 0,
+                metrics.gross_adr || 0,
+                metrics.net_revpar || 0,
+                metrics.gross_revpar || 0,
               ];
             });
 
             // Format the query to handle bulk insertion and update on conflict
-            // Format the query to handle bulk insertion and update on conflict
-            // Format the query to handle bulk insertion and update on conflict
-            // Format the query to handle bulk insertion and update on conflict
             const query = format(
-              `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, adr, occupancy_direct, revpar, rooms_sold, capacity_count, total_revenue, cloudbeds_user_id)
+              `INSERT INTO daily_metrics_snapshots (
+                stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
+                -- Old columns for backward compatibility
+                adr, revpar, total_revenue,
+                -- New columns
+                net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
+              )
                VALUES %L
                ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
-                   adr = EXCLUDED.adr,
-                   occupancy_direct = EXCLUDED.occupancy_direct,
-                   revpar = EXCLUDED.revpar,
                    rooms_sold = EXCLUDED.rooms_sold,
                    capacity_count = EXCLUDED.capacity_count,
-                   total_revenue = EXCLUDED.total_revenue;`,
+                   occupancy_direct = EXCLUDED.occupancy_direct,
+                   cloudbeds_user_id = EXCLUDED.cloudbeds_user_id,
+                   -- Update old columns
+                   adr = EXCLUDED.adr,
+                   revpar = EXCLUDED.revpar,
+                   total_revenue = EXCLUDED.total_revenue,
+                   -- Update new columns
+                   net_revenue = EXCLUDED.net_revenue,
+                   gross_revenue = EXCLUDED.gross_revenue,
+                   net_adr = EXCLUDED.net_adr,
+                   gross_adr = EXCLUDED.gross_adr,
+                   net_revpar = EXCLUDED.net_revpar,
+                   gross_revpar = EXCLUDED.gross_revpar;`,
               bulkInsertValues
             );
 
