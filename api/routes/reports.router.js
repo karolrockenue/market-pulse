@@ -7,29 +7,19 @@ const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
 
 // --- SCHEDULED REPORTS API ENDPOINTS ---
-
-router.get("/scheduled-reports", requireUserApi, async (req, res) => {
+// Create new scheduled report
+router.post("/scheduled-reports", requireUserApi, async (req, res) => {
   try {
+    // Resolve internal user_id from session (cloudbeds_user_id)
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
       [req.session.userId]
     );
-    if (userResult.rows.length === 0) return res.json([]);
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: "User not found" });
+    }
     const internalUserId = userResult.rows[0].user_id;
-    const { rows } = await pgPool.query(
-      `SELECT sr.*, h.property_name FROM scheduled_reports sr LEFT JOIN hotels h ON sr.property_id::integer = h.hotel_id WHERE sr.user_id = $1 ORDER BY sr.created_at DESC`,
-      [internalUserId]
-    );
-    res.json(rows);
-  } catch (error) {
-    console.error("Error fetching scheduled reports:", error);
-    res.status(500).json({ error: "Failed to fetch scheduled reports" });
-  }
-});
 
-// Create new scheduled report
-router.post("/scheduled-reports", requireUserApi, async (req, res) => {
-  try {
     const {
       propertyId,
       reportName,
@@ -51,12 +41,13 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
     // Defaults to satisfy NOT NULLs and keep consistent types
     const safeMetricsMarket = Array.isArray(metricsMarket) ? metricsMarket : [];
     const safeAddComparisons = !!addComparisons;
-    const safeDisplayOrder = displayOrder ?? "metric"; // typical values: "metric" | "source"
+    const safeDisplayOrder = displayOrder ?? "metric"; // "metric" | "source"
     const safeIncludeTaxes = includeTaxes ?? true;
 
-    const result = await pool.query(
+    const result = await pgPool.query(
       `
         INSERT INTO scheduled_reports (
+          user_id,
           property_id,
           report_name,
           recipients,
@@ -73,25 +64,26 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
           report_period,
           attachment_formats
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
         RETURNING *
       `,
       [
-        propertyId,
-        reportName,
-        recipients,
-        frequency,
-        dayOfWeek,
-        dayOfMonth,
-        timeOfDay,
-        metricsHotel,
-        safeMetricsMarket,
-        safeAddComparisons,
-        safeDisplayOrder,
-        displayTotals,
-        safeIncludeTaxes,
-        reportPeriod,
-        attachmentFormats,
+        internalUserId, // $1
+        propertyId, // $2
+        reportName, // $3
+        recipients, // $4
+        frequency, // $5
+        dayOfWeek, // $6
+        dayOfMonth, // $7
+        timeOfDay, // $8
+        metricsHotel, // $9
+        safeMetricsMarket, // $10
+        safeAddComparisons, // $11
+        safeDisplayOrder, // $12
+        displayTotals, // $13
+        safeIncludeTaxes, // $14
+        reportPeriod, // $15
+        attachmentFormats, // $16
       ]
     );
 
