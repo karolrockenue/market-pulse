@@ -546,19 +546,30 @@
     </script>
     <script src="/app/reports.js"></script>
 <script type="module">
-      import { loadComponent } from "/app/utils.mjs";
- import sidebar from "/app/_shared/sidebar.mjs";
+  import { loadComponent } from "/app/utils.mjs";
+  import sidebar from "/app/_shared/sidebar.mjs";
 
-      // Register the Alpine components when Alpine is ready.
-      document.addEventListener("alpine:init", () => {
-        Alpine.data("reportsPage", reportsPage);
-        Alpine.data("sidebar", sidebar);
-      });
+  // Ensure Alpine components are registered whether Alpine has already booted or not
+  const registerComponents = () => {
+    Alpine.data("sidebar", sidebar);
+    Alpine.data("reportsPage", reportsPage);
+  };
 
-      // Use the exact same pattern as the working design.html page to load the component HTML.
-      document.addEventListener('DOMContentLoaded', async () => {
-       await loadComponent("sidebar", "sidebar-placeholder");
-      });
-    </script>
+  if (window.Alpine) {
+    // Alpine already initialized
+    registerComponents();
+  } else {
+    // Register as soon as Alpine boots
+    document.addEventListener("alpine:init", registerComponents);
+  }
+
+  // Load the sidebar HTML, then explicitly init that subtree so Alpine sees it
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadComponent("sidebar", "sidebar-placeholder");
+    const mount = document.getElementById("sidebar-placeholder");
+    if (window.Alpine && mount) Alpine.initTree(mount);
+  });
+</script>
+
   </body>
 </html>
