@@ -290,27 +290,18 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     }
 
     const period = getPeriod(granularity);
-    const query = `
+    const kpiQuery = `
       SELECT
-        ${period} as period,
-        -- Base metrics WITH 'your_' prefix
-        AVG(rooms_sold) as your_rooms_sold,
-        AVG(capacity_count) as your_capacity_count,
-        AVG(occupancy_direct) as your_occupancy_direct,
-        -- Old columns (based on gross values) aliased as 'your_'
-        AVG(adr) as your_adr,
-        AVG(revpar) as your_revpar,
-        SUM(total_revenue) as your_total_revenue,
-        -- New pre-calculated columns aliased as 'your_'
-        SUM(net_revenue) as your_net_revenue,
-        SUM(gross_revenue) as your_gross_revenue,
-        AVG(net_adr) as your_net_adr,
-        AVG(gross_adr) as your_gross_adr,
-        AVG(net_revpar) as your_net_revpar,
-        AVG(gross_revpar) as your_gross_revpar
-      FROM daily_metrics_snapshots
-      WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
-      GROUP BY period ORDER BY period ASC;
+          -- Use the new, reliable gross_adr and gross_revpar columns for calculations
+          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_adr ELSE NULL END) AS your_adr,
+          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.occupancy_direct ELSE NULL END) AS your_occupancy,
+          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_revpar ELSE NULL END) AS your_revpar,
+
+          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_adr ELSE NULL END) AS market_adr,
+          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.occupancy_direct ELSE NULL END) AS market_occupancy,
+          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_revpar ELSE NULL END) AS market_revpar
+      FROM daily_metrics_snapshots dms
+      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND (dms.hotel_id = $1 OR dms.hotel_id = ANY($4::int[]));
     `;
     const result = await pgPool.query(query, [propertyId, startDate, endDate]);
     res.json({ metrics: result.rows });

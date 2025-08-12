@@ -593,9 +593,9 @@ function buildTableBody(data, headers, component) {
         const isMarket = key.startsWith("Market ");
         const prefix = isMarket ? "market" : "your";
         const baseMetricKey = isMarket ? key.substring(7) : key;
-
         let value;
 
+        // This corrected switch handles all metric types explicitly.
         switch (baseMetricKey) {
           case "Rooms Sold":
             value = row[`${prefix}_rooms_sold`];
@@ -654,7 +654,7 @@ function buildTableBody(data, headers, component) {
               currencyCode
             );
             break;
-          default: // This will handle the _delta columns
+          default: // This handles the _delta columns
             if (key.endsWith("_delta")) {
               const deltaBaseMetric = key.replace("_delta", "").toLowerCase();
               const yourKey = includeTaxes
@@ -676,17 +676,16 @@ function buildTableBody(data, headers, component) {
             break;
         }
 
-        const alignClass =
-          key === "date" ? "font-medium text-left" : "font-normal text-right";
-        return `<td class="px-4 py-4 whitespace-nowrap text-sm ${alignClass} ${
-          header.separator ? "border-r border-slate-300" : ""
-        }">${content || "-"}</td>`;
-      });
+        const isDate = key === "date";
+        const alignClass = isDate
+          ? "font-medium text-left"
+          : "font-normal text-right";
+        const cellTag = isDate ? "th" : "td"; // Use <th> for the date column for bolding
 
-      if (key === "date")
-        cells[0] = `<th class="px-4 py-4 whitespace-nowrap text-sm font-medium text-left">${formatDateForDisplay(
-          row.date
-        )}</th>`;
+        return `<${cellTag} class="px-4 py-4 whitespace-nowrap text-sm ${alignClass} ${
+          header.separator ? "border-r border-slate-300" : ""
+        }">${content || "-"}</${cellTag}>`;
+      });
 
       return `<tr class="${
         index % 2 === 0 ? "bg-white" : "bg-slate-50/50"
