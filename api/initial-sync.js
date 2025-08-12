@@ -170,6 +170,7 @@ async function runSync(propertyId) {
     // ==================================================================
     // MEWS LOGIC PATH (All new code)
     // ==================================================================
+    // Replace with this:
     else if (pmsType === "mews") {
       console.log("--- Running Mews Sync ---");
       // Get Mews credentials from the DB
@@ -205,46 +206,68 @@ async function runSync(propertyId) {
       );
       console.log("✅ Hotel metadata sync complete.");
 
-      // Fetch 5 years of historical data for Mews
-      const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 5);
-      const endDate = new Date(); // today
-
-      const startDateStr = startDate.toISOString().split("T")[0];
-      const endDateStr = endDate.toISOString().split("T")[0];
-
-      console.log(
-        `Fetching Mews data from ${startDateStr} to ${endDateStr}...`
-      );
-      const [occupancyData, revenueData] = await Promise.all([
-        mewsAdapter.getOccupancyMetrics(credentials, startDateStr, endDateStr),
-        mewsAdapter.getRevenueMetrics(credentials, startDateStr, endDateStr),
-      ]);
-
-      // Combine the occupancy and revenue data into a single object
+      // NEW: Fetch historical data in 90-day batches to respect API limits
       let allProcessedData = {};
-      occupancyData.dailyMetrics.forEach((metric) => {
-        allProcessedData[metric.date] = {
-          ...allProcessedData[metric.date],
-          rooms_sold: metric.occupied,
-          capacity_count: metric.available,
-          occupancy:
-            metric.available > 0 ? metric.occupied / metric.available : 0,
-        };
-      });
-      revenueData.dailyMetrics.forEach((metric) => {
-        allProcessedData[metric.date] = {
-          ...allProcessedData[metric.date],
-          net_revenue: metric.netRevenue,
-          gross_revenue: metric.grossRevenue,
-        };
-      });
+      let currentStartDate = new Date();
+      currentStartDate.setFullYear(currentStartDate.getFullYear() - 5); // Start 5 years ago
+      const today = new Date();
 
+      while (currentStartDate < today) {
+        let currentEndDate = new Date(currentStartDate);
+        currentEndDate.setDate(currentEndDate.getDate() + 89); // Set end of batch (90 days total)
+
+        // Ensure the last batch doesn't go into the future
+        if (currentEndDate > today) {
+          currentEndDate = today;
+        }
+
+        const startDateStr = currentStartDate.toISOString().split("T")[0];
+        const endDateStr = currentEndDate.toISOString().split("T")[0];
+
+        console.log(
+          `Fetching Mews data from ${startDateStr} to ${endDateStr}...`
+        );
+
+        // Fetch occupancy and revenue for the current batch
+        const [occupancyData, revenueData] = await Promise.all([
+          mewsAdapter.getOccupancyMetrics(
+            credentials,
+            startDateStr,
+            endDateStr
+          ),
+          mewsAdapter.getRevenueMetrics(credentials, startDateStr, endDateStr),
+        ]);
+
+        // Combine the occupancy data into the main object
+        occupancyData.dailyMetrics.forEach((metric) => {
+          allProcessedData[metric.date] = {
+            ...allProcessedData[metric.date],
+            rooms_sold: metric.occupied,
+            capacity_count: metric.available,
+            occupancy:
+              metric.available > 0 ? metric.occupied / metric.available : 0,
+          };
+        });
+        // Combine the revenue data into the main object
+        revenueData.dailyMetrics.forEach((metric) => {
+          allProcessedData[metric.date] = {
+            ...allProcessedData[metric.date],
+            net_revenue: metric.netRevenue,
+            gross_revenue: metric.grossRevenue,
+          };
+        });
+
+        // Set the start date for the next loop iteration
+        currentStartDate.setDate(currentStartDate.getDate() + 90);
+      }
+
+      console.log("✅ All historical data fetched.");
+
+      // Insert all collected data into the database
       const datesToUpdate = Object.keys(allProcessedData);
       if (datesToUpdate.length > 0) {
         const bulkInsertValues = datesToUpdate.map((date) => {
           const metrics = allProcessedData[date];
-          // Calculate ADR and RevPAR
           const net_adr =
             metrics.rooms_sold > 0
               ? metrics.net_revenue / metrics.rooms_sold
@@ -253,9 +276,14 @@ async function runSync(propertyId) {
             metrics.rooms_sold > 0
               ? metrics.gross_revenue / metrics.rooms_sold
               : 0;
-          const net_revpar = metrics.net_revenue / metrics.capacity_count || 0;
+          const net_revpar =
+            metrics.capacity_count > 0
+              ? metrics.net_revenue / metrics.capacity_count
+              : 0;
           const gross_revpar =
-            metrics.gross_revenue / metrics.capacity_count || 0;
+            metrics.capacity_count > 0
+              ? metrics.gross_revenue / metrics.capacity_count
+              : 0;
 
           return [
             date,
@@ -263,7 +291,7 @@ async function runSync(propertyId) {
             metrics.rooms_sold || 0,
             metrics.capacity_count || 0,
             metrics.occupancy || 0,
-            null, // cloudbeds_user_id is null for Mews
+            null,
             metrics.net_revenue || 0,
             metrics.gross_revenue || 0,
             net_adr,
@@ -285,7 +313,6 @@ async function runSync(propertyId) {
         `✅ Mews sync job complete for property ${propertyId}. Synced ${datesToUpdate.length} metric records.`
       );
     }
-
     // If we get here, all steps for the specific PMS succeeded.
     await client.query("COMMIT");
   } catch (e) {
