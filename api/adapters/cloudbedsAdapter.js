@@ -43,14 +43,17 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
     const roomsSold = metrics.rooms_sold;
     const capacityCount = metrics.capacity_count;
 
+    // Convert taxRate to a number to ensure correct math.
+    const numericTaxRate = parseFloat(taxRate);
+
     // Determine Net and Gross Revenue based on the hotel's pricing model.
     if (pricingModel === "exclusive") {
       metrics.net_revenue = rawRevenue;
-      metrics.gross_revenue = rawRevenue * (1 + taxRate);
+      metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     } else {
       // Default to 'inclusive' if the model is anything else.
       metrics.gross_revenue = rawRevenue;
-      metrics.net_revenue = rawRevenue / (1 + taxRate);
+      metrics.net_revenue = rawRevenue / (1 + numericTaxRate);
     }
 
     // Calculate Occupancy.
