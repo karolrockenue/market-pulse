@@ -1,0 +1,113 @@
+﻿Architectural Proposal: Enhancing Revenue Data Accuracy and Performance
+Date: August 12, 2025 Author: Karol Marcu & Market Pulse AI Assistant Status: Proposed
+1.0 Executive Summary
+This document proposes a critical architectural enhancement to the Market Pulse database schema and data ingestion logic. The current method of calculating tax-inclusive (gross) and tax-exclusive (net) revenue "on-the-fly" for Cloudbeds hotels is flawed, leading to significant risks of historical data inaccuracy and poor application performance.
+The proposed solution is to pre-calculate and store both net and gross revenue in the daily_metrics_snapshots table during the daily data sync. This change will guarantee historical data integrity, dramatically improve reporting speed, and create a more robust and consistent data model for all current and future PMS integrations, including the new Mews adapter. While this requires a one-time data migration, the long-term benefits to accuracy, performance, and maintainability are substantial.
+2.0 The Problem in Detail: Flaws in the Current Architecture
+Our current system was designed around the data structure provided by our first PMS integration, Cloudbeds. This has led to an architectural dependency that is both inefficient and fragile.
+2.1 Current Data Flow (Cloudbeds)
+1. Data Received: For each day, the Cloudbeds API provides a single revenue figure.
+2. Metadata Stored: In our hotels table, we store the hotel's tax rate (e.g., 20%) and its pricing model (e.g., inclusive).
+3. Data Stored: In the daily_metrics_snapshots table, we calculate and store only the net revenue in a single total_room_revenue column.
+4. Calculation on the Fly: When a user on the Advanced Reporting page toggles the "Include Tax" switch, the application must:
+   * Fetch the raw total_room_revenue (net).
+   * Fetch the hotel's current tax_rate and pricing_model.
+   * Perform a real-time calculation to display the gross revenue.
+2.2 Illustrative Scenarios
+Let's analyze two hotels, both with a 20% tax rate:
+* Hotel A (Tax Inclusive): Reports a revenue of £100. This is their gross revenue.
+   * Our sync job calculates and stores the net revenue: £100 / 1.20 = £83.33.
+   * When a user wants to see gross, we calculate it back: £83.33 * 1.20 = £100.
+* Hotel B (Tax Exclusive): Reports a revenue of £100. This is their net revenue.
+   * Our sync job stores this directly: £100.
+   * When a user wants to see gross, we calculate it: £100 * 1.20 = £120.
+2.3 The Critical Flaws
+This "on-the-fly" calculation model has two severe, business-critical flaws:
+Flaw #1: Historical Inaccuracy (The Tax Rate Bug)
+This is the most dangerous flaw. Tax rates change. Let's imagine that on January 1, 2026, Hotel B's local tax rate changes from 20% to 22%. We update this in our hotels table.
+Now, a user runs a report for a date in 2025.
+* The system fetches the stored net revenue for a day in 2025: £100.
+* The system fetches the hotel's current tax rate: 22%.
+* The system calculates the gross revenue on the fly: £100 * 1.22 = £122.
+This is wrong. The gross revenue for that day in 2025 should have been £120. By using the current tax rate to calculate historical data, we are corrupting our historical reports. The data is no longer a reliable record of past performance.
+Flaw #2: Poor Performance and Scalability
+Every time a user loads the reporting page or flips the tax toggle, our application server has to perform calculations for every single data point in the report. For a report spanning a full year, this means hundreds of individual calculations. This is inefficient, slows down the user experience, and does not scale well as we add more users and hotels.
+Flaw #3: Inconsistent Logic (The Mews Problem)
+The Mews API is more advanced and provides pre-calculated NetValue and GrossValue for every transaction. The "on-the-fly" model is completely unnecessary for Mews. Maintaining two separate logical paths—one that calculates and one that doesn't—adds unnecessary complexity to our codebase, making it harder to maintain and increasing the risk of bugs.
+3.0 The Proposed Solution: A Robust, Pre-Calculated Data Model
+The solution is to shift all calculation logic from the reporting layer to the data ingestion layer. The daily sync job should be the single source of truth for calculating and storing final, immutable revenue figures.
+3.1 Proposed Schema Changes
+Table: daily_metrics_snapshots This core table will be modified to store both revenue figures explicitly.
+* REMOVE:
+   * total_room_revenue (numeric)
+* ADD:
+   * net_revenue (numeric) - Stores revenue exclusive of tax.
+   * gross_revenue (numeric) - Stores revenue inclusive of tax.
+Table: hotels A new column will be added to store the hotel's default pricing model.
+* ADD:
+   * pricing_model (varchar) - Stores the hotel's default pricing setting (e.g., 'inclusive' or 'exclusive').
+3.2 The New Data Flow
+During the Daily Sync (/api/daily-refresh.js):
+* For a Cloudbeds Hotel:
+   1. The job fetches the single revenue figure for the day.
+   2. It looks up the hotel's pricing_model and tax_rate.
+   3. It performs the calculation once to determine both the net and gross values.
+   4. It saves these final, accurate values into the net_revenue and gross_revenue columns.
+* For a Mews Hotel:
+   1. The job fetches the NetValue and GrossValue from the Mews API.
+   2. It saves these values directly to the net_revenue and gross_revenue columns. No calculation is needed.
+On the Reporting Page:
+1. The application fetches both the net_revenue and gross_revenue columns.
+2. The "Include Tax" toggle becomes a simple, instantaneous frontend switch that chooses which of the two pre-calculated columns to display. No backend calculations are performed.
+4.0 Benefits of the New Architecture
+1. Guaranteed Historical Accuracy: By calculating revenue at the time of ingestion, the historically correct net and gross values are locked in forever. Future changes to a hotel's tax rate will have no impact on past data.
+2. Superior Performance: Reports will load significantly faster. The application is now performing a simple database read instead of hundreds of calculations, resulting in a much better user experience.
+3. System-wide Consistency: The logic for handling revenue becomes standardized. The reporting layer treats a Cloudbeds hotel and a Mews hotel identically, which simplifies development, reduces complexity, and minimizes the potential for bugs.
+4. Future-Proof Scalability: This model is robust and scales effortlessly. As we add more PMS integrations, we simply need to ensure the adapter provides a net and gross value to the sync job. The rest of the system remains unchanged.
+This architectural change fixes a critical flaw in our current system and provides a more robust, scalable, and performant foundation for the future of Market Pulse.
+
+
+Changelog: 
+
+Date: August 12, 2025
+* Objective: Execute a full-stack refactor of the revenue data model to pre-calculate and store both net and gross values at the point of ingestion. The goal was to eliminate on-the-fly frontend calculations to improve reporting performance and create a consistent data model for future PMS integrations like Mews.
+* Key Changes:
+   1. Database Expansion: The process began by modifying the database schema. An
+ALTER TABLE script was executed to add six new NUMERIC columns to the daily_metrics_snapshots table: net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, and gross_revpar. A
+pricing_model VARCHAR(50) column was also added to the hotels table to store whether a property's pricing is 'inclusive' or 'exclusive' of tax.
+   2. Backend Logic Refactor: The core data processing logic in /api/adapters/cloudbedsAdapter.js was enhanced. The processApiDataForTable and processUpcomingApiData functions were updated to accept a hotel's tax_rate and tax_type as arguments. Inside these functions, new logic was added to calculate all six of the new financial metrics based on the raw
+room_revenue value from the Cloudbeds API.
+   3. Data Pipeline Update: The sync scripts (/api/initial-sync.js and /api/daily-refresh.js) were modified. Prior to calling the adapter, they now execute a query on the hotels table to fetch the specific tax_rate and tax_type for the property being synced. These values are then passed as arguments into the updated adapter functions.
+   4. Iterative Debugging & Hardening:
+   * Initial Test: A test run of the updated sync scripts revealed that the new net_ columns were being populated with 0.
+   * Bug 1 (Calculation): A systematic debugging process using console.log statements revealed a JavaScript type coercion bug. The tax_rate value, a NUMERIC type from PostgreSQL, was being read as a string in Node.js. This caused the expression (1 + taxRate) to perform string concatenation (e.g., "1" + "0.20" resulting in "10.20") instead of mathematical addition. The fix was to wrap the tax_rate variable with parseFloat() in both adapter processing functions to ensure a correct calculation.
+   * Bug 2 (Schema Mismatch): A second test revealed a mismatch between the project's documentation and the actual database schema. The code was attempting to write to a column named total_room_revenue based on the documentation, but the actual column name in the database was total_revenue. This caused the column to be null in test results. The INSERT statements in the sync scripts and the backfill script were corrected to reference the proper total_revenue column name.
+   5. Historical Data Backfill: A comprehensive, one-time SQL UPDATE script was written and executed. This script successfully iterated through all existing records in daily_metrics_snapshots. For each row, it joined with the hotels table on hotel_id, read the old total_revenue column (which stores gross revenue), and used it to calculate and populate the six new metric columns (net_revenue, gross_revenue, net_adr, etc.). A verification test confirmed that historical data was correctly populated.
+   6. Frontend Migration Attempt: The final phase involved updating the application to use the new data structure.
+   * Backend API: The API endpoints in /api/routes/dashboard.router.js, specifically GET /api/kpi-summary and GET /api/metrics-from-db, were modified to select and serve the new pre-calculated columns from the database.
+   * Frontend Rendering: The primary rendering functions in /public/app/reports.js—processAndMergeData, buildTableBody, and buildTableTotalsRow—were replaced with new logic intended to simply display the pre-calculated data without performing any math.
+   * Outcome: The backend refactoring and data migration were a complete success. The application's data ingestion pipeline now correctly calculates and stores a full set of net and gross financial metrics for all incoming data. All historical data has been successfully backfilled to conform to the new, more robust schema. However, the final step of migrating the frontend UI to this new data structure failed, introducing critical bugs that leave both the Main Dashboard and Advanced Reporting pages in a non-functional state.
+________________
+
+
+Current Unresolved Bugs
+The following issues were observed after the final deployment and are currently unresolved. The descriptions below are based on factual observations from the application's behavior and logs, without hypothesizing on the root cause.
+   * Main Dashboard: The page loads, but all primary metrics for "Your Hotel" (Occupancy, ADR, and RevPAR) are displayed as 0. Analysis of the browser's developer tools shows that network requests to the dashboard's API endpoints are failing with a 500 Internal Server Error.
+   * Advanced Reporting Page: When attempting to generate a report, the request to the API fails, and a user-facing error message, "Error: Could not load your hotel data from the server," is displayed. The browser console shows a fatal frontend crash: ReferenceError: key is not defined in the buildTableBody function within reports.js. Visual inspection of the UI also shows that the "Date" and "Market Occupancy" columns in the report table are blank.
+Date: August 12, 2025
+   * Objective: To continue the architectural refactor by migrating all remaining backend services to use the new, pre-calculated revenue columns (gross_revenue, net_revenue, etc.) and to resolve a critical production error with the scheduled reports cron job.
+   * Key Changes:
+   * Market Overview Refactor: All four API endpoints in api/routes/market.router.js (/trends, /kpis, /neighborhoods, /seasonality) were successfully updated. Their SQL queries now read from the new gross_adr and gross_revpar columns, ensuring the Market Overview page's data is consistent with the main dashboard.
+   * Scheduled Reports Refactor: The entire api/send-scheduled-reports.js script was overhauled. Its data-fetching functions now select the new gross_* and net_* columns, and the report generation logic was made "tax-aware," correctly using either gross or net values based on each report's saved include_taxes setting.
+   * Cron Job Stability Fix: A fatal TypeError that crashed the scheduled reports job was resolved. The script in api/send-scheduled-reports.js now safely handles being triggered by the Vercel cron job, which was causing the crash by not including a req.body in its request.
+   * Outcome: The backend data queries for the Market Overview page and the scheduled reports system are now fully aligned with the new database architecture, and the production cron job is stable. However, this work has surfaced a blocking UI bug on the Advanced Reporting page.
+   * Unresolved Bugs:
+   * On the Advanced Reporting page (/app/reports.html), the main data table fails to load. After the page's script-loading logic was refactored, the table no longer renders, preventing any data from being displayed. The page's other UI elements, including the configuration panels and modals, appear to be functional.
+________________
+
+
+Remaining Refactoring Work
+After the Advanced Reporting page is debugged, the following areas will still need to be updated to complete the migration to the new database schema:
+   * dashboard.router.js: A minor fallback case in the /kpi-summary endpoint still uses the legacy total_revenue column when a hotel has no competitors. This should be updated to use gross_revenue.
+   * cloudbedsAdapter.js: The adapter still calculates and provides the old adr, revpar, and total_revenue fields for "backward compatibility." Once all other services are confirmed to be using the new gross_* and net_* fields, this legacy logic can be removed to simplify the codebase.
+   * Database Schema: The final step of the migration will be to execute an ALTER TABLE script to drop the now-redundant total_revenue, adr, and revpar columns from the daily_metrics_snapshots table.
