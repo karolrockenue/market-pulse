@@ -463,12 +463,24 @@ export default function () {
         if (!dataMap.has(date))
           dataMap.set(date, { date, your: {}, market: {} });
         const entry = dataMap.get(date);
-        entry[source] = {
-          occupancy:
-            parseFloat(row.occupancy_direct || row.market_occupancy) || 0,
-          adr: parseFloat(row.adr || row.market_adr) || 0,
-          revpar: parseFloat(row.revpar || row.market_revpar) || 0,
-        };
+
+        // --- THE FIX ---
+        // This logic now correctly checks for the 'your_...' prefixed aliases
+        // when processing data from the 'your' source (yourData).
+        if (source === "your") {
+          entry[source] = {
+            occupancy: parseFloat(row.your_occupancy_direct) || 0,
+            adr: parseFloat(row.your_adr) || 0,
+            revpar: parseFloat(row.your_revpar) || 0,
+          };
+        } else {
+          // source === 'market'
+          entry[source] = {
+            occupancy: parseFloat(row.market_occupancy) || 0,
+            adr: parseFloat(row.market_adr) || 0,
+            revpar: parseFloat(row.market_revpar) || 0,
+          };
+        }
       };
       yourData.forEach((row) => processRow(row, "your"));
       marketData.forEach((row) => processRow(row, "market"));
