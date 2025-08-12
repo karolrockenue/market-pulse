@@ -594,17 +594,18 @@ function buildTableBody(data, headers, component) {
         const prefix = isMarket ? "market" : "your";
         let baseMetricKey = isMarket ? key.substring(7) : key;
 
+        // This makes "Market ADR" -> "ADR"
         if (baseMetricKey.startsWith("Market ")) {
           baseMetricKey = baseMetricKey.substring(7);
         }
 
         let value;
 
-        // --- THE FIX: This switch now correctly handles all cases ---
+        // --- THE FIX: This switch now uses the correct data properties ---
         switch (baseMetricKey) {
           case "Rooms Sold":
-            // Correctly uses the dynamic prefix for 'your_rooms_sold'
-            value = row[`${prefix}_rooms_sold`];
+            // Looks for `your_your_rooms_sold` or `market_your_rooms_sold` etc
+            value = row[`your_your_rooms_sold`];
             content = formatValue(
               parseFloat(value),
               baseMetricKey,
@@ -613,13 +614,13 @@ function buildTableBody(data, headers, component) {
             );
             break;
           case "Rooms Unsold":
-            // Correctly uses the dynamic prefix for both properties
             const unsold =
-              (row[`${prefix}_capacity_count`] || 0) -
-              (row[`${prefix}_rooms_sold`] || 0);
+              (row[`your_your_capacity_count`] || 0) -
+              (row[`your_your_rooms_sold`] || 0);
             content = formatValue(unsold, baseMetricKey, false, currencyCode);
             break;
           case "Occupancy":
+            // Correctly references `your_occupancy_direct` and `market_occupancy`
             value =
               prefix === "your"
                 ? row[`your_occupancy_direct`]
