@@ -475,10 +475,11 @@ export default function () {
           };
         } else {
           // source === 'market'
+          // This now correctly reads the new 'gross' metric fields from the API response.
           entry[source] = {
             occupancy: parseFloat(row.market_occupancy) || 0,
-            adr: parseFloat(row.market_adr) || 0,
-            revpar: parseFloat(row.market_revpar) || 0,
+            adr: parseFloat(row.market_gross_adr) || 0,
+            revpar: parseFloat(row.market_gross_revpar) || 0,
           };
         }
       };
