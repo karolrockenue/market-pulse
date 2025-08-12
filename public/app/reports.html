@@ -440,8 +440,7 @@
 <script>
       function reportsPage() {
         return {
-
-          // --- NEW: State for the visual report builder ---
+          // --- State for the visual report builder ---
           reportMetrics: [
             { key: 'Occupancy', label: 'Occupancy', group: 'Hotel' },
             { key: 'ADR', label: 'ADR', group: 'Hotel' },
@@ -452,9 +451,9 @@
             { key: 'Market Occupancy', label: 'Market Occupancy', group: 'Market' },
             { key: 'Market ADR', label: 'Market ADR', group: 'Market' },
           ],
-          selectedMetricKeys: ['Occupancy', 'ADR', 'Total Revenue', 'Rooms Sold'], // Default selections
+          selectedMetricKeys: ['Occupancy', 'ADR', 'Total Revenue', 'Rooms Sold'],
 
-          // --- EXISTING STATE ---
+          // --- Core State Properties ---
           isInitialized: false,
           propertyId: null,
           isScheduleModalOpen: false,
@@ -477,11 +476,12 @@
           propertyTaxName: 'VAT',
           currencyCode: 'USD',
 
-          // --- INIT ---
-          async init() {
-            await import('/app/reports.js');
-            this.handlePresetChange("current-month");
+          // --- THE FIX: A much cleaner initialization function ---
+          init() {
+            // Set the initial date range using a helper from reports.js
+            window.handlePresetChange("current-month");
 
+            // Listen for the sidebar to announce a property change
             window.addEventListener("property-changed", async (event) => {
               if (event.detail && event.detail.property_id) {
                 this.propertyId = event.detail.property_id;
@@ -498,28 +498,28 @@
                 } catch (error) {
                   console.error("Could not fetch details:", error);
                 }
+                // Once we have the new property details, generate the report
                 this.handleGenerateReport();
               }
             });
 
-            const { loadComponent } = await import("/app/utils.mjs");
-            const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
-
-            Alpine.data("sidebar", sidebar);
-            await loadComponent("sidebar", "sidebar-placeholder");
+            // This flag is used to prevent content from showing before Alpine is ready
             this.isInitialized = true;
+
+            // Load schedule data after the page is initialized
             this.handleFrequencyChange();
-            this.schedules = await window.fetchSchedules();
+            window.fetchSchedules().then(schedules => {
+                this.schedules = schedules;
+            });
           },
 
-          // --- NEW HELPER METHODS TO OPEN MODALS ---
+          // --- Helper Methods ---
           openScheduleModal() {
             this.isScheduleModalOpen = true;
           },
           openManageModal() {
             this.isManageModalOpen = true;
           },
-
           toggleMetric(metricKey) {
             const index = this.selectedMetricKeys.indexOf(metricKey);
             if (index > -1) {
@@ -530,7 +530,7 @@
             this.handleGenerateReport();
           },
 
-          // --- PROXY METHODS (Unchanged) ---
+          // --- Proxy Methods to call helpers in reports.js ---
           handleGenerateReport() { window.handleGenerateReport(this, this.propertyId); },
           handlePresetChange(preset) { window.handlePresetChange(preset); },
           exportToCSV() { window.exportToCSV(this.propertyName); },
@@ -541,18 +541,20 @@
         };
       }
     </script>
-    <script src="/app/reports.js"></script>
-<script type="module">
+  <script src="/app/reports.js"></script>
+    <script type="module">
+      // THE FIX: This is now the single source of truth for page initialization.
       import { loadComponent } from "/app/utils.mjs";
- import sidebar from "/app/_shared/sidebar.mjs";
+      import sidebar from "/app/_shared/sidebar.mjs";
 
-      // Register the Alpine components when Alpine is ready.
+      // Register all Alpine components in one place, when Alpine is ready.
       document.addEventListener("alpine:init", () => {
-        Alpine.data("reportsPage", reportsPage);
+        // The reportsPage function is defined in the script tag above
+        Alpine.data("reportsPage", reportsPage); 
         Alpine.data("sidebar", sidebar);
       });
 
-      // Use the exact same pattern as the working design.html page to load the component HTML.
+      // Load the shared sidebar's HTML once the DOM is ready.
       document.addEventListener('DOMContentLoaded', async () => {
        await loadComponent("sidebar", "sidebar-placeholder");
       });
