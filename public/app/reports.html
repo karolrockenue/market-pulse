@@ -213,15 +213,16 @@
         Schedule Delivery
         <svg class="h-5 w-5 -mr-1 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
     </button>
-    <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 z-10 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-        <div class="py-1">
-            <a href="#" @click.prevent="isScheduleModalOpen = true; open = false" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">Create New Schedule</a>
-            <a href="#" @click.prevent="isManageModalOpen = true; open = false" class="relative text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
-                Manage Schedules
-                <span x-show="schedules.length > 0" x-text="schedules.length" class="absolute top-1.5 right-3 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold"></span>
-            </a>
-        </div>
+  <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 z-10 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+    <div class="py-1">
+        <a href="#" @click.prevent="openScheduleModal(); open = false" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">Create New Schedule</a>
+        
+        <a href="#" @click.prevent="openManageModal(); open = false" class="relative text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
+            Manage Schedules
+            <span x-show="schedules.length > 0" x-text="schedules.length" class="absolute top-1.5 right-3 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold"></span>
+        </a>
     </div>
+</div>
 </div>
       </div>
     </div>
@@ -456,14 +457,11 @@
           // --- EXISTING STATE ---
           isInitialized: false,
           propertyId: null,
-          // --- STATE ---
-          isInitialized: false,
-          propertyId: null,
           isScheduleModalOpen: false,
           isManageModalOpen: false,
           propertyName: "Your Hotel",
           addComparisons: false,
-        displayOrder: 'metric', // The default selection
+          displayOrder: 'metric',
           displayTotals: true,
           granularity: "daily",
           preset: "current-month",
@@ -480,70 +478,58 @@
           currencyCode: 'USD',
 
           // --- INIT ---
-          // This restored init() function correctly loads all dependencies in order.
           async init() {
-            // First, ensure all helper functions from reports.js are loaded and ready.
             await import('/app/reports.js');
-
-            // Now we can safely call a function from that file.
             this.handlePresetChange("current-month");
 
-            // This listener waits for the new sidebar to send property data.
-         // This listener waits for the new sidebar to send property data.
-window.addEventListener("property-changed", async (event) => {
-  // --- FIX: Now listening for 'property_id' to match other pages ---
-  if (event.detail && event.detail.property_id) {
-    this.propertyId = event.detail.property_id; // Use the correct property name
-    this.propertyName = event.detail.propertyName;
-    try {
-      const response = await fetch(`/api/hotel-details/${this.propertyId}`);
-      if (!response.ok) throw new Error('Could not fetch property details.');
-      const details = await response.json();
-      this.propertyTaxRate = parseFloat(details.tax_rate);
-      this.propertyTaxType = details.tax_type;
-      this.propertyTaxName = details.tax_name;
-      this.currencyCode = details.currency_code;
-      this.includeTaxes = (this.propertyTaxType === 'inclusive');
-    } catch (error) {
-      console.error("Could not fetch details:", error);
-    }
-    this.handleGenerateReport();
-  }
-});
+            window.addEventListener("property-changed", async (event) => {
+              if (event.detail && event.detail.property_id) {
+                this.propertyId = event.detail.property_id;
+                this.propertyName = event.detail.propertyName;
+                try {
+                  const response = await fetch(`/api/hotel-details/${this.propertyId}`);
+                  if (!response.ok) throw new Error('Could not fetch property details.');
+                  const details = await response.json();
+                  this.propertyTaxRate = parseFloat(details.tax_rate);
+                  this.propertyTaxType = details.tax_type;
+                  this.propertyTaxName = details.tax_name;
+                  this.currencyCode = details.currency_code;
+                  this.includeTaxes = (this.propertyTaxType === 'inclusive');
+                } catch (error) {
+                  console.error("Could not fetch details:", error);
+                }
+                this.handleGenerateReport();
+              }
+            });
 
-            // Dynamically import our component logic.
             const { loadComponent } = await import("/app/utils.mjs");
-            // We import the NEW sidebar logic, but NOT the old header logic.
-    const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
+            const { default: sidebar } = await import("/app/_shared/sidebar.mjs");
 
-            // Register the components with Alpine.
             Alpine.data("sidebar", sidebar);
-
-            // Load the NEW sidebar HTML into the placeholder.
-  await loadComponent("sidebar", "sidebar-placeholder");
-
-            // Show the page content.
+            await loadComponent("sidebar", "sidebar-placeholder");
             this.isInitialized = true;
-
-            // Load schedule data.
             this.handleFrequencyChange();
             this.schedules = await window.fetchSchedules();
           },
-// --- NEW: Method for the visual builder ---
+
+          // --- NEW HELPER METHODS TO OPEN MODALS ---
+          openScheduleModal() {
+            this.isScheduleModalOpen = true;
+          },
+          openManageModal() {
+            this.isManageModalOpen = true;
+          },
+
           toggleMetric(metricKey) {
             const index = this.selectedMetricKeys.indexOf(metricKey);
             if (index > -1) {
-              // If it's already selected, remove it
               this.selectedMetricKeys.splice(index, 1);
             } else {
-              // Otherwise, add it
               this.selectedMetricKeys.push(metricKey);
             }
-            // Automatically re-run the report after a change
             this.handleGenerateReport();
           },
 
-          // --- PROXY METHODS (Unchanged) ---
           // --- PROXY METHODS (Unchanged) ---
           handleGenerateReport() { window.handleGenerateReport(this, this.propertyId); },
           handlePresetChange(preset) { window.handlePresetChange(preset); },
