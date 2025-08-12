@@ -6,6 +6,41 @@ const router = express.Router();
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
 
+// Get scheduled reports for the current user
+router.get("/scheduled-reports", requireUserApi, async (req, res) => {
+  try {
+    // Resolve internal user_id from session (cloudbeds_user_id)
+    const userResult = await pgPool.query(
+      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    const internalUserId = userResult.rows[0].user_id;
+
+    const { rows } = await pgPool.query(
+      `SELECT sr.*, h.property_name
+       FROM scheduled_reports sr
+       LEFT JOIN hotels h
+         ON (
+           CASE
+             WHEN sr.property_id ~ '^[0-9]+$' THEN sr.property_id::int
+             ELSE NULL
+           END
+         ) = h.hotel_id
+       WHERE sr.user_id = $1
+       ORDER BY sr.created_at DESC`,
+      [internalUserId]
+    );
+
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching scheduled reports:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- SCHEDULED REPORTS API ENDPOINTS ---
 // Create new scheduled report
 router.post("/scheduled-reports", requireUserApi, async (req, res) => {
