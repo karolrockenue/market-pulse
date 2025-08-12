@@ -71,8 +71,8 @@ module.exports = async (request, response) => {
             // Start the transaction
             await client.query("BEGIN");
 
-            // Prepare the values for the bulk insert/update operation
-            // Prepare the values for the bulk insert/update operation
+            // Map the processed data to the format needed for a bulk database insert.
+            // This now only returns 12 values to match the 12 columns in the query.
             const bulkInsertValues = datesToUpdate.map((date) => {
               const metrics = processedData[date];
               return [
@@ -82,10 +82,6 @@ module.exports = async (request, response) => {
                 metrics.capacity_count || 0,
                 metrics.occupancy || 0,
                 cloudbedsUserId,
-                // Old columns for backward compatibility
-                metrics.adr || 0,
-                metrics.revpar || 0,
-                metrics.total_revenue || 0,
                 // New columns
                 metrics.net_revenue || 0,
                 metrics.gross_revenue || 0,
