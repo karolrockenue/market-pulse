@@ -298,15 +298,18 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     const period = getPeriod(granularity);
 
     // This is the correct, simple query for this endpoint with the correct aliases.
+    // This is the final, correct query that uses the new reliable columns.
     const query = `
       SELECT
         ${period} as period,
         AVG(rooms_sold) as your_rooms_sold,
         AVG(capacity_count) as your_capacity_count,
         AVG(occupancy_direct) as your_occupancy_direct,
-        AVG(adr) as your_adr,
-        AVG(revpar) as your_revpar,
-        SUM(total_revenue) as your_total_revenue,
+        -- Use the NEW gross columns but keep the OLD aliases for the dashboard
+        AVG(gross_adr) as your_adr,
+        AVG(gross_revpar) as your_revpar,
+        SUM(gross_revenue) as your_total_revenue,
+        -- Also select all the new columns for the reporting page
         SUM(net_revenue) as your_net_revenue,
         SUM(gross_revenue) as your_gross_revenue,
         AVG(net_adr) as your_net_adr,
