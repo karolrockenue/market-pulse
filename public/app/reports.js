@@ -83,7 +83,8 @@ function handlePresetChange(preset) {
 }
 
 async function handleGenerateReport(component, propertyId) {
-  const reportContainer = document.getElementById("report-results-container");
+  const reportContainer = document.getElementById("report-table");
+
   reportContainer.innerHTML =
     '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">Loading live report data...</div>';
 
@@ -604,8 +605,8 @@ function buildTableBody(data, headers, component) {
         // --- THE FIX: This switch now uses the correct data properties ---
         switch (baseMetricKey) {
           case "Rooms Sold":
-            // Looks for `your_your_rooms_sold` or `market_your_rooms_sold` etc
-            value = row[`your_your_rooms_sold`];
+            // Correct: respect prefix ("your" | "market") without double-prefixing
+            value = row[`${prefix}_rooms_sold`];
             content = formatValue(
               parseFloat(value),
               baseMetricKey,
@@ -615,8 +616,11 @@ function buildTableBody(data, headers, component) {
             break;
           case "Rooms Unsold":
             const unsold =
-              (row[`your_your_capacity_count`] || 0) -
-              (row[`your_your_rooms_sold`] || 0);
+              (row[`${prefix}_capacity_count`] || 0) -
+              (row[`${prefix}_rooms_sold`] || 0);
+            content = formatValue(unsold, baseMetricKey, false, currencyCode);
+            break;
+
             content = formatValue(unsold, baseMetricKey, false, currencyCode);
             break;
           case "Occupancy":
@@ -826,7 +830,8 @@ function renderReportTable(
   displayOrder,
   component // Receive the full component state
 ) {
-  const container = document.getElementById("report-results-container");
+  const container = document.getElementById("report-table");
+
   if (!data || data.length === 0) {
     container.innerHTML =
       '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">No data available.</div>';
