@@ -23,7 +23,6 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
         aggregatedData[date] = {
           rooms_sold: 0,
           capacity_count: 0,
-          // We only need to aggregate the primary room_revenue figure from the API.
           room_revenue: 0,
         };
       }
@@ -43,30 +42,44 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
     const roomsSold = metrics.rooms_sold;
     const capacityCount = metrics.capacity_count;
 
-    // Convert taxRate to a number to ensure correct math.
+    // --- START DEBUG LOGGING ---
+    console.log(`\n--- Debugging START for Date: ${date} ---`);
+    console.log(
+      `[DEBUG A] Inputs: rawRevenue=${rawRevenue}, taxRate=${taxRate} (type: ${typeof taxRate}), pricingModel=${pricingModel}`
+    );
+
     const numericTaxRate = parseFloat(taxRate);
+    console.log(`[DEBUG B] Parsed Tax Rate: numericTaxRate=${numericTaxRate}`);
 
-    // Determine Net and Gross Revenue based on the hotel's pricing model.
     if (pricingModel === "exclusive") {
+      const divisor = 1 + numericTaxRate;
+      const calculatedGross = rawRevenue * divisor;
+      console.log(
+        `[DEBUG C - Exclusive] Divisor=${divisor}, Calculated Gross=${calculatedGross}`
+      );
       metrics.net_revenue = rawRevenue;
-      metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
+      metrics.gross_revenue = calculatedGross;
     } else {
-      // Default to 'inclusive' if the model is anything else.
+      const divisor = 1 + numericTaxRate;
+      const calculatedNet = rawRevenue / divisor;
+      console.log(
+        `[DEBUG D - Inclusive] Divisor=${divisor}, Calculated Net=${calculatedNet}`
+      );
       metrics.gross_revenue = rawRevenue;
-      metrics.net_revenue = rawRevenue / (1 + numericTaxRate);
+      metrics.net_revenue = calculatedNet;
     }
+    console.log(
+      `[DEBUG E] Assigned Metrics: net_revenue=${metrics.net_revenue}, gross_revenue=${metrics.gross_revenue}`
+    );
+    console.log(`--- Debugging END for Date: ${date} ---\n`);
+    // --- END DEBUG LOGGING ---
 
-    // Calculate Occupancy.
     metrics.occupancy = capacityCount > 0 ? roomsSold / capacityCount : 0;
-
-    // Calculate Net and Gross versions of ADR and RevPAR.
     metrics.gross_adr = roomsSold > 0 ? metrics.gross_revenue / roomsSold : 0;
     metrics.net_adr = roomsSold > 0 ? metrics.net_revenue / roomsSold : 0;
     metrics.gross_revpar = metrics.gross_adr * metrics.occupancy;
     metrics.net_revpar = metrics.net_adr * metrics.occupancy;
 
-    // --- For backward compatibility ---
-    // Populate the old fields to prevent breaking the existing application.
     metrics.adr = metrics.gross_adr;
     metrics.revpar = metrics.gross_revpar;
     metrics.total_revenue = metrics.gross_revenue;
