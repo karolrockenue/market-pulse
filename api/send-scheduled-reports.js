@@ -58,16 +58,22 @@ function calculateDateRange(period) {
 
 async function getHotelMetrics(propertyId, startDate, endDate) {
   const query = `
-    SELECT stay_date::date, 
-           AVG(adr) as adr, 
-           AVG(occupancy_direct) as occupancy, 
-           AVG(revpar) as revpar,
-           SUM(total_revenue) as total_revenue, 
-           SUM(rooms_sold) as rooms_sold,
-           SUM(capacity_count) as capacity_count
+    SELECT 
+      stay_date::date, 
+      rooms_sold,
+      capacity_count,
+      occupancy_direct,
+      -- THE FIX: Select all new gross and net columns instead of legacy ones
+      gross_revenue,
+      net_revenue,
+      gross_adr,
+      net_adr,
+      gross_revpar,
+      net_revpar
     FROM daily_metrics_snapshots
     WHERE hotel_id = $1 AND stay_date::date >= $2 AND stay_date::date <= $3
-    GROUP BY stay_date::date ORDER BY stay_date::date ASC;
+    GROUP BY stay_date::date, rooms_sold, capacity_count, occupancy_direct, gross_revenue, net_revenue, gross_adr, net_adr, gross_revpar, net_revpar
+    ORDER BY stay_date::date ASC;
   `;
   const { rows } = await pgPool.query(query, [propertyId, startDate, endDate]);
   return rows;
@@ -77,7 +83,6 @@ async function getHotelMetrics(propertyId, startDate, endDate) {
 
 // The function now accepts 'propertyId' and 'category' for fallback.
 async function getMarketMetrics(propertyId, category, startDate, endDate) {
-  // --- NEW COMP SET LOGIC ---
   const compSetResult = await pgPool.query(
     "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
     [propertyId]
@@ -85,22 +90,29 @@ async function getMarketMetrics(propertyId, category, startDate, endDate) {
   let query;
   let queryParams;
 
+  const metricsToSelect = `
+    AVG(dms.occupancy_direct) as market_occupancy,
+    -- THE FIX: Select all new gross and net market columns
+    AVG(dms.gross_adr) as market_gross_adr,
+    AVG(dms.net_adr) as market_net_adr,
+    AVG(dms.gross_revpar) as market_gross_revpar,
+    AVG(dms.net_revpar) as market_net_revpar
+  `;
+
   if (compSetResult.rows.length > 0) {
-    // A custom comp set exists. Build the query to use the specific list of competitor IDs.
     const competitorIds = compSetResult.rows.map(
       (row) => row.competitor_hotel_id
     );
     query = `
-      SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
+      SELECT stay_date::date, ${metricsToSelect}
       FROM daily_metrics_snapshots dms
       WHERE dms.hotel_id = ANY($1::int[]) AND dms.stay_date::date >= $2 AND dms.stay_date::date <= $3
       GROUP BY stay_date::date ORDER BY stay_date::date ASC;
     `;
     queryParams = [competitorIds, startDate, endDate];
   } else {
-    // No custom comp set. Fall back to the original category-based query.
     query = `
-      SELECT stay_date::date, AVG(dms.adr) as market_adr, AVG(dms.occupancy_direct) as market_occupancy
+      SELECT stay_date::date, ${metricsToSelect}
       FROM daily_metrics_snapshots dms
       JOIN hotels h ON dms.hotel_id = h.hotel_id
       WHERE dms.hotel_id != $1 AND h.category = $2 AND dms.stay_date::date >= $3 AND dms.stay_date::date <= $4
@@ -108,7 +120,6 @@ async function getMarketMetrics(propertyId, category, startDate, endDate) {
     `;
     queryParams = [propertyId, category, startDate, endDate];
   }
-  // --- END NEW COMP SET LOGIC ---
 
   const { rows } = await pgPool.query(query, queryParams);
   return rows;
@@ -116,24 +127,20 @@ async function getMarketMetrics(propertyId, category, startDate, endDate) {
 
 function processData(hotelData, marketData) {
   const dataMap = new Map();
-  const processRow = (row, isMarket = false) => {
-    // FIX: Treat stay_date as a string, which is how the database returns it.
-    // We just need the first 10 characters (the 'YYYY-MM-DD' part).
+  hotelData.forEach((row) => {
     const date = row.stay_date.substring(0, 10);
-    if (!dataMap.has(date)) dataMap.set(date, { date: date });
-    const entry = dataMap.get(date);
-    const prefix = isMarket ? "market_" : "";
-    entry[`${prefix}adr`] = row.adr;
-    entry[`${prefix}occupancy`] = row.occupancy;
-    if (!isMarket) {
-      entry.revpar = row.revpar;
-      entry.total_revenue = row.total_revenue;
-      entry.rooms_sold = row.rooms_sold;
-      entry.capacity_count = row.capacity_count;
+    dataMap.set(date, { date, ...row });
+  });
+
+  marketData.forEach((row) => {
+    const date = row.stay_date.substring(0, 10);
+    if (dataMap.has(date)) {
+      // Merge market data into the existing hotel data entry for that date
+      const existingEntry = dataMap.get(date);
+      dataMap.set(date, { ...existingEntry, ...row });
     }
-  };
-  hotelData.forEach((row) => processRow(row, false));
-  marketData.forEach((row) => processRow(row, true));
+  });
+
   return Array.from(dataMap.values()).sort(
     (a, b) => new Date(a.date) - new Date(b.date)
   );
@@ -142,24 +149,40 @@ function processData(hotelData, marketData) {
 // --- DYNAMIC FILE GENERATORS ---
 
 // Reusable function to get headers and format data
+// Reusable function to get headers and format data
 function getReportData(data, report) {
+  // THE FIX: This function is now "tax-aware".
+  // It checks the report's settings to decide which revenue columns to use.
+  const useGross = report.include_taxes;
+
   const masterHeaderOrder = {
     Date: (row) => row.date,
     "Rooms Sold": (row) => parseFloat(row.rooms_sold) || 0,
     "Rooms Unsold": (row) =>
-      parseFloat(row.capacity_count) - parseFloat(row.rooms_sold) || 0,
-    ADR: (row) => parseFloat(row.adr) || 0,
-    RevPAR: (row) => parseFloat(row.revpar) || 0,
-    Occupancy: (row) => parseFloat(row.occupancy) || 0,
-    "Total Revenue": (row) => parseFloat(row.total_revenue) || 0,
+      (parseFloat(row.capacity_count) || 0) - (parseFloat(row.rooms_sold) || 0),
+    ADR: (row) => parseFloat(useGross ? row.gross_adr : row.net_adr) || 0,
+    RevPAR: (row) =>
+      parseFloat(useGross ? row.gross_revpar : row.net_revpar) || 0,
+    Occupancy: (row) => parseFloat(row.occupancy_direct) || 0,
+    "Total Revenue": (row) =>
+      parseFloat(useGross ? row.gross_revenue : row.net_revenue) || 0,
+    "Market Occupancy": (row) => parseFloat(row.market_occupancy) || 0,
+    "Market ADR": (row) =>
+      parseFloat(useGross ? row.market_gross_adr : row.market_net_adr) || 0,
   };
-  const headers = [];
-  const hotelMetrics = new Set(report.metrics_hotel);
+
+  const headers = ["Date"];
+  const selectedMetrics = new Set([
+    ...report.metrics_hotel,
+    ...report.metrics_market,
+  ]);
+
   for (const header of Object.keys(masterHeaderOrder)) {
-    if (hotelMetrics.has(header) || header === "Date") {
+    if (header !== "Date" && selectedMetrics.has(header)) {
       headers.push(header);
     }
   }
+
   const body = data.map((row) =>
     headers.map((header) => masterHeaderOrder[header](row))
   );
@@ -168,22 +191,36 @@ function getReportData(data, report) {
   if (report.display_totals) {
     totals = {};
     const sums = ["Rooms Sold", "Rooms Unsold", "Total Revenue"];
-    const avgs = ["ADR", "RevPAR", "Occupancy"];
+    const avgs = [
+      "ADR",
+      "RevPAR",
+      "Occupancy",
+      "Market Occupancy",
+      "Market ADR",
+    ];
+
     sums.forEach((key) => {
-      totals[key] = data.reduce(
-        (sum, row) => sum + (masterHeaderOrder[key](row) || 0),
-        0
-      );
+      if (headers.includes(key)) {
+        totals[key] = data.reduce(
+          (sum, row) => sum + (masterHeaderOrder[key](row) || 0),
+          0
+        );
+      }
     });
+
     avgs.forEach((key) => {
-      totals[key] =
-        data.reduce((sum, row) => sum + (masterHeaderOrder[key](row) || 0), 0) /
-        data.length;
+      if (headers.includes(key)) {
+        totals[key] =
+          data.reduce(
+            (sum, row) => sum + (masterHeaderOrder[key](row) || 0),
+            0
+          ) / data.length;
+      }
     });
   }
+
   return { headers, body, totals };
 }
-
 function generateCSV(data, report) {
   const { headers, body, totals } = getReportData(data, report);
   const headerRow = headers.join(",");
@@ -261,16 +298,17 @@ async function generateXLSX(data, report) {
 }
 
 // --- MAIN HANDLER ---
+// --- MAIN HANDLER ---
 module.exports = async (req, res) => {
   try {
     let dueReports;
-    const { reportId } = req.body; // Check for a specific reportId from the request body.
+    // THE FIX: Safely access reportId from req.body, which might be undefined in a cron job.
+    // We check if req.body exists before trying to get reportId from it.
+    const reportId = req.body?.reportId;
 
     // If a reportId is provided, this is a manual trigger for a single report.
     if (reportId) {
       console.log(`Manual trigger: Fetching report with ID: ${reportId}`);
-      // This query fetches only the specific report by its ID, ignoring the schedule.
-      // We use sr.id because that's the correct column name for the primary key.
       const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
          FROM scheduled_reports sr
@@ -290,7 +328,6 @@ module.exports = async (req, res) => {
       const currentDayOfWeek = now.getUTCDay();
       const currentDayOfMonth = now.getUTCDate();
 
-      // This is the original query to find all reports that are due at the current time.
       const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
          FROM scheduled_reports sr
@@ -305,9 +342,6 @@ module.exports = async (req, res) => {
       dueReports = result.rows;
     }
 
-    // The rest of the logic is the same for both cases. It processes the
-    // `dueReports` array, which will have one report for a manual trigger
-    // or multiple reports for a scheduled run.
     if (dueReports.length === 0) {
       const message = reportId
         ? `Report with ID ${reportId} not found.`
@@ -320,7 +354,6 @@ module.exports = async (req, res) => {
     let sentCount = 0;
 
     for (const report of dueReports) {
-      // ... (The entire 'for' loop and its contents are identical to the original file)
       const { startDate, endDate } = calculateDateRange(report.report_period);
       const hotelData = await getHotelMetrics(
         report.property_id,
