@@ -73,87 +73,79 @@ user: A standard team member invited by an owner. Has view-only access to the sh
 4.0 Database Schema
 The following are the key tables in the PostgreSQL database.
 
-users
+- **users**
+  `user_id` (integer, PK), `cloudbeds_user_id` (varchar), `email` (varchar), `role` (varchar), `first_name` (text), `last_name` (text), `pms_type` (varchar), `created_at` (timestamptz), `updated_at` (timestamptz)
 
-user_id (integer, PK), cloudbeds_user_id (varchar), email (varchar), role (varchar), first_name (text), last_name (text), pms_type (varchar), created_at (timestamptz), updated_at (timestamptz)
+- **hotels**
+  `hotel_id` (integer, PK), `property_name` (text), `city` (text), `go_live_date` (date), `category` (varchar), `neighborhood` (varchar), `currency_code` (text), `tax_rate` (numeric), `tax_type` (varchar), `tax_name` (varchar), **`pricing_model` (varchar)**, `latitude` (numeric), `longitude` (numeric)
 
-hotels
+- **user_properties**
+  `user_id` (varchar), `property_id` (integer), `pms_credentials` (jsonb), `status` (varchar)
 
-hotel_id (integer, PK), property_name (text), city (text), go_live_date (date), category (varchar), neighborhood (varchar), currency_code (text), tax_rate (numeric), tax_type (varchar), tax_name (varchar), latitude (numeric), longitude (numeric)
+- **daily_metrics_snapshots**
+  `snapshot_id` (integer, PK), `hotel_id` (integer), `stay_date` (date), `rooms_sold` (integer), `capacity_count` (integer), **`net_revenue` (numeric)**, **`gross_revenue` (numeric)**, **`net_adr` (numeric)**, **`gross_adr` (numeric)**, **`net_revpar` (numeric)**, **`gross_revpar` (numeric)**
 
-user_properties
+- **hotel_comp_sets**
+  `hotel_id` (integer), `competitor_hotel_id` (integer)
 
-user_id (varchar), property_id (integer), pms_credentials (jsonb), status (varchar)
+- **user_invitations**
+  `invitation_id` (integer, PK), `inviter_user_id` (integer), `invitee_email` (varchar), `property_id` (integer), `invitation_token` (varchar), `role` (varchar), `status` (varchar)
 
-daily_metrics_snapshots
+- **scheduled_reports**
+  `id` (integer, PK), `user_id` (integer), `property_id` (varchar), `report_name` (varchar), `frequency` (varchar), `metrics_hotel` (ARRAY), `metrics_market` (ARRAY)
 
-snapshot_id (integer, PK), hotel_id (integer), stay_date (date), adr (numeric), revpar (numeric), total_room_revenue (numeric), rooms_sold (integer), capacity_count (integer)
+- **magic_login_tokens**
+  `token` (text, PK), `user_id` (integer), `expires_at` (timestamptz), `used_at` (timestamptz)
 
-hotel_comp_sets
-
-hotel_id (integer), competitor_hotel_id (integer)
-
-user_invitations
-
-invitation_id (integer, PK), inviter_user_id (integer), invitee_email (varchar), property_id (integer), invitation_token (varchar), role (varchar), status (varchar)
-
-scheduled_reports
-
-id (integer, PK), user_id (integer), property_id (varchar), report_name (varchar), frequency (varchar), metrics_hotel (ARRAY), metrics_market (ARRAY)
-
-magic_login_tokens
-
-token (text, PK), user_id (integer), expires_at (timestamptz), used_at (timestamptz)
-
-5.0 Project File Structure
-market-pulse/
-├── api/
-│ ├── adapters/
-│ │ └── cloudbedsAdapter.js
-│ ├── routes/
-│ │ ├── admin.router.js
-│ │ ├── auth.router.js
-│ │ ├── dashboard.router.js
-│ │ ├── reports.router.js
-│ │ └── users.router.js
-│ ├── utils/
-│ │ ├── cloudbeds.js
-│ │ ├── db.js
-│ │ └── middleware.js
-│ ├── daily-refresh.js
-│ ├── initial-sync.js
-│ └── send-scheduled-reports.js
-├── node_modules/
-├── public/
-│ ├── admin/
-│ │ ├── admin.mjs
-│ │ └── index.html
-│ ├── app/
-│ │ ├── \_shared/
-│ │ │ ├── sidebar.html
-│ │ │ └── sidebar.mjs
-│ │ ├── dashboard.mjs
-│ │ ├── index.html
-│ │ ├── market-overview.html
-│ │ ├── market-overview.mjs
-│ │ ├── reports.html
-│ │ ├── reports.js
-│ │ ├── settings.html
-│ │ ├── settings.mjs
-│ │ └── utils.mjs
-│ ├── favicon.png
-│ ├── constants.mjs
-│ ├── login.html
-│ ├── privacy.html
-│ ├── support.html
-│ └── terms.html
-├── changelog.txt
-├── package-lock.json
-├── package.json
-├── server.js
-└── vercel.json
-6.0 API Endpoints
-The API is organized into feature-based routers. All are mounted under /api.
+  5.0 Project File Structure
+  market-pulse/
+  ├── api/
+  │ ├── adapters/
+  │ │ └── cloudbedsAdapter.js
+  │ ├── routes/
+  │ │ ├── admin.router.js
+  │ │ ├── auth.router.js
+  │ │ ├── dashboard.router.js
+  │ │ ├── reports.router.js
+  │ │ └── users.router.js
+  │ ├── utils/
+  │ │ ├── cloudbeds.js
+  │ │ ├── db.js
+  │ │ └── middleware.js
+  │ ├── daily-refresh.js
+  │ ├── initial-sync.js
+  │ └── send-scheduled-reports.js
+  ├── node_modules/
+  ├── public/
+  │ ├── admin/
+  │ │ ├── admin.mjs
+  │ │ └── index.html
+  │ ├── app/
+  │ │ ├── \_shared/
+  │ │ │ ├── sidebar.html
+  │ │ │ └── sidebar.mjs
+  │ │ ├── dashboard.mjs
+  │ │ ├── index.html
+  │ │ ├── market-overview.html
+  │ │ ├── market-overview.mjs
+  │ │ ├── reports.html
+  │ │ ├── reports.js
+  │ │ ├── settings.html
+  │ │ ├── settings.mjs
+  │ │ └── utils.mjs
+  │ ├── favicon.png
+  │ ├── constants.mjs
+  │ ├── login.html
+  │ ├── privacy.html
+  │ ├── support.html
+  │ └── terms.html
+  ├── changelog.txt
+  ├── package-lock.json
+  ├── package.json
+  ├── server.js
+  └── vercel.json
+  6.0 API Endpoints
+  The API is organized into feature-based routers. All are mounted under /api.
 
 auth.router.js
 
@@ -250,3 +242,12 @@ Heavy Commenting: All new or changed code must be thoroughly commented to explai
 Incremental Testing: After each step, the AI will provide a "Test Point" with specific instructions for the user (Karol) to execute to verify the change.
 
 Instructions for AI: at the start of each session, you will get this file. Acknowledge by saying 'Done'. No need to elaborate. Always as questions to see files / screenshots / any data you need if unsure of the best course of action
+
+9.0 Architectural Milestone: Revenue Data Model Refactor
+In August 2025, the application underwent a critical architectural refactor to enhance revenue data accuracy and performance.
+
+Problem: The original architecture calculated tax-inclusive (gross) revenue "on-the-fly" whenever a report was run. This model had severe flaws: it created incorrect historical reports if a hotel's tax rate changed, caused poor application performance, and was incompatible with newer PMS systems that provide pre-calculated values.
+
+Solution: The data model was redesigned to pre-calculate and store final, immutable net and gross values for all key metrics (revenue, ADR, RevPAR). This logic was moved into the data ingestion layer (cloudbedsAdapter.js, initial-sync.js, daily-refresh.js). The process involved modifying the database schema, refactoring the entire data pipeline, backfilling all historical data with the new values, and migrating all backend and frontend components to use the new data structure.
+
+Outcome: The refactor was a success. It guarantees historical data integrity, dramatically improved reporting speed, and created a consistent, scalable data model for all current and future PMS integrations.

@@ -184,6 +184,10 @@ const getRevenueMetrics = async (credentials, startDate, endDate) => {
       },
       // IMPORTANT: Filter by Type to get only room revenue ('SpaceOrder').
       Types: ["SpaceOrder"],
+      // BUG FIX #1: Add the AccountingStates filter to exclude canceled orders.
+      // This tells the Mews API to only send items that are 'Open' or 'Closed'.
+      // This is based on the documentation you provided.
+      AccountingStates: ["Open", "Closed"],
       Limitation: {
         Cursor: cursor,
         Count: 1000, // Fetch up to 1000 items per page
@@ -207,24 +211,36 @@ const getRevenueMetrics = async (credentials, startDate, endDate) => {
   const dailyTotals = {};
 
   allOrderItems.forEach((item) => {
-    // Normalize the ConsumedUtc timestamp to a YYYY-MM-DD date string.
-    const date = new Date(item.ConsumedUtc).toISOString().split("T")[0];
+    // BUG FIX #2: Correct the date grouping for hotel's local timezone.
+    // The ConsumedUtc is often late at night (e.g., 22:00Z), which is the previous
+    // day in UTC but the correct day in the hotel's local time.
+    // We add a 5-hour offset to the timestamp before extracting the date.
+    // This pushes the date into the correct local calendar day.
+    const consumedTime = new Date(item.ConsumedUtc);
+    consumedTime.setHours(consumedTime.getHours() + 5);
+    const date = consumedTime.toISOString().split("T")[0];
 
-    // Initialize the total for this day if it doesn't exist.
+    // Initialize the totals for this day if they don't exist.
     if (!dailyTotals[date]) {
-      dailyTotals[date] = { totalRevenue: 0 };
+      dailyTotals[date] = { totalNetRevenue: 0, totalGrossRevenue: 0 };
     }
 
-    // Add the NetValue of the item to the daily total.
-    if (item.Amount && typeof item.Amount.NetValue === "number") {
-      dailyTotals[date].totalRevenue += item.Amount.NetValue;
+    // Add the NetValue and GrossValue of the item to the daily total.
+    if (item.Amount) {
+      if (typeof item.Amount.NetValue === "number") {
+        dailyTotals[date].totalNetRevenue += item.Amount.NetValue;
+      }
+      if (typeof item.Amount.GrossValue === "number") {
+        dailyTotals[date].totalGrossRevenue += item.Amount.GrossValue;
+      }
     }
   });
 
   // Convert the dailyTotals object into an array for a cleaner return format.
   const results = Object.keys(dailyTotals).map((date) => ({
     date,
-    totalRevenue: dailyTotals[date].totalRevenue,
+    netRevenue: dailyTotals[date].totalNetRevenue,
+    grossRevenue: dailyTotals[date].totalGrossRevenue,
   }));
 
   return {
@@ -232,6 +248,7 @@ const getRevenueMetrics = async (credentials, startDate, endDate) => {
     rawItems: allOrderItems, // Return all raw items for debugging
   };
 };
+
 module.exports = {
   getHotelDetails,
   getOccupancyMetrics,
