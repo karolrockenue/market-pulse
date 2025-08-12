@@ -291,8 +291,23 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
 
     const period = getPeriod(granularity);
     const query = `
-      SELECT ${period} as period, AVG(adr::numeric) as adr, AVG(occupancy_direct::numeric) as occupancy_direct, AVG(revpar::numeric) as revpar,
-    SUM(total_revenue::numeric)   as total_revenue, SUM(rooms_sold) as rooms_sold, SUM(capacity_count) as capacity_count
+      SELECT
+        ${period} as period,
+        -- Base metrics
+        AVG(rooms_sold) as rooms_sold,
+        AVG(capacity_count) as capacity_count,
+        AVG(occupancy_direct) as occupancy_direct,
+        -- Old columns (based on gross values) aliased as 'your_'
+        AVG(adr) as your_adr,
+        AVG(revpar) as your_revpar,
+        SUM(total_revenue) as your_total_revenue,
+        -- New pre-calculated columns aliased as 'your_'
+        SUM(net_revenue) as your_net_revenue,
+        SUM(gross_revenue) as your_gross_revenue,
+        AVG(net_adr) as your_net_adr,
+        AVG(gross_adr) as your_gross_adr,
+        AVG(net_revpar) as your_net_revpar,
+        AVG(gross_revpar) as your_gross_revpar
       FROM daily_metrics_snapshots
       WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
@@ -422,7 +437,19 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
 
     const period = getPeriod(granularity);
     const metricsQuery = `
-      SELECT ${period} as period, AVG(dms.adr::numeric) as market_adr, AVG(dms.occupancy_direct::numeric) as market_occupancy, AVG(dms.revpar::numeric) as market_revpar
+      SELECT
+        ${period} as period,
+        -- Old columns for compatibility
+        AVG(dms.adr) as market_adr,
+        AVG(dms.occupancy_direct) as market_occupancy,
+        AVG(dms.revpar) as market_revpar,
+        -- New pre-calculated columns for the market
+        AVG(dms.net_adr) as market_net_adr,
+        AVG(dms.gross_adr) as market_gross_adr,
+        AVG(dms.net_revpar) as market_net_revpar,
+        AVG(dms.gross_revpar) as market_gross_revpar,
+        SUM(dms.net_revenue) as market_net_revenue,
+        SUM(dms.gross_revenue) as market_gross_revenue
       FROM daily_metrics_snapshots dms
       WHERE dms.hotel_id = ANY($1::int[]) AND dms.stay_date >= $2::date AND dms.stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;

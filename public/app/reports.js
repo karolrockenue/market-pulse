@@ -175,36 +175,27 @@ async function fetchMarketMetrics(propertyId, startDate, endDate, granularity) {
 
 function processAndMergeData(yourData, marketData) {
   const dataMap = new Map();
-  const processRow = (row) => {
+
+  // Helper to add data to our map, prefixing keys with 'your_' or 'market_'
+  const processRow = (row, prefix) => {
     const date = (row.period || row.stay_date).substring(0, 10);
     if (!dataMap.has(date)) {
       dataMap.set(date, { date });
     }
     const entry = dataMap.get(date);
-    const roomsSold = parseInt(row.rooms_sold, 10);
-    const capacity = parseInt(row.capacity_count, 10);
-    const roomsUnsold = capacity - roomsSold;
-
-    const metrics = {
-      Occupancy: parseFloat(row.occupancy_direct),
-      ADR: parseFloat(row.adr),
-      RevPAR: parseFloat(row.revpar),
-      "Total Revenue": parseFloat(row.total_revenue),
-      "Rooms Sold": roomsSold,
-      "Rooms Unsold": roomsUnsold,
-      "Market Occupancy": parseFloat(row.market_occupancy),
-      "Market ADR": parseFloat(row.market_adr),
-      "Market Total Revenue": parseFloat(row.market_total_revenue),
-      "Market Rooms Sold": parseInt(row.market_rooms_sold, 10),
-    };
-    for (const key in metrics) {
-      if (!isNaN(metrics[key])) {
-        entry[key] = metrics[key];
+    for (const key in row) {
+      if (key !== "period" && key !== "stay_date") {
+        // Use the original key for non-financial metrics like 'rooms_sold'
+        // and create prefixed keys for all metrics for consistency.
+        const baseKey = key.replace(`${prefix}_`, "");
+        entry[`${prefix}_${baseKey}`] = row[key];
       }
     }
   };
-  yourData.forEach(processRow);
-  marketData.forEach(processRow);
+
+  yourData.forEach((row) => processRow(row, "your"));
+  marketData.forEach((row) => processRow(row, "market"));
+
   const mergedData = Array.from(dataMap.values());
   return mergedData.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
@@ -590,167 +581,171 @@ function buildTableHeaders(selected, addComparisons, displayOrder, component) {
   return headers.map((h) => ({ align: "right", ...h }));
 }
 // public/app/reports.js
-// FINAL CORRECTED: This version keeps alternating rows and uses the 'Inter' font for all cells.
 function buildTableBody(data, headers, component) {
-  const { includeTaxes, propertyTaxRate, propertyTaxType, currencyCode } =
-    component;
-  const financialKeys = new Set([
-    "ADR",
-    "RevPAR",
-    "Total Revenue",
-    "Market ADR",
-    "Market RevPAR",
-    "Market Total Revenue",
-  ]);
+  const { includeTaxes, currencyCode } = component;
 
   return data
     .map((row, index) => {
       const cells = headers.map((header) => {
-        let value = row[header.key];
-        if (
-          !includeTaxes &&
-          financialKeys.has(header.key) &&
-          propertyTaxType === "inclusive" &&
-          propertyTaxRate > 0
-        ) {
-          if (typeof value === "number") {
-            value = value / (1 + propertyTaxRate);
-          }
-        }
-
         let content;
-        if (header.key === "date") {
+        const key = header.key;
+
+        if (key === "date") {
           content = formatDateForDisplay(row.date);
-        } else if (header.key.endsWith("_delta")) {
-          const baseMetric = header.key.replace("_delta", "");
-          let yourValue = row[baseMetric] || 0;
-          let marketValue = row[`Market ${baseMetric}`] || 0;
-          if (
-            !includeTaxes &&
-            financialKeys.has(baseMetric) &&
-            propertyTaxType === "inclusive" &&
-            propertyTaxRate > 0
-          ) {
-            yourValue = yourValue / (1 + propertyTaxRate);
-            marketValue = marketValue / (1 + propertyTaxRate);
-          }
+        } else if (key.endsWith("_delta")) {
+          const baseMetric = key.replace("_delta", "").toLowerCase();
+          const yourKey = includeTaxes
+            ? `your_gross_${baseMetric}`
+            : `your_net_${baseMetric}`;
+          const marketKey = includeTaxes
+            ? `market_gross_${baseMetric}`
+            : `market_net_${baseMetric}`;
+
+          // Handle cases like 'Rooms Sold' which don't have net/gross versions
+          const yourValue =
+            row[yourKey] !== undefined
+              ? row[yourKey]
+              : row[`your_${baseMetric}`] || 0;
+          const marketValue =
+            row[marketKey] !== undefined
+              ? row[marketKey]
+              : row[`market_${baseMetric}`] || 0;
+
           content = formatValue(
-            yourValue - marketValue,
+            parseFloat(yourValue) - parseFloat(marketValue),
             baseMetric,
             true,
             currencyCode
           );
         } else {
-          content = formatValue(value, header.key, false, currencyCode);
+          const isMarket = key.startsWith("Market ");
+          const baseMetric = (isMarket ? key.substring(7) : key)
+            .toLowerCase()
+            .replace(/ /g, "_");
+          const prefix = isMarket ? "market" : "your";
+
+          const valueKey = includeTaxes
+            ? `${prefix}_gross_${baseMetric}`
+            : `${prefix}_net_${baseMetric}`;
+
+          // Handle non-financial metrics by falling back to the simple key
+          const value =
+            row[valueKey] !== undefined
+              ? row[valueKey]
+              : row[`${prefix}_${baseMetric}`];
+          content = formatValue(parseFloat(value), key, false, currencyCode);
         }
 
-        // This class logic now correctly uses the standard font for all data cells.
         const alignClass =
-          header.key === "date" ? "font-medium" : "font-normal"; // font-data class removed to default to Inter font.
-        // This removes the separatorClass variable and its use in the template literal,
-        // deleting the final vertical borders from the table.
-        // Removed px-4, as the new parent wrapper now handles all horizontal padding.
-        // Added the isMarket check here as well to style the main data cells.
-        // REMOVED: The check for header.isMarket to remove the background color.
-        // This adds the border style if the header has the 'separator' flag.
-        return `<td class="px-4 py-4 whitespace-nowrap text-sm text-right ${alignClass} ${
+          key === "date" ? "font-medium text-left" : "font-normal text-right";
+        return `<td class="px-4 py-4 whitespace-nowrap text-sm ${alignClass} ${
           header.separator ? "border-r border-slate-300" : ""
         }">${content}</td>`;
       });
-      cells[0] = cells[0].replace("text-right", "text-left");
 
-      // This restores the alternating row colors and uses the more subtle hover effect.
       return `<tr class="${
         index % 2 === 0 ? "bg-white" : "bg-slate-50/50"
       } hover:bg-slate-50 transition-colors">${cells.join("")}</tr>`;
     })
     .join("");
 }
-
-// public/app/reports.js
-
 // FIXED: Final, correct version of the totals row logic.
 function buildTableTotalsRow(data, headers, component) {
-  const { includeTaxes, propertyTaxRate, propertyTaxType, currencyCode } =
-    component;
-  const financialKeys = new Set([
-    "ADR",
-    "RevPAR",
-    "Total Revenue",
-    "Market ADR",
-    "Market RevPAR",
-    "Market Total Revenue",
-  ]);
+  const { includeTaxes, currencyCode } = component;
+  const totals = {};
   const avgKeys = new Set([
-    "Occupancy",
-    "ADR",
-    "RevPAR",
-    "Market Occupancy",
-    "Market ADR",
-    "Market RevPAR",
+    "occupancy_direct",
+    "adr",
+    "revpar",
+    "net_adr",
+    "gross_adr",
+    "net_revpar",
+    "gross_revpar",
+    "your_adr",
+    "your_revpar",
+    "your_net_adr",
+    "your_gross_adr",
+    "your_net_revpar",
+    "your_gross_revpar",
+    "market_adr",
+    "market_revpar",
+    "market_net_adr",
+    "market_gross_adr",
+    "market_net_revpar",
+    "market_gross_revpar",
   ]);
 
-  const totals = {};
-  headers.forEach((h) => {
-    if (h.key !== "date" && !h.key.endsWith("_delta")) {
-      totals[h.key] = data.reduce((sum, row) => sum + (row[h.key] || 0), 0);
-      if (avgKeys.has(h.key) && data.length > 0) {
-        totals[h.key] /= data.length;
+  // Calculate totals/averages for all relevant keys from the merged data
+  data.forEach((row) => {
+    for (const key in row) {
+      if (key !== "date") {
+        const val = parseFloat(row[key]) || 0;
+        totals[key] = (totals[key] || 0) + val;
       }
     }
   });
 
-  const cells = headers.map((header) => {
-    let value = totals[header.key];
-    if (
-      !includeTaxes &&
-      financialKeys.has(header.key) &&
-      propertyTaxType === "inclusive" &&
-      propertyTaxRate > 0
-    ) {
-      if (typeof value === "number") value = value / (1 + propertyTaxRate);
+  // Calculate the final averages
+  for (const key in totals) {
+    if (avgKeys.has(key)) {
+      totals[key] /= data.length;
     }
+  }
 
+  const cells = headers.map((header) => {
     let content = "";
-    if (header.key === "date") {
+    const key = header.key;
+
+    if (key === "date") {
       content = "Totals / Averages";
-    } else if (header.key.endsWith("_delta")) {
-      const baseMetric = header.key.replace("_delta", "");
-      let yourTotal = totals[baseMetric] || 0;
-      let marketTotal = totals[`Market ${baseMetric}`] || 0;
-      if (
-        !includeTaxes &&
-        propertyTaxType === "inclusive" &&
-        propertyTaxRate > 0
-      ) {
-        if (financialKeys.has(baseMetric))
-          yourTotal = yourTotal / (1 + propertyTaxRate);
-        if (financialKeys.has(`Market ${baseMetric}`))
-          marketTotal = marketTotal / (1 + propertyTaxRate);
-      }
+    } else if (key.endsWith("_delta")) {
+      const baseMetric = key.replace("_delta", "").toLowerCase();
+      const yourKey = includeTaxes
+        ? `your_gross_${baseMetric}`
+        : `your_net_${baseMetric}`;
+      const marketKey = includeTaxes
+        ? `market_gross_${baseMetric}`
+        : `market_net_${baseMetric}`;
+
+      const yourValue =
+        totals[yourKey] !== undefined
+          ? totals[yourKey]
+          : totals[`your_${baseMetric}`] || 0;
+      const marketValue =
+        totals[marketKey] !== undefined
+          ? totals[marketKey]
+          : totals[`market_${marketKey}`] || 0;
+
       content = formatValue(
-        yourTotal - marketTotal,
+        yourValue - marketValue,
         baseMetric,
         true,
         currencyCode
       );
-    } else if (value !== undefined) {
-      content = formatValue(value, header.key, false, currencyCode);
+    } else {
+      const isMarket = key.startsWith("Market ");
+      const baseMetric = (isMarket ? key.substring(7) : key)
+        .toLowerCase()
+        .replace(/ /g, "_");
+      const prefix = isMarket ? "market" : "your";
+
+      const valueKey = includeTaxes
+        ? `${prefix}_gross_${baseMetric}`
+        : `${prefix}_net_${baseMetric}`;
+
+      const value =
+        totals[valueKey] !== undefined
+          ? totals[valueKey]
+          : totals[`${prefix}_${baseMetric}`];
+      content = formatValue(value, key, false, currencyCode);
     }
 
     const alignClass =
-      header.key === "date"
-        ? "font-data text-slate-800 text-left"
-        : "font-data text-slate-800 text-right";
-    // Removed the separator logic for the totals row.
-    // Added the isMarket check to the totals row for consistency.
-    // REMOVED: The check for header.isMarket to remove the background color.
-    // This adds the same border style to the Totals row for consistency.
-    return `<td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${alignClass} ${
+      key === "date" ? "font-semibold text-left" : "font-semibold text-right";
+    return `<td class="px-4 py-3 whitespace-nowrap text-sm ${alignClass} ${
       header.separator ? "border-r border-slate-300" : ""
     }">${content}</td>`;
   });
-  // Removed the border-t-2 class to delete the line above the totals row.
   return `<tr class="bg-slate-100">${cells.join("")}</tr>`;
 }
 // public/app/reports.js
