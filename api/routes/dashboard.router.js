@@ -293,21 +293,12 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     const query = `
       SELECT
         ${period} as period,
-        -- Base metrics
-        AVG(rooms_sold) as rooms_sold,
-        AVG(capacity_count) as capacity_count,
+        AVG(gross_adr) as adr,
         AVG(occupancy_direct) as occupancy_direct,
-        -- Old columns (based on gross values) aliased as 'your_'
-        AVG(adr) as your_adr,
-        AVG(revpar) as your_revpar,
-        SUM(total_revenue) as your_total_revenue,
-        -- New pre-calculated columns aliased as 'your_'
-        SUM(net_revenue) as your_net_revenue,
-        SUM(gross_revenue) as your_gross_revenue,
-        AVG(net_adr) as your_net_adr,
-        AVG(gross_adr) as your_gross_adr,
-        AVG(net_revpar) as your_net_revpar,
-        AVG(gross_revpar) as your_gross_revpar
+        AVG(gross_revpar) as revpar,
+        SUM(gross_revenue) as total_revenue,
+        SUM(rooms_sold) as rooms_sold,
+        SUM(capacity_count) as capacity_count
       FROM daily_metrics_snapshots
       WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
