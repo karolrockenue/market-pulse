@@ -438,109 +438,122 @@
       </div>
     </div>
 <script>
-      function reportsPage() {
+    function reportsPage() {
         return {
-          // --- State for the visual report builder ---
-          reportMetrics: [
-            { key: 'Occupancy', label: 'Occupancy', group: 'Hotel' },
-            { key: 'ADR', label: 'ADR', group: 'Hotel' },
-            { key: 'RevPAR', label: 'RevPAR', group: 'Hotel' },
-            { key: 'Total Revenue', label: 'Total Revenue', group: 'Hotel' },
-            { key: 'Rooms Sold', label: 'Rooms Sold', group: 'Hotel' },
-            { key: 'Rooms Unsold', label: 'Rooms Unsold', group: 'Hotel' },
-            { key: 'Market Occupancy', label: 'Market Occupancy', group: 'Market' },
-            { key: 'Market ADR', label: 'Market ADR', group: 'Market' },
-          ],
-          selectedMetricKeys: ['Occupancy', 'ADR', 'Total Revenue', 'Rooms Sold'],
+            // --- State for the visual report builder ---
+            reportMetrics: [
+                { key: 'Occupancy', label: 'Occupancy', group: 'Hotel' },
+                { key: 'ADR', label: 'ADR', group: 'Hotel' },
+                { key: 'RevPAR', label: 'RevPAR', group: 'Hotel' },
+                { key: 'Total Revenue', label: 'Total Revenue', group: 'Hotel' },
+                { key: 'Rooms Sold', label: 'Rooms Sold', group: 'Hotel' },
+                { key: 'Rooms Unsold', label: 'Rooms Unsold', group: 'Hotel' },
+                { key: 'Market Occupancy', label: 'Market Occupancy', group: 'Market' },
+                { key: 'Market ADR', label: 'Market ADR', group: 'Market' },
+            ],
+            selectedMetricKeys: ['Occupancy', 'ADR', 'Total Revenue', 'Rooms Sold'],
 
-          // --- Core State Properties ---
-          isInitialized: false,
-          propertyId: null,
-          isScheduleModalOpen: false,
-          isManageModalOpen: false,
-          propertyName: "Your Hotel",
-          addComparisons: false,
-          displayOrder: 'metric',
-          displayTotals: true,
-          granularity: "daily",
-          preset: "current-month",
-          schedules: [],
-          newScheduleName: "",
-          newScheduleRecipients: "",
-          newSchedulePeriod: "current-month",
-          newScheduleFrequency: "Weekly",
-          newScheduleFormats: ["csv"],
-          propertyTaxRate: null,
-          propertyTaxType: null,
-          includeTaxes: true,
-          propertyTaxName: 'VAT',
-          currencyCode: 'USD',
+            // --- Core State Properties ---
+            isInitialized: false,
+            propertyId: null,
+            isScheduleModalOpen: false,
+            isManageModalOpen: false,
+            propertyName: "Your Hotel",
+            addComparisons: false,
+            displayOrder: 'metric',
+            displayTotals: true,
+            granularity: "daily",
+            preset: "current-month",
+            schedules: [],
+            newScheduleName: "",
+            newScheduleRecipients: "",
+            newSchedulePeriod: "current-month",
+            newScheduleFrequency: "Weekly",
+            newScheduleFormats: ["csv"],
+            propertyTaxRate: null,
+            propertyTaxType: null,
+            includeTaxes: true,
+            propertyTaxName: 'VAT',
+            currencyCode: 'USD',
 
-          // --- THE FIX: A much cleaner initialization function ---
-          init() {
-            // Set the initial date range using a helper from reports.js
-            window.handlePresetChange("current-month");
+            // --- THE FIX: A new, robust init() method ---
+            async init() {
+                // Set initial date range
+                window.handlePresetChange("current-month");
 
-            // Listen for the sidebar to announce a property change
-            window.addEventListener("property-changed", async (event) => {
-              if (event.detail && event.detail.property_id) {
-                this.propertyId = event.detail.property_id;
-                this.propertyName = event.detail.propertyName;
+                // Listen for SUBSEQUENT property changes from the sidebar
+                window.addEventListener("property-changed", async (event) => {
+                    const detail = event.detail;
+                    if (detail && detail.property_id && this.propertyId !== detail.property_id) {
+                        await this.loadPropertyData(detail.property_id, detail.propertyName);
+                    }
+                });
+                
+                // Perform its OWN initial data load to avoid the race condition
                 try {
-                  const response = await fetch(`/api/hotel-details/${this.propertyId}`);
-                  if (!response.ok) throw new Error('Could not fetch property details.');
-                  const details = await response.json();
-                  this.propertyTaxRate = parseFloat(details.tax_rate);
-                  this.propertyTaxType = details.tax_type;
-                  this.propertyTaxName = details.tax_name;
-                  this.currencyCode = details.currency_code;
-                  this.includeTaxes = (this.propertyTaxType === 'inclusive');
+                    const propertiesResponse = await fetch('/api/my-properties');
+                    const properties = await propertiesResponse.json();
+                    if (properties && properties.length > 0) {
+                        const firstProperty = properties[0];
+                        await this.loadPropertyData(firstProperty.property_id, firstProperty.property_name);
+                    } else {
+                        // Handle case where user has no properties
+                         document.getElementById("report-results-container").innerHTML = '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">No properties found for your account.</div>';
+                    }
                 } catch (error) {
-                  console.error("Could not fetch details:", error);
+                    console.error("Failed to perform initial load for reports page:", error);
+                }
+
+                this.isInitialized = true;
+
+                // Load schedule data
+                this.handleFrequencyChange();
+                window.fetchSchedules().then(schedules => {
+                    this.schedules = schedules;
+                });
+            },
+
+            // --- NEW: Centralized function to load all data for a property ---
+            async loadPropertyData(propertyId, propertyName) {
+                this.propertyId = propertyId;
+                this.propertyName = propertyName;
+                try {
+                    const response = await fetch(`/api/hotel-details/${this.propertyId}`);
+                    if (!response.ok) throw new Error('Could not fetch property details.');
+                    const details = await response.json();
+                    this.propertyTaxRate = parseFloat(details.tax_rate);
+                    this.propertyTaxType = details.tax_type;
+                    this.propertyTaxName = details.tax_name;
+                    this.currencyCode = details.currency_code;
+                    this.includeTaxes = (this.propertyTaxType === 'inclusive');
+                } catch (error) {
+                    console.error("Could not fetch details:", error);
                 }
                 // Once we have the new property details, generate the report
                 this.handleGenerateReport();
-              }
-            });
+            },
 
-            // This flag is used to prevent content from showing before Alpine is ready
-            this.isInitialized = true;
+            // --- Helper Methods ---
+            openScheduleModal() { this.isScheduleModalOpen = true; },
+            openManageModal() { this.isManageModalOpen = true; },
+            toggleMetric(metricKey) {
+                const index = this.selectedMetricKeys.indexOf(metricKey);
+                if (index > -1) { this.selectedMetricKeys.splice(index, 1); } 
+                else { this.selectedMetricKeys.push(metricKey); }
+                this.handleGenerateReport();
+            },
 
-            // Load schedule data after the page is initialized
-            this.handleFrequencyChange();
-            window.fetchSchedules().then(schedules => {
-                this.schedules = schedules;
-            });
-          },
-
-          // --- Helper Methods ---
-          openScheduleModal() {
-            this.isScheduleModalOpen = true;
-          },
-          openManageModal() {
-            this.isManageModalOpen = true;
-          },
-          toggleMetric(metricKey) {
-            const index = this.selectedMetricKeys.indexOf(metricKey);
-            if (index > -1) {
-              this.selectedMetricKeys.splice(index, 1);
-            } else {
-              this.selectedMetricKeys.push(metricKey);
-            }
-            this.handleGenerateReport();
-          },
-
-          // --- Proxy Methods to call helpers in reports.js ---
-          handleGenerateReport() { window.handleGenerateReport(this, this.propertyId); },
-          handlePresetChange(preset) { window.handlePresetChange(preset); },
-          exportToCSV() { window.exportToCSV(this.propertyName); },
-          exportToExcel() { window.exportToExcel(this.propertyName); },
-          handleFrequencyChange() { window.handleFrequencyChange(); },
-          saveSchedule() { window.saveSchedule(this); },
-          deleteSchedule(id) { window.deleteSchedule(this, id); },
+            // --- Proxy Methods to call helpers in reports.js ---
+            handleGenerateReport() { window.handleGenerateReport(this, this.propertyId); },
+            handlePresetChange(preset) { window.handlePresetChange(preset); },
+            exportToCSV() { window.exportToCSV(this.propertyName); },
+            exportToExcel() { window.exportToExcel(this.propertyName); },
+            handleFrequencyChange() { window.handleFrequencyChange(); },
+            saveSchedule() { window.saveSchedule(this); },
+            deleteSchedule(id) { window.deleteSchedule(this, id); },
         };
-      }
-    </script>
+    }
+</script>
   <script src="/app/reports.js"></script>
     <script type="module">
       // THE FIX: This is now the single source of truth for page initialization.

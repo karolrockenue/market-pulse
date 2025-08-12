@@ -718,7 +718,7 @@ function buildTableTotalsRow(data, headers, component) {
   const totals = {};
   const avgKeys = new Set([
     "your_occupancy_direct",
-    "market_occupancy",
+    "market_occupancy_direct",
     "your_net_adr",
     "your_gross_adr",
     "your_net_revpar",
@@ -754,21 +754,16 @@ function buildTableTotalsRow(data, headers, component) {
       content = "Totals / Averages";
     } else if (key.endsWith("_delta")) {
       const baseMetric = key.replace("_delta", "").toLowerCase();
-      let yourValue, marketValue;
+      const yourKey = includeTaxes
+        ? `your_gross_${baseMetric}`
+        : `your_net_${baseMetric}`;
+      const marketKey = includeTaxes
+        ? `market_gross_${baseMetric}`
+        : `market_net_${baseMetric}`;
 
-      if (baseMetric === "occupancy") {
-        yourValue = totals["your_occupancy_direct"] || 0;
-        marketValue = totals["market_occupancy"] || 0;
-      } else {
-        const yourKey = includeTaxes
-          ? `your_gross_${baseMetric}`
-          : `your_net_${baseMetric}`;
-        const marketKey = includeTaxes
-          ? `market_gross_${baseMetric}`
-          : `market_net_${baseMetric}`;
-        yourValue = totals[yourKey] || 0;
-        marketValue = totals[marketKey] || 0;
-      }
+      const yourValue = totals[yourKey] || 0;
+      const marketValue = totals[marketKey] || 0;
+
       content = formatValue(
         yourValue - marketValue,
         baseMetric,
@@ -791,11 +786,7 @@ function buildTableTotalsRow(data, headers, component) {
             (totals[`${prefix}_rooms_sold`] || 0);
           break;
         case "Occupancy":
-          // THE FIX: Use the correct property name for market occupancy
-          value =
-            prefix === "your"
-              ? totals["your_occupancy_direct"]
-              : totals["market_occupancy"];
+          value = totals[`${prefix}_occupancy_direct`];
           break;
         case "ADR":
           value = includeTaxes
