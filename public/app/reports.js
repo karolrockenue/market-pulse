@@ -83,7 +83,8 @@ function handlePresetChange(preset) {
 }
 
 async function handleGenerateReport(component, propertyId) {
-  const reportContainer = document.getElementById("report-results-container");
+  // THE FIX: Target the new, specific container, leaving the modals alone.
+  const reportContainer = document.getElementById("report-dynamic-content");
   reportContainer.innerHTML =
     '<div class="bg-white rounded-xl border p-8 text-center text-gray-500">Loading live report data...</div>';
 
@@ -93,7 +94,6 @@ async function handleGenerateReport(component, propertyId) {
         "No property selected. Please choose a property from the header dropdown."
       );
     }
-    // This fix passes the component state down to the helper function.
     const selectedColumns = getSelectedColumns(component);
     const allSelected = [...selectedColumns.hotel, ...selectedColumns.market];
 
@@ -124,15 +124,13 @@ async function handleGenerateReport(component, propertyId) {
 
     const liveData = processAndMergeData(yourData.metrics, marketData.metrics);
 
-    // public/app/reports.js
-
     renderReportTable(
       liveData,
       selectedColumns,
       granularity,
       addComparisons,
       displayOrder,
-      component // Pass the entire component state
+      component
     );
   } catch (error) {
     console.error("Failed to generate report:", error);
