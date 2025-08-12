@@ -587,53 +587,118 @@ function buildTableBody(data, headers, component) {
   return data
     .map((row, index) => {
       const cells = headers.map((header) => {
-        let content;
+        let content = "";
         const key = header.key;
 
-        if (key === "date") {
-          content = formatDateForDisplay(row.date);
-        } else if (key.endsWith("_delta")) {
-          const baseMetric = key.replace("_delta", "").toLowerCase();
-          const yourKey = includeTaxes
-            ? `your_gross_${baseMetric}`
-            : `your_net_${baseMetric}`;
-          const marketKey = includeTaxes
-            ? `market_gross_${baseMetric}`
-            : `market_net_${baseMetric}`;
+        // This new logic is more explicit and less prone to errors.
+        switch (key) {
+          case "date":
+            content = formatDateForDisplay(row.date);
+            break;
+          case "Rooms Sold":
+            content = formatValue(
+              parseFloat(row.your_rooms_sold),
+              key,
+              false,
+              currencyCode
+            );
+            break;
+          case "Rooms Unsold":
+            // Re-introduce the on-the-fly calculation for this non-database metric.
+            const roomsUnsold =
+              (row.your_capacity_count || 0) - (row.your_rooms_sold || 0);
+            content = formatValue(roomsUnsold, key, false, currencyCode);
+            break;
+          case "Occupancy":
+            content = formatValue(
+              parseFloat(row.your_occupancy_direct),
+              key,
+              false,
+              currencyCode
+            );
+            break;
+          case "ADR":
+            const adrValue = includeTaxes
+              ? row.your_gross_adr
+              : row.your_net_adr;
+            content = formatValue(
+              parseFloat(adrValue),
+              key,
+              false,
+              currencyCode
+            );
+            break;
+          case "RevPAR":
+            const revparValue = includeTaxes
+              ? row.your_gross_revpar
+              : row.your_net_revpar;
+            content = formatValue(
+              parseFloat(revparValue),
+              key,
+              false,
+              currencyCode
+            );
+            break;
+          case "Total Revenue":
+            const revenueValue = includeTaxes
+              ? row.your_gross_revenue
+              : row.your_net_revenue;
+            content = formatValue(
+              parseFloat(revenueValue),
+              key,
+              false,
+              currencyCode
+            );
+            break;
 
-          // Handle cases like 'Rooms Sold' which don't have net/gross versions
-          const yourValue =
-            row[yourKey] !== undefined
-              ? row[yourKey]
-              : row[`your_${baseMetric}`] || 0;
-          const marketValue =
-            row[marketKey] !== undefined
-              ? row[marketKey]
-              : row[`market_${baseMetric}`] || 0;
+          // Handle all Market columns and all Delta columns
+          default:
+            if (key.endsWith("_delta")) {
+              const baseMetric = key.replace("_delta", "").toLowerCase();
+              const yourKey = includeTaxes
+                ? `your_gross_${baseMetric}`
+                : `your_net_${baseMetric}`;
+              const marketKey = includeTaxes
+                ? `market_gross_${baseMetric}`
+                : `market_net_${baseMetric}`;
 
-          content = formatValue(
-            parseFloat(yourValue) - parseFloat(marketValue),
-            baseMetric,
-            true,
-            currencyCode
-          );
-        } else {
-          const isMarket = key.startsWith("Market ");
-          const baseMetric = (isMarket ? key.substring(7) : key)
-            .toLowerCase()
-            .replace(/ /g, "_");
-          const prefix = isMarket ? "market" : "your";
+              let yourValue = row[yourKey];
+              let marketValue = row[marketKey];
 
-          const valueKey = includeTaxes
-            ? `${prefix}_gross_${baseMetric}`
-            : `${prefix}_net_${baseMetric}`;
+              // Fallback for non-financial metrics like 'Rooms Sold'
+              if (yourValue === undefined)
+                yourValue = row[`your_${baseMetric.replace(/ /g, "_")}`] || 0;
+              if (marketValue === undefined)
+                marketValue =
+                  row[`market_${baseMetric.replace(/ /g, "_")}`] || 0;
 
-          // Handle non-financial metrics by falling back to the simple key
-          const value =
-            row[valueKey] !== undefined
-              ? row[valueKey]
-              : row[`${prefix}_${baseMetric}`];
-          content = formatValue(parseFloat(value), key, false, currencyCode);
+              content = formatValue(
+                parseFloat(yourValue) - parseFloat(marketValue),
+                baseMetric,
+                true,
+                currencyCode
+              );
+            } else if (key.startsWith("Market ")) {
+              const baseMetric = key
+                .substring(7)
+                .toLowerCase()
+                .replace(/ /g, "_");
+              const prefix = "market";
+              const valueKey = includeTaxes
+                ? `${prefix}_gross_${baseMetric}`
+                : `${prefix}_net_${baseMetric}`;
+              const value =
+                row[valueKey] !== undefined
+                  ? row[valueKey]
+                  : row[`${prefix}_${baseMetric}`];
+              content = formatValue(
+                parseFloat(value),
+                key,
+                false,
+                currencyCode
+              );
+            }
+            break;
         }
 
         const alignClass =
@@ -654,13 +719,8 @@ function buildTableTotalsRow(data, headers, component) {
   const { includeTaxes, currencyCode } = component;
   const totals = {};
   const avgKeys = new Set([
-    "occupancy_direct",
-    "adr",
-    "revpar",
-    "net_adr",
-    "gross_adr",
-    "net_revpar",
-    "gross_revpar",
+    "your_occupancy_direct",
+    "market_occupancy_direct",
     "your_adr",
     "your_revpar",
     "your_net_adr",
@@ -685,10 +745,12 @@ function buildTableTotalsRow(data, headers, component) {
     }
   });
 
-  // Calculate the final averages
-  for (const key in totals) {
-    if (avgKeys.has(key)) {
-      totals[key] /= data.length;
+  // Calculate the final averages for the relevant metrics
+  if (data.length > 0) {
+    for (const key in totals) {
+      if (avgKeys.has(key)) {
+        totals[key] /= data.length;
+      }
     }
   }
 
@@ -707,14 +769,13 @@ function buildTableTotalsRow(data, headers, component) {
         ? `market_gross_${baseMetric}`
         : `market_net_${baseMetric}`;
 
-      const yourValue =
-        totals[yourKey] !== undefined
-          ? totals[yourKey]
-          : totals[`your_${baseMetric}`] || 0;
-      const marketValue =
-        totals[marketKey] !== undefined
-          ? totals[marketKey]
-          : totals[`market_${marketKey}`] || 0;
+      let yourValue = totals[yourKey];
+      let marketValue = totals[marketKey];
+
+      if (yourValue === undefined)
+        yourValue = totals[`your_${baseMetric.replace(/ /g, "_")}`] || 0;
+      if (marketValue === undefined)
+        marketValue = totals[`market_${baseMetric.replace(/ /g, "_")}`] || 0;
 
       content = formatValue(
         yourValue - marketValue,
@@ -724,19 +785,43 @@ function buildTableTotalsRow(data, headers, component) {
       );
     } else {
       const isMarket = key.startsWith("Market ");
-      const baseMetric = (isMarket ? key.substring(7) : key)
-        .toLowerCase()
-        .replace(/ /g, "_");
-      const prefix = isMarket ? "market" : "your";
-
-      const valueKey = includeTaxes
-        ? `${prefix}_gross_${baseMetric}`
-        : `${prefix}_net_${baseMetric}`;
-
-      const value =
-        totals[valueKey] !== undefined
-          ? totals[valueKey]
-          : totals[`${prefix}_${baseMetric}`];
+      let value;
+      switch (key) {
+        case "Rooms Sold":
+          value = totals.your_rooms_sold;
+          break;
+        case "Rooms Unsold":
+          value =
+            (totals.your_capacity_count || 0) - (totals.your_rooms_sold || 0);
+          break;
+        case "Occupancy":
+          value = totals.your_occupancy_direct;
+          break;
+        case "ADR":
+          value = includeTaxes ? totals.your_gross_adr : totals.your_net_adr;
+          break;
+        case "RevPAR":
+          value = includeTaxes
+            ? totals.your_gross_revpar
+            : totals.your_net_revpar;
+          break;
+        case "Total Revenue":
+          value = includeTaxes
+            ? totals.your_gross_revenue
+            : totals.your_net_revenue;
+          break;
+        default: // Handles all market columns
+          const baseMetric = key.substring(7).toLowerCase().replace(/ /g, "_");
+          const prefix = "market";
+          const valueKey = includeTaxes
+            ? `${prefix}_gross_${baseMetric}`
+            : `${prefix}_net_${baseMetric}`;
+          value =
+            totals[valueKey] !== undefined
+              ? totals[valueKey]
+              : totals[`${prefix}_${baseMetric}`];
+          break;
+      }
       content = formatValue(value, key, false, currencyCode);
     }
 
