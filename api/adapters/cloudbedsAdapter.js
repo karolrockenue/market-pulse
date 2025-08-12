@@ -155,12 +155,6 @@ function processUpcomingApiData(allData, taxRate, pricingModel) {
     metrics.net_adr = roomsSold > 0 ? metrics.net_revenue / roomsSold : 0;
     metrics.gross_revpar = metrics.gross_adr * metrics.occupancy;
     metrics.net_revpar = metrics.net_adr * metrics.occupancy;
-
-    // --- For backward compatibility ---
-    metrics.adr = metrics.gross_adr;
-    metrics.revpar = metrics.gross_revpar;
-    metrics.total_revenue = metrics.gross_revenue;
-    metrics.room_revenue = metrics.gross_revenue;
   }
 
   return aggregated;
