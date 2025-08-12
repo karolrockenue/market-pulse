@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 // /api/initial-sync.js (Refactored for Multi-PMS Support)
 const fetch = require("node-fetch");
 const pgPool = require("./utils/db");
