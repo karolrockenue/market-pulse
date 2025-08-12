@@ -232,7 +232,9 @@ async function getHistoricalMetrics(
   accessToken,
   propertyId,
   startDate,
-  endDate
+  endDate,
+  taxRate,
+  pricingModel
 ) {
   const columnsToRequest = [
     "adr",
@@ -325,7 +327,7 @@ async function getHistoricalMetrics(
   } while (nextToken);
 
   console.log("--- HISTORICAL SYNC COMPLETE ---");
-  return processApiDataForTable(allApiData);
+  return processApiDataForTable(allApiData, taxRate, pricingModel);
 }
 
 /**
@@ -341,7 +343,12 @@ async function getHistoricalMetrics(
  * @param {string} propertyId - The ID of the property to fetch data for.
  * @returns {Promise<Object>} The processed forecast data in our canonical format.
  */
-async function getUpcomingMetrics(accessToken, propertyId) {
+async function getUpcomingMetrics(
+  accessToken,
+  propertyId,
+  taxRate,
+  pricingModel
+) {
   const today = new Date();
   const futureDate = new Date();
   futureDate.setDate(today.getDate() + 365);
@@ -433,7 +440,7 @@ async function getUpcomingMetrics(accessToken, propertyId) {
 
   console.log("--- FORECAST SYNC COMPLETE ---");
   // Use the new helper function to process all the pages of raw forecast data.
-  return processUpcomingApiData(allApiData);
+  return processUpcomingApiData(allApiData, taxRate, pricingModel);
 }
 // Export all public functions.
 /**

@@ -91,12 +91,12 @@ async function runSync(propertyId) {
     // --- Fetch historical and forecast metrics (Refactored to be monthly) ---
     // --- NEW: Fetch hotel's tax info before processing metrics ---
     const hotelInfoResult = await client.query(
-      "SELECT tax_rate, pricing_model FROM hotels WHERE hotel_id = $1",
+      "SELECT tax_rate, tax_type FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
     // Set defaults to prevent crashes if data is missing.
     const taxRate = hotelInfoResult.rows[0]?.tax_rate || 0;
-    const pricingModel = hotelInfoResult.rows[0]?.pricing_model || "inclusive";
+    const pricingModel = hotelInfoResult.rows[0]?.tax_type || "inclusive";
     console.log(
       `✅ Hotel Info: Tax Rate=${taxRate}, Pricing Model=${pricingModel}`
     );
