@@ -189,8 +189,13 @@ async function runSync(propertyId) {
       const credentials = credsResult.rows[0].pms_credentials;
 
       // Sync hotel metadata from Mews
+      // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
+
+      // ADD THIS LINE FOR DEBUGGING
+      console.log("DEBUG: Data to be updated:", hotelDetails);
+
       await client.query(
         `UPDATE hotels SET 
           property_name = $1, city = $2, currency_code = $3, latitude = $4, longitude = $5, pricing_model = 'gross'
