@@ -27,15 +27,9 @@ router.get("/scheduled-reports", requireUserApi, async (req, res) => {
   }
 });
 
+// Create new scheduled report
 router.post("/scheduled-reports", requireUserApi, async (req, res) => {
   try {
-    const userResult = await pgPool.query(
-      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
-    );
-    if (userResult.rows.length === 0)
-      return res.status(404).json({ error: "User not found." });
-    const internalUserId = userResult.rows[0].user_id;
     const {
       propertyId,
       reportName,
@@ -53,10 +47,36 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
       reportPeriod,
       attachmentFormats,
     } = req.body;
-    const { rows } = await pgPool.query(
-      `INSERT INTO scheduled_reports (user_id, property_id, report_name, recipients, frequency, day_of_week, day_of_month, time_of_day, metrics_hotel, metrics_market, add_comparisons, display_order, display_totals, include_taxes, report_period, attachment_formats) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+
+    // Defaults to satisfy NOT NULLs and keep consistent types
+    const safeMetricsMarket = Array.isArray(metricsMarket) ? metricsMarket : [];
+    const safeAddComparisons = !!addComparisons;
+    const safeDisplayOrder = displayOrder ?? "metric"; // typical values: "metric" | "source"
+    const safeIncludeTaxes = includeTaxes ?? true;
+
+    const result = await pool.query(
+      `
+        INSERT INTO scheduled_reports (
+          property_id,
+          report_name,
+          recipients,
+          frequency,
+          day_of_week,
+          day_of_month,
+          time_of_day,
+          metrics_hotel,
+          metrics_market,
+          add_comparisons,
+          display_order,
+          display_totals,
+          include_taxes,
+          report_period,
+          attachment_formats
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        RETURNING *
+      `,
       [
-        internalUserId,
         propertyId,
         reportName,
         recipients,
@@ -65,46 +85,20 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
         dayOfMonth,
         timeOfDay,
         metricsHotel,
-        metricsMarket,
-        addComparisons,
-        displayOrder,
+        safeMetricsMarket,
+        safeAddComparisons,
+        safeDisplayOrder,
         displayTotals,
-        includeTaxes,
+        safeIncludeTaxes,
         reportPeriod,
         attachmentFormats,
       ]
     );
-    res.status(201).json(rows[0]);
+
+    res.json(result.rows[0]);
   } catch (error) {
     console.error("Error creating scheduled report:", error);
-    res.status(500).json({ error: "Failed to create scheduled report" });
-  }
-});
-
-router.delete("/scheduled-reports/:id", requireUserApi, async (req, res) => {
-  try {
-    const userResult = await pgPool.query(
-      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
-    );
-    if (userResult.rows.length === 0)
-      return res.status(404).json({ error: "User not found." });
-    const internalUserId = userResult.rows[0].user_id;
-    const { id } = req.params;
-    const result = await pgPool.query(
-      "DELETE FROM scheduled_reports WHERE id = $1 AND user_id = $2",
-      [id, internalUserId]
-    );
-    if (result.rowCount === 0)
-      return res
-        .status(404)
-        .json({
-          error: "Report not found or you do not have permission to delete it.",
-        });
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error deleting scheduled report:", error);
-    res.status(500).json({ error: "Failed to delete scheduled report" });
+    res.status(500).json({ error: error.message });
   }
 });
 
