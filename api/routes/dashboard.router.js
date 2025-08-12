@@ -449,13 +449,11 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     // --- CORRECTED QUERY LOGIC END ---
 
     const period = getPeriod(granularity);
+    // This query is now cleaned up to only select the new pre-calculated columns.
     const metricsQuery = `
       SELECT
         ${period} as period,
-        -- Old columns for compatibility
-        AVG(dms.adr) as market_adr,
         AVG(dms.occupancy_direct) as market_occupancy,
-        AVG(dms.revpar) as market_revpar,
         -- New pre-calculated columns for the market
         AVG(dms.net_adr) as market_net_adr,
         AVG(dms.gross_adr) as market_gross_adr,
