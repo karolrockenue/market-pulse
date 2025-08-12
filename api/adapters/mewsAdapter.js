@@ -36,28 +36,12 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
 };
 
 /**
- * [FINAL FIX] A more robust, library-free timezone helper for European timezones.
- * It correctly calculates the start and end of DST for any given year.
+ * [FINAL FIX] Returns a simple midnight UTC timestamp string as required by Mews API examples.
  * @param {string} dateString - A date in 'YYYY-MM-DD' format.
- * @returns {string} An ISO 8601 timestamp string for midnight in the corrected timezone.
+ * @returns {string} An ISO 8601 timestamp string for midnight UTC.
  */
 const _getMewsUtcTimestamp = (dateString) => {
-  const date = new Date(dateString + "T12:00:00Z"); // Use midday to avoid date boundary issues
-  const year = date.getUTCFullYear();
-
-  // In the EU, DST starts on the last Sunday of March at 1:00 UTC.
-  const dstStart = new Date(Date.UTC(year, 2, 31, 1)); // Start with March 31st, 1:00 UTC
-  dstStart.setUTCDate(dstStart.getUTCDate() - dstStart.getUTCDay()); // Find the last Sunday
-
-  // DST ends on the last Sunday of October at 1:00 UTC.
-  const dstEnd = new Date(Date.UTC(year, 9, 31, 1)); // Start with October 31st, 1:00 UTC
-  dstEnd.setUTCDate(dstEnd.getUTCDate() - dstEnd.getUTCDay()); // Find the last Sunday
-
-  const isDst = date >= dstStart && date < dstEnd;
-  const offsetString = isDst ? "+02:00" : "+01:00";
-  const localTime = `${dateString}T00:00:00.000${offsetString}`;
-
-  return new Date(localTime).toISOString();
+  return `${dateString}T00:00:00Z`;
 };
 
 /**
