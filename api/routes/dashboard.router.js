@@ -218,11 +218,13 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     }
 
     if (competitorIds.length === 0) {
+      // This is a fallback for hotels with no competitors.
+      // It now correctly uses the new pre-calculated gross revenue and revpar columns.
       const yourHotelQuery = `
           SELECT
-            (SUM(total_revenue) / NULLIF(SUM(rooms_sold), 0)) AS your_adr,
-            (SUM(rooms_sold)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS your_occupancy,
-            (SUM(total_revenue)::NUMERIC / NULLIF(SUM(capacity_count), 0)) AS your_revpar
+            AVG(gross_adr) AS your_adr,
+            AVG(occupancy_direct) AS your_occupancy,
+            AVG(gross_revpar) AS your_revpar
           FROM daily_metrics_snapshots
           WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3;
         `;
@@ -231,6 +233,7 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
         startDate,
         endDate,
       ]);
+      // Return the hotel's own data and an empty object for the market.
       return res.json({ yourHotel: yourHotelResult.rows[0] || {}, market: {} });
     }
 

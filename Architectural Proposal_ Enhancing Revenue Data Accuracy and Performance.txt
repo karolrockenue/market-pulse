@@ -111,3 +111,47 @@ After the Advanced Reporting page is debugged, the following areas will still ne
    * dashboard.router.js: A minor fallback case in the /kpi-summary endpoint still uses the legacy total_revenue column when a hotel has no competitors. This should be updated to use gross_revenue.
    * cloudbedsAdapter.js: The adapter still calculates and provides the old adr, revpar, and total_revenue fields for "backward compatibility." Once all other services are confirmed to be using the new gross_* and net_* fields, this legacy logic can be removed to simplify the codebase.
    * Database Schema: The final step of the migration will be to execute an ALTER TABLE script to drop the now-redundant total_revenue, adr, and revpar columns from the daily_metrics_snapshots table.
+
+
+Appendix — Scheduled Reports Page & API Bug Resolution
+ Date: August 12, 2025 (post–main architectural changes)
+Status: Resolved
+Summary:
+ The Advanced Reporting page previously displayed the “Could not load scheduled reports” popup on page load and after creating a new report. This was traced to a missing backend route and unsafe SQL casting in the join to the hotels table. Additionally, attempts to create a scheduled report failed due to a NOT NULL constraint violation on the display_order column in scheduled_reports.
+Fix Implementation:
+   1. Backend Enhancements
+
+      * New GET /scheduled-reports endpoint was added in /api/routes/reports.router.js to serve the list of scheduled reports for the logged-in user.
+
+Implemented safe casting for property_id in the SQL join:
+
+sql
+CopyEdit
+CASE
+  WHEN sr.property_id ~ '^[0-9]+$' THEN sr.property_id::int
+  ELSE NULL
+END
+         *  This prevents casting errors from legacy non-numeric values.
+
+         * POST /scheduled-reports handler updated to:
+
+            * Resolve user_id from cloudbeds_user_id in the session.
+
+            * Default display_order to "metric" if not provided.
+
+            * Ensure include_taxes, add_comparisons, and metrics_market have safe default values.
+
+               * Rows now insert with a valid user_id, ensuring they appear in the GET results.
+
+                  2. Frontend
+
+                     * No structural changes required for the modal or table render logic; the popup disappearance confirmed backend stability.
+
+Outcome:
+                        * Page load no longer triggers the “Could not load scheduled reports” popup.
+
+                        * Scheduled reports can be created without hitting the display_order NOT NULL constraint.
+
+                        * Newly created reports immediately appear in the schedule list.
+
+                        * API is robust against legacy data inconsistencies.
