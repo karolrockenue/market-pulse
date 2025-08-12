@@ -174,7 +174,7 @@ async function runSync(propertyId) {
         `INSERT INTO daily_metrics_snapshots (
           stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
           -- Old columns for backward compatibility
-          adr, revpar, total_room_revenue,
+         adr, revpar, total_revenue,
           -- New columns
           net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
          )
