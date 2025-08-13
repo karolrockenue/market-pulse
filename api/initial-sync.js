@@ -171,6 +171,7 @@ async function runSync(propertyId) {
     // MEWS LOGIC PATH (All new code)
     // ==================================================================
     // Replace with this:
+    // replace with this
     else if (pmsType === "mews") {
       console.log("--- Running Mews Sync ---");
       // Get Mews credentials from the DB
@@ -189,27 +190,22 @@ async function runSync(propertyId) {
       const credentials = credsResult.rows[0].pms_credentials;
 
       // Sync hotel metadata from Mews
-      // Sync hotel metadata from Mews
-      // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
 
-      // Extract the hotel's specific timezone from the Mews API response.
-      const timezone = hotelDetails.rawResponse.Enterprise.TimeZoneIdentifier;
-      if (!timezone) {
-        // Failsafe to prevent syncs from running with an incorrect timezone.
+      // *** CHANGE #1: Store the hotel's specific timezone ***
+      const hotelTimezone = hotelDetails.timezone;
+      if (!hotelTimezone) {
+        // If the timezone isn't returned, we cannot proceed safely.
         throw new Error(
-          "Could not determine the hotel's timezone from the Mews API."
+          `Mews did not return a timezone for property ${propertyId}. Halting sync.`
         );
       }
-      console.log(`Using timezone: ${timezone}`);
 
-      // ADD THIS LINE FOR DEBUGGING
-      console.log("DEBUG: Data to be updated:", hotelDetails);
       await client.query(
         `UPDATE hotels SET 
-          property_name = $1, city = $2, currency_code = $3, latitude = $4, longitude = $5, pricing_model = 'gross'
-         WHERE hotel_id = $6::integer`, // <-- FIX IS HERE
+      property_name = $1, city = $2, currency_code = $3, latitude = $4, longitude = $5, pricing_model = 'gross', timezone = $7
+     WHERE hotel_id = $6::integer`,
         [
           hotelDetails.propertyName,
           hotelDetails.city,
@@ -217,11 +213,14 @@ async function runSync(propertyId) {
           hotelDetails.latitude,
           hotelDetails.longitude,
           propertyId,
+          hotelTimezone, // Pass the timezone to the UPDATE query
         ]
       );
-      console.log("✅ Hotel metadata sync complete.");
+      console.log(
+        `✅ Hotel metadata sync complete. Timezone set to: ${hotelTimezone}`
+      );
 
-      // NEW: Fetch historical data in 90-day batches to respect API limits
+      // Fetch historical data in 90-day batches to respect API limits
       let allProcessedData = {};
       let currentStartDate = new Date();
       currentStartDate.setFullYear(currentStartDate.getFullYear() - 5); // Start 5 years ago
@@ -231,7 +230,6 @@ async function runSync(propertyId) {
         let currentEndDate = new Date(currentStartDate);
         currentEndDate.setDate(currentEndDate.getDate() + 89); // Set end of batch (90 days total)
 
-        // Ensure the last batch doesn't go into the future
         if (currentEndDate > today) {
           currentEndDate = today;
         }
@@ -245,18 +243,18 @@ async function runSync(propertyId) {
 
         // Fetch occupancy and revenue for the current batch
         const [occupancyData, revenueData] = await Promise.all([
-          // Pass the timezone variable into both adapter functions.
+          // *** CHANGE #2: Pass the timezone to the adapter functions ***
           mewsAdapter.getOccupancyMetrics(
             credentials,
             startDateStr,
             endDateStr,
-            timezone
+            hotelTimezone // <-- Pass the timezone here
           ),
           mewsAdapter.getRevenueMetrics(
             credentials,
             startDateStr,
             endDateStr,
-            timezone
+            hotelTimezone // <-- And here
           ),
         ]);
 
@@ -296,7 +294,7 @@ async function runSync(propertyId) {
               : 0;
           const gross_adr =
             metrics.rooms_sold > 0
-              ? metrics.gross_revenue / metrics.rooms_sold
+              ? metrics.gross_revenue / metrics.gross_revenue
               : 0;
           const net_revpar =
             metrics.capacity_count > 0
@@ -313,7 +311,7 @@ async function runSync(propertyId) {
             metrics.rooms_sold || 0,
             metrics.capacity_count || 0,
             metrics.occupancy || 0,
-            null,
+            null, // cloudbeds_user_id is null for Mews
             metrics.net_revenue || 0,
             metrics.gross_revenue || 0,
             net_adr,
@@ -324,9 +322,9 @@ async function runSync(propertyId) {
         });
         const query = format(
           `INSERT INTO daily_metrics_snapshots (
-              stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
-              net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
-            ) VALUES %L`,
+          stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
+          net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
+        ) VALUES %L`,
           bulkInsertValues
         );
         await client.query(query);

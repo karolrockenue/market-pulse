@@ -320,11 +320,15 @@ router.get("/test-mews-occupancy", async (req, res) => {
         "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
     };
 
-    // Call the REFACTORED adapter function with the date range.
+    // This is the timezone for the Mews demo hotel.
+    const demoTimezone = "Europe/Budapest";
+
+    // Call the adapter function, now passing the required timezone.
     const occupancyData = await mewsAdapter.getOccupancyMetrics(
       demoCredentials,
       startDate,
-      endDate
+      endDate,
+      demoTimezone // Pass the timezone as the fourth argument.
     );
 
     // Send the full response back for inspection.
