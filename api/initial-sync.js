@@ -228,7 +228,7 @@ async function runSync(propertyId) {
       const today = new Date();
 
       while (currentStartDate < today) {
-        let currentEndDate = new new Date(currentStartDate)();
+        let currentEndDate = new Date(currentStartDate);
         currentEndDate.setDate(currentEndDate.getDate() + 89); // Set end of batch (90 days total)
 
         // Ensure the last batch doesn't go into the future
