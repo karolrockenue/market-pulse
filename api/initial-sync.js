@@ -192,6 +192,10 @@ async function runSync(propertyId) {
       // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
+      console.log(
+        "DEBUG: Fetched hotel details inside sync script:",
+        hotelDetails
+      );
 
       // *** CHANGE #1: Store the hotel's specific timezone ***
       const hotelTimezone = hotelDetails.timezone;
