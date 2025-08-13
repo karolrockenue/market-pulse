@@ -50,3 +50,40 @@ Implementation Plan
    * Mews: The sync job will map NetValue to net_revenue and GrossValue to gross_revenue.
 4. Update Reporting Page: The UI toggle will be simplified to switch between displaying the net_revenue and gross_revenue columns.
 This architectural change is the next logical step before the Mews adapter can be fully integrated into the production data sync jobs.
+
+
+5.0 Current Status & Unresolved Issues
+The initial-sync.js script is now fully refactored, and the database schema has been updated to support the Mews integration. However, end-to-end testing has revealed two critical, blocking issues that prevent a successful data sync:
+* Persistent API Timestamp Error: The script consistently fails during the historical data fetch with the Mews API error: FirstTimeUnitStartUtc is not start of TimeUnit. This indicates the current method for generating UTC timestamps for API calls is still incorrect and not properly handling timezone or Daylight Saving Time transitions.
+* Transaction Rollback Issue: As a direct result of the API error, the script's database transaction is rolled back before completion. This prevents the initial hotel metadata update from being permanently saved to the hotels table (pressumably)
+
+
+## 2025-08-13: Mews Initial Sync Integration & Debugging
+This session focused on integrating the Mews PMS for historical data synchronization and debugging the local development environment for testing.
+________________
+
+
+### Changed
+* Refactored initial-sync.js to Support Multi-PMS Data Synchronization
+   * Added conditional logic to detect a property's pms_type ('mews' or 'cloudbeds') and execute the appropriate sync process.
+   * Integrated the mewsAdapter to be called by the script for Mews properties.
+   * Implemented batch fetching for Mews historical data (in 90-day chunks) to respect API rate limits.
+________________
+
+
+### Fixed
+* mewsAdapter.js
+   * Corrected the getRevenueMetrics function to properly calculate and return both netRevenue and grossRevenue.
+   * Added a filter to getRevenueMetrics to exclude revenue from orders with a Canceled accounting state.
+   * Made several attempts to fix a recurring Daylight Saving Time bug related to timestamp generation for API calls.
+* initial-sync.js
+   * Added dotenv configuration to ensure the script loads the correct DATABASE_URL from the .env file when run locally.
+   * Corrected a silent failure in the UPDATE hotels command by adding an ::integer type cast to the WHERE clause, fixing a data type mismatch.
+* Database
+   * Added the required pms_type column to the hotels table to enable multi-PMS functionality.
+________________
+
+
+### ⚠️ Unresolved Issues
+* The initial-sync script is still failing during the historical data fetch with a Mews API error: FirstTimeUnitStartUtc is not start of TimeUnit. This indicates the simplified timestamp generation in the adapter is still incorrect.
+* Because the script crashes during the data fetch, the database transaction is rolled back. This prevents the hotel metadata update from being saved to the hotels table

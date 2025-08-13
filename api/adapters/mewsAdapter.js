@@ -72,15 +72,23 @@ const getHotelDetails = async (credentials) => {
  * @param {object} credentials - The credentials for the property.
  * @param {string} startDate - The start date of the range, in 'YYYY-MM-DD' format.
  * @param {string} endDate - The end date of the range, in 'YYYY-MM-DD' format.
+ * @param {string} timezone - The IANA timezone name for the hotel.
  * @returns {Promise<object>} An object containing the daily metrics and the raw API response.
  */
-const getOccupancyMetrics = async (credentials, startDate, endDate) => {
+const getOccupancyMetrics = async (
+  credentials,
+  startDate,
+  endDate,
+  timezone
+) => {
+  // Add a timezone parameter to the function signature.
   const serviceId = "bd26d8db-86da-4f96-9efc-e5a4654a4a94";
 
   const availabilityPayload = {
     ServiceId: serviceId,
-    FirstTimeUnitStartUtc: _getMewsUtcTimestamp(startDate),
-    LastTimeUnitStartUtc: _getMewsUtcTimestamp(endDate),
+    // Pass the hotel's timezone to the timestamp generation function.
+    FirstTimeUnitStartUtc: _getMewsUtcTimestamp(startDate, timezone),
+    LastTimeUnitStartUtc: _getMewsUtcTimestamp(endDate, timezone),
     Metrics: ["Occupied", "ActiveResources"],
   };
 
@@ -124,23 +132,25 @@ const getOccupancyMetrics = async (credentials, startDate, endDate) => {
     rawResponse: response,
   };
 };
-
 /**
  * Fetches daily revenue metrics for a date range using the Mews 'orderItems/getAll' endpoint.
  * @param {object} credentials - The credentials for the property.
  * @param {string} startDate - The start date of the range, in 'YYYY-MM-DD' format.
  * @param {string} endDate - The end date of the range, in 'YYYY-MM-DD' format.
+ * @param {string} timezone - The IANA timezone name for the hotel.
  * @returns {Promise<object>} An object containing the daily revenue metrics and the raw API response.
  */
-const getRevenueMetrics = async (credentials, startDate, endDate) => {
+const getRevenueMetrics = async (credentials, startDate, endDate, timezone) => {
+  // Add a timezone parameter to the function signature.
   let allOrderItems = [];
   let cursor = null;
 
   do {
     const payload = {
       ConsumedUtc: {
-        StartUtc: _getMewsUtcTimestamp(startDate),
-        EndUtc: _getMewsUtcTimestamp(endDate),
+        // Pass the hotel's timezone to the timestamp generation function.
+        StartUtc: _getMewsUtcTimestamp(startDate, timezone),
+        EndUtc: _getMewsUtcTimestamp(endDate, timezone),
       },
       Types: ["SpaceOrder"],
       AccountingStates: ["Open", "Closed"],
@@ -160,9 +170,9 @@ const getRevenueMetrics = async (credentials, startDate, endDate) => {
 
   const dailyTotals = {};
   allOrderItems.forEach((item) => {
-    const consumedTime = new Date(item.ConsumedUtc);
-    consumedTime.setHours(consumedTime.getHours() + 5);
-    const date = consumedTime.toISOString().split("T")[0];
+    // The item's ConsumedUtc is already the correct UTC time. We just need to format it.
+    const date = item.ConsumedUtc.split("T")[0];
+
     if (!dailyTotals[date]) {
       dailyTotals[date] = { totalNetRevenue: 0, totalGrossRevenue: 0 };
     }
