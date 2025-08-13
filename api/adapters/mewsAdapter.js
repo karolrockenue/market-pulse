@@ -71,6 +71,7 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
  * @returns {Promise<object>} A standardized hotel details object.
  */
 // replace with this
+// replace with this
 const getHotelDetails = async (credentials) => {
   // Call the Mews configuration endpoint
   const response = await _callMewsApi("configuration/get", credentials);
@@ -87,8 +88,12 @@ const getHotelDetails = async (credentials) => {
     currencyCode: defaultCurrency ? defaultCurrency.Currency : null,
     latitude: response.Enterprise.Address.Latitude,
     longitude: response.Enterprise.Address.Longitude,
-    // Access the timezone directly from the full response object
     timezone: response.Enterprise.TimeZoneIdentifier,
+    // --- ADDING NEW FIELDS ---
+    address_1: response.Enterprise.Address.Line1,
+    zip_postal_code: response.Enterprise.Address.PostalCode,
+    country: response.Enterprise.Address.CountryCode,
+    // --- END NEW FIELDS ---
     pmsType: "mews",
     rawResponse: response,
   };
@@ -136,25 +141,22 @@ const getAccommodationServiceId = async (credentials) => {
  * @returns {Promise<object>} An object containing the daily metrics and the raw API response.
  */
 // replace with this
+// replace with this
 const getOccupancyMetrics = async (
   credentials,
   startDate,
   endDate,
-  timezone = "Europe/Budapest" // Add timezone parameter with a default for testing
+  timezone = "Europe/Budapest"
 ) => {
-  // Dynamically fetch the Accommodation Service ID for this property.
   const serviceId = await getAccommodationServiceId(credentials);
 
-  // Define the payload for the Mews API call.
   const availabilityPayload = {
     ServiceId: serviceId,
-    // Use the new, robust helper to get correct UTC timestamps.
     FirstTimeUnitStartUtc: _getUtcTimestampForMews(startDate, timezone),
     LastTimeUnitStartUtc: _getUtcTimestampForMews(endDate, timezone),
     Metrics: ["Occupied", "ActiveResources"],
   };
 
-  // Call the Mews API.
   const response = await _callMewsApi(
     "services/getAvailability/2024-01-22",
     credentials,
@@ -167,30 +169,27 @@ const getOccupancyMetrics = async (
     response.ResourceCategoryAvailabilities &&
     response.ResourceCategoryAvailabilities.length > 0
   ) {
-    // Use the top-level 'TimeUnitStartsUtc' for the date list.
     response.TimeUnitStartsUtc.forEach((utcDate) => {
-      // Convert the UTC date string back to a local date for the key.
       const date = new Date(utcDate).toISOString().split("T")[0];
       dailyTotals[date] = { occupied: 0, available: 0 };
     });
 
-    // Iterate over each resource category returned by the API to sum up the metrics.
     response.ResourceCategoryAvailabilities.forEach((category) => {
       const occupiedValues = category.Metrics.Occupied;
       const availableValues = category.Metrics.ActiveResources;
 
-      // Use the top-level dates array for consistent indexing.
       response.TimeUnitStartsUtc.forEach((utcDate, index) => {
         const date = new Date(utcDate).toISOString().split("T")[0];
         if (dailyTotals[date]) {
-          dailyTotals[date].occupied += occupiedValues[index] || 0;
-          dailyTotals[date].available += availableValues[index] || 0;
+          dailyTotals[date].occupied +=
+            (occupiedValues ? occupiedValues[index] : 0) || 0;
+          dailyTotals[date].available +=
+            (availableValues ? availableValues[index] : 0) || 0;
         }
       });
     });
   }
 
-  // Convert the results to the expected array format.
   const results = Object.keys(dailyTotals).map((date) => ({
     date,
     occupied: dailyTotals[date].occupied,
@@ -202,7 +201,6 @@ const getOccupancyMetrics = async (
     rawResponse: response,
   };
 };
-
 /**
  * Fetches daily revenue metrics for a date range using the Mews 'orderItems/getAll' endpoint.
  * @param {object} credentials - The credentials for the property.
