@@ -70,29 +70,27 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
  * @param {string} credentials.accessToken - The access token for the specific property.
  * @returns {Promise<object>} A standardized hotel details object.
  */
+// replace with this
 const getHotelDetails = async (credentials) => {
   // Call the Mews configuration endpoint
   const response = await _callMewsApi("configuration/get", credentials);
 
-  const { Enterprise } = response;
-
   // Find the default currency
-  const defaultCurrency = Enterprise.Currencies.find(
+  const defaultCurrency = response.Enterprise.Currencies.find(
     (c) => c.IsDefault === true
   );
 
   // Transform the Mews response into our internal standard format
-  // replace with this
-  // Transform the Mews response into our internal standard format
   const hotelDetails = {
-    propertyName: Enterprise.Name,
-    city: Enterprise.Address.City,
+    propertyName: response.Enterprise.Name,
+    city: response.Enterprise.Address.City,
     currencyCode: defaultCurrency ? defaultCurrency.Currency : null,
-    latitude: Enterprise.Address.Latitude,
-    longitude: Enterprise.Address.Longitude,
-    timezone: Enterprise.TimezoneIdentifier, // Add the hotel's specific timezone
-    pmsType: "mews", // Set the PMS type
-    rawResponse: response, // Optionally store the original response for debugging
+    latitude: response.Enterprise.Address.Latitude,
+    longitude: response.Enterprise.Address.Longitude,
+    // Access the timezone directly from the full response object
+    timezone: response.Enterprise.TimeZoneIdentifier,
+    pmsType: "mews",
+    rawResponse: response,
   };
 
   return hotelDetails;
