@@ -190,8 +190,19 @@ async function runSync(propertyId) {
 
       // Sync hotel metadata from Mews
       // Sync hotel metadata from Mews
+      // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
+
+      // Extract the hotel's specific timezone from the Mews API response.
+      const timezone = hotelDetails.rawResponse.Enterprise.TimeZoneIdentifier;
+      if (!timezone) {
+        // Failsafe to prevent syncs from running with an incorrect timezone.
+        throw new Error(
+          "Could not determine the hotel's timezone from the Mews API."
+        );
+      }
+      console.log(`Using timezone: ${timezone}`);
 
       // ADD THIS LINE FOR DEBUGGING
       console.log("DEBUG: Data to be updated:", hotelDetails);
@@ -217,7 +228,7 @@ async function runSync(propertyId) {
       const today = new Date();
 
       while (currentStartDate < today) {
-        let currentEndDate = new Date(currentStartDate);
+        let currentEndDate = new new Date(currentStartDate)();
         currentEndDate.setDate(currentEndDate.getDate() + 89); // Set end of batch (90 days total)
 
         // Ensure the last batch doesn't go into the future
@@ -234,12 +245,19 @@ async function runSync(propertyId) {
 
         // Fetch occupancy and revenue for the current batch
         const [occupancyData, revenueData] = await Promise.all([
+          // Pass the timezone variable into both adapter functions.
           mewsAdapter.getOccupancyMetrics(
             credentials,
             startDateStr,
-            endDateStr
+            endDateStr,
+            timezone
           ),
-          mewsAdapter.getRevenueMetrics(credentials, startDateStr, endDateStr),
+          mewsAdapter.getRevenueMetrics(
+            credentials,
+            startDateStr,
+            endDateStr,
+            timezone
+          ),
         ]);
 
         // Combine the occupancy data into the main object
