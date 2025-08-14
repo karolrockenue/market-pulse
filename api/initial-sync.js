@@ -139,7 +139,14 @@ async function runSync(propertyId) {
 
       // --- NEW LOGIC TO SET GO_LIVE_DATE ---
       // Find the earliest date from all the data we've collected.
-      const earliestDate = Object.keys(allProcessedData).sort()[0];
+      // --- NEW LOGIC TO SET GO_LIVE_DATE ---
+      // Find the earliest date that has actual activity (rooms sold or revenue).
+      const sortedDates = Object.keys(allProcessedData).sort();
+      const earliestDate = sortedDates.find(
+        (date) =>
+          allProcessedData[date].rooms_sold > 0 ||
+          allProcessedData[date].gross_revenue > 0
+      );
 
       if (earliestDate) {
         console.log(`Setting effective go_live_date to: ${earliestDate}`);
@@ -308,7 +315,14 @@ async function runSync(propertyId) {
 
       // --- NEW LOGIC TO SET GO_LIVE_DATE ---
       // Find the earliest date from all the data we've collected.
-      const earliestDate = Object.keys(allProcessedData).sort()[0];
+      // --- NEW LOGIC TO SET GO_LIVE_DATE ---
+      // Find the earliest date that has actual activity (rooms sold or revenue).
+      const sortedDates = Object.keys(allProcessedData).sort();
+      const earliestDate = sortedDates.find(
+        (date) =>
+          allProcessedData[date].rooms_sold > 0 ||
+          allProcessedData[date].gross_revenue > 0
+      );
 
       if (earliestDate) {
         console.log(`Setting effective go_live_date to: ${earliestDate}`);
