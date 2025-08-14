@@ -3,7 +3,6 @@ const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const format = require("pg-format");
 // add this line at the top
-const mewsAdapter = require("../adapters/mewsAdapter.js");
 
 // /api/daily-refresh.js
 // ...
