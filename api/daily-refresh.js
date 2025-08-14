@@ -7,6 +7,13 @@ const mewsAdapter = require("../adapters/mewsAdapter.js");
 
 // /api/daily-refresh.js
 // ...
+// /api/daily-refresh.js (Refactored for Direct DB Update)
+const pgPool = require("./utils/db");
+const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
+const format = require("pg-format");
+
+// /api/daily-refresh.js
+// ...
 module.exports = async (request, response) => {
   // ** REFACTORED LOGIC **
   // The job now fetches all connected properties directly, making it property-centric
