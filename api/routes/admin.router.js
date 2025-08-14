@@ -347,91 +347,89 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
 
 // --- NEW MEWS CONNECTION ENDPOINT ---
 // This endpoint handles the manual connection of a new Mews property by an admin.
+// --- FINAL MEWS CONNECTION ENDPOINT ---
+// This endpoint handles the manual connection of a new Mews property by an admin.
 router.post("/mews/connect", requireAdminApi, async (req, res) => {
-  // Extract the accessToken provided by Mews and the email of the hotel's owner from the request body.
+  // Extract the accessToken and ownerEmail from the request body.
   const { accessToken, ownerEmail } = req.body;
 
-  // Validate that both required pieces of information were provided.
   if (!accessToken || !ownerEmail) {
     return res
       .status(400)
       .json({ error: "An accessToken and ownerEmail are required." });
   }
 
-  // Use a single database client to perform all operations within a transaction.
-  // This ensures that all steps succeed or none of them do, preventing partial data.
   const client = await pgPool.connect();
   try {
-    // Begin the database transaction.
     await client.query("BEGIN");
 
-    // Find the user_id for the owner's email. A user must exist to own a property.
+    // Step 1: Use the token to get hotel details from the Mews API FIRST.
+    // The adapter now returns the pmsPropertyId (the Mews UUID).
+    const mewsCredentials = { accessToken };
+    const hotelDetails = await mewsAdapter.getHotelDetails(mewsCredentials);
+
+    const pmsPropertyId = hotelDetails.pmsPropertyId;
+    if (!pmsPropertyId) {
+      throw new Error("Could not retrieve property ID from Mews API.");
+    }
+
+    // Step 2: Find the user_id for the owner's email.
     const userResult = await client.query(
       "SELECT user_id FROM users WHERE email = $1",
       [ownerEmail]
     );
-
-    // If no user is found with that email, we cannot proceed.
     if (userResult.rows.length === 0) {
       throw new Error(`User with email ${ownerEmail} not found.`);
     }
     const userId = userResult.rows[0].user_id;
 
-    // Create a placeholder record in the 'hotels' table.
-    // It's critical to set 'pms_type' to 'mews' so the sync script knows how to process it.
-    // The property_name is temporary and will be updated by the sync script.
+    // Step 3: Insert the new hotel record.
+    // We provide the Mews ID to our new pms_property_id column.
+    // The database will now auto-generate the internal hotel_id for us.
     const hotelInsertResult = await client.query(
-      `INSERT INTO hotels (property_name, pms_type) VALUES ($1, $2) RETURNING hotel_id`,
-      ["New Mews Hotel (Syncing...)", "mews"]
+      `INSERT INTO hotels (property_name, pms_type, pms_property_id) 
+       VALUES ($1, $2, $3) 
+       RETURNING hotel_id`,
+      [hotelDetails.propertyName || "New Mews Hotel", "mews", pmsPropertyId]
     );
-    const newHotelId = hotelInsertResult.rows[0].hotel_id;
+    const newInternalHotelId = hotelInsertResult.rows[0].hotel_id;
     console.log(
-      `[Mews Connect] Created placeholder hotel with ID: ${newHotelId}`
+      `[Mews Connect] Created hotel with internal ID: ${newInternalHotelId} and Mews ID: ${pmsPropertyId}`
     );
 
-    // Store the provided Mews accessToken in the 'pms_credentials' JSONB column.
-    const pmsCredentials = { accessToken };
-
-    // Create the link between the user and the new property in the 'user_properties' table.
+    // Step 4: Create the link between the user and the new property.
     await client.query(
       `INSERT INTO user_properties (user_id, property_id, pms_credentials, status) VALUES ($1, $2, $3, $4)`,
-      [userId, newHotelId, pmsCredentials, "active"]
+      [userId, newInternalHotelId, mewsCredentials, "active"]
     );
-    console.log(`[Mews Connect] Linked hotel ${newHotelId} to user ${userId}.`);
+    console.log(
+      `[Mews Connect] Linked hotel ${newInternalHotelId} to user ${userId}.`
+    );
 
-    // If all database operations were successful, commit the transaction to save the changes.
+    // If all succeeds, commit the transaction.
     await client.query("COMMIT");
 
-    // Immediately send a success response to the admin user so they know the process has started.
     res.status(202).json({
-      // 202 Accepted status indicates the request is good and processing has begun.
       success: true,
-      message: `Mews hotel connection initiated for hotel ID ${newHotelId}. Initial sync starting in the background.`,
-      hotelId: newHotelId,
+      message: `Mews hotel connection initiated for hotel ID ${newInternalHotelId}. Initial sync starting now.`,
+      hotelId: newInternalHotelId,
     });
 
     // --- Trigger Sync in Background ---
-    // After responding to the user, start the initial data sync.
-    // We do this without 'await' so the admin isn't left waiting for the entire sync to complete.
     console.log(
-      `[Mews Connect] Triggering initial sync for new hotel ID: ${newHotelId}`
+      `[Mews Connect] Triggering initial sync for new hotel ID: ${newInternalHotelId}`
     );
-    initialSyncHandler.runSync(newHotelId).catch((err) => {
-      // If the background sync fails, log the error for debugging.
+    initialSyncHandler.runSync(newInternalHotelId).catch((err) => {
       console.error(
-        `[Mews Connect] CRITICAL: Background initial sync failed for hotel ID ${newHotelId}:`,
+        `[Mews Connect] CRITICAL: Background initial sync failed for hotel ID ${newInternalHotelId}:`,
         err
       );
     });
   } catch (error) {
-    // If any error occurred during the 'try' block, roll back the transaction.
-    // This undoes all the database changes (e.g., the INSERT statements).
     await client.query("ROLLBACK");
     console.error(`[Mews Connect] Failed to connect Mews property:`, error);
-    // Send a server error response back to the admin user.
     res.status(500).json({ success: false, error: error.message });
   } finally {
-    // VERY IMPORTANT: Always release the database client back to the pool.
     client.release();
   }
 });
