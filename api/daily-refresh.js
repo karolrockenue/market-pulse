@@ -65,7 +65,7 @@ module.exports = async (request, response) => {
       } else if (pms_type === "mews") {
         try {
           // Get Mews credentials from the database for the current hotel.
-          const credsResult = await client.query(
+          const credsResult = await pgPool.query(
             "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
             [hotel_id]
           );
