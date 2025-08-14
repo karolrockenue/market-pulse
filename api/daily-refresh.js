@@ -7,146 +7,170 @@ const mewsAdapter = require("../adapters/mewsAdapter.js");
 
 // /api/daily-refresh.js
 // ...
-// replace with this
 module.exports = async (request, response) => {
-  console.log("Starting daily refresh for all properties...");
-  const client = await pgPool.connect();
+  // ** REFACTORED LOGIC **
+  // The job now fetches all connected properties directly, making it property-centric
+  // instead of user-centric. This is more robust.
+  console.log("Starting daily FORECAST refresh job for ALL PROPERTIES...");
+  let totalRecordsUpdated = 0;
 
   try {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    // Step 1: Get a list of all unique, connected properties from the user_properties table.
+    const propertiesResult = await pgPool.query(
+      "SELECT DISTINCT property_id FROM user_properties WHERE status = 'connected'"
+    );
+    const connectedProperties = propertiesResult.rows;
+    console.log(
+      `Found ${connectedProperties.length} connected properties to process.`
+    );
 
-    console.log(`Fetching data for date: ${yesterdayStr}`);
+    // Step 2: Loop through each property directly.
+    for (const prop of connectedProperties) {
+      const propertyId = prop.property_id;
+      console.log(`--- Processing property: ${propertyId} ---`);
+      try {
+        // Get the user_id associated with this property. We need this for the INSERT query.
+        // We take the first one found, assuming any user linked to the property is valid for this purpose.
+        const userResult = await pgPool.query(
+          "SELECT user_id FROM user_properties WHERE property_id = $1 LIMIT 1",
+          [propertyId]
+        );
 
-    const hotelsResult = await client.query("SELECT * FROM hotels");
-    const allHotels = hotelsResult.rows;
-    let processedCount = 0;
-
-    for (const hotel of allHotels) {
-      const { hotel_id, pms_type, timezone } = hotel;
-      console.log(
-        `Processing hotel: ${hotel.property_name} (ID: ${hotel_id}, PMS: ${pms_type})`
-      );
-
-      if (pms_type === "mews") {
-        try {
-          const credsResult = await client.query(
-            "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
-            [hotel_id]
-          );
-          const credentials = credsResult.rows[0]?.pms_credentials;
-          if (!credentials || !timezone) {
-            throw new Error("Missing credentials or timezone for Mews hotel.");
-          }
-
-          const [occupancyData, revenueData] = await Promise.all([
-            mewsAdapter.getOccupancyMetrics(
-              credentials,
-              yesterdayStr,
-              yesterdayStr,
-              timezone
-            ),
-            mewsAdapter.getRevenueMetrics(
-              credentials,
-              yesterdayStr,
-              yesterdayStr,
-              timezone
-            ),
-          ]);
-
-          const metrics = {
-            ...occupancyData.dailyMetrics[0],
-            ...revenueData.dailyMetrics[0],
-          };
-          const rooms_sold = metrics.occupied || 0;
-          const capacity_count = metrics.available || 0;
-          const net_revenue = metrics.netRevenue || 0;
-          const gross_revenue = metrics.grossRevenue || 0;
-
-          const upsertQuery = format(
-            `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, net_revenue, gross_revenue)
-             VALUES (%L, %L, %L, %L, %L, %L)
-             ON CONFLICT (hotel_id, stay_date) 
-             DO UPDATE SET rooms_sold = EXCLUDED.rooms_sold, capacity_count = EXCLUDED.capacity_count, net_revenue = EXCLUDED.net_revenue, gross_revenue = EXCLUDED.gross_revenue;`,
-            yesterdayStr,
-            hotel_id,
-            rooms_sold,
-            capacity_count,
-            net_revenue,
-            gross_revenue
-          );
-          await client.query(upsertQuery);
-          console.log(
-            `✅ Successfully refreshed data for Mews hotel ID: ${hotel_id}`
-          );
-          processedCount++;
-        } catch (err) {
+        if (userResult.rows.length === 0) {
+          // If no user is linked, we can't get credentials. Log and skip.
           console.error(
-            `❌ Failed to refresh data for Mews hotel ID ${hotel_id}:`,
-            err.message
+            `-- Could not find a user for property ${propertyId}. Skipping. --`
           );
+          continue; // Move to the next property in the loop
         }
-      } else if (pms_type === "cloudbeds") {
-        try {
-          const accessToken = await cloudbedsAdapter.getAccessToken(hotel_id);
-          const data = await cloudbedsAdapter.getDailyFinancials(
-            accessToken,
-            hotel_id,
-            yesterdayStr
-          );
+        const cloudbedsUserId = userResult.rows[0].user_id;
 
-          if (data) {
-            const {
-              rooms_sold,
-              capacity_count,
-              net_revenue,
-              gross_revenue,
-              net_adr,
-              gross_adr,
-              net_revpar,
-              gross_revpar,
-            } = data;
-            const upsertQuery = format(
-              `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
-               VALUES (%L, %L, %L, %L, %L, %L, %L, %L, %L, %L)
-               ON CONFLICT (hotel_id, stay_date)
-               DO UPDATE SET rooms_sold = EXCLUDED.rooms_sold, capacity_count = EXCLUDED.capacity_count, net_revenue = EXCLUDED.net_revenue, gross_revenue = EXCLUDED.gross_revenue, net_adr = EXCLUDED.net_adr, gross_adr = EXCLUDED.gross_adr, net_revpar = EXCLUDED.net_revpar, gross_revpar = EXCLUDED.gross_revpar;`,
-              yesterdayStr,
-              hotel_id,
-              rooms_sold,
-              capacity_count,
-              net_revenue,
-              gross_revenue,
-              net_adr,
-              gross_adr,
-              net_revpar,
-              gross_revpar
+        // NEW: Fetch the hotel's tax info to pass to the adapter.
+        const hotelInfoResult = await pgPool.query(
+          "SELECT tax_rate, tax_type FROM hotels WHERE hotel_id = $1",
+          [propertyId]
+        );
+        const taxRate = hotelInfoResult.rows[0]?.tax_rate || 0;
+        const pricingModel = hotelInfoResult.rows[0]?.tax_type || "inclusive";
+
+        // Get a valid access token for the property using the adapter
+        const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
+
+        // Fetch the upcoming metrics data, passing the new tax info.
+        const processedData = await cloudbedsAdapter.getUpcomingMetrics(
+          accessToken,
+          propertyId,
+          taxRate,
+          pricingModel
+        );
+
+        const datesToUpdate = Object.keys(processedData);
+
+        if (datesToUpdate.length > 0) {
+          // Use a dedicated client for the transaction
+          const client = await pgPool.connect();
+          try {
+            // Start the transaction
+            await client.query("BEGIN");
+
+            // Map the processed data to the format needed for a bulk database insert.
+            // This now only returns 12 values to match the 12 columns in the query.
+            const bulkInsertValues = datesToUpdate.map((date) => {
+              const metrics = processedData[date];
+              return [
+                date,
+                propertyId,
+                metrics.rooms_sold || 0,
+                metrics.capacity_count || 0,
+                metrics.occupancy || 0,
+                cloudbedsUserId,
+                // New columns
+                metrics.net_revenue || 0,
+                metrics.gross_revenue || 0,
+                metrics.net_adr || 0,
+                metrics.gross_adr || 0,
+                metrics.net_revpar || 0,
+                metrics.gross_revpar || 0,
+              ];
+            });
+
+            // This query now correctly uses ON CONFLICT and only references the new columns.
+            const query = format(
+              `INSERT INTO daily_metrics_snapshots (
+                stay_date, hotel_id, rooms_sold, capacity_count, occupancy_direct, cloudbeds_user_id,
+                -- New columns
+                net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar
+              )
+               VALUES %L
+               ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
+                   rooms_sold = EXCLUDED.rooms_sold,
+                   capacity_count = EXCLUDED.capacity_count,
+                   occupancy_direct = EXCLUDED.occupancy_direct,
+                   cloudbeds_user_id = EXCLUDED.cloudbeds_user_id,
+                   -- Update new columns
+                   net_revenue = EXCLUDED.net_revenue,
+                   gross_revenue = EXCLUDED.gross_revenue,
+                   net_adr = EXCLUDED.net_adr,
+                   gross_adr = EXCLUDED.gross_adr,
+                   net_revpar = EXCLUDED.net_revpar,
+                   gross_revpar = EXCLUDED.gross_revpar;`,
+              bulkInsertValues
             );
-            await client.query(upsertQuery);
+
+            // Execute the query
+            await client.query(query);
+            // Commit the transaction
+            await client.query("COMMIT");
+
+            totalRecordsUpdated += datesToUpdate.length;
             console.log(
-              `✅ Successfully refreshed data for Cloudbeds hotel ID: ${hotel_id}`
+              `-- Successfully updated ${datesToUpdate.length} records for property ${propertyId}. --`
             );
-            processedCount++;
+          } catch (e) {
+            // If any error occurs, roll back the transaction
+            await client.query("ROLLBACK");
+            throw e; // Re-throw the error to be caught by the outer catch block
+          } finally {
+            // Always release the client back to the pool
+            client.release();
           }
-        } catch (err) {
-          console.error(
-            `❌ Failed to refresh data for Cloudbeds hotel ID ${hotel_id}:`,
-            err.message
+        } else {
+          console.log(
+            `-- No new records to update for property ${propertyId}. --`
           );
         }
+      } catch (propertyError) {
+        // Catch any error for a specific property and log it, so the main job can continue
+        console.error(
+          `-- Failed to process property ${propertyId}. Error: --`,
+          propertyError.message
+        );
       }
-    } // end for loop
+    }
 
-    console.log("Daily refresh job finished.");
-    return response.status(200).json({
-      success: true,
-      message: `Daily refresh completed. Processed ${processedCount} of ${allHotels.length} hotels.`,
+    // --- FINAL FIX: Update system_state table directly ---
+    console.log(
+      "✅ Daily refresh job complete. Updating system_state table..."
+    );
+    const jobData = { timestamp: new Date().toISOString() };
+    const systemStateQuery = `
+      INSERT INTO system_state (key, value)
+      VALUES ($1, $2)
+      ON CONFLICT (key)
+      DO UPDATE SET value = $2;
+    `;
+    // Use the main pool for this simple query.
+    await pgPool.query(systemStateQuery, ["last_successful_refresh", jobData]);
+    console.log("System state updated successfully.");
+    // --- END OF FIX ---
+    // The response should reflect the new property-centric logic.
+    response.status(200).json({
+      status: "Success",
+      processedProperties: connectedProperties.length,
+      totalRecordsUpdated: totalRecordsUpdated,
     });
-  } catch (e) {
-    console.error("A critical error occurred during the daily refresh:", e);
-    return response.status(500).json({ success: false, error: e.message });
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error("CRON JOB FAILED:", error);
+    response.status(500).json({ status: "Failure", error: error.message });
   }
 };
