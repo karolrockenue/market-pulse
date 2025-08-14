@@ -63,11 +63,97 @@ module.exports = async (request, response) => {
           continue; // Skip to the next hotel.
         }
       } else if (pms_type === "mews") {
-        // MEWS FORECAST LOGIC WILL BE ADDED HERE IN THE NEXT STEP
-        console.log(
-          `-- Mews property found. Forecast logic not yet implemented. Skipping for now. --`
-        );
-        continue; // Skip Mews properties for now.
+        try {
+          // Get Mews credentials from the database for the current hotel.
+          const credsResult = await client.query(
+            "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
+            [hotel_id]
+          );
+          const credentials = credsResult.rows[0]?.pms_credentials;
+          if (!credentials) {
+            throw new Error(
+              `No Mews credentials found for property ${hotel_id}.`
+            );
+          }
+
+          // Define the date range for the forecast: today for the next 365 days.
+          const startDate = new Date();
+          const endDate = new Date();
+          endDate.setDate(startDate.getDate() + 365);
+          const startDateStr = startDate.toISOString().split("T")[0];
+          const endDateStr = endDate.toISOString().split("T")[0];
+
+          // Fetch both occupancy and revenue data from the Mews adapter in parallel.
+          const [occupancyData, revenueData] = await Promise.all([
+            mewsAdapter.getOccupancyMetrics(
+              credentials,
+              startDateStr,
+              endDateStr,
+              timezone
+            ),
+            mewsAdapter.getRevenueMetrics(
+              credentials,
+              startDateStr,
+              endDateStr,
+              timezone
+            ),
+          ]);
+
+          // Create a temporary map to merge the two data sources.
+          const dataMap = {};
+
+          occupancyData.dailyMetrics.forEach((metric) => {
+            dataMap[metric.date] = {
+              ...dataMap[metric.date],
+              rooms_sold: metric.occupied,
+              capacity_count: metric.available,
+            };
+          });
+
+          revenueData.dailyMetrics.forEach((metric) => {
+            dataMap[metric.date] = {
+              ...dataMap[metric.date],
+              net_revenue: metric.netRevenue,
+              gross_revenue: metric.grossRevenue,
+            };
+          });
+
+          // Calculate the final derived metrics for each day.
+          for (const date in dataMap) {
+            const metrics = dataMap[date];
+            metrics.occupancy =
+              metrics.capacity_count > 0 && metrics.rooms_sold
+                ? metrics.rooms_sold / metrics.capacity_count
+                : 0;
+            // CORRECT ADR CALCULATION: Use rooms_sold as the divisor.
+            metrics.net_adr =
+              metrics.rooms_sold > 0 && metrics.net_revenue
+                ? metrics.net_revenue / metrics.rooms_sold
+                : 0;
+            metrics.gross_adr =
+              metrics.rooms_sold > 0 && metrics.gross_revenue
+                ? metrics.gross_revenue / metrics.rooms_sold
+                : 0;
+            // REVPAR calculations
+            metrics.net_revpar =
+              metrics.capacity_count > 0 && metrics.net_revenue
+                ? metrics.net_revenue / metrics.capacity_count
+                : 0;
+            metrics.gross_revpar =
+              metrics.capacity_count > 0 && metrics.gross_revenue
+                ? metrics.gross_revenue / metrics.capacity_count
+                : 0;
+          }
+
+          // Assign the final, calculated data to the processedData variable, which the rest of the script uses.
+          processedData = dataMap;
+        } catch (err) {
+          console.error(
+            `-- Failed to fetch Mews forecast for ${property_name}. Error: --`,
+            err.message
+          );
+          continue; // Skip to the next hotel on failure.
+        }
       } else {
         console.log(
           `-- Unknown PMS type '${pms_type}' for hotel ${property_name}. Skipping. --`

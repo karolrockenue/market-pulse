@@ -359,7 +359,7 @@ async function runSync(propertyId) {
               : 0;
           const gross_adr =
             metrics.rooms_sold > 0
-              ? metrics.gross_revenue / metrics.gross_revenue
+              ? metrics.gross_revenue / metrics.rooms_sold
               : 0;
           const net_revpar =
             metrics.capacity_count > 0
