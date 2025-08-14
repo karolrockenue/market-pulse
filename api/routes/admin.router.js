@@ -205,46 +205,107 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
     return res.status(400).json({ error: "A propertyId is required." });
   }
 
-  const client = await pgPool.connect(); // Use a single client for the transaction
+  // Use a single client for a transaction, ensuring the operation is all-or-nothing.
+  const client = await pgPool.connect();
+
   try {
-    // --- FIX: Correctly destructure the object from getAdminAccessToken ---
-    // The function returns { accessToken, propertyId }, so we need to get the token string.
-    const { accessToken } = await getAdminAccessToken(
-      req.session.userId,
-      propertyId
+    // First, determine the PMS type for the given propertyId.
+    const hotelPmsResult = await client.query(
+      "SELECT pms_type FROM hotels WHERE hotel_id = $1",
+      [propertyId]
     );
+    if (hotelPmsResult.rows.length === 0) {
+      return res.status(404).json({ error: "Hotel not found." });
+    }
+    const pmsType = hotelPmsResult.rows[0].pms_type;
 
     // Start a database transaction.
     await client.query("BEGIN");
 
-    // Execute all Cloudbeds sync functions concurrently.
-    // --- FIX: Use the consistent 'cloudbedsAdapter' module for all calls. ---
-    await Promise.all([
-      cloudbedsAdapter.syncHotelDetailsToDb(accessToken, propertyId, client),
-      cloudbedsAdapter.syncHotelTaxInfoToDb(accessToken, propertyId, client),
-    ]);
-
-    // Sync neighborhood after core details are saved to ensure lat/lon exist.
-    const hotelRes = await client.query(
-      "SELECT latitude, longitude FROM hotels WHERE hotel_id = $1",
-      [propertyId]
-    );
-    const coords = hotelRes.rows[0];
-
-    if (coords && coords.latitude && coords.longitude) {
-      const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
-        coords.latitude,
-        coords.longitude
+    // Branch the logic based on the PMS type.
+    if (pmsType === "cloudbeds") {
+      console.log(
+        `[Admin Sync] Syncing info for Cloudbeds hotel: ${propertyId}`
       );
-      if (neighborhood) {
-        await client.query(
-          "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
-          [neighborhood, propertyId]
+
+      // --- This is the existing, working logic for Cloudbeds ---
+      const { accessToken } = await getAdminAccessToken(
+        req.session.userId,
+        propertyId
+      );
+      await Promise.all([
+        cloudbedsAdapter.syncHotelDetailsToDb(accessToken, propertyId, client),
+        cloudbedsAdapter.syncHotelTaxInfoToDb(accessToken, propertyId, client),
+      ]);
+
+      // Sync neighborhood after core details are saved.
+      const hotelRes = await client.query(
+        "SELECT latitude, longitude FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+      const coords = hotelRes.rows[0];
+      if (coords && coords.latitude && coords.longitude) {
+        const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
+          coords.latitude,
+          coords.longitude
+        );
+        if (neighborhood) {
+          await client.query(
+            "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
+            [neighborhood, propertyId]
+          );
+        }
+      }
+    } else if (pmsType === "mews") {
+      console.log(`[Admin Sync] Syncing info for Mews hotel: ${propertyId}`);
+
+      // --- This is the new logic for Mews ---
+      // 1. Get Mews credentials from the database.
+      const credsResult = await client.query(
+        "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
+        [propertyId]
+      );
+      const mewsCredentials = credsResult.rows[0]?.pms_credentials;
+      if (
+        !mewsCredentials ||
+        !mewsCredentials.clientToken ||
+        !mewsCredentials.accessToken
+      ) {
+        throw new Error(
+          `Could not find valid Mews credentials for property ${propertyId}.`
         );
       }
+
+      // 2. Call the Mews adapter to get the latest hotel details.
+      const hotelDetails = await mewsAdapter.getHotelDetails(mewsCredentials);
+
+      // 3. Construct and run the UPDATE query to save the details to our database.
+      const updateQuery = `
+        UPDATE hotels
+        SET 
+          property_name = $1, 
+          city = $2, 
+          currency_code = $3, 
+          latitude = $4, 
+          longitude = $5, 
+          timezone = $6
+        WHERE hotel_id = $7;
+      `;
+      await client.query(updateQuery, [
+        hotelDetails.propertyName,
+        hotelDetails.city,
+        hotelDetails.currencyCode,
+        hotelDetails.latitude,
+        hotelDetails.longitude,
+        hotelDetails.timezone,
+        propertyId,
+      ]);
+    } else {
+      // Handle cases where the PMS type is unknown or not supported yet.
+      throw new Error(`Sync logic not implemented for PMS type: '${pmsType}'`);
     }
 
-    // Commit the transaction if all operations were successful.
+    // If all operations were successful, commit the transaction.
     await client.query("COMMIT");
 
     res.status(200).json({
