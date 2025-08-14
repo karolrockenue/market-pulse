@@ -135,7 +135,24 @@ async function runSync(propertyId) {
       );
       allProcessedData = { ...allProcessedData, ...futureData };
 
+      allProcessedData = { ...allProcessedData, ...futureData };
+
+      // --- NEW LOGIC TO SET GO_LIVE_DATE ---
+      // Find the earliest date from all the data we've collected.
+      const earliestDate = Object.keys(allProcessedData).sort()[0];
+
+      if (earliestDate) {
+        console.log(`Setting effective go_live_date to: ${earliestDate}`);
+        // As you described, run the UPDATE query to store this date.
+        await client.query(
+          `UPDATE hotels SET go_live_date = $1 WHERE hotel_id = $2`,
+          [earliestDate, propertyId]
+        );
+      }
+      // --- END NEW LOGIC ---
+
       const datesToUpdate = Object.keys(allProcessedData);
+
       if (datesToUpdate.length > 0) {
         const bulkInsertValues = datesToUpdate.map((date) => {
           const metrics = allProcessedData[date];
@@ -288,6 +305,20 @@ async function runSync(propertyId) {
       }
 
       console.log("✅ All historical data fetched.");
+
+      // --- NEW LOGIC TO SET GO_LIVE_DATE ---
+      // Find the earliest date from all the data we've collected.
+      const earliestDate = Object.keys(allProcessedData).sort()[0];
+
+      if (earliestDate) {
+        console.log(`Setting effective go_live_date to: ${earliestDate}`);
+        // As you described, run the UPDATE query to store this date.
+        await client.query(
+          `UPDATE hotels SET go_live_date = $1 WHERE hotel_id = $2`,
+          [earliestDate, propertyId]
+        );
+      }
+      // --- END NEW LOGIC ---
 
       const datesToUpdate = Object.keys(allProcessedData);
       if (datesToUpdate.length > 0) {
