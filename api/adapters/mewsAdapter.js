@@ -40,12 +40,12 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
     }
 
     // Prepare the request body.
+    // Prepare the request body.
     const requestBody = {
       // The ClientToken is now read from the secure environment variables.
       ClientToken: process.env.MEWS_CLIENT_TOKEN,
       // The AccessToken is still passed in per-property.
       AccessToken: credentials.accessToken,
-      Client: "Market Pulse 1.0.0", // As required by Mews API
       ...data,
     };
 
