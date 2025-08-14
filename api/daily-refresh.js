@@ -64,7 +64,7 @@ module.exports = async (request, response) => {
         }
       } else if (pms_type === "mews") {
         try {
-          // Get Mews credentials from the database for the current hotel.
+          // Get Mews credentials from the database.
           const credsResult = await pgPool.query(
             "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
             [hotel_id]
@@ -76,56 +76,69 @@ module.exports = async (request, response) => {
             );
           }
 
-          // Define the date range for the forecast: today for the next 365 days.
-          const startDate = new Date();
-          const endDate = new Date();
-          endDate.setDate(startDate.getDate() + 365);
-          const startDateStr = startDate.toISOString().split("T")[0];
-          const endDateStr = endDate.toISOString().split("T")[0];
-
-          // Fetch both occupancy and revenue data from the Mews adapter in parallel.
-          const [occupancyData, revenueData] = await Promise.all([
-            mewsAdapter.getOccupancyMetrics(
-              credentials,
-              startDateStr,
-              endDateStr,
-              timezone
-            ),
-            mewsAdapter.getRevenueMetrics(
-              credentials,
-              startDateStr,
-              endDateStr,
-              timezone
-            ),
-          ]);
-
-          // Create a temporary map to merge the two data sources.
           const dataMap = {};
+          let currentStartDate = new Date();
+          const finalEndDate = new Date();
+          finalEndDate.setDate(currentStartDate.getDate() + 365);
 
-          occupancyData.dailyMetrics.forEach((metric) => {
-            dataMap[metric.date] = {
-              ...dataMap[metric.date],
-              rooms_sold: metric.occupied,
-              capacity_count: metric.available,
-            };
-          });
+          // Loop through the next 365 days in 90-day chunks to respect API limits.
+          while (currentStartDate < finalEndDate) {
+            let currentEndDate = new Date(currentStartDate);
+            currentEndDate.setDate(currentEndDate.getDate() + 89); // Fetch in ~90 day chunks
 
-          revenueData.dailyMetrics.forEach((metric) => {
-            dataMap[metric.date] = {
-              ...dataMap[metric.date],
-              net_revenue: metric.netRevenue,
-              gross_revenue: metric.grossRevenue,
-            };
-          });
+            if (currentEndDate > finalEndDate) {
+              currentEndDate = finalEndDate;
+            }
 
-          // Calculate the final derived metrics for each day.
+            const startDateStr = currentStartDate.toISOString().split("T")[0];
+            const endDateStr = currentEndDate.toISOString().split("T")[0];
+
+            console.log(
+              `-- Fetching Mews forecast chunk from ${startDateStr} to ${endDateStr}... --`
+            );
+
+            const [occupancyData, revenueData] = await Promise.all([
+              mewsAdapter.getOccupancyMetrics(
+                credentials,
+                startDateStr,
+                endDateStr,
+                timezone
+              ),
+              mewsAdapter.getRevenueMetrics(
+                credentials,
+                startDateStr,
+                endDateStr,
+                timezone
+              ),
+            ]);
+
+            // Merge the data from this chunk into our main dataMap.
+            occupancyData.dailyMetrics.forEach((metric) => {
+              dataMap[metric.date] = {
+                ...dataMap[metric.date],
+                rooms_sold: metric.occupied,
+                capacity_count: metric.available,
+              };
+            });
+            revenueData.dailyMetrics.forEach((metric) => {
+              dataMap[metric.date] = {
+                ...dataMap[metric.date],
+                net_revenue: metric.netRevenue,
+                gross_revenue: metric.grossRevenue,
+              };
+            });
+
+            // Advance the start date for the next loop iteration.
+            currentStartDate.setDate(currentStartDate.getDate() + 90);
+          }
+
+          // Calculate the final derived metrics for each day after all chunks are fetched.
           for (const date in dataMap) {
             const metrics = dataMap[date];
             metrics.occupancy =
               metrics.capacity_count > 0 && metrics.rooms_sold
                 ? metrics.rooms_sold / metrics.capacity_count
                 : 0;
-            // CORRECT ADR CALCULATION: Use rooms_sold as the divisor.
             metrics.net_adr =
               metrics.rooms_sold > 0 && metrics.net_revenue
                 ? metrics.net_revenue / metrics.rooms_sold
@@ -134,7 +147,6 @@ module.exports = async (request, response) => {
               metrics.rooms_sold > 0 && metrics.gross_revenue
                 ? metrics.gross_revenue / metrics.rooms_sold
                 : 0;
-            // REVPAR calculations
             metrics.net_revpar =
               metrics.capacity_count > 0 && metrics.net_revenue
                 ? metrics.net_revenue / metrics.capacity_count
@@ -145,14 +157,13 @@ module.exports = async (request, response) => {
                 : 0;
           }
 
-          // Assign the final, calculated data to the processedData variable, which the rest of the script uses.
           processedData = dataMap;
         } catch (err) {
           console.error(
             `-- Failed to fetch Mews forecast for ${property_name}. Error: --`,
             err.message
           );
-          continue; // Skip to the next hotel on failure.
+          continue;
         }
       } else {
         console.log(
