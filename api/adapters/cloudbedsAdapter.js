@@ -651,9 +651,9 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   const query = `
     INSERT INTO hotels (
       hotel_id, property_name, city, address_1, country, currency_code,
-      property_type, zip_postal_code, latitude, longitude, primary_language
+      property_type, zip_postal_code, latitude, longitude, primary_language, pms_type
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     ON CONFLICT (hotel_id) DO UPDATE SET
       property_name = EXCLUDED.property_name,
       city = EXCLUDED.city,
@@ -664,7 +664,8 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
       zip_postal_code = EXCLUDED.zip_postal_code,
       latitude = EXCLUDED.latitude,
       longitude = EXCLUDED.longitude,
-      primary_language = EXCLUDED.primary_language;
+      primary_language = EXCLUDED.primary_language,
+      pms_type = EXCLUDED.pms_type;
   `;
   const values = [
     hotelDetails.propertyID,
@@ -678,6 +679,7 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     hotelDetails.propertyAddress.propertyLatitude,
     hotelDetails.propertyAddress.propertyLongitude,
     hotelDetails.propertyPrimaryLanguage,
+    "cloudbeds", // Set the pms_type to 'cloudbeds'
   ];
 
   await dbClient.query(query, values); // Use the provided dbClient

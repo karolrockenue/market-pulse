@@ -254,6 +254,21 @@ async function runSync(propertyId) {
       );
       console.log(`✅ Hotel metadata sync complete.`);
 
+      // --- NEW: Automatically sync neighborhood for Mews hotels ---
+      if (hotelDetails.latitude && hotelDetails.longitude) {
+        const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
+          hotelDetails.latitude,
+          hotelDetails.longitude
+        );
+        if (neighborhood) {
+          await client.query(
+            "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
+            [neighborhood, propertyId]
+          );
+          console.log(`✅ Neighborhood set to: ${neighborhood}`);
+        }
+      }
+
       // --- The rest of the historical data fetch remains unchanged ---
       let allProcessedData = {};
       let currentStartDate = new Date();
