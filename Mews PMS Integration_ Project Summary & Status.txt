@@ -102,3 +102,20 @@ Changed
 Fixed
 * Critical Timestamp Bug: Permanently fixed the FirstTimeUnitStartUtc is not start of TimeUnit API error by replacing the brittle, hardcoded timezone logic with the date-fns-tz library for robust, timezone-aware timestamp generation.
 * Database NOT NULL Constraint: Resolved the database error that prevented Mews data from being saved by making the cloudbeds_user_id column optional.
+2025-08-14: Final Mews Integration & Data Integrity Fixes
+This session addressed the final bugs in the Mews data pipeline, completing the backend integration and ensuring data accuracy for both Mews and Cloudbeds properties.
+________________
+
+
+Changed
+* Refined go_live_date Logic: The initial-sync.js script was updated to define the go_live_date as the first day a hotel has actual activity (rooms_sold > 0 or gross_revenue > 0), not just the earliest record. This corrects the issue where the date was being set to years with no sales data.
+* Automated Neighborhood Sync: The initial-sync.js script now automatically runs the neighborhood lookup for new Mews properties, making the manual "Sync Hotel Info" button unnecessary for initial setup.
+Fixed
+* Cloudbeds Onboarding Failure: Corrected a critical bug where the pms_type was not being set for new Cloudbeds hotels during OAuth, causing the initial sync to fail silently. The cloudbedsAdapter.js now correctly sets pms_type to 'cloudbeds' for all new hotel records.
+* Mews ADR Calculation: Fixed a bug in initial-sync.js where the Gross ADR for Mews properties was being calculated incorrectly, resulting in a value of 1.
+* Mews Daily Refresh: Completed the Mews forecast logic in daily-refresh.js, which was previously a placeholder. The script now fetches the 365-day forecast in 90-day batches to comply with Mews API rate limits and prevent errors.
+________________
+
+
+To Do
+* Build User-Facing Mews Onboarding: The final piece of the integration is to create a user-facing onboarding flow. This will involve building new authentication routes (e.g., /auth/mews and /auth/mews/callback) to allow new customers using Mews to connect their properties to the application themselves.
