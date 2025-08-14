@@ -84,6 +84,7 @@ const getHotelDetails = async (credentials) => {
 
   // Transform the Mews response into our internal standard format
   const hotelDetails = {
+    pmsPropertyId: response.Enterprise.Id,
     propertyName: response.Enterprise.Name,
     city: response.Enterprise.Address.City,
     currencyCode: defaultCurrency ? defaultCurrency.Currency : null,
