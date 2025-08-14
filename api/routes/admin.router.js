@@ -300,6 +300,22 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
         hotelDetails.timezone,
         propertyId,
       ]);
+      // 4. Look up and save the neighborhood, reusing the same function as Cloudbeds.
+      if (hotelDetails.latitude && hotelDetails.longitude) {
+        // We can use the cloudbedsAdapter for this because it's a generic coordinate lookup.
+        const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
+          hotelDetails.latitude,
+          hotelDetails.longitude
+        );
+
+        // If a neighborhood was found, save it to the database.
+        if (neighborhood) {
+          await client.query(
+            "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
+            [neighborhood, propertyId]
+          );
+        }
+      }
     } else {
       // Handle cases where the PMS type is unknown or not supported yet.
       throw new Error(`Sync logic not implemented for PMS type: '${pmsType}'`);
