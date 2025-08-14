@@ -91,13 +91,28 @@ module.exports = async (request, response) => {
         }
       } else if (pms_type === "cloudbeds") {
         try {
+          // Get a valid access token for the property using the adapter
           const accessToken = await cloudbedsAdapter.getAccessToken(hotel_id);
-          const data = await cloudbedsAdapter.getDailyFinancials(
+
+          // Get the hotel's tax info from the 'hotel' object already in our loop.
+          // This is required by the getUpcomingMetrics function.
+          const taxRate = hotel.tax_rate || 0;
+          // The old script used 'tax_type', which corresponds to the pricing model.
+          const pricingModel = hotel.tax_type || "inclusive";
+
+          // Call the correct, existing function to get metrics.
+          // This function fetches data for multiple upcoming dates.
+          const allMetrics = await cloudbedsAdapter.getUpcomingMetrics(
             accessToken,
             hotel_id,
-            yesterdayStr
+            taxRate,
+            pricingModel
           );
 
+          // From the bulk data, select only the metrics for the specific day we are processing.
+          const data = allMetrics[yesterdayStr];
+
+          // Proceed only if data for 'yesterday' exists in the response.
           if (data) {
             const {
               rooms_sold,
@@ -109,11 +124,13 @@ module.exports = async (request, response) => {
               net_revpar,
               gross_revpar,
             } = data;
+
+            // The upsert query remains the same, inserting a single day's record.
             const upsertQuery = format(
               `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
-               VALUES (%L, %L, %L, %L, %L, %L, %L, %L, %L, %L)
-               ON CONFLICT (hotel_id, stay_date)
-               DO UPDATE SET rooms_sold = EXCLUDED.rooms_sold, capacity_count = EXCLUDED.capacity_count, net_revenue = EXCLUDED.net_revenue, gross_revenue = EXCLUDED.gross_revenue, net_adr = EXCLUDED.net_adr, gross_adr = EXCLUDED.gross_adr, net_revpar = EXCLUDED.net_revpar, gross_revpar = EXCLUDED.gross_revpar;`,
+           VALUES (%L, %L, %L, %L, %L, %L, %L, %L, %L, %L)
+           ON CONFLICT (hotel_id, stay_date)
+           DO UPDATE SET rooms_sold = EXCLUDED.rooms_sold, capacity_count = EXCLUDED.capacity_count, net_revenue = EXCLUDED.net_revenue, gross_revenue = EXCLUDED.gross_revenue, net_adr = EXCLUDED.net_adr, gross_adr = EXCLUDED.gross_adr, net_revpar = EXCLUDED.net_revpar, gross_revpar = EXCLUDED.gross_revpar;`,
               yesterdayStr,
               hotel_id,
               rooms_sold,
@@ -130,6 +147,11 @@ module.exports = async (request, response) => {
               `✅ Successfully refreshed data for Cloudbeds hotel ID: ${hotel_id}`
             );
             processedCount++;
+          } else {
+            // Log if the bulk data did not contain an entry for yesterday.
+            console.log(
+              `-- No data found for ${yesterdayStr} for Cloudbeds hotel ID: ${hotel_id}. Skipping. --`
+            );
           }
         } catch (err) {
           console.error(

@@ -87,3 +87,18 @@ ________________
 ### ⚠️ Unresolved Issues
 * The initial-sync script is still failing during the historical data fetch with a Mews API error: FirstTimeUnitStartUtc is not start of TimeUnit. This indicates the simplified timestamp generation in the adapter is still incorrect.
 * Because the script crashes during the data fetch, the database transaction is rolled back. This prevents the hotel metadata update from being saved to the hotels table
+
+
+2025-08-14: Mews Initial Sync Integration and Refactor
+This major update fully integrates the Mews PMS into the initial-sync.js script, introduces significant architectural improvements to the Mews adapter, and makes the database schema PMS-agnostic.
+Added
+* Added multi-PMS logic to the initial-sync.js script to detect and process Mews properties.
+* Added a timezone column to the hotels table to support accurate, timezone-aware data fetching for all properties.
+Changed
+* Refactored Occupancy Logic: The mewsAdapter.getOccupancyMetrics function was completely overhauled. It now uses the reservations/getAll endpoint to get a reliable count of confirmed bookings ("rooms sold") and makes a separate call to services/getAvailability to get the total room capacity (ActiveResources). This resolves the "0 rooms sold" issue caused by Mews's reservation assignment strategy.
+* Dynamic Service ID: The adapter no longer uses a hardcoded ServiceId. It now dynamically finds the active, reservable "Stay" service for any given property.
+* Database Schema: The primary key on the daily_metrics_snapshots table was changed from (hotel_id, stay_date, cloudbeds_user_id) to the PMS-agnostic (hotel_id, stay_date).
+* Enhanced Metadata Sync: The Mews sync process now saves additional hotel details (address_1, zip_postal_code, country) and standardizes the pricing_model to 'inclusive' for consistency with Cloudbeds data.
+Fixed
+* Critical Timestamp Bug: Permanently fixed the FirstTimeUnitStartUtc is not start of TimeUnit API error by replacing the brittle, hardcoded timezone logic with the date-fns-tz library for robust, timezone-aware timestamp generation.
+* Database NOT NULL Constraint: Resolved the database error that prevented Mews data from being saved by making the cloudbeds_user_id column optional.
