@@ -178,7 +178,55 @@
               </div>
             </div>
           </div>
-
+<div class="bg-white p-6 rounded-xl border border-slate-200 mb-8">
+            <h2 class="text-lg font-semibold text-slate-800 border-b pb-3">
+              Connect New Mews Property
+            </h2>
+            <p class="text-sm text-slate-500 mt-3">
+              Enter the Mews Access Token and the property owner's email address.
+              The owner must already have a user account in Market Pulse.
+            </p>
+            <div class="mt-4 space-y-4">
+              <div>
+                <label
+                  for="mews-access-token"
+                  class="block text-sm font-medium text-slate-600"
+                  >Mews Access Token</label
+                >
+                <input
+                  type="text"
+                  id="mews-access-token"
+                  placeholder="Paste the Access Token received from Mews"
+                  class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label
+                  for="mews-owner-email"
+                  class="block text-sm font-medium text-slate-600"
+                  >Owner's Email Address</label
+                >
+                <input
+                  type="email"
+                  id="mews-owner-email"
+                  placeholder="owner@example.com"
+                  class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div class="flex items-center justify-between">
+                <button
+                  id="connect-mews-btn"
+                  class="control-btn bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Connect & Sync Property
+                </button>
+                <span
+                  id="mews-connect-status"
+                  class="text-sm font-medium text-slate-500"
+                ></span>
+              </div>
+            </div>
+          </div>
           <div class="bg-white p-6 rounded-xl border border-slate-200 mb-8">
             <h2 class="text-lg font-semibold text-slate-800">
               Hotel Management
