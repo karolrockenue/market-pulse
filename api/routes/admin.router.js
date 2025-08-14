@@ -424,21 +424,28 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
   }
 });
 // TEMPORARY TEST ROUTE for Mews Connection & Configuration
+// TEMPORARY TEST ROUTE for Mews Connection & Configuration
 router.get("/test-mews-connection", async (req, res) => {
   console.log("Admin route /test-mews-connection hit.");
   try {
-    // Use the same hardcoded demo credentials for consistency.
+    // THIS IS THE ONLY CHANGE: We now read the ClientToken from the environment,
+    // exactly like our failing code does.
     const demoCredentials = {
-      clientToken:
-        "E916C341C3414D28A866AD200152DBD3-A046EB5583FFBE94DE1172237763712",
+      clientToken: process.env.MEWS_CLIENT_TOKEN,
       accessToken:
         "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
     };
 
-    // Call the adapter function to get the hotel's configuration details.
+    // This debug line will show us exactly what is in the environment variable on Vercel.
+    console.log(
+      "[VERCEL TEST ROUTE DEBUG] Credentials being used:",
+      demoCredentials
+    );
+
+    // Call the adapter function.
     const hotelDetails = await mewsAdapter.getHotelDetails(demoCredentials);
 
-    // Send the full response back. The rawResponse contains what we need to inspect.
+    // Send the full response back.
     res.status(200).json({
       message: "Successfully connected to Mews and fetched configuration.",
       data: hotelDetails,
