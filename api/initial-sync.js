@@ -172,6 +172,7 @@ async function runSync(propertyId) {
     // ==================================================================
     // Replace with this:
     // replace with this
+    // replace with this
     else if (pmsType === "mews") {
       console.log("--- Running Mews Sync ---");
       // Get Mews credentials from the DB
@@ -192,23 +193,27 @@ async function runSync(propertyId) {
       // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
-      console.log(
-        "DEBUG: Fetched hotel details inside sync script:",
-        hotelDetails
-      );
 
-      // *** CHANGE #1: Store the hotel's specific timezone ***
       const hotelTimezone = hotelDetails.timezone;
       if (!hotelTimezone) {
-        // If the timezone isn't returned, we cannot proceed safely.
         throw new Error(
           `Mews did not return a timezone for property ${propertyId}. Halting sync.`
         );
       }
 
+      // --- UPDATED QUERY: Saves new fields and standardizes pricing_model ---
       await client.query(
         `UPDATE hotels SET 
-      property_name = $1, city = $2, currency_code = $3, latitude = $4, longitude = $5, pricing_model = 'gross', timezone = $7
+      property_name = $1, 
+      city = $2, 
+      currency_code = $3, 
+      latitude = $4, 
+      longitude = $5, 
+      pricing_model = 'inclusive', -- Standardize to 'inclusive'
+      timezone = $7,
+      address_1 = $8,
+      zip_postal_code = $9,
+      country = $10
      WHERE hotel_id = $6::integer`,
         [
           hotelDetails.propertyName,
@@ -217,22 +222,23 @@ async function runSync(propertyId) {
           hotelDetails.latitude,
           hotelDetails.longitude,
           propertyId,
-          hotelTimezone, // Pass the timezone to the UPDATE query
+          hotelTimezone,
+          hotelDetails.address_1,
+          hotelDetails.zip_postal_code,
+          hotelDetails.country,
         ]
       );
-      console.log(
-        `✅ Hotel metadata sync complete. Timezone set to: ${hotelTimezone}`
-      );
+      console.log(`✅ Hotel metadata sync complete.`);
 
-      // Fetch historical data in 90-day batches to respect API limits
+      // --- The rest of the historical data fetch remains unchanged ---
       let allProcessedData = {};
       let currentStartDate = new Date();
-      currentStartDate.setFullYear(currentStartDate.getFullYear() - 5); // Start 5 years ago
+      currentStartDate.setFullYear(currentStartDate.getFullYear() - 5);
       const today = new Date();
 
       while (currentStartDate < today) {
         let currentEndDate = new Date(currentStartDate);
-        currentEndDate.setDate(currentEndDate.getDate() + 89); // Set end of batch (90 days total)
+        currentEndDate.setDate(currentEndDate.getDate() + 89);
 
         if (currentEndDate > today) {
           currentEndDate = today;
@@ -245,24 +251,21 @@ async function runSync(propertyId) {
           `Fetching Mews data from ${startDateStr} to ${endDateStr}...`
         );
 
-        // Fetch occupancy and revenue for the current batch
         const [occupancyData, revenueData] = await Promise.all([
-          // *** CHANGE #2: Pass the timezone to the adapter functions ***
           mewsAdapter.getOccupancyMetrics(
             credentials,
             startDateStr,
             endDateStr,
-            hotelTimezone // <-- Pass the timezone here
+            hotelTimezone
           ),
           mewsAdapter.getRevenueMetrics(
             credentials,
             startDateStr,
             endDateStr,
-            hotelTimezone // <-- And here
+            hotelTimezone
           ),
         ]);
 
-        // Combine the occupancy data into the main object
         occupancyData.dailyMetrics.forEach((metric) => {
           allProcessedData[metric.date] = {
             ...allProcessedData[metric.date],
@@ -272,7 +275,7 @@ async function runSync(propertyId) {
               metric.available > 0 ? metric.occupied / metric.available : 0,
           };
         });
-        // Combine the revenue data into the main object
+
         revenueData.dailyMetrics.forEach((metric) => {
           allProcessedData[metric.date] = {
             ...allProcessedData[metric.date],
@@ -281,13 +284,11 @@ async function runSync(propertyId) {
           };
         });
 
-        // Set the start date for the next loop iteration
         currentStartDate.setDate(currentStartDate.getDate() + 90);
       }
 
       console.log("✅ All historical data fetched.");
 
-      // Insert all collected data into the database
       const datesToUpdate = Object.keys(allProcessedData);
       if (datesToUpdate.length > 0) {
         const bulkInsertValues = datesToUpdate.map((date) => {
@@ -315,7 +316,7 @@ async function runSync(propertyId) {
             metrics.rooms_sold || 0,
             metrics.capacity_count || 0,
             metrics.occupancy || 0,
-            null, // cloudbeds_user_id is null for Mews
+            null,
             metrics.net_revenue || 0,
             metrics.gross_revenue || 0,
             net_adr,

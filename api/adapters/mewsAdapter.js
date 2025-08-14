@@ -72,6 +72,7 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
  */
 // replace with this
 // replace with this
+// replace with this
 const getHotelDetails = async (credentials) => {
   // Call the Mews configuration endpoint
   const response = await _callMewsApi("configuration/get", credentials);
@@ -142,64 +143,88 @@ const getAccommodationServiceId = async (credentials) => {
  */
 // replace with this
 // replace with this
+// replace with this
 const getOccupancyMetrics = async (
   credentials,
   startDate,
   endDate,
   timezone = "Europe/Budapest"
 ) => {
+  // --- PART 1: Get Total Room Capacity ---
+  // We still call getAvailability, but only to get the total number of ActiveResources.
   const serviceId = await getAccommodationServiceId(credentials);
-
   const availabilityPayload = {
     ServiceId: serviceId,
     FirstTimeUnitStartUtc: _getUtcTimestampForMews(startDate, timezone),
     LastTimeUnitStartUtc: _getUtcTimestampForMews(endDate, timezone),
-    Metrics: ["Occupied", "ActiveResources"],
+    Metrics: ["ActiveResources"], // We only need the total capacity from this endpoint.
   };
-
-  const response = await _callMewsApi(
+  const availabilityData = await _callMewsApi(
     "services/getAvailability/2024-01-22",
     credentials,
     availabilityPayload
   );
 
-  const dailyTotals = {};
+  // --- PART 2: Get Confirmed Reservations ---
+  // We call reservations/getAll to get a list of confirmed bookings.
+  const reservationsPayload = {
+    CollidingUtc: {
+      StartUtc: _getUtcTimestampForMews(startDate, timezone),
+      EndUtc: _getUtcTimestampForMews(endDate, timezone),
+    },
+    States: ["Confirmed", "Started", "Processed"],
+    Limitation: { Count: 1000 }, // Assuming we handle pagination later if needed.
+  };
+  const reservationData = await _callMewsApi(
+    "reservations/getAll/2023-06-06",
+    credentials,
+    reservationsPayload
+  );
 
-  if (
-    response.ResourceCategoryAvailabilities &&
-    response.ResourceCategoryAvailabilities.length > 0
-  ) {
-    response.TimeUnitStartsUtc.forEach((utcDate) => {
-      const date = new Date(utcDate).toISOString().split("T")[0];
-      dailyTotals[date] = { occupied: 0, available: 0 };
+  // --- PART 3: Process and Combine the Data ---
+  const dailyMetrics = {};
+  const { Reservations } = reservationData;
+
+  // Initialize our results object with dates and total capacity.
+  availabilityData.TimeUnitStartsUtc.forEach((utcDate) => {
+    const date = new Date(utcDate).toISOString().split("T")[0];
+    dailyMetrics[date] = {
+      occupied: 0,
+      available: 0,
+    };
+    // Sum the capacity from all resource categories for this date.
+    availabilityData.ResourceCategoryAvailabilities.forEach((category) => {
+      const index = availabilityData.TimeUnitStartsUtc.indexOf(utcDate);
+      dailyMetrics[date].available +=
+        category.Metrics.ActiveResources[index] || 0;
     });
+  });
 
-    response.ResourceCategoryAvailabilities.forEach((category) => {
-      const occupiedValues = category.Metrics.Occupied;
-      const availableValues = category.Metrics.ActiveResources;
+  // Loop through each reservation to count "occupied" rooms for each day.
+  if (Reservations && Reservations.length > 0) {
+    Reservations.forEach((res) => {
+      const resStart = new Date(res.ScheduledStartUtc);
+      const resEnd = new Date(res.ScheduledEndUtc);
 
-      response.TimeUnitStartsUtc.forEach((utcDate, index) => {
-        const date = new Date(utcDate).toISOString().split("T")[0];
-        if (dailyTotals[date]) {
-          dailyTotals[date].occupied +=
-            (occupiedValues ? occupiedValues[index] : 0) || 0;
-          dailyTotals[date].available +=
-            (availableValues ? availableValues[index] : 0) || 0;
+      // Iterate through each day in our dailyMetrics object.
+      for (const dateStr in dailyMetrics) {
+        const currentDay = new Date(dateStr);
+        // A reservation occupies a room on a given day if the day is
+        // on or after the start date AND before the end date.
+        if (currentDay >= resStart && currentDay < resEnd) {
+          dailyMetrics[dateStr].occupied += 1;
         }
-      });
+      }
     });
   }
 
-  const results = Object.keys(dailyTotals).map((date) => ({
+  const results = Object.keys(dailyMetrics).map((date) => ({
     date,
-    occupied: dailyTotals[date].occupied,
-    available: dailyTotals[date].available,
+    occupied: dailyMetrics[date].occupied,
+    available: dailyMetrics[date].available,
   }));
 
-  return {
-    dailyMetrics: results,
-    rawResponse: response,
-  };
+  return { dailyMetrics: results }; // Return a cleaner response now.
 };
 /**
  * Fetches daily revenue metrics for a date range using the Mews 'orderItems/getAll' endpoint.
@@ -282,10 +307,21 @@ const getRevenueMetrics = async (
   };
 };
 
+// add this new function before module.exports
+/**
+ * [QUICK TEST] Fetches a raw list of reservations for a given date range.
+ * @param {object} credentials The Mews API credentials.
+ * @param {string} startDate The start date of the range in 'YYYY-MM-DD' format.
+ * @param {string} endDate The end date of the range in 'YYYY-MM-DD' format.
+ * @param {string} timezone The IANA timezone identifier.
+ * @returns {Promise<object>} The raw response from the Mews API.
+ */
+
 // replace with this
 module.exports = {
   getHotelDetails,
-  getAccommodationServiceId, // Add the new function here
+  getAccommodationServiceId,
   getOccupancyMetrics,
   getRevenueMetrics,
+  // Add the new test function here
 };
