@@ -349,8 +349,8 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
 // This endpoint handles the manual connection of a new Mews property by an admin.
 // --- FINAL MEWS CONNECTION ENDPOINT ---
 // This endpoint handles the manual connection of a new Mews property by an admin.
+// --- FINAL, CORRECTED MEWS CONNECTION ENDPOINT ---
 router.post("/mews/connect", requireAdminApi, async (req, res) => {
-  // Extract the accessToken and ownerEmail from the request body.
   const { accessToken, ownerEmail } = req.body;
 
   if (!accessToken || !ownerEmail) {
@@ -359,13 +359,18 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
       .json({ error: "An accessToken and ownerEmail are required." });
   }
 
+  // This is the critical fix: we build the full credentials object here.
+  // It reads the ClientToken from the environment and takes the AccessToken from the form.
+  const mewsCredentials = {
+    clientToken: process.env.MEWS_CLIENT_TOKEN,
+    accessToken: accessToken,
+  };
+
   const client = await pgPool.connect();
   try {
     await client.query("BEGIN");
 
-    // Step 1: Use the token to get hotel details from the Mews API FIRST.
-    // The adapter now returns the pmsPropertyId (the Mews UUID).
-    const mewsCredentials = { accessToken };
+    // The adapter now receives the complete credentials object it expects.
     const hotelDetails = await mewsAdapter.getHotelDetails(mewsCredentials);
 
     const pmsPropertyId = hotelDetails.pmsPropertyId;
@@ -373,7 +378,6 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
       throw new Error("Could not retrieve property ID from Mews API.");
     }
 
-    // Step 2: Find the user_id for the owner's email.
     const userResult = await client.query(
       "SELECT user_id FROM users WHERE email = $1",
       [ownerEmail]
@@ -383,9 +387,6 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
     }
     const userId = userResult.rows[0].user_id;
 
-    // Step 3: Insert the new hotel record.
-    // We provide the Mews ID to our new pms_property_id column.
-    // The database will now auto-generate the internal hotel_id for us.
     const hotelInsertResult = await client.query(
       `INSERT INTO hotels (property_name, pms_type, pms_property_id) 
        VALUES ($1, $2, $3) 
@@ -393,20 +394,13 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
       [hotelDetails.propertyName || "New Mews Hotel", "mews", pmsPropertyId]
     );
     const newInternalHotelId = hotelInsertResult.rows[0].hotel_id;
-    console.log(
-      `[Mews Connect] Created hotel with internal ID: ${newInternalHotelId} and Mews ID: ${pmsPropertyId}`
-    );
 
-    // Step 4: Create the link between the user and the new property.
+    // We store the full credentials object in the database for initial-sync to use.
     await client.query(
       `INSERT INTO user_properties (user_id, property_id, pms_credentials, status) VALUES ($1, $2, $3, $4)`,
       [userId, newInternalHotelId, mewsCredentials, "active"]
     );
-    console.log(
-      `[Mews Connect] Linked hotel ${newInternalHotelId} to user ${userId}.`
-    );
 
-    // If all succeeds, commit the transaction.
     await client.query("COMMIT");
 
     res.status(202).json({
@@ -415,10 +409,6 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
       hotelId: newInternalHotelId,
     });
 
-    // --- Trigger Sync in Background ---
-    console.log(
-      `[Mews Connect] Triggering initial sync for new hotel ID: ${newInternalHotelId}`
-    );
     initialSyncHandler.runSync(newInternalHotelId).catch((err) => {
       console.error(
         `[Mews Connect] CRITICAL: Background initial sync failed for hotel ID ${newInternalHotelId}:`,
@@ -433,7 +423,6 @@ router.post("/mews/connect", requireAdminApi, async (req, res) => {
     client.release();
   }
 });
-
 // TEMPORARY TEST ROUTE for Mews Connection & Configuration
 router.get("/test-mews-connection", async (req, res) => {
   console.log("Admin route /test-mews-connection hit.");

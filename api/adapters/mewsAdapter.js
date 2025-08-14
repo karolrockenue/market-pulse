@@ -34,35 +34,24 @@ const _getUtcTimestampForMews = (dateString, timezone) => {
  */
 const _callMewsApi = async (endpoint, credentials, data = {}) => {
   try {
-    // Check if the required environment variable is set.
-    if (!process.env.MEWS_CLIENT_TOKEN) {
-      throw new Error("MEWS_CLIENT_TOKEN environment variable is not set.");
-    }
-
-    // Prepare the request body.
+    // Prepare the request body with authentication tokens, as required by Mews.
     const requestBody = {
-      // The ClientToken is now read from the secure environment variables.
-      ClientToken: process.env.MEWS_CLIENT_TOKEN,
-      // The AccessToken is still passed in per-property.
+      ClientToken: credentials.clientToken,
       AccessToken: credentials.accessToken,
       Client: "Market Pulse 1.0.0", // As required by Mews API
       ...data,
     };
-    console.log(
-      "DEBUG: Sending to Mews API:",
-      JSON.stringify(requestBody, null, 2)
-    );
 
-    // Make a POST request to the specified Mews endpoint.
+    // Make a POST request to the specified Mews endpoint
     const response = await axios.post(
       `${MEWS_API_BASE_URL}/api/connector/v1/${endpoint}`,
       requestBody
     );
 
-    // Return the data part of the response.
+    // Return the data part of the response
     return response.data;
   } catch (error) {
-    // Log detailed error information for debugging.
+    // Log detailed error information for debugging
     const errorMessage = error.response
       ? JSON.stringify(error.response.data)
       : error.message;
