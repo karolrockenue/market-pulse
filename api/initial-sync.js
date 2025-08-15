@@ -2,6 +2,7 @@ require("dotenv").config();
 
 // /api/initial-sync.js (Refactored for Multi-PMS Support)
 const fetch = require("node-fetch");
+const crypto = require("crypto");
 const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const mewsAdapter = require("./adapters/mewsAdapter.js"); // NEW: Require Mews adapter
@@ -212,7 +213,29 @@ async function runSync(propertyId) {
           `No Mews credentials found for property ${propertyId}.`
         );
       }
-      const credentials = credsResult.rows[0].pms_credentials;
+      const storedCredentials = credsResult.rows[0].pms_credentials;
+
+      // --- NEW: Decrypt the Access Token before using it ---
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+      const [ivHex, authTagHex, encryptedToken] =
+        storedCredentials.accessToken.split(":");
+      if (!ivHex || !authTagHex || !encryptedToken) {
+        throw new Error("Stored credentials are in an invalid format.");
+      }
+
+      const iv = Buffer.from(ivHex, "hex");
+      const authTag = Buffer.from(authTagHex, "hex");
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(authTag);
+
+      let decryptedToken = decipher.update(encryptedToken, "hex", "utf8");
+      decryptedToken += decipher.final("utf8");
+
+      const credentials = {
+        clientToken: storedCredentials.clientToken,
+        accessToken: decryptedToken,
+      };
+      // --- END DECRYPTION LOGIC ---
 
       // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
