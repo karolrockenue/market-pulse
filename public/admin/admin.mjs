@@ -499,105 +499,28 @@ const setupApiExplorer = (ui) => {
     }
   });
 };
-// --- NEW MEWS HELPER FUNCTION ---
-/**
- * Handles the logic for connecting a new Mews property from the admin panel.
- * @param {object} ui - The object containing all UI element references.
- */
-const connectMewsProperty = async (ui) => {
-  // Get the values from the input fields.
-  const accessToken = ui.mewsAccessTokenInput.value.trim();
-  const ownerEmail = ui.mewsOwnerEmailInput.value.trim();
-
-  // Simple validation to ensure fields are not empty.
-  if (!accessToken || !ownerEmail) {
-    ui.mewsConnectStatus.textContent = "Please fill out both fields.";
-    ui.mewsConnectStatus.className = "text-sm font-medium text-yellow-600";
-    return;
-  }
-
-  // Disable the button and show a status message to prevent multiple clicks.
-  ui.connectMewsBtn.disabled = true;
-  ui.connectMewsBtn.textContent = "Connecting...";
-  ui.mewsConnectStatus.textContent = "Submitting connection request...";
-  ui.mewsConnectStatus.className = "text-sm font-medium text-slate-500";
-
-  try {
-    // Call the backend endpoint we created earlier.
-    const response = await fetch("/api/admin/mews/connect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // Send the token and email in the request body.
-      body: JSON.stringify({ accessToken, ownerEmail }),
-    });
-
-    const data = await response.json();
-
-    // If the API returns an error, display it.
-    if (!response.ok) {
-      throw new Error(data.error || "An unknown error occurred.");
-    }
-
-    // On success, show the success message from the API.
-    ui.mewsConnectStatus.textContent = `✅ ${data.message}`;
-    ui.mewsConnectStatus.className = "text-sm font-medium text-green-600";
-
-    // Clear the input fields for the next use.
-    ui.mewsAccessTokenInput.value = "";
-    ui.mewsOwnerEmailInput.value = "";
-
-    // Refresh the main hotels table after a short delay to show the new property being synced.
-    setTimeout(() => {
-      fetchAndRenderHotels(ui);
-    }, 2000); // 2-second delay
-  } catch (error) {
-    // On failure, display the error message.
-    ui.mewsConnectStatus.textContent = `❌ Error: ${error.message}`;
-    ui.mewsConnectStatus.className = "text-sm font-medium text-red-600";
-  } finally {
-    // Re-enable the button, whether the process succeeded or failed.
-    ui.connectMewsBtn.disabled = false;
-    ui.connectMewsBtn.textContent = "Connect & Sync Property";
-  }
-};
 
 // --- MAIN PANEL INITIALIZER ---
-// --- MAIN PANEL INITIALIZER ---
+
 function initializeAdminPanel() {
-  // --- ADD THESE TWO LINES FOR DEBUGGING ---
-  console.log("DEBUG: Initializing admin panel...");
-  console.log(
-    "DEBUG: Connect Mews Button Element:",
-    document.getElementById("connect-mews-btn")
-  );
-  // --- END OF DEBUGGING LINES ---
-
   const ui = {
-    // Mews Connection UI
-    mewsAccessTokenInput: document.getElementById("mews-access-token"),
-    mewsOwnerEmailInput: document.getElementById("mews-owner-email"),
-    connectMewsBtn: document.getElementById("connect-mews-btn"),
-    mewsConnectStatus: document.getElementById("mews-connect-status"),
-
-    // System Health & Data Freshness UI
     lastRefreshTimeEl: document.getElementById("last-refresh-time"),
+    propertySelector: document.getElementById("admin-property-selector"),
+
     testCloudbedsBtn: document.getElementById("test-cloudbeds-btn"),
     cloudbedsStatusEl: document.getElementById("cloudbeds-status"),
     testDbBtn: document.getElementById("test-db-btn"),
     dbStatusEl: document.getElementById("db-status"),
     runDailyRefreshBtn: document.getElementById("run-daily-refresh-btn"),
-    jobStatusMessage: document.getElementById("job-status-message"),
+    // NEW: Add references for the new report trigger UI
     reportSelectDropdown: document.getElementById("report-select-dropdown"),
     sendSingleReportBtn: document.getElementById("send-single-report-btn"),
     singleReportStatusMessage: document.getElementById(
       "single-report-status-message"
     ),
-
-    // Hotel Management Table UI
     hotelsTableBody: document.getElementById("hotels-table-body"),
     initialSyncStatus: document.getElementById("initial-sync-status"),
-
-    // Comp Set Modal UI
+    apiResultsContainer: document.getElementById("api-results-container"),
     compsetModal: document.getElementById("compset-modal"),
     compsetHotelName: document.getElementById("compset-hotel-name"),
     compsetCloseBtn: document.getElementById("compset-close-btn"),
@@ -610,10 +533,6 @@ function initializeAdminPanel() {
     currentCompetitorsCount: document.getElementById(
       "current-competitors-count"
     ),
-
-    // API Explorer UI
-    propertySelector: document.getElementById("admin-property-selector"),
-    apiResultsContainer: document.getElementById("api-results-container"),
     allGeneralApiButtons: document.querySelectorAll(
       '#admin-content button[id^="fetch-"]'
     ),
@@ -633,11 +552,9 @@ function initializeAdminPanel() {
     insightsStep2: document.getElementById("insights-step-2"),
     insightsStep3: document.getElementById("insights-step-3"),
   };
-
   const state = { currentEditingHotelId: null };
 
   // --- Attach All Event Listeners ---
-  ui.connectMewsBtn.addEventListener("click", () => connectMewsProperty(ui));
   ui.compsetCloseBtn.addEventListener("click", () =>
     closeCompSetManager(ui, state)
   );
@@ -654,55 +571,17 @@ function initializeAdminPanel() {
   ui.availableHotelsList.addEventListener("change", (event) =>
     handleCheckboxChange(event, ui)
   );
-  ui.testCloudbedsBtn.addEventListener("click", () =>
-    testConnection("/api/admin/test-cloudbeds", ui.cloudbedsStatusEl, ui, true)
-  );
-  ui.testDbBtn.addEventListener("click", () =>
-    testConnection("/api/admin/test-database", ui.dbStatusEl, ui, false)
-  );
-  ui.runDailyRefreshBtn.addEventListener("click", () =>
-    runJob(ui, "daily-refresh", null, ui.runDailyRefreshBtn)
-  );
-  ui.sendSingleReportBtn.addEventListener("click", async () => {
-    const reportId = ui.reportSelectDropdown.value;
-    const btn = ui.sendSingleReportBtn;
-    const statusEl = ui.singleReportStatusMessage;
-    if (!reportId) {
-      statusEl.textContent = "Please select a report first.";
-      statusEl.className = "text-sm font-medium text-yellow-600 h-4 block";
-      return;
-    }
-    btn.disabled = true;
-    btn.textContent = "Sending...";
-    statusEl.textContent = "Sending report...";
-    statusEl.className = "text-sm font-medium text-slate-500 h-4 block";
-    try {
-      const response = await fetch("/api/admin/run-scheduled-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportId }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unknown error.");
-      statusEl.textContent = `✅ ${data.message}`;
-      statusEl.className = "text-sm font-medium text-green-600 h-4 block";
-    } catch (error) {
-      statusEl.textContent = `❌ Error: ${error.message}`;
-      statusEl.className = "text-sm font-medium text-red-600 h-4 block";
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Send Now";
-      setTimeout(() => {
-        statusEl.textContent = "";
-      }, 8000);
-    }
-  });
 
   ui.hotelsTableBody.addEventListener("click", (event) => {
+    console.log("1. Click detected on hotels table."); // <-- ADD THIS LINE
+
     const button = event.target.closest("button[data-action]");
     if (!button) return;
     const { hotelId, action } = button.dataset;
+    console.log("2. Button action is:", action); // <-- ADD THIS LINE
+
     if (action === "manage-compset") {
+      console.log("3. Entering 'manage-compset' logic."); // <-- ADD THIS LINE
       openCompSetManager(
         hotelId,
         button.closest("tr").cells[1].textContent,
@@ -724,23 +603,46 @@ function initializeAdminPanel() {
     }
   });
 
+  ui.testCloudbedsBtn.addEventListener("click", () =>
+    // Call testConnection for Cloudbeds, indicating it requires a property ID.
+    testConnection("/api/admin/test-cloudbeds", ui.cloudbedsStatusEl, ui, true)
+  );
+  ui.testDbBtn.addEventListener("click", () =>
+    // Call testConnection for the database, which does not require a property ID.
+    testConnection("/api/admin/test-database", ui.dbStatusEl, ui, false)
+  );
+  ui.runDailyRefreshBtn.addEventListener("click", () =>
+    runJob(ui, "daily-refresh", null, ui.runDailyRefreshBtn)
+  );
+  // Event listener for the new "Send Scheduled Reports" button.
+  // --- New Scheduled Report Trigger Logic ---
+
+  // This function fetches reports from our new API endpoint and populates the dropdown.
   const populateReportsDropdown = async () => {
     try {
       const response = await fetch("/api/admin/get-scheduled-reports");
       if (!response.ok) throw new Error("Server error fetching reports.");
       const reports = await response.json();
+
+      // Clear the "loading..." text
       ui.reportSelectDropdown.innerHTML = "";
+
       if (reports.length === 0) {
         ui.reportSelectDropdown.innerHTML =
           '<option value="">No reports found</option>';
-        ui.sendSingleReportBtn.disabled = true;
+        ui.sendSingleReportBtn.disabled = true; // Disable button if no reports
         return;
       }
+
+      // Add a default, non-selectable option
       ui.reportSelectDropdown.innerHTML =
         '<option value="">-- Select a report to send --</option>';
+
+      // Create and append an <option> for each report
       reports.forEach((report) => {
         const option = document.createElement("option");
         option.value = report.report_id;
+        // Format the text to be descriptive, e.g., "The Jade Hotel - Weekly"
         option.textContent = `${report.property_name} - ${report.report_name}`;
         ui.reportSelectDropdown.appendChild(option);
       });
@@ -751,10 +653,58 @@ function initializeAdminPanel() {
     }
   };
 
-  // --- Initial Page Load Calls ---
+  // Event listener for the "Send Now" button.
+  ui.sendSingleReportBtn.addEventListener("click", async () => {
+    const reportId = ui.reportSelectDropdown.value;
+    const btn = ui.sendSingleReportBtn;
+    const statusEl = ui.singleReportStatusMessage;
+
+    // First, validate that a report has been selected.
+    if (!reportId) {
+      statusEl.textContent = "Please select a report first.";
+      statusEl.className = "text-sm font-medium text-yellow-600 h-4 block";
+      return;
+    }
+
+    // Standard UI feedback: disable button, show status message.
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    statusEl.textContent = "Sending report...";
+    statusEl.className = "text-sm font-medium text-slate-500 h-4 block";
+
+    try {
+      // Call our new POST endpoint with the selected reportId in the body.
+      const response = await fetch("/api/admin/run-scheduled-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unknown error.");
+
+      // Display success message from the server.
+      statusEl.textContent = `✅ ${data.message}`;
+      statusEl.className = "text-sm font-medium text-green-600 h-4 block";
+    } catch (error) {
+      // Display error message.
+      statusEl.textContent = `❌ Error: ${error.message}`;
+      statusEl.className = "text-sm font-medium text-red-600 h-4 block";
+    } finally {
+      // Re-enable the button and clear the message after a delay.
+      btn.disabled = false;
+      btn.textContent = "Send Now";
+      setTimeout(() => {
+        statusEl.textContent = "";
+      }, 8000);
+    }
+  });
+
+  // Call the function to populate the dropdown when the admin panel loads.
   populateReportsDropdown();
+
   setupApiExplorer(ui);
-  setupPropertySelector(ui);
+  // --- Initial Page Load Calls ---
+  setupPropertySelector(ui); // <-- This was the missing line
   fetchLastRefreshTime(ui);
   fetchAndRenderHotels(ui);
 }

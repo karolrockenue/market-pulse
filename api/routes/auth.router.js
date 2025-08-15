@@ -5,9 +5,11 @@ const fetch = require("node-fetch");
 const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
 const pgPool = require("../utils/db");
+
 const { requireUserApi } = require("../utils/middleware");
 
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
+const mewsAdapter = require("../adapters/mewsAdapter");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -293,7 +295,201 @@ router.get("/session-info", async (req, res) => {
     res.json({ isLoggedIn: false });
   }
 });
+// --- MEWS ONBOARDING: STEP 1 - VALIDATE TOKEN & USER ---
+// --- MEWS ONBOARDING: STEP 1 - VALIDATE TOKEN & USER ---
+router.post("/mews/validate", async (req, res) => {
+  // Destructure and validate the incoming data from the frontend form
+  const { firstName, lastName, email, accessToken } = req.body;
+  if (!firstName || !lastName || !email || !accessToken) {
+    return res.status(400).json({ message: "All fields are required." });
+  }
 
+  try {
+    // Check if a user with this email already exists in the database
+    const existingUser = await pgPool.query(
+      "SELECT user_id FROM users WHERE email = $1",
+      [email]
+    );
+    if (existingUser.rows.length > 0) {
+      // Use status 409 Conflict for an existing resource
+      return res
+        .status(409)
+        .json({ message: "An account with this email already exists." });
+    }
+
+    // --- FIX: Combine the server's ClientToken with the user's AccessToken ---
+    // --- FIX: Combine the server's ClientToken with the user's AccessToken ---
+    const clientToken = process.env.MEWS_CLIENT_TOKEN;
+    // --- DIAGNOSTIC LOG ---
+    console.log("MEWS_CLIENT_TOKEN from server environment:", clientToken);
+    // --- END DIAGNOSTIC LOG ---
+    if (!clientToken) {
+      console.error("MEWS_CLIENT_TOKEN is not set in environment variables.");
+      return res.status(500).json({ message: "Server configuration error." });
+    }
+    const credentials = { clientToken, accessToken };
+    // --- END FIX ---
+
+    // Use the adapter to get initial details from Mews. This validates the token.
+    // This call corresponds to Mews' /configuration/get endpoint.
+    const propertyDetails = await mewsAdapter.getHotelDetails(credentials); // Pass the full credentials object
+
+    // --- LOGIC TO DETECT A PORTFOLIO TOKEN ---
+    // A portfolio token used with /configuration/get returns a "dummy" enterprise.
+    // We assume such a dummy enterprise might lack a physical address, which is a good indicator.
+    // --- FIX: Use the 'IsPortfolio' flag for reliable token type detection ---
+    if (propertyDetails.rawResponse.Enterprise.IsPortfolio === true) {
+      // If it looks like a portfolio, fetch the list of all hotels in that portfolio.
+      const portfolioHotels = await mewsAdapter.getPortfolioEnterprises(
+        credentials
+      );
+      if (!portfolioHotels || portfolioHotels.length === 0) {
+        return res.status(404).json({
+          message: "Portfolio token is valid, but no properties were found.",
+        });
+      }
+      // Respond to the frontend with the list of hotels
+      return res.status(200).json({
+        tokenType: "portfolio",
+        properties: portfolioHotels, // Expects an array of {id, name} objects
+      });
+    } else {
+      // If it has an address, it's a single property.
+      // Respond to the frontend with the single hotel's details.
+      return res.status(200).json({
+        tokenType: "single",
+        properties: [
+          {
+            id: propertyDetails.id,
+            name: propertyDetails.propertyName, // <-- FIX: Use .propertyName
+          },
+        ],
+      });
+    }
+  } catch (error) {
+    console.error("Mews validation error:", error);
+    // The adapter should throw an error for an invalid token.
+    // We respond with a 401 Unauthorized status.
+    return res.status(401).json({ message: "Invalid Mews Access Token." });
+  }
+});
+
+// --- MEWS ONBOARDING: STEP 2 - CREATE USER & PROPERTY ---
+router.post("/mews/create", async (req, res) => {
+  const { firstName, lastName, email, accessToken, selectedProperties } =
+    req.body;
+
+  // Basic validation
+  if (
+    !firstName ||
+    !email ||
+    !accessToken ||
+    !selectedProperties ||
+    selectedProperties.length === 0
+  ) {
+    return res.status(400).json({ message: "Missing required information." });
+  }
+
+  const client = await pgPool.connect();
+  try {
+    // --- Start Transaction ---
+    await client.query("BEGIN");
+
+    // --- 1. Encrypt the Mews Access Token for secure storage ---
+    const iv = crypto.randomBytes(16);
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    let encryptedToken = cipher.update(accessToken, "utf8", "hex");
+    encryptedToken += cipher.final("hex");
+    const authTag = cipher.getAuthTag().toString("hex");
+    // Store iv and authTag with the token for decryption
+    const storedCredentials = {
+      accessToken: `${iv.toString("hex")}:${authTag}:${encryptedToken}`,
+      clientToken: process.env.MEWS_CLIENT_TOKEN, // Also store the client token used
+    };
+
+    // --- 2. Create the User ---
+    const userResult = await client.query(
+      `INSERT INTO users (email, first_name, last_name, role, pms_type)
+       VALUES ($1, $2, $3, 'owner', 'mews')
+       RETURNING user_id`,
+      [email, firstName, lastName]
+    );
+    const newUserId = userResult.rows[0].user_id;
+
+    const newHotelIds = [];
+
+    // --- 3. Create Hotels and Link to User ---
+    for (const property of selectedProperties) {
+      // Create a shell record for the hotel. Full details will be fetched by initial-sync.
+      const hotelResult = await client.query(
+        `INSERT INTO hotels (pms_property_id, property_name, pms_type)
+         VALUES ($1, $2, 'mews')
+         RETURNING hotel_id`,
+        [property.id, property.name]
+      );
+      const newHotelId = hotelResult.rows[0].hotel_id;
+      newHotelIds.push(newHotelId);
+
+      // Link the user to the new property
+      await client.query(
+        `INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
+         VALUES ($1, $2, $3, 'syncing')`,
+        [newUserId, newHotelId, storedCredentials]
+      );
+    }
+
+    // --- Commit Transaction ---
+    await client.query("COMMIT");
+
+    // --- 4. Log the new user in by creating a session ---
+    req.session.regenerate(async (err) => {
+      if (err) {
+        console.error("Mews onboarding: Session regeneration failed:", err);
+        // Even if session fails, account was created.
+        return res
+          .status(500)
+          .json({ message: "Could not log you in automatically." });
+      }
+      req.session.userId = newUserId;
+      req.session.role = "owner";
+      req.session.save();
+
+      // --- 5. Asynchronously Trigger Initial Sync for each new property ---
+      for (const hotelId of newHotelIds) {
+        const syncUrl =
+          process.env.VERCEL_ENV === "production"
+            ? "https://www.market-pulse.io/api/initial-sync"
+            : "http://localhost:3000/api/initial-sync";
+        fetch(syncUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
+          },
+          body: JSON.stringify({ hotelId: hotelId }),
+        }).catch((syncErr) =>
+          console.error(
+            `Failed to trigger initial sync for hotel ${hotelId}:`,
+            syncErr
+          )
+        );
+      }
+
+      // --- 6. Respond to frontend to redirect ---
+      res.status(200).json({
+        message: "Connection successful!",
+        redirectTo: "/app/",
+      });
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Mews connection creation:", error);
+    res.status(500).json({ message: "An internal server error occurred." });
+  } finally {
+    client.release();
+  }
+});
 router.get("/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
   const redirectUri =

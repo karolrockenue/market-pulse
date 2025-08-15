@@ -10,6 +10,10 @@
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
@@ -207,7 +211,6 @@
                 <div class="flex-grow border-t border-gray-700"></div>
               </div>
 
-              <!-- New User Onboarding Card -->
               <div class="glass-card p-8 rounded-2xl text-center">
                 <h2 class="text-xl font-semibold text-white">
                   New to Market Pulse?
@@ -216,26 +219,48 @@
                   Connect your hotel for the first time via your PMS
                   Marketplace.
                 </p>
-                <a
-                  href="/api/auth/cloudbeds"
-                  class="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-600 rounded-lg shadow-lg font-semibold text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500 transition-all duration-200"
-                >
-                  <svg
-                    class="w-5 h-5 mr-2 -ml-1"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
+                <div class="space-y-4">
+                  <a
+                    href="/api/auth/cloudbeds"
+                    class="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-600 rounded-lg shadow-lg font-semibold text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500 transition-all duration-200"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v6a1.5 1.5 0 001.5 1.5z"
-                    />
-                  </svg>
-                  Connect with Cloudbeds
-                </a>
+                    <svg
+                      class="w-5 h-5 mr-2 -ml-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h16.5a1.5 1.5 0 001.5-1.5v-6a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v6a1.5 1.5 0 001.5 1.5z"
+                      />
+                    </svg>
+                    Connect with Cloudbeds
+                  </a>
+                  <button
+                    data-modal-target="mews-modal"
+                    class="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-600 rounded-lg shadow-lg font-semibold text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500 transition-all duration-200"
+                  >
+                    <svg
+                      class="w-5 h-5 mr-2 -ml-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+                      />
+                    </svg>
+                    Connect with Mews
+                  </button>
+                </div>
               </div>
 
               <!-- T&C and Privacy Agreement -->
@@ -378,6 +403,159 @@
 
     <!-- Contact Modal -->
     <div
+      id="mews-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50"
+      x-data="mewsOnboarding()"
+      x-init="init()"
+    >
+      <div class="glass-card rounded-2xl p-8 max-w-lg w-full m-4">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-white">Connect to Mews</h2>
+          <button
+            data-modal-close="mews-modal"
+            class="text-gray-400 hover:text-white"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <div x-show="currentStep === 1">
+          <p class="text-gray-400 mb-6">
+            First, create your Market Pulse account. Then, you'll be asked to
+            provide your Mews Access Token.
+          </p>
+          <form @submit.prevent="validateMewsConnection" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                x-model="formData.firstName"
+                type="text"
+                name="firstName"
+                required
+                placeholder="First Name"
+                class="w-full px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+              <input
+                x-model="formData.lastName"
+                type="text"
+                name="lastName"
+                required
+                placeholder="Last Name"
+                class="w-full px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
+            <input
+              x-model="formData.email"
+              type="email"
+              name="email"
+              required
+              placeholder="Enter your email"
+              class="w-full px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+            <div>
+              <input
+                x-model="formData.accessToken"
+                type="password"
+                name="accessToken"
+                required
+                placeholder="Paste your Mews Access Token"
+                class="w-full px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+              <p class="text-xs text-gray-500 mt-2 pl-1">
+                You can find this in your Mews Marketplace 'My Subscriptions'
+                section.
+              </p>
+            </div>
+            <button
+              type="submit"
+              :disabled="isLoading"
+              class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span x-show="!isLoading">Verify & Continue</span>
+              <span x-show="isLoading">Verifying...</span>
+            </button>
+          </form>
+          <div
+            x-show="message.text"
+            :class="message.isError ? 'text-red-400' : 'text-green-400'"
+            class="mt-4 text-sm font-medium"
+            x-text="message.text"
+          ></div>
+        </div>
+      <div x-show="currentStep === 2">
+  <template x-if="propertyData.tokenType === 'single'">
+    <div>
+      <p class="text-gray-400 text-center mb-1">
+        Is this your property?
+      </p>
+      <p
+        class="text-2xl font-bold text-white text-center mb-6"
+        x-text="propertyData.properties[0].name"
+      ></p>
+      <button
+        @click="createMewsConnection"
+        :disabled="isLoading"
+        class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-lg font-semibold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-green-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span x-show="!isLoading">Yes, Connect</span>
+        <span x-show="isLoading">Connecting...</span>
+      </button>
+    </div>
+  </template>
+
+  <template x-if="propertyData.tokenType === 'portfolio'">
+    <div>
+      <p class="text-gray-400 mb-4">
+        This token has access to multiple properties. Please select
+        which one(s) you'd like to connect to Market Pulse.
+      </p>
+      <div
+        class="max-h-60 overflow-y-auto space-y-3 pr-2 mb-6"
+      >
+        <template
+          x-for="property in propertyData.properties"
+          :key="property.id"
+        >
+          <label
+            class="flex items-center p-3 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700/50 cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              :value="property.id"
+              x-model="formData.selectedProperties"
+              class="h-5 w-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-600"
+            />
+            <span
+              class="ml-3 text-white font-medium"
+              x-text="property.name"
+            ></span>
+          </label>
+        </template>
+      </div>
+      <button
+        @click="createMewsConnection"
+        :disabled="isLoading || formData.selectedProperties.length === 0"
+        class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-lg font-semibold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-green-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span x-show="!isLoading">Connect Selected Properties</span>
+        <span x-show="isLoading">Connecting...</span>
+      </button>
+    </div>
+  </template>
+</div>
+    </div>
+    <div
       id="contact-modal"
       class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50"
     >
@@ -493,6 +671,123 @@
       });
 
       // --- Scroll Reveal Animation ---
+      // --- Mews Onboarding Modal Logic ---
+      function mewsOnboarding() {
+        return {
+          // --- STATE ---
+          currentStep: 1, // Controls which view is visible in the modal
+          isLoading: false, // For showing loading states on buttons
+          // Holds all the data from the form
+       // Holds all the data from the form
+formData: {
+  firstName: '',
+  lastName: '',
+  email: '',
+  accessToken: '',
+  selectedProperties: [], // To store selections for portfolio tokens
+},
+          // For displaying success or error messages
+          message: {
+            text: "",
+            isError: false,
+          },
+          // To store the response from the validation step
+          propertyData: {
+            tokenType: null, // will be 'single' or 'portfolio'
+            properties: [], // will hold the list of hotels
+          },
+
+          // --- METHODS ---
+          init() {
+            // You can add initialization logic here if needed
+          },
+
+          // --- Step 1: Validate the user's token and details ---
+          async validateMewsConnection() {
+            this.isLoading = true;
+            this.message.text = ""; // Clear previous messages
+
+            try {
+              const response = await fetch("/api/auth/mews/validate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.formData),
+              });
+
+              const result = await response.json();
+
+              if (!response.ok) {
+                // If the server returns an error, display it
+                throw new Error(result.message || "Validation failed.");
+              }
+
+              // --- Handle a successful validation ---
+              this.propertyData.tokenType = result.tokenType;
+              this.propertyData.properties = result.properties;
+              this.currentStep = 2; // Move to the next step
+
+              // We will build the UI for Step 2 next. For now, this is a success.
+            } catch (error) {
+              this.message.isError = true;
+              this.message.text = error.message;
+            } finally {
+              this.isLoading = false;
+            }
+          },
+// --- Step 2: Send all data to the server to create the resources ---
+async createMewsConnection() {
+  this.isLoading = true;
+  this.message.text = '';
+
+  // Prepare the list of selected properties to be sent to the server.
+  let selectedProperties;
+  if (this.propertyData.tokenType === 'single') {
+    // For a single property, the selection is implicit.
+    selectedProperties = this.propertyData.properties;
+  } else {
+    // For a portfolio, filter the full list to get only the properties the user checked.
+    const selectedIds = new Set(this.formData.selectedProperties);
+    selectedProperties = this.propertyData.properties.filter(p => selectedIds.has(p.id));
+  }
+
+  // We create a separate payload to send, ensuring we don't send the whole formData object.
+  // This payload now includes the array of selected property objects {id, name}.
+  const payload = {
+    firstName: this.formData.firstName,
+    lastName: this.formData.lastName,
+    email: this.formData.email,
+    accessToken: this.formData.accessToken,
+    selectedProperties: selectedProperties,
+  };
+
+  try {
+    const response = await fetch('/api/auth/mews/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), // Send the corrected payload
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Connection failed.');
+    }
+
+    // A successful connection will result in a redirect.
+    window.location.href = result.redirectTo || '/app/';
+
+  } catch (error) {
+    this.message.isError = true;
+    this.message.text = error.message;
+    // If creation fails, send the user back to the first step to try again.
+    this.currentStep = 1;
+  } finally {
+    this.isLoading = false;
+  }
+}
+
+        };
+      }
       const revealElements = document.querySelectorAll(".reveal");
       const revealOnScroll = () => {
         const windowHeight = window.innerHeight;

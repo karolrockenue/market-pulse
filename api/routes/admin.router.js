@@ -343,206 +343,177 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
     client.release();
   }
 });
-// /api/routes/admin.router.js
 
-// --- NEW MEWS CONNECTION ENDPOINT ---
-// This endpoint handles the manual connection of a new Mews property by an admin.
-// --- FINAL MEWS CONNECTION ENDPOINT ---
-// This endpoint handles the manual connection of a new Mews property by an admin.
-// --- FINAL, CORRECTED MEWS CONNECTION ENDPOINT ---
-router.post("/mews/connect", requireAdminApi, async (req, res) => {
-  const { accessToken, ownerEmail } = req.body;
-
-  if (!accessToken || !ownerEmail) {
-    return res
-      .status(400)
-      .json({ error: "An accessToken and ownerEmail are required." });
+/**
+ * A helper function to retrieve and decrypt Mews credentials for a given property.
+ * @param {string} propertyId The internal hotel_id of the property.
+ * @returns {Promise<{clientToken: string, accessToken: string}>} The Mews credentials.
+ */
+async function getMewsCredentials(propertyId) {
+  // Find the encrypted credentials in the database.
+  const credsResult = await pgPool.query(
+    `SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1`,
+    [propertyId]
+  );
+  const storedCredentials = credsResult.rows[0]?.pms_credentials;
+  if (!storedCredentials || !storedCredentials.accessToken) {
+    throw new Error(
+      `Could not find Mews credentials for property ${propertyId}.`
+    );
   }
 
-  // This is the critical fix: we build the full credentials object here.
-  // It reads the ClientToken from the environment and takes the AccessToken from the form.
-  const mewsCredentials = {
-    clientToken: process.env.MEWS_CLIENT_TOKEN,
-    accessToken: accessToken,
+  // --- Decrypt the Access Token ---
+  const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+  const [ivHex, authTagHex, encryptedToken] =
+    storedCredentials.accessToken.split(":");
+  if (!ivHex || !authTagHex || !encryptedToken) {
+    throw new Error("Stored credentials are in an invalid format.");
+  }
+
+  const iv = Buffer.from(ivHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
+
+  let decryptedToken = decipher.update(encryptedToken, "hex", "utf8");
+  decryptedToken += decipher.final("utf8");
+
+  return {
+    clientToken: storedCredentials.clientToken,
+    accessToken: decryptedToken,
   };
+}
 
-  const client = await pgPool.connect();
+// SECURE MEWS TEST ROUTE for Connection & Configuration
+router.get("/test-mews-connection", requireAdminApi, async (req, res) => {
   try {
-    await client.query("BEGIN");
-
-    // The adapter now receives the complete credentials object it expects.
-    const hotelDetails = await mewsAdapter.getHotelDetails(mewsCredentials);
-
-    const pmsPropertyId = hotelDetails.pmsPropertyId;
-    if (!pmsPropertyId) {
-      throw new Error("Could not retrieve property ID from Mews API.");
+    // Get the propertyId from the query string (e.g., from an Admin Panel UI).
+    const { propertyId } = req.query;
+    if (!propertyId) {
+      return res
+        .status(400)
+        .json({ error: "A propertyId query parameter is required." });
     }
 
-    const userResult = await client.query(
-      "SELECT user_id FROM users WHERE email = $1",
-      [ownerEmail]
-    );
-    if (userResult.rows.length === 0) {
-      throw new Error(`User with email ${ownerEmail} not found.`);
-    }
-    const userId = userResult.rows[0].user_id;
+    // Fetch and decrypt the credentials for the requested property.
+    const credentials = await getMewsCredentials(propertyId);
 
-    const hotelInsertResult = await client.query(
-      `INSERT INTO hotels (property_name, pms_type, pms_property_id) 
-       VALUES ($1, $2, $3) 
-       RETURNING hotel_id`,
-      [hotelDetails.propertyName || "New Mews Hotel", "mews", pmsPropertyId]
-    );
-    const newInternalHotelId = hotelInsertResult.rows[0].hotel_id;
+    // Call the adapter function with the dynamic credentials.
+    const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
 
-    // We store the full credentials object in the database for initial-sync to use.
-    await client.query(
-      `INSERT INTO user_properties (user_id, property_id, pms_credentials, status) VALUES ($1, $2, $3, $4)`,
-      [userId, newInternalHotelId, mewsCredentials, "active"]
-    );
-
-    await client.query("COMMIT");
-
-    res.status(202).json({
-      success: true,
-      message: `Mews hotel connection initiated for hotel ID ${newInternalHotelId}. Initial sync starting now.`,
-      hotelId: newInternalHotelId,
-    });
-
-    initialSyncHandler.runSync(newInternalHotelId).catch((err) => {
-      console.error(
-        `[Mews Connect] CRITICAL: Background initial sync failed for hotel ID ${newInternalHotelId}:`,
-        err
-      );
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error(`[Mews Connect] Failed to connect Mews property:`, error);
-    res.status(500).json({ success: false, error: error.message });
-  } finally {
-    client.release();
-  }
-});
-// TEMPORARY TEST ROUTE for Mews Connection & Configuration
-// TEMPORARY TEST ROUTE for Mews Connection & Configuration
-router.get("/test-mews-connection", async (req, res) => {
-  console.log("Admin route /test-mews-connection hit.");
-  try {
-    // THIS IS THE ONLY CHANGE: We now read the ClientToken from the environment,
-    // exactly like our failing code does.
-    const demoCredentials = {
-      clientToken: process.env.MEWS_CLIENT_TOKEN,
-      accessToken:
-        "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
-    };
-
-    // This debug line will show us exactly what is in the environment variable on Vercel.
-    console.log(
-      "[VERCEL TEST ROUTE DEBUG] Credentials being used:",
-      demoCredentials
-    );
-
-    // Call the adapter function.
-    const hotelDetails = await mewsAdapter.getHotelDetails(demoCredentials);
-
-    // Send the full response back.
     res.status(200).json({
-      message: "Successfully connected to Mews and fetched configuration.",
+      message: `Successfully connected to Mews for property ${propertyId}.`,
       data: hotelDetails,
     });
   } catch (error) {
-    console.error("Test Mews connection failed:", error);
+    console.error(
+      `Test Mews connection failed for property ${req.query.propertyId}:`,
+      error
+    );
     res.status(500).json({ message: "Test failed.", error: error.message });
   }
 });
-// TEMPORARY TEST ROUTE for Mews Occupancy Metrics (New Version)
-router.get("/test-mews-occupancy", async (req, res) => {
-  console.log("Admin route /test-mews-occupancy hit.");
+// SECURE MEWS TEST ROUTE for Occupancy Metrics
+router.get("/test-mews-occupancy", requireAdminApi, async (req, res) => {
   try {
-    // --- NEW: Set up a default date range for the last 7 days ---
-    // --- FIX: Set up a default date range for a 7-day period ending yesterday ---
+    // Get the propertyId from the query string.
+    const { propertyId, startDate, endDate } = req.query;
+    if (!propertyId) {
+      return res
+        .status(400)
+        .json({ error: "A propertyId query parameter is required." });
+    }
+
+    // Fetch and decrypt the credentials for the requested property.
+    const credentials = await getMewsCredentials(propertyId);
+
+    // --- NEW: Fetch hotel details to get the correct timezone ---
+    const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
+    if (!hotelDetails.timezone) {
+      throw new Error(
+        `Timezone could not be determined for property ${propertyId}.`
+      );
+    }
+
+    // --- Use the same date range logic as before ---
     const endDateObj = new Date();
-    endDateObj.setDate(endDateObj.getDate() - 1); // End date is yesterday
+    endDateObj.setDate(endDateObj.getDate() - 1);
     const startDateObj = new Date();
-    startDateObj.setDate(startDateObj.getDate() - 8); // Start date is 8 days ago
+    startDateObj.setDate(startDateObj.getDate() - 8);
 
-    // Format dates to YYYY-MM-DD
-    const defaultEndDate = endDateObj.toISOString().split("T")[0];
-    const defaultStartDate = startDateObj.toISOString().split("T")[0];
+    const finalStartDate =
+      startDate || startDateObj.toISOString().split("T")[0];
+    const finalEndDate = endDate || endDateObj.toISOString().split("T")[0];
 
-    // Use dates from query parameters if provided, otherwise use the defaults.
-    const startDate = req.query.startDate || defaultStartDate;
-    const endDate = req.query.endDate || defaultEndDate;
-
-    // Use the same hardcoded demo credentials for consistency.
-    const demoCredentials = {
-      clientToken:
-        "E916C341431C4D28A866AD200152DBD3-A046EB5583FFBE94DE1172237763712",
-      accessToken:
-        "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
-    };
-
-    // This is the timezone for the Mews demo hotel.
-    const demoTimezone = "Europe/Budapest";
-
-    // Call the adapter function, now passing the required timezone.
+    // Call the adapter function with dynamic credentials and timezone.
     const occupancyData = await mewsAdapter.getOccupancyMetrics(
-      demoCredentials,
-      startDate,
-      endDate,
-      demoTimezone // Pass the timezone as the fourth argument.
+      credentials,
+      finalStartDate,
+      finalEndDate,
+      hotelDetails.timezone // Use the dynamic timezone
     );
 
-    // Send the full response back for inspection.
     res.status(200).json({
-      message: `Successfully fetched Mews occupancy data for range: ${startDate} to ${endDate}.`,
+      message: `Successfully fetched Mews occupancy data for property ${propertyId}.`,
       data: occupancyData,
     });
   } catch (error) {
-    console.error("Test Mews occupancy failed:", error);
+    console.error(
+      `Test Mews occupancy failed for property ${req.query.propertyId}:`,
+      error
+    );
     res.status(500).json({ message: "Test failed.", error: error.message });
   }
 });
-
-// TEMPORARY TEST ROUTE for Mews Revenue Metrics
-router.get("/test-mews-revenue", async (req, res) => {
-  console.log("Admin route /test-mews-revenue hit.");
+// SECURE MEWS TEST ROUTE for Revenue Metrics
+router.get("/test-mews-revenue", requireAdminApi, async (req, res) => {
   try {
-    // Set up a default date range for a 7-day period ending yesterday.
+    // Get the propertyId from the query string.
+    const { propertyId, startDate, endDate } = req.query;
+    if (!propertyId) {
+      return res
+        .status(400)
+        .json({ error: "A propertyId query parameter is required." });
+    }
+
+    // Fetch and decrypt the credentials for the requested property.
+    const credentials = await getMewsCredentials(propertyId);
+
+    // Fetch hotel details to get the correct timezone for the revenue call.
+    const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
+    if (!hotelDetails.timezone) {
+      throw new Error(
+        `Timezone could not be determined for property ${propertyId}.`
+      );
+    }
+
+    // Use the same date range logic as before.
     const endDateObj = new Date();
-    endDateObj.setDate(endDateObj.getDate() - 1); // End date is yesterday
+    endDateObj.setDate(endDateObj.getDate() - 1);
     const startDateObj = new Date();
-    startDateObj.setDate(startDateObj.getDate() - 8); // Start date is 8 days ago
+    startDateObj.setDate(startDateObj.getDate() - 8);
 
-    const defaultEndDate = endDateObj.toISOString().split("T")[0];
-    const defaultStartDate = startDateObj.toISOString().split("T")[0];
+    const finalStartDate =
+      startDate || startDateObj.toISOString().split("T")[0];
+    const finalEndDate = endDate || endDateObj.toISOString().split("T")[0];
 
-    // Use dates from query parameters if provided, otherwise use the defaults.
-    const startDate = req.query.startDate || defaultStartDate;
-    const endDate = req.query.endDate || defaultEndDate;
-
-    // Use the same hardcoded demo credentials.
-    const demoCredentials = {
-      clientToken:
-        "E916C341431C4D28A866AD200152DBD3-A046EB5583FFBE94DE1172237763712",
-      accessToken:
-        "CC150C355D6A4048A220AD20015483AB-B6D09C0C84B09538077CB8FFBB907B4",
-    };
-
-    // Call the new adapter function to get revenue metrics.
+    // Call the adapter function with dynamic credentials and timezone.
     const revenueData = await mewsAdapter.getRevenueMetrics(
-      demoCredentials,
-      startDate,
-      endDate
+      credentials,
+      finalStartDate,
+      finalEndDate,
+      hotelDetails.timezone // Use the dynamic timezone
     );
 
-    // Send the full response back for inspection.
     res.status(200).json({
-      message: `Successfully fetched Mews revenue data for range: ${startDate} to ${endDate}.`,
+      message: `Successfully fetched Mews revenue data for property ${propertyId}.`,
       data: revenueData,
     });
   } catch (error) {
-    console.error("Test Mews revenue failed:", error);
+    console.error(
+      `Test Mews revenue failed for property ${req.query.propertyId}:`,
+      error
+    );
     res.status(500).json({ message: "Test failed.", error: error.message });
   }
 });

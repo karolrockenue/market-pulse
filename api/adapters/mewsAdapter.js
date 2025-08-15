@@ -50,6 +50,7 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
 
     // Return the data part of the response
     return response.data;
+    // replace with this
   } catch (error) {
     // Log detailed error information for debugging
     const errorMessage = error.response
@@ -83,7 +84,7 @@ const getHotelDetails = async (credentials) => {
 
   // Transform the Mews response into our internal standard format
   const hotelDetails = {
-    pmsPropertyId: response.Enterprise.Id,
+    id: response.Enterprise.Id, // <-- ADD THIS LINE
     propertyName: response.Enterprise.Name,
     city: response.Enterprise.Address.City,
     currencyCode: defaultCurrency ? defaultCurrency.Currency : null,
@@ -317,11 +318,34 @@ const getRevenueMetrics = async (
  * @returns {Promise<object>} The raw response from the Mews API.
  */
 
-// replace with this
+/**
+ * Fetches all enterprises (hotels) associated with a Portfolio Access Token.
+ * @param {object} credentials - The credentials for the property.
+ * @returns {Promise<Array<{id: string, name: string}>>} A list of enterprises.
+ */
+const getPortfolioEnterprises = async (credentials) => {
+  // Call the Mews enterprises/getAll endpoint.
+  // We omit any filters to get all enterprises within the token's scope.
+  const response = await _callMewsApi("enterprises/getAll", credentials, {
+    Limitation: { Count: 1000 }, // Get up to 1000 properties, assuming no portfolio has more.
+  });
+
+  // If the response is valid but contains no enterprises, return an empty array.
+  if (!response.Enterprises) {
+    return [];
+  }
+
+  // Map the Mews response to the simple {id, name} format our frontend needs.
+  return response.Enterprises.map((enterprise) => ({
+    id: enterprise.Id,
+    name: enterprise.Name,
+  }));
+};
+
 module.exports = {
   getHotelDetails,
   getAccommodationServiceId,
   getOccupancyMetrics,
   getRevenueMetrics,
-  // Add the new test function here
+  getPortfolioEnterprises, // Export the new function
 };
