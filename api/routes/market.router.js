@@ -46,6 +46,8 @@ router.get("/trends", requireUserApi, async (req, res) => {
                 FROM hotels h
                 JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
                 WHERE h.city = $1
+                  -- NEW: Only include hotels that were live before the start of 2024.
+                  AND h.go_live_date < '2024-01-01'
                   ${tierFilterSql}
                   AND dms.stay_date >= $2 AND dms.stay_date <= $3
                 GROUP BY h.hotel_id
@@ -278,12 +280,13 @@ router.get("/seasonality", requireUserApi, async (req, res) => {
   const endDate = `${year}-12-31`;
 
   const query = `
-        WITH ValidatedHotels AS (
+     WITH ValidatedHotels AS (
             SELECT hotel_id
             FROM hotels
             WHERE city = $1
               AND go_live_date IS NOT NULL
-              AND go_live_date <= $2::date
+              -- NEW: Only include hotels that were live before the start of 2024.
+              AND go_live_date < '2024-01-01'
         )
         SELECT
             stay_date::date AS date,

@@ -38,7 +38,7 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
     const requestBody = {
       ClientToken: credentials.clientToken,
       AccessToken: credentials.accessToken,
-      Client: "Market Pulse 1.0.0", // As required by Mews API
+      Client: "Rockenue 1.0.0", // Use a unique client name for certification
       ...data,
     };
 
@@ -50,13 +50,33 @@ const _callMewsApi = async (endpoint, credentials, data = {}) => {
 
     // Return the data part of the response
     return response.data;
-    // replace with this
   } catch (error) {
-    // Log detailed error information for debugging
+    // --- NEW DETAILED LOGGING FOR MEWS SUPPORT ---
     const errorMessage = error.response
       ? JSON.stringify(error.response.data)
       : error.message;
-    console.error(`Mews API Error calling [${endpoint}]:`, errorMessage);
+
+    // Create masked tokens for safe logging (shows first and last 4 chars)
+    const maskedClientToken = credentials.clientToken
+      ? `${credentials.clientToken.substring(
+          0,
+          4
+        )}...${credentials.clientToken.slice(-4)}`
+      : "N/A";
+    const maskedAccessToken = credentials.accessToken
+      ? `${credentials.accessToken.substring(
+          0,
+          4
+        )}...${credentials.accessToken.slice(-4)}`
+      : "N/A";
+
+    console.error("--- MEWS API CALL FAILED ---");
+    console.error(`Endpoint: ${endpoint}`);
+    console.error(`Client Token (Masked): ${maskedClientToken}`);
+    console.error(`Access Token (Masked): ${maskedAccessToken}`);
+    console.error(`Full Error Response: ${errorMessage}`);
+    console.error("-----------------------------");
+    // --- END DETAILED LOGGING ---
 
     // Rethrow the error with the specific API message for better debugging upstream.
     throw new Error(`Mews API call to ${endpoint} failed: ${errorMessage}`);

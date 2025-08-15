@@ -333,9 +333,12 @@
         Alpine.data("marketOverview", marketOverviewComponent);
       });
 
-      // Load the shared sidebar component when the DOM is ready
+ // Load the shared sidebar component when the DOM is ready
       document.addEventListener("DOMContentLoaded", async () => {
         await loadComponent("sidebar", "sidebar-placeholder");
+        // NEW: Manually trigger a resize event after the sidebar loads.
+        // This forces ECharts to redraw and fit into the new container size.
+        window.dispatchEvent(new Event('resize'));
       });
     </script>
     <script
