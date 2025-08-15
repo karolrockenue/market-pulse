@@ -286,3 +286,14 @@ In August 2025, the application underwent a critical architectural refactor to e
 - **Problem:** The original architecture calculated tax-inclusive (gross) revenue "on-the-fly" whenever a report was run. This model had severe flaws: it created incorrect historical reports if a hotel's tax rate changed, caused poor application performance, and was incompatible with newer PMS systems that provide pre-calculated values.
 - **Solution:** The data model was redesigned to pre-calculate and store final, immutable net and gross values for all key metrics (revenue, ADR, RevPAR). This logic was moved into the data ingestion layer (`cloudbedsAdapter.js`, `mewsAdapter.js`, `initial-sync.js`, `daily-refresh.js`). The process involved modifying the database schema, refactoring the entire data pipeline, backfilling all historical data with the new values, and migrating all backend and frontend components to use the new data structure.
 - **Outcome:** The refactor was a success. It guarantees historical data integrity, dramatically improved reporting speed, and created a consistent, scalable data model for all current and future PMS integrations.
+
+## 10.0 Architectural Milestone: Mews PMS Integration
+
+In August 2025, the application was successfully extended to support a second PMS, Mews, marking a significant step towards becoming a true multi-PMS platform.
+
+- **Problem:** The original application architecture and database schema were tightly coupled to the Cloudbeds PMS, particularly its OAuth 2.0 flow and its use of integer-based IDs. Integrating Mews, which uses a non-OAuth, manual token exchange and string-based UUIDs for property IDs, required significant architectural changes.
+- **Solution:** A comprehensive, multi-step integration was executed:
+  1.  **Schema Evolution:** The database schema was made PMS-agnostic. Key changes included making the `users.cloudbeds_user_id` column optional, adding a `hotels.pms_property_id` column to store original string-based IDs, and converting the `hotels.hotel_id` into a true auto-incrementing `SERIAL` primary key.
+  2.  **New Onboarding Flow:** A complete, user-facing onboarding flow was built on the login page. This includes a multi-step modal, backend validation routes, logic to handle both single and multi-property Mews accounts, and secure, encrypted storage for Mews credentials.
+  3.  **Adapter Implementation:** The `mewsAdapter.js` was fully developed to handle all Mews-specific API logic, including authentication, data transformation, and pagination.
+- **Outcome:** The integration was a success. The application now has a robust, scalable, and secure system for onboarding and syncing data from Mews properties. This milestone validates the adapter-based architecture and paves the way for integrating additional PMS vendors in the future.

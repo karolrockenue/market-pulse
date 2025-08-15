@@ -260,7 +260,7 @@ router.get("/session-info", async (req, res) => {
   if (req.session && req.session.userId) {
     try {
       const userResult = await pgPool.query(
-        "SELECT first_name, last_name, role FROM users WHERE cloudbeds_user_id = $1",
+        "SELECT first_name, last_name, role FROM users WHERE user_id = $1",
         [req.session.userId]
       );
       if (userResult.rows.length === 0) {
@@ -467,7 +467,7 @@ router.post("/mews/create", async (req, res) => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
           },
-          body: JSON.stringify({ hotelId: hotelId }),
+          body: JSON.stringify({ propertyId: hotelId }),
         }).catch((syncErr) =>
           console.error(
             `Failed to trigger initial sync for hotel ${hotelId}:`,
