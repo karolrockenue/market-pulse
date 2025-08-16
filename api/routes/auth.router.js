@@ -260,7 +260,7 @@ router.get("/session-info", async (req, res) => {
   if (req.session && req.session.userId) {
     try {
       const userResult = await pgPool.query(
-        "SELECT first_name, last_name, role FROM users WHERE user_id = $1",
+        "SELECT first_name, last_name, role FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
       );
       if (userResult.rows.length === 0) {
@@ -409,23 +409,34 @@ router.post("/mews/create", async (req, res) => {
     };
 
     // --- 2. Create the User ---
+    // --- 2. Create the User ---
     const userResult = await client.query(
       `INSERT INTO users (email, first_name, last_name, role, pms_type)
-       VALUES ($1, $2, $3, 'owner', 'mews')
-       RETURNING user_id`,
+   VALUES ($1, $2, $3, 'owner', 'mews')
+   RETURNING user_id`,
       [email, firstName, lastName]
     );
-    const newUserId = userResult.rows[0].user_id;
+    const newUserIdInt = userResult.rows[0].user_id; // This is the integer ID
+
+    // --- NEW: Generate and save a unique string ID for the session ---
+    const newUserStringId = `mews-${newUserIdInt}-${crypto
+      .randomBytes(4)
+      .toString("hex")}`;
+    await client.query(
+      `UPDATE users SET cloudbeds_user_id = $1 WHERE user_id = $2`,
+      [newUserStringId, newUserIdInt]
+    );
+    // --- END NEW ---
 
     const newHotelIds = [];
 
     // --- 3. Create Hotels and Link to User ---
     for (const property of selectedProperties) {
-      // Create a shell record for the hotel. Full details will be fetched by initial-sync.
+      // ... (rest of the loop is the same)
       const hotelResult = await client.query(
         `INSERT INTO hotels (pms_property_id, property_name, pms_type)
-         VALUES ($1, $2, 'mews')
-         RETURNING hotel_id`,
+     VALUES ($1, $2, 'mews')
+     RETURNING hotel_id`,
         [property.id, property.name]
       );
       const newHotelId = hotelResult.rows[0].hotel_id;
@@ -434,8 +445,8 @@ router.post("/mews/create", async (req, res) => {
       // Link the user to the new property
       await client.query(
         `INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
-         VALUES ($1, $2, $3, 'syncing')`,
-        [newUserId, newHotelId, storedCredentials]
+     VALUES ($1, $2, $3, 'syncing')`,
+        [newUserStringId, newHotelId, storedCredentials] // <-- FIX: Use the new string ID here
       );
     }
 
@@ -451,7 +462,7 @@ router.post("/mews/create", async (req, res) => {
           .status(500)
           .json({ message: "Could not log you in automatically." });
       }
-      req.session.userId = newUserId;
+      req.session.userId = newUserStringId; // <-- FIX: Use the new string ID for the session
       req.session.role = "owner";
       req.session.save();
 
@@ -477,9 +488,12 @@ router.post("/mews/create", async (req, res) => {
       }
 
       // --- 6. Respond to frontend to redirect ---
+      // --- 6. Respond to frontend to redirect ---
+      // We only have one hotel ID for Mews single-property onboarding.
+      const primaryPropertyId = newHotelIds[0];
       res.status(200).json({
         message: "Connection successful!",
-        redirectTo: "/app/",
+        redirectTo: `/app/?newConnection=true&propertyId=${primaryPropertyId}`,
       });
     });
   } catch (error) {
