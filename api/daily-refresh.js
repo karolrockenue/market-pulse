@@ -252,9 +252,10 @@ module.exports = async (request, response) => {
       "✅ Daily forecast refresh job complete. Updating system_state table..."
     );
     const jobData = { timestamp: new Date().toISOString() };
+    // THE FIX: Corrected the key to match what the dashboard API endpoint reads.
     await pgPool.query(
       "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
-      ["last_successful_forecast_refresh", jobData]
+      ["last_successful_refresh", jobData]
     );
     console.log("System state updated successfully.");
 
