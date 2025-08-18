@@ -179,6 +179,14 @@ function marketOverviewComponent() {
       2023: "dotted",
       2022: "dotted",
     },
+    // NEW: Defines how much to lighten the color for older years.
+    // 0 = original color, 0.3 = 30% lighter, 0.5 = 50% lighter.
+    yearShadeFactors: {
+      2025: 0,
+      2024: 0.3,
+      2023: 0.5,
+      2022: 0.65,
+    },
     allHistoricalYears: [2025, 2024, 2023, 2022],
     availableSeasonalityYears: [],
     activeSeasonalityYear: null,
@@ -387,12 +395,22 @@ function marketOverviewComponent() {
           ? "Entire Market"
           : row.category;
         const seriesKey = `${category}-${year}`;
+        // Check if we've already created this series.
         if (!seriesData[seriesKey]) {
+          // Get the base color for the category (e.g., 'Luxury' -> purple).
+          const baseColor = this.tierColors[category] || "#000000";
+          // Get the shade factor for the year (e.g., 2024 -> 0.3).
+          const shadeFactor = this.yearShadeFactors[year] || 0;
+          // Calculate the final color by lightening the base color.
+          const finalColor = this.adjustHexColor(baseColor, shadeFactor);
+
+          // Create the series object with the new dynamic color.
           seriesData[seriesKey] = {
             name: `${category} - ${year}`,
             type: "line",
             smooth: true,
-            color: this.tierColors[category] || "#000000",
+            // USE THE NEW COLOR: The calculated color is used here.
+            color: finalColor,
             lineStyle: {
               type: this.yearLineStyles[year] || "solid",
             },
@@ -468,6 +486,33 @@ function marketOverviewComponent() {
         this.sortColumn = column;
         this.sortDirection = "desc";
       }
+    },
+
+    // NEW: A helper function to lighten a HEX color by a given factor.
+    adjustHexColor(hex, lightenFactor) {
+      // If no valid hex is provided, return a default color.
+      if (!hex || hex.length < 4) return "#000000";
+
+      // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF").
+      const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+      hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+
+      // Parse the hex string into its RGB components.
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      if (!result) return "#000000";
+
+      let r = parseInt(result[1], 16);
+      let g = parseInt(result[2], 16);
+      let b = parseInt(result[3], 16);
+
+      // Apply the lightening effect. This moves each color component towards
+      // white (255) by the factor specified.
+      r = Math.round(r + (255 - r) * lightenFactor);
+      g = Math.round(g + (255 - g) * lightenFactor);
+      b = Math.round(b + (255 - b) * lightenFactor);
+
+      // Convert the new RGB values back to a hex string.
+      return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
     },
 
     // --- UPDATED: Heatmap colors now use brand palette ---
