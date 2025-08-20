@@ -137,33 +137,35 @@ router.post(
  */
 // find this line/block
 // replace with this
+// replace with this
 router.get("/team", requireUserApi, async (req, res) => {
-  // The session ID can be for a Cloudbeds or Mews user, so we handle it generically.
-  const sessionPmsUserId = req.session.userId;
-  const sessionPmsType = req.session.pmsType;
+  // This is the Cloudbeds-specific ID from the user's session.
+  const requesterCloudbedsId = req.session.userId;
 
   try {
-    // Step 1: Get the internal user_id for the currently logged-in user.
-    // The query now correctly handles different PMS types.
+    // Step 1: Get the internal user_id (the integer PK) for the logged-in user
+    // by looking them up using their cloudbeds_user_id from the session.
     const userResult = await pgPool.query(
-      "SELECT user_id FROM users WHERE pms_user_id = $1 AND pms_type = $2",
-      [sessionPmsUserId, sessionPmsType]
+      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+      [requesterCloudbedsId]
     );
 
+    // If we can't find an internal user for the session, something is wrong.
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "Current user not found." });
+      // This can happen if a user exists in the session but was deleted from the DB.
+      // Return an empty array to prevent the frontend from crashing.
+      return res.json([]);
     }
     const currentUserId = userResult.rows[0].user_id;
 
-    // Step 2: Find all properties the current user has access to.
+    // Step 2: Find all properties this user has access to, using their internal user_id.
     const propertiesResult = await pgPool.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
       [currentUserId]
     );
-
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
 
-    // If the user has no properties, just return their own profile info.
+    // If the user isn't linked to any properties, just return their own info.
     if (propertyIds.length === 0) {
       const selfResult = await pgPool.query(
         "SELECT first_name, last_name, email, role FROM users WHERE user_id = $1",
@@ -186,7 +188,7 @@ router.get("/team", requireUserApi, async (req, res) => {
       ]);
     }
 
-    // Step 3: Find all unique user_ids linked to those properties.
+    // Step 3: Find the internal user_ids of ALL users who have access to ANY of those properties.
     const teamResult = await pgPool.query(
       "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
       [propertyIds]
@@ -194,7 +196,7 @@ router.get("/team", requireUserApi, async (req, res) => {
     const teamUserIds = teamResult.rows.map((u) => u.user_id);
     if (teamUserIds.length === 0) return res.json([]);
 
-    // Step 4: Fetch details for all active users using their correct internal user_ids.
+    // Step 4: Fetch the profile details for all those users using their internal user_ids.
     const activeUsersResult = await pgPool.query(
       `SELECT first_name, last_name, email, role FROM users WHERE user_id = ANY($1::int[])`,
       [teamUserIds]
@@ -211,7 +213,7 @@ router.get("/team", requireUserApi, async (req, res) => {
       role: roleMap[user.role] || "User",
     }));
 
-    // Step 5: Fetch all pending invitations for the properties this team has access to.
+    // Step 5: Fetch pending invitations for any of the shared properties.
     const pendingInvitesResult = await pgPool.query(
       `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
       [propertyIds]
@@ -222,7 +224,7 @@ router.get("/team", requireUserApi, async (req, res) => {
       }`.trim(),
       email: invite.invitee_email,
       status: "Pending",
-      role: "User", // Invited users are always assigned the 'User' role by default.
+      role: "User",
     }));
 
     const allMembers = [...activeUsers, ...pendingInvites];
