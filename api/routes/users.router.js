@@ -135,19 +135,39 @@ router.post(
  * @description Fetches all active users and pending invitations for the user's account.
  * @access User
  */
+// find this line/block
+// replace with this
 router.get("/team", requireUserApi, async (req, res) => {
-  const requesterCloudbedsId = req.session.userId;
+  // The session ID can be for a Cloudbeds or Mews user, so we handle it generically.
+  const sessionPmsUserId = req.session.userId;
+  const sessionPmsType = req.session.pmsType;
+
   try {
+    // Step 1: Get the internal user_id for the currently logged-in user.
+    // The query now correctly handles different PMS types.
+    const userResult = await pgPool.query(
+      "SELECT user_id FROM users WHERE pms_user_id = $1 AND pms_type = $2",
+      [sessionPmsUserId, sessionPmsType]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "Current user not found." });
+    }
+    const currentUserId = userResult.rows[0].user_id;
+
+    // Step 2: Find all properties the current user has access to.
     const propertiesResult = await pgPool.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
-      [requesterCloudbedsId]
+      [currentUserId]
     );
+
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
 
+    // If the user has no properties, just return their own profile info.
     if (propertyIds.length === 0) {
       const selfResult = await pgPool.query(
-        "SELECT first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = $1",
-        [requesterCloudbedsId]
+        "SELECT first_name, last_name, email, role FROM users WHERE user_id = $1",
+        [currentUserId]
       );
       if (selfResult.rows.length === 0) return res.json([]);
       const self = selfResult.rows[0];
@@ -166,16 +186,18 @@ router.get("/team", requireUserApi, async (req, res) => {
       ]);
     }
 
+    // Step 3: Find all unique user_ids linked to those properties.
     const teamResult = await pgPool.query(
       "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
       [propertyIds]
     );
-    const teamCloudbedsIds = teamResult.rows.map((u) => u.user_id);
-    if (teamCloudbedsIds.length === 0) return res.json([]);
+    const teamUserIds = teamResult.rows.map((u) => u.user_id);
+    if (teamUserIds.length === 0) return res.json([]);
 
+    // Step 4: Fetch details for all active users using their correct internal user_ids.
     const activeUsersResult = await pgPool.query(
-      `SELECT first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = ANY($1::text[])`,
-      [teamCloudbedsIds]
+      `SELECT first_name, last_name, email, role FROM users WHERE user_id = ANY($1::int[])`,
+      [teamUserIds]
     );
     const roleMap = {
       super_admin: "Super Admin",
@@ -189,10 +211,10 @@ router.get("/team", requireUserApi, async (req, res) => {
       role: roleMap[user.role] || "User",
     }));
 
-    // --- FIX: Corrected column name from 'invited_by_user_id' to 'inviter_user_id' ---
+    // Step 5: Fetch all pending invitations for the properties this team has access to.
     const pendingInvitesResult = await pgPool.query(
-      `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE inviter_user_id = ANY(SELECT user_id FROM users WHERE cloudbeds_user_id = ANY($1::text[])) AND status = 'pending'`,
-      [teamCloudbedsIds]
+      `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
+      [propertyIds]
     );
     const pendingInvites = pendingInvitesResult.rows.map((invite) => ({
       name: `${invite.invitee_first_name || ""} ${
@@ -200,7 +222,7 @@ router.get("/team", requireUserApi, async (req, res) => {
       }`.trim(),
       email: invite.invitee_email,
       status: "Pending",
-      role: "User",
+      role: "User", // Invited users are always assigned the 'User' role by default.
     }));
 
     const allMembers = [...activeUsers, ...pendingInvites];
@@ -210,7 +232,6 @@ router.get("/team", requireUserApi, async (req, res) => {
     res.status(500).json({ error: "Could not fetch team members." });
   }
 });
-
 /**
  * @route DELETE /api/users/remove
  * @description Deletes a user and all their associated data from the account.
