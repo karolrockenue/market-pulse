@@ -10,6 +10,7 @@ const { requireUserApi } = require("../utils/middleware");
 
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 const mewsAdapter = require("../adapters/mewsAdapter");
+const operaAdapter = require("../adapters/operaAdapter");
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -504,6 +505,102 @@ router.post("/mews/create", async (req, res) => {
     client.release();
   }
 });
+
+// --- OHIP/OPERA ONBOARDING ROUTES ---
+
+/**
+ * Step 1: Initiate the OAuth 2.0 flow for OPERA Cloud.
+ * This route constructs the Oracle authorization URL with the necessary parameters
+ * (client ID, redirect URI, scopes) and redirects the user to Oracle's
+ * login and consent screen.
+ */
+router.get("/opera", (req, res) => {
+  // Retrieve the necessary configuration from environment variables.
+  const { OPERA_CLIENT_ID, OPERA_DOMAIN_URL } = process.env;
+
+  // Define the Redirect URI. This must exactly match the URI registered in the OCI console.
+  const redirectUri =
+    process.env.VERCEL_ENV === "production"
+      ? "https://www.market-pulse.io/api/auth/opera/callback" // This will be your production callback URL
+      : "http://localhost:3000/api/auth/opera/callback";
+
+  // Check for required configuration to prevent server errors.
+  if (!OPERA_CLIENT_ID || !OPERA_DOMAIN_URL) {
+    console.error("OHIP configuration is missing in environment variables.");
+    return res.status(500).send("Server configuration error.");
+  }
+
+  // Define the scopes (permissions) we are requesting. 'openid' is standard for OIDC.
+  // We will add specific OHIP API scopes later on once we know which ones are needed.
+  // In addition to the standard OIDC scopes, we are now requesting the primary
+  // scope required to access the Oracle Hospitality APIs.
+  // Reverting to the original scopes to confirm the base functionality.
+  const scopes = "openid profile email urn:opc:idm:__myscopes__";
+
+  // Construct the URL query parameters.
+  const params = new URLSearchParams({
+    client_id: OPERA_CLIENT_ID,
+    response_type: "code",
+    redirect_uri: redirectUri,
+    scope: scopes,
+    state: crypto.randomBytes(16).toString("hex"), // Use a CSRF token for security.
+  });
+
+  // Construct the full authorization URL from the domain URL.
+  const authorizationUrl = `${OPERA_DOMAIN_URL}/oauth2/v1/authorize?${params.toString()}`;
+
+  // Redirect the user to the Oracle authorization server.
+  res.redirect(authorizationUrl);
+});
+
+/**
+ * Step 2: Handle the callback from the Oracle Authorization Server.
+ * Oracle redirects the user back to this endpoint after they grant consent.
+ * This endpoint receives an authorization 'code' in the query parameters.
+ */
+/**
+ * Step 2: Handle the callback from the Oracle Authorization Server.
+ * This route now calls our adapter to exchange the received authorization code
+ * for an access token and a refresh token.
+ */
+router.get("/opera/callback", async (req, res) => {
+  // Extract the authorization code from the query parameters sent by Oracle.
+  const { code } = req.query;
+
+  // Validate that the code exists.
+  if (!code) {
+    return res
+      .status(400)
+      .send("Authorization code is missing from the callback.");
+  }
+
+  try {
+    // Call our new adapter function to perform the token exchange.
+    const tokenData = await operaAdapter.exchangeCodeForTokens(code);
+
+    // For this test, we will log the entire token response to the server console.
+    // This is a crucial step to let us see the structure of the data we get back.
+    console.log("Successfully received OHIP tokens:", tokenData);
+
+    // In future steps, we will save these tokens and create the user session.
+    // For now, just send a success message to the browser to confirm the flow worked.
+    res
+      .status(200)
+      .send(
+        "<h1>OHIP Connection Successful!</h1><p>Successfully exchanged the code for tokens. Please check your server console for the full token response. You can close this window.</p>"
+      );
+  } catch (error) {
+    // If the token exchange fails, our adapter will throw an error.
+    // We catch it here and send a user-friendly error message to the browser.
+    console.error("Failed during OHIP token exchange:", error);
+    res
+      .status(500)
+      .send(
+        "<h1>Error</h1><p>Could not exchange the authorization code for an access token. Please check the server logs for more details.</p>"
+      );
+  }
+});
+
 router.get("/cloudbeds", (req, res) => {
   const { CLOUDBEDS_CLIENT_ID } = process.env;
   const redirectUri =

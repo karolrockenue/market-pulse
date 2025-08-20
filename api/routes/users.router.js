@@ -397,26 +397,39 @@ router.post(
     const client = await pgPool.connect();
     try {
       await client.query("BEGIN");
+      // replace with this
+      // Find the user's internal primary key (`user_id`) using their email address.
+      // This is the correct foreign key to use for the `user_properties` table.
       const userToLinkResult = await client.query(
-        "SELECT cloudbeds_user_id FROM users WHERE email = $1",
+        "SELECT user_id FROM users WHERE email = $1",
         [email]
       );
+
+      // Check if a user with the provided email exists in the system.
       if (userToLinkResult.rows.length === 0) {
         throw new Error(
           "User not found. Please ensure the user has an existing Market Pulse account."
         );
       }
-      const userCloudbedsIdToLink = userToLinkResult.rows[0].cloudbeds_id;
+
+      // Get the correct user_id from the query result.
+      const userIdToLink = userToLinkResult.rows[0].user_id;
+
+      // Verify that this user doesn't already have access to the target property.
       const existingLinkCheck = await client.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        [userCloudbedsIdToLink, propertyId]
+        [userIdToLink, propertyId]
       );
+
+      // If a link already exists, inform the admin.
       if (existingLinkCheck.rows.length > 0) {
         throw new Error("This user already has access to this property.");
       }
+
+      // Insert the new record into user_properties using the correct internal user_id.
       await client.query(
         "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
-        [userCloudbedsIdToLink, propertyId]
+        [userIdToLink, propertyId]
       );
       await client.query("COMMIT");
       res
