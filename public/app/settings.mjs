@@ -258,7 +258,10 @@ export default function settingsPage() {
         }
 
         // --- Success ---
-        this.invitation.message = "Invitation sent successfully!";
+        // replace with this
+        // --- Success ---
+        // Use the success message directly from the API response.
+        this.invitation.message = result.message;
         this.invitation.messageType = "success";
 
         // Clear the form fields but keep the modal open to show the success message
