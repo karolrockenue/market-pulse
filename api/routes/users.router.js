@@ -138,38 +138,24 @@ router.post(
 // find this line/block
 // replace with this
 // replace with this
+// replace with this
 router.get("/team", requireUserApi, async (req, res) => {
-  // This is the Cloudbeds-specific ID from the user's session.
   const requesterCloudbedsId = req.session.userId;
 
   try {
-    // Step 1: Get the internal user_id (the integer PK) for the logged-in user
-    // by looking them up using their cloudbeds_user_id from the session.
-    const userResult = await pgPool.query(
-      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [requesterCloudbedsId]
-    );
-
-    // If we can't find an internal user for the session, something is wrong.
-    if (userResult.rows.length === 0) {
-      // This can happen if a user exists in the session but was deleted from the DB.
-      // Return an empty array to prevent the frontend from crashing.
-      return res.json([]);
-    }
-    const currentUserId = userResult.rows[0].user_id;
-
-    // Step 2: Find all properties this user has access to, using their internal user_id.
+    // Step 1: Find all properties linked to the current user's session ID.
+    // This works because the user's own link is correct.
     const propertiesResult = await pgPool.query(
       "SELECT property_id FROM user_properties WHERE user_id = $1",
-      [currentUserId]
+      [requesterCloudbedsId]
     );
     const propertyIds = propertiesResult.rows.map((p) => p.property_id);
 
-    // If the user isn't linked to any properties, just return their own info.
     if (propertyIds.length === 0) {
+      // If no properties, just return the current user.
       const selfResult = await pgPool.query(
-        "SELECT first_name, last_name, email, role FROM users WHERE user_id = $1",
-        [currentUserId]
+        "SELECT user_id, first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = $1",
+        [requesterCloudbedsId]
       );
       if (selfResult.rows.length === 0) return res.json([]);
       const self = selfResult.rows[0];
@@ -188,18 +174,20 @@ router.get("/team", requireUserApi, async (req, res) => {
       ]);
     }
 
-    // Step 3: Find the internal user_ids of ALL users who have access to ANY of those properties.
+    // Step 2: Get all the raw, mixed-type user IDs from user_properties for the found properties.
     const teamResult = await pgPool.query(
       "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
       [propertyIds]
     );
-    const teamUserIds = teamResult.rows.map((u) => u.user_id);
-    if (teamUserIds.length === 0) return res.json([]);
+    const teamIds = teamResult.rows.map((u) => u.user_id);
+    if (teamIds.length === 0) return res.json([]);
 
-    // Step 4: Fetch the profile details for all those users using their internal user_ids.
+    // Step 3: Fetch all users who match EITHER the cloudbeds_user_id OR the internal user_id.
+    // This is the key change to handle the inconsistent data. We cast the integer user_id to text to compare.
     const activeUsersResult = await pgPool.query(
-      `SELECT first_name, last_name, email, role FROM users WHERE user_id = ANY($1::int[])`,
-      [teamUserIds]
+      `SELECT first_name, last_name, email, role FROM users 
+       WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
+      [teamIds]
     );
     const roleMap = {
       super_admin: "Super Admin",
@@ -213,7 +201,7 @@ router.get("/team", requireUserApi, async (req, res) => {
       role: roleMap[user.role] || "User",
     }));
 
-    // Step 5: Fetch pending invitations for any of the shared properties.
+    // Step 4: Fetch pending invites for any of the shared properties. This logic is unchanged.
     const pendingInvitesResult = await pgPool.query(
       `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
       [propertyIds]
