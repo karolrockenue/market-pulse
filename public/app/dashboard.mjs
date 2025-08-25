@@ -309,16 +309,21 @@ export default function () {
           `/api/sync-status/${propertyId}?t=${Date.now()}`
         );
         const status = await statusRes.json();
-
         const considerDone = async () => {
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
           // Ensure we have a property selected before loading data
           if (!this.currentPropertyId) this.currentPropertyId = propertyId;
           // Clean URL (?newConnection=...&propertyId=...)
           history.pushState({}, "", window.location.pathname);
-          // Load a real preset before hiding spinner
+          // Load a real preset before hiding the main sync spinner
           await this.setPreset("current-month");
           this.isSyncing = false;
+
+          // --- NEW: Trigger the category modal ---
+          // Store the new property's ID so the save function knows which hotel to update.
+          this.categorizationPropertyId = propertyId;
+          // Set the flag to true, which will make the modal appear on the screen.
+          this.showCategoryModal = true;
         };
 
         if (status?.isSyncComplete) {
@@ -544,6 +549,43 @@ export default function () {
       } catch (error) {
         console.error("Error fetching ranking data:", error);
         this.ranking = null;
+      }
+    },
+
+    // --- NEW: Method to save the selected hotel category ---
+    async saveCategory() {
+      // Guard clause: Do nothing if the property ID for categorization isn't set.
+      if (!this.categorizationPropertyId) {
+        console.error("Cannot save category: property ID is missing.");
+        return;
+      }
+
+      try {
+        // Send a PATCH request to our new endpoint.
+        const response = await fetch(
+          `/api/my-properties/${this.categorizationPropertyId}/category`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            // The body contains the category the user selected in the modal.
+            body: JSON.stringify({ category: this.selectedCategory }),
+          }
+        );
+
+        // If the server response is not OK (e.g., 404, 500), throw an error.
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Server responded with an error.");
+        }
+
+        // If the save is successful, hide the modal.
+        this.showCategoryModal = false;
+      } catch (error) {
+        // If an error occurs during the fetch, show it to the user.
+        console.error("Failed to save hotel category:", error);
+        this.showError(
+          "Could not save your selection. Please try again later."
+        );
       }
     },
 
