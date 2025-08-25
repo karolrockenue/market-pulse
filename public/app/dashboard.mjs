@@ -148,6 +148,10 @@ export default function () {
   return {
     // --- STATE PROPERTIES ---
     currentPropertyId: null,
+    // New state properties for the category selection modal.
+    showCategoryModal: false, // Controls if the modal is visible.
+    categorizationPropertyId: null, // Stores the ID of the property being categorized.
+    selectedCategory: "Midscale", // Holds the user's selection, defaults to 'Midscale'.
     currentPropertyName: "Loading...",
     properties: [],
     hasProperties: false,

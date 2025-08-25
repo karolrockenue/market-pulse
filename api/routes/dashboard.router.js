@@ -112,6 +112,7 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
     }
 
     // Fetches hotel details, now including the 'category' field.
+    // Fetches hotel details, now including the 'category' field.
     const hotelResult = await pgPool.query(
       "SELECT property_name, currency_code, tax_rate, tax_type, tax_name, category FROM hotels WHERE hotel_id = $1",
       [propertyId]

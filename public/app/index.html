@@ -151,7 +151,113 @@
 <div id="main-loader" class="fixed inset-0 flex items-center justify-center bg-[#1e293b] z-50">
     <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
 </div>
+<div
+  x-show="showCategoryModal"
+  x-cloak
+  class="fixed inset-0 bg-gray-900 bg-opacity-60 z-50 flex items-center justify-center p-4"
+  @keydown.escape.window="showCategoryModal = false"
+>
+  <div
+    class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 md:p-8"
+    @click.outside="showCategoryModal = false"
+  >
+    <h2 class="text-2xl font-bold text-slate-800">
+      One last step...
+    </h2>
+    <p class="text-slate-500 mt-2">
+      Please classify your property. This helps us provide the most accurate
+      competitive market data.
+    </p>
 
+    <div class="mt-6 space-y-4">
+      <label
+        class="flex items-center p-4 border rounded-lg cursor-pointer transition-all"
+        :class="selectedCategory === 'Economy' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'"
+      >
+        <input
+          type="radio"
+          name="category"
+          value="Economy"
+          class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+          x-model="selectedCategory"
+        />
+        <span class="ml-4">
+          <span class="font-semibold text-slate-700">Economy</span>
+          <span class="block text-sm text-slate-500">
+            For 1 to 2-star properties, or 3-star hotels with budget-focused pricing and amenities.
+          </span>
+        </span>
+      </label>
+
+      <label
+        class="flex items-center p-4 border rounded-lg cursor-pointer transition-all"
+        :class="selectedCategory === 'Midscale' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'"
+      >
+        <input
+          type="radio"
+          name="category"
+          value="Midscale"
+          class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+          x-model="selectedCategory"
+        />
+        <span class="ml-4">
+          <span class="font-semibold text-slate-700">Midscale</span>
+          <span class="block text-sm text-slate-500">
+            For standard 3-star properties that offer a balance of quality service and value.
+          </span>
+        </span>
+      </label>
+
+      <label
+        class="flex items-center p-4 border rounded-lg cursor-pointer transition-all"
+        :class="selectedCategory === 'Upper Midscale' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'"
+      >
+        <input
+          type="radio"
+          name="category"
+          value="Upper Midscale"
+          class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+          x-model="selectedCategory"
+        />
+        <span class="ml-4">
+          <span class="font-semibold text-slate-700">Upper Midscale</span>
+          <span class="block text-sm text-slate-500">
+            For high-performing 3-star deluxe or standard 4-star properties with enhanced amenities.
+          </span>
+        </span>
+      </label>
+
+      <label
+        class="flex items-center p-4 border rounded-lg cursor-pointer transition-all"
+        :class="selectedCategory === 'Luxury' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'"
+      >
+        <input
+          type="radio"
+          name="category"
+          value="Luxury"
+          class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+          x-model="selectedCategory"
+        />
+        <span class="ml-4">
+          <span class="font-semibold text-slate-700">Luxury</span>
+          <span class="block text-sm text-slate-500">
+            For 5-star properties offering premium services and a superior guest experience.
+          </span>
+        </span>
+      </label>
+    </div>
+
+    <div class="mt-8 text-right">
+      <button
+        @click="saveCategory()"
+        type="button"
+        class="inline-flex justify-center items-center rounded-lg bg-blue-600 text-white font-semibold text-sm shadow-sm hover:bg-blue-700 px-6 py-2.5"
+      >
+        Save & Continue
+      </button>
+    </div>
+  </div>
+</div>
 <div id="dashboard-wrapper" class="opacity-0">
 <!-- Initial Sync Loading Overlay -->
 <div
