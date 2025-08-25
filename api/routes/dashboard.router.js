@@ -111,8 +111,9 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
       }
     }
 
+    // Fetches hotel details, now including the 'category' field.
     const hotelResult = await pgPool.query(
-      "SELECT property_name, currency_code, tax_rate, tax_type, tax_name FROM hotels WHERE hotel_id::text = $1",
+      "SELECT property_name, currency_code, tax_rate, tax_type, tax_name, category FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
     if (hotelResult.rows.length === 0) {
@@ -483,7 +484,59 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch competitor metrics" });
   }
 });
+// --- NEW: ENDPOINT TO SET HOTEL CATEGORY ---
+router.patch(
+  "/my-properties/:propertyId/category",
+  requireUserApi,
+  async (req, res) => {
+    // Extract propertyId from the URL parameters and category from the request body.
+    const { propertyId } = req.params;
+    const { category } = req.body;
 
+    // Define the list of valid categories to prevent invalid data injection.
+    const validCategories = ["Economy", "Midscale", "Upper Midscale", "Luxury"];
+    if (!category || !validCategories.includes(category)) {
+      return res.status(400).json({ error: "A valid category is required." });
+    }
+
+    try {
+      // Security check: For regular users, verify they have access to this property.
+      // super_admin users can bypass this check.
+      if (req.session.role !== "super_admin") {
+        const accessCheck = await pgPool.query(
+          "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
+          [req.session.userId, propertyId]
+        );
+        if (accessCheck.rows.length === 0) {
+          return res
+            .status(403)
+            .json({ error: "Access denied to this property." });
+        }
+      }
+
+      // Update the category for the specified hotel in the database.
+      const updateResult = await pgPool.query(
+        "UPDATE hotels SET category = $1 WHERE hotel_id = $2 RETURNING hotel_id, category",
+        [category, propertyId]
+      );
+
+      // If no rows are returned, it means the hotel_id was not found.
+      if (updateResult.rowCount === 0) {
+        return res.status(404).json({ error: "Property not found." });
+      }
+
+      // Send a success response.
+      res.status(200).json({
+        message: "Hotel category updated successfully.",
+        hotel: updateResult.rows[0],
+      });
+    } catch (error) {
+      // Log any errors and send a generic server error response.
+      console.error("Error updating hotel category:", error);
+      res.status(500).json({ error: "Failed to update hotel category." });
+    }
+  }
+);
 // --- NEW: MARKET RANKING ENDPOINT ---
 router.get("/market-ranking", requireUserApi, async (req, res) => {
   try {
