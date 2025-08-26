@@ -203,7 +203,7 @@ function marketOverviewComponent() {
       adr: { current: 0, prior: 0, change: 0 },
       revpar: { current: 0, prior: 0, change: 0 },
     },
-
+    isInitialLoad: true,
     get pageTitle() {
       if (this.marketCity) {
         return `${this.marketCity} Market Overview`;
@@ -250,20 +250,50 @@ function marketOverviewComponent() {
     },
 
     async handlePropertyChange(propertyData) {
+      // Stop if the property data is invalid.
       if (!propertyData || !propertyData.property_id) {
         this.marketCity = "Unknown";
         this.currentPropertyId = null;
         return;
       }
+
       const cityChanged = this.marketCity !== propertyData.city;
       this.currentPropertyId = propertyData.property_id;
       this.marketCity = propertyData.city || "Unknown";
-      if (cityChanged) {
-        this.updateHistoricalChart();
-        this.fetchKpiData();
-        // --- RENAMED: from fetchNeighborhoodData to fetchAreaData ---
-        this.fetchAreaData();
-        await this.fetchAvailableSeasonalityYears();
+
+      try {
+        // Only fetch all new data if the city has actually changed.
+        if (cityChanged) {
+          // Use Promise.all to run data fetches in parallel for speed.
+          await Promise.all([
+            this.updateHistoricalChart(),
+            this.fetchKpiData(),
+            this.fetchAreaData(),
+            this.fetchAvailableSeasonalityYears(),
+          ]);
+        }
+      } catch (error) {
+        // Log any errors that occur during the data fetching.
+        console.error("Error loading market overview data:", error);
+      } finally {
+        // This block runs after the data fetches, regardless of success or failure.
+        if (this.isInitialLoad) {
+          const loader = document.getElementById("main-loader");
+          const wrapper = document.getElementById("market-overview-wrapper");
+
+          if (loader && wrapper) {
+            // Fade out the loader and fade in the main content.
+            loader.style.opacity = "0";
+            wrapper.style.opacity = "1";
+
+            // After the animation, remove the loader from the DOM completely.
+            setTimeout(() => {
+              loader.style.display = "none";
+            }, 500); // Matches the CSS transition duration.
+          }
+          // Set the flag to false so this animation only runs once.
+          this.isInitialLoad = false;
+        }
       }
     },
 
