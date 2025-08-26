@@ -58,8 +58,13 @@ const historicalRevparChartManager = {
     });
   },
   // --- MODIFIED: Update function now accepts legendData ---
+  // --- MODIFIED: Update function now accepts legendData ---
   update(seriesData, yAxisFormatter, tooltipFormatter, legendData) {
     if (!this.chartInstance) return;
+
+    // Hide the loading animation now that we have data.
+    this.chartInstance.hideLoading();
+
     this.chartInstance.setOption(
       {
         // Pass the custom-formatted legend data to the chart
