@@ -415,11 +415,13 @@
       });
 
  // Load the shared sidebar component when the DOM is ready
+ // Load the shared sidebar component when the DOM is ready
       document.addEventListener("DOMContentLoaded", async () => {
         await loadComponent("sidebar", "sidebar-placeholder");
-        // NEW: Manually trigger a resize event after the sidebar loads.
+        // Manually trigger a resize event after the sidebar loads.
         // This forces ECharts to redraw and fit into the new container size.
-        window.dispatchEvent(new Event('resize'));
+        // A small delay ensures all elements have settled before the resize.
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
       });
     </script>
     <script
