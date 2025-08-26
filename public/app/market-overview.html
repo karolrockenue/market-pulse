@@ -93,22 +93,65 @@
               </header>
 
               <div class="flex-shrink-0 w-64">
+                <!-- NEW: Redesigned Market Trend Stat Card -->
                 <div
-                  class="rounded-lg p-4 h-full flex flex-col justify-center text-white shadow-lg"
-                  :style="{ backgroundColor: marketKpis.revpar.change >= 0 ? '#71c0bb' : '#c36063' }"
+                  class="rounded-xl p-4 h-full flex flex-col justify-between text-white shadow-lg transition-all duration-300"
+                  :class="{
+                    'bg-gradient-to-br from-green-500 to-teal-600': marketKpis.revpar.change >= 0,
+                    'bg-gradient-to-br from-red-500 to-rose-600': marketKpis.revpar.change < 0
+                  }"
                 >
-                  <h3 class="text-sm font-medium opacity-80">
-                    Market RevPAR Trend
-                  </h3>
-                  <p class="text-2xl font-semibold mt-2">
-                    <span
-                      x-text="marketKpis.revpar.change >= 0 ? 'Up' : 'Down'"
-                    ></span>
-                    <span
-                      x-text="` ${(Math.abs(marketKpis.revpar.change) * 100).toFixed(1)}%`"
-                    ></span>
-                    <span class="opacity-80"> vs PY</span>
-                  </p>
+                  <!-- Card Header -->
+                  <div class="flex justify-between items-center">
+                    <h3 class="font-semibold opacity-90">
+                      Market RevPAR Trend
+                    </h3>
+                    <!-- Icon: Up or Down Arrow -->
+                    <template x-if="marketKpis.revpar.change >= 0">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6 opacity-80"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M5 10l7-7m0 0l7 7m-7-7v18"
+                        />
+                      </svg>
+                    </template>
+                    <template x-if="marketKpis.revpar.change < 0">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6 opacity-80"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="3"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                        />
+                      </svg>
+                    </template>
+                  </div>
+                  <!-- Main Stat: Large Percentage -->
+                  <div class="text-right mt-4">
+                    <p class="text-5xl font-bold">
+                      <span
+                        x-text="marketKpis.revpar.change >= 0 ? '+' : ''"
+                      ></span>
+                      <span
+                        x-text="`${(marketKpis.revpar.change * 100).toFixed(1)}%`"
+                      ></span>
+                    </p>
+                    <p class="opacity-80 text-sm font-medium">vs Prior Year</p>
+                  </div>
                 </div>
               </div>
             </div>
