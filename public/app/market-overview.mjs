@@ -2,6 +2,10 @@
 
 const historicalRevparChartManager = {
   chartInstance: null,
+  // NEW: Method to display the chart's built-in loading animation.
+  showLoading() {
+    this.chartInstance?.showLoading();
+  },
   init(element) {
     if (!element) return;
     this.chartInstance =
@@ -234,10 +238,7 @@ function marketOverviewComponent() {
       window.addEventListener("resize", () =>
         historicalRevparChartManager.resize()
       );
-      this.$watch("activeMetric", () => this.updateHistoricalChart());
-      this.$watch("activeTiers", () => this.updateHistoricalChart());
-      this.$watch("activeYears", () => this.updateHistoricalChart());
-      this.$watch("isEntireMarketSelected", () => this.updateHistoricalChart());
+      // The redundant $watch listeners have been removed from here.
       const seasonalityChartElement = document.getElementById(
         "seasonality-heatmap"
       );
@@ -426,6 +427,9 @@ function marketOverviewComponent() {
     },
 
     async updateHistoricalChart() {
+      // Show the loading animation inside the chart before fetching data.
+      historicalRevparChartManager.showLoading();
+
       const trendData = await this.fetchTrendData();
       const seriesData = {};
       trendData.forEach((row) => {
@@ -489,6 +493,8 @@ function marketOverviewComponent() {
 
     setMetric(metric) {
       this.activeMetric = metric;
+      // Explicitly call the update function.
+      this.updateHistoricalChart();
     },
     toggleTier(tier) {
       if (tier === "Entire Market") {
@@ -506,6 +512,8 @@ function marketOverviewComponent() {
           this.isEntireMarketSelected = true;
         }
       }
+      // Explicitly call the update function.
+      this.updateHistoricalChart();
     },
     toggleYear(year) {
       if (this.activeYears.includes(year)) {
@@ -513,6 +521,8 @@ function marketOverviewComponent() {
       } else {
         this.activeYears.push(year);
       }
+      // Explicitly call the update function.
+      this.updateHistoricalChart();
     },
     setActiveHeatmapMetric(metric) {
       this.activeHeatmapMetric = metric;
