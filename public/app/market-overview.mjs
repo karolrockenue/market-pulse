@@ -250,10 +250,25 @@ function marketOverviewComponent() {
     },
 
     async handlePropertyChange(propertyData) {
-      // Stop if the property data is invalid.
-      if (!propertyData || !propertyData.property_id) {
-        this.marketCity = "Unknown";
-        this.currentPropertyId = null;
+      // Stop if the property data is invalid or hasn't changed.
+      if (
+        !propertyData ||
+        !propertyData.property_id ||
+        this.currentPropertyId === propertyData.property_id
+      ) {
+        // If there's no valid property, we must still hide the loader on initial load.
+        if (this.isInitialLoad) {
+          const loader = document.getElementById("main-loader");
+          const wrapper = document.getElementById("market-overview-wrapper");
+          if (loader && wrapper) {
+            loader.style.opacity = "0";
+            wrapper.style.opacity = "1";
+            setTimeout(() => {
+              loader.style.display = "none";
+            }, 500);
+          }
+          this.isInitialLoad = false;
+        }
         return;
       }
 
@@ -262,36 +277,31 @@ function marketOverviewComponent() {
       this.marketCity = propertyData.city || "Unknown";
 
       try {
-        // Only fetch all new data if the city has actually changed.
-        if (cityChanged) {
-          // Use Promise.all to run data fetches in parallel for speed.
+        // On the very first load, we must fetch the KPI data to avoid flickering.
+        // On subsequent property changes, we fetch everything.
+        if (this.isInitialLoad || cityChanged) {
           await Promise.all([
             this.updateHistoricalChart(),
-            this.fetchKpiData(),
+            this.fetchKpiData(), // This fetches the data for the card color
             this.fetchAreaData(),
             this.fetchAvailableSeasonalityYears(),
           ]);
         }
       } catch (error) {
-        // Log any errors that occur during the data fetching.
         console.error("Error loading market overview data:", error);
       } finally {
-        // This block runs after the data fetches, regardless of success or failure.
+        // The logic to hide the loader now runs *after* the await Promise.all() is complete.
         if (this.isInitialLoad) {
           const loader = document.getElementById("main-loader");
           const wrapper = document.getElementById("market-overview-wrapper");
 
           if (loader && wrapper) {
-            // Fade out the loader and fade in the main content.
             loader.style.opacity = "0";
             wrapper.style.opacity = "1";
-
-            // After the animation, remove the loader from the DOM completely.
             setTimeout(() => {
               loader.style.display = "none";
-            }, 500); // Matches the CSS transition duration.
+            }, 500);
           }
-          // Set the flag to false so this animation only runs once.
           this.isInitialLoad = false;
         }
       }
