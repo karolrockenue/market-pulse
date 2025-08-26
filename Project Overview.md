@@ -297,3 +297,17 @@ In August 2025, the application was successfully extended to support a second PM
   2.  **New Onboarding Flow:** A complete, user-facing onboarding flow was built on the login page. This includes a multi-step modal, backend validation routes, logic to handle both single and multi-property Mews accounts, and secure, encrypted storage for Mews credentials.
   3.  **Adapter Implementation:** The `mewsAdapter.js` was fully developed to handle all Mews-specific API logic, including authentication, data transformation, and pagination.
 - **Outcome:** The integration was a success. The application now has a robust, scalable, and secure system for onboarding and syncing data from Mews properties. This milestone validates the adapter-based architecture and paves the way for integrating additional PMS vendors in the future.
+
+August 25, 2025 - Feature: Post-Sync Property Categorization
+
+Summary: Implemented a new user-facing modal that prompts hotel owners to classify their property's quality tier (e.g., Economy, Luxury) immediately after the initial data sync is complete. This ensures more accurate market data from the outset.
+
+New API Endpoint: Added a new PATCH /api/my-properties/:propertyId/category endpoint to dashboard.router.js to securely save the user's selection to the database.
+
+Frontend Logic:
+
+Added the category selection modal to public/app/index.html.
+
+Updated public/app/dashboard.mjs to trigger the modal's appearance when the ?newConnection=true parameter is present in the URL and the initial sync finishes.
+
+Enhancement: The /api/hotel-details/:propertyId endpoint in dashboard.router.js was updated to include the category field in its response.

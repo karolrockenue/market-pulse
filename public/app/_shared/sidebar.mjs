@@ -29,29 +29,43 @@ export default function sidebar() {
     async fetchSessionInfo() {
       try {
         const response = await fetch("/api/auth/session-info");
-        const session = await response.json();
-        if (session.isLoggedIn) {
-          this.user.name =
-            `${session.firstName || ""} ${session.lastName || ""}`.trim() ||
-            "User";
-          this.user.initials = (session.firstName || "U").charAt(0);
-          switch (session.role) {
-            case "super_admin":
-              this.user.role = "Super Admin";
-              break;
-            case "owner":
-              this.user.role = "Owner";
-              break;
-            default:
-              this.user.role = "User";
-              break;
-          }
-          // Correctly determine admin status for showing/hiding links
-          this.isAdmin = session.role === "super_admin";
+
+        // If the server responds with an unauthorized status, the session is invalid. Redirect.
+        if (!response.ok) {
+          window.location.href = "/signin";
+          return; // Stop execution
         }
+
+        const session = await response.json();
+
+        // If the session data explicitly says the user is not logged in, redirect.
+        if (!session.isLoggedIn) {
+          window.location.href = "/signin";
+          return; // Stop execution
+        }
+
+        // If we've made it this far, the user is authenticated. Proceed to populate data.
+        this.user.name =
+          `${session.firstName || ""} ${session.lastName || ""}`.trim() ||
+          "User";
+        this.user.initials = (session.firstName || "U").charAt(0);
+        switch (session.role) {
+          case "super_admin":
+            this.user.role = "Super Admin";
+            break;
+          case "owner":
+            this.user.role = "Owner";
+            break;
+          default:
+            this.user.role = "User";
+            break;
+        }
+        // Correctly determine admin status for showing/hiding links
+        this.isAdmin = session.role === "super_admin";
       } catch (error) {
-        console.error("Error fetching session info:", error);
-        this.user.name = "Error";
+        // If any other error occurs (e.g., network failure), assume auth has failed and redirect.
+        console.error("Critical error fetching session info:", error);
+        window.location.href = "/signin";
       }
     },
 
