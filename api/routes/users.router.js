@@ -140,55 +140,50 @@ router.post(
 // replace with this
 // replace with this
 router.get("/team", requireUserApi, async (req, res) => {
-  const requesterCloudbedsId = req.session.userId;
-
   try {
-    // Step 1: Find all properties linked to the current user's session ID.
-    // This works because the user's own link is correct.
-    const propertiesResult = await pgPool.query(
-      "SELECT property_id FROM user_properties WHERE user_id = $1",
-      [requesterCloudbedsId]
-    );
-    const propertyIds = propertiesResult.rows.map((p) => p.property_id);
+    let propertyIds = [];
+    const { role, userId } = req.session;
+    const { propertyId: selectedPropertyId } = req.query; // Get propertyId from the frontend
+
+    // START: New Role-Based Logic
+    // If the user is a super_admin and a specific property is selected on the frontend...
+    if (role === "super_admin" && selectedPropertyId) {
+      // ...then the context is ONLY that single property.
+      propertyIds = [selectedPropertyId];
+    } else {
+      // ...otherwise, for regular 'owner' or 'user' roles, find all properties they belong to.
+      const propertiesResult = await pgPool.query(
+        "SELECT property_id FROM user_properties WHERE user_id = $1",
+        [userId]
+      );
+      propertyIds = propertiesResult.rows.map((p) => p.property_id);
+    }
+    // END: New Role-Based Logic
 
     if (propertyIds.length === 0) {
-      // If no properties, just return the current user.
-      const selfResult = await pgPool.query(
-        "SELECT user_id, first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = $1",
-        [requesterCloudbedsId]
-      );
-      if (selfResult.rows.length === 0) return res.json([]);
-      const self = selfResult.rows[0];
-      const roleMap = {
-        super_admin: "Super Admin",
-        owner: "Owner",
-        user: "User",
-      };
-      return res.json([
-        {
-          name: `${self.first_name || ""} ${self.last_name || ""}`.trim(),
-          email: self.email,
-          status: "Active",
-          role: roleMap[self.role] || "User",
-        },
-      ]);
+      return res.json([]); // No properties to check, so the team is empty.
     }
 
-    // Step 2: Get all the raw, mixed-type user IDs from user_properties for the found properties.
+    // Step 1: Get all unique user IDs associated with the determined properties.
     const teamResult = await pgPool.query(
       "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
       [propertyIds]
     );
-    const teamIds = teamResult.rows.map((u) => u.user_id);
-    if (teamIds.length === 0) return res.json([]);
+    const teamUserIds = teamResult.rows.map((u) => u.user_id);
 
-    // Step 3: Fetch all users who match EITHER the cloudbeds_user_id OR the internal user_id.
-    // This is the key change to handle the inconsistent data. We cast the integer user_id to text to compare.
+    // If there are no users, the team is empty.
+    if (teamUserIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Step 2: Fetch details for all active users found.
+    // This query handles the mix of integer and string IDs in user_properties.
     const activeUsersResult = await pgPool.query(
       `SELECT first_name, last_name, email, role FROM users 
        WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
-      [teamIds]
+      [teamUserIds]
     );
+
     const roleMap = {
       super_admin: "Super Admin",
       owner: "Owner",
@@ -201,7 +196,7 @@ router.get("/team", requireUserApi, async (req, res) => {
       role: roleMap[user.role] || "User",
     }));
 
-    // Step 4: Fetch pending invites for any of the shared properties. This logic is unchanged.
+    // Step 3: Fetch any pending invitations for these properties.
     const pendingInvitesResult = await pgPool.query(
       `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
       [propertyIds]
@@ -212,9 +207,10 @@ router.get("/team", requireUserApi, async (req, res) => {
       }`.trim(),
       email: invite.invitee_email,
       status: "Pending",
-      role: "User",
+      role: "User", // Invited users are always standard users by default.
     }));
 
+    // Combine and send the final list.
     const allMembers = [...activeUsers, ...pendingInvites];
     res.json(allMembers);
   } catch (error) {
