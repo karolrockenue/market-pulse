@@ -46,20 +46,30 @@ export default function settingsPage() {
       );
     },
 
-    // --- INITIALIZATION ---
     async init() {
-      // The init function no longer loads component HTML. It goes straight to fetching data.
+      // Fetch initial data when the page first loads.
+      await this.loadDataForCurrentProperty();
+
+      // IMPORTANT: Add the event listener to react to property changes from the sidebar.
+      window.addEventListener("property-changed", () =>
+        this.loadDataForCurrentProperty()
+      );
+
+      // Finally, show the page content
+      this.$nextTick(() => {
+        this.isInitialized = true;
+      });
+    },
+
+    // NEW: Centralized function to load all page data.
+    // This will be called on initial load and whenever the property changes.
+    async loadDataForCurrentProperty() {
       await Promise.all([
         this.fetchProfile(),
         this.fetchTeamMembers(),
         this.fetchConnectedProperties(),
         this.fetchOwnedProperties(),
       ]);
-
-      // Finally, show the page content
-      this.$nextTick(() => {
-        this.isInitialized = true;
-      });
     },
     // --- METHODS ---
 

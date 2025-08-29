@@ -141,78 +141,88 @@ router.post(
 // replace with this
 router.get("/team", requireUserApi, async (req, res) => {
   try {
-    let propertyIds = [];
-    const { role, userId } = req.session;
-    const { propertyId: selectedPropertyId } = req.query; // Get propertyId from the frontend
+    const { role } = req.session;
+    const propertyIdForQuery =
+      role === "super_admin" ? req.query.propertyId : null;
 
-    // START: New Role-Based Logic
-    // If the user is a super_admin and a specific property is selected on the frontend...
-    if (role === "super_admin" && selectedPropertyId) {
-      // ...then the context is ONLY that single property.
-      propertyIds = [selectedPropertyId];
-    } else {
-      // ...otherwise, for regular 'owner' or 'user' roles, find all properties they belong to.
-      const propertiesResult = await pgPool.query(
-        "SELECT property_id FROM user_properties WHERE user_id = $1",
-        [userId]
-      );
-      propertyIds = propertiesResult.rows.map((p) => p.property_id);
-    }
-    // END: New Role-Based Logic
-
-    if (propertyIds.length === 0) {
-      return res.json([]); // No properties to check, so the team is empty.
-    }
-
-    // Step 1: Get all unique user IDs associated with the determined properties.
-    const teamResult = await pgPool.query(
-      "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
-      [propertyIds]
-    );
-    const teamUserIds = teamResult.rows.map((u) => u.user_id);
-
-    // If there are no users, the team is empty.
-    if (teamUserIds.length === 0) {
-      return res.json([]);
-    }
-
-    // Step 2: Fetch details for all active users found.
-    // This query handles the mix of integer and string IDs in user_properties.
-    const activeUsersResult = await pgPool.query(
-      `SELECT first_name, last_name, email, role FROM users 
-       WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
-      [teamUserIds]
-    );
+    let activeUsers = [];
+    let propertyIdsForInvites = [];
 
     const roleMap = {
       super_admin: "Super Admin",
       owner: "Owner",
       user: "User",
     };
-    const activeUsers = activeUsersResult.rows.map((user) => ({
-      name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-      email: user.email,
-      status: "Active",
-      role: roleMap[user.role] || "User",
-    }));
 
-    // Step 3: Fetch any pending invitations for these properties.
-    const pendingInvitesResult = await pgPool.query(
-      `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
-      [propertyIds]
-    );
-    const pendingInvites = pendingInvitesResult.rows.map((invite) => ({
-      name: `${invite.invitee_first_name || ""} ${
-        invite.invitee_last_name || ""
-      }`.trim(),
-      email: invite.invitee_email,
-      status: "Pending",
-      role: "User", // Invited users are always standard users by default.
-    }));
+    // If you are a super_admin and have selected a property, fetch its team directly.
+    if (role === "super_admin" && propertyIdForQuery) {
+      const teamResult = await pgPool.query(
+        `SELECT u.first_name, u.last_name, u.email, u.role
+         FROM users u
+         -- Join on both possible key types to ensure all users are found
+         JOIN user_properties up ON u.cloudbeds_user_id = up.user_id OR u.user_id::text = up.user_id
+         WHERE up.property_id = $1`,
+        [propertyIdForQuery]
+      );
+
+      activeUsers = teamResult.rows.map((user) => ({
+        name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+        email: user.email,
+        status: "Active",
+        role: roleMap[user.role] || "User",
+      }));
+      propertyIdsForInvites = [propertyIdForQuery];
+    } else {
+      // This is the original logic for regular users, which works correctly for them.
+      const propertiesResult = await pgPool.query(
+        "SELECT property_id FROM user_properties WHERE user_id = $1",
+        [req.session.userId]
+      );
+      const propertyIds = propertiesResult.rows.map((p) => p.property_id);
+      propertyIdsForInvites = propertyIds; // Use these properties to find invites
+
+      if (propertyIds.length > 0) {
+        const teamResult = await pgPool.query(
+          "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
+          [propertyIds]
+        );
+        const teamUserIds = teamResult.rows.map((u) => u.user_id);
+
+        if (teamUserIds.length > 0) {
+          const activeUsersResult = await pgPool.query(
+            `SELECT first_name, last_name, email, role FROM users 
+             WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
+            [teamUserIds]
+          );
+          activeUsers = activeUsersResult.rows.map((user) => ({
+            name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+            email: user.email,
+            status: "Active",
+            role: roleMap[user.role] || "User",
+          }));
+        }
+      }
+    }
+
+    // Fetch pending invitations for the relevant properties
+    let pendingInvites = [];
+    if (propertyIdsForInvites.length > 0) {
+      const pendingInvitesResult = await pgPool.query(
+        `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
+        [propertyIdsForInvites]
+      );
+      pendingInvites = pendingInvitesResult.rows.map((invite) => ({
+        name: `${invite.invitee_first_name || ""} ${
+          invite.invitee_last_name || ""
+        }`.trim(),
+        email: invite.invitee_email,
+        status: "Pending",
+        role: "User",
+      }));
+    }
 
     // Combine and send the final list.
-    const allMembers = [...activeUsers, ...pendingInvites];
-    res.json(allMembers);
+    res.json([...activeUsers, ...pendingInvites]);
   } catch (error) {
     console.error("Error fetching team members:", error);
     res.status(500).json({ error: "Could not fetch team members." });
