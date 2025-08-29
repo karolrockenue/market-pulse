@@ -204,10 +204,19 @@ export default function () {
         this.checkSyncStatus(newPropertyId);
       }
 
+      // ...
       window.addEventListener("property-changed", (event) =>
         this.handlePropertyChange(event.detail)
       );
       this.initializeDashboard();
+
+      // --- TEMPORARY CODE FOR TESTING ---
+      // This will force the category modal to appear on every page load.
+      // Remember to remove this after you have confirmed the UI is correct.
+      this.showCategoryModal = true;
+      this.categorizationPropertyId = "123"; // Set a dummy ID for testing
+      // --- END TEMPORARY CODE ---
+      // ...
 
       // NEW: Watch for changes to the 'market' object.
       // Whenever it's updated with new data, this will automatically
