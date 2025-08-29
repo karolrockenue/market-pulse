@@ -174,14 +174,20 @@ function marketOverviewComponent() {
     activeMetric: "revpar",
     allMetrics: ["revpar", "adr", "occupancy"],
     isEntireMarketSelected: true,
-    allTiers: ["Luxury", "Upper Midscale", "Midscale", "Budget"],
+    // START: Update quality tiers
+    // Replaced 'Budget' with 'Economy' for consistency and added 'Hostel' in a logical order.
+    allTiers: ["Hostel", "Economy", "Midscale", "Upper Midscale", "Luxury"],
     tierColors: {
       "Entire Market": "#4B5563",
-      Luxury: "#8B5CF6",
-      "Upper Midscale": "#F97316",
+      // Added a new color for the 'Hostel' category.
+      Hostel: "#22C55E", // A vibrant green
+      // Renamed 'Budget' to 'Economy' and kept its original color.
+      Economy: "#14B8A6",
       Midscale: "#3B82F6",
-      Budget: "#14B8A6",
+      "Upper Midscale": "#F97316",
+      Luxury: "#8B5CF6",
     },
+    // END: Update quality tiers
     yearLineStyles: {
       2025: "solid",
       2024: "dashed",
