@@ -219,9 +219,29 @@ export default function settingsPage() {
     /**
      * @description Fetches the list of active users and pending invitations.
      */
+    /**
+     * @description Fetches the list of active users and pending invitations.
+     */
     async fetchTeamMembers() {
       try {
-        const response = await fetch("/api/users/team");
+        // START: Modification for super_admin view
+        // Get the currently selected property ID from browser storage.
+        // The sidebar component is responsible for setting this value.
+        const propertyId = localStorage.getItem("currentPropertyId");
+
+        // Base URL for the API endpoint.
+        let url = "/api/users/team";
+
+        // If a property is selected, add it to the URL as a query parameter.
+        // This is crucial for the backend to know which team to fetch for a super_admin.
+        if (propertyId) {
+          url += `?propertyId=${propertyId}`;
+        }
+
+        // Use the newly constructed URL for the fetch request.
+        const response = await fetch(url);
+        // END: Modification
+
         if (!response.ok) {
           throw new Error("Could not fetch team members.");
         }
