@@ -495,8 +495,16 @@ router.patch(
     const { category } = req.body;
 
     // Define the list of valid categories to prevent invalid data injection.
-    const validCategories = ["Economy", "Midscale", "Upper Midscale", "Luxury"];
+    // Define the list of valid categories to prevent invalid data injection.
+    const validCategories = [
+      "Economy",
+      "Midscale",
+      "Upper Midscale",
+      "Luxury",
+      "Hostel",
+    ]; // Add "Hostel" as a valid option
     if (!category || !validCategories.includes(category)) {
+      // If the provided category is not in our list, reject the request.
       return res.status(400).json({ error: "A valid category is required." });
     }
 
