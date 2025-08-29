@@ -180,7 +180,14 @@ const fetchAndRenderHotels = async (ui) => {
       hotels.length === 0
         ? `<tr><td colspan="7" class="p-4 text-center text-slate-500">No hotels found.</td></tr>`
         : "";
-    const categories = ["Budget", "Midscale", "Upper Midscale", "Luxury"];
+    // CORRECTED: Use the application-wide standard category list.
+    const categories = [
+      "Hostel",
+      "Economy",
+      "Midscale",
+      "Upper Midscale",
+      "Luxury",
+    ];
     hotels.forEach((hotel) => {
       const row = ui.hotelsTableBody.insertRow();
       const selectOptions = categories

@@ -670,7 +670,14 @@ router.post("/update-hotel-category", requireAdminApi, async (req, res) => {
   const { hotelId, category } = req.body;
 
   // Validate that the category is one of the allowed values
-  const allowedCategories = ["Budget", "Midscale", "Upper Midscale", "Luxury"];
+  // CORRECTED: Use the application-wide standard category list to validate input.
+  const allowedCategories = [
+    "Hostel",
+    "Economy",
+    "Midscale",
+    "Upper Midscale",
+    "Luxury",
+  ];
   if (!allowedCategories.includes(category)) {
     return res.status(400).json({ error: "Invalid category provided." });
   }
