@@ -237,7 +237,8 @@ export default function settingsPage() {
         // START: Modification for super_admin view
         // Get the currently selected property ID from browser storage.
         // The sidebar component is responsible for setting this value.
-        const propertyId = localStorage.getItem("currentPropertyId");
+        // FIX: Use the correct key ('selectedPropertyId') to match the key set by the sidebar.
+        const propertyId = localStorage.getItem("selectedPropertyId");
 
         // Base URL for the API endpoint.
         let url = "/api/users/team";
