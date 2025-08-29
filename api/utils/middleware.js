@@ -138,9 +138,29 @@ async function requireAccountOwner(req, res, next) {
   }
 }
 
+/**
+ * Middleware to ensure the user has management permissions.
+ * Allows 'owner' and 'super_admin' roles to proceed.
+ */
+const requireManagePermission = (req, res, next) => {
+  // Check if the user's role from the session is one of the allowed roles.
+  if (req.session && ["owner", "super_admin"].includes(req.session.role)) {
+    // If they have permission, continue to the next function in the chain.
+    return next();
+  }
+  // If they do not have permission, send a 'Forbidden' error.
+  res
+    .status(403)
+    .json({
+      error: "Forbidden: You do not have permission to perform this action.",
+    });
+};
+
 module.exports = {
   requireUserApi,
   requireAdminApi,
   requirePageLogin,
-  requireAccountOwner, // Export the new middleware
+  requireAccountOwner,
+  // Export the new middleware function so other files can use it.
+  requireManagePermission,
 };

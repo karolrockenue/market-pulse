@@ -5,7 +5,12 @@ const crypto = require("crypto");
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const { requireUserApi, requireAccountOwner } = require("../utils/middleware");
+// Import the new 'requireManagePermission' function
+const {
+  requireUserApi,
+  requireAccountOwner,
+  requireManagePermission,
+} = require("../utils/middleware");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 // Add this line with the other require statements at the top of the file.
@@ -141,7 +146,7 @@ router.post(
 // replace with this
 router.get("/team", requireUserApi, async (req, res) => {
   try {
-    const { role } = req.session;
+    const { role, userId } = req.session;
     const propertyIdForQuery =
       role === "super_admin" ? req.query.propertyId : null;
 
@@ -154,12 +159,10 @@ router.get("/team", requireUserApi, async (req, res) => {
       user: "User",
     };
 
-    // If you are a super_admin and have selected a property, fetch its team directly.
     if (role === "super_admin" && propertyIdForQuery) {
       const teamResult = await pgPool.query(
         `SELECT u.first_name, u.last_name, u.email, u.role
          FROM users u
-         -- Join on both possible key types to ensure all users are found
          JOIN user_properties up ON u.cloudbeds_user_id = up.user_id OR u.user_id::text = up.user_id
          WHERE up.property_id = $1`,
         [propertyIdForQuery]
@@ -172,14 +175,40 @@ router.get("/team", requireUserApi, async (req, res) => {
         role: roleMap[user.role] || "User",
       }));
       propertyIdsForInvites = [propertyIdForQuery];
+
+      // START: New logic to add the super_admin to the list
+      // Check if the viewing admin is already in the list (unlikely, but a good safeguard).
+      const isAdminInList = activeUsers.some(
+        (user) => user.email === req.session.email
+      );
+      if (!isAdminInList) {
+        // Fetch the admin's own details from the users table.
+        const adminDetailsResult = await pgPool.query(
+          "SELECT first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = $1",
+          [userId]
+        );
+        if (adminDetailsResult.rows.length > 0) {
+          const adminUser = adminDetailsResult.rows[0];
+          // Add the admin's user object to the start of the array.
+          activeUsers.unshift({
+            name: `${adminUser.first_name || ""} ${
+              adminUser.last_name || ""
+            }`.trim(),
+            email: adminUser.email,
+            status: "Active",
+            role: roleMap[adminUser.role] || "User",
+          });
+        }
+      }
+      // END: New logic
     } else {
-      // This is the original logic for regular users, which works correctly for them.
+      // This is the original logic for regular users.
       const propertiesResult = await pgPool.query(
         "SELECT property_id FROM user_properties WHERE user_id = $1",
-        [req.session.userId]
+        [userId]
       );
       const propertyIds = propertiesResult.rows.map((p) => p.property_id);
-      propertyIdsForInvites = propertyIds; // Use these properties to find invites
+      propertyIdsForInvites = propertyIds;
 
       if (propertyIds.length > 0) {
         const teamResult = await pgPool.query(
@@ -221,7 +250,6 @@ router.get("/team", requireUserApi, async (req, res) => {
       }));
     }
 
-    // Combine and send the final list.
     res.json([...activeUsers, ...pendingInvites]);
   } catch (error) {
     console.error("Error fetching team members:", error);
@@ -403,7 +431,8 @@ router.post(
  */
 router.post(
   "/link-property",
-  [requireUserApi, requireAccountOwner],
+  // Replace the restrictive 'requireAccountOwner' with our new, more flexible check.
+  [requireUserApi, requireManagePermission],
   async (req, res) => {
     const { email, propertyId } = req.body;
     if (!email || !propertyId) {
