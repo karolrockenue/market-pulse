@@ -42,19 +42,37 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
     const roomsSold = metrics.rooms_sold;
     const capacityCount = metrics.capacity_count;
 
-    // START: Corrected Tax Calculation Logic
-    // Based on the new finding, the 'rawRevenue' from the Cloudbeds API is ALWAYS the net revenue,
-    // regardless of the 'pricingModel' set in the hotel's configuration.
+    // --- START DEBUG LOGGING ---
+    console.log(`\n--- Debugging START for Date: ${date} ---`);
+    console.log(
+      `[DEBUG A] Inputs: rawRevenue=${rawRevenue}, taxRate=${taxRate} (type: ${typeof taxRate}), pricingModel=${pricingModel}`
+    );
 
-    // Ensure the tax rate is a valid number for calculations.
-    const numericTaxRate = parseFloat(taxRate) || 0;
+    const numericTaxRate = parseFloat(taxRate);
+    console.log(`[DEBUG B] Parsed Tax Rate: numericTaxRate=${numericTaxRate}`);
 
-    // 1. Assign the incoming revenue directly to 'net_revenue'.
-    metrics.net_revenue = rawRevenue;
-
-    // 2. Always calculate 'gross_revenue' by adding the tax to the net revenue.
-    metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
-    // END: Corrected Tax Calculation Logic
+    if (pricingModel === "exclusive") {
+      const divisor = 1 + numericTaxRate;
+      const calculatedGross = rawRevenue * divisor;
+      console.log(
+        `[DEBUG C - Exclusive] Divisor=${divisor}, Calculated Gross=${calculatedGross}`
+      );
+      metrics.net_revenue = rawRevenue;
+      metrics.gross_revenue = calculatedGross;
+    } else {
+      const divisor = 1 + numericTaxRate;
+      const calculatedNet = rawRevenue / divisor;
+      console.log(
+        `[DEBUG D - Inclusive] Divisor=${divisor}, Calculated Net=${calculatedNet}`
+      );
+      metrics.gross_revenue = rawRevenue;
+      metrics.net_revenue = calculatedNet;
+    }
+    console.log(
+      `[DEBUG E] Assigned Metrics: net_revenue=${metrics.net_revenue}, gross_revenue=${metrics.gross_revenue}`
+    );
+    console.log(`--- Debugging END for Date: ${date} ---\n`);
+    // --- END DEBUG LOGGING ---
 
     metrics.occupancy = capacityCount > 0 ? roomsSold / capacityCount : 0;
     metrics.gross_adr = roomsSold > 0 ? metrics.gross_revenue / roomsSold : 0;
@@ -113,19 +131,22 @@ function processUpcomingApiData(allData, taxRate, pricingModel) {
     const roomsSold = metrics.rooms_sold;
     const capacityCount = metrics.capacity_count;
 
-    // START: Corrected Tax Calculation Logic
-    // Based on the new finding, the 'rawRevenue' from the Cloudbeds API is ALWAYS the net revenue.
-    // The 'pricingModel' is therefore irrelevant for this calculation.
+    // Determine Net and Gross Revenue based on the hotel's pricing model.
+    // Convert taxRate to a number to ensure correct math.
+    const numericTaxRate = parseFloat(taxRate);
 
-    // Ensure the tax rate is a valid number.
-    const numericTaxRate = parseFloat(taxRate) || 0;
+    // Convert taxRate to a number to ensure correct math.
 
-    // 1. The incoming revenue is always the 'net_revenue'.
-    metrics.net_revenue = rawRevenue;
+    // Determine Net and Gross Revenue based on the hotel's pricing model.
+    if (pricingModel === "exclusive") {
+      metrics.net_revenue = rawRevenue;
+      metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
+    } else {
+      // Default to 'inclusive' if the model is anything else.
+      metrics.gross_revenue = rawRevenue;
+      metrics.net_revenue = rawRevenue / (1 + numericTaxRate);
+    }
 
-    // 2. The 'gross_revenue' is always calculated by adding tax to the net value.
-    metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
-    // END: Corrected Tax Calculation Logic
     // Calculate Occupancy.
     metrics.occupancy = capacityCount > 0 ? roomsSold / capacityCount : 0;
 
