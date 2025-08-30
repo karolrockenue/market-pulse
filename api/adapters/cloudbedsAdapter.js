@@ -51,22 +51,18 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
     const numericTaxRate = parseFloat(taxRate);
     console.log(`[DEBUG B] Parsed Tax Rate: numericTaxRate=${numericTaxRate}`);
 
+    // REFACTORED: Correct tax calculation logic
     if (pricingModel === "exclusive") {
-      const divisor = 1 + numericTaxRate;
-      const calculatedGross = rawRevenue * divisor;
-      console.log(
-        `[DEBUG C - Exclusive] Divisor=${divisor}, Calculated Gross=${calculatedGross}`
-      );
+      // For 'exclusive' pricing, the API provides the net revenue.
+      // We calculate gross by adding the tax. This logic is correct and remains unchanged.
       metrics.net_revenue = rawRevenue;
-      metrics.gross_revenue = calculatedGross;
+      metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     } else {
-      const divisor = 1 + numericTaxRate;
-      const calculatedNet = rawRevenue / divisor;
-      console.log(
-        `[DEBUG D - Inclusive] Divisor=${divisor}, Calculated Net=${calculatedNet}`
-      );
-      metrics.gross_revenue = rawRevenue;
-      metrics.net_revenue = calculatedNet;
+      // THE FIX: For 'inclusive' pricing, the Cloudbeds API still sends net revenue.
+      // The old logic incorrectly assumed this value was gross.
+      // We now correctly assign the raw value to net_revenue and calculate gross by adding tax.
+      metrics.net_revenue = rawRevenue;
+      metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     }
     console.log(
       `[DEBUG E] Assigned Metrics: net_revenue=${metrics.net_revenue}, gross_revenue=${metrics.gross_revenue}`
@@ -139,12 +135,16 @@ function processUpcomingApiData(allData, taxRate, pricingModel) {
 
     // Determine Net and Gross Revenue based on the hotel's pricing model.
     if (pricingModel === "exclusive") {
+      // For 'exclusive' pricing, the API provides the net revenue.
+      // We calculate gross by adding the tax. This logic remains correct.
       metrics.net_revenue = rawRevenue;
       metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     } else {
-      // Default to 'inclusive' if the model is anything else.
-      metrics.gross_revenue = rawRevenue;
-      metrics.net_revenue = rawRevenue / (1 + numericTaxRate);
+      // THE FIX: For 'inclusive' pricing, the Cloudbeds API still sends net revenue.
+      // The old logic incorrectly assumed this value was gross.
+      // We now correctly assign the raw value to net_revenue and calculate gross by adding tax.
+      metrics.net_revenue = rawRevenue;
+      metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     }
 
     // Calculate Occupancy.
