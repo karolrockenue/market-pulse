@@ -12,6 +12,10 @@
       "dest": "/api/daily-refresh.js"
     },
     {
+      "src": "/api/run-backfill",
+      "dest": "/api/run-backfill.js"
+    },
+    {
       "src": "/api/initial-sync",
       "dest": "/api/initial-sync.js"
     },
