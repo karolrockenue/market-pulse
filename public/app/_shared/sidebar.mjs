@@ -16,14 +16,58 @@ export default function sidebar() {
     currentPropertyId: null,
     currentPropertyName: "Loading...",
 
-    // --- INIT ---
-    // This runs when the component is initialized.
-    // /public/app/_shared/sidebar.mjs
+    // /public/app/dashboard.mjs
     init() {
-      console.log(`%c[SIDEBAR] 1. Initializing component.`, "color: #f59e0b");
-      this.fetchSessionInfo();
-      this.fetchProperties();
-      this.fetchLastRefreshTime();
+      // Set up the listener first, so it's ready for any event.
+      window.addEventListener("property-changed", (event) =>
+        this.handlePropertyChange(event.detail)
+      );
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const newPropertyId = urlParams.get("propertyId");
+      const isNewConnection = urlParams.get("newConnection") === "true";
+
+      // This is the authoritative logic for a new connection.
+      if (isNewConnection && newPropertyId) {
+        // 1. Set the correct ID in storage.
+        localStorage.setItem("currentPropertyId", newPropertyId);
+
+        // 2. Reliably trigger the initial sync from the frontend.
+        fetch("/api/initial-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ propertyId: newPropertyId }),
+        }).catch((err) =>
+          console.error("Failed to trigger initial sync from frontend:", err)
+        );
+
+        // 3. Start polling for sync completion and show the spinner.
+        this.isSyncing = true;
+        this.syncStatusInterval = setInterval(
+          () => this.checkSyncStatus(newPropertyId),
+          15000
+        );
+        this.checkSyncStatus(newPropertyId);
+
+        // 4. Dispatch the ONE authoritative event to tell all components which property to load.
+        // We use a small timeout to ensure the sidebar has had time to initialize its own listeners.
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("property-changed", {
+              detail: {
+                property_id: newPropertyId,
+                property_name: "Syncing New Property...",
+              },
+            })
+          );
+        }, 100);
+      }
+
+      this.initializeDashboard();
+
+      this.$watch("market", () => {
+        this.$nextTick(() => this.renderBreakdownCharts());
+      });
     },
 
     // --- METHODS ---
@@ -72,60 +116,41 @@ export default function sidebar() {
     },
 
     // /public/app/_shared/sidebar.mjs
-
     // /public/app/_shared/sidebar.mjs
+
     async fetchProperties() {
       try {
-        console.log(
-          `%c[SIDEBAR] 2. Fetching properties list from /api/my-properties...`,
-          "color: #f59e0b"
-        );
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
-        console.log(
-          `%c[SIDEBAR] 3. Received ${this.properties.length} properties.`,
-          "color: #f59e0b",
-          this.properties
-        );
 
         const isNewConnection = new URLSearchParams(window.location.search).has(
           "newConnection"
         );
 
         if (this.properties.length > 0) {
+          // If it's NOT a new connection, behave as normal (load saved or first property).
+          // If it IS a new connection, do nothing and wait for the dashboard to dispatch the event.
           if (!isNewConnection) {
             const savedPropertyId = localStorage.getItem("currentPropertyId");
-            console.log(
-              `%c[SIDEBAR] 4a. Not a new connection. Reading 'currentPropertyId' from localStorage. Value: ${savedPropertyId}`,
-              "color: #f59e0b"
-            );
             const isValidSavedProperty =
               savedPropertyId &&
               this.properties.some((p) => p.property_id == savedPropertyId);
             this.currentPropertyId = isValidSavedProperty
               ? savedPropertyId
               : this.properties[0].property_id;
-            console.log(
-              `%c[SIDEBAR] 4b. Setting active property ID to: ${this.currentPropertyId}`,
-              "color: #f59e0b"
-            );
             this.updateCurrentPropertyName();
             this.dispatchPropertyChangeEvent();
-          } else {
-            console.log(
-              `%c[SIDEBAR] 4c. New connection detected. Sidebar will wait for dashboard to lead.`,
-              "color: #f59e0b"
-            );
           }
         } else {
           this.currentPropertyName = "No properties found";
         }
       } catch (error) {
         console.error("Error fetching properties:", error);
+        this.properties = [];
+        this.currentPropertyName = "Error loading properties";
       }
     },
-
     async fetchLastRefreshTime() {
       try {
         const response = await fetch("/api/last-refresh-time");

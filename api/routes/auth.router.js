@@ -731,22 +731,28 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       // /api/routes/auth.router.js
 
+      // /api/routes/auth.router.js
+
+      // This array will hold the internal IDs of the property/properties just synced.
+      const newlySyncedInternalIds = [];
+
       // Sync hotel details and link properties to the user
       for (const property of userProperties) {
-        // THE FIX: Capture the internal hotel ID returned by the updated adapter function.
         const internalHotelId = await cloudbedsAdapter.syncHotelDetailsToDb(
           access_token,
           property.property_id,
           client
         );
 
-        // If the sync failed for some reason, the ID will be null. Skip this property.
         if (!internalHotelId) {
           console.warn(
             `Skipping property link for ${property.property_id} due to sync failure.`
           );
           continue;
         }
+
+        // Add the new internal ID to our list.
+        newlySyncedInternalIds.push(internalHotelId);
 
         const linkQuery = `
           INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
@@ -756,7 +762,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
             status = 'connected';
         `;
 
-        // THE FIX: Use the new internalHotelId to correctly link the user to the property.
         await client.query(linkQuery, [
           cloudbedsUser.user_id,
           internalHotelId,
@@ -766,7 +771,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       await client.query("COMMIT");
 
-      // Step 4: Handle session and redirect AFTER the database transaction is safely committed
+      // Step 4: Handle session and redirect
       req.session.userId = cloudbedsUser.user_id;
       req.session.role = userRole;
 
@@ -778,39 +783,26 @@ router.get("/cloudbeds/callback", async (req, res) => {
           );
           return res
             .status(500)
-            .send(
-              "Your account was connected, but we could not log you in. Please try logging in manually."
-            );
+            .send("Your account was connected, but we could not log you in.");
         }
 
-        // THE FIX: Use the new internal ID for the sync and redirect.
-        // We are re-querying the database for the user's first linked property's internal ID.
-        // This is the safest way to get the correct ID after the transaction is complete.
-        pgPool
-          .query(
-            "SELECT property_id FROM user_properties WHERE user_id = $1 ORDER BY property_id ASC LIMIT 1",
-            [cloudbedsUser.user_id]
-          )
-          .then((result) => {
-            if (result.rows.length > 0) {
-              const internalPropertyId = result.rows[0].property_id;
+        // THE FIX: Use the first ID from the list of properties we *just* synced.
+        // This guarantees we redirect to the new property, not an old one.
+        const primaryNewPropertyId = newlySyncedInternalIds[0];
 
-              // Redirect the user to the frontend with the correct internal ID.
-              res.redirect(
-                `/app/?newConnection=true&propertyId=${internalPropertyId}`
-              );
-            } else {
-              // Fallback redirect if no property is found for some reason.
-              res.redirect("/app/");
-            }
-          })
-          .catch((queryError) => {
-            console.error(
-              "Failed to query for property ID post-commit:",
-              queryError
-            );
-            res.redirect("/app/");
-          });
+        if (primaryNewPropertyId) {
+          // We no longer trigger the sync from the backend. We just redirect.
+          // The frontend will now handle the sync trigger reliably.
+          res.redirect(
+            `/app/?newConnection=true&propertyId=${primaryNewPropertyId}`
+          );
+        } else {
+          // Fallback if no properties were synced.
+          console.warn(
+            "OAuth callback completed but no new properties were synced."
+          );
+          res.redirect("/app/");
+        }
       });
     } catch (dbError) {
       await client.query("ROLLBACK");
