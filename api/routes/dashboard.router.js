@@ -450,32 +450,21 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     });
     // --- CORRECTED QUERY LOGIC END ---
 
-    // /api/routes/dashboard.js
-
     const period = getPeriod(granularity);
-
-    // This is the correct, simple query for this endpoint with the correct aliases.
-    // This is the final, correct query that uses the new reliable columns.
-    const query = `
+    // This query is now cleaned up to only select the new pre-calculated columns.
+    const metricsQuery = `
       SELECT
         ${period} as period,
-       
-        SUM(rooms_sold) as your_rooms_sold,
-       
-        AVG(capacity_count) as your_capacity_count,
-        AVG(occupancy_direct) as your_occupancy_direct,
-        
-        AVG(gross_adr) as your_adr,
-        AVG(gross_revpar) as your_revpar,
-        SUM(gross_revenue) as your_total_revenue,
-       
-        SUM(gross_revenue) as your_gross_revenue,
-        AVG(net_adr) as your_net_adr,
-        AVG(gross_adr) as your_gross_adr,
-        AVG(net_revpar) as your_net_revpar,
-        AVG(gross_revpar) as your_gross_revpar
-      FROM daily_metrics_snapshots
-      WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
+        AVG(dms.occupancy_direct) as market_occupancy,
+        -- New pre-calculated columns for the market
+        AVG(dms.net_adr) as market_net_adr,
+        AVG(dms.gross_adr) as market_gross_adr,
+        AVG(dms.net_revpar) as market_net_revpar,
+        AVG(dms.gross_revpar) as market_gross_revpar,
+        SUM(dms.net_revenue) as market_net_revenue,
+        SUM(dms.gross_revenue) as market_gross_revenue
+      FROM daily_metrics_snapshots dms
+      WHERE dms.hotel_id = ANY($1::int[]) AND dms.stay_date >= $2::date AND dms.stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
     `;
     const result = await pgPool.query(metricsQuery, [
