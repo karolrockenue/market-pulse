@@ -327,10 +327,8 @@ export default function () {
       }
     },
 
-    // --- STUCK SPINNER HARDENING ---
-    // If /api/sync-status stays 'false' but KPI endpoints already serve data,
-    // we consider sync complete (backend status is lagging). We also cache-bust
-    // the status call to dodge any proxy/browser staleness.
+    // /public/app/dashboard.mjs
+
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -338,25 +336,25 @@ export default function () {
         return;
       }
       try {
-        // 1) Ask the server if it thinks sync is done
         const statusRes = await fetch(
           `/api/sync-status/${propertyId}?t=${Date.now()}`
         );
         const status = await statusRes.json();
+
         const considerDone = async () => {
+          console.log(`Sync for property ${propertyId} is complete.`);
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
-          // Ensure we have a property selected before loading data
-          if (!this.currentPropertyId) this.currentPropertyId = propertyId;
-          // Clean URL (?newConnection=...&propertyId=...)
+
+          // Clean the URL parameters now that the new connection flow is done.
           history.pushState({}, "", window.location.pathname);
-          // Load a real preset before hiding the main sync spinner
-          await this.setPreset("current-month");
           this.isSyncing = false;
 
-          // --- NEW: Trigger the category modal ---
-          // Store the new property's ID so the save function knows which hotel to update.
+          // THE FIX: Dispatch the event to tell the sidebar to reload the property list.
+          // This ensures the new property is included before we proceed.
+          window.dispatchEvent(new CustomEvent("sync-complete"));
+
+          // Show the category modal for the user's final setup step.
           this.categorizationPropertyId = propertyId;
-          // Set the flag to true, which will make the modal appear on the screen.
           this.showCategoryModal = true;
         };
 
@@ -365,8 +363,7 @@ export default function () {
           return;
         }
 
-        // 2) Fallback probe: if KPI summary works, data exists -> treat as done
-        // Use a very small date window to keep the call cheap.
+        // The fallback probe logic remains the same.
         const today = new Date();
         const start = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
         const fmt = (d) =>
@@ -375,7 +372,6 @@ export default function () {
           )
             .toISOString()
             .split("T")[0];
-
         const probeUrl = `/api/kpi-summary?startDate=${fmt(
           start
         )}&endDate=${fmt(today)}&propertyId=${propertyId}`;
@@ -384,7 +380,6 @@ export default function () {
         });
         if (probeRes.ok) {
           const probe = await probeRes.json();
-          // If we get any numeric KPI back, we know snapshots exist and queries work.
           const hasData =
             probe?.yourHotel &&
             (Number.isFinite(probe.yourHotel.occupancy) ||
@@ -395,11 +390,8 @@ export default function () {
             return;
           }
         }
-
-        // 3) Otherwise keep polling
       } catch (err) {
         console.error("Error checking sync status (with fallback):", err);
-        // Fail safe: stop spinner instead of trapping user forever
         this.isSyncing = false;
         if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
       }

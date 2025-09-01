@@ -16,58 +16,21 @@ export default function sidebar() {
     currentPropertyId: null,
     currentPropertyName: "Loading...",
 
-    // /public/app/dashboard.mjs
+    // /public/app/_shared/sidebar.mjs
+
     init() {
-      // Set up the listener first, so it's ready for any event.
-      window.addEventListener("property-changed", (event) =>
-        this.handlePropertyChange(event.detail)
-      );
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const newPropertyId = urlParams.get("propertyId");
-      const isNewConnection = urlParams.get("newConnection") === "true";
-
-      // This is the authoritative logic for a new connection.
-      if (isNewConnection && newPropertyId) {
-        // 1. Set the correct ID in storage.
-        localStorage.setItem("currentPropertyId", newPropertyId);
-
-        // 2. Reliably trigger the initial sync from the frontend.
-        fetch("/api/initial-sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ propertyId: newPropertyId }),
-        }).catch((err) =>
-          console.error("Failed to trigger initial sync from frontend:", err)
+      // THE FIX: Listen for a custom event that the dashboard will send when a sync is done.
+      // This forces the sidebar to reload the property list at the correct time.
+      window.addEventListener("sync-complete", () => {
+        console.log(
+          "[SIDEBAR] Received sync-complete event. Re-fetching properties..."
         );
-
-        // 3. Start polling for sync completion and show the spinner.
-        this.isSyncing = true;
-        this.syncStatusInterval = setInterval(
-          () => this.checkSyncStatus(newPropertyId),
-          15000
-        );
-        this.checkSyncStatus(newPropertyId);
-
-        // 4. Dispatch the ONE authoritative event to tell all components which property to load.
-        // We use a small timeout to ensure the sidebar has had time to initialize its own listeners.
-        setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent("property-changed", {
-              detail: {
-                property_id: newPropertyId,
-                property_name: "Syncing New Property...",
-              },
-            })
-          );
-        }, 100);
-      }
-
-      this.initializeDashboard();
-
-      this.$watch("market", () => {
-        this.$nextTick(() => this.renderBreakdownCharts());
+        this.fetchProperties();
       });
+
+      this.fetchSessionInfo();
+      this.fetchProperties();
+      this.fetchLastRefreshTime();
     },
 
     // --- METHODS ---
@@ -116,7 +79,6 @@ export default function sidebar() {
     },
 
     // /public/app/_shared/sidebar.mjs
-    // /public/app/_shared/sidebar.mjs
 
     async fetchProperties() {
       try {
@@ -124,21 +86,23 @@ export default function sidebar() {
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
 
-        const isNewConnection = new URLSearchParams(window.location.search).has(
-          "newConnection"
-        );
-
         if (this.properties.length > 0) {
-          // If it's NOT a new connection, behave as normal (load saved or first property).
-          // If it IS a new connection, do nothing and wait for the dashboard to dispatch the event.
-          if (!isNewConnection) {
-            const savedPropertyId = localStorage.getItem("currentPropertyId");
-            const isValidSavedProperty =
-              savedPropertyId &&
-              this.properties.some((p) => p.property_id == savedPropertyId);
-            this.currentPropertyId = isValidSavedProperty
-              ? savedPropertyId
-              : this.properties[0].property_id;
+          const savedPropertyId = localStorage.getItem("currentPropertyId");
+          const isValidSavedProperty =
+            savedPropertyId &&
+            this.properties.some((p) => p.property_id == savedPropertyId);
+
+          // THE FIX: Only select a property and dispatch an event if the saved property is valid.
+          // This prevents the sidebar from incorrectly choosing the "wrong" property during a new sync.
+          if (isValidSavedProperty) {
+            this.currentPropertyId = savedPropertyId;
+            this.updateCurrentPropertyName();
+            this.dispatchPropertyChangeEvent();
+          } else {
+            // If no valid saved property is found, try defaulting to the first in the list.
+            // This is a safe fallback for normal page loads.
+            this.currentPropertyId = this.properties[0].property_id;
+            localStorage.setItem("currentPropertyId", this.currentPropertyId);
             this.updateCurrentPropertyName();
             this.dispatchPropertyChangeEvent();
           }
