@@ -646,68 +646,96 @@ async function getHotelDetails(accessToken, propertyId) {
  * @returns {Promise<void>}
  */
 // /api/adapters/cloudbedsAdapter.js
+// /api/adapters/cloudbedsAdapter.js
 
 async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   console.log(
-    `[Sync Function] Starting detail sync for property ${propertyId}...`
+    `[Sync Function] Starting detail sync for Cloudbeds property ${propertyId}...`
   );
-
   const hotelDetails = await getHotelDetails(accessToken, propertyId);
   if (!hotelDetails) {
     console.error(`[Sync Function] Could not fetch details for ${propertyId}.`);
     return null;
   }
 
-  // THE FIX: Fetch the neighborhood using the coordinates from the hotel details.
+  // THE FIX: First, check if a hotel exists with this ID in EITHER the new or old column.
+  const checkQuery = `
+    SELECT hotel_id FROM hotels 
+    WHERE pms_property_id = $1 OR hotel_id = $1::integer
+  `;
+  const existingHotelResult = await dbClient.query(checkQuery, [propertyId]);
+  const existingHotel = existingHotelResult.rows[0];
+
   const neighborhood = await getNeighborhoodFromCoords(
     hotelDetails.propertyAddress.propertyLatitude,
     hotelDetails.propertyAddress.propertyLongitude
   );
 
-  const query = `
-    INSERT INTO hotels (
-      pms_property_id, property_name, city, currency_code, pms_type, latitude, longitude,
-      address_1, country, zip_postal_code, property_type, neighborhood, go_live_date
-    )
-    VALUES ($1, $2, $3, $4, 'cloudbeds', $5, $6, $7, $8, $9, $10, $11, NOW())
-    ON CONFLICT (pms_property_id) DO UPDATE SET
-      property_name = EXCLUDED.property_name,
-      city = EXCLUDED.city,
-      currency_code = EXCLUDED.currency_code,
-      latitude = EXCLUDED.latitude,
-      longitude = EXCLUDED.longitude,
-      address_1 = EXCLUDED.address_1,
-      country = EXCLUDED.country,
-      zip_postal_code = EXCLUDED.zip_postal_code,
-      property_type = EXCLUDED.property_type,
-      neighborhood = EXCLUDED.neighborhood
-    RETURNING hotel_id;
-  `;
+  let internalHotelId;
 
-  const values = [
-    hotelDetails.propertyID,
-    hotelDetails.propertyName,
-    hotelDetails.propertyAddress.propertyCity,
-    hotelDetails.propertyCurrency.currencyCode,
-    hotelDetails.propertyAddress.propertyLatitude,
-    hotelDetails.propertyAddress.propertyLongitude,
-    hotelDetails.propertyAddress.propertyAddress1,
-    hotelDetails.propertyAddress.propertyCountry,
-    hotelDetails.propertyAddress.propertyZip,
-    hotelDetails.propertyType,
-    neighborhood, // Add the fetched neighborhood to the insert values.
-  ];
-
-  const result = await dbClient.query(query, values);
-  const internalHotelId = result.rows[0].hotel_id;
+  if (existingHotel) {
+    // --- UPDATE PATH ---
+    // If the hotel already exists, UPDATE its record with the latest details.
+    internalHotelId = existingHotel.hotel_id;
+    console.log(
+      `[Sync Function] Existing hotel found with internal ID ${internalHotelId}. Updating details...`
+    );
+    const updateQuery = `
+      UPDATE hotels SET
+        pms_property_id = $1, property_name = $2, city = $3, currency_code = $4,
+        latitude = $5, longitude = $6, address_1 = $7, country = $8,
+        zip_postal_code = $9, property_type = $10, neighborhood = $11, pms_type = 'cloudbeds'
+      WHERE hotel_id = $12;
+    `;
+    await dbClient.query(updateQuery, [
+      hotelDetails.propertyID,
+      hotelDetails.propertyName,
+      hotelDetails.propertyAddress.propertyCity,
+      hotelDetails.propertyCurrency.currencyCode,
+      hotelDetails.propertyAddress.propertyLatitude,
+      hotelDetails.propertyAddress.propertyLongitude,
+      hotelDetails.propertyAddress.propertyAddress1,
+      hotelDetails.propertyAddress.propertyCountry,
+      hotelDetails.propertyAddress.propertyZip,
+      hotelDetails.propertyType,
+      neighborhood,
+      internalHotelId,
+    ]);
+  } else {
+    // --- INSERT PATH ---
+    // If no hotel is found, INSERT a new record.
+    console.log(
+      `[Sync Function] No existing hotel found. Creating new record...`
+    );
+    const insertQuery = `
+      INSERT INTO hotels (
+        pms_property_id, property_name, city, currency_code, pms_type, latitude, longitude,
+        address_1, country, zip_postal_code, property_type, neighborhood, go_live_date
+      )
+      VALUES ($1, $2, $3, $4, 'cloudbeds', $5, $6, $7, $8, $9, $10, $11, NOW())
+      RETURNING hotel_id;
+    `;
+    const result = await dbClient.query(insertQuery, [
+      hotelDetails.propertyID,
+      hotelDetails.propertyName,
+      hotelDetails.propertyAddress.propertyCity,
+      hotelDetails.propertyCurrency.currencyCode,
+      hotelDetails.propertyAddress.propertyLatitude,
+      hotelDetails.propertyAddress.propertyLongitude,
+      hotelDetails.propertyAddress.propertyAddress1,
+      hotelDetails.propertyAddress.propertyCountry,
+      hotelDetails.propertyAddress.propertyZip,
+      hotelDetails.propertyType,
+      neighborhood,
+    ]);
+    internalHotelId = result.rows[0].hotel_id;
+  }
 
   console.log(
     `[Sync Function] Successfully synced details for property ${propertyId}. Internal hotel_id is ${internalHotelId}.`
   );
-
   return internalHotelId;
 }
-
 /**
  * Fetches tax details and saves them to our local database.
  * @param {string} accessToken - A valid Cloudbeds access token or API key.
