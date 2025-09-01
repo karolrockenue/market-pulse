@@ -655,26 +655,35 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   const hotelDetails = await getHotelDetails(accessToken, propertyId);
   if (!hotelDetails) {
     console.error(`[Sync Function] Could not fetch details for ${propertyId}.`);
-    // Return null if details can't be fetched, so the calling function knows to skip.
     return null;
   }
 
-  // THE FIX: This query now inserts the original Cloudbeds ID into `pms_property_id`
-  // and lets the database auto-generate the primary key `hotel_id`.
-  // It uses ON CONFLICT with `pms_property_id` to prevent duplicates.
-  // It also returns the new (or existing) internal `hotel_id`.
+  // THE FIX: Fetch the neighborhood using the coordinates from the hotel details.
+  const neighborhood = await getNeighborhoodFromCoords(
+    hotelDetails.propertyAddress.propertyLatitude,
+    hotelDetails.propertyAddress.propertyLongitude
+  );
+
   const query = `
     INSERT INTO hotels (
-      pms_property_id, property_name, city, currency_code, pms_type,
-      latitude, longitude, go_live_date
+      pms_property_id, property_name, city, currency_code, pms_type, latitude, longitude,
+      address_1, country, zip_postal_code, property_type, neighborhood, go_live_date
     )
-    VALUES ($1, $2, $3, $4, 'cloudbeds', $5, $6, NOW())
+    VALUES ($1, $2, $3, $4, 'cloudbeds', $5, $6, $7, $8, $9, $10, $11, NOW())
     ON CONFLICT (pms_property_id) DO UPDATE SET
       property_name = EXCLUDED.property_name,
       city = EXCLUDED.city,
-      currency_code = EXCLUDED.currency_code
+      currency_code = EXCLUDED.currency_code,
+      latitude = EXCLUDED.latitude,
+      longitude = EXCLUDED.longitude,
+      address_1 = EXCLUDED.address_1,
+      country = EXCLUDED.country,
+      zip_postal_code = EXCLUDED.zip_postal_code,
+      property_type = EXCLUDED.property_type,
+      neighborhood = EXCLUDED.neighborhood
     RETURNING hotel_id;
   `;
+
   const values = [
     hotelDetails.propertyID,
     hotelDetails.propertyName,
@@ -682,9 +691,13 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     hotelDetails.propertyCurrency.currencyCode,
     hotelDetails.propertyAddress.propertyLatitude,
     hotelDetails.propertyAddress.propertyLongitude,
+    hotelDetails.propertyAddress.propertyAddress1,
+    hotelDetails.propertyAddress.propertyCountry,
+    hotelDetails.propertyAddress.propertyZip,
+    hotelDetails.propertyType,
+    neighborhood, // Add the fetched neighborhood to the insert values.
   ];
 
-  // Execute the query and capture the result.
   const result = await dbClient.query(query, values);
   const internalHotelId = result.rows[0].hotel_id;
 
@@ -692,7 +705,6 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     `[Sync Function] Successfully synced details for property ${propertyId}. Internal hotel_id is ${internalHotelId}.`
   );
 
-  // Return the internal database ID. This is critical for the next step.
   return internalHotelId;
 }
 
@@ -768,23 +780,44 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
  * @param {string} propertyId - The ID of the property to disable.
  * @returns {Promise<void>}
  */
-async function setAppDisabled(accessToken, propertyId) {
-  const url = "https://api.cloudbeds.com/api/v1.1/postAppState";
+async function setAppDisabled(accessToken, internalPropertyId) {
+  // THE FIX: Look up the original PMS ID from our database using the internal ID.
+  const hotelResult = await pgPool.query(
+    "SELECT pms_property_id, pms_type FROM hotels WHERE hotel_id = $1",
+    [internalPropertyId]
+  );
 
+  if (hotelResult.rows.length === 0) {
+    throw new Error(`Hotel with internal ID ${internalPropertyId} not found.`);
+  }
+
+  const hotel = hotelResult.rows[0];
+
+  // This function is Cloudbeds-specific, so we ensure we're not accidentally running it for another PMS.
+  if (hotel.pms_type !== "cloudbeds") {
+    console.log(
+      `[Adapter] Skipping app disable for non-Cloudbeds property ${internalPropertyId}.`
+    );
+    return;
+  }
+
+  // Use the correct, original Cloudbeds ID for the API call.
+  const cloudbedsPropertyId = hotel.pms_property_id;
+
+  const url = "https://api.cloudbeds.com/api/v1.1/postAppState";
   const params = new URLSearchParams();
-  params.append("propertyID", propertyId);
-  // CORRECTED: Use the 'disabled' value as specified in the new documentation screenshot.
+  params.append("propertyID", cloudbedsPropertyId);
   params.append("app_state", "disabled");
 
   console.log(
-    `[Adapter] Setting app_state to 'disabled' for property ${propertyId} in Cloudbeds.`
+    `[Adapter] Setting app_state to 'disabled' for Cloudbeds property ${cloudbedsPropertyId} (Internal ID: ${internalPropertyId}).`
   );
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "X-PROPERTY-ID": propertyId,
+      "X-PROPERTY-ID": cloudbedsPropertyId,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params,
@@ -792,12 +825,9 @@ async function setAppDisabled(accessToken, propertyId) {
 
   const data = await response.json();
 
-  // If the API call was not successful, we now throw an error.
-  // This will be caught by the route handler, which will prevent the disconnection
-  // from completing in our database. This makes the entire operation atomic.
   if (!response.ok || !data.success) {
     console.error(
-      `[Adapter] Failed to disable app for property ${propertyId}. Response: ${JSON.stringify(
+      `[Adapter] Failed to disable app for property ${cloudbedsPropertyId}. Response: ${JSON.stringify(
         data
       )}`
     );
@@ -809,7 +839,7 @@ async function setAppDisabled(accessToken, propertyId) {
   }
 
   console.log(
-    `[Adapter] Successfully disabled app for property ${propertyId} in Cloudbeds.`
+    `[Adapter] Successfully disabled app for property ${cloudbedsPropertyId} in Cloudbeds.`
   );
 }
 

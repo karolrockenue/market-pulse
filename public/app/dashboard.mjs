@@ -553,39 +553,44 @@ export default function () {
       }
     },
 
-    // --- NEW: Method to save the selected hotel category ---
     async saveCategory() {
-      // Guard clause: Do nothing if the property ID for categorization isn't set.
-      if (!this.categorizationPropertyId) {
-        console.error("Cannot save category: property ID is missing.");
+      // Added logging to see what's happening when the button is clicked.
+      console.log(
+        `Attempting to save category '${this.selectedCategory}' for property ID: ${this.categorizationPropertyId}`
+      );
+
+      if (!this.categorizationPropertyId || !this.selectedCategory) {
+        console.error(
+          "Cannot save category: property ID or selected category is missing."
+        );
+        this.showError("Please select a category before saving.");
         return;
       }
 
       try {
-        // Send a PATCH request to our new endpoint.
         const response = await fetch(
           `/api/my-properties/${this.categorizationPropertyId}/category`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            // The body contains the category the user selected in the modal.
             body: JSON.stringify({ category: this.selectedCategory }),
           }
         );
 
-        // If the server response is not OK (e.g., 404, 500), throw an error.
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || "Server responded with an error.");
         }
 
-        // If the save is successful, hide the modal.
+        console.log("Category saved successfully.");
         this.showCategoryModal = false;
+
+        // After saving, refresh the market composition card to reflect the new category.
+        this.runReport();
       } catch (error) {
-        // If an error occurs during the fetch, show it to the user.
         console.error("Failed to save hotel category:", error);
         this.showError(
-          "Could not save your selection. Please try again later."
+          `Could not save your selection. Error: ${error.message}`
         );
       }
     },
