@@ -783,31 +783,50 @@ router.get("/cloudbeds/callback", async (req, res) => {
             );
         }
 
-        const primaryPropertyId = userProperties[0]?.property_id;
-        if (primaryPropertyId) {
-          const syncUrl =
-            process.env.VERCEL_ENV === "production"
-              ? "https://www.market-pulse.io/api/initial-sync"
-              : "http://localhost:3000/api/initial-sync";
-          fetch(syncUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
-            },
-            body: JSON.stringify({ propertyId: primaryPropertyId }),
-          }).catch((syncErr) =>
-            console.error("Failed to trigger initial sync:", syncErr)
-          );
-        }
-        // /api/routes/auth.router.js
+        // THE FIX: Use the new internal ID for the sync and redirect.
+        // We are re-querying the database for the user's first linked property's internal ID.
+        // This is the safest way to get the correct ID after the transaction is complete.
+        pgPool
+          .query(
+            "SELECT property_id FROM user_properties WHERE user_id = $1 ORDER BY property_id ASC LIMIT 1",
+            [cloudbedsUser.user_id]
+          )
+          .then((result) => {
+            if (result.rows.length > 0) {
+              const internalPropertyId = result.rows[0].property_id;
 
-        // CRITICAL FIX: Add the new propertyId to the redirect URL.
-        // This allows the frontend to know exactly which property to select
-        // and check the sync status for.
-        res.redirect(
-          `/app/?newConnection=true&propertyId=${primaryPropertyId}`
-        );
+              // Trigger the initial sync with the correct internal ID.
+              const syncUrl =
+                process.env.VERCEL_ENV === "production"
+                  ? "https://www.market-pulse.io/api/initial-sync"
+                  : "http://localhost:3000/api/initial-sync";
+              fetch(syncUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
+                },
+                body: JSON.stringify({ propertyId: internalPropertyId }),
+              }).catch((syncErr) =>
+                console.error("Failed to trigger initial sync:", syncErr)
+              );
+
+              // Redirect the user to the frontend with the correct internal ID.
+              res.redirect(
+                `/app/?newConnection=true&propertyId=${internalPropertyId}`
+              );
+            } else {
+              // Fallback redirect if no property is found for some reason.
+              res.redirect("/app/");
+            }
+          })
+          .catch((queryError) => {
+            console.error(
+              "Failed to query for property ID post-commit:",
+              queryError
+            );
+            res.redirect("/app/");
+          });
       });
     } catch (dbError) {
       await client.query("ROLLBACK");
