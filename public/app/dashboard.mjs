@@ -578,12 +578,10 @@ export default function () {
       }
     },
 
-    async saveCategory() {
-      // Added logging to see what's happening when the button is clicked.
-      console.log(
-        `Attempting to save category '${this.selectedCategory}' for property ID: ${this.categorizationPropertyId}`
-      );
+    // /public/app/dashboard.mjs
+    // /public/app/dashboard.mjs
 
+    async saveCategory() {
       if (!this.categorizationPropertyId || !this.selectedCategory) {
         console.error(
           "Cannot save category: property ID or selected category is missing."
@@ -610,8 +608,12 @@ export default function () {
         console.log("Category saved successfully.");
         this.showCategoryModal = false;
 
-        // After saving, refresh the market composition card to reflect the new category.
-        this.runReport();
+        // THE FIX: We introduce a small delay before reloading the dashboard data.
+        // This ensures the database has time to commit the category change from the previous
+        // request before we ask for new data that depends on it.
+        setTimeout(() => {
+          this.setPreset("current-month");
+        }, 250); // A 250ms delay is imperceptible to the user but enough for the DB.
       } catch (error) {
         console.error("Failed to save hotel category:", error);
         this.showError(
