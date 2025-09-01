@@ -69,21 +69,33 @@ export default function sidebar() {
       }
     },
 
+    // /public/app/_shared/sidebar.mjs
+
     async fetchProperties() {
       try {
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
+
+        // THE FIX: Check if we are in the middle of a new connection flow.
+        const isNewConnection = new URLSearchParams(window.location.search).has(
+          "newConnection"
+        );
+
         if (this.properties.length > 0) {
-          const savedPropertyId = localStorage.getItem("currentPropertyId");
-          const isValidSavedProperty =
-            savedPropertyId &&
-            this.properties.some((p) => p.property_id == savedPropertyId);
-          this.currentPropertyId = isValidSavedProperty
-            ? savedPropertyId
-            : this.properties[0].property_id;
-          this.updateCurrentPropertyName();
-          this.dispatchPropertyChangeEvent();
+          // If it's NOT a new connection, behave as normal.
+          // If it IS a new connection, do nothing and wait for the dashboard to take the lead.
+          if (!isNewConnection) {
+            const savedPropertyId = localStorage.getItem("currentPropertyId");
+            const isValidSavedProperty =
+              savedPropertyId &&
+              this.properties.some((p) => p.property_id == savedPropertyId);
+            this.currentPropertyId = isValidSavedProperty
+              ? savedPropertyId
+              : this.properties[0].property_id;
+            this.updateCurrentPropertyName();
+            this.dispatchPropertyChangeEvent();
+          }
         } else {
           this.currentPropertyName = "No properties found";
         }
