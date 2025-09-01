@@ -729,13 +729,24 @@ router.get("/cloudbeds/callback", async (req, res) => {
         token_expiry: new Date(Date.now() + expires_in * 1000),
       };
 
+      // /api/routes/auth.router.js
+
       // Sync hotel details and link properties to the user
       for (const property of userProperties) {
-        await cloudbedsAdapter.syncHotelDetailsToDb(
+        // THE FIX: Capture the internal hotel ID returned by the updated adapter function.
+        const internalHotelId = await cloudbedsAdapter.syncHotelDetailsToDb(
           access_token,
           property.property_id,
           client
         );
+
+        // If the sync failed for some reason, the ID will be null. Skip this property.
+        if (!internalHotelId) {
+          console.warn(
+            `Skipping property link for ${property.property_id} due to sync failure.`
+          );
+          continue;
+        }
 
         const linkQuery = `
           INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
@@ -744,9 +755,11 @@ router.get("/cloudbeds/callback", async (req, res) => {
             pms_credentials = EXCLUDED.pms_credentials,
             status = 'connected';
         `;
+
+        // THE FIX: Use the new internalHotelId to correctly link the user to the property.
         await client.query(linkQuery, [
           cloudbedsUser.user_id,
-          property.property_id,
+          internalHotelId,
           pmsCredentials,
         ]);
       }

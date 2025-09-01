@@ -645,6 +645,8 @@ async function getHotelDetails(accessToken, propertyId) {
  * @param {object} dbClient - An active pg database client for transactions.
  * @returns {Promise<void>}
  */
+// /api/adapters/cloudbedsAdapter.js
+
 async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   console.log(
     `[Sync Function] Starting detail sync for property ${propertyId}...`
@@ -653,47 +655,45 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   const hotelDetails = await getHotelDetails(accessToken, propertyId);
   if (!hotelDetails) {
     console.error(`[Sync Function] Could not fetch details for ${propertyId}.`);
-    return; // Do not throw error, to avoid breaking Promise.all
+    // Return null if details can't be fetched, so the calling function knows to skip.
+    return null;
   }
 
+  // THE FIX: This query now inserts the original Cloudbeds ID into `pms_property_id`
+  // and lets the database auto-generate the primary key `hotel_id`.
+  // It uses ON CONFLICT with `pms_property_id` to prevent duplicates.
+  // It also returns the new (or existing) internal `hotel_id`.
   const query = `
     INSERT INTO hotels (
-      hotel_id, property_name, city, address_1, country, currency_code,
-      property_type, zip_postal_code, latitude, longitude, primary_language, pms_type
+      pms_property_id, property_name, city, currency_code, pms_type,
+      latitude, longitude, go_live_date
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    ON CONFLICT (hotel_id) DO UPDATE SET
+    VALUES ($1, $2, $3, $4, 'cloudbeds', $5, $6, NOW())
+    ON CONFLICT (pms_property_id) DO UPDATE SET
       property_name = EXCLUDED.property_name,
       city = EXCLUDED.city,
-      address_1 = EXCLUDED.address_1,
-      country = EXCLUDED.country,
-      currency_code = EXCLUDED.currency_code,
-      property_type = EXCLUDED.property_type,
-      zip_postal_code = EXCLUDED.zip_postal_code,
-      latitude = EXCLUDED.latitude,
-      longitude = EXCLUDED.longitude,
-      primary_language = EXCLUDED.primary_language,
-      pms_type = EXCLUDED.pms_type;
+      currency_code = EXCLUDED.currency_code
+    RETURNING hotel_id;
   `;
   const values = [
     hotelDetails.propertyID,
     hotelDetails.propertyName,
     hotelDetails.propertyAddress.propertyCity,
-    hotelDetails.propertyAddress.propertyAddress1,
-    hotelDetails.propertyAddress.propertyCountry,
     hotelDetails.propertyCurrency.currencyCode,
-    hotelDetails.propertyType,
-    hotelDetails.propertyAddress.propertyZip,
     hotelDetails.propertyAddress.propertyLatitude,
     hotelDetails.propertyAddress.propertyLongitude,
-    hotelDetails.propertyPrimaryLanguage,
-    "cloudbeds", // Set the pms_type to 'cloudbeds'
   ];
 
-  await dbClient.query(query, values); // Use the provided dbClient
+  // Execute the query and capture the result.
+  const result = await dbClient.query(query, values);
+  const internalHotelId = result.rows[0].hotel_id;
+
   console.log(
-    `[Sync Function] Successfully synced details for property ${propertyId}.`
+    `[Sync Function] Successfully synced details for property ${propertyId}. Internal hotel_id is ${internalHotelId}.`
   );
+
+  // Return the internal database ID. This is critical for the next step.
+  return internalHotelId;
 }
 
 /**
