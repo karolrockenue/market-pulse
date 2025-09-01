@@ -512,8 +512,10 @@ router.patch(
       // Security check: For regular users, verify they have access to this property.
       // super_admin users can bypass this check.
       if (req.session.role !== "super_admin") {
+        // THE FIX: Explicitly cast the propertyId from the URL to an integer.
+        // This prevents a hard crash in the database driver from a type mismatch.
         const accessCheck = await pgPool.query(
-          "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
+          "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2::integer",
           [req.session.userId, propertyId]
         );
         if (accessCheck.rows.length === 0) {

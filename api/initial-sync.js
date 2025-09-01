@@ -44,58 +44,59 @@ async function runSync(propertyId) {
     );
     console.log("✅ Existing data cleared.");
 
+    // /api/initial-sync.js
+
     // ==================================================================
-    // CLOUDBEDS LOGIC PATH (Existing code, moved but unchanged)
+    // CLOUDBEDS LOGIC PATH
     // ==================================================================
     if (pmsType === "cloudbeds") {
       console.log("--- Running Cloudbeds Sync ---");
+
+      // THE FIX: Get the pms_property_id from the hotels table first.
+      const hotelDetailsResult = await client.query(
+        "SELECT pms_property_id, tax_rate, tax_type FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+      const pmsPropertyId = hotelDetailsResult.rows[0]?.pms_property_id;
+      // This provides a fallback for old hotels where pms_property_id is null.
+      // In that case, the internal propertyId IS the correct Cloudbeds ID.
+      const cloudbedsApiId = pmsPropertyId || propertyId;
+
       // Get user and credential info
-      const result = await client.query(
-        `SELECT u.cloudbeds_user_id, up.pms_credentials
-         FROM users u
+      const userResult = await client.query(
+        `SELECT u.cloudbeds_user_id FROM users u
          JOIN user_properties up ON u.cloudbeds_user_id = up.user_id
          WHERE up.property_id = $1::integer LIMIT 1`,
         [propertyId]
       );
 
-      if (result.rows.length === 0) {
+      if (userResult.rows.length === 0) {
         throw new Error(`No user link found for property ${propertyId}.`);
       }
-      const user = result.rows[0];
+      const user = userResult.rows[0];
+      // getAccessToken uses our internal ID, which is correct for finding credentials.
       const accessToken = await cloudbedsAdapter.getAccessToken(propertyId);
 
-      // Sync metadata
-      console.log(`Syncing hotel metadata for property ${propertyId}...`);
-      await Promise.all([
-        cloudbedsAdapter.syncHotelDetailsToDb(accessToken, propertyId, client),
-        cloudbedsAdapter.syncHotelTaxInfoToDb(accessToken, propertyId, client),
-      ]);
-      const hotelRes = await client.query(
-        "SELECT latitude, longitude FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+      // Sync metadata using the correct ID for the Cloudbeds API.
+      console.log(
+        `Syncing hotel metadata for Cloudbeds property ${cloudbedsApiId}...`
       );
-      const coords = hotelRes.rows[0];
-      if (coords && coords.latitude && coords.longitude) {
-        const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
-          coords.latitude,
-          coords.longitude
-        );
-        if (neighborhood) {
-          await client.query(
-            "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
-            [neighborhood, propertyId]
-          );
-        }
-      }
+      await cloudbedsAdapter.syncHotelDetailsToDb(
+        accessToken,
+        cloudbedsApiId,
+        client
+      );
+      await cloudbedsAdapter.syncHotelTaxInfoToDb(
+        accessToken,
+        cloudbedsApiId,
+        client
+      );
+
       console.log("✅ Hotel metadata sync complete.");
 
       // Fetch historical metrics
-      const hotelInfoResult = await client.query(
-        "SELECT tax_rate, tax_type FROM hotels WHERE hotel_id = $1",
-        [propertyId]
-      );
-      const taxRate = hotelInfoResult.rows[0]?.tax_rate || 0;
-      const pricingModel = hotelInfoResult.rows[0]?.tax_type || "inclusive";
+      const taxRate = hotelDetailsResult.rows[0]?.tax_rate || 0;
+      const pricingModel = hotelDetailsResult.rows[0]?.tax_type || "inclusive";
 
       let allProcessedData = {};
       const startYear = new Date().getFullYear() - 5;
@@ -115,9 +116,11 @@ async function runSync(propertyId) {
               "0"
             )}...`
           );
+
+          // Use the correct cloudbedsApiId for the API call.
           const monthlyData = await cloudbedsAdapter.getHistoricalMetrics(
             accessToken,
-            propertyId,
+            cloudbedsApiId,
             monthStartDate,
             monthEndDate,
             taxRate,
@@ -128,20 +131,15 @@ async function runSync(propertyId) {
       }
 
       console.log("Fetching forecast data for the next 365 days...");
+      // Use the correct cloudbedsApiId for the API call.
       const futureData = await cloudbedsAdapter.getUpcomingMetrics(
         accessToken,
-        propertyId,
+        cloudbedsApiId,
         taxRate,
         pricingModel
       );
       allProcessedData = { ...allProcessedData, ...futureData };
 
-      allProcessedData = { ...allProcessedData, ...futureData };
-
-      // --- NEW LOGIC TO SET GO_LIVE_DATE ---
-      // Find the earliest date from all the data we've collected.
-      // --- NEW LOGIC TO SET GO_LIVE_DATE ---
-      // Find the earliest date that has actual activity (rooms sold or revenue).
       const sortedDates = Object.keys(allProcessedData).sort();
       const earliestDate = sortedDates.find(
         (date) =>
@@ -151,13 +149,11 @@ async function runSync(propertyId) {
 
       if (earliestDate) {
         console.log(`Setting effective go_live_date to: ${earliestDate}`);
-        // As you described, run the UPDATE query to store this date.
         await client.query(
           `UPDATE hotels SET go_live_date = $1 WHERE hotel_id = $2`,
           [earliestDate, propertyId]
         );
       }
-      // --- END NEW LOGIC ---
 
       const datesToUpdate = Object.keys(allProcessedData);
 
