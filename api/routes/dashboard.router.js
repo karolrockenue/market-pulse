@@ -509,6 +509,8 @@ router.patch(
     }
 
     try {
+      // /api/routes/dashboard.router.js
+
       // Security check: For regular users, verify they have access to this property.
       // super_admin users can bypass this check.
       if (req.session.role !== "super_admin") {

@@ -185,14 +185,31 @@ export default function () {
     isInitialLoad: true,
     ranking: null,
 
-    // --- INITIALIZATION ---
+    // /public/app/dashboard.mjs
+
+    // /public/app/dashboard.mjs
+
     init() {
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
 
+      // THE FIX: This entire block is new. It makes the dashboard proactive.
       if (newPropertyId) {
+        // Set the ID in local storage so the sidebar can pick it up.
         localStorage.setItem("currentPropertyId", newPropertyId);
+        // Immediately dispatch the event to force the dashboard to load the correct property,
+        // rather than waiting for the sidebar to initialize.
+        this.$nextTick(() => {
+          window.dispatchEvent(
+            new CustomEvent("property-changed", {
+              detail: {
+                property_id: newPropertyId,
+                property_name: "Loading...",
+              },
+            })
+          );
+        });
       }
 
       if (isNewConnection && newPropertyId) {
@@ -204,17 +221,12 @@ export default function () {
         this.checkSyncStatus(newPropertyId);
       }
 
-      // ...
       window.addEventListener("property-changed", (event) =>
         this.handlePropertyChange(event.detail)
       );
       this.initializeDashboard();
 
-      // NEW: Watch for changes to the 'market' object.
-      // Whenever it's updated with new data, this will automatically
-      // call our rendering function to redraw the visual bars.
       this.$watch("market", () => {
-        // Use $nextTick to ensure the DOM is ready before we try to draw.
         this.$nextTick(() => this.renderBreakdownCharts());
       });
     },
