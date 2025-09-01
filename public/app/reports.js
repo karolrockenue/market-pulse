@@ -391,6 +391,7 @@ function exportToExcel(propertyName) {
 
 // public/app/reports.js
 // public/app/reports.js
+// public/app/reports.js
 
 function formatValue(value, columnName, isDelta = false, currencyCode = "USD") {
   if (typeof value !== "number" || isNaN(value)) return "-";
@@ -403,7 +404,14 @@ function formatValue(value, columnName, isDelta = false, currencyCode = "USD") {
     : "";
 
   let formattedValue;
-  if (lowerCaseCol.includes("occupancy")) {
+  // NEW: Added a check for rooms sold/unsold to ensure they are always integers.
+  if (
+    lowerCaseCol.includes("rooms sold") ||
+    lowerCaseCol.includes("rooms unsold")
+  ) {
+    // Round the value to the nearest whole number and format it.
+    formattedValue = sign + Math.round(value).toLocaleString("en-GB");
+  } else if (lowerCaseCol.includes("occupancy")) {
     const points = (value * 100).toFixed(1);
     formattedValue = isDelta ? `${sign}${points}pts` : `${points}%`;
   } else if (
