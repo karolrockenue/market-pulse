@@ -332,17 +332,25 @@ async function getHistoricalMetrics(
  * @param {string} propertyId - The ID of the property to fetch data for.
  * @returns {Promise<Object>} The processed forecast data in our canonical format.
  */
+// /api/adapters/cloudbedsAdapter.js
+
 async function getUpcomingMetrics(
   accessToken,
   propertyId,
   taxRate,
   pricingModel
 ) {
-  const today = new Date();
-  const futureDate = new Date();
-  futureDate.setDate(today.getDate() + 365);
-  const startDate = today.toISOString().split("T")[0];
-  const endDate = futureDate.toISOString().split("T")[0];
+  // NEW: The start date is now set to 14 days in the past to recapture recent changes.
+  const startDateObj = new Date();
+  startDateObj.setDate(startDateObj.getDate() - 14);
+
+  // NEW: The end date is set 365 days from today for the future forecast.
+  const endDateObj = new Date();
+  endDateObj.setDate(endDateObj.getDate() + 365);
+
+  // Format the dates for the API request payload.
+  const startDate = startDateObj.toISOString().split("T")[0];
+  const endDate = endDateObj.toISOString().split("T")[0];
 
   const columnsToRequest = [
     "adr",
