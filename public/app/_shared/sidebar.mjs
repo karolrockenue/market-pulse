@@ -18,7 +18,9 @@ export default function sidebar() {
 
     // --- INIT ---
     // This runs when the component is initialized.
+    // /public/app/_shared/sidebar.mjs
     init() {
+      console.log(`%c[SIDEBAR] 1. Initializing component.`, "color: #f59e0b");
       this.fetchSessionInfo();
       this.fetchProperties();
       this.fetchLastRefreshTime();
@@ -71,38 +73,56 @@ export default function sidebar() {
 
     // /public/app/_shared/sidebar.mjs
 
+    // /public/app/_shared/sidebar.mjs
     async fetchProperties() {
       try {
+        console.log(
+          `%c[SIDEBAR] 2. Fetching properties list from /api/my-properties...`,
+          "color: #f59e0b"
+        );
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
+        console.log(
+          `%c[SIDEBAR] 3. Received ${this.properties.length} properties.`,
+          "color: #f59e0b",
+          this.properties
+        );
 
-        // THE FIX: Check if we are in the middle of a new connection flow.
         const isNewConnection = new URLSearchParams(window.location.search).has(
           "newConnection"
         );
 
         if (this.properties.length > 0) {
-          // If it's NOT a new connection, behave as normal.
-          // If it IS a new connection, do nothing and wait for the dashboard to take the lead.
           if (!isNewConnection) {
             const savedPropertyId = localStorage.getItem("currentPropertyId");
+            console.log(
+              `%c[SIDEBAR] 4a. Not a new connection. Reading 'currentPropertyId' from localStorage. Value: ${savedPropertyId}`,
+              "color: #f59e0b"
+            );
             const isValidSavedProperty =
               savedPropertyId &&
               this.properties.some((p) => p.property_id == savedPropertyId);
             this.currentPropertyId = isValidSavedProperty
               ? savedPropertyId
               : this.properties[0].property_id;
+            console.log(
+              `%c[SIDEBAR] 4b. Setting active property ID to: ${this.currentPropertyId}`,
+              "color: #f59e0b"
+            );
             this.updateCurrentPropertyName();
             this.dispatchPropertyChangeEvent();
+          } else {
+            console.log(
+              `%c[SIDEBAR] 4c. New connection detected. Sidebar will wait for dashboard to lead.`,
+              "color: #f59e0b"
+            );
           }
         } else {
           this.currentPropertyName = "No properties found";
         }
       } catch (error) {
         console.error("Error fetching properties:", error);
-        this.properties = [];
-        this.currentPropertyName = "Error loading properties";
       }
     },
 
@@ -153,14 +173,18 @@ export default function sidebar() {
       this.dispatchPropertyChangeEvent();
     },
 
+    // /public/app/_shared/sidebar.mjs
     dispatchPropertyChangeEvent() {
       const currentProperty = this.properties.find(
         (p) => p.property_id == this.currentPropertyId
       );
       if (!currentProperty) return;
+      console.log(
+        `%c[SIDEBAR] 5. Dispatching 'property-changed' event with ID: ${currentProperty.property_id} and Name: ${currentProperty.property_name}`,
+        "color: #f59e0b"
+      );
       window.dispatchEvent(
         new CustomEvent("property-changed", {
-          // This is the only change. We now pass the whole property object.
           detail: currentProperty,
         })
       );

@@ -186,39 +186,47 @@ export default function () {
     ranking: null,
 
     // /public/app/dashboard.mjs
-
-    // /public/app/dashboard.mjs
-
-    // /public/app/dashboard.mjs
-
     init() {
+      console.log("%c[DASHBOARD] 1. Initializing component.", "color: #3b82f6");
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
 
-      // This listener MUST be set up first.
-      window.addEventListener("property-changed", (event) =>
-        this.handlePropertyChange(event.detail)
-      );
+      window.addEventListener("property-changed", (event) => {
+        const propertyId = event.detail?.property_id;
+        console.log(
+          `%c[DASHBOARD] Received 'property-changed' event for ID: ${propertyId}`,
+          "color: #3b82f6"
+        );
+        this.handlePropertyChange(event.detail);
+      });
 
-      // THE FIX: This is the new, authoritative logic for a new connection.
       if (isNewConnection && newPropertyId) {
         console.log(
-          `New connection detected for property ID: ${newPropertyId}. Orchestrating setup...`
+          `%c[DASHBOARD] 2a. New connection flow started for property ID: ${newPropertyId}`,
+          "color: #3b82f6"
         );
-        // 1. Set the correct ID in storage.
         localStorage.setItem("currentPropertyId", newPropertyId);
+        console.log(
+          `%c[DASHBOARD] 2b. Set 'currentPropertyId' in localStorage to: ${newPropertyId}`,
+          "color: #3b82f6"
+        );
 
-        // 2. Reliably trigger the initial sync from the frontend.
         fetch("/api/initial-sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ propertyId: newPropertyId }),
-        }).catch((err) =>
-          console.error("Failed to trigger initial sync from frontend:", err)
-        );
+        })
+          .then((res) => {
+            console.log(
+              `%c[DASHBOARD] 2c. Triggered initial sync. Server responded with status: ${res.status}`,
+              "color: #3b82f6"
+            );
+          })
+          .catch((err) =>
+            console.error("Failed to trigger initial sync from frontend:", err)
+          );
 
-        // 3. Start polling for sync completion and show the spinner.
         this.isSyncing = true;
         this.syncStatusInterval = setInterval(
           () => this.checkSyncStatus(newPropertyId),
@@ -226,8 +234,11 @@ export default function () {
         );
         this.checkSyncStatus(newPropertyId);
 
-        // 4. Dispatch the ONE authoritative event to tell all components which property to load.
         this.$nextTick(() => {
+          console.log(
+            `%c[DASHBOARD] 2d. Dispatching authoritative 'property-changed' event for new property ID: ${newPropertyId}`,
+            "color: #3b82f6"
+          );
           window.dispatchEvent(
             new CustomEvent("property-changed", {
               detail: {
@@ -240,10 +251,6 @@ export default function () {
       }
 
       this.initializeDashboard();
-
-      this.$watch("market", () => {
-        this.$nextTick(() => this.renderBreakdownCharts());
-      });
     },
     // This function now only initializes the main chart.
     initializeDashboard() {
