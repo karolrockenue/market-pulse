@@ -75,7 +75,7 @@ export default function sidebar() {
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
         if (this.properties.length > 0) {
-          const savedPropertyId = localStorage.getItem("selectedPropertyId");
+          const savedPropertyId = localStorage.getItem("currentPropertyId");
           const isValidSavedProperty =
             savedPropertyId &&
             this.properties.some((p) => p.property_id == savedPropertyId);
@@ -135,7 +135,7 @@ export default function sidebar() {
 
     switchProperty(propertyId) {
       this.currentPropertyId = propertyId;
-      localStorage.setItem("selectedPropertyId", propertyId);
+      localStorage.setItem("currentPropertyId", propertyId);
       this.updateCurrentPropertyName();
       this.propertyDropdownOpen = false; // Close dropdown on selection
       this.dispatchPropertyChangeEvent();

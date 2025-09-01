@@ -795,22 +795,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
             if (result.rows.length > 0) {
               const internalPropertyId = result.rows[0].property_id;
 
-              // Trigger the initial sync with the correct internal ID.
-              const syncUrl =
-                process.env.VERCEL_ENV === "production"
-                  ? "https://www.market-pulse.io/api/initial-sync"
-                  : "http://localhost:3000/api/initial-sync";
-              fetch(syncUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
-                },
-                body: JSON.stringify({ propertyId: internalPropertyId }),
-              }).catch((syncErr) =>
-                console.error("Failed to trigger initial sync:", syncErr)
-              );
-
               // Redirect the user to the frontend with the correct internal ID.
               res.redirect(
                 `/app/?newConnection=true&propertyId=${internalPropertyId}`

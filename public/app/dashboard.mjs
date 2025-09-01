@@ -212,7 +212,21 @@ export default function () {
         });
       }
 
+      // /public/app/dashboard.mjs
+
       if (isNewConnection && newPropertyId) {
+        // THE FIX: The frontend now reliably triggers the initial sync.
+        console.log(
+          `New connection detected. Triggering initial sync for property ${newPropertyId}...`
+        );
+        fetch("/api/initial-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ propertyId: newPropertyId }),
+        }).catch((err) =>
+          console.error("Failed to trigger initial sync from frontend:", err)
+        );
+
         this.isSyncing = true;
         this.syncStatusInterval = setInterval(
           () => this.checkSyncStatus(newPropertyId),
