@@ -307,7 +307,9 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     const query = `
       SELECT
         ${period} as period,
-        AVG(rooms_sold) as your_rooms_sold,
+        -- THE FIX: Changed AVG(rooms_sold) to SUM(rooms_sold) for correct weekly/monthly totals.
+        SUM(rooms_sold) as your_rooms_sold,
+        -- AVG(capacity_count) is correct, as the hotel's room count is static.
         AVG(capacity_count) as your_capacity_count,
         AVG(occupancy_direct) as your_occupancy_direct,
         -- Use the NEW gross columns but keep the OLD aliases for the dashboard
@@ -325,7 +327,6 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
       WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
     `;
-
     // The variable 'query' now correctly matches the execution line.
     const result = await pgPool.query(query, [propertyId, startDate, endDate]);
     res.json({ metrics: result.rows });
