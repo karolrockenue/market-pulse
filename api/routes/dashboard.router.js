@@ -307,10 +307,9 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     const query = `
       SELECT
         ${period} as period,
-        -- THE FIX: Changed AVG(rooms_sold) to SUM(rooms_sold) for correct weekly/monthly totals.
         SUM(rooms_sold) as your_rooms_sold,
-        -- AVG(capacity_count) is correct, as the hotel's room count is static.
-        AVG(capacity_count) as your_capacity_count,
+        -- THE FIX: Changed AVG to SUM to get total available room nights for the period.
+        SUM(capacity_count) as your_capacity_count,
         AVG(occupancy_direct) as your_occupancy_direct,
         -- Use the NEW gross columns but keep the OLD aliases for the dashboard
         AVG(gross_adr) as your_adr,
