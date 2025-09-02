@@ -568,6 +568,7 @@ router.get("/run-endpoint-tests", requireAdminApi, (req, res) => {
   ];
   res.status(200).json(results);
 });
+// This is the fully corrected route handler for the API Explorer.
 router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
   try {
     const { endpoint } = req.params;
@@ -580,7 +581,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
     }
 
     // --- THE FIX: Look up the external PMS ID before making any API calls. ---
-    // The 'propertyId' from the request is our internal ID.
     const hotelResult = await pgPool.query(
       "SELECT pms_property_id, pms_type FROM hotels WHERE hotel_id = $1",
       [propertyId]
@@ -590,7 +590,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
       return res.status(404).json({ error: "Hotel not found." });
     }
 
-    // This API explorer is currently for Cloudbeds only.
     if (hotelResult.rows[0].pms_type !== "cloudbeds") {
       return res.status(400).json({
         message: "API Explorer currently supports Cloudbeds properties only.",
@@ -612,8 +611,7 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        // Use the correct external ID in the header.
-        "X-PROPERTY-ID": cloudbedsApiId,
+        "X-PROPERTY-ID": cloudbedsApiId, // Correct ID in header
       },
     };
 
@@ -624,8 +622,7 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
             .status(400)
             .json({ error: "Dataset ID and columns are required." });
         const requestBody = {
-          // Use the correct external ID in the request body.
-          property_ids: [cloudbedsApiId],
+          property_ids: [cloudbedsApiId], // Correct ID in body
           dataset_id: parseInt(id, 10),
           columns: columns
             .split(",")
@@ -663,28 +660,28 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         options.body = JSON.stringify(requestBody);
         break;
 
-      // General API cases
+      // General API cases using the correct cloudbedsApiId in the URL
       case "sample-hotel":
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${cloudbedsApiId}`;
         break;
       case "sample-guest":
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${propertyId}&pageSize=1`;
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${cloudbedsApiId}&pageSize=1`;
         break;
       case "sample-reservation":
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${propertyId}&pageSize=1`;
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${cloudbedsApiId}&pageSize=1`;
         break;
       case "sample-room":
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageSize=1`;
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${cloudbedsApiId}&pageSize=1`;
         break;
       case "sample-rate":
         const today = new Date().toISOString().split("T")[0];
         const tomorrow = new Date(Date.now() + 86400000)
           .toISOString()
           .split("T")[0];
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${propertyId}&pageSize=1&startDate=${today}&endDate=${tomorrow}`;
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${cloudbedsApiId}&pageSize=1&startDate=${today}&endDate=${tomorrow}`;
         break;
       case "taxes-fees":
-        targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${propertyId}`;
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${cloudbedsApiId}`;
         break;
       case "user-info":
         targetUrl = "https://api.cloudbeds.com/api/v1.3/userinfo";
