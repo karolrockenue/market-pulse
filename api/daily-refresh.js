@@ -21,7 +21,9 @@ module.exports = async (request, response) => {
     // This is more efficient as it's one query for all properties.
     // It also fetches the pms_type and timezone needed for branching.
     const propertiesResult = await pgPool.query(
-      "SELECT hotel_id, property_name, pms_type, timezone, tax_rate, tax_type FROM hotels"
+      // /api/daily-refresh.js
+
+      "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type FROM hotels"
     );
     const allProperties = propertiesResult.rows;
     console.log(`Found ${allProperties.length} properties to process.`);
@@ -42,16 +44,24 @@ module.exports = async (request, response) => {
 
       let processedData; // This will hold the forecast data from the adapter.
 
+      // /api/daily-refresh.js
+
       // Branch logic based on the property's PMS type.
       if (pms_type === "cloudbeds") {
         try {
+          // THE FIX: Determine the correct ID to use for the Cloudbeds API.
+          // For new hotels, this will be pms_property_id.
+          // For old hotels, it will fall back to hotel_id, which is correct for them.
+          const cloudbedsApiId = hotel.pms_property_id || hotel.hotel_id;
+
+          // getAccessToken correctly uses our internal hotel_id to find credentials.
           const accessToken = await cloudbedsAdapter.getAccessToken(hotel_id);
           const pricingModel = tax_type || "inclusive";
 
-          // Call the Cloudbeds adapter to get the forecast data.
+          // Call the Cloudbeds adapter with the correct ID for their API.
           processedData = await cloudbedsAdapter.getUpcomingMetrics(
             accessToken,
-            hotel_id,
+            cloudbedsApiId,
             tax_rate,
             pricingModel
           );
