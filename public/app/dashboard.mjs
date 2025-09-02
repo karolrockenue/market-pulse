@@ -634,6 +634,17 @@ export default function () {
 
         // Step 4: FINALLY, hide the loading overlay to reveal the fully populated dashboard.
         this.isSyncing = false;
+
+        // Hide the initial #main-loader as well, revealing the dashboard content.
+        const loader = document.getElementById("main-loader");
+        const wrapper = document.getElementById("dashboard-wrapper");
+        if (loader && wrapper) {
+          loader.style.opacity = "0";
+          wrapper.style.opacity = "1";
+          setTimeout(() => {
+            loader.style.display = "none";
+          }, 500); // Match the transition duration
+        }
       } catch (error) {
         console.error("Failed to save onboarding data:", error);
         this.showError(
