@@ -336,7 +336,6 @@ export default function () {
     },
 
     // /public/app/dashboard.mjs
-
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -355,33 +354,29 @@ export default function () {
 
           history.pushState({}, "", window.location.pathname);
           this.isSyncing = false;
-          window.dispatchEvent(new CustomEvent("sync-complete"));
 
-          // --- NEW LOGIC: Check for missing tax info before showing the modal ---
-          console.log("Checking for missing tax information...");
+          // --- REVISED LOGIC: Check for tax info and set a session flag ---
           const detailsRes = await fetch(`/api/hotel-details/${propertyId}`);
           const details = await detailsRes.json();
 
-          // Set a flag if the tax rate is null.
-          this.isTaxInfoMissing = details.tax_rate === null;
-          if (this.isTaxInfoMissing) {
+          // If the tax rate is null, set a flag in sessionStorage.
+          // This flag will be read by the main data loading function.
+          if (details.tax_rate === null) {
             console.log(
-              "Tax info is missing for this property. Modal will ask for user input."
+              "Tax info is missing. Setting session flag to prompt user."
             );
+            sessionStorage.setItem("awaitingTaxInfoForProperty", propertyId);
           }
 
-          // Show the category modal for the user's final setup step.
-          this.categorizationPropertyId = propertyId;
-          this.showCategoryModal = true;
+          // Finally, dispatch the event to let the sidebar and other components know the sync is done.
+          window.dispatchEvent(new CustomEvent("sync-complete"));
         };
 
         if (status?.isSyncComplete) {
           await considerDone();
           return;
         }
-        // ... (rest of the function)
 
-        // The fallback probe logic remains the same.
         const today = new Date();
         const start = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
         const fmt = (d) =>
@@ -746,11 +741,7 @@ export default function () {
         formatDateLabel: this.formatDateLabel,
       });
     },
-    // This function is now fully asynchronous to ensure it waits for data loading to complete.
-    // This function is now fully asynchronous and includes a try/finally block for robustness.
     async handlePropertyChange(eventDetail) {
-      // This tells JavaScript to find 'property_id' in the incoming object
-      // and assign its value to a new variable called 'propertyId'.
       const { property_id: propertyId, property_name: propertyName } =
         eventDetail;
       if (!propertyId || this.currentPropertyId === propertyId) return;
@@ -758,45 +749,47 @@ export default function () {
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
 
+      // --- REVISED LOGIC: Check for the session flag ---
+      const awaitingTaxInfo = sessionStorage.getItem(
+        "awaitingTaxInfoForProperty"
+      );
+      if (awaitingTaxInfo && awaitingTaxInfo == this.currentPropertyId) {
+        // If the flag matches this property, we need to show the modal.
+        this.isTaxInfoMissing = true;
+        this.categorizationPropertyId = this.currentPropertyId;
+        this.showCategoryModal = true;
+        // IMPORTANT: Clear the flag so the modal doesn't show again on the next page load.
+        sessionStorage.removeItem("awaitingTaxInfoForProperty");
+      }
+      // --- END REVISED LOGIC ---
+
       if (!this.isSyncing && this.syncStatusInterval) {
         clearInterval(this.syncStatusInterval);
         this.syncStatusInterval = null;
       }
 
       try {
-        // Fetch supporting details for the property.
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
         this.currencyCode = details.currency_code || "USD";
 
-        // We only run the main data load if the initial sync isn't active.
         if (!this.isSyncing) {
           await this.setPreset("current-month");
         }
       } catch (error) {
-        // If there's an error, log it, but don't stop execution.
         console.error("Error during initial data load:", error);
         this.showError("Failed to load initial dashboard data.");
       } finally {
-        // --- ROBUST LOGIC: This block now runs regardless of success or failure. ---
-        // It checks the flag to ensure it only runs once.
         if (this.isInitialLoad) {
-          // Find the loader and the content wrapper elements.
           const loader = document.getElementById("main-loader");
           const wrapper = document.getElementById("dashboard-wrapper");
-
           if (loader && wrapper) {
-            // Start the animations.
             loader.style.opacity = "0";
             wrapper.style.opacity = "1";
-
-            // Hide the loader completely after the animation.
             setTimeout(() => {
               loader.style.display = "none";
             }, 500);
           }
-
-          // Set the flag to false so this never runs again.
           this.isInitialLoad = false;
         }
       }
