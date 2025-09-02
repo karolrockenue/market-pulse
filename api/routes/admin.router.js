@@ -228,14 +228,40 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
         `[Admin Sync] Syncing info for Cloudbeds hotel: ${propertyId}`
       );
 
-      // --- This is the existing, working logic for Cloudbeds ---
+      // THE FIX: Look up the correct external PMS ID before calling the adapter.
+      // The 'propertyId' variable from the request is our internal ID.
+      // We need the 'pms_property_id' for the external Cloudbeds API.
+      const hotelDetailsResult = await client.query(
+        "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+
+      // Use the fetched pms_property_id, but fall back to the internal ID for legacy hotels.
+      const cloudbedsApiId =
+        hotelDetailsResult.rows[0]?.pms_property_id || propertyId;
+
+      console.log(
+        `[Admin Sync] Internal ID: ${propertyId}, Found Cloudbeds API ID: ${cloudbedsApiId}`
+      );
+
+      // getAdminAccessToken correctly uses our internal ID to find the refresh token.
       const { accessToken } = await getAdminAccessToken(
         req.session.userId,
         propertyId
       );
+
+      // Now, call the adapter functions with the correct external ID (cloudbedsApiId).
       await Promise.all([
-        cloudbedsAdapter.syncHotelDetailsToDb(accessToken, propertyId, client),
-        cloudbedsAdapter.syncHotelTaxInfoToDb(accessToken, propertyId, client),
+        cloudbedsAdapter.syncHotelDetailsToDb(
+          accessToken,
+          cloudbedsApiId,
+          client
+        ),
+        cloudbedsAdapter.syncHotelTaxInfoToDb(
+          accessToken,
+          cloudbedsApiId,
+          client
+        ),
       ]);
 
       // Sync neighborhood after core details are saved.
