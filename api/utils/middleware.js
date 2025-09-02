@@ -1,6 +1,5 @@
 // /api/utils/middleware.js (with extensive debugging)
 const pgPool = require("./db");
-const cloudbeds = require("./cloudbeds");
 
 async function requireUserApi(req, res, next) {
   // --- NEW DIAGNOSTIC LOG ---
@@ -149,11 +148,9 @@ const requireManagePermission = (req, res, next) => {
     return next();
   }
   // If they do not have permission, send a 'Forbidden' error.
-  res
-    .status(403)
-    .json({
-      error: "Forbidden: You do not have permission to perform this action.",
-    });
+  res.status(403).json({
+    error: "Forbidden: You do not have permission to perform this action.",
+  });
 };
 
 module.exports = {

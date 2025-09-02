@@ -18,7 +18,7 @@ const initialSyncHandler = require("../initial-sync.js");
 const scheduledReportsHandler = require("../send-scheduled-reports.js");
 
 // Add this line with the other require statements
-const cloudbeds = require("../utils/cloudbeds");
+
 // Import the entire adapter module.
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js");
 const mewsAdapter = require("../adapters/mewsAdapter.js");
