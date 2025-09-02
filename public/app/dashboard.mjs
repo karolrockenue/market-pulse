@@ -751,16 +751,12 @@ export default function () {
         eventDetail;
       if (!propertyId) return;
 
-      // --- THIS IS THE KEY CHANGE ---
-      // If an initial sync is running, stop this function from doing anything.
-      // The final data load will be triggered by the saveOnboardingData function later.
       if (this.isSyncing) {
         console.log(
           "handlePropertyChange: Aborting data load because a sync is in progress."
         );
         return;
       }
-      // --- END CHANGE ---
 
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
@@ -775,18 +771,20 @@ export default function () {
         console.error("Error during initial data load:", error);
         this.showError("Failed to load initial dashboard data.");
       } finally {
-        if (this.isInitialLoad) {
-          const loader = document.getElementById("main-loader");
-          const wrapper = document.getElementById("dashboard-wrapper");
-          if (loader && wrapper) {
-            loader.style.opacity = "0";
-            wrapper.style.opacity = "1";
-            setTimeout(() => {
-              loader.style.display = "none";
-            }, 500);
-          }
-          this.isInitialLoad = false;
+        // --- THIS BLOCK IS RESTORED ---
+        // This ensures that for a normal page load, the initial spinner is hidden
+        // and the main dashboard content becomes visible.
+        const loader = document.getElementById("main-loader");
+        const wrapper = document.getElementById("dashboard-wrapper");
+        if (loader && wrapper) {
+          loader.style.opacity = "0";
+          wrapper.style.opacity = "1";
+          setTimeout(() => {
+            loader.style.display = "none";
+          }, 500);
         }
+        this.isInitialLoad = false;
+        // --- END RESTORED BLOCK ---
       }
     },
     // --- HELPER METHODS ---
