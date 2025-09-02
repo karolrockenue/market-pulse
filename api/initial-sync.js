@@ -140,18 +140,57 @@ async function runSync(propertyId) {
       );
       allProcessedData = { ...allProcessedData, ...futureData };
 
-      const sortedDates = Object.keys(allProcessedData).sort();
-      const earliestDate = sortedDates.find(
-        (date) =>
-          allProcessedData[date].rooms_sold > 0 ||
-          allProcessedData[date].gross_revenue > 0
-      );
+      // --- NEW, MORE ROBUST GO_LIVE_DATE LOGIC ---
+      console.log("Calculating go_live_date with new robust logic...");
 
-      if (earliestDate) {
-        console.log(`Setting effective go_live_date to: ${earliestDate}`);
+      // Step 1: Get a sorted list of all dates that have actual activity.
+      const activeDates = Object.keys(allProcessedData)
+        .filter(
+          (date) =>
+            allProcessedData[date].rooms_sold > 0 ||
+            allProcessedData[date].gross_revenue > 0
+        )
+        .sort();
+
+      let newGoLiveDate = null;
+
+      if (activeDates.length > 0) {
+        // Step 2: Count the number of active days for each month.
+        const monthlyActivityCounts = {};
+        for (const date of activeDates) {
+          const month = date.substring(0, 7); // "YYYY-MM"
+          monthlyActivityCounts[month] =
+            (monthlyActivityCounts[month] || 0) + 1;
+        }
+
+        // Step 3: Find the first month that meets our "serious business" criteria (10+ active days).
+        const sortedMonths = Object.keys(monthlyActivityCounts).sort();
+        const firstSeriousMonth = sortedMonths.find(
+          (month) => monthlyActivityCounts[month] >= 10
+        );
+
+        if (firstSeriousMonth) {
+          // Step 4: If a "serious" month is found, find the earliest date within that month.
+          newGoLiveDate = activeDates.find((date) =>
+            date.startsWith(firstSeriousMonth)
+          );
+          console.log(
+            `First serious month (${firstSeriousMonth}) found. Setting go_live_date to first active day: ${newGoLiveDate}`
+          );
+        } else {
+          // Fallback: If no month has 10+ active days, use the original logic (earliest date overall).
+          newGoLiveDate = activeDates[0];
+          console.log(
+            `No month met the 10-day activity threshold. Falling back to earliest date: ${newGoLiveDate}`
+          );
+        }
+      }
+
+      // Step 5: Update the database with the calculated date.
+      if (newGoLiveDate) {
         await client.query(
           `UPDATE hotels SET go_live_date = $1 WHERE hotel_id = $2`,
-          [earliestDate, propertyId]
+          [newGoLiveDate, propertyId]
         );
       }
 
