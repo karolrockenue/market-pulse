@@ -349,59 +349,24 @@ export default function () {
         const considerDone = async () => {
           console.log(`Sync for property ${propertyId} is complete.`);
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
-
           history.pushState({}, "", window.location.pathname);
-          // --- THIS IS THE KEY CHANGE ---
-          // We NO LONGER set isSyncing to false here. We want the loading overlay to stay visible.
 
-          console.log("Checking for missing tax information...");
+          // Keep the loading screen (isSyncing = true) visible.
+          // Check for missing tax info before showing the modal.
           const detailsRes = await fetch(`/api/hotel-details/${propertyId}`);
           const details = await detailsRes.json();
-
           this.isTaxInfoMissing = details.tax_rate === null;
-          if (this.isTaxInfoMissing) {
-            console.log("Tax info is missing. Modal will ask for user input.");
-          }
 
-          // Show the category modal ON TOP of the loading overlay.
+          // Show the category modal ON TOP of the loading screen.
           this.categorizationPropertyId = propertyId;
           this.showCategoryModal = true;
         };
 
         if (status?.isSyncComplete) {
           await considerDone();
-          return;
-        }
-
-        // ... (rest of the function is the same, no changes needed there)
-        const today = new Date();
-        const start = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
-        const fmt = (d) =>
-          new Date(
-            Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-          )
-            .toISOString()
-            .split("T")[0];
-        const probeUrl = `/api/kpi-summary?startDate=${fmt(
-          start
-        )}&endDate=${fmt(today)}&propertyId=${propertyId}`;
-        const probeRes = await fetch(probeUrl, {
-          headers: { "x-probe": "sync-bypass" },
-        });
-        if (probeRes.ok) {
-          const probe = await probeRes.json();
-          const hasData =
-            probe?.yourHotel &&
-            (Number.isFinite(probe.yourHotel.occupancy) ||
-              Number.isFinite(probe.yourHotel.revpar) ||
-              Number.isFinite(probe.yourHotel.adr));
-          if (hasData) {
-            await considerDone();
-            return;
-          }
         }
       } catch (err) {
-        console.error("Error checking sync status (with fallback):", err);
+        console.error("Error checking sync status:", err);
         this.isSyncing = false;
         if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
       }
@@ -593,15 +558,12 @@ export default function () {
 
     // /public/app/dashboard.mjs
     // /public/app/dashboard.mjs
-
-    // This new function handles saving both tax (if needed) and category from the modal.
     async saveOnboardingData() {
       if (!this.categorizationPropertyId) return;
 
       try {
         // Step 1: Save tax info (if needed).
         if (this.isTaxInfoMissing) {
-          console.log("Saving user-submitted tax info...");
           const taxResponse = await fetch(
             `/api/my-properties/${this.categorizationPropertyId}/tax-info`,
             {
@@ -615,7 +577,6 @@ export default function () {
         }
 
         // Step 2: Save the selected category.
-        console.log("Saving selected category...");
         const categoryResponse = await fetch(
           `/api/my-properties/${this.categorizationPropertyId}/category`,
           {
@@ -626,9 +587,7 @@ export default function () {
         );
         if (!categoryResponse.ok) throw new Error("Failed to save category.");
 
-        // --- THIS IS THE KEY CHANGE ---
         // Step 3: Hide the modal and run the report to load all dashboard data.
-        // The main loading overlay is still visible during this.
         this.showCategoryModal = false;
         await this.runReport();
 
@@ -751,10 +710,9 @@ export default function () {
         eventDetail;
       if (!propertyId) return;
 
+      // If an initial sync is running, stop this function from doing anything.
+      // The final data load will be triggered by the saveOnboardingData function.
       if (this.isSyncing) {
-        console.log(
-          "handlePropertyChange: Aborting data load because a sync is in progress."
-        );
         return;
       }
 
@@ -762,29 +720,14 @@ export default function () {
       this.currentPropertyName = propertyName;
 
       try {
+        // For a normal property change (not a new connection), fetch details and run the report.
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
         this.currencyCode = details.currency_code || "USD";
-
         await this.setPreset("current-month");
       } catch (error) {
         console.error("Error during initial data load:", error);
         this.showError("Failed to load initial dashboard data.");
-      } finally {
-        // --- THIS BLOCK IS RESTORED ---
-        // This ensures that for a normal page load, the initial spinner is hidden
-        // and the main dashboard content becomes visible.
-        const loader = document.getElementById("main-loader");
-        const wrapper = document.getElementById("dashboard-wrapper");
-        if (loader && wrapper) {
-          loader.style.opacity = "0";
-          wrapper.style.opacity = "1";
-          setTimeout(() => {
-            loader.style.display = "none";
-          }, 500);
-        }
-        this.isInitialLoad = false;
-        // --- END RESTORED BLOCK ---
       }
     },
     // --- HELPER METHODS ---
