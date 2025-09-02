@@ -351,25 +351,21 @@ export default function () {
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
           history.pushState({}, "", window.location.pathname);
-          this.isSyncing = false;
+          // --- THIS IS THE KEY CHANGE ---
+          // We NO LONGER set isSyncing to false here. We want the loading overlay to stay visible.
 
-          // Check for missing tax info before showing the modal
           console.log("Checking for missing tax information...");
           const detailsRes = await fetch(`/api/hotel-details/${propertyId}`);
           const details = await detailsRes.json();
 
           this.isTaxInfoMissing = details.tax_rate === null;
           if (this.isTaxInfoMissing) {
-            console.log(
-              "Tax info is missing for this property. Modal will ask for user input."
-            );
+            console.log("Tax info is missing. Modal will ask for user input.");
           }
 
+          // Show the category modal ON TOP of the loading overlay.
           this.categorizationPropertyId = propertyId;
           this.showCategoryModal = true;
-
-          // Dispatch this event last to let sidebar update
-          window.dispatchEvent(new CustomEvent("sync-complete"));
         };
 
         if (status?.isSyncComplete) {
@@ -603,7 +599,7 @@ export default function () {
       if (!this.categorizationPropertyId) return;
 
       try {
-        // Step 1: If tax info was missing, save the user-submitted data first.
+        // Step 1: Save tax info (if needed).
         if (this.isTaxInfoMissing) {
           console.log("Saving user-submitted tax info...");
           const taxResponse = await fetch(
@@ -630,20 +626,22 @@ export default function () {
         );
         if (!categoryResponse.ok) throw new Error("Failed to save category.");
 
-        // Step 3: Close the modal and reload the dashboard with the new data.
-        // Step 3: Close the modal and reload the dashboard with the new data.
+        // --- THIS IS THE KEY CHANGE ---
+        // Step 3: Hide the modal and run the report to load all dashboard data.
+        // The main loading overlay is still visible during this.
         this.showCategoryModal = false;
+        await this.runReport();
 
-        // THE FIX: Use a short timeout. This is a more robust way to yield to the browser's
-        // rendering engine, ensuring the modal disappears instantly before the heavy report runs.
-        setTimeout(() => {
-          this.runReport();
-        }, 50); // 50ms is imperceptible to the user.
+        // Step 4: FINALLY, hide the loading overlay to reveal the fully populated dashboard.
+        this.isSyncing = false;
       } catch (error) {
         console.error("Failed to save onboarding data:", error);
         this.showError(
           `Could not save your selection. Error: ${error.message}`
         );
+        // If something fails, hide the loading screens so the user isn't stuck.
+        this.isSyncing = false;
+        this.showCategoryModal = false;
       }
     },
 
@@ -751,9 +749,18 @@ export default function () {
     async handlePropertyChange(eventDetail) {
       const { property_id: propertyId, property_name: propertyName } =
         eventDetail;
-      // THE FIX: We've simplified the second condition. If the ID is the same, we still want to proceed
-      // in some cases during onboarding, so we let the logic inside the function handle it.
       if (!propertyId) return;
+
+      // --- THIS IS THE KEY CHANGE ---
+      // If an initial sync is running, stop this function from doing anything.
+      // The final data load will be triggered by the saveOnboardingData function later.
+      if (this.isSyncing) {
+        console.log(
+          "handlePropertyChange: Aborting data load because a sync is in progress."
+        );
+        return;
+      }
+      // --- END CHANGE ---
 
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
@@ -763,12 +770,7 @@ export default function () {
         const details = await response.json();
         this.currencyCode = details.currency_code || "USD";
 
-        // --- THIS IS THE KEY CHANGE ---
-        // We only run the main report if the dashboard is NOT in the middle of a new-connection sync.
-        // For a new connection, the report will be triggered later by the saveOnboardingData function.
-        if (!this.isSyncing) {
-          await this.setPreset("current-month");
-        }
+        await this.setPreset("current-month");
       } catch (error) {
         console.error("Error during initial data load:", error);
         this.showError("Failed to load initial dashboard data.");
