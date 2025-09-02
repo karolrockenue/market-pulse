@@ -571,7 +571,7 @@ router.get("/run-endpoint-tests", requireAdminApi, (req, res) => {
 router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
   try {
     const { endpoint } = req.params;
-    const { id, columns, startDate, endDate, groupBy, propertyId } = req.query; // <-- Now reads propertyId
+    const { id, columns, startDate, endDate, groupBy, propertyId } = req.query;
 
     if (!propertyId) {
       return res
@@ -579,9 +579,32 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         .json({ error: "A propertyId is required for API explorer calls." });
     }
 
+    // --- THE FIX: Look up the external PMS ID before making any API calls. ---
+    // The 'propertyId' from the request is our internal ID.
+    const hotelResult = await pgPool.query(
+      "SELECT pms_property_id, pms_type FROM hotels WHERE hotel_id = $1",
+      [propertyId]
+    );
+
+    if (hotelResult.rows.length === 0) {
+      return res.status(404).json({ error: "Hotel not found." });
+    }
+
+    // This API explorer is currently for Cloudbeds only.
+    if (hotelResult.rows[0].pms_type !== "cloudbeds") {
+      return res.status(400).json({
+        message: "API Explorer currently supports Cloudbeds properties only.",
+        pms_type: hotelResult.rows[0].pms_type,
+      });
+    }
+
+    // Use the correct external ID for the Cloudbeds API, with a fallback for legacy properties.
+    const cloudbedsApiId = hotelResult.rows[0].pms_property_id || propertyId;
+
+    // getAdminAccessToken uses our internal ID to fetch credentials, which is correct.
     const { accessToken } = await getAdminAccessToken(
       req.session.userId,
-      propertyId // <-- Pass the propertyId
+      propertyId
     );
 
     let targetUrl;
@@ -589,7 +612,8 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "X-PROPERTY-ID": propertyId, // <-- Use the correct propertyId here
+        // Use the correct external ID in the header.
+        "X-PROPERTY-ID": cloudbedsApiId,
       },
     };
 
@@ -600,7 +624,8 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
             .status(400)
             .json({ error: "Dataset ID and columns are required." });
         const requestBody = {
-          property_ids: [propertyId], // <-- Use the correct propertyId here
+          // Use the correct external ID in the request body.
+          property_ids: [cloudbedsApiId],
           dataset_id: parseInt(id, 10),
           columns: columns
             .split(",")
