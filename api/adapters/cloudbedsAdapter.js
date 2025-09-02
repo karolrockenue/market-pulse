@@ -784,9 +784,15 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
     return; // Fail gracefully
   }
 
+  // THE FIX: The WHERE clause is updated to check against the 'pms_property_id' column.
+  // This ensures that we find the correct hotel record using the external ID
+  // provided by the Cloudbeds API, which is the correct behavior for this function.
+  // A fallback to check hotel_id is included to maintain compatibility with legacy hotels
+  // where the internal and external IDs were the same.
   await dbClient.query(
-    // Use the provided dbClient
-    `UPDATE hotels SET tax_rate = $1, tax_type = $2, tax_name = $3 WHERE hotel_id::text = $4`,
+    `UPDATE hotels 
+     SET tax_rate = $1, tax_type = $2, tax_name = $3 
+     WHERE pms_property_id = $4 OR hotel_id::text = $4`,
     [taxRate, taxType, taxName, propertyId]
   );
   console.log(
