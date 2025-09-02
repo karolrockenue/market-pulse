@@ -751,21 +751,21 @@ export default function () {
     async handlePropertyChange(eventDetail) {
       const { property_id: propertyId, property_name: propertyName } =
         eventDetail;
-      if (!propertyId || this.currentPropertyId === propertyId) return;
+      // THE FIX: We've simplified the second condition. If the ID is the same, we still want to proceed
+      // in some cases during onboarding, so we let the logic inside the function handle it.
+      if (!propertyId) return;
 
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
-
-      if (!this.isSyncing && this.syncStatusInterval) {
-        clearInterval(this.syncStatusInterval);
-        this.syncStatusInterval = null;
-      }
 
       try {
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
         this.currencyCode = details.currency_code || "USD";
 
+        // --- THIS IS THE KEY CHANGE ---
+        // We only run the main report if the dashboard is NOT in the middle of a new-connection sync.
+        // For a new connection, the report will be triggered later by the saveOnboardingData function.
         if (!this.isSyncing) {
           await this.setPreset("current-month");
         }
