@@ -429,7 +429,6 @@ export default function () {
           throw new Error("Could not load chart/table data.");
         const yourHotelData = await yourHotelResponse.json();
         const marketData = await marketResponse.json();
-
         // NEW: Populate our new market object with the data from the API response.
         this.market = {
           competitorCount: marketData.competitorCount,
@@ -437,6 +436,10 @@ export default function () {
           breakdown: marketData.breakdown,
           source: marketData.source,
         };
+
+        // THE FIX: Call the function responsible for drawing the breakdown charts.
+        // This was missing, which is why the UI was not updating.
+        this.renderBreakdownCharts();
 
         this.allMetrics = this.processAndMergeData(
           yourHotelData.metrics,
