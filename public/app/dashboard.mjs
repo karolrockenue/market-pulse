@@ -634,11 +634,11 @@ export default function () {
         // Step 3: Close the modal and reload the dashboard with the new data.
         this.showCategoryModal = false;
 
-        // THE FIX: Use $nextTick to wait for Alpine to process the UI update (hiding the modal)
-        // before we start the heavy data loading. This makes the modal feel instant.
-        this.$nextTick(() => {
+        // THE FIX: Use a short timeout. This is a more robust way to yield to the browser's
+        // rendering engine, ensuring the modal disappears instantly before the heavy report runs.
+        setTimeout(() => {
           this.runReport();
-        });
+        }, 50); // 50ms is imperceptible to the user.
       } catch (error) {
         console.error("Failed to save onboarding data:", error);
         this.showError(
