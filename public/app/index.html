@@ -148,9 +148,7 @@
     x-cloak
     x-init="window.alpineInstance = this"
 >
-<div id="main-loader" class="fixed inset-0 flex items-center justify-center bg-[#1e293b] z-50">
-    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-</div>
+
 <div
   x-show="showCategoryModal"
   x-cloak
@@ -290,25 +288,42 @@
         </div>
     </div>
 
+<div x-show="isTaxInfoMissing" x-transition class="mt-8 pt-6 border-t">
+        <h3 class="text-xl font-bold text-slate-800">
+          Step 2: Add Tax Information
+        </h3>
+        <p class="text-slate-500 mt-1 text-sm">
+          We couldn't find tax info for this property. Please provide it below.
+        </p>
+        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="tax-rate" class="block text-sm font-medium text-slate-600">Tax Rate (e.g., 0.20 for 20%)</label>
+                <input type="number" step="0.0001" id="tax-rate" x-model.number="taxData.rate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+            <div>
+                <label for="tax-type" class="block text-sm font-medium text-slate-600">Tax Type</label>
+                <select id="tax-type" x-model="taxData.type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="inclusive">Inclusive</option>
+                    <option value="exclusive">Exclusive</option>
+                </select>
+            </div>
+            <div class="sm:col-span-2">
+                <label for="tax-name" class="block text-sm font-medium text-slate-600">Tax Name (e.g., VAT)</label>
+                <input type="text" id="tax-name" x-model="taxData.name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+        </div>
+    </div>
+
     <div class="mt-8 text-right">
-      <button
-        @click="saveOnboardingData()"
-        type="button"
-        class="inline-flex justify-center items-center rounded-lg bg-blue-600 text-white font-semibold text-sm shadow-sm hover:bg-blue-700 px-6 py-2.5"
-      >
-        Save & Continue
+      <button @click="saveOnboardingData()" type="button" class="inline-flex justify-center items-center rounded-lg bg-blue-600 text-white font-semibold text-sm shadow-sm hover:bg-blue-700 px-6 py-2.5">
+        Save &amp; Continue
       </button>
     </div>
   </div>
 </div>
 <div id="dashboard-wrapper" class="opacity-0">
 <!-- Initial Sync Loading Overlay -->
-<div
-  x-show="isSyncing"
-  x-cloak
-  style="background-color: #0c121c"
-  class="fixed inset-0 flex flex-col items-center justify-center z-50 transition-opacity"
->
+<div x-show="isSyncing" x-cloak class="fixed inset-0 flex flex-col items-center justify-center bg-[#1e293b] z-50">
   <!-- Blue Spinner (copied from admin panel style) -->
   <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent border-solid rounded-full animate-spin"></div>
   <!-- Text Content -->
