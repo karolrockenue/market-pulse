@@ -82,6 +82,9 @@ export default function sidebar() {
 
     async fetchProperties() {
       try {
+        // --- THE FIX: Store the current ID before fetching ---
+        const previousPropertyId = this.currentPropertyId;
+
         const response = await fetch("/api/my-properties");
         if (!response.ok) throw new Error("Could not fetch properties");
         this.properties = await response.json();
@@ -92,18 +95,20 @@ export default function sidebar() {
             savedPropertyId &&
             this.properties.some((p) => p.property_id == savedPropertyId);
 
-          // THE FIX: Only select a property and dispatch an event if the saved property is valid.
-          // This prevents the sidebar from incorrectly choosing the "wrong" property during a new sync.
+          let newPropertyId = null;
           if (isValidSavedProperty) {
-            this.currentPropertyId = savedPropertyId;
-            this.updateCurrentPropertyName();
-            this.dispatchPropertyChangeEvent();
+            newPropertyId = savedPropertyId;
           } else {
-            // If no valid saved property is found, try defaulting to the first in the list.
-            // This is a safe fallback for normal page loads.
-            this.currentPropertyId = this.properties[0].property_id;
-            localStorage.setItem("currentPropertyId", this.currentPropertyId);
-            this.updateCurrentPropertyName();
+            newPropertyId = this.properties[0].property_id;
+          }
+
+          this.currentPropertyId = newPropertyId;
+          localStorage.setItem("currentPropertyId", this.currentPropertyId);
+          this.updateCurrentPropertyName();
+
+          // --- THE FIX: Only dispatch the event if the ID has actually changed ---
+          // This prevents the unnecessary reload that was causing the race condition.
+          if (this.currentPropertyId !== previousPropertyId) {
             this.dispatchPropertyChangeEvent();
           }
         } else {

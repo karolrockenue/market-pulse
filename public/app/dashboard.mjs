@@ -334,8 +334,6 @@ export default function () {
         );
       }
     },
-
-    // /public/app/dashboard.mjs
     async checkSyncStatus(propertyId) {
       if (!propertyId) {
         this.isSyncing = false;
@@ -355,20 +353,22 @@ export default function () {
           history.pushState({}, "", window.location.pathname);
           this.isSyncing = false;
 
-          // --- REVISED LOGIC: Check for tax info and set a session flag ---
+          // Check for missing tax info before showing the modal
+          console.log("Checking for missing tax information...");
           const detailsRes = await fetch(`/api/hotel-details/${propertyId}`);
           const details = await detailsRes.json();
 
-          // If the tax rate is null, set a flag in sessionStorage.
-          // This flag will be read by the main data loading function.
-          if (details.tax_rate === null) {
+          this.isTaxInfoMissing = details.tax_rate === null;
+          if (this.isTaxInfoMissing) {
             console.log(
-              "Tax info is missing. Setting session flag to prompt user."
+              "Tax info is missing for this property. Modal will ask for user input."
             );
-            sessionStorage.setItem("awaitingTaxInfoForProperty", propertyId);
           }
 
-          // Finally, dispatch the event to let the sidebar and other components know the sync is done.
+          this.categorizationPropertyId = propertyId;
+          this.showCategoryModal = true;
+
+          // Dispatch this event last to let sidebar update
           window.dispatchEvent(new CustomEvent("sync-complete"));
         };
 
@@ -377,6 +377,7 @@ export default function () {
           return;
         }
 
+        // ... (rest of the function is the same, no changes needed there)
         const today = new Date();
         const start = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
         const fmt = (d) =>
@@ -748,20 +749,6 @@ export default function () {
 
       this.currentPropertyId = propertyId;
       this.currentPropertyName = propertyName;
-
-      // --- REVISED LOGIC: Check for the session flag ---
-      const awaitingTaxInfo = sessionStorage.getItem(
-        "awaitingTaxInfoForProperty"
-      );
-      if (awaitingTaxInfo && awaitingTaxInfo == this.currentPropertyId) {
-        // If the flag matches this property, we need to show the modal.
-        this.isTaxInfoMissing = true;
-        this.categorizationPropertyId = this.currentPropertyId;
-        this.showCategoryModal = true;
-        // IMPORTANT: Clear the flag so the modal doesn't show again on the next page load.
-        sessionStorage.removeItem("awaitingTaxInfoForProperty");
-      }
-      // --- END REVISED LOGIC ---
 
       if (!this.isSyncing && this.syncStatusInterval) {
         clearInterval(this.syncStatusInterval);
