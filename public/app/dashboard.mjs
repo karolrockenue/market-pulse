@@ -148,10 +148,18 @@ export default function () {
   return {
     // --- STATE PROPERTIES ---
     currentPropertyId: null,
-    // New state properties for the category selection modal.
-    showCategoryModal: false, // Controls if the modal is visible.
-    categorizationPropertyId: null, // Stores the ID of the property being categorized.
-    selectedCategory: "Midscale", // Holds the user's selection, defaults to 'Midscale'.
+    // --- NEW: State for the combined onboarding modal (Category & Tax) ---
+    showCategoryModal: false,
+    categorizationPropertyId: null,
+    selectedCategory: "Midscale",
+    isTaxInfoMissing: false, // This flag will determine if the tax section is shown.
+    taxData: {
+      // This will hold the user's input from the modal.
+      rate: 0.2,
+      type: "inclusive",
+      name: "VAT",
+    },
+    // --- END NEW ---
     currentPropertyName: "Loading...",
     properties: [],
     hasProperties: false,
@@ -345,13 +353,22 @@ export default function () {
           console.log(`Sync for property ${propertyId} is complete.`);
           if (this.syncStatusInterval) clearInterval(this.syncStatusInterval);
 
-          // Clean the URL parameters now that the new connection flow is done.
           history.pushState({}, "", window.location.pathname);
           this.isSyncing = false;
-
-          // THE FIX: Dispatch the event to tell the sidebar to reload the property list.
-          // This ensures the new property is included before we proceed.
           window.dispatchEvent(new CustomEvent("sync-complete"));
+
+          // --- NEW LOGIC: Check for missing tax info before showing the modal ---
+          console.log("Checking for missing tax information...");
+          const detailsRes = await fetch(`/api/hotel-details/${propertyId}`);
+          const details = await detailsRes.json();
+
+          // Set a flag if the tax rate is null.
+          this.isTaxInfoMissing = details.tax_rate === null;
+          if (this.isTaxInfoMissing) {
+            console.log(
+              "Tax info is missing for this property. Modal will ask for user input."
+            );
+          }
 
           // Show the category modal for the user's final setup step.
           this.categorizationPropertyId = propertyId;
@@ -362,6 +379,7 @@ export default function () {
           await considerDone();
           return;
         }
+        // ... (rest of the function)
 
         // The fallback probe logic remains the same.
         const today = new Date();
@@ -584,17 +602,29 @@ export default function () {
     // /public/app/dashboard.mjs
     // /public/app/dashboard.mjs
 
-    async saveCategory() {
-      if (!this.categorizationPropertyId || !this.selectedCategory) {
-        console.error(
-          "Cannot save category: property ID or selected category is missing."
-        );
-        this.showError("Please select a category before saving.");
-        return;
-      }
+    // This new function handles saving both tax (if needed) and category from the modal.
+    async saveOnboardingData() {
+      if (!this.categorizationPropertyId) return;
 
       try {
-        const response = await fetch(
+        // Step 1: If tax info was missing, save the user-submitted data first.
+        if (this.isTaxInfoMissing) {
+          console.log("Saving user-submitted tax info...");
+          const taxResponse = await fetch(
+            `/api/my-properties/${this.categorizationPropertyId}/tax-info`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(this.taxData),
+            }
+          );
+          if (!taxResponse.ok)
+            throw new Error("Failed to save tax information.");
+        }
+
+        // Step 2: Save the selected category.
+        console.log("Saving selected category...");
+        const categoryResponse = await fetch(
           `/api/my-properties/${this.categorizationPropertyId}/category`,
           {
             method: "PATCH",
@@ -602,23 +632,13 @@ export default function () {
             body: JSON.stringify({ category: this.selectedCategory }),
           }
         );
+        if (!categoryResponse.ok) throw new Error("Failed to save category.");
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Server responded with an error.");
-        }
-
-        console.log("Category saved successfully.");
+        // Step 3: Close the modal and reload the dashboard with the new data.
         this.showCategoryModal = false;
-
-        // THE FIX: We introduce a small delay before reloading the dashboard data.
-        // This ensures the database has time to commit the category change from the previous
-        // request before we ask for new data that depends on it.
-        setTimeout(() => {
-          this.setPreset("current-month");
-        }, 250); // A 250ms delay is imperceptible to the user but enough for the DB.
+        await this.runReport(); // Reload all dashboard data
       } catch (error) {
-        console.error("Failed to save hotel category:", error);
+        console.error("Failed to save onboarding data:", error);
         this.showError(
           `Could not save your selection. Error: ${error.message}`
         );

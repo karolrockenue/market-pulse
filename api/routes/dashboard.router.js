@@ -680,4 +680,68 @@ router.get("/market-ranking", requireUserApi, async (req, res) => {
   }
 });
 
+// --- NEW: ENDPOINT TO SAVE USER-SUBMITTED TAX INFO ---
+router.patch(
+  "/my-properties/:propertyId/tax-info",
+  requireUserApi, // Ensures the user is logged in
+  async (req, res) => {
+    // Get the property ID from the URL and the tax data from the request body.
+    const { propertyId } = req.params;
+    const { rate, type, name } = req.body;
+
+    // --- Data Validation ---
+    // Ensure the rate is a valid number.
+    const taxRate = parseFloat(rate);
+    if (isNaN(taxRate) || taxRate < 0 || taxRate > 1) {
+      return res
+        .status(400)
+        .json({ error: "A valid tax rate between 0 and 1 is required." });
+    }
+    // Ensure the type is one of the allowed values.
+    if (!["inclusive", "exclusive"].includes(type)) {
+      return res
+        .status(400)
+        .json({ error: "Tax type must be 'inclusive' or 'exclusive'." });
+    }
+
+    try {
+      // Security Check: Only a super_admin or a user directly linked to the property can update it.
+      if (req.session.role !== "super_admin") {
+        const accessCheck = await pgPool.query(
+          "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2::integer",
+          [req.session.userId, propertyId]
+        );
+        if (accessCheck.rows.length === 0) {
+          return res
+            .status(403)
+            .json({ error: "Access denied to this property." });
+        }
+      }
+
+      // --- Database Update ---
+      // Update the hotels table with the provided tax information.
+      const updateResult = await pgPool.query(
+        "UPDATE hotels SET tax_rate = $1, tax_type = $2, tax_name = $3 WHERE hotel_id = $4 RETURNING hotel_id, tax_rate, tax_type, tax_name",
+        [taxRate, type, name || "Tax", propertyId]
+      );
+
+      // If no rows were updated, the property was not found.
+      if (updateResult.rowCount === 0) {
+        return res.status(404).json({ error: "Property not found." });
+      }
+
+      // Send a success response.
+      res.status(200).json({
+        message: "Hotel tax information updated successfully.",
+        hotel: updateResult.rows[0],
+      });
+    } catch (error) {
+      console.error("Error updating hotel tax info:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to update hotel tax information." });
+    }
+  }
+);
+
 module.exports = router;
