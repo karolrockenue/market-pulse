@@ -77,50 +77,67 @@ router.get("/trends", requireUserApi, async (req, res) => {
   }
 });
 // --- NEW KPI ENDPOINT ---
-// This endpoint calculates the rolling 365-day KPIs for a given city vs. the prior year.
-// --- NEW KPI ENDPOINT ---
 router.get("/kpis", requireUserApi, async (req, res) => {
   const { city } = req.query;
   if (!city) {
     return res.status(400).json({ error: "City is a required parameter." });
   }
 
+  // Define the date ranges for the query
   const today = new Date();
   const endDateCurrent = new Date(today);
   const startDateCurrent = new Date(new Date().setDate(today.getDate() - 364));
   const endDatePrior = new Date(new Date().setDate(today.getDate() - 365));
   const startDatePrior = new Date(new Date().setDate(today.getDate() - 729));
 
+  // This new query implements the "Average of Changes" logic.
   const query = `
-    WITH ValidatedHotels AS (
+    -- CTE 1: Define the date ranges to be used throughout the query.
+    WITH DateRanges AS (
+        SELECT $2::date AS current_start, $3::date AS current_end,
+               $4::date AS prior_start, $5::date AS prior_end
+    ),
+    -- CTE 2: Find all hotels that are eligible for this YoY comparison.
+    ValidatedHotels AS (
         SELECT hotel_id
-        FROM hotels
+        FROM hotels, DateRanges
         WHERE city = $1
           AND go_live_date IS NOT NULL
-          AND go_live_date <= $4
+          -- THIS IS THE NEW RULE: Only include hotels with a go_live_date at least 2 months
+          -- before the start of the comparison period, ensuring they are mature properties.
+          AND go_live_date <= (DateRanges.prior_start - INTERVAL '2 months')
     ),
-    CurrentPeriodMetrics AS (
+    -- CTE 3: Calculate the average metrics for each hotel for both the current and prior periods.
+    HotelYoY AS (
         SELECT
-            -- THE FIX: Use the new gross columns
-            AVG(gross_adr) as current_adr,
-            AVG(occupancy_direct) as current_occupancy,
-            AVG(gross_revpar) as current_revpar
-        FROM daily_metrics_snapshots
-        WHERE hotel_id IN (SELECT hotel_id FROM ValidatedHotels)
-          AND stay_date BETWEEN $2 AND $3
-    ),
-    PriorPeriodMetrics AS (
-        SELECT
-            -- THE FIX: Use the new gross columns
-            AVG(gross_adr) as prior_adr,
-            AVG(occupancy_direct) as prior_occupancy,
-            AVG(gross_revpar) as prior_revpar
-        FROM daily_metrics_snapshots
-        WHERE hotel_id IN (SELECT hotel_id FROM ValidatedHotels)
-          AND stay_date BETWEEN $4 AND $5
+            h.hotel_id,
+            AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_revpar END) as current_revpar,
+            AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.gross_revpar END) as prior_revpar,
+            AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_adr END) as current_adr,
+            AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.gross_adr END) as prior_adr,
+            AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.occupancy_direct END) as current_occupancy,
+            AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.occupancy_direct END) as prior_occupancy
+        FROM hotels h
+        JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
+        CROSS JOIN DateRanges dr
+        WHERE h.hotel_id IN (SELECT hotel_id FROM ValidatedHotels)
+        GROUP BY h.hotel_id
     )
-    SELECT cp.*, pp.*
-    FROM CurrentPeriodMetrics cp, PriorPeriodMetrics pp;
+    -- Final SELECT: Calculate the final market values.
+    SELECT
+        -- THIS IS THE NEW LOGIC: Average the individual percentage changes of each hotel.
+        AVG( (current_revpar - prior_revpar) / NULLIF(prior_revpar, 0) ) AS revpar_change,
+        AVG( (current_adr - prior_adr) / NULLIF(prior_adr, 0) ) AS adr_change,
+        AVG( current_occupancy - prior_occupancy ) AS occupancy_change,
+        
+        -- Also calculate the simple market-wide averages for display on the KPI cards.
+        AVG(current_revpar) as current_revpar,
+        AVG(prior_revpar) as prior_revpar,
+        AVG(current_adr) as current_adr,
+        AVG(prior_adr) as prior_adr,
+        AVG(current_occupancy) as current_occupancy,
+        AVG(prior_occupancy) as prior_occupancy
+    FROM HotelYoY;
   `;
 
   try {
@@ -131,17 +148,8 @@ router.get("/kpis", requireUserApi, async (req, res) => {
       startDatePrior,
       endDatePrior,
     ]);
-    if (result.rows.length === 0) {
-      return res.json({
-        current_adr: 0,
-        current_occupancy: 0,
-        current_revpar: 0,
-        prior_adr: 0,
-        prior_occupancy: 0,
-        prior_revpar: 0,
-      });
-    }
-    res.json(result.rows[0]);
+    // Send back the single row of aggregated data, or a default object if no hotels qualified.
+    res.json(result.rows[0] || {});
   } catch (error) {
     console.error("Error in /api/market/kpis:", error);
     res.status(500).json({ error: "Failed to fetch market KPIs." });

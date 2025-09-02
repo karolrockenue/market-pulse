@@ -385,16 +385,20 @@ function marketOverviewComponent() {
         );
         if (!response.ok) throw new Error("API request failed");
         const data = await response.json();
-        const currentAdr = parseFloat(data.current_adr) || 0;
-        const priorAdr = parseFloat(data.prior_adr) || 0;
+
+        // THE FIX: Directly use the pre-calculated change values from the new API response.
+        const revparChange = parseFloat(data.revpar_change) || 0;
+        const adrChange = parseFloat(data.adr_change) || 0;
+        const occupancyChange = parseFloat(data.occupancy_change) || 0;
+
+        // The raw values for display are still needed.
         const currentRevpar = parseFloat(data.current_revpar) || 0;
         const priorRevpar = parseFloat(data.prior_revpar) || 0;
+        const currentAdr = parseFloat(data.current_adr) || 0;
+        const priorAdr = parseFloat(data.prior_adr) || 0;
         const currentOccupancy = parseFloat(data.current_occupancy) || 0;
         const priorOccupancy = parseFloat(data.prior_occupancy) || 0;
-        const adrChange = priorAdr > 0 ? (currentAdr - priorAdr) / priorAdr : 0;
-        const revparChange =
-          priorRevpar > 0 ? (currentRevpar - priorRevpar) / priorRevpar : 0;
-        const occupancyChange = currentOccupancy - priorOccupancy;
+
         this.marketKpis = {
           occupancy: {
             current: currentOccupancy,
@@ -405,7 +409,7 @@ function marketOverviewComponent() {
           revpar: {
             current: currentRevpar,
             prior: priorRevpar,
-            change: revparChange,
+            change: revparChange, // Use the new pre-calculated value
           },
         };
       } catch (error) {
