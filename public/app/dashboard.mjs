@@ -631,8 +631,14 @@ export default function () {
         if (!categoryResponse.ok) throw new Error("Failed to save category.");
 
         // Step 3: Close the modal and reload the dashboard with the new data.
+        // Step 3: Close the modal and reload the dashboard with the new data.
         this.showCategoryModal = false;
-        await this.runReport(); // Reload all dashboard data
+
+        // THE FIX: Use $nextTick to wait for Alpine to process the UI update (hiding the modal)
+        // before we start the heavy data loading. This makes the modal feel instant.
+        this.$nextTick(() => {
+          this.runReport();
+        });
       } catch (error) {
         console.error("Failed to save onboarding data:", error);
         this.showError(
