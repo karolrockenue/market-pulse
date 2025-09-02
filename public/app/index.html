@@ -148,22 +148,20 @@
     x-cloak
     x-init="window.alpineInstance = this"
 >
+<div id="main-loader" class="fixed inset-0 flex items-center justify-center bg-[#1e293b] z-50">
+    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+</div>
 <div
   x-show="isSyncing"
   x-cloak
   style="background-color: #0c121c"
   class="fixed inset-0 flex flex-col items-center justify-center z-50 transition-opacity"
 >
-  <!-- Blue Spinner (copied from admin panel style) -->
   <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent border-solid rounded-full animate-spin"></div>
-  <!-- Text Content -->
   <div class="text-center text-white mt-6">
     <h2 class="text-xl font-semibold">Syncing your hotel data...</h2>
     <p class="text-base text-gray-300 mt-2">Syncing up to 5 years of data, this can take a moment.</p>
   </div>
-</div>
-<div id="main-loader" class="fixed inset-0 flex items-center justify-center bg-[#1e293b] z-50">
-    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
 </div>
 <div
   x-show="showCategoryModal"
