@@ -158,22 +158,31 @@ router.get("/team", requireUserApi, async (req, res) => {
       owner: "Owner",
       user: "User",
     };
-
     if (role === "super_admin" && propertyIdForQuery) {
-      const teamResult = await pgPool.query(
-        `SELECT u.first_name, u.last_name, u.email, u.role
-         FROM users u
-         JOIN user_properties up ON u.cloudbeds_user_id = up.user_id OR u.user_id::text = up.user_id
-         WHERE up.property_id = $1`,
+      // Step 1: Get all unique user IDs linked to this property from user_properties.
+      const userIdsResult = await pgPool.query(
+        `SELECT DISTINCT user_id FROM user_properties WHERE property_id = $1`,
         [propertyIdForQuery]
       );
+      const teamUserIds = userIdsResult.rows.map((row) => row.user_id);
 
-      activeUsers = teamResult.rows.map((user) => ({
-        name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-        email: user.email,
-        status: "Active",
-        role: roleMap[user.role] || "User",
-      }));
+      // Step 2: If we found any linked users, fetch their full details from the users table.
+      if (teamUserIds.length > 0) {
+        const teamResult = await pgPool.query(
+          `SELECT first_name, last_name, email, role FROM users
+           WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
+          [teamUserIds]
+        );
+
+        // Map the results to the format the frontend expects.
+        activeUsers = teamResult.rows.map((user) => ({
+          name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+          email: user.email,
+          status: "Active",
+          role: roleMap[user.role] || "User",
+        }));
+      }
+
       propertyIdsForInvites = [propertyIdForQuery];
 
       // START: New logic to add the super_admin to the list
