@@ -108,9 +108,9 @@ export default function sidebar() {
 
           // --- THE FIX: Only dispatch the event if the ID has actually changed ---
           // This prevents the unnecessary reload that was causing the race condition.
-          if (this.currentPropertyId !== previousPropertyId) {
-            this.dispatchPropertyChangeEvent();
-          }
+          // Always dispatch the event on initial load to ensure all pages
+          // are synced with the sidebar's active property.
+          this.dispatchPropertyChangeEvent();
         } else {
           this.currentPropertyName = "No properties found";
         }
