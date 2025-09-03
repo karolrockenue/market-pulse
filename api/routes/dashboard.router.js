@@ -242,16 +242,30 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    // Security check to ensure the user has access to the requested property.
     if (req.session.role !== "super_admin") {
-      const accessCheck = await pgPool.query(
-        "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        [req.session.userId, propertyId]
+      const userResult = await pgPool.query(
+        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+        [req.session.userId]
       );
-      if (accessCheck.rows.length === 0)
+
+      if (userResult.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Access denied: User not found." });
+      }
+      const internalUserId = userResult.rows[0].user_id;
+
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
+        [req.session.userId, internalUserId, propertyId]
+      );
+
+      if (accessCheck.rows.length === 0) {
         return res
           .status(403)
           .json({ error: "Access denied to this property." });
+      }
     }
 
     const compSetResult = await pgPool.query(
@@ -346,16 +360,30 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
-
+    // Security check to ensure the user has access to the requested property.
     if (req.session.role !== "super_admin") {
-      const accessCheck = await pgPool.query(
-        "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        [req.session.userId, propertyId]
+      const userResult = await pgPool.query(
+        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+        [req.session.userId]
       );
-      if (accessCheck.rows.length === 0)
+
+      if (userResult.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Access denied: User not found." });
+      }
+      const internalUserId = userResult.rows[0].user_id;
+
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
+        [req.session.userId, internalUserId, propertyId]
+      );
+
+      if (accessCheck.rows.length === 0) {
         return res
           .status(403)
           .json({ error: "Access denied to this property." });
+      }
     }
 
     const period = getPeriod(granularity);
@@ -399,15 +427,17 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
+    // Security: Ensure the user has access to the requested property
     if (req.session.role !== "super_admin") {
       const accessCheck = await pgPool.query(
-        "SELECT * FROM user_properties WHERE user_id = $1 AND property_id = $2",
+        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [req.session.userId, propertyId]
       );
-      if (accessCheck.rows.length === 0)
+      if (accessCheck.rows.length === 0) {
         return res
           .status(403)
           .json({ error: "Access denied to this property." });
+      }
     }
 
     let competitorIds;
