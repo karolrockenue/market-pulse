@@ -74,18 +74,36 @@ router.get("/my-properties", requireUserApi, async (req, res) => {
       const result = await pgPool.query(query);
       return res.json(result.rows);
     } else {
-      // If they are a regular user ('owner' or 'user'), get only their linked properties.
+      // For regular users, we must find their properties by looking for EITHER their
+      // original cloudbeds_user_id OR their internal user_id in the user_properties table.
+
+      // Step 1: Get the logged-in user's internal integer ID from the users table.
+      const userResult = await pgPool.query(
+        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+        [req.session.userId]
+      );
+
+      // If the user in the session doesn't exist in the users table, they have no properties.
+      if (userResult.rows.length === 0) {
+        return res.json([]);
+      }
+      const internalUserId = userResult.rows[0].user_id;
+
+      // Step 2: Use both the session ID (cloudbeds_user_id) and the internal ID to find all linked properties.
       const query = `
         SELECT 
           up.property_id, 
           h.property_name,
-          h.city /* Add this line to select the city */
+          h.city
         FROM user_properties up
-        LEFT JOIN hotels h ON up.property_id::text = h.hotel_id::text
-        WHERE up.user_id = $1
+        JOIN hotels h ON up.property_id = h.hotel_id
+        WHERE up.user_id = $1 OR up.user_id = $2::text
         ORDER BY h.property_name;
       `;
-      const result = await pgPool.query(query, [req.session.userId]);
+      const result = await pgPool.query(query, [
+        req.session.userId,
+        internalUserId,
+      ]);
       return res.json(result.rows);
     }
   } catch (error) {
