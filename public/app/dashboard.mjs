@@ -626,11 +626,10 @@ export default function () {
         );
         if (!categoryResponse.ok) throw new Error("Failed to save category.");
 
-        // --- THIS IS THE KEY CHANGE ---
-        // Step 3: Hide the modal and run the report to load all dashboard data.
-        // The main loading overlay is still visible during this.
+        // Step 3: Hide the modal and set the default date preset.
+        // This will set the correct date range AND trigger runReport() automatically.
         this.showCategoryModal = false;
-        await this.runReport();
+        await this.setPreset("current-month");
 
         // Step 4: FINALLY, hide the loading overlay to reveal the fully populated dashboard.
         this.isSyncing = false;
