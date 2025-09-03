@@ -761,6 +761,14 @@ export default function () {
         eventDetail;
       if (!propertyId) return;
 
+      // --- THE FIX ---
+      // Set the component's active property ID and name immediately upon receiving the event.
+      // This is critical so the component knows which property it's working with, even during a sync.
+      this.currentPropertyId = propertyId;
+      this.currentPropertyName = propertyName;
+
+      // Now, check if a sync is in progress. If so, we'll abort the data-loading part,
+      // but the component state (above) is already correctly set for later.
       if (this.isSyncing) {
         console.log(
           "handlePropertyChange: Aborting data load because a sync is in progress."
@@ -768,9 +776,7 @@ export default function () {
         return;
       }
 
-      this.currentPropertyId = propertyId;
-      this.currentPropertyName = propertyName;
-
+      // This code block will now only run for normal page loads or when switching properties via the sidebar.
       try {
         const response = await fetch(`/api/hotel-details/${propertyId}`);
         const details = await response.json();
@@ -781,9 +787,6 @@ export default function () {
         console.error("Error during initial data load:", error);
         this.showError("Failed to load initial dashboard data.");
       } finally {
-        // --- THIS BLOCK IS RESTORED ---
-        // This ensures that for a normal page load, the initial spinner is hidden
-        // and the main dashboard content becomes visible.
         const loader = document.getElementById("main-loader");
         const wrapper = document.getElementById("dashboard-wrapper");
         if (loader && wrapper) {
@@ -794,7 +797,6 @@ export default function () {
           }, 500);
         }
         this.isInitialLoad = false;
-        // --- END RESTORED BLOCK ---
       }
     },
     // --- HELPER METHODS ---
