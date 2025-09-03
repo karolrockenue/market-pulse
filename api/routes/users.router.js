@@ -147,109 +147,88 @@ router.post(
 router.get("/team", requireUserApi, async (req, res) => {
   try {
     const { role, userId } = req.session;
-    const propertyIdForQuery =
-      role === "super_admin" ? req.query.propertyId : null;
+    const { propertyId } = req.query; // Always expect a propertyId
 
-    let activeUsers = [];
-    let propertyIdsForInvites = [];
+    // If no property is selected on the frontend, return an empty list.
+    if (!propertyId) {
+      return res.json([]);
+    }
 
-    const roleMap = {
-      super_admin: "Super Admin",
-      owner: "Owner",
-      user: "User",
-    };
-    if (role === "super_admin" && propertyIdForQuery) {
-      // Step 1: Get all unique user IDs linked to this property. This pattern is proven to work.
-      const userIdsResult = await pgPool.query(
-        `SELECT DISTINCT user_id FROM user_properties WHERE property_id = $1::integer`,
-        [propertyIdForQuery]
-      );
-      const teamUserIds = userIdsResult.rows.map((row) => row.user_id);
-
-      // Step 2: If we found any linked users, fetch their full details from the users table.
-      if (teamUserIds.length > 0) {
-        const teamResult = await pgPool.query(
-          `SELECT first_name, last_name, email, role FROM users
-           WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
-          [teamUserIds]
-        );
-
-        activeUsers = teamResult.rows.map((user) => ({
-          name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-          email: user.email,
-          status: "Active",
-          role: roleMap[user.role] || "User",
-        }));
-      }
-
-      propertyIdsForInvites = [propertyIdForQuery];
-    } else {
-      // This is the corrected logic for regular users.
-      // Step 1: Get the user's internal ID from their session ID.
+    // --- NEW: UNIFIED SECURITY CHECK ---
+    // For non-admins, we must verify they have access to the requested property.
+    if (role !== "super_admin") {
       const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [userId]
       );
       if (userResult.rows.length === 0) {
-        // If the session user doesn't exist, they have no team.
-        return res.json([]);
+        return res
+          .status(403)
+          .json({ error: "Access denied: User not found." });
       }
       const internalUserId = userResult.rows[0].user_id;
 
-      // Step 2: Use BOTH IDs to find the properties this user has access to.
-      const propertiesResult = await pgPool.query(
-        "SELECT property_id FROM user_properties WHERE user_id = $1 OR user_id = $2::text",
-        [userId, internalUserId]
+      // Use the robust access check to confirm the user is linked to this property.
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
+        [userId, internalUserId, propertyId]
       );
-      const propertyIds = propertiesResult.rows.map((p) => p.property_id);
-      propertyIdsForInvites = propertyIds;
 
-      if (propertyIds.length > 0) {
-        const teamResult = await pgPool.query(
-          "SELECT DISTINCT user_id FROM user_properties WHERE property_id = ANY($1::int[])",
-          [propertyIds]
-        );
-        const teamUserIds = teamResult.rows.map((u) => u.user_id);
-
-        if (teamUserIds.length > 0) {
-          const activeUsersResult = await pgPool.query(
-            `SELECT first_name, last_name, email, role FROM users 
-             WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
-            [teamUserIds]
-          );
-          // THE FIX: The map function was incorrectly using 'teamResult' (which only contains user IDs)
-          // instead of 'activeUsersResult' (which contains the full user details).
-          activeUsers = activeUsersResult.rows
-            .map((user) => ({
-              name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-              email: user.email,
-              status: "Active",
-              role: roleMap[user.role] || "User",
-            }))
-            .filter((user) => user.email);
-        }
+      if (accessCheck.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property." });
       }
     }
 
-    // Fetch pending invitations for the relevant properties
-    let pendingInvites = [];
-    if (propertyIdsForInvites.length > 0) {
-      const pendingInvitesResult = await pgPool.query(
-        `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
-        [propertyIdsForInvites]
+    // --- UNIFIED DATA FETCHING LOGIC ---
+    // This logic is now the same for all roles. It fetches users for the specific propertyId.
+    let activeUsers = [];
+    const userIdsResult = await pgPool.query(
+      `SELECT DISTINCT user_id FROM user_properties WHERE property_id = $1::integer`,
+      [propertyId]
+    );
+    const teamUserIds = userIdsResult.rows.map((row) => row.user_id);
+
+    if (teamUserIds.length > 0) {
+      const teamResult = await pgPool.query(
+        `SELECT first_name, last_name, email, role FROM users
+         WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
+        [teamUserIds]
       );
-      pendingInvites = pendingInvitesResult.rows
-        .map((invite) => ({
-          name: `${invite.invitee_first_name || ""} ${
-            invite.invitee_last_name || ""
-          }`.trim(),
-          email: invite.invitee_email,
-          status: "Pending",
-          role: "User",
+
+      const roleMap = {
+        super_admin: "Super Admin",
+        owner: "Owner",
+        user: "User",
+      };
+      activeUsers = teamResult.rows
+        .map((user) => ({
+          name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+          email: user.email,
+          status: "Active",
+          role: roleMap[user.role] || "User",
         }))
-        .filter((invite) => invite.email);
+        .filter((user) => user.email);
     }
 
+    // Fetch pending invitations, also filtered by the single propertyId
+    const pendingInvitesResult = await pgPool.query(
+      `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = $1::integer AND status = 'pending'`,
+      [propertyId]
+    );
+    const pendingInvites = pendingInvitesResult.rows
+      .map((invite) => ({
+        name: `${invite.invitee_first_name || ""} ${
+          invite.invitee_last_name || ""
+        }`.trim(),
+        email: invite.invitee_email,
+        status: "Pending",
+        role: "User",
+      }))
+      .filter((invite) => invite.email);
+
+    // Return the combined list for the specific property.
     res.json([...activeUsers, ...pendingInvites]);
   } catch (error) {
     console.error("Error fetching team members:", error);
