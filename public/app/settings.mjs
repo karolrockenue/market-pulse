@@ -4,6 +4,7 @@ export default function settingsPage() {
   return {
     // --- STATE ---
     isInitialized: false,
+    isLoading: false,
     // Profile section
     profile: { firstName: "", lastName: "", email: "" },
     originalProfile: {},
@@ -63,13 +64,28 @@ export default function settingsPage() {
 
     // NEW: Centralized function to load all page data.
     // This will be called on initial load and whenever the property changes.
+    // NEW: Centralized function to load all page data.
+    // This will be called on initial load and whenever the property changes.
     async loadDataForCurrentProperty() {
-      await Promise.all([
-        this.fetchProfile(),
-        this.fetchTeamMembers(),
-        this.fetchConnectedProperties(),
-        this.fetchOwnedProperties(),
-      ]);
+      // Prevent new data fetches from starting if one is already in progress.
+      if (this.isLoading) {
+        return;
+      }
+      this.isLoading = true;
+
+      try {
+        await Promise.all([
+          this.fetchProfile(),
+          this.fetchTeamMembers(),
+          this.fetchConnectedProperties(),
+          this.fetchOwnedProperties(),
+        ]);
+      } catch (error) {
+        console.error("Failed to load settings page data:", error);
+      } finally {
+        // Ensure the flag is always reset, even if an error occurs.
+        this.isLoading = false;
+      }
     },
     // --- METHODS ---
 

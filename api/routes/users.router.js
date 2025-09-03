@@ -161,7 +161,7 @@ router.get("/team", requireUserApi, async (req, res) => {
     if (role === "super_admin" && propertyIdForQuery) {
       // Step 1: Get all unique user IDs linked to this property. This pattern is proven to work.
       const userIdsResult = await pgPool.query(
-        `SELECT DISTINCT user_id FROM user_properties WHERE property_id = $1`,
+        `SELECT DISTINCT user_id FROM user_properties WHERE property_id = $1::integer`,
         [propertyIdForQuery]
       );
       const teamUserIds = userIdsResult.rows.map((row) => row.user_id);
