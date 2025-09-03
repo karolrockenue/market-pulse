@@ -410,7 +410,6 @@ router.post(
  */
 router.post(
   "/link-property",
-  // Replace the restrictive 'requireAccountOwner' with our new, more flexible check.
   [requireUserApi, requireManagePermission],
   async (req, res) => {
     const { email, propertyId } = req.body;
@@ -422,42 +421,39 @@ router.post(
     const client = await pgPool.connect();
     try {
       await client.query("BEGIN");
-      // replace with this
-      // Find the user's internal primary key (`user_id`) using their email address.
-      // This is the correct foreign key to use for the `user_properties` table.
+
+      // THE FIX: Fetch BOTH the internal user_id and the cloudbeds_user_id.
+      // The cloudbeds_user_id is the consistent key we need to use.
       const userToLinkResult = await client.query(
-        "SELECT user_id FROM users WHERE email = $1",
+        "SELECT user_id, cloudbeds_user_id FROM users WHERE email = $1",
         [email]
       );
 
-      // Check if a user with the provided email exists in the system.
       if (userToLinkResult.rows.length === 0) {
         throw new Error(
           "User not found. Please ensure the user has an existing Market Pulse account."
         );
       }
 
-      // Get the correct user_id from the query result.
-      const userIdToLink = userToLinkResult.rows[0].user_id;
+      const internalUserId = userToLinkResult.rows[0].user_id;
+      const cloudbedsUserIdToLink = userToLinkResult.rows[0].cloudbeds_user_id;
 
-      // Verify that this user doesn't already have access to the target property.
+      // Verify that this user doesn't already have access, checking against BOTH possible ID formats.
       const existingLinkCheck = await client.query(
-        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        // --- FIX: Explicitly convert the integer user ID to a string before querying ---
-        [userIdToLink.toString(), propertyId]
+        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2) AND property_id = $3",
+        [internalUserId.toString(), cloudbedsUserIdToLink, propertyId]
       );
 
-      // If a link already exists, inform the admin.
       if (existingLinkCheck.rows.length > 0) {
         throw new Error("This user already has access to this property.");
       }
 
-      // Insert the new record into user_properties using the correct internal user_id.
+      // THE FIX: Insert the new record using the cloudbeds_user_id to ensure data consistency.
       await client.query(
         "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
-        // --- FIX: Explicitly convert the integer user ID to a string for insertion ---
-        [userIdToLink.toString(), propertyId]
+        [cloudbedsUserIdToLink, propertyId]
       );
+
       await client.query("COMMIT");
       res
         .status(200)
