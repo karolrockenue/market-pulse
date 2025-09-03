@@ -473,7 +473,8 @@ router.post(
       // Verify that this user doesn't already have access to the target property.
       const existingLinkCheck = await client.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
-        [userIdToLink, propertyId]
+        // --- FIX: Explicitly convert the integer user ID to a string before querying ---
+        [userIdToLink.toString(), propertyId]
       );
 
       // If a link already exists, inform the admin.
@@ -484,7 +485,8 @@ router.post(
       // Insert the new record into user_properties using the correct internal user_id.
       await client.query(
         "INSERT INTO user_properties (user_id, property_id, status) VALUES ($1, $2, 'connected')",
-        [userIdToLink, propertyId]
+        // --- FIX: Explicitly convert the integer user ID to a string for insertion ---
+        [userIdToLink.toString(), propertyId]
       );
       await client.query("COMMIT");
       res
