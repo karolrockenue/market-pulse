@@ -117,11 +117,30 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
     const { propertyId } = req.params;
 
     // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
+    // Security check to ensure the user has access to the requested property.
     if (req.session.role !== "super_admin") {
-      const accessCheck = await pgPool.query(
-        "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id::text = $2",
-        [req.session.userId, propertyId]
+      // Step 1: Get the user's internal integer ID from their session ID.
+      // This is necessary because the user_properties table can link via either the string-based cloudbeds_user_id or the internal user_id.
+      const userResult = await pgPool.query(
+        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+        [req.session.userId]
       );
+
+      // If the user doesn't exist in our system, deny access.
+      if (userResult.rows.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Access denied: User not found." });
+      }
+      const internalUserId = userResult.rows[0].user_id;
+
+      // Step 2: Check if a link exists in user_properties using EITHER the session ID or the internal ID.
+      const accessCheck = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3",
+        [req.session.userId, internalUserId, propertyId]
+      );
+
+      // If no link is found, the user is not authorized for this property.
       if (accessCheck.rows.length === 0) {
         return res
           .status(403)
