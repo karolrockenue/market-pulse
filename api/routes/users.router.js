@@ -217,7 +217,9 @@ router.get("/team", requireUserApi, async (req, res) => {
              WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
             [teamUserIds]
           );
-          activeUsers = teamResult.rows
+          // THE FIX: The map function was incorrectly using 'teamResult' (which only contains user IDs)
+          // instead of 'activeUsersResult' (which contains the full user details).
+          activeUsers = activeUsersResult.rows
             .map((user) => ({
               name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
               email: user.email,
