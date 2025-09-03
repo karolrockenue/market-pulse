@@ -662,6 +662,11 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
     );
     const tokenResponse = await tokenRes.json();
+    // --- TEMPORARY DEBUG LOG ---
+    console.log(
+      "--- CLOUDBEDS TOKEN RESPONSE ---",
+      JSON.stringify(tokenResponse, null, 2)
+    );
 
     if (!tokenResponse.access_token) {
       console.error("[BREADCRUMB FAIL] Token exchange failed.");
