@@ -184,10 +184,22 @@ router.get("/team", requireUserApi, async (req, res) => {
 
       propertyIdsForInvites = [propertyIdForQuery];
     } else {
-      // This is the original logic for regular users.
-      const propertiesResult = await pgPool.query(
-        "SELECT property_id FROM user_properties WHERE user_id = $1",
+      // This is the corrected logic for regular users.
+      // Step 1: Get the user's internal ID from their session ID.
+      const userResult = await pgPool.query(
+        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [userId]
+      );
+      if (userResult.rows.length === 0) {
+        // If the session user doesn't exist, they have no team.
+        return res.json([]);
+      }
+      const internalUserId = userResult.rows[0].user_id;
+
+      // Step 2: Use BOTH IDs to find the properties this user has access to.
+      const propertiesResult = await pgPool.query(
+        "SELECT property_id FROM user_properties WHERE user_id = $1 OR user_id = $2::text",
+        [userId, internalUserId]
       );
       const propertyIds = propertiesResult.rows.map((p) => p.property_id);
       propertyIdsForInvites = propertyIds;
