@@ -183,32 +183,6 @@ router.get("/team", requireUserApi, async (req, res) => {
       }
 
       propertyIdsForInvites = [propertyIdForQuery];
-
-      // START: New logic to add the super_admin to the list
-      // Check if the viewing admin is already in the list (unlikely, but a good safeguard).
-      const isAdminInList = activeUsers.some(
-        (user) => user.email === req.session.email
-      );
-      if (!isAdminInList) {
-        // Fetch the admin's own details from the users table.
-        const adminDetailsResult = await pgPool.query(
-          "SELECT first_name, last_name, email, role FROM users WHERE cloudbeds_user_id = $1",
-          [userId]
-        );
-        if (adminDetailsResult.rows.length > 0) {
-          const adminUser = adminDetailsResult.rows[0];
-          // Add the admin's user object to the start of the array.
-          activeUsers.unshift({
-            name: `${adminUser.first_name || ""} ${
-              adminUser.last_name || ""
-            }`.trim(),
-            email: adminUser.email,
-            status: "Active",
-            role: roleMap[adminUser.role] || "User",
-          });
-        }
-      }
-      // END: New logic
     } else {
       // This is the original logic for regular users.
       const propertiesResult = await pgPool.query(
@@ -231,12 +205,14 @@ router.get("/team", requireUserApi, async (req, res) => {
              WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
             [teamUserIds]
           );
-          activeUsers = activeUsersResult.rows.map((user) => ({
-            name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-            email: user.email,
-            status: "Active",
-            role: roleMap[user.role] || "User",
-          }));
+          activeUsers = teamResult.rows
+            .map((user) => ({
+              name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+              email: user.email,
+              status: "Active",
+              role: roleMap[user.role] || "User",
+            }))
+            .filter((user) => user.email);
         }
       }
     }
@@ -248,14 +224,16 @@ router.get("/team", requireUserApi, async (req, res) => {
         `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = ANY($1::int[]) AND status = 'pending'`,
         [propertyIdsForInvites]
       );
-      pendingInvites = pendingInvitesResult.rows.map((invite) => ({
-        name: `${invite.invitee_first_name || ""} ${
-          invite.invitee_last_name || ""
-        }`.trim(),
-        email: invite.invitee_email,
-        status: "Pending",
-        role: "User",
-      }));
+      pendingInvites = pendingInvitesResult.rows
+        .map((invite) => ({
+          name: `${invite.invitee_first_name || ""} ${
+            invite.invitee_last_name || ""
+          }`.trim(),
+          email: invite.invitee_email,
+          status: "Pending",
+          role: "User",
+        }))
+        .filter((invite) => invite.email);
     }
 
     res.json([...activeUsers, ...pendingInvites]);
