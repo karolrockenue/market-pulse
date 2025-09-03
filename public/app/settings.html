@@ -248,7 +248,9 @@
                           ></span>
                         </td>
                         <td class="px-4 py-3 text-right">
-                          <template x-if="member.email !== profile.email">
+                          <template
+                            x-if="(currentUserRole === 'owner' || currentUserRole === 'super_admin') && member.email !== profile.email"
+                          >
                             <button
                               @click="removeUser(member.email)"
                               class="text-slate-400 hover:text-red-600 font-medium transition-colors"

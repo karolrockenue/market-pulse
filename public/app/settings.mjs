@@ -12,7 +12,9 @@ export default function settingsPage() {
     saveMessage: "",
     // User Management section
     // User Management section
+    // User Management section
     teamMembers: [],
+    currentUserRole: "", // NEW: To store the logged-in user's role for UI control.
     isAccountOwner: false, // NEW: Flag to show/hide the grant access UI
     ownedProperties: [], // NEW: List of properties the user owns
     isLinkModalOpen: false, // NEW: Controls the new modal
@@ -79,6 +81,7 @@ export default function settingsPage() {
           this.fetchTeamMembers(),
           this.fetchConnectedProperties(),
           this.fetchOwnedProperties(),
+          this.fetchCurrentUserRole(),
         ]);
       } catch (error) {
         console.error("Failed to load settings page data:", error);
@@ -240,6 +243,23 @@ export default function settingsPage() {
         this.linkAccess.message = error.message;
       } finally {
         this.isLinking = false;
+      }
+    },
+
+    /**
+     * @description Fetches the current user's session info to get their role.
+     */
+    async fetchCurrentUserRole() {
+      try {
+        const response = await fetch("/api/auth/session-info");
+        if (!response.ok) throw new Error("Could not fetch session info.");
+        const data = await response.json();
+        // Store the role, defaulting to 'user' for safety.
+        this.currentUserRole = data.role || "user";
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        // Default to the least privileged role if the fetch fails.
+        this.currentUserRole = "user";
       }
     },
     /**

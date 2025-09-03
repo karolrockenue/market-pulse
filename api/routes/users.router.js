@@ -242,7 +242,7 @@ router.get("/team", requireUserApi, async (req, res) => {
  */
 router.delete(
   "/remove",
-  [requireUserApi, requireInvitePermission],
+  [requireUserApi, requireManagePermission],
   async (req, res) => {
     const { email: emailToRemove } = req.body;
     const adminCloudbedsId = req.session.userId;
