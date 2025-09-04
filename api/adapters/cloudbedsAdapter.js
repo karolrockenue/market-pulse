@@ -659,11 +659,21 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   }
 
   // THE FIX: First, check if a hotel exists with this ID in EITHER the new or old column.
-  const checkQuery = `
-    SELECT hotel_id FROM hotels 
-    WHERE pms_property_id = $1 OR hotel_id = $1::integer
-  `;
-  const existingHotelResult = await dbClient.query(checkQuery, [propertyId]);
+  // SAFETY: Never cast jumbo Cloudbeds IDs to integer. Only attempt integer comparison
+  // if the input is clearly a small, 32-bit-safe integer (<= 10 digits).
+  const existingHotelResult = await dbClient.query(
+    `
+  SELECT hotel_id
+  FROM hotels
+  WHERE pms_property_id = $1
+     OR (
+          $1 ~ '^[0-9]{1,10}$'       -- only try cast if it fits 32-bit int length
+          AND hotel_id = ($1)::integer
+        )
+  `,
+    [String(propertyId)] // ensure we always bind a string, not a JS number
+  );
+
   const existingHotel = existingHotelResult.rows[0];
 
   const neighborhood = await getNeighborhoodFromCoords(
