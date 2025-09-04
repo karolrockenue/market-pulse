@@ -167,6 +167,62 @@ router.get("/test-cloudbeds", requireAdminApi, async (req, res) => {
   }
 });
 
+// NEW: Zero-DB Cloudbeds debug — hit getHotelDetails with a raw token.
+// Usage (admin only):
+//   GET /api/admin/debug/cloudbeds/property-details?access_token=...&propertyId=96147116859584
+router.get(
+  "/debug/cloudbeds/property-details",
+  requireAdminApi,
+  async (req, res) => {
+    try {
+      const { access_token, propertyId } = req.query;
+
+      // 1) Validate inputs early to avoid confusing errors.
+      if (!access_token) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "Query param 'access_token' is required.",
+          });
+      }
+      if (!propertyId) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "Query param 'propertyId' is required.",
+          });
+      }
+
+      // 2) Call Cloudbeds directly — NO DB LOOKUPS.
+      //    Important: Many Cloudbeds endpoints require BOTH the property ID in URL AND X-PROPERTY-ID header.
+      const url = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${encodeURIComponent(
+        propertyId
+      )}`;
+      const resp = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "X-PROPERTY-ID": propertyId,
+        },
+      });
+
+      // 3) Return the raw Cloudbeds JSON and HTTP status so we can see the real error (e.g., 403).
+      const data = await resp.json().catch(() => ({}));
+
+      return res.status(resp.status).json({
+        success: resp.ok && data?.success !== false,
+        httpStatus: resp.status,
+        cloudbeds: data,
+      });
+    } catch (err) {
+      console.error("[Debug] Cloudbeds property-details probe failed:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
 // NEW: Route to manually trigger the daily refresh job
 router.get("/daily-refresh", requireAdminApi, async (req, res) => {
   console.log("Admin panel manually triggering daily-refresh job...");
