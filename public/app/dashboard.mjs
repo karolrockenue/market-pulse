@@ -192,10 +192,47 @@ export default function () {
     // This new flag tracks the very first time the dashboard loads.
     isInitialLoad: true,
     ranking: null,
+    async init() {
+      // --- NEW: Session Verification Step ---
+      // This logic runs before anything else to ensure the user is properly logged in,
+      // preventing the race condition after an OAuth redirect.
+      console.log("[DASHBOARD] 1a. Verifying session...");
+      const maxRetries = 10; // Try for ~3 seconds
+      let sessionVerified = false;
 
-    // /public/app/dashboard.mjs
-    init() {
-      console.log("%c[DASHBOARD] 1. Initializing component.", "color: #3b82f6");
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const response = await fetch("/api/auth/session-info");
+          if (response.ok) {
+            const session = await response.json();
+            if (session.isLoggedIn) {
+              console.log("[DASHBOARD] 1b. Session verified successfully.");
+              sessionVerified = true;
+              break; // Exit the loop on success
+            }
+          }
+        } catch (error) {
+          // This catch block handles network errors, not 401s.
+          console.warn(
+            `[DASHBOARD] Session check attempt ${i + 1} failed, retrying...`
+          );
+        }
+        // Wait 300ms before the next attempt.
+        await new Promise((res) => setTimeout(res, 300));
+      }
+
+      // If the session could not be verified after all retries, redirect to the login page.
+      if (!sessionVerified) {
+        console.error(
+          "[DASHBOARD] Session could not be verified after multiple attempts. Redirecting to login."
+        );
+        window.location.href = "/signin";
+        return; // Stop the rest of the init() function from running.
+      }
+
+      // --- ORIGINAL INIT LOGIC CONTINUES BELOW (now that session is confirmed) ---
+
+      console.log("%c[DASHBOARD] 2. Initializing component.", "color: #3b82f6");
       const urlParams = new URLSearchParams(window.location.search);
       const newPropertyId = urlParams.get("propertyId");
       const isNewConnection = urlParams.get("newConnection") === "true";
@@ -211,12 +248,12 @@ export default function () {
 
       if (isNewConnection && newPropertyId) {
         console.log(
-          `%c[DASHBOARD] 2a. New connection flow started for property ID: ${newPropertyId}`,
+          `%c[DASHBOARD] 3a. New connection flow started for property ID: ${newPropertyId}`,
           "color: #3b82f6"
         );
         localStorage.setItem("currentPropertyId", newPropertyId);
         console.log(
-          `%c[DASHBOARD] 2b. Set 'currentPropertyId' in localStorage to: ${newPropertyId}`,
+          `%c[DASHBOARD] 3b. Set 'currentPropertyId' in localStorage to: ${newPropertyId}`,
           "color: #3b82f6"
         );
 
@@ -227,7 +264,7 @@ export default function () {
         })
           .then((res) => {
             console.log(
-              `%c[DASHBOARD] 2c. Triggered initial sync. Server responded with status: ${res.status}`,
+              `%c[DASHBOARD] 3c. Triggered initial sync. Server responded with status: ${res.status}`,
               "color: #3b82f6"
             );
           })
@@ -244,7 +281,7 @@ export default function () {
 
         this.$nextTick(() => {
           console.log(
-            `%c[DASHBOARD] 2d. Dispatching authoritative 'property-changed' event for new property ID: ${newPropertyId}`,
+            `%c[DASHBOARD] 3d. Dispatching authoritative 'property-changed' event for new property ID: ${newPropertyId}`,
             "color: #3b82f6"
           );
           window.dispatchEvent(
