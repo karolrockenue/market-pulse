@@ -233,8 +233,10 @@ market-pulse/
 │ │ ├── settings.mjs
 │ │ └── utils.mjs
 │ ├── rockenue/
-│ │ ├── index.html
-│ │ └── rockenue.mjs
+│ ├── index.html
+│ ├── rockenue.mjs
+│ ├── shreeji-report.html
+│ └── shreeji-report.mjs
 │ ├── favicon.png
 │ ├── constants.mjs
 │ ├── login.html
@@ -309,6 +311,10 @@ GET /user/profile, PUT /user/profile: Manages user profile data.
 admin.router.js
 (Contains various endpoints for the Admin Panel, including fetching all hotels, managing comp sets, triggering syncs/reports, and powering the API Explorer for both Cloudbeds and Mews).
 
+rockenue.router.js
+GET /rockenue/status: A protected endpoint to verify super_admin access.
+GET /rockenue/hotels: Fetches a list of all hotel properties for use in report dropdowns.
+
 7.0 Key Features & Functionality
 Main Dashboard (/app/index.html): Features a two-column, "headerless" design. It includes interactive KPI summary cards, a unified data table comparing "Your Hotel" vs. "The Market," a "Market Composition" card with visual breakdowns, and a "Market Ranking" component.
 
@@ -320,8 +326,7 @@ Settings (/app/settings.html): A central hub for account management. Users can e
 
 Admin Panel (/admin/index.html): An internal tool for super_admin users. Key features include a Competitive Set Manager, a powerful, multi-filter API Explorer for debugging, and manual triggers for system jobs.
 
-Rockenue Section (/rockenue/index.html): A secure area for internal company (Rockenue) reports and administrative tools. This section is only accessible to super_admin users and is completely separate from the client-facing parts of the application.
-
+Rockenue Section (/rockenue/index.html): A secure area for internal company (Rockenue) reports and administrative tools. This section is only accessible to super_admin users and is completely separate from the client-facing parts of the application. It currently includes the "Shreeji Report" for viewing in-house guest balances.
 Automated Jobs (Vercel Cron Jobs):
 
 Daily Data Refresh: The /api/daily-refresh.js script runs automatically to pull the latest data for all connected properties.
