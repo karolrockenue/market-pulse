@@ -33,50 +33,6 @@ router.use(requireSuperAdmin);
  * This allows testing with a manually provided token to isolate permission issues.
  * Accessible at POST /api/rockenue/debug-probe
  */
-router.post("/debug-probe", async (req, res) => {
-  const { accessToken, propertyId, endpoint } = req.body;
-
-  if (!accessToken || !propertyId || !endpoint) {
-    return res
-      .status(400)
-      .json({ error: "accessToken, propertyId, and endpoint are required." });
-  }
-
-  // Construct the full Cloudbeds API URL from the provided endpoint slug.
-  const url = `https://api.cloudbeds.com/api/v1.1/${endpoint}?propertyID=${propertyId}`;
-
-  try {
-    // Make the direct API call using the provided credentials.
-    const probeResponse = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "X-PROPERTY-ID": propertyId,
-      },
-    });
-
-    // Read the response body as text, as it could be JSON or HTML.
-    const responseBody = await probeResponse.text();
-
-    // Send back a detailed report to the frontend.
-    res.status(200).json({
-      request: {
-        url: url,
-        method: "GET",
-      },
-      response: {
-        status: probeResponse.status,
-        statusText: probeResponse.statusText,
-        headers: Object.fromEntries(probeResponse.headers.entries()),
-        body: responseBody,
-      },
-    });
-  } catch (error) {
-    console.error("Debug probe failed:", error);
-    res
-      .status(500)
-      .json({ error: "Probe request failed.", details: error.message });
-  }
-});
 
 /**
  * A helper function to get a valid Cloudbeds access token for a given property.
@@ -156,92 +112,54 @@ router.get("/hotels", async (req, res) => {
  * This is the core logic for fetching and combining the data.
  * Accessible at GET /api/rockenue/shreeji-report?hotel_id=...&date=...
  */
+/**
+ * REFACTORED: Generates the Shreeji Report data using a single, efficient API call.
+ */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
-
-  // --- 1. Input Validation ---
   if (!hotel_id || !date) {
-    return res
-      .status(400)
-      .json({ error: "hotel_id and date are required parameters." });
+    return res.status(400).json({ error: "hotel_id and date are required." });
   }
 
   try {
-    // --- 2. Determine PMS Type and Get External ID ---
     const hotelInfoResult = await pool.query(
       "SELECT pms_type, pms_property_id FROM hotels WHERE hotel_id = $1",
       [hotel_id]
     );
-
     if (hotelInfoResult.rows.length === 0) {
       return res.status(404).json({ error: "Hotel not found." });
     }
-    const { pms_type, pms_property_id } = hotelInfoResult.rows[0];
 
-    // The external ID is what we use to talk to the PMS API.
-    const externalPropertyId = pms_property_id || hotel_id; // Fallback for older hotels
+    const { pms_type, pms_property_id } = hotelInfoResult.rows[0];
+    const externalPropertyId = pms_property_id || hotel_id;
 
     let reportData = [];
 
-    // --- 3. Branch Logic Based on PMS Type ---
     if (pms_type === "cloudbeds") {
-      // Get a fresh access token for Cloudbeds.
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // Fetch both lists of data from Cloudbeds in parallel to save time.
-      const [allRooms, inHouseReservations] = await Promise.all([
-        cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
-        cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
-          status: "in_house",
-        }),
-      ]);
+      // This is the only API call we need now. We filter for guests checked in on the report date.
+      const reservations = await cloudbedsAdapter.getReservationsWithDetails(
+        accessToken,
+        externalPropertyId,
+        { checkInFrom: date, checkInTo: date, status: "checked_in" }
+      );
 
-      // Create a quick lookup map of reservations by their assigned room number.
-      const reservationMap = new Map();
-      inHouseReservations.forEach((res) => {
-        if (res.roomID) {
-          // A reservation might be in-house but not yet assigned a room.
-          reservationMap.set(res.roomID.toString(), res);
-        }
-      });
-
-      // --- 4. Merge the Data ---
-      // Loop through the definitive list of all physical rooms.
-      reportData = allRooms.map((room) => {
-        const reservation = reservationMap.get(room.roomID.toString());
-
-        // If a reservation exists for this room, populate the details.
-        if (reservation) {
-          return {
-            roomName: room.roomName,
-            guestName: `${reservation.guestFirstName} ${reservation.guestLastName}`,
-            balance: reservation.balance,
-            source: reservation.sourceName || "N/A", // Use source name if available
-          };
-        } else {
-          // If no reservation, the room is vacant.
-          return {
-            roomName: room.roomName,
-            guestName: "--- VACANT ---",
-            balance: 0,
-            source: "N/A",
-          };
-        }
-      });
-    } else if (pms_type === "mews") {
-      // Future logic for Mews would go here.
-      // It would be very similar: get credentials, fetch rooms, fetch in-house guests, merge.
+      // Map the API response directly to our desired report format.
+      reportData = reservations.map((res) => ({
+        // The unassignedRooms array contains the room name when a guest is checked in.
+        roomName: res.unassignedRooms?.[0]?.roomName || "N/A",
+        guestName: `${res.guestFirstName} ${res.guestLastName}`,
+        balance: res.balance,
+        source: res.sourceName || "N/A",
+      }));
+    } else {
       return res
         .status(501)
         .json({ error: "Report not implemented for Mews yet." });
-    } else {
-      return res
-        .status(400)
-        .json({ error: `Unsupported PMS type: ${pms_type}` });
     }
 
-    // --- 5. Sort and Send the Final Report ---
-    // Sort the final report by room name/number.
+    // Sort the final report by room name.
     reportData.sort((a, b) =>
       a.roomName.localeCompare(b.roomName, undefined, { numeric: true })
     );

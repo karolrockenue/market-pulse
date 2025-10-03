@@ -1003,6 +1003,68 @@ async function getReservations(accessToken, propertyId, filters = {}) {
   return allReservations;
 }
 
+/**
+ * NEW: Fetches reservations with extra rate and source details.
+ * This is the preferred endpoint for detailed reporting.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The external PMS ID of the property.
+ * @param {object} [filters={}] - An object of key-value pairs for URL query parameters.
+ * @returns {Promise<Array>} - A flat array of detailed reservation objects.
+ */
+async function getReservationsWithDetails(
+  accessToken,
+  propertyId,
+  filters = {}
+) {
+  let allReservations = [];
+  let pageNumber = 1;
+  const pageSize = 100;
+  let hasMore = true;
+
+  // Add the crucial 'includeGuestsDetails' parameter automatically.
+  const finalFilters = { ...filters, includeGuestsDetails: "true" };
+  const filterParams = new URLSearchParams(finalFilters).toString();
+
+  while (hasMore) {
+    // Use the correct v1.3 endpoint as identified from the documentation.
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservationsWithRateDetails?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}&${filterParams}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
+    });
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const errorText = await response.text();
+      throw new Error(
+        `Cloudbeds API returned a non-JSON response. Status: ${
+          response.status
+        }. Body: ${errorText.substring(0, 500)}...`
+      );
+    }
+
+    const data = await response.json();
+    if (!response.ok || data.success === false) {
+      // Some endpoints use `success: false`
+      throw new Error(
+        `Failed to fetch detailed reservations page ${pageNumber}. API Response: ${JSON.stringify(
+          data
+        )}`
+      );
+    }
+
+    if (data.data && data.data.length > 0) {
+      allReservations = allReservations.concat(data.data);
+      pageNumber++;
+    } else {
+      hasMore = false;
+    }
+  }
+  return allReservations;
+}
+
 module.exports = {
   getAccessToken,
   getNeighborhoodFromCoords,
@@ -1015,4 +1077,6 @@ module.exports = {
   getUserInfo,
   getRooms,
   getReservations,
+  // Export our new function.
+  getReservationsWithDetails,
 };
