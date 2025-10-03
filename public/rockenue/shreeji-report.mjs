@@ -51,9 +51,61 @@ function setDefaultDate() {
   }
 }
 
+/**
+ * NEW FUNCTION: Fetches the list of all hotels from the backend API.
+ * It then populates the 'hotel-select' dropdown with the results.
+ */
+async function loadHotels() {
+  // Get the dropdown element from the page.
+  const hotelSelect = document.getElementById("hotel-select");
+  if (!hotelSelect) return; // Exit if the element doesn't exist.
+
+  try {
+    // Call the new API endpoint we created in the previous step.
+    const response = await fetch("/api/rockenue/hotels");
+
+    // If the server responds with an error (e.g., 403 Forbidden), handle it.
+    if (!response.ok) {
+      throw new Error(`Failed to fetch hotels. Status: ${response.status}`);
+    }
+
+    // Parse the JSON data from the response.
+    const hotels = await response.json();
+
+    // Clear the initial "Loading hotels..." message.
+    hotelSelect.innerHTML = "";
+
+    // Add a default, non-selectable prompt as the first option.
+    const promptOption = document.createElement("option");
+    promptOption.textContent = "Select a hotel";
+    promptOption.value = "";
+    promptOption.disabled = true;
+    promptOption.selected = true;
+    hotelSelect.appendChild(promptOption);
+
+    // Loop through each hotel returned from the API.
+    hotels.forEach((hotel) => {
+      // Create a new <option> element for each hotel.
+      const option = document.createElement("option");
+      // Set the value to the hotel's unique ID.
+      option.value = hotel.hotel_id;
+      // Set the displayed text to the hotel's name.
+      option.textContent = hotel.property_name;
+      // Add the new option to the dropdown.
+      hotelSelect.appendChild(option);
+    });
+  } catch (error) {
+    // If an error occurs, log it and update the dropdown to show a failure message.
+    console.error("Error loading hotels:", error);
+    hotelSelect.innerHTML = '<option value="">Could not load hotels</option>';
+  }
+}
+
 // --- INITIALIZATION ---
 // Functions that run as soon as the page's DOM is ready.
 document.addEventListener("DOMContentLoaded", () => {
+  // We now call all three functions to set up the page.
   loadSidebar();
   setDefaultDate();
+  loadHotels();
 });
