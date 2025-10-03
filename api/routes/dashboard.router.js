@@ -314,10 +314,17 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     const kpiQuery = `
       SELECT
           AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_adr ELSE NULL END) AS your_adr,
-          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.occupancy_direct ELSE NULL END) AS your_occupancy,
+
+          SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::numeric /
+          NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0) AS your_occupancy,
+
           AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_revpar ELSE NULL END) AS your_revpar,
           AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_adr ELSE NULL END) AS market_adr,
-          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.occupancy_direct ELSE NULL END) AS market_occupancy,
+
+  
+          SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::numeric /
+          NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0) AS market_occupancy,
+
           AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_revpar ELSE NULL END) AS market_revpar
       FROM daily_metrics_snapshots dms
       WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND (dms.hotel_id = $1 OR dms.hotel_id = ANY($4::int[]));
