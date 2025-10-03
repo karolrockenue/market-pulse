@@ -82,7 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * FINAL REVISION 2: Simplifies the logic to fix the "no data" error.
+ * FINAL VERSION: Implements the correct two-step logic to get in-house guests.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -107,29 +107,43 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- THE FIX: We go directly to the detailed endpoint ---
-      // This call will fetch all reservations active on the report date and exclude cancellations.
-      // This is a single, efficient API call.
+      // --- STEP 1: Get all reservations overlapping the date from the basic endpoint. ---
+      const overlappingReservations = await cloudbedsAdapter.getReservations(
+        accessToken,
+        externalPropertyId,
+        {
+          checkInTo: date,
+          checkOutFrom: date,
+        }
+      );
+
+      // --- STEP 2: Filter this list in our code to get only the guests who stayed the night. ---
+      const inHouseReservations = overlappingReservations.filter(
+        // Exclude cancellations AND guests who checked out *on* the report date.
+        (res) => res.status !== "canceled" && res.checkOutDate !== date
+      );
+
+      if (inHouseReservations.length === 0) {
+        return res.status(200).json([]);
+      }
+
+      const reservationIDs = inHouseReservations.map(
+        (res) => res.reservationID
+      );
+
+      // --- STEP 3: Fetch the full details for only those specific, relevant reservations. ---
       const detailedReservations =
         await cloudbedsAdapter.getReservationsWithDetails(
           accessToken,
           externalPropertyId,
-          {
-            checkInTo: date,
-            checkOutFrom: date,
-            excludeStatuses: "canceled",
-          }
+          { reservationID: reservationIDs.join(",") }
         );
 
-      // --- Map the detailed data with corrected field names and new columns ---
+      // --- STEP 4: Map the final, detailed data. ---
       reportData = detailedReservations
-        // Filter out any guests who checked out on the report date or who are unassigned to a room.
+        // As a final safety check, remove any that might be unassigned.
         .filter(
-          (res) =>
-            res.checkOutDate !== date &&
-            res.rooms &&
-            res.rooms.length > 0 &&
-            res.rooms[0].roomName
+          (res) => res.rooms && res.rooms.length > 0 && res.rooms[0].roomName
         )
         .map((res) => ({
           roomName: res.rooms[0].roomName,
