@@ -5,7 +5,6 @@ import sidebar from "/app/_shared/sidebar.mjs";
 
 /**
  * A function to dynamically load the shared sidebar component into the page.
- * This is standard practice across the app.
  */
 async function loadSidebar() {
   const sidebarContainer = document.getElementById("sidebar-container");
@@ -14,12 +13,10 @@ async function loadSidebar() {
     return;
   }
   try {
-    // Fetch the sidebar's HTML content
     const response = await fetch("/app/_shared/sidebar.html");
     if (!response.ok) throw new Error("Failed to fetch sidebar HTML");
     const sidebarHTML = await response.text();
 
-    // Inject the HTML and initialize its Alpine.js component
     sidebarContainer.innerHTML = sidebarHTML;
     window.sidebar = sidebar;
     Alpine.initTree(sidebarContainer);
@@ -32,50 +29,35 @@ async function loadSidebar() {
 
 /**
  * Sets the default date for the date picker to yesterday.
- * This ensures the report is ready to run for the most common use case.
  */
 function setDefaultDate() {
   const datePicker = document.getElementById("report-date");
   if (datePicker) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-
-    // Format the date as YYYY-MM-DD, which is required for the date input value.
     const year = yesterday.getFullYear();
-    // Pad month and day with a leading zero if they are single-digit.
     const month = String(yesterday.getMonth() + 1).padStart(2, "0");
     const day = String(yesterday.getDate()).padStart(2, "0");
-
-    // Set the final formatted value.
     datePicker.value = `${year}-${month}-${day}`;
   }
 }
 
 /**
- * NEW FUNCTION: Fetches the list of all hotels from the backend API.
+ * Fetches the list of all hotels from the backend API.
  * It then populates the 'hotel-select' dropdown with the results.
  */
 async function loadHotels() {
-  // Get the dropdown element from the page.
   const hotelSelect = document.getElementById("hotel-select");
-  if (!hotelSelect) return; // Exit if the element doesn't exist.
+  if (!hotelSelect) return;
 
   try {
-    // Call the new API endpoint we created in the previous step.
     const response = await fetch("/api/rockenue/hotels");
-
-    // If the server responds with an error (e.g., 403 Forbidden), handle it.
     if (!response.ok) {
       throw new Error(`Failed to fetch hotels. Status: ${response.status}`);
     }
-
-    // Parse the JSON data from the response.
     const hotels = await response.json();
 
-    // Clear the initial "Loading hotels..." message.
     hotelSelect.innerHTML = "";
-
-    // Add a default, non-selectable prompt as the first option.
     const promptOption = document.createElement("option");
     promptOption.textContent = "Select a hotel";
     promptOption.value = "";
@@ -83,29 +65,112 @@ async function loadHotels() {
     promptOption.selected = true;
     hotelSelect.appendChild(promptOption);
 
-    // Loop through each hotel returned from the API.
     hotels.forEach((hotel) => {
-      // Create a new <option> element for each hotel.
       const option = document.createElement("option");
-      // Set the value to the hotel's unique ID.
       option.value = hotel.hotel_id;
-      // Set the displayed text to the hotel's name.
       option.textContent = hotel.property_name;
-      // Add the new option to the dropdown.
       hotelSelect.appendChild(option);
     });
   } catch (error) {
-    // If an error occurs, log it and update the dropdown to show a failure message.
     console.error("Error loading hotels:", error);
     hotelSelect.innerHTML = '<option value="">Could not load hotels</option>';
   }
 }
 
+/**
+ * NEW: Fetches the report data from the backend and renders it in the table.
+ * This is the main function triggered by the "Generate Report" button.
+ */
+async function generateReport() {
+  // Get references to the UI elements we'll need to interact with.
+  const hotelSelect = document.getElementById("hotel-select");
+  const datePicker = document.getElementById("report-date");
+  const generateBtn = document.querySelector("button"); // The main button
+  const tableBody = document.querySelector("tbody");
+
+  // Get the selected values from the form.
+  const selectedHotelId = hotelSelect.value;
+  const selectedDate = datePicker.value;
+
+  // --- 1. Input Validation ---
+  if (!selectedHotelId) {
+    alert("Please select a hotel before generating the report.");
+    return;
+  }
+
+  // --- 2. Update UI to show a loading state ---
+  generateBtn.disabled = true;
+  generateBtn.textContent = "Generating...";
+  tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
+
+  try {
+    // --- 3. Fetch Data from the API ---
+    // Construct the URL with query parameters for the selected hotel and date.
+    const response = await fetch(
+      `/api/rockenue/shreeji-report?hotel_id=${selectedHotelId}&date=${selectedDate}`
+    );
+    const reportData = await response.json();
+
+    if (!response.ok) {
+      // If the server returns an error (e.g., 500), throw an error with the message.
+      throw new Error(reportData.error || "An unknown error occurred.");
+    }
+
+    // --- 4. Render the Results ---
+    tableBody.innerHTML = ""; // Clear the loading message.
+
+    if (reportData.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No data found for the selected date.</td></tr>`;
+    } else {
+      // Loop through each row of data from the API.
+      reportData.forEach((row) => {
+        const tr = document.createElement("tr");
+
+        // Determine text color based on vacancy status for better readability.
+        const textColor =
+          row.guestName === "--- VACANT ---"
+            ? "text-gray-400"
+            : "text-gray-900";
+
+        // Create and append the table cells for each piece of data.
+        tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${textColor}">${
+          row.roomName
+        }</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${textColor}">${
+          row.guestName
+        }</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${textColor}">${row.balance.toFixed(
+          2
+        )}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${textColor}">${
+          row.source
+        }</td>
+                `;
+        tableBody.appendChild(tr);
+      });
+    }
+  } catch (error) {
+    // --- 5. Handle Errors ---
+    console.error("Failed to generate report:", error);
+    tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+  } finally {
+    // --- 6. Reset UI ---
+    // No matter what happens, re-enable the button and reset its text.
+    generateBtn.disabled = false;
+    generateBtn.textContent = "Generate Report";
+  }
+}
+
 // --- INITIALIZATION ---
-// Functions that run as soon as the page's DOM is ready.
 document.addEventListener("DOMContentLoaded", () => {
-  // We now call all three functions to set up the page.
   loadSidebar();
   setDefaultDate();
   loadHotels();
+
+  // NEW: Add the click event listener to the "Generate Report" button.
+  const generateBtn = document.querySelector('button[type="button"]');
+  if (generateBtn) {
+    generateBtn.addEventListener("click", generateReport);
+  }
 });

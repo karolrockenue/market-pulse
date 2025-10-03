@@ -887,6 +887,95 @@ async function setAppDisabled(accessToken, internalPropertyId) {
   );
 }
 
+/**
+ * NEW: Fetches a complete list of all physical rooms for a property.
+ * This function handles pagination to ensure all rooms are retrieved.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The external PMS ID of the property.
+ * @returns {Promise<Array>} - A flat array of room objects.
+ */
+async function getRooms(accessToken, propertyId) {
+  let allRooms = [];
+  let pageNumber = 1;
+  const pageSize = 100; // Max page size allowed by the API
+  let hasMore = true;
+
+  while (hasMore) {
+    // Construct the URL for the current page.
+    const url = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(
+        `Failed to fetch rooms page ${pageNumber} for property ${propertyId}. API Response: ${JSON.stringify(
+          data
+        )}`
+      );
+    }
+
+    // Add the rooms from the current page to our master list.
+    if (data.data && data.data.length > 0) {
+      allRooms = allRooms.concat(data.data);
+      pageNumber++;
+    } else {
+      // If a page returns no rooms, we've reached the end.
+      hasMore = false;
+    }
+  }
+  return allRooms;
+}
+
+/**
+ * NEW: Fetches a list of reservations for a property, with optional filters.
+ * Handles pagination to retrieve all matching reservations.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The external PMS ID of the property.
+ * @param {object} [filters={}] - An object of key-value pairs to be used as URL query parameters.
+ * @returns {Promise<Array>} - A flat array of reservation objects.
+ */
+async function getReservations(accessToken, propertyId, filters = {}) {
+  let allReservations = [];
+  let pageNumber = 1;
+  const pageSize = 100;
+  let hasMore = true;
+
+  // Build the filter string (e.g., "&status=in_house") from the filters object.
+  const filterParams = new URLSearchParams(filters).toString();
+
+  while (hasMore) {
+    const url = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}&${filterParams}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(
+        `Failed to fetch reservations page ${pageNumber} for property ${propertyId}. API Response: ${JSON.stringify(
+          data
+        )}`
+      );
+    }
+
+    if (data.data && data.data.length > 0) {
+      allReservations = allReservations.concat(data.data);
+      pageNumber++;
+    } else {
+      hasMore = false;
+    }
+  }
+  return allReservations;
+}
+
 module.exports = {
   getAccessToken,
   getNeighborhoodFromCoords,
@@ -894,10 +983,10 @@ module.exports = {
   getUpcomingMetrics,
   syncHotelDetailsToDb,
   syncHotelTaxInfoToDb,
-  // This is the new function we are adding.
   setAppDisabled,
-  // The following functions were already in the file but not exported.
-  // Adding them here for consistency and to prevent future issues.
   exchangeCodeForToken,
   getUserInfo,
+  // Export the two new functions so they can be used in the router.
+  getRooms,
+  getReservations,
 };
