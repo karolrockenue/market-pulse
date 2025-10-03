@@ -3,6 +3,9 @@
 
 const express = require("express");
 const router = express.Router();
+// Import the database connection pool from the shared utils directory.
+// This allows us to query the PostgreSQL database.
+const pool = require("../utils/db");
 
 /**
  * Middleware to protect routes, ensuring they are only accessible by super_admin users.
@@ -19,11 +22,9 @@ const requireSuperAdmin = (req, res, next) => {
     return next();
   } else {
     // If the session is missing or the role is incorrect, send a 403 Forbidden status.
-    res
-      .status(403)
-      .json({
-        error: "Forbidden: Access is restricted to super administrators.",
-      });
+    res.status(403).json({
+      error: "Forbidden: Access is restricted to super administrators.",
+    });
   }
 };
 
@@ -43,5 +44,27 @@ router.get("/status", (req, res) => {
   });
 });
 
-// Export the router so it can be mounted in the main server.js file in the next step.
+/**
+ * NEW ENDPOINT: Fetches a list of all hotels in the system.
+ * This is used to populate dropdowns in Rockenue reports.
+ * Accessible at GET /api/rockenue/hotels
+ */
+router.get("/hotels", async (req, res) => {
+  try {
+    // Query the database to get the ID and name for every hotel.
+    // We order by property_name to ensure the dropdown list is alphabetical.
+    const { rows } = await pool.query(
+      "SELECT hotel_id, property_name FROM hotels ORDER BY property_name ASC"
+    );
+    // Send the list of hotels back to the client.
+    res.status(200).json(rows);
+  } catch (error) {
+    // If there's an error with the database query, log it for debugging.
+    console.error("Error fetching hotels for Rockenue report:", error);
+    // Send a generic server error message to the client.
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Export the router so it can be mounted in the main server.js file.
 module.exports = router;
