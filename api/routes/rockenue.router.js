@@ -28,6 +28,55 @@ const requireSuperAdmin = (req, res, next) => {
 
 // Apply the security middleware to ALL routes that will be defined in this file.
 router.use(requireSuperAdmin);
+/**
+ * NEW DEBUGGING ENDPOINT: A raw proxy to the Cloudbeds API.
+ * This allows testing with a manually provided token to isolate permission issues.
+ * Accessible at POST /api/rockenue/debug-probe
+ */
+router.post("/debug-probe", async (req, res) => {
+  const { accessToken, propertyId, endpoint } = req.body;
+
+  if (!accessToken || !propertyId || !endpoint) {
+    return res
+      .status(400)
+      .json({ error: "accessToken, propertyId, and endpoint are required." });
+  }
+
+  // Construct the full Cloudbeds API URL from the provided endpoint slug.
+  const url = `https://api.cloudbeds.com/api/v1.1/${endpoint}?propertyID=${propertyId}`;
+
+  try {
+    // Make the direct API call using the provided credentials.
+    const probeResponse = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
+    });
+
+    // Read the response body as text, as it could be JSON or HTML.
+    const responseBody = await probeResponse.text();
+
+    // Send back a detailed report to the frontend.
+    res.status(200).json({
+      request: {
+        url: url,
+        method: "GET",
+      },
+      response: {
+        status: probeResponse.status,
+        statusText: probeResponse.statusText,
+        headers: Object.fromEntries(probeResponse.headers.entries()),
+        body: responseBody,
+      },
+    });
+  } catch (error) {
+    console.error("Debug probe failed:", error);
+    res
+      .status(500)
+      .json({ error: "Probe request failed.", details: error.message });
+  }
+});
 
 /**
  * A helper function to get a valid Cloudbeds access token for a given property.
@@ -203,11 +252,9 @@ router.get("/shreeji-report", async (req, res) => {
       `Error generating Shreeji Report for hotel ${hotel_id}:`,
       error
     );
-    res
-      .status(500)
-      .json({
-        error: "An internal server error occurred while generating the report.",
-      });
+    res.status(500).json({
+      error: "An internal server error occurred while generating the report.",
+    });
   }
 });
 

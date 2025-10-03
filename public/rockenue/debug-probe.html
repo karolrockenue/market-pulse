@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cloudbeds API Probe - Market Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="container mx-auto p-8">
+      <h1 class="text-3xl font-bold text-gray-800">Cloudbeds API Probe</h1>
+      <p class="mt-2 text-gray-600 mb-8">
+        This tool sends a raw, direct request to the Cloudbeds API to debug
+        permission issues.
+        <a href="/rockenue/index.html" class="text-blue-600 hover:underline"
+          >Back to Tools</a
+        >
+      </p>
+
+      <div class="bg-white p-6 rounded-lg shadow-md">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label
+              for="accessToken"
+              class="block text-sm font-medium text-gray-700"
+              >Cloudbeds Access Token</label
+            >
+            <textarea
+              id="accessToken"
+              rows="4"
+              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm font-mono text-xs"
+            ></textarea>
+            <p class="mt-1 text-xs text-gray-500">
+              Find this in your browser's developer tools (Network tab) after
+              navigating in the Cloudbeds app.
+            </p>
+          </div>
+          <div>
+            <label
+              for="propertyId"
+              class="block text-sm font-medium text-gray-700"
+              >Property ID</label
+            >
+            <input
+              type="text"
+              id="propertyId"
+              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+            />
+            <label
+              for="endpoint"
+              class="block text-sm font-medium text-gray-700 mt-4"
+              >API Endpoint</label
+            >
+            <select
+              id="endpoint"
+              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+            >
+              <option value="getRoomList">getRoomList</option>
+              <option value="getReservations">getReservations</option>
+              <option value="getHotelDetails">getHotelDetails</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-6">
+          <button
+            id="runProbeBtn"
+            class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
+          >
+            Run Probe
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-lg shadow-md mt-8">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Results</h2>
+        <pre
+          id="results"
+          class="bg-gray-900 text-white p-4 rounded-md overflow-x-auto text-xs font-mono"
+        >
+Probe has not been run yet.</pre
+        >
+      </div>
+    </div>
+
+    <script>
+      document
+        .getElementById("runProbeBtn")
+        .addEventListener("click", async () => {
+          const accessToken = document.getElementById("accessToken").value;
+          const propertyId = document.getElementById("propertyId").value;
+          const endpoint = document.getElementById("endpoint").value;
+          const resultsEl = document.getElementById("results");
+          const probeBtn = document.getElementById("runProbeBtn");
+
+          if (!accessToken || !propertyId) {
+            resultsEl.textContent =
+              "Error: Access Token and Property ID are required.";
+            return;
+          }
+
+          resultsEl.textContent = "Running probe...";
+          probeBtn.disabled = true;
+          probeBtn.textContent = "Running...";
+
+          try {
+            const response = await fetch("/api/rockenue/debug-probe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ accessToken, propertyId, endpoint }),
+            });
+
+            const data = await response.json();
+
+            // Try to parse the body if it's JSON, otherwise display as text.
+            let formattedBody;
+            try {
+              formattedBody = JSON.stringify(
+                JSON.parse(data.response.body),
+                null,
+                2
+              );
+            } catch (e) {
+              formattedBody = data.response.body;
+            }
+
+            resultsEl.textContent = `--- REQUEST ---\nURL: ${data.request.url}\n\n--- RESPONSE ---\nStatus: ${data.response.status} ${data.response.statusText}\n\n--- BODY ---\n${formattedBody}`;
+          } catch (error) {
+            resultsEl.textContent = `Fetch failed: ${error.message}`;
+          } finally {
+            probeBtn.disabled = false;
+            probeBtn.textContent = "Run Probe";
+          }
+        });
+    </script>
+  </body>
+</html>
