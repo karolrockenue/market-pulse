@@ -82,7 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * DEBUGGING VERSION: This will log the raw API response to the server console.
+ * FINAL VERSION: This uses the correct field names discovered from the raw data log.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -135,16 +135,7 @@ router.get("/shreeji-report", async (req, res) => {
           { reservationID: reservationIDs.join(",") }
         );
 
-      // --- ADDED FOR DEBUGGING ---
-      // This will print the raw data for the first detailed reservation to your server logs.
-      if (detailedReservations && detailedReservations.length > 0) {
-        console.log("--- DEBUG: Raw Detailed Reservation Data ---");
-        console.log(JSON.stringify(detailedReservations[0], null, 2));
-        console.log("-----------------------------------------");
-      }
-      // --- END DEBUGGING ---
-
-      // --- THE FIX: Corrected the field names in the map function ---
+      // --- THE FINAL FIX: Using the correct field names from the raw data log ---
       reportData = detailedReservations
         .filter(
           (res) => res.rooms && res.rooms.length > 0 && res.rooms[0].roomName
@@ -154,11 +145,11 @@ router.get("/shreeji-report", async (req, res) => {
           guestName: res.guestName || "N/A",
           balance: res.balance || 0,
           source: res.sourceName || "N/A",
-          // Corrected field names for dates. The API uses 'startDate' and 'endDate'.
-          checkInDate: res.startDate,
-          checkOutDate: res.endDate,
-          // Corrected field name for grand total and ensured it's parsed as a number.
-          grandTotal: parseFloat(res.grandTotal) || 0,
+          // Corrected to use the actual field names from the API response.
+          checkInDate: res.reservationCheckIn,
+          checkOutDate: res.reservationCheckOut,
+          // Corrected to use the 'total' field for the grand total.
+          grandTotal: parseFloat(res.total) || 0,
         }));
     } else {
       return res
