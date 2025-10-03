@@ -14,7 +14,6 @@ const mewsAdapter = require("../adapters/mewsAdapter");
 
 /**
  * Middleware to protect routes, ensuring they are only accessible by super_admin users.
- * This checks the user's role stored in their session.
  */
 const requireSuperAdmin = (req, res, next) => {
   if (req.session && req.session.role === "super_admin") {
@@ -26,19 +25,10 @@ const requireSuperAdmin = (req, res, next) => {
   }
 };
 
-// Apply the security middleware to ALL routes that will be defined in this file.
 router.use(requireSuperAdmin);
-/**
- * NEW DEBUGGING ENDPOINT: A raw proxy to the Cloudbeds API.
- * This allows testing with a manually provided token to isolate permission issues.
- * Accessible at POST /api/rockenue/debug-probe
- */
 
 /**
  * A helper function to get a valid Cloudbeds access token for a given property.
- * This is similar to the one in admin.router.js but is kept here for module independence.
- * @param {string} propertyId - The internal hotel ID.
- * @returns {Promise<string>} - A valid access token.
  */
 async function getCloudbedsAccessToken(propertyId) {
   if (!propertyId) {
@@ -46,7 +36,6 @@ async function getCloudbedsAccessToken(propertyId) {
       "A propertyId is required to get a Cloudbeds access token."
     );
   }
-  // Find the refresh token associated with the property.
   const credsResult = await pool.query(
     `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
     [propertyId]
@@ -57,8 +46,6 @@ async function getCloudbedsAccessToken(propertyId) {
       `Could not find a valid refresh token for property ${propertyId}.`
     );
   }
-
-  // Exchange the refresh token for a new access token.
   const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
   const params = new URLSearchParams({
     grant_type: "refresh_token",
@@ -82,19 +69,6 @@ async function getCloudbedsAccessToken(propertyId) {
   return tokenData.access_token;
 }
 
-/**
- * A placeholder endpoint to verify that the Rockenue router is working and secured.
- */
-router.get("/status", (req, res) => {
-  res.status(200).json({
-    message: "Success: You have accessed a secure Rockenue endpoint.",
-    userRole: req.session.role,
-  });
-});
-
-/**
- * Fetches a list of all hotels in the system for dropdowns.
- */
 router.get("/hotels", async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -108,12 +82,8 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * NEW ENDPOINT: Generates the Shreeji Report data.
- * This is the core logic for fetching and combining the data.
- * Accessible at GET /api/rockenue/shreeji-report?hotel_id=...&date=...
- */
-/**
- * REFACTORED: Generates the Shreeji Report data using a single, efficient API call.
+ * REFACTORED (AGAIN): Generates the Shreeji Report data using a two-step API call.
+ * This is the final, robust implementation.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -138,18 +108,43 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // This is the only API call we need now. We filter for guests checked in on the report date.
-      const reservations = await cloudbedsAdapter.getReservationsWithDetails(
+      // --- STEP 1: Get the list of relevant reservation IDs ---
+      // Use the basic `getReservations` endpoint because it supports correct date filtering.
+      const basicReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
-        { checkInFrom: date, checkInTo: date, status: "checked_in" }
+        {
+          checkInFrom: date,
+          checkInTo: date,
+          status: "checked_in",
+        }
       );
 
-      // Map the API response directly to our desired report format.
-      reportData = reservations.map((res) => ({
-        // The unassignedRooms array contains the room name when a guest is checked in.
-        roomName: res.unassignedRooms?.[0]?.roomName || "N/A",
-        guestName: `${res.guestFirstName} ${res.guestLastName}`,
+      // If no one was checked in, we can stop here.
+      if (basicReservations.length === 0) {
+        return res.status(200).json([]);
+      }
+
+      // Extract just the IDs from the response.
+      const reservationIDs = basicReservations.map((res) => res.reservationID);
+
+      // --- STEP 2: Get the full details for only those specific reservations ---
+      const detailedReservations =
+        await cloudbedsAdapter.getReservationsWithDetails(
+          accessToken,
+          externalPropertyId,
+          // Pass the list of IDs as a comma-separated string, as required by the API.
+          { reservationID: reservationIDs.join(",") }
+        );
+
+      // --- STEP 3: Map the detailed data correctly ---
+      reportData = detailedReservations.map((res) => ({
+        // CORRECTED MAPPING: The room name is in the `rooms` array.
+        roomName: res.rooms?.[0]?.roomName || "Unassigned",
+        // CORRECTED MAPPING: Guest details should now be present.
+        guestName:
+          `${res.guestFirstName || ""} ${res.guestLastName || ""}`.trim() ||
+          "N/A",
         balance: res.balance,
         source: res.sourceName || "N/A",
       }));
@@ -159,7 +154,6 @@ router.get("/shreeji-report", async (req, res) => {
         .json({ error: "Report not implemented for Mews yet." });
     }
 
-    // Sort the final report by room name.
     reportData.sort((a, b) =>
       a.roomName.localeCompare(b.roomName, undefined, { numeric: true })
     );
@@ -176,5 +170,4 @@ router.get("/shreeji-report", async (req, res) => {
   }
 });
 
-// Export the router so it can be mounted in the main server.js file.
 module.exports = router;
