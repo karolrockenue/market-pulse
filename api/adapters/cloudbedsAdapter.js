@@ -894,14 +894,20 @@ async function setAppDisabled(accessToken, internalPropertyId) {
  * @param {string} propertyId - The external PMS ID of the property.
  * @returns {Promise<Array>} - A flat array of room objects.
  */
+/**
+ * NEW & IMPROVED: Fetches a complete list of all physical rooms for a property.
+ * This function now includes robust error handling for non-JSON API responses.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The external PMS ID of the property.
+ * @returns {Promise<Array>} - A flat array of room objects.
+ */
 async function getRooms(accessToken, propertyId) {
   let allRooms = [];
   let pageNumber = 1;
-  const pageSize = 100; // Max page size allowed by the API
+  const pageSize = 100;
   let hasMore = true;
 
   while (hasMore) {
-    // Construct the URL for the current page.
     const url = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
     const response = await fetch(url, {
       headers: {
@@ -910,21 +916,32 @@ async function getRooms(accessToken, propertyId) {
       },
     });
 
+    // --- FIX: Robust Error Handling ---
+    // First, check the Content-Type header to see if we got JSON.
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      // If not JSON, read the body as text to see the HTML error page.
+      const errorText = await response.text();
+      throw new Error(
+        `Cloudbeds API returned a non-JSON response (likely an auth error page). Status: ${
+          response.status
+        }. Body: ${errorText.substring(0, 500)}...`
+      );
+    }
+
     const data = await response.json();
     if (!response.ok || !data.success) {
       throw new Error(
-        `Failed to fetch rooms page ${pageNumber} for property ${propertyId}. API Response: ${JSON.stringify(
+        `Failed to fetch rooms page ${pageNumber}. API Response: ${JSON.stringify(
           data
         )}`
       );
     }
 
-    // Add the rooms from the current page to our master list.
     if (data.data && data.data.length > 0) {
       allRooms = allRooms.concat(data.data);
       pageNumber++;
     } else {
-      // If a page returns no rooms, we've reached the end.
       hasMore = false;
     }
   }
@@ -932,11 +949,11 @@ async function getRooms(accessToken, propertyId) {
 }
 
 /**
- * NEW: Fetches a list of reservations for a property, with optional filters.
- * Handles pagination to retrieve all matching reservations.
+ * NEW & IMPROVED: Fetches a list of reservations for a property, with optional filters.
+ * Includes robust error handling for non-JSON API responses.
  * @param {string} accessToken - A valid Cloudbeds access token.
  * @param {string} propertyId - The external PMS ID of the property.
- * @param {object} [filters={}] - An object of key-value pairs to be used as URL query parameters.
+ * @param {object} [filters={}] - An object of key-value pairs for URL query parameters.
  * @returns {Promise<Array>} - A flat array of reservation objects.
  */
 async function getReservations(accessToken, propertyId, filters = {}) {
@@ -945,7 +962,6 @@ async function getReservations(accessToken, propertyId, filters = {}) {
   const pageSize = 100;
   let hasMore = true;
 
-  // Build the filter string (e.g., "&status=in_house") from the filters object.
   const filterParams = new URLSearchParams(filters).toString();
 
   while (hasMore) {
@@ -957,10 +973,21 @@ async function getReservations(accessToken, propertyId, filters = {}) {
       },
     });
 
+    // --- FIX: Robust Error Handling ---
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const errorText = await response.text();
+      throw new Error(
+        `Cloudbeds API returned a non-JSON response on reservations call. Status: ${
+          response.status
+        }. Body: ${errorText.substring(0, 500)}...`
+      );
+    }
+
     const data = await response.json();
     if (!response.ok || !data.success) {
       throw new Error(
-        `Failed to fetch reservations page ${pageNumber} for property ${propertyId}. API Response: ${JSON.stringify(
+        `Failed to fetch reservations page ${pageNumber}. API Response: ${JSON.stringify(
           data
         )}`
       );
@@ -986,7 +1013,6 @@ module.exports = {
   setAppDisabled,
   exchangeCodeForToken,
   getUserInfo,
-  // Export the two new functions so they can be used in the router.
   getRooms,
   getReservations,
 };
