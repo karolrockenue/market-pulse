@@ -82,7 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * FINAL VERSION 2: Implements the correct data mapping for all fields.
+ * FINAL VERSION 3: Corrects the mapping for dates and grand total.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -145,11 +145,11 @@ router.get("/shreeji-report", async (req, res) => {
           guestName: res.guestName || "N/A",
           balance: res.balance || 0,
           source: res.sourceName || "N/A",
-          // Corrected the field name for check-in/out dates.
-          checkInDate: res.checkInDate,
-          checkOutDate: res.checkOutDate,
-          // Corrected the field name for the grand total.
-          grandTotal: res.grandTotal || 0,
+          // Corrected field names for dates. The API uses 'startDate' and 'endDate'.
+          checkInDate: res.startDate,
+          checkOutDate: res.endDate,
+          // Corrected field name for grand total and ensured it's parsed as a number.
+          grandTotal: parseFloat(res.grandTotal) || 0,
         }));
     } else {
       return res
