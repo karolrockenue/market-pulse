@@ -561,8 +561,9 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
     const metricsQuery = `
       SELECT
         ${period} as period,
-        AVG(dms.occupancy_direct) as market_occupancy,
-        -- New pre-calculated columns for the market
+  
+        (SUM(dms.rooms_sold)::numeric / NULLIF(SUM(dms.capacity_count), 0)) as market_occupancy,
+ 
         AVG(dms.net_adr) as market_net_adr,
         AVG(dms.gross_adr) as market_gross_adr,
         AVG(dms.net_revpar) as market_net_revpar,
