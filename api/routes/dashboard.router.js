@@ -238,6 +238,14 @@ router.get("/last-refresh-time", requireUserApi, async (req, res) => {
 
 router.get("/kpi-summary", requireUserApi, async (req, res) => {
   try {
+    // PREVENT CACHING: Add headers to ensure fresh data is always fetched for the KPI cards.
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "Surrogate-Control": "no-store",
+    });
+
     const { startDate, endDate, propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
@@ -297,7 +305,8 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       const yourHotelQuery = `
           SELECT
             AVG(gross_adr) AS your_adr,
-            AVG(occupancy_direct) AS your_occupancy,
+       
+        (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as your_occupancy_direct,
             AVG(gross_revpar) AS your_revpar
           FROM daily_metrics_snapshots
           WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3;
@@ -403,7 +412,9 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
         SUM(rooms_sold) as your_rooms_sold,
         -- THE FIX: Changed AVG to SUM to get total available room nights for the period.
         SUM(capacity_count) as your_capacity_count,
-        AVG(occupancy_direct) as your_occupancy_direct,
+     -- THE FIX: Calculate occupancy from the reliable source columns instead of using the bad data.
+        -- We keep the alias 'your_occupancy_direct' to ensure the frontend component continues to work.
+        (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as your_occupancy_direct,
         -- Use the NEW gross columns but keep the OLD aliases for the dashboard
         AVG(gross_adr) as your_adr,
         AVG(gross_revpar) as your_revpar,
