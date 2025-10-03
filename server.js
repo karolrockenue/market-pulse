@@ -209,6 +209,19 @@ app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
 
+// NEW ROCKENUE PAGE ROUTE: Add a route to serve the Rockenue section's main page.
+// We add middleware here to ensure only a logged-in super_admin can even load this page.
+// If a regular user tries to access it, they will be redirected to their dashboard.
+app.get("/rockenue/", requirePageLogin, (req, res, next) => {
+  // This second check happens after confirming the user is logged in.
+  if (req.session.role !== "super_admin") {
+    // If the user is not a super_admin, redirect them away.
+    return res.redirect("/app/");
+  }
+  // If they are a super_admin, serve the (not-yet-created) page.
+  res.sendFile(path.join(publicPath, "rockenue", "index.html"));
+});
+
 // --- SERVER START ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
