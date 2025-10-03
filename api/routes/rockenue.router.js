@@ -82,8 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * REFACTORED (AGAIN): Generates the Shreeji Report data using a two-step API call.
- * This is the final, robust implementation.
+ * FINAL REFACTOR: Generates the Shreeji Report data with corrected filtering and mapping.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -108,44 +107,47 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- STEP 1: Get the list of relevant reservation IDs ---
-      // Use the basic `getReservations` endpoint because it supports correct date filtering.
-      const basicReservations = await cloudbedsAdapter.getReservations(
+      // --- STEP 1: Get an accurate list of reservation IDs for in-house guests ---
+      // FIX: This filter correctly finds all reservations whose stay period *overlaps* with the report date.
+      // It gets guests who checked in on or before the date, and check out on or after the date.
+      let overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
         {
-          checkInFrom: date,
           checkInTo: date,
-          status: "checked_in",
+          checkOutFrom: date,
         }
       );
 
-      // If no one was checked in, we can stop here.
-      if (basicReservations.length === 0) {
+      // SERVER-SIDE FILTER: Remove guests who checked out *on* the report date, as they weren't in-house overnight.
+      const inHouseReservations = overlappingReservations.filter(
+        (res) => res.checkOutDate !== date
+      );
+
+      if (inHouseReservations.length === 0) {
         return res.status(200).json([]);
       }
 
-      // Extract just the IDs from the response.
-      const reservationIDs = basicReservations.map((res) => res.reservationID);
+      const reservationIDs = inHouseReservations.map(
+        (res) => res.reservationID
+      );
 
       // --- STEP 2: Get the full details for only those specific reservations ---
       const detailedReservations =
         await cloudbedsAdapter.getReservationsWithDetails(
           accessToken,
           externalPropertyId,
-          // Pass the list of IDs as a comma-separated string, as required by the API.
           { reservationID: reservationIDs.join(",") }
         );
 
-      // --- STEP 3: Map the detailed data correctly ---
+      // --- STEP 3: Map the detailed data with corrected field names ---
       reportData = detailedReservations.map((res) => ({
-        // CORRECTED MAPPING: The room name is in the `rooms` array.
+        // FIX: The room name is in the `rooms` array.
         roomName: res.rooms?.[0]?.roomName || "Unassigned",
-        // CORRECTED MAPPING: Guest details should now be present.
-        guestName:
-          `${res.guestFirstName || ""} ${res.guestLastName || ""}`.trim() ||
-          "N/A",
-        balance: res.balance,
+        // FIX: The guest's full name is in the `guestName` field.
+        guestName: res.guestName || "N/A",
+        // FIX: The correct balance is in the `grandTotal` field.
+        balance: res.grandTotal || 0,
         source: res.sourceName || "N/A",
       }));
     } else {
