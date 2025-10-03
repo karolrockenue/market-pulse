@@ -82,10 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * FINAL REFACTOR: Generates the Shreeji Report data with corrected filtering and mapping.
- */
-/**
- * FINAL REVISION: Generates the Shreeji Report data with revised filtering and added columns.
+ * FINAL REVISION 2: Simplifies the logic to fix the "no data" error.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -110,51 +107,39 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- STEP 1: Get an accurate list of reservation IDs ---
-      // This filter finds all reservations that were active on the report date and excludes cancellations.
-      const overlappingReservations = await cloudbedsAdapter.getReservations(
-        accessToken,
-        externalPropertyId,
-        {
-          checkInTo: date,
-          checkOutFrom: date,
-          excludeStatuses: "canceled", // REVISION: Use this more flexible filter.
-        }
-      );
-
-      // Filter out any guests who checked out on the report date (as they weren't in-house overnight)
-      // or those that are unassigned.
-      const inHouseReservations = overlappingReservations.filter(
-        (res) => res.checkOutDate !== date && res.roomID
-      );
-
-      if (inHouseReservations.length === 0) {
-        return res.status(200).json([]);
-      }
-
-      const reservationIDs = inHouseReservations.map(
-        (res) => res.reservationID
-      );
-
-      // --- STEP 2: Get the full details for only those specific reservations ---
+      // --- THE FIX: We go directly to the detailed endpoint ---
+      // This call will fetch all reservations active on the report date and exclude cancellations.
+      // This is a single, efficient API call.
       const detailedReservations =
         await cloudbedsAdapter.getReservationsWithDetails(
           accessToken,
           externalPropertyId,
-          { reservationID: reservationIDs.join(",") }
+          {
+            checkInTo: date,
+            checkOutFrom: date,
+            excludeStatuses: "canceled",
+          }
         );
 
-      // --- STEP 3: Map the detailed data with corrected field names and new columns ---
-      reportData = detailedReservations.map((res) => ({
-        roomName: res.rooms?.[0]?.roomName || "Unassigned",
-        guestName: res.guestName || "N/A",
-        balance: res.balance || 0,
-        source: res.sourceName || "N/A",
-        // REVISION: Add the new data columns.
-        checkInDate: res.checkInDate,
-        checkOutDate: res.checkOutDate,
-        grandTotal: res.grandTotal || 0,
-      }));
+      // --- Map the detailed data with corrected field names and new columns ---
+      reportData = detailedReservations
+        // Filter out any guests who checked out on the report date or who are unassigned to a room.
+        .filter(
+          (res) =>
+            res.checkOutDate !== date &&
+            res.rooms &&
+            res.rooms.length > 0 &&
+            res.rooms[0].roomName
+        )
+        .map((res) => ({
+          roomName: res.rooms[0].roomName,
+          guestName: res.guestName || "N/A",
+          balance: res.balance || 0,
+          source: res.sourceName || "N/A",
+          checkInDate: res.checkInDate,
+          checkOutDate: res.checkOutDate,
+          grandTotal: res.grandTotal || 0,
+        }));
     } else {
       return res
         .status(501)
