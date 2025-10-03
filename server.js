@@ -22,6 +22,7 @@ const adminRoutes = require("./api/routes/admin.router.js"); // NEW: Import admi
 const publicPath = path.join(process.cwd(), "public");
 const userRoutes = require("./api/routes/users.router.js"); // Add this line
 const marketRouter = require("./api/routes/market.router.js");
+const rockenueRoutes = require("./api/routes/rockenue.router.js");
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
@@ -176,6 +177,7 @@ app.use("/api", reportsRoutes);
 app.use("/api/admin", adminRoutes); // FIX: Use a specific path for the admin router
 app.use("/api/users", userRoutes); // Add this line
 app.use("/api/market", marketRouter);
+app.use("/api/rockenue", rockenueRoutes);
 
 // --- STATIC AND FALLBACK ROUTES ---
 
