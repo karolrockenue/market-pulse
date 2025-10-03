@@ -82,7 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * FINAL VERSION 3: Corrects the mapping for dates and grand total.
+ * DEBUGGING VERSION: This will log the raw API response to the server console.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -134,6 +134,15 @@ router.get("/shreeji-report", async (req, res) => {
           externalPropertyId,
           { reservationID: reservationIDs.join(",") }
         );
+
+      // --- ADDED FOR DEBUGGING ---
+      // This will print the raw data for the first detailed reservation to your server logs.
+      if (detailedReservations && detailedReservations.length > 0) {
+        console.log("--- DEBUG: Raw Detailed Reservation Data ---");
+        console.log(JSON.stringify(detailedReservations[0], null, 2));
+        console.log("-----------------------------------------");
+      }
+      // --- END DEBUGGING ---
 
       // --- THE FIX: Corrected the field names in the map function ---
       reportData = detailedReservations
