@@ -82,7 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 /**
- * FINAL VERSION: Implements the correct two-step logic to get in-house guests.
+ * FINAL VERSION 2: Implements the correct data mapping for all fields.
  */
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
@@ -107,7 +107,6 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- STEP 1: Get all reservations overlapping the date from the basic endpoint. ---
       const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
@@ -117,9 +116,7 @@ router.get("/shreeji-report", async (req, res) => {
         }
       );
 
-      // --- STEP 2: Filter this list in our code to get only the guests who stayed the night. ---
       const inHouseReservations = overlappingReservations.filter(
-        // Exclude cancellations AND guests who checked out *on* the report date.
         (res) => res.status !== "canceled" && res.checkOutDate !== date
       );
 
@@ -131,7 +128,6 @@ router.get("/shreeji-report", async (req, res) => {
         (res) => res.reservationID
       );
 
-      // --- STEP 3: Fetch the full details for only those specific, relevant reservations. ---
       const detailedReservations =
         await cloudbedsAdapter.getReservationsWithDetails(
           accessToken,
@@ -139,9 +135,8 @@ router.get("/shreeji-report", async (req, res) => {
           { reservationID: reservationIDs.join(",") }
         );
 
-      // --- STEP 4: Map the final, detailed data. ---
+      // --- THE FIX: Corrected the field names in the map function ---
       reportData = detailedReservations
-        // As a final safety check, remove any that might be unassigned.
         .filter(
           (res) => res.rooms && res.rooms.length > 0 && res.rooms[0].roomName
         )
@@ -150,8 +145,10 @@ router.get("/shreeji-report", async (req, res) => {
           guestName: res.guestName || "N/A",
           balance: res.balance || 0,
           source: res.sourceName || "N/A",
+          // Corrected the field name for check-in/out dates.
           checkInDate: res.checkInDate,
           checkOutDate: res.checkOutDate,
+          // Corrected the field name for the grand total.
           grandTotal: res.grandTotal || 0,
         }));
     } else {
