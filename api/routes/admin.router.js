@@ -668,100 +668,14 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
       },
     };
 
-    // --- REFACTORED API EXPLORER LOGIC ---
-    // This new logic handles multi-step API calls for more complex endpoints.
-
-    let targetUrl;
-    let options = {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "X-PROPERTY-ID": cloudbedsApiId,
-      },
-    };
-
-    // For simple, single-call endpoints, we just build the URL and fetch.
-    const simpleEndpoints = {
-      "sample-hotel": `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${cloudbedsApiId}`,
-      "sample-guest": `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${cloudbedsApiId}&pageSize=1`,
-      "sample-reservation": `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${cloudbedsApiId}&pageSize=1`,
-      "taxes-fees": `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${cloudbedsApiId}`,
-      "user-info": "https://api.cloudbeds.com/api/v1.3/userinfo",
-      datasets: "https://api.cloudbeds.com/datainsights/v1.1/datasets",
-      // FIX: Changed 'sample-room' to fetch room *types*, which is more useful.
-      "sample-room": `https://api.cloudbeds.com/api/v1.1/getRoomTypes?propertyID=${cloudbedsApiId}`,
-    };
-
-    if (simpleEndpoints[endpoint]) {
-      targetUrl = simpleEndpoints[endpoint];
-      const apiResponse = await fetch(targetUrl, options);
-      const data = await apiResponse.json();
-      if (!apiResponse.ok)
-        throw new Error(`Cloudbeds API Error: ${JSON.stringify(data)}`);
-      return res.status(200).json(data);
-    }
-
-    // For more complex endpoints, we handle them in a switch statement.
     switch (endpoint) {
-      // FIX: 'sample-rate' now performs two API calls:
-      // 1. Get a list of room types.
-      // 2. Get rates for the *first* room type found.
-      case "sample-rate": {
-        // Step 1: Fetch available room types for the property.
-        const roomTypesUrl = `https://api.cloudbeds.com/api/v1.1/getRoomTypes?propertyID=${cloudbedsApiId}`;
-        const roomTypesResponse = await fetch(roomTypesUrl, options);
-        const roomTypesData = await roomTypesResponse.json();
-
-        if (
-          !roomTypesResponse.ok ||
-          !roomTypesData.data ||
-          roomTypesData.data.length === 0
-        ) {
-          throw new Error(
-            "Could not find any room types for this property to fetch rates."
-          );
-        }
-
-        // Step 2: Get the ID of the first room type.
-        const firstRoomTypeId = roomTypesData.data[0].roomTypeID;
-
-        // Step 3: Fetch rates for that specific room type.
-        const today = new Date().toISOString().split("T")[0];
-        const tomorrow = new Date(Date.now() + 86400000)
-          .toISOString()
-          .split("T")[0];
-        const ratesUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${cloudbedsApiId}&roomTypeID=${firstRoomTypeId}&startDate=${today}&endDate=${tomorrow}`;
-
-        const ratesResponse = await fetch(ratesUrl, options);
-        const ratesData = await ratesResponse.json();
-        if (!ratesResponse.ok)
-          throw new Error(
-            `Cloudbeds API Error fetching rates: ${JSON.stringify(ratesData)}`
-          );
-
-        // Add context to the result so it's clear what happened.
-        const finalResult = {
-          note: `Showing sample rates for the first available room type (ID: ${firstRoomTypeId}, Name: ${roomTypesData.data[0].roomTypeName})`,
-          rates: ratesData.data,
-        };
-
-        return res.status(200).json(finalResult);
-      }
-
-      case "dataset-structure":
-        if (!id)
-          return res.status(400).json({ error: "Dataset ID is required." });
-        targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
-        break;
-
-      case "insights-data": {
+      case "insights-data":
         if (!id || !columns)
           return res
             .status(400)
             .json({ error: "Dataset ID and columns are required." });
-        // (The complex insights-data logic remains the same as before)
         const requestBody = {
-          property_ids: [cloudbedsApiId],
+          property_ids: [cloudbedsApiId], // Correct ID in body
           dataset_id: parseInt(id, 10),
           columns: columns
             .split(",")
@@ -798,12 +712,48 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         options.headers["Content-Type"] = "application/json";
         options.body = JSON.stringify(requestBody);
         break;
-      }
+
+      // General API cases using the correct cloudbedsApiId in the URL
+      case "sample-hotel":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${cloudbedsApiId}`;
+        break;
+      case "sample-guest":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getGuestList?propertyID=${cloudbedsApiId}&pageSize=1`;
+        break;
+      case "sample-reservation":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${cloudbedsApiId}&pageSize=1`;
+        break;
+      case "sample-room":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${cloudbedsApiId}&pageSize=1`;
+        break;
+      case "sample-rate":
+        const today = new Date().toISOString().split("T")[0];
+        const tomorrow = new Date(Date.now() + 86400000)
+          .toISOString()
+          .split("T")[0];
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomRates?propertyID=${cloudbedsApiId}&pageSize=1&startDate=${today}&endDate=${tomorrow}`;
+        break;
+      case "taxes-fees":
+        targetUrl = `https://api.cloudbeds.com/api/v1.1/getTaxesAndFees?propertyID=${cloudbedsApiId}`;
+        break;
+      case "user-info":
+        targetUrl = "https://api.cloudbeds.com/api/v1.3/userinfo";
+        break;
+
+      // Insights API (non-data) cases
+      case "datasets":
+        targetUrl = "https://api.cloudbeds.com/datainsights/v1.1/datasets";
+        break;
+      case "dataset-structure":
+        if (!id)
+          return res.status(400).json({ error: "Dataset ID is required." });
+        targetUrl = `https://api.cloudbeds.com/datainsights/v1.1/datasets/${id}`;
+        break;
+
       default:
         return res.status(404).json({ error: "Unknown explorer endpoint." });
     }
 
-    // This part now only runs for the remaining complex cases ('dataset-structure' and 'insights-data')
     const apiResponse = await fetch(targetUrl, options);
     const data = await apiResponse.json();
     if (!apiResponse.ok)
