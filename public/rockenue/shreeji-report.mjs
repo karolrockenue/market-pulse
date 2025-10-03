@@ -44,7 +44,6 @@ function setDefaultDate() {
 
 /**
  * Fetches the list of all hotels from the backend API.
- * It then populates the 'hotel-select' dropdown with the results.
  */
 async function loadHotels() {
   const hotelSelect = document.getElementById("hotel-select");
@@ -78,85 +77,81 @@ async function loadHotels() {
 }
 
 /**
- * NEW: Fetches the report data from the backend and renders it in the table.
- * This is the main function triggered by the "Generate Report" button.
+ * Main function to generate the report. It fetches data and populates the table.
  */
 async function generateReport() {
-  // Get references to the UI elements we'll need to interact with.
   const hotelSelect = document.getElementById("hotel-select");
   const datePicker = document.getElementById("report-date");
-  const generateBtn = document.querySelector("button"); // The main button
-  const tableBody = document.querySelector("tbody");
+  const tableBody = document.querySelector("#report-results-table tbody");
+  const generateBtn = document.getElementById("generate-btn");
 
-  // Get the selected values from the form.
-  const selectedHotelId = hotelSelect.value;
-  const selectedDate = datePicker.value;
-
-  // --- 1. Input Validation ---
-  if (!selectedHotelId) {
-    alert("Please select a hotel before generating the report.");
+  if (!hotelSelect.value || !datePicker.value) {
+    alert("Please select a hotel and a date.");
     return;
   }
 
-  // --- 2. Update UI to show a loading state ---
   generateBtn.disabled = true;
   generateBtn.textContent = "Generating...";
-  tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
 
   try {
-    // --- 3. Fetch Data from the API ---
-    // Construct the URL with query parameters for the selected hotel and date.
     const response = await fetch(
-      `/api/rockenue/shreeji-report?hotel_id=${selectedHotelId}&date=${selectedDate}`
+      `/api/rockenue/shreeji-report?hotel_id=${hotelSelect.value}&date=${datePicker.value}`
     );
-    const reportData = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
-      // If the server returns an error (e.g., 500), throw an error with the message.
-      throw new Error(reportData.error || "An unknown error occurred.");
+      throw new Error(data.error || "Failed to generate report.");
     }
 
-    // --- 4. Render the Results ---
-    tableBody.innerHTML = ""; // Clear the loading message.
+    tableBody.innerHTML = ""; // Clear loading message
 
-    if (reportData.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No data found for the selected date.</td></tr>`;
-    } else {
-      // Loop through each row of data from the API.
-      reportData.forEach((row) => {
-        const tr = document.createElement("tr");
+    if (data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
+      return;
+    }
 
-        // Determine text color based on vacancy status for better readability.
-        const textColor =
-          row.guestName === "--- VACANT ---"
-            ? "text-gray-400"
-            : "text-gray-900";
+    // A helper function to format currency nicely.
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency: "GBP",
+      }).format(amount);
+    };
 
-        // Create and append the table cells for each piece of data.
-        tr.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${textColor}">${
+    // Loop through the report data and create a table row for each guest.
+    data.forEach((row) => {
+      const tr = document.createElement("tr");
+      // FINAL REVISION: Add the new table cells for the new columns.
+      tr.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${
           row.roomName
         }</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${textColor}">${
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
           row.guestName
         }</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${textColor}">${row.balance.toFixed(
-          2
-        )}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${textColor}">${
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+          row.checkInDate
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+          row.checkOutDate
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
           row.source
         }</td>
-                `;
-        tableBody.appendChild(tr);
-      });
-    }
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${formatCurrency(
+          row.grandTotal
+        )}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-semibold">${formatCurrency(
+          row.balance
+        )}</td>
+      `;
+      tableBody.appendChild(tr);
+    });
   } catch (error) {
-    // --- 5. Handle Errors ---
-    console.error("Failed to generate report:", error);
-    tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+    console.error("Error generating report:", error);
+    tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
   } finally {
-    // --- 6. Reset UI ---
-    // No matter what happens, re-enable the button and reset its text.
     generateBtn.disabled = false;
     generateBtn.textContent = "Generate Report";
   }
@@ -168,8 +163,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setDefaultDate();
   loadHotels();
 
-  // NEW: Add the click event listener to the "Generate Report" button.
-  const generateBtn = document.querySelector('button[type="button"]');
+  // Attach the event listener to the "Generate Report" button.
+  const generateBtn = document.getElementById("generate-btn");
   if (generateBtn) {
     generateBtn.addEventListener("click", generateReport);
   }
