@@ -79,6 +79,9 @@ async function loadHotels() {
 /**
  * Main function to generate the report. It fetches data and populates the table.
  */
+/**
+ * Main function to generate the report. It fetches data and populates the table.
+ */
 async function generateReport() {
   const hotelSelect = document.getElementById("hotel-select");
   const datePicker = document.getElementById("report-date");
@@ -94,60 +97,91 @@ async function generateReport() {
   generateBtn.textContent = "Generating...";
   tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
 
+  // Clear previous summary data while loading.
+  document.getElementById("summary-vacant").textContent = "--";
+  document.getElementById("summary-blocked").textContent = "--";
+  document.getElementById("summary-sold").textContent = "--";
+  document.getElementById("summary-occupancy").textContent = "--";
+  document.getElementById("summary-revpar").textContent = "--";
+  document.getElementById("summary-adr").textContent = "--";
+  document.getElementById("summary-revenue").textContent = "--";
+
   try {
     const response = await fetch(
       `/api/rockenue/shreeji-report?hotel_id=${hotelSelect.value}&date=${datePicker.value}`
     );
-    const data = await response.json();
+    const data = await response.json(); // data is now an object: { reportData: [], summary: {} }
 
     if (!response.ok) {
       throw new Error(data.error || "Failed to generate report.");
     }
 
-    tableBody.innerHTML = ""; // Clear loading message
-
-    if (data.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
-      return;
-    }
-
-    // A helper function to format currency nicely.
+    // A helper function to format currency nicely. Moved to a higher scope.
     const formatCurrency = (amount) => {
+      // Ensure the input is a number before formatting.
+      const numericAmount = typeof amount === "number" ? amount : 0;
       return new Intl.NumberFormat("en-GB", {
         style: "currency",
         currency: "GBP",
-      }).format(amount);
+      }).format(numericAmount);
     };
 
-    // Loop through the report data and create a table row for each guest.
-    data.forEach((row) => {
-      const tr = document.createElement("tr");
-      // FINAL REVISION: Add the new table cells for the new columns.
-      tr.innerHTML = `
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${
-          row.roomName
-        }</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-          row.guestName
-        }</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-          row.checkInDate
-        }</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-          row.checkOutDate
-        }</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-          row.source
-        }</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${formatCurrency(
-          row.grandTotal
-        )}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-semibold">${formatCurrency(
-          row.balance
-        )}</td>
-      `;
-      tableBody.appendChild(tr);
-    });
+    // --- REFACTORED: Use the 'reportData' key for the table rows. ---
+    const reportData = data.reportData;
+    tableBody.innerHTML = ""; // Clear loading message
+
+    if (reportData.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
+    } else {
+      // Loop through the report data and create a table row for each guest.
+      reportData.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${
+            row.roomName
+          }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+            row.guestName
+          }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+            row.checkInDate
+          }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+            row.checkOutDate
+          }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+            row.source
+          }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${formatCurrency(
+            row.grandTotal
+          )}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-semibold">${formatCurrency(
+            row.balance
+          )}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }
+
+    // --- NEW: Populate the summary footer using the 'summary' key. ---
+    const summary = data.summary;
+    document.getElementById("summary-vacant").textContent = summary.vacant;
+    document.getElementById("summary-blocked").textContent = summary.blocked;
+    document.getElementById("summary-sold").textContent = summary.sold;
+    // Format occupancy to two decimal places.
+    document.getElementById("summary-occupancy").textContent =
+      typeof summary.occupancy === "number"
+        ? summary.occupancy.toFixed(2)
+        : "0.00";
+    document.getElementById("summary-revpar").textContent = formatCurrency(
+      summary.revpar
+    );
+    document.getElementById("summary-adr").textContent = formatCurrency(
+      summary.adr
+    );
+    document.getElementById("summary-revenue").textContent = formatCurrency(
+      summary.revenue
+    );
   } catch (error) {
     console.error("Error generating report:", error);
     tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
