@@ -107,12 +107,6 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- NEW: Get a master list of ALL physical rooms at the hotel ---
-      const allHotelRooms = await cloudbedsAdapter.getRooms(
-        accessToken,
-        externalPropertyId
-      );
-
       // --- STEP 1: Get all reservations that overlap the report date ---
       const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
