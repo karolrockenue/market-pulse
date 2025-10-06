@@ -908,7 +908,15 @@ async function getRooms(accessToken, propertyId) {
   let hasMore = true;
 
   while (hasMore) {
-    const url = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    const url = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}&${filterParams}`;
+
+    // --- START SHREEJI REPORT DEBUG ---
+    // We'll log the URL for the first page of any request using `stayDate` to see what's being sent.
+    if (pageNumber === 1 && filters.stayDate) {
+      console.log(`[SHREEJI DEBUG] Fetching URL: ${url}`);
+    }
+    // --- END SHREEJI REPORT DEBUG ---
+
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -985,6 +993,17 @@ async function getReservations(accessToken, propertyId, filters = {}) {
     }
 
     const data = await response.json();
+
+    // --- START SHREEJI REPORT DEBUG ---
+    // Log the raw data we get back from the API for the first page.
+    if (pageNumber === 1 && filters.stayDate) {
+      console.log(
+        `[SHREEJI DEBUG] API Response Data (first page):`,
+        JSON.stringify(data, null, 2)
+      );
+    }
+    // --- END SHREEJI REPORT DEBUG ---
+
     if (!response.ok || !data.success) {
       throw new Error(
         `Failed to fetch reservations page ${pageNumber}. API Response: ${JSON.stringify(
