@@ -117,9 +117,11 @@ async function generateReport() {
     }
 
     // A helper function to format currency nicely. Moved to a higher scope.
+    // A helper function to format currency nicely. Moved to a higher scope.
     const formatCurrency = (amount) => {
-      // Ensure the input is a number before formatting.
-      const numericAmount = typeof amount === "number" ? amount : 0;
+      // THE FIX: Convert the incoming value (which may be a string) to a number.
+      // parseFloat() will correctly handle numbers that are sent as strings from the API.
+      const numericAmount = parseFloat(amount) || 0;
       return new Intl.NumberFormat("en-GB", {
         style: "currency",
         currency: "GBP",
