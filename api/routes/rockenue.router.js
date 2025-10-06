@@ -107,32 +107,21 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- STEP 1: Get all reservations that overlap the report date ---
-      const overlappingReservations = await cloudbedsAdapter.getReservations(
+      // --- STEP 1 & 2 COMBINED: Get all guests in-house on the report date ---
+      // THE FIX: Instead of fetching a broad date range and filtering, we now use
+      // the `stayDate` parameter. This asks the Cloudbeds API to return only guests
+      // who were physically in the hotel for the night of the selected `date`.
+      // This is far more direct and reliable.
+      const inHouseReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
         {
-          checkInTo: date,
-          checkOutFrom: date,
+          // This single parameter replaces the old, ambiguous logic.
+          stayDate: date,
+          // We can also filter by status at the API level to exclude cancelled bookings.
+          status: "confirmed,in-house,not-confirmed",
         }
       );
-      // --- STEP 2: Filter for guests who stayed overnight ---
-      // The `checkOutDate` from the adapter may include a time component (e.g., '2025-10-05T11:00:00').
-      // To correctly identify guests who stayed the night, we must compare only the date part.
-      const inHouseReservations = overlappingReservations.filter((res) => {
-        // Add a robust guard clause to safely handle reservations with missing or invalid data.
-        // If status is canceled or the checkOutDate is missing, exclude it from the report.
-        if (res.status === "canceled" || !res.checkOutDate) {
-          return false;
-        }
-
-        // Extract just the 'YYYY-MM-DD' part from the checkout date timestamp string.
-        const checkOutDateOnly = res.checkOutDate.substring(0, 10);
-
-        // A guest stayed overnight if their checkout date is on a day *after* the report date.
-        // This correctly compares the date part of the timestamp with the report date string.
-        return checkOutDateOnly > date;
-      });
 
       if (inHouseReservations.length === 0) {
         return res.status(200).json([]);
