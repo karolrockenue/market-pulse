@@ -749,15 +749,24 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
           settings: { details: true, totals: true },
         };
         if (startDate && endDate) {
+          // THE FIX: Determine the correct date column based on the dataset ID.
+          // The Financial dataset (ID 1) uses 'service_date', while others (like ID 7) use 'stay_date'.
+          const dateColumn =
+            parseInt(id, 10) === 1 ? "service_date" : "stay_date";
+
+          console.log(
+            `[API Explorer] Using date column: ${dateColumn} for dataset ID: ${id}`
+          );
+
           insightRequestBody.filters = {
             and: [
               {
-                cdf: { column: "stay_date" },
+                cdf: { column: dateColumn },
                 operator: "greater_than_or_equal",
                 value: `${startDate}T00:00:00.000Z`,
               },
               {
-                cdf: { column: "stay_date" },
+                cdf: { column: dateColumn },
                 operator: "less_than_or_equal",
                 value: `${endDate}T00:00:00.000Z`,
               },
