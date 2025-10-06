@@ -107,89 +107,52 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- STEP 1: Get a master list of ALL physical rooms at the hotel ---
-      const allHotelRooms = await cloudbedsAdapter.getRooms(
-        accessToken,
-        externalPropertyId
-      );
-
-      // --- STEP 2: Get all potentially in-house reservations ---
-      const reportDate = new Date(date);
-      const futureDate = new Date(reportDate);
-      futureDate.setDate(reportDate.getDate() + 60);
-      const endDateForQuery = futureDate.toISOString().split("T")[0];
-
-      const reservationsToFilter = await cloudbedsAdapter.getReservations(
+      // --- STEP 1: Get all reservations that overlap the report date ---
+      const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
         {
+          checkInTo: date,
           checkOutFrom: date,
-          checkOutTo: endDateForQuery,
-          status: "confirmed,in-house,not-confirmed",
         }
       );
 
-      // --- STEP 3: Filter reservations to find who was actually in-house ---
-      const inHouseReservations = reservationsToFilter.filter((res) => {
-        if (!res.startDate || !res.endDate) return false;
-        const checkInDateOnly = res.startDate.substring(0, 10);
-        const checkOutDateOnly = res.endDate.substring(0, 10);
-        return checkInDateOnly <= date && checkOutDateOnly > date;
-      });
+      // --- STEP 2: Filter for guests who stayed overnight ---
+      const inHouseReservations = overlappingReservations.filter(
+        (res) => res.status !== "canceled" && res.startDate && res.endDate
+      );
 
-      // --- STEP 4: If there are guests, get their full details ---
-      const occupiedRoomsData = new Map();
-      if (inHouseReservations.length > 0) {
-        const reservationIDs = inHouseReservations.map(
-          (res) => res.reservationID
-        );
-        const detailedReservations =
-          await cloudbedsAdapter.getReservationsWithDetails(
-            accessToken,
-            externalPropertyId,
-            { reservationID: reservationIDs.join(",") }
-          );
-
-        // Create a Map of occupied rooms for efficient lookup, with roomName as the key.
-        for (const res of detailedReservations) {
-          if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
-            const roomName = res.rooms[0].roomName;
-            occupiedRoomsData.set(roomName, {
-              guestName: res.guestName || "N/A",
-              balance: res.balance || 0,
-              source: res.sourceName || "N/A",
-              checkInDate: res.reservationCheckIn,
-              checkOutDate: res.reservationCheckOut,
-              grandTotal: parseFloat(res.total) || 0,
-            });
-          }
-        }
+      if (inHouseReservations.length === 0) {
+        return res.status(200).json([]);
       }
 
-      // --- STEP 5: Build the final report ---
-      // Iterate through the master list of all rooms. For each room, check if it's in our
-      // 'occupiedRoomsData' Map. If it is, populate the data. If not, it's empty.
-      reportData = allHotelRooms.map((room) => {
-        const occupiedData = occupiedRoomsData.get(room.roomName);
-        if (occupiedData) {
-          // Room is occupied
-          return {
-            roomName: room.roomName,
-            ...occupiedData,
-          };
-        } else {
-          // Room is empty
-          return {
-            roomName: room.roomName,
-            guestName: "---",
-            balance: 0,
-            source: "---",
-            checkInDate: "---",
-            checkOutDate: "---",
-            grandTotal: 0,
-          };
-        }
-      });
+      const reservationIDs = inHouseReservations.map(
+        (res) => res.reservationID
+      );
+
+      // --- STEP 3: Get full details for the in-house guests ---
+      const detailedReservations =
+        await cloudbedsAdapter.getReservationsWithDetails(
+          accessToken,
+          externalPropertyId,
+          { reservationID: reservationIDs.join(",") }
+        );
+
+      // --- STEP 4: Build the final report from the reservation data ---
+      reportData = detailedReservations
+        // Filter out any unassigned reservations
+        .filter(
+          (res) => res.rooms && res.rooms.length > 0 && res.rooms[0].roomName
+        )
+        .map((res) => ({
+          roomName: res.rooms[0].roomName,
+          guestName: res.guestName || "N/A",
+          balance: res.balance || 0,
+          source: res.sourceName || "N/A",
+          checkInDate: res.reservationCheckIn,
+          checkOutDate: res.reservationCheckOut,
+          grandTotal: parseFloat(res.total) || 0,
+        }));
     } else {
       return res
         .status(501)
