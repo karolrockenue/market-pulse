@@ -908,8 +908,8 @@ async function getRooms(accessToken, propertyId) {
   let hasMore = true;
 
   while (hasMore) {
-    // Corrected the URL to call the correct 'getRoomList' endpoint and removed the undefined variable.
-    const url = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    // FINAL FIX: The correct endpoint is /getRooms. This replaces the incorrect /getRoomList.
+    const url = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
     const response = await fetch(url, {
       headers: {
