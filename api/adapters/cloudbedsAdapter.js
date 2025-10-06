@@ -908,7 +908,7 @@ async function getRooms(accessToken, propertyId) {
   let hasMore = true;
 
   while (hasMore) {
-    const url = `https://api.cloudbeds.com/api/v1.1/getRoomList?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    const url = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}&${filterParams}`;
 
     const response = await fetch(url, {
       headers: {
