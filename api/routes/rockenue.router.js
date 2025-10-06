@@ -120,6 +120,19 @@ router.get("/shreeji-report", async (req, res) => {
         }
       );
 
+      // --- START SHREEJI DEBUG ---
+      // Log the data we get back from the adapter *before* we apply our own filter.
+      console.log(
+        `[SHREEJI DEBUG] Found ${overlappingReservations.length} overlapping reservations to filter.`
+      );
+      if (overlappingReservations.length > 0) {
+        console.log(
+          `[SHREEJI DEBUG] First raw reservation object:`,
+          JSON.stringify(overlappingReservations[0], null, 2)
+        );
+      }
+      // --- END SHREEJI DEBUG ---
+
       // --- STEP 2: Apply a robust server-side filter ---
       // This is the definitive logic for identifying an in-house guest for the night.
       const inHouseReservations = overlappingReservations.filter((res) => {
