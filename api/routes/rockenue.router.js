@@ -113,6 +113,14 @@ router.get("/shreeji-report", async (req, res) => {
         externalPropertyId
       );
 
+      // --- START ROOM NAME DEBUG ---
+      if (allHotelRooms && allHotelRooms.length > 0) {
+        console.log(
+          "[DEBUG] Structure of the first room object:",
+          JSON.stringify(allHotelRooms[0], null, 2)
+        );
+      }
+      // --- END ROOM NAME DEBUG ---
       // --- STEP 1: Get all reservations that overlap the report date ---
       const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
