@@ -113,9 +113,9 @@ router.get("/shreeji-report", async (req, res) => {
         externalPropertyId
       );
 
-      // CORRECTED: The API returns an object with a 'rooms' property, which is the array we need.
-      // We also add a fallback to an empty array in case the API response is ever malformed.
-      const allHotelRooms = roomsResponse.rooms || [];
+      // FINAL CORRECTION: The API returns an array containing one object, which holds the 'rooms' list.
+      // We access the first element of the response, then its 'rooms' property.
+      const allHotelRooms = roomsResponse[0]?.rooms || [];
       // --- STEP 1: Get all reservations that overlap the report date ---
       const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
