@@ -107,48 +107,20 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- STEP 1: Fetch all potentially relevant reservations ---
-      // Since the `stayDate` parameter is ignored by the API, we revert to fetching
-      // all reservations that overlap with the report date.
+      // --- STEP 1: Get all reservations that overlap the report date ---
       const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
         {
           checkInTo: date,
           checkOutFrom: date,
-          status: "confirmed,in-house,not-confirmed",
         }
       );
 
-      // --- START SHREEJI DEBUG ---
-      // Log the data we get back from the adapter *before* we apply our own filter.
-      console.log(
-        `[SHREEJI DEBUG] Found ${overlappingReservations.length} overlapping reservations to filter.`
+      // --- STEP 2: Filter for guests who stayed overnight ---
+      const inHouseReservations = overlappingReservations.filter(
+        (res) => res.status !== "canceled" && res.checkOutDate !== date
       );
-      if (overlappingReservations.length > 0) {
-        console.log(
-          `[SHREEJI DEBUG] First raw reservation object:`,
-          JSON.stringify(overlappingReservations[0], null, 2)
-        );
-      }
-      // --- END SHREEJI DEBUG ---
-
-      // --- STEP 2: Apply a robust server-side filter ---
-      // This is the definitive logic for identifying an in-house guest for the night.
-      const inHouseReservations = overlappingReservations.filter((res) => {
-        // Safety check: ignore records with invalid data.
-        if (!res.startDate || !res.endDate) {
-          return false;
-        }
-
-        // Normalize dates to 'YYYY-MM-DD' strings to handle timestamps.
-        const checkInDateOnly = res.startDate.substring(0, 10);
-        const checkOutDateOnly = res.endDate.substring(0, 10);
-
-        // A guest is "in-house" for the night of `date` if they arrived on or before that date
-        // AND they are scheduled to leave on a day after that date.
-        return checkInDateOnly <= date && checkOutDateOnly > date;
-      });
 
       if (inHouseReservations.length === 0) {
         return res.status(200).json([]);
