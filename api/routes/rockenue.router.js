@@ -121,18 +121,14 @@ router.get("/shreeji-report", async (req, res) => {
       // This is the definitive logic for identifying an in-house guest for the night.
       const inHouseReservations = overlappingReservations.filter((res) => {
         // Safety check: ignore cancelled bookings or records with invalid data.
-        // We assume the date properties are named checkInDate and checkOutDate from this endpoint.
-        if (
-          res.status === "canceled" ||
-          !res.checkInDate ||
-          !res.checkOutDate
-        ) {
+        // CORRECTED: The date properties from this API endpoint are `startDate` and `endDate`.
+        if (res.status === "canceled" || !res.startDate || !res.endDate) {
           return false;
         }
 
         // Normalize dates to 'YYYY-MM-DD' strings to safely handle full timestamps.
-        const checkInDateOnly = res.checkInDate.substring(0, 10);
-        const checkOutDateOnly = res.checkOutDate.substring(0, 10);
+        const checkInDateOnly = res.startDate.substring(0, 10);
+        const checkOutDateOnly = res.endDate.substring(0, 10);
 
         // A guest is "in-house" for the night of `date` if they arrived on or before that date
         // AND they are scheduled to leave on a day after that date.
