@@ -1089,10 +1089,12 @@ async function getDailyTakings(accessToken, propertyId, date) {
           value: `${date}T00:00:00.000Z`,
         },
         // Filter 2: Only include payments (where credit amount is positive).
+
         {
           cdf: { column: "credit_amount" },
           operator: "greater_than",
-          value: 0,
+          // THE FIX: The API requires filter values to be strings.
+          value: "0",
         },
       ],
     },
