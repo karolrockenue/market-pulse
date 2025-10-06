@@ -120,8 +120,9 @@ router.get("/shreeji-report", async (req, res) => {
       // The `checkOutDate` from the adapter may include a time component (e.g., '2025-10-05T11:00:00').
       // To correctly identify guests who stayed the night, we must compare only the date part.
       const inHouseReservations = overlappingReservations.filter((res) => {
-        // First, ensure the reservation is not cancelled.
-        if (res.status === "canceled") {
+        // Add a robust guard clause to safely handle reservations with missing or invalid data.
+        // If status is canceled or the checkOutDate is missing, exclude it from the report.
+        if (res.status === "canceled" || !res.checkOutDate) {
           return false;
         }
 
