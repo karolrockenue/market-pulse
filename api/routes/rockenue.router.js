@@ -118,9 +118,18 @@ router.get("/shreeji-report", async (req, res) => {
       );
 
       // --- STEP 2: Filter for guests who stayed overnight ---
-      const inHouseReservations = overlappingReservations.filter(
-        (res) => res.status !== "canceled" && res.checkOutDate !== date
-      );
+      // --- STEP 2: Filter for guests who stayed overnight ---
+      // To be considered "in-house" for the night of the report date, a guest
+      // must check out on a subsequent day. This logic explicitly filters out
+      // any reservations where the checkout date is the same as the report date.
+      const inHouseReservations = overlappingReservations.filter((res) => {
+        // Ensure the reservation is not cancelled.
+        const isNotCanceled = res.status !== "canceled";
+        // Ensure the checkout date is strictly after the report date.
+        // Using `>` makes the intent clearer than `!==` in this context.
+        const stayedOvernight = res.checkOutDate > date;
+        return isNotCanceled && stayedOvernight;
+      });
 
       if (inHouseReservations.length === 0) {
         return res.status(200).json([]);

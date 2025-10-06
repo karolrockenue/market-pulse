@@ -24,6 +24,7 @@ Email: SendGrid for transactional emails (magic links, reports)
 All development must adhere to the following principles to ensure consistency and maintainability.
 
 2.1 Backend: Modular Routers & Adapter Pattern
+
 Modular Express Routers: The backend is not a monolith. All API endpoints must be placed in a feature-based router file within the /api/routes/ directory (e.g., dashboard.router.js). The main server.js file is only for initialization and mounting routers.
 
 Shared Utilities: Reusable logic, such as database connections (db.js) and authentication middleware (middleware.js), is centralized in the /api/utils/ directory.
@@ -31,6 +32,7 @@ Shared Utilities: Reusable logic, such as database connections (db.js) and authe
 PMS-Agnostic Adapter Pattern: All communication with external Property Management Systems (PMS) is abstracted into adapters located in /api/adapters/. The core application logic is decoupled from any specific vendor. The cloudbedsAdapter.js and mewsAdapter.js are the single sources of truth for all their respective API interactions.
 
 2.2 Frontend: Declarative UI & Shared Components
+
 Declarative, State-Driven UI: All UI interactivity must be built using self-contained Alpine.js components (x-data). Manual DOM manipulation is forbidden. All logic is encapsulated in external .mjs modules, keeping the HTML as a clean template.
 
 Shared "Headerless" Component Architecture: The application uses a "headerless" design. A single, shared sidebar component (/public/app/\_shared/sidebar.\*) serves as the primary navigation and control center for all authenticated pages. This component is dynamically loaded into each page.
@@ -194,6 +196,7 @@ expires_at (TIMESTAMPTZ)
 used_at (TIMESTAMPTZ)
 
 5.0 Project File Structure
+
 market-pulse/
 ├── api/
 │ ├── adapters/
@@ -208,13 +211,11 @@ market-pulse/
 │ │ ├── rockenue.router.js
 │ │ └── users.router.js
 │ ├── utils/
-│ │ ├── cloudbeds.js
 │ │ ├── db.js
 │ │ └── middleware.js
 │ ├── daily-refresh.js
 │ ├── initial-sync.js
 │ └── send-scheduled-reports.js
-├── node_modules/
 ├── public/
 │ ├── admin/
 │ │ ├── admin.mjs
@@ -233,10 +234,10 @@ market-pulse/
 │ │ ├── settings.mjs
 │ │ └── utils.mjs
 │ ├── rockenue/
-│ ├── index.html
-│ ├── rockenue.mjs
-│ ├── shreeji-report.html
-│ └── shreeji-report.mjs
+│ │ ├── index.html
+│ │ ├── rockenue.mjs
+│ │ ├── shreeji-report.html
+│ │ └── shreeji-report.mjs
 │ ├── favicon.png
 │ ├── constants.mjs
 │ ├── login.html
@@ -244,8 +245,6 @@ market-pulse/
 │ ├── support.html
 │ └── terms.html
 ├── .env
-├── changelog.txt
-├── package-lock.json
 ├── package.json
 ├── server.js
 └── vercel.json
@@ -254,6 +253,7 @@ market-pulse/
 The API is organized into feature-based routers. All are mounted under /api.
 
 auth.router.js
+
 POST /auth/login: Initiates the magic link login flow.
 
 GET /auth/magic-link-callback: Validates the token from the magic link and creates a user session.
@@ -273,6 +273,7 @@ POST /auth/logout: Destroys the user's session.
 GET /auth/session-info: Retrieves details for the currently logged-in user.
 
 dashboard.router.js
+
 GET /my-properties: Fetches the list of properties a user has access to.
 
 GET /kpi-summary: Fetches aggregated KPI data for the dashboard.
@@ -284,6 +285,7 @@ GET /sync-status/:propertyId: Checks if the initial data sync for a property has
 GET /market-ranking: Calculates and returns the hotel's rank for key metrics against its comp set.
 
 market.router.js
+
 GET /market/trends: Provides aggregated historical data for the Market Overview chart.
 
 GET /market/kpis: Provides the two-year lookback KPI data.
@@ -295,9 +297,11 @@ GET /market/seasonality: Provides the data for the seasonality heatmap.
 GET /market/available-seasonality-years: Returns the years for which valid seasonality data exists.
 
 reports.router.js
+
 (Contains various endpoints for fetching and generating data for the Advanced Reporting page).
 
 users.router.js
+
 POST /users/invite: Sends an invitation to a new user for a specific property.
 
 DELETE /users/remove: Removes a user from a team.
@@ -309,13 +313,19 @@ GET /users/team: Fetches the list of all users on a team.
 GET /user/profile, PUT /user/profile: Manages user profile data.
 
 admin.router.js
+
 (Contains various endpoints for the Admin Panel, including fetching all hotels, managing comp sets, triggering syncs/reports, and powering the API Explorer for both Cloudbeds and Mews).
 
 rockenue.router.js
+
 GET /rockenue/status: A protected endpoint to verify super_admin access.
+
 GET /rockenue/hotels: Fetches a list of all hotel properties for use in report dropdowns.
 
+GET /rockenue/shreeji-report: Generates the data for the in-house guest balance report.
+
 7.0 Key Features & Functionality
+
 Main Dashboard (/app/index.html): Features a two-column, "headerless" design. It includes interactive KPI summary cards, a unified data table comparing "Your Hotel" vs. "The Market," a "Market Composition" card with visual breakdowns, and a "Market Ranking" component.
 
 Advanced Reporting (/app/reports.html): A powerful tool for creating custom reports. The UI uses interactive "pills" for selecting metrics and formatting options. It supports flexible grouping ("by Metric" or "by Source").
@@ -327,6 +337,7 @@ Settings (/app/settings.html): A central hub for account management. Users can e
 Admin Panel (/admin/index.html): An internal tool for super_admin users. Key features include a Competitive Set Manager, a powerful, multi-filter API Explorer for debugging, and manual triggers for system jobs.
 
 Rockenue Section (/rockenue/index.html): A secure area for internal company (Rockenue) reports and administrative tools. This section is only accessible to super_admin users and is completely separate from the client-facing parts of the application. It currently includes the "Shreeji Report" for viewing in-house guest balances.
+
 Automated Jobs (Vercel Cron Jobs):
 
 Daily Data Refresh: The /api/daily-refresh.js script runs automatically to pull the latest data for all connected properties.
@@ -371,17 +382,3 @@ New Onboarding Flow: A complete, user-facing onboarding flow was built on the lo
 Adapter Implementation: The mewsAdapter.js was fully developed to handle all Mews-specific API logic, including authentication, data transformation, and pagination.
 
 Outcome: The integration was a success. The application now has a robust, scalable, and secure system for onboarding and syncing data from Mews properties. This milestone validates the adapter-based architecture and paves the way for integrating additional PMS vendors in the future.
-
-August 25, 2025 - Feature: Post-Sync Property Categorization
-
-Summary: Implemented a new user-facing modal that prompts hotel owners to classify their property's quality tier (e.g., Economy, Luxury) immediately after the initial data sync is complete. This ensures more accurate market data from the outset.
-
-New API Endpoint: Added a new PATCH /api/my-properties/:propertyId/category endpoint to dashboard.router.js to securely save the user's selection to the database.
-
-Frontend Logic:
-
-Added the category selection modal to public/app/index.html.
-
-Updated public/app/dashboard.mjs to trigger the modal's appearance when the ?newConnection=true parameter is present in the URL and the initial sync finishes.
-
-Enhancement: The /api/hotel-details/:propertyId endpoint in dashboard.router.js was updated to include the category field in its response.
