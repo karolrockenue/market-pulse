@@ -92,6 +92,11 @@ router.get("/shreeji-report", async (req, res) => {
   try {
     // --- NEW: Fetch the daily performance snapshot for the summary footer ---
     // This query pulls the pre-calculated daily metrics, which is the source of truth.
+    // --- Fetch the daily performance snapshot with added debugging ---
+    console.log(
+      `[Shreeji Report] Querying DB for hotel_id: ${hotel_id}, stay_date: ${date}`
+    );
+
     const snapshotResult = await pool.query(
       `SELECT
         rooms_sold,
@@ -100,14 +105,26 @@ router.get("/shreeji-report", async (req, res) => {
         gross_adr,
         gross_revpar
        FROM daily_metrics_snapshots
-       WHERE hotel_id = $1 AND stay_date = $2`,
+       WHERE hotel_id = $1::integer AND stay_date = $2::date`,
       [hotel_id, date]
     );
+
+    // --- NEW: Log the exact data returned by the database ---
+    if (snapshotResult.rows.length > 0) {
+      console.log(
+        "[Shreeji Report] DB Result:",
+        JSON.stringify(snapshotResult.rows[0])
+      );
+    } else {
+      console.log(
+        "[Shreeji Report] DB Result: No snapshot found for this date."
+      );
+    }
 
     // Initialize a default summary object in case no data is found for the day.
     let summary = {
       vacant: "N/A",
-      blocked: "N/A", // As discussed, we don't have a source for this metric.
+      blocked: "N/A",
       sold: 0,
       occupancy: 0,
       revpar: 0,
@@ -122,7 +139,6 @@ router.get("/shreeji-report", async (req, res) => {
       summary.revenue = snapshot.gross_revenue || 0;
       summary.adr = snapshot.gross_adr || 0;
       summary.revpar = snapshot.gross_revpar || 0;
-      // Calculate Occupancy and Vacant rooms from the snapshot data.
       summary.occupancy =
         snapshot.capacity_count > 0
           ? (snapshot.rooms_sold / snapshot.capacity_count) * 100
