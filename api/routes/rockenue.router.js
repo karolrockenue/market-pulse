@@ -81,9 +81,8 @@ router.get("/hotels", async (req, res) => {
   }
 });
 
-/**
- * FINAL STABLE VERSION: Removes the failing getRooms call and focuses on occupied rooms.
- */
+// /api/routes/rockenue.router.js
+
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
   if (!hotel_id || !date) {
@@ -91,6 +90,48 @@ router.get("/shreeji-report", async (req, res) => {
   }
 
   try {
+    // --- NEW: Fetch the daily performance snapshot for the summary footer ---
+    // This query pulls the pre-calculated daily metrics, which is the source of truth.
+    const snapshotResult = await pool.query(
+      `SELECT
+        rooms_sold,
+        capacity_count,
+        gross_revenue,
+        gross_adr,
+        gross_revpar
+       FROM daily_metrics_snapshots
+       WHERE hotel_id = $1 AND stay_date = $2`,
+      [hotel_id, date]
+    );
+
+    // Initialize a default summary object in case no data is found for the day.
+    let summary = {
+      vacant: "N/A",
+      blocked: "N/A", // As discussed, we don't have a source for this metric.
+      sold: 0,
+      occupancy: 0,
+      revpar: 0,
+      adr: 0,
+      revenue: 0,
+    };
+
+    // If a snapshot was found, populate the summary object with its data.
+    if (snapshotResult.rows.length > 0) {
+      const snapshot = snapshotResult.rows[0];
+      summary.sold = snapshot.rooms_sold || 0;
+      summary.revenue = snapshot.gross_revenue || 0;
+      summary.adr = snapshot.gross_adr || 0;
+      summary.revpar = snapshot.gross_revpar || 0;
+      // Calculate Occupancy and Vacant rooms from the snapshot data.
+      summary.occupancy =
+        snapshot.capacity_count > 0
+          ? (snapshot.rooms_sold / snapshot.capacity_count) * 100
+          : 0;
+      summary.vacant =
+        (snapshot.capacity_count || 0) - (snapshot.rooms_sold || 0);
+    }
+    // --- END: Daily performance snapshot ---
+
     const hotelInfoResult = await pool.query(
       "SELECT pms_type, pms_property_id FROM hotels WHERE hotel_id = $1",
       [hotel_id]
@@ -107,16 +148,12 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // --- NEW: Get a master list of ALL physical rooms at the hotel ---
       const roomsResponse = await cloudbedsAdapter.getRooms(
         accessToken,
         externalPropertyId
       );
 
-      // FINAL CORRECTION: The API returns an array containing one object, which holds the 'rooms' list.
-      // We access the first element of the response, then its 'rooms' property.
       const allHotelRooms = roomsResponse[0]?.rooms || [];
-      // --- STEP 1: Get all reservations that overlap the report date ---
       const overlappingReservations = await cloudbedsAdapter.getReservations(
         accessToken,
         externalPropertyId,
@@ -126,24 +163,15 @@ router.get("/shreeji-report", async (req, res) => {
         }
       );
 
-      // --- STEP 2: Filter for guests who stayed overnight ---
-      // This is the definitive logic for identifying an in-house guest for the night.
       const inHouseReservations = overlappingReservations.filter((res) => {
-        // Safety check: ignore cancelled bookings or records with invalid data.
         if (res.status === "canceled" || !res.startDate || !res.endDate) {
           return false;
         }
-
-        // Normalize dates to 'YYYY-MM-DD' strings to safely handle full timestamps.
         const checkInDateOnly = res.startDate.substring(0, 10);
         const checkOutDateOnly = res.endDate.substring(0, 10);
-
-        // A guest is "in-house" for the night of `date` if they arrived on or before that date
-        // AND they are scheduled to leave on a day *after* that date.
         return checkInDateOnly <= date && checkOutDateOnly > date;
       });
 
-      // --- STEP 4: If there are guests, get their full details ---
       const occupiedRoomsData = new Map();
       if (inHouseReservations.length > 0) {
         const reservationIDs = inHouseReservations.map(
@@ -156,7 +184,6 @@ router.get("/shreeji-report", async (req, res) => {
             { reservationID: reservationIDs.join(",") }
           );
 
-        // Create a Map of occupied rooms for efficient lookup, with roomName as the key.
         for (const res of detailedReservations) {
           if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
             const roomName = res.rooms[0].roomName;
@@ -172,19 +199,14 @@ router.get("/shreeji-report", async (req, res) => {
         }
       }
 
-      // --- STEP 5: Build the final report ---
-      // Iterate through the master list of all rooms. For each room, check if it's in our
-      // 'occupiedRoomsData' Map. If it is, populate the data. If not, it's empty.
       reportData = allHotelRooms.map((room) => {
         const occupiedData = occupiedRoomsData.get(room.roomName);
         if (occupiedData) {
-          // Room is occupied
           return {
             roomName: room.roomName,
             ...occupiedData,
           };
         } else {
-          // Room is empty
           return {
             roomName: room.roomName,
             guestName: "---",
@@ -197,16 +219,21 @@ router.get("/shreeji-report", async (req, res) => {
         }
       });
     } else {
-      return res
-        .status(501)
-        .json({ error: "Report not implemented for Mews yet." });
+      // For Mews or other PMS types, we will still return the summary data, even if the report is not implemented.
+      // This allows the frontend to show the summary footer regardless of PMS.
+      if (summary.sold === 0 && summary.revenue === 0) {
+        return res
+          .status(501)
+          .json({ error: "Report not implemented for Mews yet." });
+      }
     }
 
     reportData.sort((a, b) =>
       a.roomName.localeCompare(b.roomName, undefined, { numeric: true })
     );
 
-    res.status(200).json(reportData);
+    // --- NEW: Return a single object containing both the report data and the summary ---
+    res.status(200).json({ reportData, summary });
   } catch (error) {
     console.error(
       `Error generating Shreeji Report for hotel ${hotel_id}:`,
