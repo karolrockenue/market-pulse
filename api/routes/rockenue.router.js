@@ -140,37 +140,59 @@ router.get("/shreeji-report", async (req, res) => {
         return checkInDateOnly <= date && checkOutDateOnly > date;
       });
 
-      if (inHouseReservations.length === 0) {
-        return res.status(200).json([]);
+      // --- STEP 4: If there are guests, get their full details ---
+      const occupiedRoomsData = new Map();
+      if (inHouseReservations.length > 0) {
+        const reservationIDs = inHouseReservations.map(
+          (res) => res.reservationID
+        );
+        const detailedReservations =
+          await cloudbedsAdapter.getReservationsWithDetails(
+            accessToken,
+            externalPropertyId,
+            { reservationID: reservationIDs.join(",") }
+          );
+
+        // Create a Map of occupied rooms for efficient lookup, with roomName as the key.
+        for (const res of detailedReservations) {
+          if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
+            const roomName = res.rooms[0].roomName;
+            occupiedRoomsData.set(roomName, {
+              guestName: res.guestName || "N/A",
+              balance: res.balance || 0,
+              source: res.sourceName || "N/A",
+              checkInDate: res.reservationCheckIn,
+              checkOutDate: res.reservationCheckOut,
+              grandTotal: parseFloat(res.total) || 0,
+            });
+          }
+        }
       }
 
-      const reservationIDs = inHouseReservations.map(
-        (res) => res.reservationID
-      );
-
-      // --- STEP 3: Get full details for the in-house guests ---
-      const detailedReservations =
-        await cloudbedsAdapter.getReservationsWithDetails(
-          accessToken,
-          externalPropertyId,
-          { reservationID: reservationIDs.join(",") }
-        );
-
-      // --- STEP 4: Build the final report from the reservation data ---
-      reportData = detailedReservations
-        // Filter out any unassigned reservations
-        .filter(
-          (res) => res.rooms && res.rooms.length > 0 && res.rooms[0].roomName
-        )
-        .map((res) => ({
-          roomName: res.rooms[0].roomName,
-          guestName: res.guestName || "N/A",
-          balance: res.balance || 0,
-          source: res.sourceName || "N/A",
-          checkInDate: res.reservationCheckIn,
-          checkOutDate: res.reservationCheckOut,
-          grandTotal: parseFloat(res.total) || 0,
-        }));
+      // --- STEP 5: Build the final report ---
+      // Iterate through the master list of all rooms. For each room, check if it's in our
+      // 'occupiedRoomsData' Map. If it is, populate the data. If not, it's empty.
+      reportData = allHotelRooms.map((room) => {
+        const occupiedData = occupiedRoomsData.get(room.roomName);
+        if (occupiedData) {
+          // Room is occupied
+          return {
+            roomName: room.roomName,
+            ...occupiedData,
+          };
+        } else {
+          // Room is empty
+          return {
+            roomName: room.roomName,
+            guestName: "---",
+            balance: 0,
+            source: "---",
+            checkInDate: "---",
+            checkOutDate: "---",
+            grandTotal: 0,
+          };
+        }
+      });
     } else {
       return res
         .status(501)
