@@ -40,3 +40,45 @@ Key Implementation Details:
 * Data Processing: After receiving the raw list of transactions, the function iterates through them and manually calculates the sum for each payment method, storing the results in a simple JavaScript object (takingsSummary). This local processing provides greater control and avoids the complexities that were causing API errors.
 * Data Structure Parsing: It correctly parses the API response by looking for payment method names in data.records.payment_method[i] and the corresponding amounts in data.records.credit_amount[i].
 This function is now stable and correctly returns the required data for the report.
+
+Shreeji Report Changelog
+Date: October 7, 2025
+Version: 2.0
+Description: A comprehensive overhaul of the Shreeji Report, introducing significant new features, bug fixes, and major UI enhancements to improve functionality and user experience.
+
+New Features & Enhancements
+Blocked Rooms Display: The report now fetches and displays a list of all rooms that were blocked or out of service for the selected date. This provides a more complete picture of room availability.
+
+Pax Column: A new Pax column has been added to the main guest list to show the number of adults and children for each reservation (e.g., "2" or "2+1").
+
+Dynamic Report Title: The main title is now dynamic, displaying the selected hotel's name and the formatted date (e.g., "St George Hotel - DAILY CHART — MONDAY 06-10-2025").
+
+Bug Fixes
+Blocked Rooms Calculation: Fixed a critical bug where the number of blocked rooms was always reported as zero. The logic was corrected to properly parse the API response and map blocked room IDs to room names.
+
+"Hotel Night" Logic: Implemented correct "hotel night" filtering for blocked rooms, ensuring that blocks ending on the morning of the report date are excluded, matching the logic used for in-house guest reservations.
+
+Pax Data Parsing: Corrected the backend logic to parse the adults and children count from the correct nested location within the Cloudbeds API response, ensuring accurate Pax values are displayed.
+
+UI & Styling Improvements
+Column Reordering: The main table columns have been rearranged to a more logical order: Room, Pax, Guest Name, Total Rate, Arrival, Departure, Outstanding, Agency.
+
+Column Renaming: The "Source" column has been renamed to Agency for clarity.
+
+Conditional Formatting:
+
+The "Blocked" count in the summary section now appears in red if the value is greater than zero.
+
+Cells for unoccupied rooms no longer show "---" and are now blank.
+
+"Outstanding" and "Total Rate" cells now appear blank if the value is zero.
+
+Table Appearance:
+
+A complete four-sided border has been added around the main results table.
+
+Vertical grid lines now separate all columns.
+
+The table header has been restyled to be visually consistent with the data rows, removing the background color and uppercase text.
+
+Compact Layout: The font size and vertical padding of the table have been reduced to create a more compact and data-dense view.
