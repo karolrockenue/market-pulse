@@ -187,6 +187,14 @@ router.get("/shreeji-report", async (req, res) => {
       ]);
 
       // --- RESTORED: Original, Correct Block Processing Logic ---
+
+      // --- FINAL DIAGNOSTIC LOGS ---
+      console.log("--- [FINAL CHECK] Content of getRooms response ---");
+      console.log(JSON.stringify(roomsResponse, null, 2));
+      console.log("--- [FINAL CHECK] Content of getRoomBlocks response ---");
+      console.log(JSON.stringify(roomBlocksResult, null, 2));
+      // --- END LOGS ---
+
       // Create a lookup map from roomID to roomName.
       const roomMap = new Map();
       const allRoomsForMap = roomsResponse[0]?.rooms || [];
