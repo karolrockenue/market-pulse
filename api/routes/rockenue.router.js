@@ -205,24 +205,24 @@ router.get("/shreeji-report", async (req, res) => {
 
       // Create a lookup map from roomID to roomName.
       const roomMap = new Map();
-      // FIX: The 'getRooms' adapter function returns a flat array of room objects directly.
-      // The previous code was incorrectly trying to access a nested '.rooms' property on the first element.
-      // We now correctly use the entire 'roomsResponse' array to build the map.
-      const allRoomsForMap = roomsResponse || [];
+      // THE FIX - PART 1: Revert to original logic. The logs confirm the getRooms
+      // response is nested: an array containing one object which has a 'rooms' array property.
+      // This correctly extracts the flat list of all rooms for the property.
+      const allRoomsForMap = roomsResponse[0]?.rooms || [];
       for (const room of allRoomsForMap) {
-        // The room object from getRooms contains roomID and roomName directly.
         roomMap.set(room.roomID, room.roomName);
       }
 
-      // Process the reliable data from getRoomBlocks.
-      if (
-        roomBlocksResult &&
-        roomBlocksResult.data &&
-        roomBlocksResult.data.roomBlocks
-      ) {
-        for (const block of roomBlocksResult.data.roomBlocks) {
+      // THE FIX - PART 2: Process the corrected data from getRoomBlocks.
+      // The adapter now returns a simple, flat array of block objects.
+      // We can iterate over this result directly.
+      if (roomBlocksResult && roomBlocksResult.length > 0) {
+        // Each 'block' is an object that contains a 'rooms' array.
+        for (const block of roomBlocksResult) {
+          // The 'rooms' array within a block contains objects with a 'roomID'.
           for (const room of block.rooms) {
             const roomName = roomMap.get(room.roomID);
+            // If we find a matching name in our map, add it to our list.
             if (roomName) {
               blockedRoomNames.push(roomName);
             }

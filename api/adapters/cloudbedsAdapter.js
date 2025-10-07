@@ -1183,8 +1183,11 @@ async function getRoomBlocks(accessToken, propertyId, date) {
         )}`
       );
     }
-    if (data.data && data.data.length > 0) {
-      allRoomBlocks = allRoomBlocks.concat(data.data);
+    // THE FIX: The API returns an object at 'data', not an array.
+    // The actual list of blocks is inside 'data.roomBlocks'.
+    // We now check for this specific property and concatenate it.
+    if (data.data && data.data.roomBlocks && data.data.roomBlocks.length > 0) {
+      allRoomBlocks = allRoomBlocks.concat(data.data.roomBlocks);
       pageNumber++;
     } else {
       hasMore = false;
