@@ -1138,8 +1138,8 @@ async function getDailyTakings(accessToken, propertyId, date) {
   const takingsSummary = {};
   if (data.index && data.records?.credit_amount) {
     for (let i = 0; i < data.records.credit_amount.length; i++) {
-      // The payment method corresponds to the first item in the index array for each record.
-      const paymentMethod = data.index[i]?.[0] || "Unknown";
+      // THE FIX: The payment method is in the records object, not the index array.
+      const paymentMethod = data.records.payment_method[i] || "Unknown";
       // The credit amount is in the records object.
       const amount = parseFloat(data.records.credit_amount[i]) || 0;
 
