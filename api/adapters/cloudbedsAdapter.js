@@ -1067,19 +1067,19 @@ async function getReservationsWithDetails(
   }
   return allReservations;
 }
-
 /**
- * Fetches daily takings (payments) grouped by payment method for a specific day.
+ * Fetches daily takings (payments) for a specific day by getting a raw list of transactions
+ * and summing them manually. This is a robust method to avoid complex API aggregation.
  * @param {string} accessToken - A valid Cloudbeds access token.
  * @param {string} propertyId - The external PMS ID of the property.
  * @param {string} date - The date to fetch takings for in 'YYYY-MM-DD' format.
  * @returns {Promise<Object>} - An object summarizing takings by payment method.
  */
 async function getDailyTakings(accessToken, propertyId, date) {
-  // This is the final payload, matching the structure of the successful API Explorer call.
+  // FINAL APPROACH: Request a simple list of transactions, not a summary.
   const insightsPayload = {
     property_ids: [propertyId],
-    dataset_id: 1,
+    dataset_id: 1, // Financial dataset
     filters: {
       and: [
         {
@@ -1094,18 +1094,14 @@ async function getDailyTakings(accessToken, propertyId, date) {
         },
       ],
     },
-    // The 'columns' array should ONLY contain the metric being summed.
-    columns: [{ cdf: { column: "credit_amount" }, metrics: ["sum"] }],
-    // The 'group_rows' array defines what we group by.
-    group_rows: [{ cdf: { column: "payment_method" } }],
-    // Requesting both details and totals matches the API Explorer's behavior.
-    settings: { details: true, totals: true },
+    // Request the raw columns for each transaction. We are NOT asking the API to group or sum.
+    columns: [
+      { cdf: { column: "payment_method" } },
+      { cdf: { column: "credit_amount" } },
+    ],
+    // We only want the detailed list of records.
+    settings: { details: true, totals: false },
   };
-
-  console.log(
-    "[DEBUG] Sending Final Corrected Payload:",
-    JSON.stringify(insightsPayload, null, 2)
-  );
 
   const apiResponse = await fetch(
     "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
@@ -1126,24 +1122,25 @@ async function getDailyTakings(accessToken, propertyId, date) {
     throw new Error(`Takings API Error: ${apiResponse.status}`);
   }
 
-  // Process the 'subtotals' object from the successful API response.
+  // Manually sum the results from the raw transaction list.
   const takingsSummary = {};
-  const subtotals = data.subtotals?.payment_method;
+  if (data.index && data.records?.credit_amount) {
+    for (let i = 0; i < data.records.credit_amount.length; i++) {
+      // The payment method corresponds to the first item in the index array for each record.
+      const paymentMethod = data.index[i]?.[0] || "Unknown";
+      // The credit amount is in the records object.
+      const amount = parseFloat(data.records.credit_amount[i]) || 0;
 
-  if (subtotals) {
-    for (const paymentMethod in subtotals) {
-      if (paymentMethod && paymentMethod !== "-") {
-        const sum = subtotals[paymentMethod]?.credit_amount?.sum || 0;
-        if (sum > 0) {
-          takingsSummary[paymentMethod] = sum;
-        }
+      if (amount > 0 && paymentMethod && paymentMethod !== "-") {
+        // If we've seen this payment method before, add to it. Otherwise, initialize it.
+        takingsSummary[paymentMethod] =
+          (takingsSummary[paymentMethod] || 0) + amount;
       }
     }
   }
 
   return takingsSummary;
 }
-
 module.exports = {
   getAccessToken,
   getNeighborhoodFromCoords,
