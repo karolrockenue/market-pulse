@@ -666,15 +666,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
     // --- CORRECTED LOGIC ---
     // Each case will now handle its own fetch and response.
     switch (endpoint) {
-      // --- General API Cases ---
-      // --- General API Cases ---
-      // NEW TEMPORARY CASE FOR DEBUGGING
-      case "room-blocks":
-        // This case constructs the URL for getRoomBlocks using query params from the request.
-        // We will pass startDate and endDate directly from our test URL.
-        targetUrl = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${cloudbedsApiId}&startDate=${startDate}&endDate=${endDate}`;
-        break;
-
       case "sample-hotel":
         targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${cloudbedsApiId}`;
         break;
