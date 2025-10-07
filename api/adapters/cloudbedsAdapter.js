@@ -1153,6 +1153,46 @@ async function getDailyTakings(accessToken, propertyId, date) {
 
   return takingsSummary;
 }
+async function getRoomBlocks(accessToken, propertyId, date) {
+  let allRoomBlocks = [];
+  let pageNumber = 1;
+  const pageSize = 100;
+  let hasMore = true;
+  while (hasMore) {
+    const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${propertyId}&startDate=${date}T00:00:00Z&endDate=${date}T23:59:59Z&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
+    });
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const errorText = await response.text();
+      throw new Error(
+        `Cloudbeds API returned a non-JSON response for getRoomBlocks. Status: ${
+          response.status
+        }. Body: ${errorText.substring(0, 500)}...`
+      );
+    }
+    const data = await response.json();
+    if (!response.ok || data.success === false) {
+      throw new Error(
+        `Failed to fetch room blocks page ${pageNumber}. API Response: ${JSON.stringify(
+          data
+        )}`
+      );
+    }
+    if (data.data && data.data.length > 0) {
+      allRoomBlocks = allRoomBlocks.concat(data.data);
+      pageNumber++;
+    } else {
+      hasMore = false;
+    }
+  }
+  return allRoomBlocks;
+}
+
 module.exports = {
   getAccessToken,
   getNeighborhoodFromCoords,
@@ -1167,4 +1207,5 @@ module.exports = {
   getReservations,
   getReservationsWithDetails,
   getDailyTakings,
+  getRoomBlocks,
 };
