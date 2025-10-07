@@ -197,8 +197,12 @@ router.get("/shreeji-report", async (req, res) => {
 
       // Create a lookup map from roomID to roomName.
       const roomMap = new Map();
-      const allRoomsForMap = roomsResponse[0]?.rooms || [];
+      // FIX: The 'getRooms' adapter function returns a flat array of room objects directly.
+      // The previous code was incorrectly trying to access a nested '.rooms' property on the first element.
+      // We now correctly use the entire 'roomsResponse' array to build the map.
+      const allRoomsForMap = roomsResponse || [];
       for (const room of allRoomsForMap) {
+        // The room object from getRooms contains roomID and roomName directly.
         roomMap.set(room.roomID, room.roomName);
       }
 
