@@ -1082,10 +1082,16 @@ async function getDailyTakings(accessToken, propertyId, date) {
     dataset_id: 1, // Financial dataset
     filters: {
       and: [
+        // THE FIX: Use a date range filter, even for a single day, to match the working API Explorer.
         {
           cdf: { column: "service_date" },
-          operator: "equal",
+          operator: "greater_than_or_equal",
           value: `${date}T00:00:00.000Z`,
+        },
+        {
+          cdf: { column: "service_date" },
+          operator: "less_than_or_equal",
+          value: `${date}T23:59:59.999Z`,
         },
         {
           cdf: { column: "credit_amount" },
