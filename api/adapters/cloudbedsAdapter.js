@@ -1095,10 +1095,11 @@ async function getDailyTakings(accessToken, propertyId, date) {
         },
       ],
     },
-    // THE FIX: The columns array should ONLY contain the metrics we want to aggregate.
-    // The working API Explorer code confirms that the grouping column ('payment_method')
-    // should NOT be included here.
-    columns: [{ cdf: { column: "credit_amount" }, metrics: ["sum"] }],
+    // Request the two columns we need for each transaction. No aggregation.
+    columns: [
+      { cdf: { column: "payment_method" } },
+      { cdf: { column: "credit_amount" } },
+    ],
     settings: { details: true, totals: false }, // We only want the detailed list.
   };
 
