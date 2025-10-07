@@ -902,38 +902,52 @@ async function setAppDisabled(accessToken, internalPropertyId) {
  * @returns {Promise<Array>} - A flat array of room objects.
  */
 async function getRooms(accessToken, propertyId) {
-  // This endpoint does not appear to be paginated, so we can simplify the logic.
-  const url = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyID=${propertyId}`;
+  let allRooms = [];
+  let pageNumber = 1;
+  const pageSize = 100;
+  let hasMore = true;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "X-PROPERTY-ID": propertyId,
-    },
-  });
+  while (hasMore) {
+    // FINAL FIX: The correct endpoint is /getRooms. This replaces the incorrect /getRoomList.
+    const url = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
-  const contentType = response.headers.get("content-type");
-  if (!contentType || !contentType.includes("application/json")) {
-    const errorText = await response.text();
-    throw new Error(
-      `Cloudbeds API returned a non-JSON response for getRooms. Status: ${
-        response.status
-      }. Body: ${errorText.substring(0, 500)}...`
-    );
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": propertyId,
+      },
+    });
+
+    // --- FIX: Robust Error Handling ---
+    // First, check the Content-Type header to see if we got JSON.
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      // If not JSON, read the body as text to see the HTML error page.
+      const errorText = await response.text();
+      throw new Error(
+        `Cloudbeds API returned a non-JSON response (likely an auth error page). Status: ${
+          response.status
+        }. Body: ${errorText.substring(0, 500)}...`
+      );
+    }
+
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(
+        `Failed to fetch rooms page ${pageNumber}. API Response: ${JSON.stringify(
+          data
+        )}`
+      );
+    }
+
+    if (data.data && data.data.length > 0) {
+      allRooms = allRooms.concat(data.data);
+      pageNumber++;
+    } else {
+      hasMore = false;
+    }
   }
-
-  const data = await response.json();
-
-  // The 'success' flag is inside the nested object for this endpoint.
-  if (!response.ok || (data[0] && data[0].success === false)) {
-    throw new Error(
-      `Failed to fetch rooms. API Response: ${JSON.stringify(data)}`
-    );
-  }
-
-  // DEFINITIVE FIX: The response is an array containing one object, which has a 'rooms' property.
-  // We return the nested 'rooms' array directly.
-  return data[0]?.rooms || [];
+  return allRooms;
 }
 
 /**
