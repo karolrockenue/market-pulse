@@ -266,6 +266,14 @@ router.get("/shreeji-report", async (req, res) => {
             { reservationID: reservationIDs.join(",") }
           );
 
+        // --- PAX DEBUGGING ---
+        // Log the first detailed reservation object to inspect its structure for 'adults' and 'children' fields.
+        if (detailedReservations.length > 0) {
+          console.log("--- [PAX DEBUG] First detailed reservation object ---");
+          console.log(JSON.stringify(detailedReservations[0], null, 2));
+        }
+        // --- END PAX DEBUGGING ---
+
         for (const res of detailedReservations) {
           if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
             const roomName = res.rooms[0].roomName;

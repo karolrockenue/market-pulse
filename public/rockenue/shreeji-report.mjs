@@ -140,10 +140,10 @@ async function generateReport() {
             row.roomName
           }</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.guestName
+            row.pax
           }</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.pax
+            row.guestName
           }</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
             row.checkInDate
