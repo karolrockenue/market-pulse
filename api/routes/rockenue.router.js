@@ -166,23 +166,22 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // Fetch the daily takings data in parallel with other API calls for efficiency.
-      const [takingsResult, roomsResponse, overlappingReservations] =
-        await Promise.all([
-          cloudbedsAdapter.getDailyTakings(
-            accessToken,
-            externalPropertyId,
-            date
-          ),
-          cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
-          cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
-            checkInTo: date,
-            checkOutFrom: date,
-          }),
-        ]);
+      // --- DEBUGGING: The takings function is temporarily isolated to allow the rest of the report to load. ---
+      const [roomsResponse, overlappingReservations] = await Promise.all([
+        // cloudbedsAdapter.getDailyTakings(
+        //   accessToken,
+        //   externalPropertyId,
+        //   date
+        // ),
+        cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
+        cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
+          checkInTo: date,
+          checkOutFrom: date,
+        }),
+      ]);
 
-      // Assign the result from our new function.
-      takingsData = takingsResult;
+      // takingsData will remain an empty object for now.
+      // takingsData = takingsResult;
 
       const allHotelRooms = roomsResponse[0]?.rooms || [];
 
