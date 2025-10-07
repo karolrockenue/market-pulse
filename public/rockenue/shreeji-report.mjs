@@ -197,7 +197,7 @@ async function generateReport() {
       // Otherwise, ensure the text is the default color by removing the class.
       blockedSpan.classList.remove("text-red-600");
     }
-    g;
+
     document.getElementById("summary-sold").textContent = summary.sold;
     document.getElementById("summary-occupancy").textContent =
       typeof summary.occupancy === "number"
