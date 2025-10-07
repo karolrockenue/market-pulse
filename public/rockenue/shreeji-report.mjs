@@ -87,6 +87,8 @@ async function generateReport() {
   const datePicker = document.getElementById("report-date");
   const tableBody = document.querySelector("#report-results-table tbody");
   const generateBtn = document.getElementById("generate-btn");
+  // NEW: Get a reference to the new takings container.
+  const takingsContainer = document.getElementById("takings-summary-container");
 
   if (!hotelSelect.value || !datePicker.value) {
     alert("Please select a hotel and a date.");
@@ -97,7 +99,7 @@ async function generateReport() {
   generateBtn.textContent = "Generating...";
   tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
 
-  // Clear previous summary data while loading.
+  // Clear previous summary and takings data while loading.
   document.getElementById("summary-vacant").textContent = "--";
   document.getElementById("summary-blocked").textContent = "--";
   document.getElementById("summary-sold").textContent = "--";
@@ -105,22 +107,19 @@ async function generateReport() {
   document.getElementById("summary-revpar").textContent = "--";
   document.getElementById("summary-adr").textContent = "--";
   document.getElementById("summary-revenue").textContent = "--";
+  takingsContainer.innerHTML = `<p class="text-sm text-gray-500">Loading takings data...</p>`;
 
   try {
     const response = await fetch(
       `/api/rockenue/shreeji-report?hotel_id=${hotelSelect.value}&date=${datePicker.value}`
     );
-    const data = await response.json(); // data is now an object: { reportData: [], summary: {} }
+    const data = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || "Failed to generate report.");
     }
 
-    // A helper function to format currency nicely. Moved to a higher scope.
-    // A helper function to format currency nicely. Moved to a higher scope.
     const formatCurrency = (amount) => {
-      // THE FIX: Convert the incoming value (which may be a string) to a number.
-      // parseFloat() will correctly handle numbers that are sent as strings from the API.
       const numericAmount = parseFloat(amount) || 0;
       return new Intl.NumberFormat("en-GB", {
         style: "currency",
@@ -128,14 +127,12 @@ async function generateReport() {
       }).format(numericAmount);
     };
 
-    // --- REFACTORED: Use the 'reportData' key for the table rows. ---
+    // --- POPULATE MAIN TABLE ---
     const reportData = data.reportData;
-    tableBody.innerHTML = ""; // Clear loading message
-
+    tableBody.innerHTML = "";
     if (reportData.length === 0) {
       tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
     } else {
-      // Loop through the report data and create a table row for each guest.
       reportData.forEach((row) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -165,12 +162,11 @@ async function generateReport() {
       });
     }
 
-    // --- NEW: Populate the summary footer using the 'summary' key. ---
+    // --- POPULATE PERFORMANCE SUMMARY ---
     const summary = data.summary;
     document.getElementById("summary-vacant").textContent = summary.vacant;
     document.getElementById("summary-blocked").textContent = summary.blocked;
     document.getElementById("summary-sold").textContent = summary.sold;
-    // Format occupancy to two decimal places.
     document.getElementById("summary-occupancy").textContent =
       typeof summary.occupancy === "number"
         ? summary.occupancy.toFixed(2)
@@ -184,9 +180,40 @@ async function generateReport() {
     document.getElementById("summary-revenue").textContent = formatCurrency(
       summary.revenue
     );
+
+    // --- NEW: POPULATE TAKINGS SUMMARY ---
+    const takings = data.takings;
+    takingsContainer.innerHTML = ""; // Clear the loading message.
+
+    if (takings && Object.keys(takings).length > 0) {
+      // Create a grid to display the takings.
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+
+      // Loop through the takings object (e.g., { "Cash": 500, "Credit Card": 1250 }).
+      for (const method in takings) {
+        const amount = takings[method];
+        const item = document.createElement("div");
+        item.className = "bg-gray-50 p-3 rounded-md";
+        // Create the content for each payment method.
+        item.innerHTML = `
+          <dt class="text-sm font-medium text-gray-500 truncate">${method}</dt>
+          <dd class="mt-1 text-xl font-semibold text-gray-900">${formatCurrency(
+            amount
+          )}</dd>
+        `;
+        grid.appendChild(item);
+      }
+      takingsContainer.appendChild(grid);
+    } else {
+      // Show a message if no takings data was found.
+      takingsContainer.innerHTML = `<p class="text-sm text-gray-500">No takings data found for this day.</p>`;
+    }
   } catch (error) {
     console.error("Error generating report:", error);
     tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+    // Also show an error in the takings container.
+    takingsContainer.innerHTML = `<p class="text-sm text-red-500">Error: ${error.message}</p>`;
   } finally {
     generateBtn.disabled = false;
     generateBtn.textContent = "Generate Report";
