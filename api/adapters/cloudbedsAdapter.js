@@ -1153,71 +1153,6 @@ async function getDailyTakings(accessToken, propertyId, date) {
 
   return takingsSummary;
 }
-/**
- * NEW: Fetches a list of room blocks for a specific day.
- * This function handles pagination to ensure all blocks are retrieved.
- * @param {string} accessToken - A valid Cloudbeds access token.
- * @param {string} propertyId - The external PMS ID of the property.
- * @param {string} date - The date to check for room blocks in 'YYYY-MM-DD' format.
- * @returns {Promise<Array>} - A flat array of room block objects.
- */
-async function getRoomBlocks(accessToken, propertyId, date) {
-  // Initialize an array to hold all room blocks from all pages.
-  let allRoomBlocks = [];
-  let pageNumber = 1;
-  const pageSize = 100; // Set a page size for the API request.
-  let hasMore = true;
-
-  // Loop as long as the API indicates there are more pages of data.
-  while (hasMore) {
-    // Construct the URL with parameters for propertyID, date range, and pagination.
-    // We set both startDate and endDate to the same day to find blocks active on that specific date.
-    const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${propertyId}&startDate=${date}&endDate=${date}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
-
-    const response = await fetch(url, {
-      headers: {
-        // Standard headers for authenticating with the Cloudbeds API.
-        Authorization: `Bearer ${accessToken}`,
-        "X-PROPERTY-ID": propertyId,
-      },
-    });
-
-    // Handle cases where the API might return an error page (HTML) instead of JSON.
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const errorText = await response.text();
-      throw new Error(
-        `Cloudbeds API returned a non-JSON response for getRoomBlocks. Status: ${
-          response.status
-        }. Body: ${errorText.substring(0, 500)}...`
-      );
-    }
-
-    const data = await response.json();
-
-    // If the request was not successful, throw an error with the API's response.
-    if (!response.ok || data.success === false) {
-      throw new Error(
-        `Failed to fetch room blocks page ${pageNumber}. API Response: ${JSON.stringify(
-          data
-        )}`
-      );
-    }
-
-    // If the current page contains data, add it to our main array and increment the page number.
-    if (data.data && data.data.length > 0) {
-      allRoomBlocks = allRoomBlocks.concat(data.data);
-      pageNumber++;
-    } else {
-      // If the page is empty, we've reached the end of the data.
-      hasMore = false;
-    }
-  }
-
-  // Return the complete list of room blocks.
-  return allRoomBlocks;
-}
-
 module.exports = {
   getAccessToken,
   getNeighborhoodFromCoords,
@@ -1231,7 +1166,6 @@ module.exports = {
   getRooms,
   getReservations,
   getReservationsWithDetails,
-  getDailyTakings,
   // Export our new function so other files can use it.
-  getRoomBlocks,
+  getDailyTakings,
 };
