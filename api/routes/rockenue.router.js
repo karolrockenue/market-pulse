@@ -160,8 +160,12 @@ router.get("/shreeji-report", async (req, res) => {
     const externalPropertyId = pms_property_id || hotel_id;
 
     let reportData = [];
-
     let takingsData = {}; // Initialize an empty takings object.
+
+    // CORRECTED: Declare these variables here, outside the 'if' block.
+    // This ensures they always exist when the final response is constructed.
+    let blockedRoomNames = [];
+    let blockedRoomsCount = 0;
 
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
@@ -171,7 +175,7 @@ router.get("/shreeji-report", async (req, res) => {
         takingsResult,
         roomsResponse,
         overlappingReservations,
-        roomBlocksResult, // Add a variable to hold the result of our new function call.
+        roomBlocksResult,
       ] = await Promise.all([
         cloudbedsAdapter.getDailyTakings(accessToken, externalPropertyId, date),
         cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
@@ -179,34 +183,23 @@ router.get("/shreeji-report", async (req, res) => {
           checkInTo: date,
           checkOutFrom: date,
         }),
-        // NEW: Call the getRoomBlocks function to fetch block data for the selected date.
         cloudbedsAdapter.getRoomBlocks(accessToken, externalPropertyId, date),
       ]);
 
       // --- START: Process Room Block Data ---
-
-      // Create a lookup map for roomID to roomName for easy reference.
-      // The `roomsResponse` is a flat array of all room objects for the property.
       const roomMap = new Map();
       for (const room of roomsResponse) {
         roomMap.set(room.roomID, room.roomName);
       }
 
-      // Initialize variables to store the processed block information.
-      const blockedRoomNames = [];
-      let blockedRoomsCount = 0;
-
-      // Check if the API response contains valid room block data.
+      // Note: We are now re-assigning the variables, not re-declaring them.
       if (
         roomBlocksResult &&
         roomBlocksResult.data &&
         roomBlocksResult.data.roomBlocks
       ) {
-        // Iterate over each block returned by the API.
         for (const block of roomBlocksResult.data.roomBlocks) {
-          // A single block can apply to multiple rooms, so iterate through them.
           for (const room of block.rooms) {
-            // Find the user-friendly room name using our map.
             const roomName = roomMap.get(room.roomID);
             if (roomName) {
               blockedRoomNames.push(roomName);
@@ -215,12 +208,8 @@ router.get("/shreeji-report", async (req, res) => {
         }
       }
 
-      // The total count is the number of individual rooms found in all blocks.
       blockedRoomsCount = blockedRoomNames.length;
-
-      // Update the 'blocked' value in the summary object with our new count.
       summary.blocked = blockedRoomsCount;
-
       // --- END: Process Room Block Data ---
 
       // Assign the result from our new function.
