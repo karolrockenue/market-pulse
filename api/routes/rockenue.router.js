@@ -187,6 +187,13 @@ router.get("/shreeji-report", async (req, res) => {
       ]);
 
       // --- START: Process Room Block Data ---
+      // --- START: Process Room Block Data ---
+
+      // --- FINAL DEBUG STEP: Let's see the exact content of roomsResponse ---
+      console.log("--- FINAL CHECK: roomsResponse Content ---");
+      console.log(JSON.stringify(roomsResponse, null, 2));
+      // --- END DEBUG STEP ---
+
       const roomMap = new Map();
       for (const room of roomsResponse) {
         roomMap.set(room.roomID, room.roomName);
