@@ -215,10 +215,18 @@ router.get("/shreeji-report", async (req, res) => {
 
       // THE FIX - PART 2: Process the corrected data from getRoomBlocks.
       // The adapter now returns a simple, flat array of block objects.
-      // We can iterate over this result directly.
-      if (roomBlocksResult && roomBlocksResult.length > 0) {
+
+      // First, filter these blocks to only include those active for the "hotel night" of the selected date.
+      // The logic is the same as for reservations: the block must start on or before the report date (startDate <= date)
+      // and must end after the report date (endDate > date). This correctly excludes blocks that check out on the morning of the report date.
+      const activeOvernightBlocks = roomBlocksResult.filter((block) => {
+        return block.startDate <= date && block.endDate > date;
+      });
+
+      // Now, we iterate over the correctly filtered list of active blocks.
+      if (activeOvernightBlocks && activeOvernightBlocks.length > 0) {
         // Each 'block' is an object that contains a 'rooms' array.
-        for (const block of roomBlocksResult) {
+        for (const block of activeOvernightBlocks) {
           // The 'rooms' array within a block contains objects with a 'roomID'.
           for (const room of block.rooms) {
             const roomName = roomMap.get(room.roomID);
