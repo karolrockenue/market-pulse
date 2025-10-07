@@ -266,21 +266,16 @@ router.get("/shreeji-report", async (req, res) => {
             { reservationID: reservationIDs.join(",") }
           );
 
-        // --- PAX DEBUGGING ---
-        // Log the first detailed reservation object to inspect its structure for 'adults' and 'children' fields.
-        if (detailedReservations.length > 0) {
-          console.log("--- [PAX DEBUG] First detailed reservation object ---");
-          console.log(JSON.stringify(detailedReservations[0], null, 2));
-        }
-        // --- END PAX DEBUGGING ---
-
         for (const res of detailedReservations) {
           if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
             const roomName = res.rooms[0].roomName;
 
-            // NEW: Calculate the 'Pax' string from the reservation data.
-            const adults = parseInt(res.adults, 10) || 0;
-            const children = parseInt(res.children, 10) || 0;
+            // THE FIX: The adults and children counts are nested within the first room object of the reservation.
+            // We now access them from the correct location: res.rooms[0].
+            const roomDetails = res.rooms[0];
+            const adults = parseInt(roomDetails.adults, 10) || 0;
+            const children = parseInt(roomDetails.children, 10) || 0;
+
             let paxString = `${adults}`;
             if (children > 0) {
               paxString += `+${children}`;
