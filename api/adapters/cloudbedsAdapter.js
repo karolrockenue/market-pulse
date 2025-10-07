@@ -1104,7 +1104,9 @@ async function getDailyTakings(accessToken, propertyId, date) {
       { cdf: { column: "credit_amount" }, metrics: ["sum"] },
     ],
     group_rows: [{ cdf: { column: "payment_method" } }],
-    settings: { details: false, totals: true }, // We only need the totals.
+    // THE FIX: Request both details and totals. This matches the behavior of the successful API Explorer test
+    // and may be required by the API when grouping by a non-date dimension.
+    settings: { details: true, totals: true },
   };
 
   // --- ADDED FOR DEBUGGING ---
