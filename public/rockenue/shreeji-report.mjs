@@ -97,7 +97,7 @@ async function generateReport() {
 
   generateBtn.disabled = true;
   generateBtn.textContent = "Generating...";
-  tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-2 text-center text-xs text-gray-500">Loading report data...</td></tr>`;
 
   // Clear previous summary and takings data while loading.
   document.getElementById("summary-vacant").textContent = "--";
@@ -148,36 +148,36 @@ async function generateReport() {
     const reportData = data.reportData;
     tableBody.innerHTML = "";
     if (reportData.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-2 text-center text-xs text-gray-500">No in-house guests found for the selected date.</td></tr>`;
     } else {
       reportData.forEach((row) => {
         const tr = document.createElement("tr");
         // NEW: Added the 'divide-x' class to create vertical lines between cells.
         tr.className = "divide-x divide-gray-200";
         tr.innerHTML = `
-          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${
+          <td class="px-6 py-2 whitespace-nowrap text-xs font-medium text-gray-900">${
             row.roomName
           }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.pax
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${
+            row.pax !== "---" ? row.pax : ""
           }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.guestName
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${
+            row.guestName !== "---" ? row.guestName : ""
           }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${formatCurrency(
-            row.grandTotal
-          )}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.checkInDate
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500 text-right">${
+            row.grandTotal !== 0 ? formatCurrency(row.grandTotal) : ""
           }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.checkOutDate
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${
+            row.checkInDate !== "---" ? row.checkInDate : ""
           }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-semibold">${formatCurrency(
-            row.balance
-          )}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.source
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${
+            row.checkOutDate !== "---" ? row.checkOutDate : ""
+          }</td>
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500 text-right font-semibold">${
+            row.balance !== 0 ? formatCurrency(row.balance) : ""
+          }</td>
+          <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${
+            row.source !== "---" ? row.source : ""
           }</td>
         `;
         tableBody.appendChild(tr);
@@ -233,7 +233,7 @@ async function generateReport() {
     }
   } catch (error) {
     console.error("Error generating report:", error);
-    tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-2 text-center text-xs text-red-500">Error: ${error.message}</td></tr>`;
     // Also show an error in the takings container.
     takingsContainer.innerHTML = `<p class="text-sm text-red-500">Error: ${error.message}</p>`;
   } finally {
