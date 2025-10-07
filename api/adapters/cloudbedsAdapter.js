@@ -1102,6 +1102,14 @@ async function getDailyTakings(accessToken, propertyId, date) {
     settings: { details: false, totals: true }, // We only need the totals.
   };
 
+  // --- ADDED FOR DEBUGGING ---
+  // This will log the exact JSON payload being sent to the Cloudbeds API.
+  console.log(
+    "[DEBUG] Sending Takings Payload:",
+    JSON.stringify(insightsPayload, null, 2)
+  );
+  // --- END DEBUGGING ---
+
   const apiResponse = await fetch(
     "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
     {
