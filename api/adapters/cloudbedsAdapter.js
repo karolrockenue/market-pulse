@@ -1097,7 +1097,12 @@ async function getDailyTakings(accessToken, propertyId, date) {
     // We must request the columns we intend to group by or aggregate.
     // We only need to request the metric we want to aggregate.
     // The grouping column is defined in the 'group_rows' property below.
-    columns: [{ cdf: { column: "credit_amount" }, metrics: ["sum"] }],
+    // THE FIX: We must explicitly select both the metric we are summing (credit_amount)
+    // and the column we are grouping by (payment_method).
+    columns: [
+      { cdf: { column: "payment_method" } },
+      { cdf: { column: "credit_amount" }, metrics: ["sum"] },
+    ],
     group_rows: [{ cdf: { column: "payment_method" } }],
     settings: { details: false, totals: true }, // We only need the totals.
   };
