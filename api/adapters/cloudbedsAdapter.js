@@ -1163,6 +1163,79 @@ async function getDailyTakings(accessToken, propertyId, date) {
   return takingsSummary;
 }
 
+/**
+ * Fetches daily takings (payments) grouped by payment method for a specific day.
+ * @param {string} accessToken - A valid Cloudbeds access token.
+ * @param {string} propertyId - The external PMS ID of the property.
+ * @param {string} date - The date to fetch takings for in 'YYYY-MM-DD' format.
+ * @returns {Promise<Object>} - An object summarizing takings by payment method.
+ */
+async function getDailyTakings(accessToken, propertyId, date) {
+  // This is the request payload we confirmed works using the API Explorer.
+  const insightsPayload = {
+    property_ids: [propertyId],
+    dataset_id: 1, // Financial dataset
+    filters: {
+      and: [
+        {
+          cdf: { column: "service_date" },
+          operator: "equal",
+          value: `${date}T00:00:00.000Z`,
+        },
+        {
+          cdf: { column: "credit_amount" },
+          operator: "greater_than",
+          value: "0", // Value must be a string
+        },
+      ],
+    },
+    // We must request the columns we intend to group by or aggregate.
+    columns: [
+      { cdf: { column: "payment_method" } },
+      { cdf: { column: "credit_amount" }, metrics: ["sum"] },
+    ],
+    group_rows: [{ cdf: { column: "payment_method" } }],
+    settings: { details: false, totals: true }, // We only need the totals.
+  };
+
+  const apiResponse = await fetch(
+    "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-PROPERTY-ID": propertyId,
+      },
+      body: JSON.stringify(insightsPayload),
+    }
+  );
+
+  const data = await apiResponse.json();
+  if (!apiResponse.ok) {
+    console.error(`[Takings Sync] API Error:`, data);
+    throw new Error(`Takings API Error: ${apiResponse.status}`);
+  }
+
+  // Process the 'subtotals' object from the API response into a clean format.
+  const takingsSummary = {};
+  const subtotals = data.subtotals?.payment_method;
+
+  if (subtotals) {
+    for (const paymentMethod in subtotals) {
+      // Ignore empty or "-" payment methods
+      if (paymentMethod && paymentMethod !== "-") {
+        const sum = subtotals[paymentMethod]?.credit_amount?.sum || 0;
+        if (sum > 0) {
+          takingsSummary[paymentMethod] = sum;
+        }
+      }
+    }
+  }
+
+  return takingsSummary;
+}
+
 module.exports = {
   getAccessToken,
   getNeighborhoodFromCoords,

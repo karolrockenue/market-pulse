@@ -161,23 +161,30 @@ router.get("/shreeji-report", async (req, res) => {
 
     let reportData = [];
 
+    let takingsData = {}; // Initialize an empty takings object.
+
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      const roomsResponse = await cloudbedsAdapter.getRooms(
-        accessToken,
-        externalPropertyId
-      );
+      // Fetch the daily takings data in parallel with other API calls for efficiency.
+      const [takingsResult, roomsResponse, overlappingReservations] =
+        await Promise.all([
+          cloudbedsAdapter.getDailyTakings(
+            accessToken,
+            externalPropertyId,
+            date
+          ),
+          cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
+          cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
+            checkInTo: date,
+            checkOutFrom: date,
+          }),
+        ]);
+
+      // Assign the result from our new function.
+      takingsData = takingsResult;
 
       const allHotelRooms = roomsResponse[0]?.rooms || [];
-      const overlappingReservations = await cloudbedsAdapter.getReservations(
-        accessToken,
-        externalPropertyId,
-        {
-          checkInTo: date,
-          checkOutFrom: date,
-        }
-      );
 
       const inHouseReservations = overlappingReservations.filter((res) => {
         if (res.status === "canceled" || !res.startDate || !res.endDate) {
@@ -246,8 +253,8 @@ router.get("/shreeji-report", async (req, res) => {
       a.roomName.localeCompare(b.roomName, undefined, { numeric: true })
     );
 
-    // Revert to the original response that does not include takings
-    res.status(200).json({ reportData, summary });
+    // Add the new 'takingsData' to the final response object.
+    res.status(200).json({ reportData, summary, takings: takingsData });
   } catch (error) {
     console.error(
       `Error generating Shreeji Report for hotel ${hotel_id}:`,
