@@ -187,7 +187,17 @@ async function generateReport() {
     // --- POPULATE PERFORMANCE SUMMARY ---
     const summary = data.summary;
     document.getElementById("summary-vacant").textContent = summary.vacant;
-    document.getElementById("summary-blocked").textContent = summary.blocked;
+    // NEW: Add conditional styling for the 'Blocked' summary value.
+    const blockedSpan = document.getElementById("summary-blocked");
+    blockedSpan.textContent = summary.blocked;
+    if (summary.blocked > 0) {
+      // If the count is greater than zero, make the text red.
+      blockedSpan.classList.add("text-red-600");
+    } else {
+      // Otherwise, ensure the text is the default color by removing the class.
+      blockedSpan.classList.remove("text-red-600");
+    }
+    g;
     document.getElementById("summary-sold").textContent = summary.sold;
     document.getElementById("summary-occupancy").textContent =
       typeof summary.occupancy === "number"
