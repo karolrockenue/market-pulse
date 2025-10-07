@@ -1076,11 +1076,10 @@ async function getReservationsWithDetails(
  * @returns {Promise<Object>} - An object summarizing takings by payment method.
  */
 async function getDailyTakings(accessToken, propertyId, date) {
-  // NEW APPROACH: Request a simple list of transactions, not a summary.
-  // This is a much simpler request that is less likely to fail.
+  // This is the final payload, matching the structure of the successful API Explorer call.
   const insightsPayload = {
     property_ids: [propertyId],
-    dataset_id: 1, // Financial dataset
+    dataset_id: 1,
     filters: {
       and: [
         {
@@ -1095,16 +1094,16 @@ async function getDailyTakings(accessToken, propertyId, date) {
         },
       ],
     },
-    // Request the two columns we need for each transaction. No aggregation.
-    columns: [
-      { cdf: { column: "payment_method" } },
-      { cdf: { column: "credit_amount" } },
-    ],
-    settings: { details: true, totals: false }, // We only want the detailed list.
+    // The 'columns' array should ONLY contain the metric being summed.
+    columns: [{ cdf: { column: "credit_amount" }, metrics: ["sum"] }],
+    // The 'group_rows' array defines what we group by.
+    group_rows: [{ cdf: { column: "payment_method" } }],
+    // Requesting both details and totals matches the API Explorer's behavior.
+    settings: { details: true, totals: true },
   };
 
   console.log(
-    "[DEBUG] Sending new (simpler) Takings Payload:",
+    "[DEBUG] Sending Final Corrected Payload:",
     JSON.stringify(insightsPayload, null, 2)
   );
 
@@ -1127,19 +1126,17 @@ async function getDailyTakings(accessToken, propertyId, date) {
     throw new Error(`Takings API Error: ${apiResponse.status}`);
   }
 
-  // NEW PROCESSING LOGIC: We will manually sum the results ourselves.
+  // Process the 'subtotals' object from the successful API response.
   const takingsSummary = {};
-  if (data.index && data.records) {
-    for (let i = 0; i < data.index.length; i++) {
-      // The payment method is the first item in the index array for each record.
-      const paymentMethod = data.index[i][0] || "Unknown";
-      // The credit amount is in the records object.
-      const amount = parseFloat(data.records.credit_amount?.[i]) || 0;
+  const subtotals = data.subtotals?.payment_method;
 
-      if (amount > 0 && paymentMethod !== "-") {
-        // If we've seen this payment method before, add to it. Otherwise, initialize it.
-        takingsSummary[paymentMethod] =
-          (takingsSummary[paymentMethod] || 0) + amount;
+  if (subtotals) {
+    for (const paymentMethod in subtotals) {
+      if (paymentMethod && paymentMethod !== "-") {
+        const sum = subtotals[paymentMethod]?.credit_amount?.sum || 0;
+        if (sum > 0) {
+          takingsSummary[paymentMethod] = sum;
+        }
       }
     }
   }
