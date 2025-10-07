@@ -186,6 +186,14 @@ router.get("/shreeji-report", async (req, res) => {
         cloudbedsAdapter.getRoomBlocks(accessToken, externalPropertyId, date),
       ]);
 
+      // --- START DIAGNOSTIC LOGS ---
+      // Add detailed logging to inspect the raw data structures from the Cloudbeds adapter.
+      console.log("--- [DIAGNOSTIC] Content of getRooms response ---");
+      console.log(JSON.stringify(roomsResponse, null, 2));
+      console.log("--- [DIAGNOSTIC] Content of getRoomBlocks response ---");
+      console.log(JSON.stringify(roomBlocksResult, null, 2));
+      // --- END DIAGNOSTIC LOGS ---
+
       // --- RESTORED: Original, Correct Block Processing Logic ---
 
       // --- FINAL DIAGNOSTIC LOGS ---
