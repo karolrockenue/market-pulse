@@ -183,16 +183,50 @@ router.get("/shreeji-report", async (req, res) => {
         cloudbedsAdapter.getRoomBlocks(accessToken, externalPropertyId, date),
       ]);
 
-      // --- TEST POINT ---
-      // Log the raw room block data to the server console to inspect its structure.
-      console.log("--- Room Blocks Data ---");
-      console.log(JSON.stringify(roomBlocksResult, null, 2));
-      // --- END TEST POINT ---
+      // --- START: Process Room Block Data ---
+
+      // Create a lookup map for roomID to roomName for easy reference.
+      // The `roomsResponse` is a flat array of all room objects for the property.
+      const roomMap = new Map();
+      for (const room of roomsResponse) {
+        roomMap.set(room.roomID, room.roomName);
+      }
+
+      // Initialize variables to store the processed block information.
+      const blockedRoomNames = [];
+      let blockedRoomsCount = 0;
+
+      // Check if the API response contains valid room block data.
+      if (
+        roomBlocksResult &&
+        roomBlocksResult.data &&
+        roomBlocksResult.data.roomBlocks
+      ) {
+        // Iterate over each block returned by the API.
+        for (const block of roomBlocksResult.data.roomBlocks) {
+          // A single block can apply to multiple rooms, so iterate through them.
+          for (const room of block.rooms) {
+            // Find the user-friendly room name using our map.
+            const roomName = roomMap.get(room.roomID);
+            if (roomName) {
+              blockedRoomNames.push(roomName);
+            }
+          }
+        }
+      }
+
+      // The total count is the number of individual rooms found in all blocks.
+      blockedRoomsCount = blockedRoomNames.length;
+
+      // Update the 'blocked' value in the summary object with our new count.
+      summary.blocked = blockedRoomsCount;
+
+      // --- END: Process Room Block Data ---
 
       // Assign the result from our new function.
       takingsData = takingsResult;
 
-      const allHotelRooms = roomsResponse[0]?.rooms || [];
+      const allHotelRooms = roomsResponse || [];
 
       const inHouseReservations = overlappingReservations.filter((res) => {
         if (res.status === "canceled" || !res.startDate || !res.endDate) {
@@ -261,8 +295,19 @@ router.get("/shreeji-report", async (req, res) => {
       a.roomName.localeCompare(b.roomName, undefined, { numeric: true })
     );
 
-    // Add the new 'takingsData' to the final response object.
-    res.status(200).json({ reportData, summary, takings: takingsData });
+    // Prepare the final response object, now including the processed block data.
+    res.status(200).json({
+      reportData,
+      summary,
+      takings: takingsData,
+      // Add the new 'blocks' object containing the count and a sorted list of names.
+      blocks: {
+        count: blockedRoomsCount,
+        names: blockedRoomNames.sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true })
+        ),
+      },
+    });
   } catch (error) {
     console.error(
       `Error generating Shreeji Report for hotel ${hotel_id}:`,
