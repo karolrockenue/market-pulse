@@ -213,33 +213,42 @@ async function generateReport() {
       summary.revenue
     );
 
-    // --- NEW: POPULATE TAKINGS SUMMARY ---
+    // --- POPULATE TAKINGS SUMMARY (NEW FORMAT) ---
     const takings = data.takings;
     takingsContainer.innerHTML = ""; // Clear the loading message.
 
     if (takings && Object.keys(takings).length > 0) {
-      // Create a grid to display the takings.
-      const grid = document.createElement("div");
-      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+      // First, calculate the total sum of all takings.
+      const totalTakings = Object.values(takings).reduce(
+        (sum, amount) => sum + amount,
+        0
+      );
 
-      // Loop through the takings object (e.g., { "Cash": 500, "Credit Card": 1250 }).
+      // Create and append the "Taken Total" line. This line is styled to be more prominent.
+      const totalDiv = document.createElement("div");
+      totalDiv.className =
+        "flex justify-between font-semibold text-xs text-gray-800 pb-2 mb-2 border-b border-gray-200";
+      totalDiv.innerHTML = `
+        <span>Taken Total:</span>
+        <span>${formatCurrency(totalTakings)}</span>
+      `;
+      takingsContainer.appendChild(totalDiv);
+
+      // Now, create and append a line for each individual payment method.
       for (const method in takings) {
         const amount = takings[method];
-        const item = document.createElement("div");
-        item.className = "bg-gray-50 p-3 rounded-md";
-        // Create the content for each payment method.
-        item.innerHTML = `
-          <dt class="text-sm font-medium text-gray-500 truncate">${method}</dt>
-          <dd class="mt-1 text-xl font-semibold text-gray-900">${formatCurrency(
-            amount
-          )}</dd>
+        const itemDiv = document.createElement("div");
+        // These lines are styled to match the simple text format of the main table cells.
+        itemDiv.className = "flex justify-between text-xs text-gray-500";
+        itemDiv.innerHTML = `
+          <span>${method}:</span>
+          <span>${formatCurrency(amount)}</span>
         `;
-        grid.appendChild(item);
+        takingsContainer.appendChild(itemDiv);
       }
-      takingsContainer.appendChild(grid);
     } else {
-      // Show a message if no takings data was found.
-      takingsContainer.innerHTML = `<p class="text-sm text-gray-500">No takings data found for this day.</p>`;
+      // If no takings are found, display a message with the matching text style.
+      takingsContainer.innerHTML = `<p class="text-xs text-gray-500">No takings data found for this day.</p>`;
     }
   } catch (error) {
     console.error("Error generating report:", error);
