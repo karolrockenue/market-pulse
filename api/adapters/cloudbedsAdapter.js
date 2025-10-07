@@ -1172,7 +1172,10 @@ async function getRoomBlocks(accessToken, propertyId, date) {
   while (hasMore) {
     // Construct the URL with parameters for propertyID, date range, and pagination.
     // We set both startDate and endDate to the same day to find blocks active on that specific date.
-    const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${propertyId}&startDate=${date}&endDate=${date}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    // CORRECTED: Use a full ISO 8601 timestamp with a time component.
+    // This creates a precise 24-hour window for the query, which is more robust
+    // than sending only the date. We'll use the UTC timezone identifier 'Z'.
+    const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${propertyId}&startDate=${date}T00:00:00Z&endDate=${date}T23:59:59Z&pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
     const response = await fetch(url, {
       headers: {
