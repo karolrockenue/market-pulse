@@ -1123,6 +1123,12 @@ async function getDailyTakings(accessToken, propertyId, date) {
   );
 
   const data = await apiResponse.json();
+
+  // --- ADDED FOR DEBUGGING ---
+  // Log the entire successful response from the Cloudbeds API.
+  console.log("[DEBUG] Raw Takings Response:", JSON.stringify(data, null, 2));
+  // --- END DEBUGGING ---
+
   if (!apiResponse.ok) {
     console.error(`[Takings Sync] API Error:`, data);
     throw new Error(`Takings API Error: ${apiResponse.status}`);
