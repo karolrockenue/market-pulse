@@ -189,6 +189,11 @@ router.get("/shreeji-report", async (req, res) => {
       takingsData = takingsResult;
       const allHotelRooms = roomsResponse[0]?.rooms || [];
 
+      // --- DEBUG: Log the raw room data to inspect the 'roomBlocked' flag ---
+      console.log("--- Raw Rooms Response Data ---");
+      console.log(JSON.stringify(allHotelRooms, null, 2));
+      // --- END DEBUG ---
+
       // --- NEW: Simplified Block Processing ---
       // Since the getRooms response includes a 'roomBlocked' flag, we can filter the list directly.
       const blockedRooms = allHotelRooms.filter(
