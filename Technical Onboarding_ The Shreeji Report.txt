@@ -1,0 +1,42 @@
+﻿Technical Onboarding: The Shreeji Report
+Last Updated: October 7, 2025
+This document provides a complete technical overview of the Shreeji Report, located in the secure /rockenue/ section of the Market Pulse application. It is intended to bring any AI assistant or developer up to speed on the purpose, architecture, and data flow of this feature.
+1.0 Feature Overview
+The Shreeji Report is a specialized, internal financial tool designed exclusively for super_admin users. Its primary purpose is to provide a comprehensive, multi-faceted snapshot of a single property's performance for a specific day.
+The report is composed of three distinct data components, presented together on one page:
+1. In-House Guest List: A detailed, room-by-room list of all guests who were physically staying at the property on the night of the selected date.
+2. Daily Performance Summary: A high-level overview of key performance indicators (KPIs) for the day, such as Occupancy, ADR, and RevPAR.
+3. Daily Takings Summary: A financial breakdown of all payments received on that day, grouped by payment method (e.g., Cash, Credit Card, Bank Transfer).
+2.0 Data Flow and Architecture
+The report operates on a standard request-response model, but it aggregates data from three different sources on the backend. Understanding this flow is critical.
+1. Frontend Request (shreeji-report.mjs):
+   * A super_admin selects a hotel and a date from the UI.
+   * Clicking "Generate Report" triggers the generateReport function.
+   * This function makes a single GET request to the backend endpoint: /api/rockenue/shreeji-report.
+2. Backend Aggregation (rockenue.router.js):
+   * The /shreeji-report endpoint receives the hotel_id and date.
+   * It then executes three data-fetching operations in parallel:
+      * Performance Summary: It performs a direct SQL query against the local PostgreSQL database, specifically the daily_metrics_snapshots table. This is the fastest and most efficient source for pre-calculated KPIs.
+      * Guest & Takings Data: It calls two separate asynchronous functions within the cloudbedsAdapter.js module to fetch live data from the Cloudbeds API for the selected property.
+3. Adapter Logic (cloudbedsAdapter.js):
+   * Guest List: To build the list of in-house guests, the router calls several functions (getRooms, getReservations, getReservationsWithDetails) that hit various Cloudbeds API endpoints to get a complete picture of room occupancy.
+   * Takings Summary: The router calls the getDailyTakings function, which is the most complex part of the process (see Deep Dive below).
+4. Backend Response (rockenue.router.js):
+   * The router waits for all three data sources to return.
+   * It then combines the results into a single JSON object with three top-level keys: { reportData, summary, takings }.
+   * This JSON object is sent as the response to the frontend.
+5. Frontend Rendering (shreeji-report.mjs & .html):
+   * The generateReport function receives the JSON object.
+   * It parses the data and dynamically populates the three distinct sections of the HTML page, updating the main table, the performance summary section, and the new takings summary section.
+3.0 Technical Deep Dive: The getDailyTakings Function
+The most intricate part of this feature is the getDailyTakings function within /api/adapters/cloudbedsAdapter.js. It was subject to extensive debugging due to the specific requirements of the Cloudbeds Insights API.
+Purpose: To fetch and summarize all payments (credits) for a given property on a specific day, grouped by payment method.
+Key Implementation Details:
+* API Used: Cloudbeds Insights API, Dataset ID 1 ("Financial").
+* Approach: The function uses the "simplified list" approach. Instead of asking the Cloudbeds API to perform the aggregation, it requests a raw, detailed list of all individual payment transactions for the specified day. This proved to be more reliable than using the API's built-in grouping and summing features.
+* Filtering: The API request is filtered to only include records where:
+   1. The service_date falls within the 24-hour range of the selected date (using greater_than_or_equal and less_than_or_equal operators).
+   2. The credit_amount is greater_than "0".
+* Data Processing: After receiving the raw list of transactions, the function iterates through them and manually calculates the sum for each payment method, storing the results in a simple JavaScript object (takingsSummary). This local processing provides greater control and avoids the complexities that were causing API errors.
+* Data Structure Parsing: It correctly parses the API response by looking for payment method names in data.records.payment_method[i] and the corresponding amounts in data.records.credit_amount[i].
+This function is now stable and correctly returns the required data for the report.

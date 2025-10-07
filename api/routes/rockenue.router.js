@@ -166,20 +166,28 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // Fetch the daily takings data in parallel with other API calls for efficiency.
-      const [takingsResult, roomsResponse, overlappingReservations] =
-        await Promise.all([
-          cloudbedsAdapter.getDailyTakings(
-            accessToken,
-            externalPropertyId,
-            date
-          ),
-          cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
-          cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
-            checkInTo: date,
-            checkOutFrom: date,
-          }),
-        ]);
+      // Fetch the daily takings, rooms, reservations, and room blocks in parallel for efficiency.
+      const [
+        takingsResult,
+        roomsResponse,
+        overlappingReservations,
+        roomBlocksResult, // Add a variable to hold the result of our new function call.
+      ] = await Promise.all([
+        cloudbedsAdapter.getDailyTakings(accessToken, externalPropertyId, date),
+        cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
+        cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
+          checkInTo: date,
+          checkOutFrom: date,
+        }),
+        // NEW: Call the getRoomBlocks function to fetch block data for the selected date.
+        cloudbedsAdapter.getRoomBlocks(accessToken, externalPropertyId, date),
+      ]);
+
+      // --- TEST POINT ---
+      // Log the raw room block data to the server console to inspect its structure.
+      console.log("--- Room Blocks Data ---");
+      console.log(JSON.stringify(roomBlocksResult, null, 2));
+      // --- END TEST POINT ---
 
       // Assign the result from our new function.
       takingsData = takingsResult;
