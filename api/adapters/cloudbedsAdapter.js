@@ -1076,7 +1076,8 @@ async function getReservationsWithDetails(
  * @returns {Promise<Object>} - An object summarizing takings by payment method.
  */
 async function getDailyTakings(accessToken, propertyId, date) {
-  // This is the request payload we confirmed works using the API Explorer.
+  // NEW APPROACH: Request a simple list of transactions, not a summary.
+  // This is a much simpler request that is less likely to fail.
   const insightsPayload = {
     property_ids: [propertyId],
     dataset_id: 1, // Financial dataset
@@ -1090,32 +1091,22 @@ async function getDailyTakings(accessToken, propertyId, date) {
         {
           cdf: { column: "credit_amount" },
           operator: "greater_than",
-          value: "0", // Value must be a string
+          value: "0",
         },
       ],
     },
-    // We must request the columns we intend to group by or aggregate.
-    // We only need to request the metric we want to aggregate.
-    // The grouping column is defined in the 'group_rows' property below.
-    // THE FIX: We must explicitly select both the metric we are summing (credit_amount)
-    // and the column we are grouping by (payment_method).
+    // Request the two columns we need for each transaction. No aggregation.
     columns: [
       { cdf: { column: "payment_method" } },
-      { cdf: { column: "credit_amount" }, metrics: ["sum"] },
+      { cdf: { column: "credit_amount" } },
     ],
-    group_rows: [{ cdf: { column: "payment_method" } }],
-    // THE FIX: Request both details and totals. This matches the behavior of the successful API Explorer test
-    // and may be required by the API when grouping by a non-date dimension.
-    settings: { details: true, totals: true },
+    settings: { details: true, totals: false }, // We only want the detailed list.
   };
 
-  // --- ADDED FOR DEBUGGING ---
-  // This will log the exact JSON payload being sent to the Cloudbeds API.
   console.log(
-    "[DEBUG] Sending Takings Payload:",
+    "[DEBUG] Sending new (simpler) Takings Payload:",
     JSON.stringify(insightsPayload, null, 2)
   );
-  // --- END DEBUGGING ---
 
   const apiResponse = await fetch(
     "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
@@ -1136,18 +1127,19 @@ async function getDailyTakings(accessToken, propertyId, date) {
     throw new Error(`Takings API Error: ${apiResponse.status}`);
   }
 
-  // Process the 'subtotals' object from the API response into a clean format.
+  // NEW PROCESSING LOGIC: We will manually sum the results ourselves.
   const takingsSummary = {};
-  const subtotals = data.subtotals?.payment_method;
+  if (data.index && data.records) {
+    for (let i = 0; i < data.index.length; i++) {
+      // The payment method is the first item in the index array for each record.
+      const paymentMethod = data.index[i][0] || "Unknown";
+      // The credit amount is in the records object.
+      const amount = parseFloat(data.records.credit_amount?.[i]) || 0;
 
-  if (subtotals) {
-    for (const paymentMethod in subtotals) {
-      // Ignore empty or "-" payment methods
-      if (paymentMethod && paymentMethod !== "-") {
-        const sum = subtotals[paymentMethod]?.credit_amount?.sum || 0;
-        if (sum > 0) {
-          takingsSummary[paymentMethod] = sum;
-        }
+      if (amount > 0 && paymentMethod !== "-") {
+        // If we've seen this payment method before, add to it. Otherwise, initialize it.
+        takingsSummary[paymentMethod] =
+          (takingsSummary[paymentMethod] || 0) + amount;
       }
     }
   }
