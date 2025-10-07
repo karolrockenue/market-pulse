@@ -189,13 +189,10 @@ router.get("/shreeji-report", async (req, res) => {
       // --- START: Process Room Block Data ---
       // --- START: Process Room Block Data ---
 
-      // --- FINAL DEBUG STEP: Let's see the exact content of roomsResponse ---
-      console.log("--- FINAL CHECK: roomsResponse Content ---");
-      console.log(JSON.stringify(roomsResponse, null, 2));
-      // --- END DEBUG STEP ---
-
       const roomMap = new Map();
-      for (const room of roomsResponse) {
+      // CORRECTED: The original developer was right. We need to loop over the inner `rooms` array.
+      const allRoomsForMap = roomsResponse[0]?.rooms || [];
+      for (const room of allRoomsForMap) {
         roomMap.set(room.roomID, room.roomName);
       }
 
@@ -221,8 +218,7 @@ router.get("/shreeji-report", async (req, res) => {
 
       // Assign the result from our new function.
       takingsData = takingsResult;
-
-      const allHotelRooms = roomsResponse || [];
+      const allHotelRooms = roomsResponse[0]?.rooms || [];
 
       const inHouseReservations = overlappingReservations.filter((res) => {
         if (res.status === "canceled" || !res.startDate || !res.endDate) {
