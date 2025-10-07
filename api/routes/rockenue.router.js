@@ -170,37 +170,55 @@ router.get("/shreeji-report", async (req, res) => {
     if (pms_type === "cloudbeds") {
       const accessToken = await getCloudbedsAccessToken(hotel_id);
 
-      // REFACTORED: Remove the unnecessary getRoomBlocks call.
-      const [takingsResult, roomsResponse, overlappingReservations] =
-        await Promise.all([
-          cloudbedsAdapter.getDailyTakings(
-            accessToken,
-            externalPropertyId,
-            date
-          ),
-          cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
-          cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
-            checkInTo: date,
-            checkOutFrom: date,
-          }),
-        ]);
+      // Fetch the daily takings, rooms, reservations, and room blocks in parallel for efficiency.
+      const [
+        takingsResult,
+        roomsResponse,
+        overlappingReservations,
+        roomBlocksResult,
+      ] = await Promise.all([
+        cloudbedsAdapter.getDailyTakings(accessToken, externalPropertyId, date),
+        cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
+        cloudbedsAdapter.getReservations(accessToken, externalPropertyId, {
+          checkInTo: date,
+          checkOutFrom: date,
+        }),
+        cloudbedsAdapter.getRoomBlocks(accessToken, externalPropertyId, date),
+      ]);
 
-      // Assign takings data and get the correct inner array of rooms.
+      // --- START: Process Room Block Data ---
+      // --- START: Process Room Block Data ---
+
+      const roomMap = new Map();
+      // CORRECTED: The original developer was right. We need to loop over the inner `rooms` array.
+      const allRoomsForMap = roomsResponse[0]?.rooms || [];
+      for (const room of allRoomsForMap) {
+        roomMap.set(room.roomID, room.roomName);
+      }
+
+      // Note: We are now re-assigning the variables, not re-declaring them.
+      if (
+        roomBlocksResult &&
+        roomBlocksResult.data &&
+        roomBlocksResult.data.roomBlocks
+      ) {
+        for (const block of roomBlocksResult.data.roomBlocks) {
+          for (const room of block.rooms) {
+            const roomName = roomMap.get(room.roomID);
+            if (roomName) {
+              blockedRoomNames.push(roomName);
+            }
+          }
+        }
+      }
+
+      blockedRoomsCount = blockedRoomNames.length;
+      summary.blocked = blockedRoomsCount;
+      // --- END: Process Room Block Data ---
+
+      // Assign the result from our new function.
       takingsData = takingsResult;
       const allHotelRooms = roomsResponse[0]?.rooms || [];
-
-      // --- NEW: Simplified Block Processing ---
-      // Since the getRooms response includes a 'roomBlocked' flag, we can filter the list directly.
-      const blockedRooms = allHotelRooms.filter(
-        (room) => room.roomBlocked === true
-      );
-
-      // Get the count and names from the filtered list.
-      blockedRoomsCount = blockedRooms.length;
-      blockedRoomNames = blockedRooms.map((room) => room.roomName);
-
-      // Update the summary object.
-      summary.blocked = blockedRoomsCount;
 
       const inHouseReservations = overlappingReservations.filter((res) => {
         if (res.status === "canceled" || !res.startDate || !res.endDate) {
