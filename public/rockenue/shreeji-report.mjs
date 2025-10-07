@@ -164,21 +164,21 @@ async function generateReport() {
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
             row.guestName
           }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${formatCurrency(
+            row.grandTotal
+          )}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
             row.checkInDate
           }</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
             row.checkOutDate
           }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
-            row.source
-          }</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${formatCurrency(
-            row.grandTotal
-          )}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-semibold">${formatCurrency(
             row.balance
           )}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+            row.source
+          }</td>
         `;
         tableBody.appendChild(tr);
       });
