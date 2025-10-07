@@ -71,11 +71,19 @@
 
           <!-- Report Results Table -->
           <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Results</h2>
+            <div class="flex justify-between items-center mb-4">
+              <h2 id="report-title" class="text-xl font-semibold text-gray-800">
+                Results
+              </h2>
+              <span
+                id="report-date-display"
+                class="text-sm font-medium text-gray-600"
+              ></span>
+            </div>
             <div class="overflow-x-auto" id="report-results-table">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
-                  <tr>
+                  <tr class="divide-x divide-gray-200">
                     <th
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -117,13 +125,13 @@
                       scope="col"
                       class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      Grand Total
+                      Total Rate
                     </th>
                     <th
                       scope="col"
                       class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      Balance
+                      Outstanding
                     </th>
                   </tr>
                 </thead>

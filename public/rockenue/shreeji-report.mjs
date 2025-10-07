@@ -110,6 +110,23 @@ async function generateReport() {
   takingsContainer.innerHTML = `<p class="text-sm text-gray-500">Loading takings data...</p>`;
 
   try {
+    // NEW: Get the selected hotel's name and format the date for the new heading.
+    const hotelName = hotelSelect.options[hotelSelect.selectedIndex].text;
+    const date = new Date(datePicker.value + "T00:00:00"); // Use T00:00:00 to prevent timezone shifts.
+    const dayOfWeek = date
+      .toLocaleDateString("en-GB", { weekday: "long" })
+      .toUpperCase();
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    const formattedDate = `${dayOfWeek} ${day}-${month}-${year}`;
+
+    // NEW: Update the heading content.
+    document.getElementById(
+      "report-title"
+    ).textContent = `${hotelName} - DAILY CHART`;
+    document.getElementById("report-date-display").textContent = formattedDate;
+
     const response = await fetch(
       `/api/rockenue/shreeji-report?hotel_id=${hotelSelect.value}&date=${datePicker.value}`
     );
@@ -135,6 +152,8 @@ async function generateReport() {
     } else {
       reportData.forEach((row) => {
         const tr = document.createElement("tr");
+        // NEW: Added the 'divide-x' class to create vertical lines between cells.
+        tr.className = "divide-x divide-gray-200";
         tr.innerHTML = `
           <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${
             row.roomName
