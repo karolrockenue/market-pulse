@@ -177,7 +177,6 @@ router.get("/shreeji-report", async (req, res) => {
         roomsResponse,
         overlappingReservations,
         roomBlocksResult,
-        upsellsResult, // Variable to hold the result of the new function.
       ] = await Promise.all([
         cloudbedsAdapter.getDailyTakings(accessToken, externalPropertyId, date),
         cloudbedsAdapter.getRooms(accessToken, externalPropertyId),
@@ -186,8 +185,6 @@ router.get("/shreeji-report", async (req, res) => {
           checkOutFrom: date,
         }),
         cloudbedsAdapter.getRoomBlocks(accessToken, externalPropertyId, date),
-        // Call the new function to fetch upsell data.
-        cloudbedsAdapter.getDailyUpsells(accessToken, externalPropertyId, date),
       ]);
 
       // --- START DIAGNOSTIC LOGS ---
@@ -333,8 +330,7 @@ router.get("/shreeji-report", async (req, res) => {
       reportData,
       summary,
       takings: takingsData,
-      // NEW: Add the upsells data to the final JSON response.
-      upsells: upsellsResult, // The data from our new adapter function.
+      // Add the new 'blocks' object containing the count and a sorted list of names.
       blocks: {
         count: blockedRoomsCount,
         names: blockedRoomNames.sort((a, b) =>
