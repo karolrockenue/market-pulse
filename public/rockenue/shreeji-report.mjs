@@ -97,7 +97,7 @@ async function generateReport() {
 
   generateBtn.disabled = true;
   generateBtn.textContent = "Generating...";
-  tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading report data...</td></tr>`;
 
   // Clear previous summary and takings data while loading.
   document.getElementById("summary-vacant").textContent = "--";
@@ -131,7 +131,7 @@ async function generateReport() {
     const reportData = data.reportData;
     tableBody.innerHTML = "";
     if (reportData.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">No in-house guests found for the selected date.</td></tr>`;
     } else {
       reportData.forEach((row) => {
         const tr = document.createElement("tr");
@@ -141,6 +141,9 @@ async function generateReport() {
           }</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
             row.guestName
+          }</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
+            row.pax
           }</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${
             row.checkInDate
@@ -211,7 +214,7 @@ async function generateReport() {
     }
   } catch (error) {
     console.error("Error generating report:", error);
-    tableBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
     // Also show an error in the takings container.
     takingsContainer.innerHTML = `<p class="text-sm text-red-500">Error: ${error.message}</p>`;
   } finally {

@@ -269,8 +269,18 @@ router.get("/shreeji-report", async (req, res) => {
         for (const res of detailedReservations) {
           if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
             const roomName = res.rooms[0].roomName;
+
+            // NEW: Calculate the 'Pax' string from the reservation data.
+            const adults = parseInt(res.adults, 10) || 0;
+            const children = parseInt(res.children, 10) || 0;
+            let paxString = `${adults}`;
+            if (children > 0) {
+              paxString += `+${children}`;
+            }
+
             occupiedRoomsData.set(roomName, {
               guestName: res.guestName || "N/A",
+              pax: paxString, // Add the new pax string to the data object.
               balance: res.balance || 0,
               source: res.sourceName || "N/A",
               checkInDate: res.reservationCheckIn,
@@ -292,6 +302,7 @@ router.get("/shreeji-report", async (req, res) => {
           return {
             roomName: room.roomName,
             guestName: "---",
+            pax: "---", // Add a placeholder for unoccupied rooms.
             balance: 0,
             source: "---",
             checkInDate: "---",
