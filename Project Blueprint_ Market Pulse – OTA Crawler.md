@@ -103,3 +103,14 @@ A new table will be added to the existing PostgreSQL database to store the colle
 - **Isolation:** The scraper service will be kept logically isolated, with all logs scrubbed of sensitive information.
 
 #### **CHANGELOG**
+
+v1.1 - 2025-10-08: POC Scraper Development
+Initial Scraper Built: Developed the core Node.js script (api/ota-crawler.js) using Playwright for the Booking.com POC.
+
+Database Schema Created: Successfully created the market_availability_snapshots table in the PostgreSQL database.
+
+Data Extraction Achieved: The script can now reliably extract the primary data point: "Total number of properties available."
+
+Anti-Bot Bypassed: Implemented robust anti-scraping countermeasures, including logic to handle cookie consent banners and the use of a custom User-Agent and viewport to disguise the headless browser.
+
+Dynamic & Verifiable: The script was enhanced to use dynamic dates, allowing for direct, real-time verification of the scraper's accuracy.

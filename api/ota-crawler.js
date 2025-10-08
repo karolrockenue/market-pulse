@@ -1,46 +1,94 @@
 // Import the chromium browser type from the Playwright library.
-// We specify chromium directly to ensure we use a consistent browser engine.
 const { chromium } = require("playwright");
+// Import the PostgreSQL connection pool from our shared db utility file.
+const pgPool = require("./utils/db.js");
 
 // The main function that will contain our scraping logic.
-// It's an async function because browser operations are asynchronous.
 async function scrapeBookingLondon() {
-  // Launch a new browser instance. 'headless: true' is the default,
-  // meaning it runs without a visible UI. Set to false for debugging.
   const browser = await chromium.launch();
-
-  // Log to the console that the browser has been launched.
   console.log("Browser launched...");
 
   try {
-    // Create a new page (like a new tab) within the browser.
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+      viewport: { width: 1920, height: 1080 },
+    });
+    const page = await context.newPage();
 
-    // Define the target URL for a hardcoded search: London, for 2 adults, 30 days from now.
-    // We use a static future date for this proof of concept.
-    const targetUrl =
-      "https://www.booking.com/searchresults.html?ss=London&checkin=2025-11-07&checkout=2025-11-08&group_adults=2&lang=en-us";
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
 
-    // Instruct the page to navigate to the URL.
-    // 'waitUntil: "domcontentloaded"' waits until the initial HTML is loaded, which is often faster
-    // than waiting for all images and resources ('load').
+    const today = new Date();
+    const checkinDate = formatDate(today);
+    // Note: The checkout date is not needed for the DB insert, only for the URL.
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const checkoutDate = formatDate(tomorrow);
+
+    const targetUrl = `https://www.booking.com/searchresults.html?ss=London&checkin=${checkinDate}&checkout=${checkoutDate}&group_adults=2&lang=en-us`;
+
     console.log(`Navigating to ${targetUrl}...`);
-    await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+    await page.goto(targetUrl, { waitUntil: "networkidle" });
+    console.log("Page loaded and network is idle.");
 
-    // Log a success message once the page has loaded.
-    console.log("Page loaded successfully.");
+    try {
+      const cookieButtonLocator = page.locator(
+        "button#onetrust-accept-btn-handler"
+      );
+      await cookieButtonLocator.click({ timeout: 5000 });
+      console.log("Cookie consent button clicked.");
+      await page.waitForLoadState("networkidle");
+      console.log("Network is idle after click.");
+    } catch (error) {
+      console.log("Cookie consent button not found, continuing...");
+    }
 
-    // --- DATA EXTRACTION LOGIC WILL GO HERE IN A FUTURE STEP ---
+    const resultsHeaderLocator = page.locator('h1[aria-live="assertive"]');
+    const headerText = await resultsHeaderLocator.textContent();
+    const numberMatch = headerText.match(/\d{1,3}(,\d{3})*/);
+
+    if (numberMatch && numberMatch[0]) {
+      const totalResults = parseInt(numberMatch[0].replace(/,/g, ""), 10);
+      console.log(`Total properties found: ${totalResults}`);
+
+      // --- NEW: DATABASE INSERT LOGIC ---
+
+      // Define the SQL query to insert our data. We use parameterized queries ($1, $2, etc.)
+      // to prevent SQL injection vulnerabilities.
+      // 'RETURNING id' will give us back the UUID of the row we just created.
+      const insertQuery = `
+        INSERT INTO market_availability_snapshots(provider, city_slug, checkin_date, total_results)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id;
+      `;
+
+      // The values to be inserted, corresponding to the parameters in the query.
+      const values = ["booking", "london", checkinDate, totalResults];
+
+      // Execute the query using the connection pool.
+      const result = await pgPool.query(insertQuery, values);
+
+      // Log a success message including the new row's ID.
+      console.log(
+        `✅ Successfully saved snapshot to DB with ID: ${result.rows[0].id}`
+      );
+    } else {
+      console.log("Could not find the total number of properties.");
+    }
   } catch (error) {
-    // If any error occurs during the process, log it to the console.
     console.error("An error occurred during scraping:", error);
   } finally {
-    // This block will always execute, whether the try block succeeded or failed.
-    // It's crucial for ensuring the browser is always closed to prevent lingering processes.
     await browser.close();
     console.log("Browser closed.");
+    // It's good practice to end the pool when the script is done.
+    await pgPool.end();
+    console.log("Database pool closed.");
   }
 }
 
-// Execute the main scraping function.
 scrapeBookingLondon();
