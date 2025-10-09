@@ -1,26 +1,22 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
+    { "src": "api/initial-sync.js", "use": "@vercel/node" },
+    { "src": "api/send-scheduled-reports.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/daily-refresh", "dest": "/api/daily-refresh.js" },
+    { "src": "/api/initial-sync", "dest": "/api/initial-sync.js" },
+    {
+      "src": "/api/send-scheduled-reports",
+      "dest": "/api/send-scheduled-reports.js"
     },
-    "api/ota-crawler.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 800
-    }
-  },
+    { "src": "/(.*)", "dest": "server.js" }
+  ],
   "crons": [
-    {
-      "path": "/api/daily-refresh",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/send-scheduled-reports",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/ota-crawler",
-      "schedule": "0 5 * * *"
-    }
+    { "path": "/api/daily-refresh", "schedule": "0 4 * * *" },
+    { "path": "/api/send-scheduled-reports", "schedule": "0 * * * *" }
   ]
 }
