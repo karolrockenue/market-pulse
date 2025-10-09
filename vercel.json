@@ -17,13 +17,14 @@
       "src": "/api/daily-refresh",
       "dest": "/api/daily-refresh.js"
     },
-    {
-      "src": "/api/initial-sync",
-      "dest": "/api/initial-sync.js"
-    },
+
     {
       "src": "/api/send-scheduled-reports",
       "dest": "/api/send-scheduled-reports.js"
+    },
+    {
+      "src": "/api/initial-sync",
+      "dest": "/api/initial-sync.js"
     },
     {
       "src": "/api/ota-crawler",
