@@ -269,26 +269,37 @@ function delay(ms) {
  * The main orchestration function.
  */
 async function main() {
-  // --- START: ADVANCED DEBUG LOGS ---
-  // We are adding this block to inspect the Vercel runtime environment itself,
-  // to understand why the Chromium browser is failing to launch.
-  console.log("--- Vercel Environment Debug Info ---");
+  let browser;
+  let execPath; // This will store the path to the executable after we unpack it.
+
+  // --- START: FORCED UNPACK & ADVANCED DEBUG LOGS ---
+  try {
+    // Step 1: Force the browser files to be unpacked into /tmp.
+    console.log("Forcing browser unpack before launch...");
+    execPath = await chromium.executablePath();
+    console.log(`Chromium executable should now be at: ${execPath}`);
+  } catch (unpackError) {
+    console.error("CRITICAL: Failed to unpack the browser.", unpackError);
+    // If this fails, there's no point continuing.
+    return;
+  }
+
+  // Step 2: Now that unpacking is done, inspect the environment.
+  console.log("\n--- Vercel Environment Debug Info (Post-Unpack) ---");
   console.log(`Node.js Version: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
   console.log(`Architecture: ${process.arch}`);
   console.log(`LAMBDA_TASK_ROOT: ${process.env.LAMBDA_TASK_ROOT || "Not Set"}`);
   console.log(`LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH || "Not Set"}`);
-  console.log("\n--- Listing /tmp directory contents ---");
+  console.log("\n--- Listing /tmp directory contents (Post-Unpack) ---");
   const tmpFiles = listFilesRecursive("/tmp");
   console.log(
     tmpFiles.length > 0 ? tmpFiles.join("\n") : "Directory /tmp is empty."
   );
-  console.log("---------------------------------------\n");
+  console.log("-----------------------------------------------------\n");
   // --- END: ADVANCED DEBUG LOGS ---
 
   console.log("🚀 Starting the Market Pulse OTA Crawler...");
-
-  let browser;
 
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
@@ -308,13 +319,13 @@ async function main() {
       password: process.env.PROXY_PASSWORD, // The password for proxy authentication.
     };
 
-    // This new launch sequence uses the serverless-optimized browser.
+    // Step 3: Attempt to launch the browser using the pre-unpacked executable.
     browser = await playwright.chromium.launch({
       // Using minArgs as a fallback for stubborn environments like Vercel's.
       // This provides a more aggressive set of flags to disable features
       // that might rely on missing system libraries.
       args: chromium.minArgs,
-      executablePath: await chromium.executablePath(),
+      executablePath: execPath, // Use the path we already resolved.
       headless: true,
       proxy: proxyConfig,
     });
