@@ -252,13 +252,11 @@ async function main() {
       args: chromium.args,
       // Use the executable path provided by the package.
       executablePath: await chromium.executablePath(),
-      // Use the headless mode recommended by the package.
-      headless: chromium.headless,
+      // The headless option for Playwright must be a boolean. The necessary
+      // headless flags for the serverless environment are already part of chromium.args.
+      headless: true,
       proxy: proxyConfig,
-      // This is the critical change: set the library path env variable.
-      // The chromium object exposes the exact directory where it unpacks the
-      // necessary shared libraries (.so files). We prepend this path to the
-      // existing LD_LIBRARY_PATH to ensure the chromium executable can find them.
+      // Set the library path env variable to ensure the executable can find its dependencies.
       env: {
         ...process.env,
         LD_LIBRARY_PATH: `${chromium.libraryPath}:${
