@@ -1,32 +1,16 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
-    { "src": "api/initial-sync.js", "use": "@vercel/node" },
-    { "src": "api/send-scheduled-reports.js", "use": "@vercel/node" }
-  ],
+  "functions": {
+    "api/ota-crawler.js": {
+      "maxDuration": 800
+    }
+  },
   "routes": [
     {
-      "src": "/api/daily-refresh",
-      "dest": "/api/daily-refresh.js"
-    },
-
-    {
-      "src": "/api/initial-sync",
-      "dest": "/api/initial-sync.js"
-    },
-
-    {
-      "src": "/api/send-scheduled-reports",
-      "dest": "/api/send-scheduled-reports.js"
-    },
-    {
       "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "api/index.js"
     }
   ],
-
   "crons": [
     {
       "path": "/api/daily-refresh",
@@ -35,6 +19,10 @@
     {
       "path": "/api/send-scheduled-reports",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/ota-crawler",
+      "schedule": "0 5 * * *"
     }
   ]
 }
