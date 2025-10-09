@@ -1,17 +1,16 @@
 {
   "version": 2,
   "functions": {
+    "server.js": {
+      "runtime": "@vercel/node"
+    },
+    "api/**/*.js": {
+      "runtime": "@vercel/node"
+    },
     "api/ota-crawler.js": {
       "maxDuration": 900
     }
   },
-  "builds": [
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
-    { "src": "api/initial-sync.js", "use": "@vercel/node" },
-    { "src": "api/send-scheduled-reports.js", "use": "@vercel/node" },
-    { "src": "api/ota-crawler.js", "use": "@vercel/node" }
-  ],
   "routes": [
     {
       "src": "/api/daily-refresh",
