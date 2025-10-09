@@ -4,7 +4,13 @@
     "server.js": {
       "runtime": "@vercel/node"
     },
-    "api/**/*.js": {
+    "api/daily-refresh.js": {
+      "runtime": "@vercel/node"
+    },
+    "api/initial-sync.js": {
+      "runtime": "@vercel/node"
+    },
+    "api/send-scheduled-reports.js": {
       "runtime": "@vercel/node"
     },
     "api/ota-crawler.js": {
