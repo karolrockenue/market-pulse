@@ -2,6 +2,39 @@ require("dotenv").config();
 const chromium = require("@sparticuz/chromium");
 const playwright = require("playwright-core");
 const pgPool = require("./utils/db.js");
+const fs = require("fs"); // For inspecting the file system
+const path = require("path"); // For handling file paths
+
+/**
+ * A helper function to recursively list all files in a directory. This is for
+ * debugging the Vercel environment to see what files are actually present.
+ * @param {string} dir The directory to scan.
+ * @returns {string[]} An array of full file paths.
+ */
+function listFilesRecursive(dir) {
+  const results = [];
+  try {
+    const list = fs.readdirSync(dir);
+    list.forEach((file) => {
+      const filePath = path.join(dir, file);
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat && stat.isDirectory()) {
+          results.push(...listFilesRecursive(filePath)); // Recurse into subdirectories
+        } else {
+          results.push(filePath); // Add file path to results
+        }
+      } catch (statError) {
+        // Can fail on special files like sockets, just log the file path
+        results.push(`${filePath} (could not stat)`);
+      }
+    });
+  } catch (readError) {
+    // If we can't even read the directory, report that.
+    return [`Error reading directory ${dir}: ${readError.message}`];
+  }
+  return results;
+}
 
 /**
  * A resilient function to scrape a filter facet group from the search results page.
@@ -236,18 +269,22 @@ function delay(ms) {
  * The main orchestration function.
  */
 async function main() {
-  // --- START: TEMPORARY DEBUG LOGS ---
-  // These logs will help us verify the environment variables in Vercel.
-  console.log("--- Verifying Environment Variables ---");
-  // For the database URL, we check if it exists but don't log the actual value.
-  console.log("Database URL Set:", !!process.env.DATABASE_URL);
-  // We can safely log the proxy endpoint as it's not a secret.
-  console.log("Proxy Endpoint:", process.env.PROXY_ENDPOINT);
-  // For credentials, we only check for their presence (true/false) for security.
-  console.log("Proxy Username Set:", !!process.env.PROXY_USERNAME);
-  console.log("Proxy Password Set:", !!process.env.PROXY_PASSWORD);
-  console.log("---------------------------------------");
-  // --- END: TEMPORARY DEBUG LOGS ---
+  // --- START: ADVANCED DEBUG LOGS ---
+  // We are adding this block to inspect the Vercel runtime environment itself,
+  // to understand why the Chromium browser is failing to launch.
+  console.log("--- Vercel Environment Debug Info ---");
+  console.log(`Node.js Version: ${process.version}`);
+  console.log(`Platform: ${process.platform}`);
+  console.log(`Architecture: ${process.arch}`);
+  console.log(`LAMBDA_TASK_ROOT: ${process.env.LAMBDA_TASK_ROOT || "Not Set"}`);
+  console.log(`LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH || "Not Set"}`);
+  console.log("\n--- Listing /tmp directory contents ---");
+  const tmpFiles = listFilesRecursive("/tmp");
+  console.log(
+    tmpFiles.length > 0 ? tmpFiles.join("\n") : "Directory /tmp is empty."
+  );
+  console.log("---------------------------------------\n");
+  // --- END: ADVANCED DEBUG LOGS ---
 
   console.log("🚀 Starting the Market Pulse OTA Crawler...");
 
