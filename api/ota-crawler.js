@@ -235,7 +235,21 @@ function delay(ms) {
  * The main orchestration function.
  */
 async function main() {
+  // --- START: TEMPORARY DEBUG LOGS ---
+  // These logs will help us verify the environment variables in Vercel.
+  console.log("--- Verifying Environment Variables ---");
+  // For the database URL, we check if it exists but don't log the actual value.
+  console.log("Database URL Set:", !!process.env.DATABASE_URL);
+  // We can safely log the proxy endpoint as it's not a secret.
+  console.log("Proxy Endpoint:", process.env.PROXY_ENDPOINT);
+  // For credentials, we only check for their presence (true/false) for security.
+  console.log("Proxy Username Set:", !!process.env.PROXY_USERNAME);
+  console.log("Proxy Password Set:", !!process.env.PROXY_PASSWORD);
+  console.log("---------------------------------------");
+  // --- END: TEMPORARY DEBUG LOGS ---
+
   console.log("🚀 Starting the Market Pulse OTA Crawler...");
+
   let browser;
 
   const MAX_RETRIES = 3;
