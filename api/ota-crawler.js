@@ -2,39 +2,6 @@ require("dotenv").config();
 const chromium = require("@sparticuz/chromium");
 const playwright = require("playwright-core");
 const pgPool = require("./utils/db.js");
-const fs = require("fs"); // For inspecting the file system
-const path = require("path"); // For handling file paths
-
-/**
- * A helper function to recursively list all files in a directory. This is for
- * debugging the Vercel environment to see what files are actually present.
- * @param {string} dir The directory to scan.
- * @returns {string[]} An array of full file paths.
- */
-function listFilesRecursive(dir) {
-  const results = [];
-  try {
-    const list = fs.readdirSync(dir);
-    list.forEach((file) => {
-      const filePath = path.join(dir, file);
-      try {
-        const stat = fs.statSync(filePath);
-        if (stat && stat.isDirectory()) {
-          results.push(...listFilesRecursive(filePath)); // Recurse into subdirectories
-        } else {
-          results.push(filePath); // Add file path to results
-        }
-      } catch (statError) {
-        // Can fail on special files like sockets, just log the file path
-        results.push(`${filePath} (could not stat)`);
-      }
-    });
-  } catch (readError) {
-    // If we can't even read the directory, report that.
-    return [`Error reading directory ${dir}: ${readError.message}`];
-  }
-  return results;
-}
 
 /**
  * A resilient function to scrape a filter facet group from the search results page.
@@ -50,24 +17,21 @@ async function scrapeFacetGroup(page, filterName) {
   try {
     console.log(`🔍 Scraping facet group: "${filterName}"...`);
 
-    // Locate the container for the entire filter group.
     const groupContainer = page
       .locator('div[data-testid="filters-group"], fieldset')
       .filter({
         hasText: new RegExp(filterName, "i"),
       });
 
-    // 1. Handle "Show all" button if it exists and is visible.
     const showAllButton = groupContainer
       .locator('button[data-testid="filters-group-expand-collapse"]')
       .first();
     if (await showAllButton.isVisible({ timeout: 1000 })) {
       console.log(`  -> Clicking "Show all" for "${filterName}"...`);
       await showAllButton.click();
-      await page.waitForTimeout(500); // Wait briefly for UI to update
+      await page.waitForTimeout(500);
     }
 
-    // 2. ADAPTIVE: Check for and handle nested parent categories.
     const parentButtons = await groupContainer
       .locator('button[data-testid="parent-checkbox-filter"]')
       .all();
@@ -87,7 +51,6 @@ async function scrapeFacetGroup(page, filterName) {
       }
     }
 
-    // --- Data Extraction Logic ---
     const options = await groupContainer
       .locator("div[data-filters-item]")
       .all();
@@ -207,12 +170,12 @@ async function scrapeCity(
 
       const insertQuery = `
         INSERT INTO market_availability_snapshots(
-          provider, city_slug, checkin_date, total_results, 
+          provider, city_slug, checkin_date, total_results,
           facet_property_type, facet_star_rating, facet_neighbourhood,
           facet_price_histogram, scraped_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
         ON CONFLICT (provider, city_slug, checkin_date, (CAST(scraped_at AT TIME ZONE 'UTC' AS DATE)))
-        DO UPDATE SET 
+        DO UPDATE SET
           total_results = EXCLUDED.total_results,
           facet_property_type = EXCLUDED.facet_property_type,
           facet_star_rating = EXCLUDED.facet_star_rating,
@@ -269,76 +232,34 @@ function delay(ms) {
  * The main orchestration function.
  */
 async function main() {
-  let browser;
-  let execPath; // This will store the path to the executable after we unpack it.
-
-  // --- START: FORCED UNPACK & ADVANCED DEBUG LOGS ---
-  try {
-    // Step 1: Force the browser files to be unpacked into /tmp.
-    console.log("Forcing browser unpack before launch...");
-    execPath = await chromium.executablePath();
-    console.log(`Chromium executable should now be at: ${execPath}`);
-  } catch (unpackError) {
-    console.error("CRITICAL: Failed to unpack the browser.", unpackError);
-    // If this fails, there's no point continuing.
-    return;
-  }
-
-  // Step 2: Now that unpacking is done, inspect the environment.
-  console.log("\n--- Vercel Environment Debug Info (Post-Unpack) ---");
-  console.log(`Node.js Version: ${process.version}`);
-  console.log(`Platform: ${process.platform}`);
-  console.log(`Architecture: ${process.arch}`);
-  console.log(`LAMBDA_TASK_ROOT: ${process.env.LAMBDA_TASK_ROOT || "Not Set"}`);
-  console.log(`LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH || "Not Set"}`);
-  console.log("\n--- Listing /tmp directory contents (Post-Unpack) ---");
-  const tmpFiles = listFilesRecursive("/tmp");
-  console.log(
-    tmpFiles.length > 0 ? tmpFiles.join("\n") : "Directory /tmp is empty."
-  );
-  console.log("-----------------------------------------------------\n");
-  // --- END: ADVANCED DEBUG LOGS ---
-
   console.log("🚀 Starting the Market Pulse OTA Crawler...");
+  let browser;
 
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
 
-  // --- CONFIGURE THE TARGET CITY HERE ---
   const cityToScrape = { name: "London", slug: "london" };
-  // const cityToScrape = { name: "New York", slug: "new-york" };
 
   try {
-    // For production, set headless: true. For debugging, set headless: false.
-    // For deployment, add the proxy block here.
-    // For production, set headless: true. For debugging, set headless: false.
-    // For deployment, add the proxy block here.
     const proxyConfig = {
-      server: process.env.PROXY_ENDPOINT, // The host:port of the proxy server.
-      username: process.env.PROXY_USERNAME, // The username for proxy authentication.
-      password: process.env.PROXY_PASSWORD, // The password for proxy authentication.
+      server: process.env.PROXY_ENDPOINT,
+      username: process.env.PROXY_USERNAME,
+      password: process.env.PROXY_PASSWORD,
     };
 
-    // Step 3: Attempt to launch the browser using the pre-unpacked executable.
     browser = await playwright.chromium.launch({
-      // Using minArgs as a fallback for stubborn environments like Vercel's.
-      args: chromium.minArgs,
-      executablePath: execPath, // Use the path we already resolved.
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
       headless: true,
       proxy: proxyConfig,
-      // This is the definitive fix for the libnss3.so error in Vercel.
-      // We are setting a custom environment for the spawned browser process.
       env: {
-        // Inherit the existing environment variables...
         ...process.env,
-        // ...and prepend the /tmp directory to the library search path.
-        // This ensures that the browser can find all the necessary ".so" files
-        // that were unpacked alongside it in the /tmp folder.
         LD_LIBRARY_PATH: `/tmp:${process.env.LD_LIBRARY_PATH || ""}`,
       },
     });
+
     console.log(
-      `Browser launched through proxy server. Target city: ${cityToScrape.name}`
+      `Browser launched successfully. Target city: ${cityToScrape.name}`
     );
 
     const today = new Date();
@@ -381,7 +302,6 @@ async function main() {
       }
 
       if (i < 119) {
-        // Throttling reduced to 4-8 seconds to fit within Vercel's 800-second limit.
         const randomDelay = 4000 + Math.random() * 4000;
         console.log(
           `---\n Throttling: Waiting for ${(randomDelay / 1000).toFixed(
@@ -406,14 +326,11 @@ async function main() {
 }
 
 // This is the standard Vercel serverless function handler.
-// It will be executed when the /api/ota-crawler URL is visited.
 export default async function handler(request, response) {
   try {
     await main();
-    // If main() completes without errors, send a success response.
     response.status(200).send("Scraper run completed successfully.");
   } catch (error) {
-    // If main() crashes, log the error and send a server error response.
     console.error("An error occurred during the scraper run:", error);
     response.status(500).send(`Scraper run failed: ${error.message}`);
   }
