@@ -273,7 +273,10 @@ async function main() {
 
     // This new launch sequence uses the serverless-optimized browser.
     browser = await playwright.chromium.launch({
-      args: chromium.args,
+      // Using minArgs as a fallback for stubborn environments like Vercel's.
+      // This provides a more aggressive set of flags to disable features
+      // that might rely on missing system libraries.
+      args: chromium.minArgs,
       executablePath: await chromium.executablePath(),
       headless: true,
       proxy: proxyConfig,
