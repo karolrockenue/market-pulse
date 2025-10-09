@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "playwright install --with-deps",
+    "postinstall": "npx playwright install --with-deps",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
