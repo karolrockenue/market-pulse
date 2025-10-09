@@ -409,7 +409,7 @@ function marketOverviewComponent() {
           revpar: {
             current: currentRevpar,
             prior: priorRevpar,
-            change: revparChange, // Use the new pre-calculated value
+            change: revparChange, // Use the new pre-calcudlated value
           },
         };
       } catch (error) {
