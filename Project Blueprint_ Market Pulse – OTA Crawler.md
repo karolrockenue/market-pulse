@@ -166,3 +166,45 @@ All subsequent deployment attempts now fail with a new, persistent error: Error:
 Multiple, meticulous revisions to the vercel.json file to make the function runtime definitions more explicit have failed to resolve this error. The same error persists regardless of the configuration changes.
 
 The deployment is therefore blocked, preventing the automated scraper from running in the production environment. This issue remains unresolved.
+
+v1.6 - 2025-10-09: Final Architecture Refactor & Runtime Debugging
+
+This phase focused on resolving the persistent Vercel deployment blockers and successfully deploying the OTA crawler to the production environment.
+
+Vercel Deployment Resolution:
+The Error: Function Runtimes must have a valid version was exhaustively debugged. The process involved:
+
+Refactoring vercel.json multiple times to conform to modern Vercel standards.
+
+Adding an engines property to package.json to specify the Node.js version.
+
+Adding a build script to install Playwright dependencies.
+
+Diagnosing and ruling out conflicts with Vercel Dashboard settings and legacy now.json files.
+
+The final breakthrough identified the root cause as a combination of an incompatible package structure and an out-of-sync package-lock.json file.
+
+Final Architectural Refactor:
+To ensure full compatibility with Vercel's modern infrastructure, a definitive architectural refactor was performed:
+
+The project was converted to a fully serverless pattern by moving the main server.js file to api/index.js.
+
+All configuration files (package.json, vercel.json) were updated to reflect this new structure.
+
+The scraper's dependency stack was upgraded to the industry standard for serverless environments, replacing playwright with a combination of playwright-core and @sparticuz/chromium.
+
+The api/ota-crawler.js script was refactored into a proper Vercel Serverless Function by wrapping its execution in an export default handler.
+
+Current Project State:
+The architectural refactor was a success. All previous build and deployment errors are resolved, and the project now deploys successfully to Vercel. The main application is live and operational.
+
+Outstanding Issue: Scraper Runtime Crash
+The deployed /api/ota-crawler function is not yet operational.
+
+Symptom: When the function is triggered (either manually via its URL or by the scheduled Cron Job), it immediately crashes and returns a 500 FUNCTION_INVOCATION_FAILED error.
+
+Symptom: The function logs confirm that the crash occurs during the browserType.launch call.
+
+Symptom: The detailed browser logs show the specific cause of the crash is a missing system library: /tmp/chromium: error while loading shared libraries: libnss3.so: cannot open shared object file: No such file or directory.
+
+The project is now in a stable, deployed state, but the scraper feature remains non-functional due to this final runtime error.

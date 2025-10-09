@@ -1,5 +1,5 @@
 Project "Market Pulse" - Technical Handbook
-Last Updated: October 3, 2025
+Last Updated: October 9, 2025
 
 This document provides a complete technical overview of the Market Pulse application. It is the single source of truth for all architectural principles, database schemas, and core functionalities, designed to onboard any developer or AI assistant to the project.
 
@@ -16,6 +16,8 @@ Styling: Tailwind CSS
 
 Charting: ECharts and Chart.js
 
+Headless Browser (Scraper): Playwright-Core with @sparticuz/chromium for serverless environments
+
 Deployment: Vercel (including Serverless Functions & Cron Jobs)
 
 Email: SendGrid for transactional emails (magic links, reports)
@@ -23,180 +25,75 @@ Email: SendGrid for transactional emails (magic links, reports)
 2.0 Core Architectural Principles
 All development must adhere to the following principles to ensure consistency and maintainability.
 
-2.1 Backend: Modular Routers & Adapter Pattern
-
-Modular Express Routers: The backend is not a monolith. All API endpoints must be placed in a feature-based router file within the /api/routes/ directory (e.g., dashboard.router.js). The main server.js file is only for initialization and mounting routers.
+2.1 Backend: Fully Serverless & Adapter Pattern
+Fully Serverless Architecture: The backend is structured as a collection of Vercel Serverless Functions. All API endpoints are placed in feature-based router files within the /api/routes/ directory. The main server entry point, api/index.js, is only for initialization and mounting these routers.
 
 Shared Utilities: Reusable logic, such as database connections (db.js) and authentication middleware (middleware.js), is centralized in the /api/utils/ directory.
 
-PMS-Agnostic Adapter Pattern: All communication with external Property Management Systems (PMS) is abstracted into adapters located in /api/adapters/. The core application logic is decoupled from any specific vendor. The cloudbedsAdapter.js and mewsAdapter.js are the single sources of truth for all their respective API interactions.
+PMS-Agnostic Adapter Pattern: All communication with external Property Management Systems (PMS) is abstracted into adapters located in /api/adapters/. The core application logic is decoupled from any specific vendor.
 
 2.2 Frontend: Declarative UI & Shared Components
+Declarative, State-Driven UI: All UI interactivity must be built using self-contained Alpine.js components (x-data). Manual DOM manipulation is forbidden. All logic is encapsulated in external .mjs modules.
 
-Declarative, State-Driven UI: All UI interactivity must be built using self-contained Alpine.js components (x-data). Manual DOM manipulation is forbidden. All logic is encapsulated in external .mjs modules, keeping the HTML as a clean template.
+Shared "Headerless" Component Architecture: The application uses a "headerless" design. A single, shared sidebar component (/public/app/\_shared/sidebar.\*) serves as the primary navigation and control center.
 
-Shared "Headerless" Component Architecture: The application uses a "headerless" design. A single, shared sidebar component (/public/app/\_shared/sidebar.\*) serves as the primary navigation and control center for all authenticated pages. This component is dynamically loaded into each page.
-
-Event-Driven Communication: Components are decoupled and communicate via custom events. For example, the main dashboard listens for a property-changed event from the sidebar to refresh its data.
+Event-Driven Communication: Components are decoupled and communicate via custom events.
 
 3.0 Authentication & Authorization
 The system uses a unified authentication flow with granular, role-based authorization.
 
 3.1 User Onboarding & Login
-The application supports three distinct pathways for user access and property connection:
+Magic Link (Existing Users): Primary login method for existing users via expiring tokens.
 
-Magic Link (Existing Users): The primary login method for existing users is a secure, passwordless magic link system. It uses single-use, expiring tokens stored in the magic_login_tokens table and delivered via SendGrid. This method is for authentication only and does not onboard new properties.
+Cloudbeds OAuth 2.0 (New Cloudbeds Users): New properties using Cloudbeds are connected exclusively via the standard Cloudbeds OAuth 2.0 flow.
 
-Cloudbeds OAuth 2.0 (New Cloudbeds Users): New properties using Cloudbeds are connected exclusively via the standard Cloudbeds OAuth 2.0 flow. This is initiated from the login page. The application handles the token exchange, creates the user and hotel records, and automatically triggers the initial data sync for the new property.
-
-Mews Manual Token (New Mews Users): New properties using Mews connect via a manual token exchange, also initiated from the login page. The user provides their name, email, and a Mews AccessToken. The backend validates the token, handles both single and multi-property portfolio accounts, creates the user and hotel records, securely encrypts the credentials, and triggers the initial sync. This flow does not use OAuth.
+Mews Manual Token (New Mews Users): New properties using Mews connect via a manual token exchange.
 
 3.2 Role-Based Access Control (RBAC)
-The system uses a role column in the users table to manage permissions.
-
-super_admin: Internal administrators. Can view all data and access the Admin Panel.
-
-owner: The primary client user for a hotel account. Can manage their team and properties.
-
-user: A standard team member invited by an owner. Has view-only access.
+The system uses a role column in the users table to manage permissions (super_admin, owner, user).
 
 4.0 Database Schema
-The following are the key tables in the PostgreSQL database. This reflects the final schema after modifications for the Mews integration.
+The following are the key tables in the PostgreSQL database.
 
-users
+users: Stores user account information, including role and pms_type.
 
-user_id (INTEGER, PK, SERIAL)
+hotels: Stores property details like pms_property_id and property_name.
 
-cloudbeds_user_id (VARCHAR, NULLABLE)
+user_properties: Links users to hotels and stores encrypted PMS credentials.
 
-email (VARCHAR, UNIQUE)
+daily_metrics_snapshots: Stores daily performance data for each hotel (rooms_sold, revenue, etc.).
 
-role (VARCHAR)
+hotel_comp_sets: Defines the competitive set for each hotel.
 
-first_name (TEXT)
+user_invitations: Manages invitations for new team members.
 
-last_name (TEXT)
+scheduled_reports: Stores configuration for automated email reports.
 
-pms_type (VARCHAR)
+magic_login_tokens: Stores single-use tokens for passwordless login.
 
-created_at (TIMESTAMPTZ)
+market_availability_snapshots: Stores daily aggregate data from the OTA Crawler.
 
-updated_at (TIMESTAMPTZ)
+id (UUID, PK)
 
-hotels
+provider (TEXT)
 
-hotel_id (INTEGER, PK, SERIAL)
+city_slug (TEXT)
 
-pms_property_id (VARCHAR, UNIQUE)
+checkin_date (DATE)
 
-property_name (TEXT)
+total_results (INTEGER)
 
-city (TEXT)
+facet_property_type (JSONB)
 
-go_live_date (DATE)
+facet_neighbourhood (JSONB)
 
-category (VARCHAR)
+facet_star_rating (JSONB)
 
-neighborhood (VARCHAR)
+facet_price_histogram (JSONB)
 
-currency_code (TEXT)
-
-tax_rate (NUMERIC)
-
-tax_type (VARCHAR)
-
-tax_name (VARCHAR)
-
-pricing_model (VARCHAR)
-
-latitude (NUMERIC)
-
-longitude (NUMERIC)
-
-user_properties
-
-user_id (VARCHAR)
-
-property_id (INTEGER)
-
-pms_credentials (JSONB)
-
-status (VARCHAR)
-
-daily_metrics_snapshots
-
-snapshot_id (INTEGER, PK, SERIAL)
-
-hotel_id (INTEGER)
-
-stay_date (DATE)
-
-rooms_sold (INTEGER)
-
-capacity_count (INTEGER)
-
-net_revenue (NUMERIC)
-
-gross_revenue (NUMERIC)
-
-net_adr (NUMERIC)
-
-gross_adr (NUMERIC)
-
-net_revpar (NUMERIC)
-
-gross_revpar (NUMERIC)
-
-hotel_comp_sets
-
-hotel_id (INTEGER)
-
-competitor_hotel_id (INTEGER)
-
-user_invitations
-
-invitation_id (INTEGER, PK, SERIAL)
-
-inviter_user_id (INTEGER)
-
-invitee_email (VARCHAR)
-
-property_id (INTEGER)
-
-invitation_token (VARCHAR)
-
-role (VARCHAR)
-
-status (VARCHAR)
-
-scheduled_reports
-
-id (INTEGER, PK, SERIAL)
-
-user_id (INTEGER)
-
-property_id (VARCHAR)
-
-report_name (VARCHAR)
-
-frequency (VARCHAR)
-
-metrics_hotel (ARRAY)
-
-metrics_market (ARRAY)
-
-magic_login_tokens
-
-token (TEXT, PK)
-
-user_id (INTEGER)
-
-expires_at (TIMESTAMPTZ)
-
-used_at (TIMESTAMPTZ)
+scraped_at (TIMESTAMPTZ)
 
 5.0 Project File Structure
-
 market-pulse/
 ├── api/
 │ ├── adapters/
@@ -215,7 +112,9 @@ market-pulse/
 │ │ └── middleware.js
 │ ├── daily-refresh.js
 │ ├── initial-sync.js
-│ └── send-scheduled-reports.js
+│ ├── ota-crawler.js
+│ ├── send-scheduled-reports.js
+│ └── index.js
 ├── public/
 │ ├── admin/
 │ │ ├── admin.mjs
@@ -246,9 +145,7 @@ market-pulse/
 │ └── terms.html
 ├── .env
 ├── package.json
-├── server.js
 └── vercel.json
-
 6.0 API Endpoints
 The API is organized into feature-based routers. All are mounted under /api.
 
@@ -278,7 +175,7 @@ GET /my-properties: Fetches the list of properties a user has access to.
 
 GET /kpi-summary: Fetches aggregated KPI data for the dashboard.
 
-GET /competitor-metrics: Fetches competitor set data, including the "Market Composition" breakdown.
+GET /competitor-metrics: Fetches competitor set data.
 
 GET /sync-status/:propertyId: Checks if the initial data sync for a property has completed.
 
@@ -324,61 +221,66 @@ GET /rockenue/hotels: Fetches a list of all hotel properties for use in report d
 
 GET /rockenue/shreeji-report: Generates the data for the in-house guest balance report.
 
+api/ota-crawler.js
+
+GET /api/ota-crawler: A standalone serverless function that runs the OTA scraper. It is triggered automatically by a cron job but can also be invoked manually for testing.
+
 7.0 Key Features & Functionality
+Main Dashboard: Interactive KPI summaries and data tables.
 
-Main Dashboard (/app/index.html): Features a two-column, "headerless" design. It includes interactive KPI summary cards, a unified data table comparing "Your Hotel" vs. "The Market," a "Market Composition" card with visual breakdowns, and a "Market Ranking" component.
+Advanced Reporting: Custom report builder with flexible metrics.
 
-Advanced Reporting (/app/reports.html): A powerful tool for creating custom reports. The UI uses interactive "pills" for selecting metrics and formatting options. It supports flexible grouping ("by Metric" or "by Source").
+Market Overview: City-level analysis with historical trends.
 
-Market Overview (/app/market-overview.html): A dedicated page for city-level analysis. It includes a multi-year historical trends chart, a neighborhood performance heatmap, and KPI cards, all powered by backend queries that enforce strict data completeness rules.
+Settings: User profile and team management.
 
-Settings (/app/settings.html): A central hub for account management. Users can edit their profile, and owners can manage their team via a property-aware invitation system. It also allows authorized users to securely disconnect/delete a property.
+Admin Panel: Internal tools for super_admin users.
 
-Admin Panel (/admin/index.html): An internal tool for super_admin users. Key features include a Competitive Set Manager, a powerful, multi-filter API Explorer for debugging, and manual triggers for system jobs.
+Rockenue Section: Secure area for internal company reports.
 
-Rockenue Section (/rockenue/index.html): A secure area for internal company (Rockenue) reports and administrative tools. This section is only accessible to super_admin users and is completely separate from the client-facing parts of the application. It currently includes the "Shreeji Report" for viewing in-house guest balances.
+OTA Market Availability Crawler: A new automated service that scrapes aggregate hotel availability data from Booking.com to provide forward-looking market intelligence.
 
 Automated Jobs (Vercel Cron Jobs):
+Daily Data Refresh: The /api/daily-refresh.js script pulls the latest data for all connected properties.
 
-Daily Data Refresh: The /api/daily-refresh.js script runs automatically to pull the latest data for all connected properties.
+Scheduled Reports: The /api/send-scheduled-reports.js job generates and emails reports.
 
-Scheduled Reports: The /api/send-scheduled-reports.js job checks for due reports, generates a CSV, and emails it to recipients.
+OTA Crawler: The /api/ota-crawler.js script runs daily to collect market availability data.
 
 8.0 Development Workflow
-This project follows a specific AI-assisted development workflow to ensure clarity and reduce risk.
+This project follows a specific AI-assisted development workflow.
 
 Plan Before Action: The AI must always provide a concise, bullet-point plan before any code is modified.
 
-Clarify Ambiguity: When multiple solutions exist, the AI must present the options and ask clarifying questions to agree on a path forward.
+Clarify Ambiguity: When multiple solutions exist, the AI must present the options to agree on a path.
 
-One Step at a Time: Instructions should be provided in small, sequential steps. Only provide one code block modification per step.
+One Step at a Time: Instructions should be provided in small, sequential steps.
 
 Clear Instructions: All code modifications must use a "find this line/block" and "replace with this" format.
 
-Heavy Commenting: All new or changed code must be thoroughly commented to explain its purpose.
+Heavy Commenting: All new or changed code must be thoroughly commented.
 
-Incremental Testing: After each step, the AI will provide a "Test Point" with specific instructions for the user (Karol) to execute to verify the change.
+Incremental Testing: After each step, the AI will provide a "Test Point" with specific instructions.
+
+Validate Local Environment First: Before committing changes, especially those affecting dependencies, always run npm install locally to ensure the project installs without errors. A broken local installation will always lead to a broken deployment.
 
 9.0 Architectural Milestone: Revenue Data Model Refactor
-In August 2025, the application underwent a critical architectural refactor to enhance revenue data accuracy and performance.
-
-Problem: The original architecture calculated tax-inclusive (gross) revenue "on-the-fly" whenever a report was run. This model had severe flaws: it created incorrect historical reports if a hotel's tax rate changed, caused poor application performance, and was incompatible with newer PMS systems that provide pre-calculated values.
-
-Solution: The data model was redesigned to pre-calculate and store final, immutable net and gross values for all key metrics (revenue, ADR, RevPAR). This logic was moved into the data ingestion layer (cloudbedsAdapter.js, mewsAdapter.js, initial-sync.js, daily-refresh.js). The process involved modifying the database schema, refactoring the entire data pipeline, backfilling all historical data with the new values, and migrating all backend and frontend components to use the new data structure.
-
-Outcome: The refactor was a success. It guarantees historical data integrity, dramatically improved reporting speed, and created a consistent, scalable data model for all current and future PMS integrations.
+(August 2025) The application's data model was refactored to pre-calculate and store immutable net and gross revenue metrics, ensuring historical data integrity and improving performance.
 
 10.0 Architectural Milestone: Mews PMS Integration
-In August 2025, the application was successfully extended to support a second PMS, Mews, marking a significant step towards becoming a true multi-PMS platform.
+(August 2025) The application was extended to support the Mews PMS, validating the adapter-based architecture and making the database schema PMS-agnostic.
 
-Problem: The original application architecture and database schema were tightly coupled to the Cloudbeds PMS, particularly its OAuth 2.0 flow and its use of integer-based IDs. Integrating Mews, which uses a non-OAuth, manual token exchange and string-based UUIDs for property IDs, required significant architectural changes.
+11.0 Architectural Milestone: OTA Crawler & Vercel Deployment Refactor
+(October 2025) A new OTA web scraping feature was developed and deployed, requiring a significant architectural refactor to ensure compatibility with Vercel's serverless environment.
 
-Solution: A comprehensive, multi-step integration was executed:
+Problem: Deploying a Playwright-based scraper to Vercel proved challenging, resulting in persistent and misleading build errors (Function Runtimes must have a valid version) and subsequent runtime errors from missing system libraries (libnss3.so).
 
-Schema Evolution: The database schema was made PMS-agnostic. Key changes included making the users.cloudbeds_user_id column optional, adding a hotels.pms_property_id column to store original string-based IDs, and converting the hotels.hotel_id into a true auto-incrementing SERIAL primary key.
+Solution: A multi-step solution was implemented to create a robust and compatible architecture.
 
-New Onboarding Flow: A complete, user-facing onboarding flow was built on the login page. This includes a multi-step modal, backend validation routes, logic to handle both single and multi-property Mews accounts, and secure, encrypted storage for Mews credentials.
+Dependency Upgrade: The standard playwright package was replaced with the serverless-optimized playwright-core and @sparticuz/chromium to ensure all necessary browser components were correctly bundled.
 
-Adapter Implementation: The mewsAdapter.js was fully developed to handle all Mews-specific API logic, including authentication, data transformation, and pagination.
+Configuration Simplification: A "UI-first" configuration model was adopted. All file-based overrides for the Node.js version (engines in package.json) were removed, making the Vercel Dashboard setting the single source of truth.
 
-Outcome: The integration was a success. The application now has a robust, scalable, and secure system for onboarding and syncing data from Mews properties. This milestone validates the adapter-based architecture and paves the way for integrating additional PMS vendors in the future.
+Architectural Refactor: The project was converted to a fully serverless pattern by moving the main server.js entry point to api/index.js, eliminating ambiguity for Vercel's build system.
+
+Outcome: The refactor was a success, resolving all deployment and runtime errors. This enabled the successful deployment of the automated OTA crawler and established a stable, modern architectural pattern for the entire application on Vercel.
