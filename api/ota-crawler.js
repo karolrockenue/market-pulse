@@ -3,7 +3,6 @@ const chromium = require("@sparticuz/chromium");
 const playwright = require("playwright-core");
 // ...
 const pgPool = require("./utils/db.js");
-const fs = require("fs");
 
 /**
  * A resilient function to scrape a filter facet group from the search results page.
@@ -249,68 +248,21 @@ async function main() {
       password: process.env.PROXY_PASSWORD,
     };
 
-    let executablePath;
-    try {
-      console.log(
-        "Attempting to get executable path from @sparticuz/chromium..."
-      );
-      executablePath = await chromium.executablePath();
-      console.log("Successfully got executable path:", executablePath);
-    } catch (e) {
-      console.error(
-        "CRITICAL: Failed to get executable path from chromium.",
-        e
-      );
-      // Re-throw the error to ensure the main catch block handles it
-      throw e;
-    }
-
-    // The libraryPath property is undefined in this environment, which is the root cause of the error.
-    // The libraryPath property is undefined in this environment, which is the root cause of the error.
-    // We will manually set the path to the known location of the shared libraries.
-    const libraryPath = "/tmp/swiftshader";
-    console.log(
-      "Final Library Path to be used (manual override):",
-      libraryPath
-    );
-
-    // --- FINAL DIAGNOSTIC: Check if the library file actually exists ---
-    try {
-      const dirExists = fs.existsSync(libraryPath);
-      console.log(
-        `DIAGNOSTIC - Does ${libraryPath} directory exist?`,
-        dirExists
-      );
-      if (dirExists) {
-        const files = fs.readdirSync(libraryPath);
-        console.log(
-          `DIAGNOSTIC - Contents of ${libraryPath}:`,
-          files.join(", ")
-        );
-        const libExists = files.includes("libnss3.so");
-        console.log(
-          "DIAGNOSTIC - Does libnss3.so exist in that directory?",
-          libExists
-        );
-      }
-    } catch (e) {
-      console.error("DIAGNOSTIC - Error checking file system:", e);
-    }
-    // --- END FINAL DIAGNOSTIC ---
-
     browser = await playwright.chromium.launch({
-      // Use the arguments recommended by the package for serverless environments.
+      // Arguments recommended by the package for serverless environments.
       args: chromium.args,
-      // Use the executable path we logged above.
-      executablePath: executablePath,
-      // The headless option for Playwright must be a boolean.
+      // Executable path provided by the package.
+      executablePath: await chromium.executablePath(),
+      // Headless must be a boolean for Playwright.
       headless: true,
       proxy: proxyConfig,
-      // Set the library path env variable to the correct, manually-defined path.
-      // This allows the Chromium executable to find libnss3.so and other dependencies.
+      // This stable version of the package should correctly provide the libraryPath,
+      // allowing the Chromium executable to find its required dependencies.
       env: {
         ...process.env,
-        LD_LIBRARY_PATH: `${libraryPath}:${process.env.LD_LIBRARY_PATH || ""}`,
+        LD_LIBRARY_PATH: `${chromium.libraryPath}:${
+          process.env.LD_LIBRARY_PATH || ""
+        }`,
       },
     });
     console.log(
