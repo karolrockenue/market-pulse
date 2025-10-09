@@ -1,10 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "api/ota-crawler.js": {
-      "maxDuration": 900
-    }
-  },
   "builds": [
     { "src": "server.js", "use": "@vercel/node" },
     { "src": "api/daily-refresh.js", "use": "@vercel/node" },
