@@ -11,18 +11,20 @@ const cors = require("cors");
 const path = require("path");
 
 // --- SHARED UTILITIES AND ROUTERS ---
-const pgPool = require("./api/utils/db");
-const { requirePageLogin } = require("./api/utils/middleware");
+// Corrected paths: Removed the unnecessary '/api' prefix.
+const pgPool = require("./utils/db");
+const { requirePageLogin } = require("./utils/middleware");
 
 // Import all the router files.
-const authRoutes = require("./api/routes/auth.router.js");
-const dashboardRoutes = require("./api/routes/dashboard.router.js");
-const reportsRoutes = require("./api/routes/reports.router.js");
-const adminRoutes = require("./api/routes/admin.router.js"); // NEW: Import admin router
+// Corrected paths: Removed the unnecessary '/api' prefix.
+const authRoutes = require("./routes/auth.router.js");
+const dashboardRoutes = require("./routes/dashboard.router.js");
+const reportsRoutes = require("./routes/reports.router.js");
+const adminRoutes = require("./routes/admin.router.js");
 const publicPath = path.join(process.cwd(), "public");
-const userRoutes = require("./api/routes/users.router.js"); // Add this line
-const marketRouter = require("./api/routes/market.router.js");
-const rockenueRoutes = require("./api/routes/rockenue.router.js");
+const userRoutes = require("./routes/users.router.js");
+const marketRouter = require("./routes/market.router.js");
+const rockenueRoutes = require("./routes/rockenue.router.js");
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
