@@ -7,10 +7,15 @@
   },
   "routes": [
     {
+      "src": "/api/ota-crawler",
+      "dest": "api/ota-crawler.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "api/index.js"
     }
   ],
+
   "crons": [
     {
       "path": "/api/daily-refresh",
