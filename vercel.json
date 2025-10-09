@@ -1,24 +1,14 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
   "functions": {
-    "server.js": {
-      "runtime": "@vercel/node"
-    },
-
-    "api/daily-refresh.js": {
-      "runtime": "@vercel/node"
-    },
-    "api/initial-sync.js": {
-      "runtime": "@vercel/node"
-    },
-    "api/send-scheduled-reports.js": {
-      "runtime": "@vercel/node"
-    },
-
+    "server.js": { "runtime": "nodejs20.x" },
+    "api/daily-refresh.js": { "runtime": "nodejs20.x" },
+    "api/initial-sync.js": { "runtime": "nodejs20.x" },
+    "api/send-scheduled-reports.js": { "runtime": "nodejs20.x" },
     "api/ota-crawler.js": {
-      "runtime": "@vercel/node",
-
-      "maxDuration": 800
+      "runtime": "nodejs20.x",
+      "maxDuration": 60
     }
   },
   "routes": [
@@ -28,15 +18,12 @@
       "src": "/api/send-scheduled-reports",
       "dest": "/api/send-scheduled-reports.js"
     },
-
     { "src": "/api/ota-crawler", "dest": "/api/ota-crawler.js" },
-
     { "src": "/(.*)", "dest": "server.js" }
   ],
   "crons": [
     { "path": "/api/daily-refresh", "schedule": "0 4 * * *" },
     { "path": "/api/send-scheduled-reports", "schedule": "0 * * * *" },
-
     { "path": "/api/ota-crawler", "schedule": "0 5 * * *" }
   ]
 }
