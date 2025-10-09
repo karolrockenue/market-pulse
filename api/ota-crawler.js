@@ -306,7 +306,8 @@ async function main() {
       }
 
       if (i < 119) {
-        const randomDelay = 5000 + Math.random() * 5000;
+        // Throttling reduced to 4-8 seconds to fit within Vercel's 800-second limit.
+        const randomDelay = 4000 + Math.random() * 4000;
         console.log(
           `---\n Throttling: Waiting for ${(randomDelay / 1000).toFixed(
             2

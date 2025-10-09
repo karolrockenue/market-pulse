@@ -8,7 +8,7 @@
       "runtime": "@vercel/node"
     },
     "api/ota-crawler.js": {
-      "maxDuration": 900
+      "maxDuration": 800
     }
   },
   "routes": [
