@@ -1,20 +1,17 @@
 {
   "name": "market-pulse",
   "version": "1.0.0",
+  "private": true,
   "main": "server.js",
   "engines": {
     "node": "20.x"
   },
   "scripts": {
-    "build": "playwright install --with-deps",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "npx playwright install --with-deps chromium",
+    "build": "echo \"no build step\"",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
+ "dependencies": {
     "@sendgrid/mail": "^8.1.5",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
@@ -30,3 +27,6 @@
     "playwright": "^1.56.0"
   }
 }
+
+
+
