@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "api/index.js",
   "scripts": {
-    "build": "playwright install",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node api/index.js"
   },
@@ -24,6 +23,6 @@
     "node-fetch": "^2.7.0",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
-    "playwright": "^1.56.0"
+    "playwright-aws-lambda": "^10.2.0"
   }
 }

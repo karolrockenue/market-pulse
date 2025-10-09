@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { chromium } = require("playwright");
+const playwright = require("playwright-aws-lambda");
 const pgPool = require("./utils/db.js");
 
 /**
@@ -271,10 +271,10 @@ async function main() {
     };
 
     // Launch the browser, configuring it to route all traffic through the specified proxy.
-    // The proxy server details and credentials are required for authentication.
-    browser = await chromium.launch({
+    // The new package handles browser launching and paths automatically.
+    browser = await playwright.launchChromium({
       headless: true,
-      proxy: proxyConfig, // Use the proxy configuration.
+      proxy: proxyConfig,
     });
     console.log(
       `Browser launched through proxy server. Target city: ${cityToScrape.name}`
@@ -344,7 +344,16 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("An unhandled exception reached the top level:", error);
-  process.exit(1);
-});
+// This is the standard Vercel serverless function handler.
+// It will be executed when the /api/ota-crawler URL is visited.
+export default async function handler(request, response) {
+  try {
+    await main();
+    // If main() completes without errors, send a success response.
+    response.status(200).send("Scraper run completed successfully.");
+  } catch (error) {
+    // If main() crashes, log the error and send a server error response.
+    console.error("An error occurred during the scraper run:", error);
+    response.status(500).send(`Scraper run failed: ${error.message}`);
+  }
+}
