@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+
   "functions": {
     "server.js": { "runtime": "nodejs20.x" },
     "api/daily-refresh.js": { "runtime": "nodejs20.x" },
