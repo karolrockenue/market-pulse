@@ -1,7 +1,9 @@
 require("dotenv").config();
 const chromium = require("@sparticuz/chromium");
 const playwright = require("playwright-core");
+// ...
 const pgPool = require("./utils/db.js");
+const fs = require("fs");
 
 /**
  * A resilient function to scrape a filter facet group from the search results page.
@@ -264,12 +266,37 @@ async function main() {
     }
 
     // The libraryPath property is undefined in this environment, which is the root cause of the error.
+    // The libraryPath property is undefined in this environment, which is the root cause of the error.
     // We will manually set the path to the known location of the shared libraries.
     const libraryPath = "/tmp/swiftshader";
     console.log(
       "Final Library Path to be used (manual override):",
       libraryPath
     );
+
+    // --- FINAL DIAGNOSTIC: Check if the library file actually exists ---
+    try {
+      const dirExists = fs.existsSync(libraryPath);
+      console.log(
+        `DIAGNOSTIC - Does ${libraryPath} directory exist?`,
+        dirExists
+      );
+      if (dirExists) {
+        const files = fs.readdirSync(libraryPath);
+        console.log(
+          `DIAGNOSTIC - Contents of ${libraryPath}:`,
+          files.join(", ")
+        );
+        const libExists = files.includes("libnss3.so");
+        console.log(
+          "DIAGNOSTIC - Does libnss3.so exist in that directory?",
+          libExists
+        );
+      }
+    } catch (e) {
+      console.error("DIAGNOSTIC - Error checking file system:", e);
+    }
+    // --- END FINAL DIAGNOSTIC ---
 
     browser = await playwright.chromium.launch({
       // Use the arguments recommended by the package for serverless environments.
