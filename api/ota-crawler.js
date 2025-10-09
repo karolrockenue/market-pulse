@@ -275,7 +275,7 @@ async function main() {
     browser = await playwright.chromium.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: true,
       proxy: proxyConfig,
     });
     console.log(
