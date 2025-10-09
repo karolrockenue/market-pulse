@@ -322,12 +322,20 @@ async function main() {
     // Step 3: Attempt to launch the browser using the pre-unpacked executable.
     browser = await playwright.chromium.launch({
       // Using minArgs as a fallback for stubborn environments like Vercel's.
-      // This provides a more aggressive set of flags to disable features
-      // that might rely on missing system libraries.
       args: chromium.minArgs,
       executablePath: execPath, // Use the path we already resolved.
       headless: true,
       proxy: proxyConfig,
+      // This is the definitive fix for the libnss3.so error in Vercel.
+      // We are setting a custom environment for the spawned browser process.
+      env: {
+        // Inherit the existing environment variables...
+        ...process.env,
+        // ...and prepend the /tmp directory to the library search path.
+        // This ensures that the browser can find all the necessary ".so" files
+        // that were unpacked alongside it in the /tmp folder.
+        LD_LIBRARY_PATH: `/tmp:${process.env.LD_LIBRARY_PATH || ""}`,
+      },
     });
     console.log(
       `Browser launched through proxy server. Target city: ${cityToScrape.name}`
