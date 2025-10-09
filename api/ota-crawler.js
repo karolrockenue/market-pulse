@@ -247,12 +247,23 @@ async function main() {
       password: process.env.PROXY_PASSWORD,
     };
 
-    // --- DIAGNOSTIC LOGGING ---
-    // Log the paths provided by @sparticuz/chromium to verify them in the Vercel environment.
-    const executablePath = await chromium.executablePath();
-    console.log("DIAGNOSTIC - Executable Path:", executablePath);
-    console.log("DIAGNOSTIC - Library Path:", chromium.libraryPath);
-    // --- END DIAGNOSTIC LOGGING ---
+    let executablePath;
+    try {
+      console.log(
+        "Attempting to get executable path from @sparticuz/chromium..."
+      );
+      executablePath = await chromium.executablePath();
+      console.log("Successfully got executable path:", executablePath);
+    } catch (e) {
+      console.error(
+        "CRITICAL: Failed to get executable path from chromium.",
+        e
+      );
+      // Re-throw the error to ensure the main catch block handles it
+      throw e;
+    }
+
+    console.log("Final Library Path to be used:", chromium.libraryPath);
 
     browser = await playwright.chromium.launch({
       // Use the arguments recommended by the package for serverless environments.
