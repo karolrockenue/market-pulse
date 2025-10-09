@@ -247,13 +247,19 @@ async function main() {
       password: process.env.PROXY_PASSWORD,
     };
 
+    // --- DIAGNOSTIC LOGGING ---
+    // Log the paths provided by @sparticuz/chromium to verify them in the Vercel environment.
+    const executablePath = await chromium.executablePath();
+    console.log("DIAGNOSTIC - Executable Path:", executablePath);
+    console.log("DIAGNOSTIC - Library Path:", chromium.libraryPath);
+    // --- END DIAGNOSTIC LOGGING ---
+
     browser = await playwright.chromium.launch({
       // Use the arguments recommended by the package for serverless environments.
       args: chromium.args,
-      // Use the executable path provided by the package.
-      executablePath: await chromium.executablePath(),
-      // The headless option for Playwright must be a boolean. The necessary
-      // headless flags for the serverless environment are already part of chromium.args.
+      // Use the executable path we logged above.
+      executablePath: executablePath,
+      // The headless option for Playwright must be a boolean.
       headless: true,
       proxy: proxyConfig,
       // Set the library path env variable to ensure the executable can find its dependencies.
