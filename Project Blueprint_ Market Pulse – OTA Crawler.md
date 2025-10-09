@@ -142,3 +142,27 @@ Scraper Resilience Hardened: The generic `scrapeFacetGroup` function was signifi
 Retry Mechanism Added: The main loop was enhanced with an automatic retry mechanism to re-attempt failed scrapes for individual dates, significantly improving the overall data harvest rate against temporary errors.
 
 Phase 1 Complete: With a fully automated, resilient, and production-ready script, all development for Phase 1 is now complete. The crawler is ready for deployment.
+Of course. Here is a new changelog entry summarizing today's work and the unresolved deployment issue, formatted to be added to your project blueprint file.
+
+v1.5 - 2025-10-09: Production Deployment & Configuration
+
+Proxy Integration Completed: The ota-crawler.js script was successfully integrated with a residential proxy service to meet the project's anonymity and geo-targeting requirements. This involved securely managing credentials and updating the Playwright browser configuration.
+
+Local End-to-End Testing Successful: The full data pipeline, including the new proxy integration, was successfully tested in a local environment. The script correctly connected, scraped, and saved data to the database.
+
+Vercel Cron Job Configured: The vercel.json file was configured to deploy and run the ota-crawler.js script as a daily scheduled cron job.
+
+Outstanding Issue: Vercel Deployment Blocked
+Attempts to deploy the production-ready scraper to Vercel are consistently failing. The deployment process is blocked by a persistent configuration error.
+
+The symptoms are as follows:
+
+The initial deployment attempt failed with a Conflicting functions and builds configuration error, which occurs when vercel.json contains both functions and builds properties.
+
+To resolve this and to support the required maxDuration setting, the vercel.json file was refactored to use the modern functions property exclusively.
+
+All subsequent deployment attempts now fail with a new, persistent error: Error: Function Runtimes must have a valid version, for example 'now-php@1.0.0'.
+
+Multiple, meticulous revisions to the vercel.json file to make the function runtime definitions more explicit have failed to resolve this error. The same error persists regardless of the configuration changes.
+
+The deployment is therefore blocked, preventing the automated scraper from running in the production environment. This issue remains unresolved.
