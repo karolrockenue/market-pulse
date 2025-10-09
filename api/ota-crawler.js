@@ -1,5 +1,6 @@
 require("dotenv").config();
-const playwright = require("playwright-aws-lambda");
+const chromium = require("@sparticuz/chromium");
+const playwright = require("playwright-core");
 const pgPool = require("./utils/db.js");
 
 /**
@@ -270,10 +271,11 @@ async function main() {
       password: process.env.PROXY_PASSWORD, // The password for proxy authentication.
     };
 
-    // Launch the browser, configuring it to route all traffic through the specified proxy.
-    // The new package handles browser launching and paths automatically.
-    browser = await playwright.launchChromium({
-      headless: true,
+    // This new launch sequence uses the serverless-optimized browser.
+    browser = await playwright.chromium.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
       proxy: proxyConfig,
     });
     console.log(
