@@ -2,12 +2,12 @@
   "version": 2,
 
   "functions": {
-    "server.js": { "runtime": "nodejs20.x" },
-    "api/daily-refresh.js": { "runtime": "nodejs20.x" },
-    "api/initial-sync.js": { "runtime": "nodejs20.x" },
-    "api/send-scheduled-reports.js": { "runtime": "nodejs20.x" },
+    "server.js": { "runtime": "@vercel/node" },
+    "api/daily-refresh.js": { "runtime": "@vercel/node" },
+    "api/initial-sync.js": { "runtime": "@vercel/node" },
+    "api/send-scheduled-reports.js": { "runtime": "@vercel/node" },
     "api/ota-crawler.js": {
-      "runtime": "nodejs20.x",
+      "runtime": "@vercel/node",
       "maxDuration": 60
     }
   },
