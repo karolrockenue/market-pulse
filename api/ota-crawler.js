@@ -263,7 +263,13 @@ async function main() {
       throw e;
     }
 
-    console.log("Final Library Path to be used:", chromium.libraryPath);
+    // The libraryPath property is undefined in this environment, which is the root cause of the error.
+    // We will manually set the path to the known location of the shared libraries.
+    const libraryPath = "/tmp/swiftshader";
+    console.log(
+      "Final Library Path to be used (manual override):",
+      libraryPath
+    );
 
     browser = await playwright.chromium.launch({
       // Use the arguments recommended by the package for serverless environments.
@@ -273,15 +279,13 @@ async function main() {
       // The headless option for Playwright must be a boolean.
       headless: true,
       proxy: proxyConfig,
-      // Set the library path env variable to ensure the executable can find its dependencies.
+      // Set the library path env variable to the correct, manually-defined path.
+      // This allows the Chromium executable to find libnss3.so and other dependencies.
       env: {
         ...process.env,
-        LD_LIBRARY_PATH: `${chromium.libraryPath}:${
-          process.env.LD_LIBRARY_PATH || ""
-        }`,
+        LD_LIBRARY_PATH: `${libraryPath}:${process.env.LD_LIBRARY_PATH || ""}`,
       },
     });
-
     console.log(
       `Browser launched successfully. Target city: ${cityToScrape.name}`
     );
