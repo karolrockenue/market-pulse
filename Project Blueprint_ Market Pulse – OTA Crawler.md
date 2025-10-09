@@ -114,3 +114,31 @@ Data Extraction Achieved: The script can now reliably extract the primary data p
 Anti-Bot Bypassed: Implemented robust anti-scraping countermeasures, including logic to handle cookie consent banners and the use of a custom User-Agent and viewport to disguise the headless browser.
 
 Dynamic & Verifiable: The script was enhanced to use dynamic dates, allowing for direct, real-time verification of the scraper's accuracy.
+
+v1.2 - 2025-10-08: Advanced Scraper Refinement
+Facet Scraping Implemented: The scraper was enhanced to parse and collect two of the three required facet data points: 'Property Types' and 'Neighbourhoods'.
+
+Refactored for Resilience: The scraping logic was significantly refactored to handle multiple, inconsistent UI patterns served by the target site, including nested accordions and dynamic "Show all" buttons.
+
+Full Data Pipeline to Database: The script now successfully saves all collected data (total_results, facet_property_type, facet_neighbourhood) to the market_availability_snapshots table.
+Outstanding Task: The 'Star rating' facet is not yet being captured reliably. The final task for the data collection phase of the POC is to fix the locator for this last remaining data point.
+
+v1.3 - 2025-10-08: POC Data Collection Complete & Extension Added
+Star Rating Scraper Fixed: The outstanding task from v1.2 was completed. [cite_start]The scraper now reliably captures the 'Star rating' facet by using the correct "Property rating" identifier. [cite: 1]
+
+[cite_start]Price Histogram Implemented: The planned 'Future Extension (v1)' was successfully implemented ahead of schedule. [cite: 1] [cite_start]A new function was added to scrape the price distribution histogram, providing a powerful "median ADR proxy". [cite: 1]
+
+Database Schema Extended: The `market_availability_snapshots` table was updated with a new `facet_price_histogram` column (JSONB) to store the new histogram data.
+
+POC Complete: All data points required for the Proof of Concept—plus the future extension—are now being successfully scraped and saved to the database. The data collection phase is complete.
+
+v1.4 - 2025-10-09: Automation, Resilience & Production Hardening
+Automation Loop Implemented: The script was fully refactored to run in an automated 120-day loop, with throttling between requests, to collect the full forward-looking data set. This included centralizing browser and database resource management to ensure stability over long runs.
+
+Historical Data Model Implemented: The data strategy was updated to store a historical record of each day's scrape. This was achieved by creating a unique, functional index on the `scraped_at` date, allowing for daily trend analysis. An upsert logic was implemented to ensure data freshness for multiple runs within the same day.
+
+Scraper Resilience Hardened: The generic `scrapeFacetGroup` function was significantly refactored to be adaptive. It now handles inconsistent UI patterns on the target site, resolving all previously known intermittent failures for the 'Property type' and 'Neighborhood' facets.
+
+Retry Mechanism Added: The main loop was enhanced with an automatic retry mechanism to re-attempt failed scrapes for individual dates, significantly improving the overall data harvest rate against temporary errors.
+
+Phase 1 Complete: With a fully automated, resilient, and production-ready script, all development for Phase 1 is now complete. The crawler is ready for deployment.
