@@ -15,32 +15,49 @@ module.exports = async (req, res) => {
 
   try {
     const TOTAL_DAYS = 120;
-    const CHUNK_SIZE = 5; // We'll process 5 days per worker function.
-    const workerPromises = [];
+    const CHUNK_SIZE = 5;
+    const workerUrls = [];
 
-    // 2. Loop and create chunks of work.
+    // First, prepare all the worker URLs.
     for (let startDay = 0; startDay < TOTAL_DAYS; startDay += CHUNK_SIZE) {
       const endDay = Math.min(startDay + CHUNK_SIZE - 1, TOTAL_DAYS - 1);
-
-      // 3. Construct the URL for the worker function.
-      // We pass the start day, end day, and the secret.
       const workerUrl = `https://${process.env.VERCEL_URL}/api/ota-crawler?startDay=${startDay}&endDay=${endDay}&secret=${crawlerSecret}`;
-
-      console.log(`  -> Dispatching worker for days ${startDay}-${endDay}`);
-
-      // 4. Trigger the worker. We use fetch but don't wait for the response (fire and forget).
-      // This allows all workers to run in parallel.
-      workerPromises.push(fetch(workerUrl));
+      workerUrls.push({ url: workerUrl, range: `days ${startDay}-${endDay}` });
     }
 
-    // Wait for all the trigger requests to be sent.
-    await Promise.all(workerPromises);
+    console.log(
+      `Prepared ${workerUrls.length} worker jobs. Dispatching now...`
+    );
 
-    const message = `Successfully dispatched ${workerPromises.length} workers to cover ${TOTAL_DAYS} days.`;
-    console.log(message);
-    res.status(200).send(message);
+    // Use Promise.allSettled to attempt all dispatches, even if some fail.
+    const dispatchResults = await Promise.allSettled(
+      workerUrls.map((job) => fetch(job.url))
+    );
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    // Log the outcome of each individual dispatch.
+    dispatchResults.forEach((result, index) => {
+      const job = workerUrls[index];
+      if (result.status === "fulfilled") {
+        // A "fulfilled" status means the fetch request was successfully sent and acknowledged.
+        console.log(`✅ Successfully dispatched worker for ${job.range}.`);
+        successCount++;
+      } else {
+        // A "rejected" status means the fetch request itself failed.
+        console.error(
+          `❌ FAILED to dispatch worker for ${job.range}. Reason: ${result.reason}`
+        );
+        failureCount++;
+      }
+    });
+
+    const summaryMessage = `Dispatch complete. Successful: ${successCount}, Failed: ${failureCount}.`;
+    console.log(summaryMessage);
+    res.status(200).send(summaryMessage);
   } catch (error) {
-    console.error("Error in crawler manager:", error);
+    console.error("A critical error occurred in the crawler manager:", error);
     res.status(500).send(`Manager failed: ${error.message}`);
   }
 };

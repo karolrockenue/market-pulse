@@ -332,7 +332,7 @@ async function main(startDay = 0, endDay = 119) {
   );
 }
 module.exports = async (req, res) => {
-  // Add secret validation to the worker as well.
+  // Secret validation remains the same.
   const { secret, startDay, endDay } = req.query;
   const crawlerSecret = process.env.CRAWLER_SECRET;
 
@@ -341,20 +341,20 @@ module.exports = async (req, res) => {
     return res.status(401).send("Unauthorized");
   }
 
-  // Parse startDay and endDay from the query, with defaults.
   const start = startDay ? parseInt(startDay, 10) : 0;
-  const end = endDay ? parseInt(endDay, 10) : 4; // Default to a small local run.
+  const end = endDay ? parseInt(endDay, 10) : 4;
 
   try {
-    // We don't wait for main() to finish. This allows the manager to move on.
-    main(start, end);
-    // Immediately send a response to acknowledge the job has started.
+    // CRITICAL CHANGE: We now 'await' the main function.
+    // This forces the serverless function to stay alive until the scrape is complete.
+    await main(start, end);
     res
-      .status(202)
-      .send(`Accepted: Worker job started for days ${start}-${end}.`);
+      .status(200)
+      .send(`Success: Worker job completed for days ${start}-${end}.`);
   } catch (error) {
-    console.error("An error occurred during the scraper run:", error);
-    // Note: This error will only catch immediate setup errors, not errors inside main().
-    res.status(500).send(`Scraper run failed: ${error.message}`);
+    console.error(`Worker for days ${start}-${end} failed:`, error);
+    res
+      .status(500)
+      .send(`Worker for days ${start}-${end} failed: ${error.message}`);
   }
 };
