@@ -332,29 +332,30 @@ async function main(startDay = 0, endDay = 119) {
   );
 }
 module.exports = async (req, res) => {
-  // Secret validation remains the same.
   const { secret, startDay, endDay } = req.query;
-  const crawlerSecret = process.env.CRAWLER_SECRET;
+  const jobLabel = `[Worker for days ${startDay}-${endDay}]`;
 
-  if (!crawlerSecret || secret !== crawlerSecret) {
-    console.warn("Unauthorized attempt to trigger a crawler worker.");
-    return res.status(401).send("Unauthorized");
-  }
-
-  const start = startDay ? parseInt(startDay, 10) : 0;
-  const end = endDay ? parseInt(endDay, 10) : 4;
+  console.log(`${jobLabel} --- Job received.`);
 
   try {
-    // CRITICAL CHANGE: We now 'await' the main function.
-    // This forces the serverless function to stay alive until the scrape is complete.
+    const crawlerSecret = process.env.CRAWLER_SECRET;
+
+    if (!crawlerSecret || secret !== crawlerSecret) {
+      console.warn(`${jobLabel} ❌ UNAUTHORIZED: Secret token is invalid.`);
+      return res.status(401).send("Unauthorized");
+    }
+    console.log(`${jobLabel} --- Secret validated.`);
+
+    const start = startDay ? parseInt(startDay, 10) : 0;
+    const end = endDay ? parseInt(endDay, 10) : 4;
+
+    console.log(`${jobLabel} --- Starting main scrape function...`);
     await main(start, end);
-    res
-      .status(200)
-      .send(`Success: Worker job completed for days ${start}-${end}.`);
+    console.log(`${jobLabel} --- Main scrape function finished.`);
+
+    res.status(200).send(`Success: Worker job completed for ${jobLabel}.`);
   } catch (error) {
-    console.error(`Worker for days ${start}-${end} failed:`, error);
-    res
-      .status(500)
-      .send(`Worker for days ${start}-${end} failed: ${error.message}`);
+    console.error(`${jobLabel} ❌ CRITICAL FAILURE in worker handler:`, error);
+    res.status(500).send(`Worker ${jobLabel} failed: ${error.message}`);
   }
 };
