@@ -339,4 +339,3 @@ module.exports = async (request, response) => {
     response.status(500).send(`Scraper run failed: ${error.message}`);
   }
 };
-th;
