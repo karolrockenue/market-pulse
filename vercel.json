@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/ota-crawler.js": {
-      "maxDuration": 800
+      "maxDuration": 300
     }
   },
   "routes": [
