@@ -1,5 +1,5 @@
 require("dotenv").config();
-const playwright = require("playwright");
+const playwright = require("playwright-core");
 const pgPool = require("./utils/db.js");
 /**
  * This is the original Playwright version of the facet scraping function.
