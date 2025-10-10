@@ -1,6 +1,13 @@
 require("dotenv").config();
 const playwright = require("playwright-core");
 const pgPool = require("./utils/db.js");
+
+// Conditionally require @sparticuz/chromium only in production.
+// This loads the package once when the function starts, not inside the loop.
+let chromium = null;
+if (process.env.VERCEL_ENV === "production") {
+  chromium = require("@sparticuz/chromium");
+}
 /**
  * This is the original Playwright version of the facet scraping function.
  * @param {import('playwright').Page} page The Playwright page object.
@@ -263,7 +270,7 @@ async function main(startDay = 0, endDay = 119) {
       };
 
       if (process.env.VERCEL_ENV === "production") {
-        const chromium = require("@sparticuz/chromium");
+        // Use the globally loaded chromium object.
         launchOptions.executablePath = await chromium.executablePath();
         launchOptions.args = chromium.args;
         launchOptions.headless = true;
