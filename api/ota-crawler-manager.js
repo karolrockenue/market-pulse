@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
 
       // 3. Construct the URL for the worker function.
       // We pass the start day, end day, and the secret.
-      const workerUrl = `${process.env.VERCEL_URL}/api/ota-crawler?startDay=${startDay}&endDay=${endDay}&secret=${crawlerSecret}`;
+      const workerUrl = `https://${process.env.VERCEL_URL}/api/ota-crawler?startDay=${startDay}&endDay=${endDay}&secret=${crawlerSecret}`;
 
       console.log(`  -> Dispatching worker for days ${startDay}-${endDay}`);
 
