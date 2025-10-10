@@ -4,8 +4,7 @@
   "main": "api/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node api/index.js",
-    "build": "node -e 'require(\"@sparticuz/chromium\")'"
+    "start": "node api/index.js"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +24,6 @@
     "node-fetch": "^2.7.0",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
-    "playwright-core": "^1.45.1"
+    "puppeteer-core": "^24.23.0"
   }
 }

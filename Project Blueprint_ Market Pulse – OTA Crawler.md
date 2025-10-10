@@ -208,3 +208,35 @@ Symptom: The function logs confirm that the crash occurs during the browserType.
 Symptom: The detailed browser logs show the specific cause of the crash is a missing system library: /tmp/chromium: error while loading shared libraries: libnss3.so: cannot open shared object file: No such file or directory.
 
 The project is now in a stable, deployed state, but the scraper feature remains non-functional due to this final runtime error.
+
+Session updates:
+
+10pm 9 oct
+Session Summary
+As requested, here is a detailed summary of the debugging steps we took to isolate this issue.
+
+Initial State: The scraper function crashed on Vercel with a libnss3.so: cannot open shared object file error, indicating the Chromium executable couldn't find its system dependencies.
+
+Step 1: Enforce Bundling: We added a build script to package.json. The goal was to force Vercel's build process to execute the @sparticuz/chromium installation script and ensure the browser was included in the final deployment. This is a standard practice for this package on Vercel.
+
+Outcome: The error remained unchanged.
+
+Step 2: Correct Library Path: We modified the browser launch call in ota-crawler.js to set the LD_LIBRARY_PATH environment variable, pointing it to the path supposedly provided by chromium.libraryPath.
+
+Outcome: This produced a new error (headless: expected boolean, got string), which was a positive sign. It indicated we had likely progressed past the library loading issue.
+
+Step 3: Fix headless Parameter: We corrected the invalid headless parameter, changing it back to the boolean true.
+
+Outcome: The libnss3.so error unexpectedly returned, suggesting the previous step's "progress" was misleading and the root issue was more complex.
+
+Step 4 & 5: Isolate with Logging: We added targeted console.log statements around the @sparticuz/chromium initialization calls.
+
+Outcome: These logs provided the critical insight: the executablePath was being created successfully, but the chromium.libraryPath property was undefined. This discovery pinpointed the exact point of failure.
+
+Step 6: Manual Path Override: Based on the undefined path, we manually set the LD_LIBRARY_PATH to /tmp/swiftshader, the known location for the shared libraries.
+
+Outcome: The error still persisted.
+
+Step 7: Final File System Check: Our final diagnostic step was to use Node's fs module to check for the existence of the /tmp/swiftshader directory at runtime.
+
+Outcome: This provided the definitive answer. The log Does /tmp/swiftshader directory exist? false proved that the dependency package is failing to unpack its required libraries, explaining why all previous attempts to reference them had failed.
