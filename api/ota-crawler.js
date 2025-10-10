@@ -220,17 +220,20 @@ function delay(ms) {
 /**
  * The main orchestration function.
  */
-async function main() {
-  console.log("🚀 Starting the Market Pulse OTA Crawler...");
+async function main(startDay = 0, endDay = 119) {
+  // Default to the full range
+  console.log(
+    `🚀 Starting the Market Pulse OTA Crawler for days ${startDay}-${endDay}...`
+  );
 
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
   const cityToScrape = { name: "London", slug: "london" };
   const today = new Date();
 
-  // The main loop now iterates through each day.
-  for (let i = 0; i < 120; i++) {
-    let browser = null; // Browser is now defined inside the loop.
+  // The main loop now iterates through the specified day range.
+  for (let i = startDay; i <= endDay; i++) {
+    let browser = null;
 
     const checkinDate = new Date(today);
     checkinDate.setDate(today.getDate() + i);
@@ -240,7 +243,7 @@ async function main() {
     const checkoutStr = formatDate(checkoutDate);
 
     try {
-      // A new browser is launched for each day, ensuring a clean environment.
+      // A new browser is launched for each day.
       console.log("Preparing to launch browser for new day...");
       const proxyEndpoint = process.env.PROXY_ENDPOINT;
       const proxyUsername = process.env.PROXY_USERNAME;
@@ -270,7 +273,6 @@ async function main() {
       browser = await playwright.chromium.launch(launchOptions);
       console.log(`Browser launched successfully for ${checkinStr}.`);
 
-      // The retry logic is now wrapped inside the main try/catch block.
       let success = false;
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -282,7 +284,7 @@ async function main() {
             cityToScrape.slug
           );
           success = true;
-          break; // Break the retry loop on success.
+          break;
         } catch (error) {
           console.warn(
             `---\n ⚠️ Attempt ${attempt}/${MAX_RETRIES} failed for ${checkinStr}: ${error.message} \n---`
@@ -302,21 +304,18 @@ async function main() {
         );
       }
     } catch (error) {
-      // This catches errors from browser launch or the retry loop.
       console.error(
         `A critical error occurred during the scrape for ${checkinStr}:`,
         error
       );
     } finally {
-      // The browser is closed cleanly after each day's scrape finishes or fails.
       if (browser) {
         await browser.close();
         console.log(`Browser closed for ${checkinStr}.`);
       }
     }
 
-    // Throttling between days.
-    if (i < 119) {
+    if (i < endDay) {
       const randomDelay = 4000 + Math.random() * 4000;
       console.log(
         `---\n Throttling: Waiting for ${(randomDelay / 1000).toFixed(
@@ -327,17 +326,35 @@ async function main() {
     }
   }
 
-  // The database pool is now closed once after all days are processed.
   await pgPool.end();
-  console.log("Database pool closed. Crawler run finished.");
+  console.log(
+    `Database pool closed. Crawler run finished for days ${startDay}-${endDay}.`
+  );
 }
-// We are keeping the robust CommonJS handler for Vercel.
-module.exports = async (request, response) => {
+module.exports = async (req, res) => {
+  // Add secret validation to the worker as well.
+  const { secret, startDay, endDay } = req.query;
+  const crawlerSecret = process.env.CRAWLER_SECRET;
+
+  if (!crawlerSecret || secret !== crawlerSecret) {
+    console.warn("Unauthorized attempt to trigger a crawler worker.");
+    return res.status(401).send("Unauthorized");
+  }
+
+  // Parse startDay and endDay from the query, with defaults.
+  const start = startDay ? parseInt(startDay, 10) : 0;
+  const end = endDay ? parseInt(endDay, 10) : 4; // Default to a small local run.
+
   try {
-    await main();
-    response.status(200).send("Scraper run completed successfully.");
+    // We don't wait for main() to finish. This allows the manager to move on.
+    main(start, end);
+    // Immediately send a response to acknowledge the job has started.
+    res
+      .status(202)
+      .send(`Accepted: Worker job started for days ${start}-${end}.`);
   } catch (error) {
     console.error("An error occurred during the scraper run:", error);
-    response.status(500).send(`Scraper run failed: ${error.message}`);
+    // Note: This error will only catch immediate setup errors, not errors inside main().
+    res.status(500).send(`Scraper run failed: ${error.message}`);
   }
 };
