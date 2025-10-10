@@ -222,60 +222,55 @@ function delay(ms) {
  */
 async function main() {
   console.log("🚀 Starting the Market Pulse OTA Crawler...");
-  let browser = null;
 
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
   const cityToScrape = { name: "London", slug: "london" };
+  const today = new Date();
 
-  try {
-    // Get the Browserless.io API key from environment variables.
-    console.log("Preparing to launch self-hosted Chromium browser...");
+  // The main loop now iterates through each day.
+  for (let i = 0; i < 120; i++) {
+    let browser = null; // Browser is now defined inside the loop.
 
-    // Read the Smartproxy credentials from the .env file.
-    const proxyEndpoint = process.env.PROXY_ENDPOINT;
-    const proxyUsername = process.env.PROXY_USERNAME;
-    const proxyPassword = process.env.PROXY_PASSWORD;
+    const checkinDate = new Date(today);
+    checkinDate.setDate(today.getDate() + i);
+    const checkoutDate = new Date(checkinDate);
+    checkoutDate.setDate(checkinDate.getDate() + 1);
+    const checkinStr = formatDate(checkinDate);
+    const checkoutStr = formatDate(checkoutDate);
 
-    if (!proxyEndpoint || !proxyUsername || !proxyPassword) {
-      throw new Error("Proxy credentials are not set in your .env file.");
-    }
-    let launchOptions = {
-      proxy: {
-        server: `http://${proxyEndpoint}`,
-        username: proxyUsername,
-        password: proxyPassword,
-      },
-    };
+    try {
+      // A new browser is launched for each day, ensuring a clean environment.
+      console.log("Preparing to launch browser for new day...");
+      const proxyEndpoint = process.env.PROXY_ENDPOINT;
+      const proxyUsername = process.env.PROXY_USERNAME;
+      const proxyPassword = process.env.PROXY_PASSWORD;
+      if (!proxyEndpoint || !proxyUsername || !proxyPassword) {
+        throw new Error(
+          "Proxy credentials are not set in environment variables."
+        );
+      }
 
-    // Vercel sets this variable to "production" on deployment.
-    if (process.env.VERCEL_ENV === "production") {
-      console.log(
-        "Production environment detected. Using @sparticuz/chromium."
-      );
-      const chromium = require("@sparticuz/chromium");
-      launchOptions.executablePath = await chromium.executablePath();
-      launchOptions.args = chromium.args;
-      launchOptions.headless = true;
-    } else {
-      console.log("Local environment detected. Using standard Chromium.");
-      launchOptions.headless = false; // See the browser locally.
-    }
+      let launchOptions = {
+        proxy: {
+          server: `http://${proxyEndpoint}`,
+          username: proxyUsername,
+          password: proxyPassword,
+        },
+      };
 
-    browser = await playwright.chromium.launch(launchOptions);
-    console.log(
-      `Browser launched successfully. Target city: ${cityToScrape.name}`
-    );
+      if (process.env.VERCEL_ENV === "production") {
+        const chromium = require("@sparticuz/chromium");
+        launchOptions.executablePath = await chromium.executablePath();
+        launchOptions.args = chromium.args;
+        launchOptions.headless = true;
+      } else {
+        launchOptions.headless = false;
+      }
+      browser = await playwright.chromium.launch(launchOptions);
+      console.log(`Browser launched successfully for ${checkinStr}.`);
 
-    const today = new Date();
-    for (let i = 0; i < 120; i++) {
-      const checkinDate = new Date(today);
-      checkinDate.setDate(today.getDate() + i);
-      const checkoutDate = new Date(checkinDate);
-      checkoutDate.setDate(checkinDate.getDate() + 1);
-      const checkinStr = formatDate(checkinDate);
-      const checkoutStr = formatDate(checkoutDate);
-
+      // The retry logic is now wrapped inside the main try/catch block.
       let success = false;
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -287,16 +282,12 @@ async function main() {
             cityToScrape.slug
           );
           success = true;
-          break;
+          break; // Break the retry loop on success.
         } catch (error) {
           console.warn(
             `---\n ⚠️ Attempt ${attempt}/${MAX_RETRIES} failed for ${checkinStr}: ${error.message} \n---`
           );
-          if (attempt === MAX_RETRIES) {
-            console.error(
-              `---\n ❌ All ${MAX_RETRIES} attempts failed for ${checkinStr}. Moving to next day. \n---`
-            );
-          } else {
+          if (attempt < MAX_RETRIES) {
             console.log(
               `---\n Retrying in ${RETRY_DELAY / 1000} seconds... \n---`
             );
@@ -305,30 +296,41 @@ async function main() {
         }
       }
 
-      if (i < 119) {
-        const randomDelay = 4000 + Math.random() * 4000;
-        console.log(
-          `---\n Throttling: Waiting for ${(randomDelay / 1000).toFixed(
-            2
-          )} seconds... \n---`
+      if (!success) {
+        console.error(
+          `---\n ❌ All ${MAX_RETRIES} attempts failed for ${checkinStr}. Moving to next day. \n---`
         );
-        await delay(randomDelay);
+      }
+    } catch (error) {
+      // This catches errors from browser launch or the retry loop.
+      console.error(
+        `A critical error occurred during the scrape for ${checkinStr}:`,
+        error
+      );
+    } finally {
+      // The browser is closed cleanly after each day's scrape finishes or fails.
+      if (browser) {
+        await browser.close();
+        console.log(`Browser closed for ${checkinStr}.`);
       }
     }
 
-    console.log("✅ Crawler run finished for all 120 days.");
-  } catch (error) {
-    console.error("A critical error occurred in the main process:", error);
-  } finally {
-    if (browser) {
-      await browser.close();
-      console.log("Browser closed.");
+    // Throttling between days.
+    if (i < 119) {
+      const randomDelay = 4000 + Math.random() * 4000;
+      console.log(
+        `---\n Throttling: Waiting for ${(randomDelay / 1000).toFixed(
+          2
+        )} seconds... \n---`
+      );
+      await delay(randomDelay);
     }
-    await pgPool.end();
-    console.log("Database pool closed.");
   }
-}
 
+  // The database pool is now closed once after all days are processed.
+  await pgPool.end();
+  console.log("Database pool closed. Crawler run finished.");
+}
 // We are keeping the robust CommonJS handler for Vercel.
 module.exports = async (request, response) => {
   try {
