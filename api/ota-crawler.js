@@ -256,7 +256,7 @@ async function main() {
       const chromium = require("@sparticuz/chromium");
       launchOptions.executablePath = await chromium.executablePath();
       launchOptions.args = chromium.args;
-      launchOptions.headless = chromium.headless;
+      launchOptions.headless = true;
     } else {
       console.log("Local environment detected. Using standard Chromium.");
       launchOptions.headless = false; // See the browser locally.
