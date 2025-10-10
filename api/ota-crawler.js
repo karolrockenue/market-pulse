@@ -1,8 +1,9 @@
 require("dotenv").config();
 const playwright = require("playwright-core");
 // This is the new part: we get the path to the bundled browser directly.
+
 const browserExecutablePath =
-  require("@playwright/browser-chromium").executablePath();
+  require("@playwright/browser-chromium").executablePath;
 const pgPool = require("./utils/db.js");
 
 /**
