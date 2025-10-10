@@ -1,14 +1,9 @@
 require("dotenv").config();
-const playwright = require("playwright-core");
-// This is the new part: we get the path to the bundled browser directly.
-
-const browserExecutablePath =
-  require("@playwright/browser-chromium").executablePath;
+const playwright = require("playwright");
 const pgPool = require("./utils/db.js");
-
 /**
  * This is the original Playwright version of the facet scraping function.
- * @param {import('playwright-core').Page} page The Playwright page object.
+ * @param {import('playwright').Page} page The Playwright page object.
  * @param {string} filterName The name of the filter group to scrape (e.g., "Property type").
  * @returns {Promise<{[key: string]: number}>} A promise that resolves to an object of scraped names and counts.
  */
@@ -81,7 +76,7 @@ async function scrapeFacetGroup(page, filterName) {
 
 /**
  * The original Playwright version of the price histogram scraping function.
- * @param {import('playwright-core').Page} page The Playwright page object.
+ * @param {import('playwright').Page} page The Playwright page object.
  * @returns {Promise<number[]>} An array of integers representing the histogram bar heights.
  */
 async function scrapePriceHistogram(page) {
@@ -234,26 +229,40 @@ async function main() {
   const cityToScrape = { name: "London", slug: "london" };
 
   try {
-    const proxyConfig = {
-      server: process.env.PROXY_ENDPOINT,
-      username: process.env.PROXY_USERNAME,
-      password: process.env.PROXY_PASSWORD,
+    // Get the Browserless.io API key from environment variables.
+    console.log("Preparing to launch self-hosted Chromium browser...");
+
+    // Read the Smartproxy credentials from the .env file.
+    const proxyEndpoint = process.env.PROXY_ENDPOINT;
+    const proxyUsername = process.env.PROXY_USERNAME;
+    const proxyPassword = process.env.PROXY_PASSWORD;
+
+    if (!proxyEndpoint || !proxyUsername || !proxyPassword) {
+      throw new Error("Proxy credentials are not set in your .env file.");
+    }
+    let launchOptions = {
+      proxy: {
+        server: `http://${proxyEndpoint}`,
+        username: proxyUsername,
+        password: proxyPassword,
+      },
     };
 
-    // This is the new browser launch method.
-    // It uses the executablePath from the bundled browser package and
-    // adds sandbox arguments required for most serverless environments.
-    browser = await playwright.chromium.launch({
-      executablePath: browserExecutablePath,
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-      ],
-      proxy: proxyConfig,
-    });
+    // Vercel sets this variable to "production" on deployment.
+    if (process.env.VERCEL_ENV === "production") {
+      console.log(
+        "Production environment detected. Using @sparticuz/chromium."
+      );
+      const chromium = require("@sparticuz/chromium");
+      launchOptions.executablePath = await chromium.executablePath();
+      launchOptions.args = chromium.args;
+      launchOptions.headless = chromium.headless;
+    } else {
+      console.log("Local environment detected. Using standard Chromium.");
+      launchOptions.headless = false; // See the browser locally.
+    }
 
+    browser = await playwright.chromium.launch(launchOptions);
     console.log(
       `Browser launched successfully. Target city: ${cityToScrape.name}`
     );
