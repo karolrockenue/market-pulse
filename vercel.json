@@ -3,19 +3,12 @@
   "functions": {
     "api/ota-crawler.js": {
       "maxDuration": 300
-    },
-    "api/ota-crawler-manager.js": {
-      "maxDuration": 60
     }
   },
   "routes": [
     {
       "src": "/api/ota-crawler",
       "dest": "api/ota-crawler.js"
-    },
-    {
-      "src": "/api/ota-crawler-manager",
-      "dest": "api/ota-crawler-manager.js"
     },
     {
       "src": "/(.*)",
@@ -32,7 +25,7 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/ota-crawler-manager?secret=${CRAWLER_SECRET}",
+      "path": "/api/ota-crawler",
       "schedule": "0 5 * * *"
     }
   ]

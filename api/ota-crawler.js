@@ -3,45 +3,28 @@ const playwright = require("playwright-core");
 const pgPool = require("./utils/db.js");
 
 // Conditionally require @sparticuz/chromium only in production.
-// This loads the package once when the function starts, not inside the loop.
 let chromium = null;
 if (process.env.VERCEL_ENV === "production") {
   chromium = require("@sparticuz/chromium");
 }
-/**
- * This is the original Playwright version of the facet scraping function.
- * @param {import('playwright').Page} page The Playwright page object.
- * @param {string} filterName The name of the filter group to scrape (e.g., "Property type").
- * @returns {Promise<{[key: string]: number}>} A promise that resolves to an object of scraped names and counts.
- */
+
 async function scrapeFacetGroup(page, filterName) {
   const results = {};
   try {
-    console.log(`🔍 Scraping facet group: "${filterName}"...`);
-
     const groupContainer = page
       .locator('div[data-testid="filters-group"], fieldset')
-      .filter({
-        hasText: new RegExp(filterName, "i"),
-      });
-
+      .filter({ hasText: new RegExp(filterName, "i") });
     const showAllButton = groupContainer
       .locator('button[data-testid="filters-group-expand-collapse"]')
       .first();
     if (await showAllButton.isVisible({ timeout: 1000 })) {
-      console.log(`  -> Clicking "Show all" for "${filterName}"...`);
       await showAllButton.click();
       await page.waitForTimeout(500);
     }
-
     const parentButtons = await groupContainer
       .locator('button[data-testid="parent-checkbox-filter"]')
       .all();
-
     if (parentButtons.length > 0) {
-      console.log(
-        `  -> Found ${parentButtons.length} parent categories to expand for "${filterName}".`
-      );
       for (const button of parentButtons) {
         if (
           (await button.isVisible()) &&
@@ -52,7 +35,6 @@ async function scrapeFacetGroup(page, filterName) {
         }
       }
     }
-
     const options = await groupContainer
       .locator("div[data-filters-item]")
       .all();
@@ -61,12 +43,10 @@ async function scrapeFacetGroup(page, filterName) {
         'div[data-testid="filters-group-label-content"]'
       );
       const countElement = option.locator(".fff1944c52");
-
       if ((await nameElement.count()) > 0 && (await countElement.count()) > 0) {
         const name = (await nameElement.innerText()).trim();
         const countText = await countElement.textContent();
         const count = parseInt(countText.trim().replace(/,/g, ""), 10);
-
         if (name && !isNaN(count)) {
           results[name] = count;
         }
@@ -74,22 +54,16 @@ async function scrapeFacetGroup(page, filterName) {
     }
   } catch (error) {
     console.warn(
-      `Could not fully parse the facet group: "${filterName}"`,
+      `Could not fully parse facet group: "${filterName}"`,
       error.message
     );
   }
   return results;
 }
 
-/**
- * The original Playwright version of the price histogram scraping function.
- * @param {import('playwright').Page} page The Playwright page object.
- * @returns {Promise<number[]>} An array of integers representing the histogram bar heights.
- */
 async function scrapePriceHistogram(page) {
   const results = [];
   try {
-    console.log(`📊 Scraping price histogram...`);
     const histogramContainer = page.locator(
       'div[data-testid="filters-group-histogram"]'
     );
@@ -102,14 +76,11 @@ async function scrapePriceHistogram(page) {
       }
     }
   } catch (error) {
-    console.warn(`Could not find or parse the price histogram.`, error.message);
+    console.warn(`Could not parse price histogram.`, error.message);
   }
   return results;
 }
 
-/**
- * The original Playwright version of the main scraper function.
- */
 async function scrapeCity(
   browser,
   checkinDate,
@@ -117,11 +88,7 @@ async function scrapeCity(
   cityName,
   citySlug
 ) {
-  console.log(
-    `\n---\n Scraping ${cityName} for check-in date: ${checkinDate} \n---`
-  );
   let context = null;
-
   try {
     context = await browser.newContext({
       userAgent:
@@ -129,25 +96,17 @@ async function scrapeCity(
       viewport: { width: 1920, height: 1080 },
     });
     const page = await context.newPage();
-
     const urlCityName = cityName.replace(" ", "+");
     const targetUrl = `https://www.booking.com/searchresults.html?ss=${urlCityName}&checkin=${checkinDate}&checkout=${checkoutDate}&group_adults=2&lang=en-us`;
-
-    console.log(`Navigating to ${targetUrl}...`);
     await page.goto(targetUrl, { waitUntil: "networkidle" });
-    console.log("Page loaded and network is idle.");
-
     try {
       await page
         .locator("button#onetrust-accept-btn-handler")
         .click({ timeout: 5000 });
-      console.log("Cookie consent button clicked.");
       await page.waitForLoadState("networkidle");
-      console.log("Network is idle after click.");
     } catch (error) {
       console.log("Cookie consent button not found, continuing...");
     }
-
     const resultsHeaderLocator = page.locator(
       'h1:has-text("properties found")'
     );
@@ -155,37 +114,13 @@ async function scrapeCity(
       timeout: 10000,
     });
     const numberMatch = headerText.match(/\d{1,3}(,\d{3})*/);
-
     if (numberMatch && numberMatch[0]) {
       const totalResults = parseInt(numberMatch[0].replace(/,/g, ""), 10);
-      console.log(`Total properties found: ${totalResults}`);
-
       const propertyTypes = await scrapeFacetGroup(page, "Property type");
       const starRatings = await scrapeFacetGroup(page, "Property rating");
       const neighbourhoods = await scrapeFacetGroup(page, "Neighborhood");
       const priceHistogram = await scrapePriceHistogram(page);
-
-      console.log("📊 Scraped Property Types:", propertyTypes);
-      console.log("⭐️ Scraped Star Ratings:", starRatings);
-      console.log("📍 Scraped Neighbourhoods:", neighbourhoods);
-      console.log("💰 Scraped Price Histogram:", priceHistogram);
-
-      const insertQuery = `
-        INSERT INTO market_availability_snapshots(
-          provider, city_slug, checkin_date, total_results,
-          facet_property_type, facet_star_rating, facet_neighbourhood,
-          facet_price_histogram, scraped_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-        ON CONFLICT (provider, city_slug, checkin_date, (CAST(scraped_at AT TIME ZONE 'UTC' AS DATE)))
-        DO UPDATE SET
-          total_results = EXCLUDED.total_results,
-          facet_property_type = EXCLUDED.facet_property_type,
-          facet_star_rating = EXCLUDED.facet_star_rating,
-          facet_neighbourhood = EXCLUDED.facet_neighbourhood,
-          facet_price_histogram = EXCLUDED.facet_price_histogram,
-          scraped_at = NOW()
-        RETURNING id;
-      `;
+      const insertQuery = `INSERT INTO market_availability_snapshots(provider, city_slug, checkin_date, total_results, facet_property_type, facet_star_rating, facet_neighbourhood, facet_price_histogram, scraped_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) ON CONFLICT (provider, city_slug, checkin_date, (CAST(scraped_at AT TIME ZONE 'UTC' AS DATE))) DO UPDATE SET total_results = EXCLUDED.total_results, facet_property_type = EXCLUDED.facet_property_type, facet_star_rating = EXCLUDED.facet_star_rating, facet_neighbourhood = EXCLUDED.facet_neighbourhood, facet_price_histogram = EXCLUDED.facet_price_histogram, scraped_at = NOW() RETURNING id;`;
       const values = [
         "booking",
         citySlug,
@@ -196,16 +131,13 @@ async function scrapeCity(
         JSON.stringify(neighbourhoods),
         JSON.stringify(priceHistogram),
       ];
-
       const result = await pgPool.query(insertQuery, values);
       console.log(
-        `✅ Successfully saved/updated snapshot to DB with ID: ${result.rows[0].id}`
+        `✅ [DEBUG-STEP-1] Successfully saved snapshot for ${checkinDate} with ID: ${result.rows[0].id}`
       );
     } else {
-      console.log("Could not find the total number of properties on the page.");
+      throw new Error("Could not find total properties on page.");
     }
-  } catch (error) {
-    throw error;
   } finally {
     if (context) {
       await context.close();
@@ -214,63 +146,32 @@ async function scrapeCity(
 }
 
 function formatDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  /* ... same as before ... */
 }
-
 function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  /* ... same as before ... */
 }
 
-/**
- * The main orchestration function.
- */
-async function main(startDay = 0, endDay = 119) {
-  // Default to the full range
-  console.log(
-    `🚀 Starting the Market Pulse OTA Crawler for days ${startDay}-${endDay}...`
-  );
-
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 5000;
+async function main() {
+  console.log("🚀 [DEBUG-STEP-1] Starting Monolithic Scraper Test...");
   const cityToScrape = { name: "London", slug: "london" };
   const today = new Date();
-
-  // The main loop now iterates through the specified day range.
-  for (let i = startDay; i <= endDay; i++) {
+  for (let i = 0; i < 5; i++) {
+    // Hardcoded to 5 days for this test
     let browser = null;
-
     const checkinDate = new Date(today);
     checkinDate.setDate(today.getDate() + i);
-    const checkoutDate = new Date(checkinDate);
-    checkoutDate.setDate(checkinDate.getDate() + 1);
     const checkinStr = formatDate(checkinDate);
-    const checkoutStr = formatDate(checkoutDate);
-
+    const checkoutStr = formatDate(new Date(checkinDate.getTime() + 86400000));
     try {
-      // A new browser is launched for each day.
-      console.log("Preparing to launch browser for new day...");
-      const proxyEndpoint = process.env.PROXY_ENDPOINT;
-      const proxyUsername = process.env.PROXY_USERNAME;
-      const proxyPassword = process.env.PROXY_PASSWORD;
-      if (!proxyEndpoint || !proxyUsername || !proxyPassword) {
-        throw new Error(
-          "Proxy credentials are not set in environment variables."
-        );
-      }
-
       let launchOptions = {
         proxy: {
-          server: `http://${proxyEndpoint}`,
-          username: proxyUsername,
-          password: proxyPassword,
+          server: `http://${process.env.PROXY_ENDPOINT}`,
+          username: process.env.PROXY_USERNAME,
+          password: process.env.PROXY_PASSWORD,
         },
       };
-
       if (process.env.VERCEL_ENV === "production") {
-        // Use the globally loaded chromium object.
         launchOptions.executablePath = await chromium.executablePath();
         launchOptions.args = chromium.args;
         launchOptions.headless = true;
@@ -278,38 +179,13 @@ async function main(startDay = 0, endDay = 119) {
         launchOptions.headless = false;
       }
       browser = await playwright.chromium.launch(launchOptions);
-      console.log(`Browser launched successfully for ${checkinStr}.`);
-
-      let success = false;
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          await scrapeCity(
-            browser,
-            checkinStr,
-            checkoutStr,
-            cityToScrape.name,
-            cityToScrape.slug
-          );
-          success = true;
-          break;
-        } catch (error) {
-          console.warn(
-            `---\n ⚠️ Attempt ${attempt}/${MAX_RETRIES} failed for ${checkinStr}: ${error.message} \n---`
-          );
-          if (attempt < MAX_RETRIES) {
-            console.log(
-              `---\n Retrying in ${RETRY_DELAY / 1000} seconds... \n---`
-            );
-            await delay(RETRY_DELAY);
-          }
-        }
-      }
-
-      if (!success) {
-        console.error(
-          `---\n ❌ All ${MAX_RETRIES} attempts failed for ${checkinStr}. Moving to next day. \n---`
-        );
-      }
+      await scrapeCity(
+        browser,
+        checkinStr,
+        checkoutStr,
+        cityToScrape.name,
+        cityToScrape.slug
+      );
     } catch (error) {
       console.error(
         `A critical error occurred during the scrape for ${checkinStr}:`,
@@ -318,51 +194,26 @@ async function main(startDay = 0, endDay = 119) {
     } finally {
       if (browser) {
         await browser.close();
-        console.log(`Browser closed for ${checkinStr}.`);
+      }
+      if (i < 4) {
+        await delay(5000);
       }
     }
-
-    if (i < endDay) {
-      const randomDelay = 4000 + Math.random() * 4000;
-      console.log(
-        `---\n Throttling: Waiting for ${(randomDelay / 1000).toFixed(
-          2
-        )} seconds... \n---`
-      );
-      await delay(randomDelay);
-    }
   }
-
   await pgPool.end();
-  console.log(
-    `Database pool closed. Crawler run finished for days ${startDay}-${endDay}.`
-  );
+  console.log("Database pool closed. Monolithic run finished.");
 }
+
 module.exports = async (req, res) => {
-  const { secret, startDay, endDay } = req.query;
-  const jobLabel = `[Worker for days ${startDay}-${endDay}]`;
-
-  console.log(`${jobLabel} --- Job received.`);
-
+  console.log("[DEBUG-STEP-1] Monolithic handler invoked.");
   try {
-    const crawlerSecret = process.env.CRAWLER_SECRET;
-
-    if (!crawlerSecret || secret !== crawlerSecret) {
-      console.warn(`${jobLabel} ❌ UNAUTHORIZED: Secret token is invalid.`);
-      return res.status(401).send("Unauthorized");
-    }
-    console.log(`${jobLabel} --- Secret validated.`);
-
-    const start = startDay ? parseInt(startDay, 10) : 0;
-    const end = endDay ? parseInt(endDay, 10) : 4;
-
-    console.log(`${jobLabel} --- Starting main scrape function...`);
-    await main(start, end);
-    console.log(`${jobLabel} --- Main scrape function finished.`);
-
-    res.status(200).send(`Success: Worker job completed for ${jobLabel}.`);
+    await main();
+    res.status(200).send("Monolithic scraper run completed.");
   } catch (error) {
-    console.error(`${jobLabel} ❌ CRITICAL FAILURE in worker handler:`, error);
-    res.status(500).send(`Worker ${jobLabel} failed: ${error.message}`);
+    console.error(
+      "[DEBUG-STEP-1] CRITICAL FAILURE in monolithic handler:",
+      error
+    );
+    res.status(500).send(`Monolithic scraper failed: ${error.message}`);
   }
 };
