@@ -206,18 +206,16 @@ app.get("/signin", (req, res) => {
   res.sendFile(path.join(publicPath, "login.html"));
 });
 
-app.get("/app/", requirePageLogin, (req, res) => {
+// server.js
+// --- NEW: SPA CATCH-ALL ROUTE ---
+// This route serves the main entry point of the React application for any page within the /app/ directory.
+// The `requirePageLogin` middleware protects the entire React app.
+// React Router will handle the client-side navigation for specific paths like /app/reports or /app/settings.
+app.get("/app/*", requirePageLogin, (req, res) => {
   res.sendFile(path.join(publicPath, "app", "index.html"));
 });
 
-app.get("/app/reports.html", requirePageLogin, (req, res) => {
-  res.sendFile(path.join(publicPath, "app", "reports.html"));
-});
-
-app.get("/app/settings.html", requirePageLogin, (req, res) => {
-  res.sendFile(path.join(publicPath, "app", "settings.html"));
-});
-
+// The admin route remains unchanged as it is not part of the React SPA.
 app.get("/admin/", (req, res) => {
   res.sendFile(path.join(publicPath, "admin", "index.html"));
 });
