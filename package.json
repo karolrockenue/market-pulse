@@ -6,9 +6,11 @@
   "author": "",
   "license": "ISC",
   "description": "",
+
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "vercel-build": "cd ../Market\\ Pulse\\ Dashboard\\ Redesign && npm install && npm run build && cd ../market-pulse && rm -rf public/app && mkdir -p public/app && cp -r ../Market\\ Pulse\\ Dashboard\\ Redesign/build/* public/app/"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
@@ -23,8 +25,5 @@
     "node-fetch": "^2.7.0",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4"
-  },
-  "engines": {
-    "node": "20.x"
   }
 }
