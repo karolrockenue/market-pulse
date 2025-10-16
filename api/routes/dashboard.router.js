@@ -236,9 +236,10 @@ router.get("/last-refresh-time", requireUserApi, async (req, res) => {
   }
 });
 
+// dashboard.router.js
 router.get("/kpi-summary", requireUserApi, async (req, res) => {
   try {
-    // PREVENT CACHING: Add headers to ensure fresh data is always fetched for the KPI cards.
+    // --- SETUP: Prevent caching and get query params ---
     res.set({
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       Pragma: "no-cache",
@@ -247,117 +248,121 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     });
 
     const { startDate, endDate, propertyId } = req.query;
-    if (!propertyId)
+    if (!propertyId) {
       return res.status(400).json({ error: "A propertyId is required." });
-
-    // Security check to ensure the user has access to the requested property.
-    if (req.session.role !== "super_admin") {
-      const userResult = await pgPool.query(
-        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-        [req.session.userId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res
-          .status(403)
-          .json({ error: "Access denied: User not found." });
-      }
-      const internalUserId = userResult.rows[0].user_id;
-
-      const accessCheck = await pgPool.query(
-        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
-        [req.session.userId, internalUserId, propertyId]
-      );
-
-      if (accessCheck.rows.length === 0) {
-        return res
-          .status(403)
-          .json({ error: "Access denied to this property." });
-      }
     }
 
-    const compSetResult = await pgPool.query(
-      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
-    );
+    // --- STEP 1: Security Check (omitted for brevity, same as before) ---
+    if (req.session.role !== "super_admin") {
+      const userResult = await pgPool.query("SELECT user_id FROM users WHERE cloudbeds_user_id = $1", [req.session.userId]);
+      if (userResult.rows.length === 0) return res.status(403).json({ error: "Access denied: User not found." });
+      const internalUserId = userResult.rows[0].user_id;
+      const accessCheck = await pgPool.query("SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer", [req.session.userId, internalUserId, propertyId]);
+      if (accessCheck.rows.length === 0) return res.status(403).json({ error: "Access denied to this property." });
+    }
+    
+    // --- STEP 2: Determine Competitive Set (same logic as before) ---
+    const compSetResult = await pgPool.query("SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1", [propertyId]);
     let competitorIds;
-
     if (compSetResult.rows.length > 0) {
       competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
     } else {
-      const categoryResult = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
-      );
+      const categoryResult = await pgPool.query("SELECT category FROM hotels WHERE hotel_id = $1", [propertyId]);
       const category = categoryResult.rows[0]?.category;
-      if (!category) return res.json({ yourHotel: {}, market: {} });
-
-      const categoryCompSetResult = await pgPool.query(
-        "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-        [category, propertyId]
-      );
+      if (!category) return res.json({ kpis: {}, marketRank: {}, chartData: [], tableData: [] });
+      const categoryCompSetResult = await pgPool.query("SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2", [category, propertyId]);
       competitorIds = categoryCompSetResult.rows.map((row) => row.hotel_id);
     }
 
-    if (competitorIds.length === 0) {
-      // This is a fallback for hotels with no competitors.
-      // It now correctly uses the new pre-calculated gross revenue and revpar columns.
-      const yourHotelQuery = `
-          SELECT
-            AVG(gross_adr) AS your_adr,
-       
-        (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as your_occupancy_direct,
-            AVG(gross_revpar) AS your_revpar
-          FROM daily_metrics_snapshots
-          WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3;
-        `;
-      const yourHotelResult = await pgPool.query(yourHotelQuery, [
-        propertyId,
-        startDate,
-        endDate,
-      ]);
-      // Return the hotel's own data and an empty object for the market.
-      return res.json({ yourHotel: yourHotelResult.rows[0] || {}, market: {} });
-    }
+    // --- STEP 3: Fetch all data concurrently using Promise.all for performance ---
+    const allHotelIds = [propertyId, ...competitorIds];
 
-    const kpiQuery = `
-      SELECT
-          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_adr ELSE NULL END) AS your_adr,
+    const [kpiData, rankingData, hotelHistory, marketHistory] = await Promise.all([
+      // Query 1: Get aggregate KPIs for the main cards
+      pgPool.query(`
+        SELECT
+          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_adr END) AS your_adr,
+          (SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::numeric / NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0)) AS your_occupancy,
+          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_revpar END) AS your_revpar,
+          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_adr END) AS market_adr,
+          (SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::numeric / NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0)) AS market_occupancy,
+          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_revpar END) AS market_revpar
+        FROM daily_metrics_snapshots dms
+        WHERE dms.stay_date BETWEEN $2 AND $3 AND dms.hotel_id = ANY($4::int[]);
+      `, [propertyId, startDate, endDate, allHotelIds]),
 
-          SUM(CASE WHEN dms.hotel_id = $1 THEN dms.rooms_sold ELSE 0 END)::numeric /
-          NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0) AS your_occupancy,
+      // Query 2: Get market ranking
+      pgPool.query(`
+        WITH HotelPerformance AS (
+          SELECT hotel_id, AVG(gross_revpar) AS revpar FROM daily_metrics_snapshots
+          WHERE hotel_id = ANY($1::int[]) AND stay_date BETWEEN $2 AND $3 GROUP BY hotel_id
+        ), Rankings AS (
+          SELECT hotel_id, RANK() OVER (ORDER BY revpar DESC NULLS LAST) as revpar_rank FROM HotelPerformance
+        )
+        SELECT revpar_rank FROM Rankings WHERE hotel_id = $4;
+      `, [allHotelIds, startDate, endDate, propertyId]),
 
-          AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_revpar ELSE NULL END) AS your_revpar,
-          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_adr ELSE NULL END) AS market_adr,
+      // Query 3: Get hotel's historical data for the chart
+      pgPool.query(`
+        SELECT stay_date AS date, occupancy_direct, gross_adr, gross_revpar
+        FROM daily_metrics_snapshots WHERE hotel_id = $1 AND stay_date BETWEEN $2 AND $3 ORDER BY stay_date;
+      `, [propertyId, startDate, endDate]),
 
-  
-          SUM(CASE WHEN dms.hotel_id != $1 THEN dms.rooms_sold ELSE 0 END)::numeric /
-          NULLIF(SUM(CASE WHEN dms.hotel_id != $1 THEN dms.capacity_count ELSE 0 END), 0) AS market_occupancy,
-
-          AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_revpar ELSE NULL END) AS market_revpar
-      FROM daily_metrics_snapshots dms
-      WHERE dms.stay_date >= $2 AND dms.stay_date <= $3 AND (dms.hotel_id = $1 OR dms.hotel_id = ANY($4::int[]));
-    `;
-    const result = await pgPool.query(kpiQuery, [
-      propertyId,
-      startDate,
-      endDate,
-      competitorIds,
+      // Query 4: Get market's historical data for the chart
+      pgPool.query(`
+        SELECT stay_date AS date, 
+          (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as occupancy_direct,
+          AVG(gross_adr) as gross_adr,
+          AVG(gross_revpar) as gross_revpar
+        FROM daily_metrics_snapshots WHERE hotel_id = ANY($1::int[]) AND stay_date BETWEEN $2 AND $3 GROUP BY stay_date ORDER BY stay_date;
+      `, [competitorIds, startDate, endDate])
     ]);
-    const kpis = result.rows[0] || {};
 
-    res.json({
-      yourHotel: {
-        occupancy: kpis.your_occupancy,
-        adr: kpis.your_adr,
-        revpar: kpis.your_revpar,
-      },
-      market: {
-        occupancy: kpis.market_occupancy,
-        adr: kpis.market_adr,
-        revpar: kpis.market_revpar,
-      },
+    // --- STEP 4: Process and format the data into the required structure ---
+    const baseKpis = kpiData.rows[0] || {};
+    const yourOccupancy = (baseKpis.your_occupancy || 0) * 100;
+    const marketOccupancy = (baseKpis.market_occupancy || 0) * 100;
+
+    // Format KPI card data
+    const finalKpis = {
+      occupancy: yourOccupancy,
+      adr: baseKpis.your_adr || 0,
+      revpar: baseKpis.your_revpar || 0,
+      occupancyChange: yourOccupancy - marketOccupancy,
+      adrChange: (baseKpis.your_adr || 0) - (baseKpis.market_adr || 0),
+      revparChange: (baseKpis.your_revpar || 0) - (baseKpis.market_revpar || 0),
+    };
+
+    // Format Market Rank data
+    const finalMarketRank = {
+      rank: rankingData.rows.length > 0 ? parseInt(rankingData.rows[0].revpar_rank, 10) : allHotelIds.length,
+      total: allHotelIds.length,
+    };
+
+    // Format Chart and Table data by merging hotel and market history
+    const marketHistoryMap = new Map(marketHistory.rows.map(row => [row.date.toISOString().split('T')[0], row]));
+    const finalChartData = hotelHistory.rows.map(hotelRow => {
+        const dateStr = hotelRow.date.toISOString().split('T')[0];
+        const marketRow = marketHistoryMap.get(dateStr) || {};
+        return {
+            date: dateStr,
+            your_occupancy: (hotelRow.occupancy_direct || 0) * 100,
+            market_occupancy: (marketRow.occupancy_direct || 0) * 100,
+            your_adr: hotelRow.gross_adr || 0,
+            market_adr: marketRow.gross_adr || 0,
+            your_revpar: hotelRow.gross_revpar || 0,
+            market_revpar: marketRow.gross_revpar || 0,
+        };
     });
+
+    // --- STEP 5: Send the final, structured response ---
+    res.json({
+      kpis: finalKpis,
+      marketRank: finalMarketRank,
+      chartData: finalChartData,
+      tableData: finalChartData, // Table and Chart use the same data
+    });
+
   } catch (error) {
     console.error("Error in /api/kpi-summary:", error);
     res.status(500).json({ error: "Failed to fetch KPI summary" });
