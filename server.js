@@ -37,11 +37,24 @@ const allowedOrigins = [
 if (process.env.VERCEL_ENV !== "production") {
   allowedOrigins.push("http://localhost:3000");
 }
+// server.js
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // Check if the request origin is in our static list (production, localhost)
+    const isAllowed = allowedOrigins.indexOf(origin) !== -1;
+
+    // --- NEW: Check if the origin is a Vercel preview URL ---
+    // Vercel preview URLs are dynamic but always end with '.vercel.app'.
+    // We create a regular expression to safely check for this pattern.
+    const isVercelPreview =
+      origin && new RegExp("https?://.*.vercel.app$").test(origin);
+
+    // If the origin is not present (e.g., a server-to-server request),
+    // or if it's in our allowed list, or if it's a Vercel preview URL, allow it.
+    if (!origin || isAllowed || isVercelPreview) {
       callback(null, true);
     } else {
+      // Otherwise, block the request.
       callback(new Error("Not allowed by CORS"));
     }
   },

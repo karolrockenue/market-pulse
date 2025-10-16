@@ -114,7 +114,7 @@ market-pulse/
 │ ├── initial-sync.js
 │ ├── ota-crawler.js
 │ ├── send-scheduled-reports.js
-│ └── index.js
+│ └── server.js
 ├── public/
 │ ├── admin/
 │ │ ├── admin.mjs
@@ -281,6 +281,5 @@ Dependency Upgrade: The standard playwright package was replaced with the server
 
 Configuration Simplification: A "UI-first" configuration model was adopted. All file-based overrides for the Node.js version (engines in package.json) were removed, making the Vercel Dashboard setting the single source of truth.
 
-Architectural Refactor: The project was converted to a fully serverless pattern by moving the main server.js entry point to api/index.js, eliminating ambiguity for Vercel's build system.
 
 Outcome: The refactor was a success, resolving all deployment and runtime errors. This enabled the successful deployment of the automated OTA crawler and established a stable, modern architectural pattern for the entire application on Vercel.
