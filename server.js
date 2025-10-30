@@ -22,7 +22,7 @@ const adminRoutes = require("./api/routes/admin.router.js");
 // Point to the React build output directory
 // Point to the directory containing the React build, which vercel.json
 // copies into the function bundle under the name "react-build".
-const publicPath = path.join(process.cwd(), "build");
+const publicPath = path.join(process.cwd(), "build");g
 const userRoutes = require("./api/routes/users.router.js");
 const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
@@ -199,4 +199,4 @@ app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 
-module.exports = app;
+
