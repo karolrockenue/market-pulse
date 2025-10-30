@@ -2,19 +2,34 @@
   "version": 2,
   "builds": [
     {
+      "src": "web/vite.config.ts",
+      "use": "@vercel/static-build",
+      "config": {
+        "outputDirectory": "react-build"
+      }
+    },
+    {
       "src": "server.js",
       "use": "@vercel/node",
-"config": {
+      "config": {
         "includeFiles": [
-          "public/**"
+          "react-build/**"
         ]
       }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "server.js"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/react-build/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/react-build/index.html"
     }
   ]
 }

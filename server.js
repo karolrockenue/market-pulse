@@ -20,9 +20,9 @@ const dashboardRoutes = require("./api/routes/dashboard.router.js");
 const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js");
 // Point to the React build output directory
-// Point to the root of the serverless function, where the React app
-// files (index.html, assets/, etc.) have been copied by vercel.json.
-const publicPath = path.join(process.cwd());
+// Point to the directory containing the React build, which vercel.json
+// copies into the function bundle under the name "react-build".
+const publicPath = path.join(process.cwd(), "react-build");
 const userRoutes = require("./api/routes/users.router.js");
 const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
@@ -191,27 +191,7 @@ app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
-// For any GET request that is not an API route (e.g., /app, /admin, /reports),
-// send the React app's index.html file.
-// This allows React Router to handle client-side navigation.
-app.get('*', (req, res) => {
-  // --- [DEBUG] Start: Add enhanced logging ---
-  const requestedPath = req.path;
-  const targetFile = path.join(publicPath, 'index.html');
-  
-  console.log(`--- [DEBUG] server.js: Incoming request for: ${requestedPath}`);
-  console.log(`--- [DEBUG] server.js: publicPath variable is: ${publicPath}`);
-  console.log(`--- [DEBUG] server.js: Attempting to send file from: ${targetFile}`);
-  // --- [DEBUG] End ---
 
-  res.sendFile(targetFile, (err) => {
-    if (err) {
-      // This will help debug if the file isn't found
-      console.error("Error sending index.html:", err);
-      res.status(500).send("Error loading application.");
-    }
-  });
-});
 
 // --- SERVER START ---
 const PORT = process.env.PORT || 3000;
