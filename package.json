@@ -9,7 +9,9 @@
 "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-"build": "echo 'No root build script specified'" },
+    "build": "echo 'No root build script specified'",
+    "vercel-build": "cd web && yarn install && yarn build"
+  },
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
     "connect-pg-simple": "^10.0.0",
