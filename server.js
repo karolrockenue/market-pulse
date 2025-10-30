@@ -20,7 +20,8 @@ const dashboardRoutes = require("./api/routes/dashboard.router.js");
 const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js");
 // Point to the React build output directory
-const publicPath = path.join(process.cwd(), "web", "build");
+// Point to the root of the serverless function (where includeFiles copies the build output)
+const publicPath = path.join(process.cwd());
 const userRoutes = require("./api/routes/users.router.js");
 const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
@@ -128,8 +129,8 @@ app.use(
     },
   })
 );
-// Serve static assets (js, css) from the React build directory
-app.use(express.static(publicPath));
+// Serve static assets (e.g., the 'assets' folder) from the root
+app.use(express.static(path.join(publicPath, 'assets')));
 
 // /server.js
 // --- DEVELOPMENT ONLY LOGIN ---
