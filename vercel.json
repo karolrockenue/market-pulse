@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/vite.config.ts",
+      "src": "web/package.json",
       "use": "@vercel/static-build",
       "config": {
         "outputDirectory": "react-build"
