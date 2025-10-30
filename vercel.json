@@ -1,19 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "web/package.json",
-      "use": "@vercel/vite"
-    },
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
-    { "src": "api/initial-sync.js", "use": "@vercel/node" },
-    { "src": "api/send-scheduled-reports.js", "use": "@vercel/node" },
-    {
-      "src": "api/sync-rockenue-assets.js",
-      "use": "@vercel/node"
-    }
-  ],
   "routes": [
     {
       "src": "/api/daily-refresh",
