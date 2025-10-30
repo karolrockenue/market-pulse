@@ -34,6 +34,12 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.set("trust proxy", 1);
 
+// --- STATIC ASSET SERVING ---
+// Serve all static assets (JS, CSS, images) from the React build directory.
+// This MUST come BEFORE any CORS or session middleware, as static files
+// don't need authentication and should be served immediately.
+app.use(express.static(publicPath));
+
 // --- MIDDLEWARE SETUP (CORS, Session) ---
 const allowedOrigins = [
   "https://market-pulse.io",
@@ -130,8 +136,6 @@ app.use(
     },
   })
 );
-// Serve all static assets from the React build directory
-app.use(express.static(publicPath));
 
 // /server.js
 // --- DEVELOPMENT ONLY LOGIN ---
