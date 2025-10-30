@@ -20,9 +20,9 @@ const dashboardRoutes = require("./api/routes/dashboard.router.js");
 const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js");
 // Point to the React build output directory
-// Point to the directory containing the React build, which vercel.json
-// copies into the function bundle under the name "react-build".
-const publicPath = path.join(process.cwd(), "build");g
+// The React app is in the /web folder and builds to /web/build
+// This path is relative to the Vercel serverless function root (process.cwd())
+const publicPath = path.join(process.cwd(), "web", "build");
 const userRoutes = require("./api/routes/users.router.js");
 const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
@@ -188,6 +188,31 @@ app.use("/api/market", marketRouter);
 app.use("/api/rockenue", rockenueRoutes);
 app.use("/api/support", supportRoutes); // [NEW] Mount the support router
 app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
+
+// --- STATIC AND FALLBACK ROUTES ---
+// This must come AFTER all API routes
+
+// Fallback route for Single Page Application (SPA)
+// This catches all non-API GET requests (like /, /app, /reports)
+// and serves the React app's index.html. This is the fix for the
+// "ENOENT: no such file or directory, stat '/var/task/index.html'" error.
+app.get("*", (req, res) => {
+  // We construct the path to the index.html inside our 'web/build' directory
+  const indexPath = path.join(publicPath, "index.html");
+
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      // If the file can't be sent (e.g., build failed, path is wrong)
+      // log the error and send a 500 response.
+      console.error("Error sending index.html:", err);
+      res.status(500).send("Error serving the application.");
+    }
+  });
+});
+
+
+
+// --- SERVER START ---
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
