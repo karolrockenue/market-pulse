@@ -195,7 +195,16 @@ app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
 // send the React app's index.html file.
 // This allows React Router to handle client-side navigation.
 app.get('*', (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+  // --- [DEBUG] Start: Add enhanced logging ---
+  const requestedPath = req.path;
+  const targetFile = path.join(publicPath, 'index.html');
+  
+  console.log(`--- [DEBUG] server.js: Incoming request for: ${requestedPath}`);
+  console.log(`--- [DEBUG] server.js: publicPath variable is: ${publicPath}`);
+  console.log(`--- [DEBUG] server.js: Attempting to send file from: ${targetFile}`);
+  // --- [DEBUG] End ---
+
+  res.sendFile(targetFile, (err) => {
     if (err) {
       // This will help debug if the file isn't found
       console.error("Error sending index.html:", err);
