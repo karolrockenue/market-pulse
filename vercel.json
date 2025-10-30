@@ -4,8 +4,12 @@
     {
       "src": "server.js",
       "use": "@vercel/node",
-      "config": {
-        "includeFiles": "web/build/**"
+"config": {
+        "includeFiles": [
+          "web/build/index.html",
+          "web/build/favicon.ico",
+          "web/build/assets/**"
+        ]
       }
     }
   ],
