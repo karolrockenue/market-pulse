@@ -2,34 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "outputDirectory": "build"
-      }
-    },
-    {
       "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "build/**"
-        ]
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "server.js"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/build/assets/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/build/index.html"
+      "dest": "server.js"
     }
   ]
 }
