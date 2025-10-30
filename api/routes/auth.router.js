@@ -54,7 +54,24 @@ router.post("/login", async (req, res) => {
       [token, user.user_id, expires_at]
     );
 
-    const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
+  // --- DYNAMIC URL LOGIC ---
+    // Create the correct baseUrl based on the environment.
+    // This ensures magic links work on production, Vercel previews, and local development.
+    let baseUrl;
+    if (process.env.VERCEL_ENV === 'production') {
+      // Production environment
+      baseUrl = 'https://www.market-pulse.io';
+    } else if (process.env.VERCEL_URL) { 
+      // Vercel preview environment (e.g., "my-branch.vercel.app")
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else {
+      // Local development environment
+      baseUrl = 'http://localhost:3000'; // Frontend runs on 3000
+    }
+
+    // Construct the final link using the dynamic base URL
+    const loginLink = `${baseUrl}/api/auth/magic-link-callback?token=${token}`;
+    // --- END DYNAMIC URL LOGIC ---
 const msg = {
   to: user.email,
   // [FIX] Use your verified SendGrid sending domain to avoid spam filters
