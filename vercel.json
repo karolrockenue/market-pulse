@@ -2,43 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "packageManager": "yarn",
-        "installCommand": "yarn install --frozen-lockfile --production=false",
-        "buildCommand": "yarn build",
-        "outputDirectory": "build"
-      }
-    },
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
-    { "src": "api/initial-sync.js", "use": "@vercel/node" },
-    { "src": "api/send-scheduled-reports.js", "use": "@vercel/node" },
-    { "src": "api/sync-rockenue-assets.js", "use": "@vercel/node" }
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
   ],
   "routes": [
-    { "src": "/api/daily-refresh", "dest": "/api/daily-refresh.js" },
-    { "src": "/api/initial-sync", "dest": "/api/initial-sync.js" },
-    { "src": "/api/send-scheduled-reports", "dest": "/api/send-scheduled-reports.js" },
-    { "src": "/api/sync-rockenue-assets", "dest": "/api/sync-rockenue-assets.js" },
-    { "src": "/api/(.*)", "dest": "server.js" },
-    { "src": "/assets/(.*)", "dest": "/web/build/assets/$1" },
-    { "src": "/favicon.ico", "dest": "/web/build/favicon.ico" },
-    { "src": "/(.*)", "dest": "/web/build/index.html" }
-  ],
-  "crons": [
     {
-      "path": "/api/daily-refresh",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/send-scheduled-reports",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/sync-rockenue-assets",
-      "schedule": "0 4 * * *"
+      "src": "/(.*)",
+      "dest": "server.js"
     }
   ]
 }

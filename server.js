@@ -19,7 +19,8 @@ const authRoutes = require("./api/routes/auth.router.js");
 const dashboardRoutes = require("./api/routes/dashboard.router.js");
 const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js");
-const publicPath = path.join(process.cwd(), "public");
+// Point to the React build output directory
+const publicPath = path.join(process.cwd(), "web", "build");
 const userRoutes = require("./api/routes/users.router.js");
 const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
@@ -127,11 +128,8 @@ app.use(
     },
   })
 );
-// Serve static files from the "public" directory.
-// This must come BEFORE any of the page-serving routes.
-app.use(express.static(path.join(process.cwd(), "public")));
-
-
+// Serve static assets (js, css) from the React build directory
+app.use(express.static(publicPath));
 
 // /server.js
 // --- DEVELOPMENT ONLY LOGIN ---
@@ -189,46 +187,19 @@ app.use("/api/rockenue", rockenueRoutes);
 app.use("/api/support", supportRoutes); // [NEW] Mount the support router
 app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
 // --- STATIC AND FALLBACK ROUTES ---
+// This must come AFTER all API routes
 
-app.get("/", (req, res) => {
-  if (req.session.userId) {
-    res.redirect("/app/");
-  } else {
-    res.redirect("/signin");
-  }
-});
-
-app.get("/signin", (req, res) => {
-  res.sendFile(path.join(publicPath, "login.html"));
-});
-
-app.get("/app/", requirePageLogin, (req, res) => {
-  res.sendFile(path.join(publicPath, "app", "index.html"));
-});
-
-app.get("/app/reports.html", requirePageLogin, (req, res) => {
-  res.sendFile(path.join(publicPath, "app", "reports.html"));
-});
-
-app.get("/app/settings.html", requirePageLogin, (req, res) => {
-  res.sendFile(path.join(publicPath, "app", "settings.html"));
-});
-
-app.get("/admin/", (req, res) => {
-  res.sendFile(path.join(publicPath, "admin", "index.html"));
-});
-
-// NEW ROCKENUE PAGE ROUTE: Add a route to serve the Rockenue section's main page.
-// We add middleware here to ensure only a logged-in super_admin can even load this page.
-// If a regular user tries to access it, they will be redirected to their dashboard.
-app.get("/rockenue/", requirePageLogin, (req, res, next) => {
-  // This second check happens after confirming the user is logged in.
-  if (req.session.role !== "super_admin") {
-    // If the user is not a super_admin, redirect them away.
-    return res.redirect("/app/");
-  }
-  // If they are a super_admin, serve the (not-yet-created) page.
-  res.sendFile(path.join(publicPath, "rockenue", "index.html"));
+// For any GET request that is not an API route (e.g., /app, /admin, /reports),
+// send the React app's index.html file.
+// This allows React Router to handle client-side navigation.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+    if (err) {
+      // This will help debug if the file isn't found
+      console.error("Error sending index.html:", err);
+      res.status(500).send("Error loading application.");
+    }
+  });
 });
 
 // --- SERVER START ---
