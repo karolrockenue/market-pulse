@@ -58,16 +58,24 @@ router.post("/login", async (req, res) => {
     // Create the correct baseUrl based on the environment.
     // This ensures magic links work on production, Vercel previews, and local development.
     let baseUrl;
+// --- DYNAMIC URL LOGIC (v2) ---
+    // Create the correct baseUrl based on the environment.
+
     if (process.env.VERCEL_ENV === 'production') {
       // Production environment
       baseUrl = 'https://www.market-pulse.io';
-    } else if (process.env.VERCEL_URL) { 
-      // Vercel preview environment (e.g., "my-branch.vercel.app")
+    } else if (process.env.VERCEL_BRANCH_URL) { 
+      // Vercel "branch" preview environment (e.g., "feature-branch.vercel.app")
+      // This is the URL the user is actually visiting.
+      baseUrl = `https://${process.env.VERCEL_BRANCH_URL}`;
+    } else if (process.env.VERCEL_URL) {
+      // Fallback for other Vercel previews (e.g., the ...k3p69ah6r... URL)
       baseUrl = `https://${process.env.VERCEL_URL}`;
     } else {
       // Local development environment
       baseUrl = 'http://localhost:3000'; // Frontend runs on 3000
     }
+    // --- END DYNAMIC URL LOGIC (v2) ---
 
     // Construct the final link using the dynamic base URL
     const loginLink = `${baseUrl}/api/auth/magic-link-callback?token=${token}`;
