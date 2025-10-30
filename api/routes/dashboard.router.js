@@ -302,12 +302,14 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     if (competitorIds.length === 0) {
       // This is a fallback for hotels with no competitors.
       // It now correctly uses the new pre-calculated gross revenue and revpar columns.
+ // /api/routes/dashboard.router.js
       const yourHotelQuery = `
           SELECT
             AVG(gross_adr) AS your_adr,
        
         (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as your_occupancy_direct,
-            AVG(gross_revpar) AS your_revpar
+            AVG(gross_revpar) AS your_revpar,
+            SUM(gross_revenue) AS your_total_revenue -- [NEW] Add total revenue calculation
           FROM daily_metrics_snapshots
           WHERE hotel_id = $1 AND stay_date >= $2 AND stay_date <= $3;
         `;
@@ -320,6 +322,7 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       return res.json({ yourHotel: yourHotelResult.rows[0] || {}, market: {} });
     }
 
+// /api/routes/dashboard.router.js
     const kpiQuery = `
       SELECT
           AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_adr ELSE NULL END) AS your_adr,
@@ -328,6 +331,10 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
           NULLIF(SUM(CASE WHEN dms.hotel_id = $1 THEN dms.capacity_count ELSE 0 END), 0) AS your_occupancy,
 
           AVG(CASE WHEN dms.hotel_id = $1 THEN dms.gross_revpar ELSE NULL END) AS your_revpar,
+          
+          -- [NEW] Add total revenue calculation for your hotel
+          SUM(CASE WHEN dms.hotel_id = $1 THEN dms.gross_revenue ELSE NULL END) AS your_total_revenue,
+
           AVG(CASE WHEN dms.hotel_id != $1 THEN dms.gross_adr ELSE NULL END) AS market_adr,
 
   
@@ -347,10 +354,12 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     const kpis = result.rows[0] || {};
 
     res.json({
+// /api/routes/dashboard.router.js
       yourHotel: {
         occupancy: kpis.your_occupancy,
         adr: kpis.your_adr,
         revpar: kpis.your_revpar,
+        totalRevenue: kpis.your_total_revenue, // [NEW] Pass the new value in the response
       },
       market: {
         occupancy: kpis.market_occupancy,
@@ -363,7 +372,6 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch KPI summary" });
   }
 });
-
 router.get("/metrics-from-db", requireUserApi, async (req, res) => {
   // Prevent API response caching
   res.set({
@@ -376,63 +384,136 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
     const { startDate, endDate, granularity = "daily", propertyId } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
-    // Security check to ensure the user has access to the requested property.
+
+    // Security check (No changes needed here)
     if (req.session.role !== "super_admin") {
       const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
       );
-
       if (userResult.rows.length === 0) {
-        return res
-          .status(403)
-          .json({ error: "Access denied: User not found." });
+        return res.status(403).json({ error: "Access denied: User not found." });
       }
       const internalUserId = userResult.rows[0].user_id;
-
       const accessCheck = await pgPool.query(
         "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
         [req.session.userId, internalUserId, propertyId]
       );
-
       if (accessCheck.rows.length === 0) {
-        return res
-          .status(403)
-          .json({ error: "Access denied to this property." });
+        return res.status(403).json({ error: "Access denied to this property." });
       }
     }
 
+    // --- [NEW] Fetch total_rooms for capacity calculation ---
+    const hotelResult = await pgPool.query("SELECT total_rooms FROM hotels WHERE hotel_id = $1", [propertyId]);
+    if (hotelResult.rows.length === 0) {
+        return res.status(404).json({ error: "Hotel not found." });
+    }
+    const totalRooms = hotelResult.rows[0].total_rooms;
+    if (!totalRooms || totalRooms <= 0) {
+        // Handle cases where total_rooms might be missing or invalid
+        console.warn(`Hotel ${propertyId} has missing or invalid total_rooms (${totalRooms}). Capacity calculations may be inaccurate.`);
+        // We could throw an error or proceed cautiously. Let's proceed but calculations might yield null/0.
+    }
+    // --- [END NEW] ---
+
     const period = getPeriod(granularity);
 
-    // This is the correct, simple query for this endpoint with the correct aliases.
-    // This is the final, correct query that uses the new reliable columns.
+    // This query now focuses only on summing/averaging metrics. Capacity is handled separately.
     const query = `
       SELECT
         ${period} as period,
         SUM(rooms_sold) as your_rooms_sold,
-        -- THE FIX: Changed AVG to SUM to get total available room nights for the period.
-        SUM(capacity_count) as your_capacity_count,
-     -- THE FIX: Calculate occupancy from the reliable source columns instead of using the bad data.
-        -- We keep the alias 'your_occupancy_direct' to ensure the frontend component continues to work.
-        (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as your_occupancy_direct,
-        -- Use the NEW gross columns but keep the OLD aliases for the dashboard
-        AVG(gross_adr) as your_adr,
-        AVG(gross_revpar) as your_revpar,
-        SUM(gross_revenue) as your_total_revenue,
-        -- Also select all the new columns for the reporting page
+        -- [REMOVED] SUM(capacity_count) - We calculate this outside SQL now
+        (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) as your_occupancy_direct, -- Keep for now, might be useful elsewhere
+        AVG(gross_adr) as your_adr, -- Keep alias for KPI card
+        AVG(gross_revpar) as your_revpar, -- Keep alias for KPI card
+        SUM(gross_revenue) as your_total_revenue, -- Keep alias for KPI card
+        -- Full metrics needed by Budgeting/Reports
         SUM(net_revenue) as your_net_revenue,
         SUM(gross_revenue) as your_gross_revenue,
         AVG(net_adr) as your_net_adr,
         AVG(gross_adr) as your_gross_adr,
         AVG(net_revpar) as your_net_revpar,
-        AVG(gross_revpar) as your_gross_revpar
+        AVG(gross_revpar) as your_gross_revpar,
+        -- [NEW] Calculate days in the period for capacity calc
+        COUNT(DISTINCT stay_date) as days_in_period
       FROM daily_metrics_snapshots
       WHERE hotel_id = $1 AND stay_date >= $2::date AND stay_date <= $3::date
       GROUP BY period ORDER BY period ASC;
     `;
-    // The variable 'query' now correctly matches the execution line.
+
     const result = await pgPool.query(query, [propertyId, startDate, endDate]);
-    res.json({ metrics: result.rows });
+
+    // --- [NEW] Post-process results to calculate correct capacity and remaining unsold ---
+    const today = new Date(); // Use server's current date
+
+
+   const processedMetrics = await Promise.all(result.rows.map(async (row) => {
+        const periodDate = new Date(row.period);
+        const daysInPeriod = parseInt(row.days_in_period, 10);
+        const correctCapacity = totalRooms ? totalRooms * daysInPeriod : null;
+
+        let physicalUnsoldRemaining = null;
+
+        // [NEW LOG 1] Check if the condition for running the query is met
+   // [NEW LOG 1] Check if the condition for running the query is met
+        
+        // [FIX] Compare UTC month and year to avoid timezone comparison bugs.
+        // The original check (periodDate.getTime() === currentMonthStart.getTime()) would fail
+        // if the server's local timezone was different from UTC, as 'currentMonthStart'
+        // was created in local time while 'periodDate' was created from a UTC timestamp.
+        const isCurrentMonthConditionMet = (
+            granularity === 'monthly' &&
+            periodDate.getUTCFullYear() === today.getUTCFullYear() &&
+            periodDate.getUTCMonth() === today.getUTCMonth()
+        );
+        
+        if (periodDate.getUTCMonth() === 9 && periodDate.getUTCFullYear() === 2025) { // Log only for October
+             // [MODIFIED] Update log to show the new comparison values
+             console.log(`[BACKEND DEBUG Oct] Granularity=${granularity}, PeriodMonth=${periodDate.getUTCMonth()}, TodayMonth=${today.getUTCMonth()}, ConditionMet=${isCurrentMonthConditionMet}`);
+        }
+
+        if (isCurrentMonthConditionMet) {
+            try {
+                const unsoldQuery = `
+                    SELECT SUM(capacity_count - rooms_sold) AS physical_unsold_remaining
+                    FROM daily_metrics_snapshots
+                    WHERE hotel_id = $1
+                    AND stay_date >= CURRENT_DATE
+                    AND date_trunc('month', stay_date) = date_trunc('month', CURRENT_DATE);
+                `;
+                // [NEW LOG 2] Log before running the query
+                console.log(`[BACKEND DEBUG Oct] Running unsoldQuery for hotel ${propertyId}...`);
+                const unsoldResult = await pgPool.query(unsoldQuery, [propertyId]);
+                // [NEW LOG 3] Log the raw query result
+                console.log(`[BACKEND DEBUG Oct] unsoldQuery raw result:`, JSON.stringify(unsoldResult.rows));
+
+                // Parse the result
+                const rawValue = unsoldResult.rows[0]?.physical_unsold_remaining;
+                physicalUnsoldRemaining = rawValue !== null && rawValue !== undefined
+                    ? parseInt(rawValue, 10)
+                    : 0;
+
+                // [NEW LOG 4] Log the final parsed value
+                console.log(`[BACKEND DEBUG Oct] Parsed physicalUnsoldRemaining:`, physicalUnsoldRemaining);
+
+            } catch (unsoldError) {
+                console.error(`[BACKEND DEBUG Oct] Failed to calculate physical_unsold_remaining for ${propertyId}:`, unsoldError);
+                physicalUnsoldRemaining = 0;
+            }
+        }
+
+        return {
+            ...row,
+            your_capacity_count: correctCapacity,
+            physical_unsold_remaining: physicalUnsoldRemaining
+        };
+    }));
+    // --- [END NEW] ---
+
+    res.json({ metrics: processedMetrics }); // Send the processed data
+
   } catch (error) {
     console.error("Error in /api/metrics-from-db:", error);
     res.status(500).json({ error: "Failed to fetch metrics from database" });
@@ -502,25 +583,21 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
       });
     }
 
-    // --- CORRECTED QUERY LOGIC START ---
-    // This new query correctly gets the data for the breakdown card.
+// /api/routes/dashboard.router.js
+// --- UPGRADED DATA AGGREGATION LOGIC ---
+    // [FINAL FIX] This query is now simple and correct.
+    // It reads the definitive room count from the 'hotels.total_rooms' column,
+// /api/routes/dashboard.router.js
+// --- UPGRADED DATA AGGREGATION LOGIC ---
+    // [FINAL FIX] This query is now simple and correct.
+    // It reads the definitive room count from the 'hotels.total_rooms' column,
+    // completely bypassing the flawed 'daily_metrics_snapshots' table.
     const competitorDetailsQuery = `
-        WITH latest_snapshots AS (
-            -- This part first finds the MOST RECENT daily snapshot for each competitor hotel
-            -- to get its latest 'capacity_count' (total rooms).
-            SELECT DISTINCT ON (hotel_id) hotel_id, capacity_count
-            FROM daily_metrics_snapshots
-            WHERE hotel_id = ANY($1::int[])
-            ORDER BY hotel_id, stay_date DESC
-        )
-        -- Then, it joins that information back to the main 'hotels' table
-        -- to get the static info like category and neighborhood.
         SELECT 
             h.category, 
             h.neighborhood, 
-            ls.capacity_count
+            h.total_rooms
         FROM hotels h
-        LEFT JOIN latest_snapshots ls ON h.hotel_id = ls.hotel_id
         WHERE h.hotel_id = ANY($1::int[]);
     `;
     const { rows: competitorDetails } = await pgPool.query(
@@ -528,33 +605,47 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
       [competitorIds]
     );
 
+    // This new logic builds the complex, nested object the frontend design requires.
     const breakdown = {
       categories: {},
       neighborhoods: {},
     };
     let totalRooms = 0;
+    
+    // Process each competitor hotel to build the nested breakdown.
     competitorDetails.forEach((hotel) => {
-      // Aggregate category counts
-      if (hotel.category) {
-        breakdown.categories[hotel.category] =
-          (breakdown.categories[hotel.category] || 0) + 1;
-      }
-
-      // --- NEW, MORE ROBUST CHECK FOR NEIGHBORHOODS ---
-      // 1. Use optional chaining (?.) to safely access the property.
-      // 2. Trim any whitespace from the beginning and end.
+      // Ensure we have valid data to work with.
+      const category = hotel.category?.trim();
       const neighborhood = hotel.neighborhood?.trim();
+      const rooms = hotel.total_rooms || 0;
 
-      // 3. Only count the neighborhood if it's a valid, non-empty string.
+      // Sum up the total rooms for the entire market.
+      totalRooms += rooms;
+
+      // Aggregate the simple neighborhood summary for the bottom of the card.
       if (neighborhood) {
-        breakdown.neighborhoods[neighborhood] =
-          (breakdown.neighborhoods[neighborhood] || 0) + 1;
+        breakdown.neighborhoods[neighborhood] = (breakdown.neighborhoods[neighborhood] || 0) + 1;
       }
 
-      // Sum up total rooms
-      totalRooms += hotel.capacity_count || 0;
+      // Aggregate the complex category breakdown.
+      if (category) {
+        // If this is the first time we see this category, initialize its object.
+        if (!breakdown.categories[category]) {
+          breakdown.categories[category] = { properties: 0, rooms: 0, neighborhoods: {} };
+        }
+
+        // Increment the property count and add to the room count for this category.
+        breakdown.categories[category].properties += 1;
+        breakdown.categories[category].rooms += rooms;
+
+        // If the hotel is in a valid neighborhood, count it within its category.
+        if (neighborhood) {
+          const categoryNeighborhoods = breakdown.categories[category].neighborhoods;
+          categoryNeighborhoods[neighborhood] = (categoryNeighborhoods[neighborhood] || 0) + 1;
+        }
+      }
     });
-    // --- CORRECTED QUERY LOGIC END ---
+    // --- END OF UPGRADED LOGIC ---
 
     const period = getPeriod(granularity);
     // This query is now cleaned up to only select the new pre-calculated columns.
@@ -719,17 +810,19 @@ router.get("/market-ranking", requireUserApi, async (req, res) => {
     const allHotelIds = [propertyId, ...competitorIds];
     const totalHotels = allHotelIds.length;
 
+// /api/routes/dashboard.router.js
     // Step 2: Calculate performance for all hotels and rank them using window functions
     // Step 2: Calculate performance for all hotels and rank them using window functions
     const rankingQuery = `
       WITH HotelPerformance AS (
         -- First, calculate the average performance for each hotel in the set
-        -- THE FIX: This now uses the pre-calculated gross metrics to ensure
-        -- consistency with all other dashboard components.
+        -- [FIX] This now calculates occupancy correctly and uses gross metrics
+        -- to ensure consistency with all other dashboard components.
         SELECT
           hotel_id,
           AVG(gross_adr) AS adr,
-          AVG(occupancy_direct) AS occupancy,
+          -- [FIX] Correctly calculate occupancy from source columns, instead of reading 'occupancy_direct'
+          (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) AS occupancy,
           AVG(gross_revpar) AS revpar
         FROM daily_metrics_snapshots
         WHERE
@@ -850,5 +943,86 @@ router.patch(
     }
   }
 );
+// --- NEW: ENDPOINT FOR THE MAIN DASHBOARD PERFORMANCE CHART ---
+router.get("/dashboard-chart", requireUserApi, async (req, res) => {
+  try {
+    // 1. Read the new 'granularity' parameter, defaulting to 'daily'.
+    const { startDate, endDate, propertyId, granularity = 'daily' } = req.query;
+    if (!propertyId || !startDate || !endDate) {
+      return res.status(400).json({ error: "propertyId, startDate, and endDate are required." });
+    }
+
+    // Security check (no changes needed here)
+    if (req.session.role !== "super_admin") {
+      // Logic to check user access to the property
+      const userResult = await pgPool.query("SELECT user_id FROM users WHERE cloudbeds_user_id = $1", [req.session.userId]);
+      if (userResult.rows.length === 0) return res.status(403).json({ error: "Access denied: User not found." });
+      const internalUserId = userResult.rows[0].user_id;
+      const accessCheck = await pgPool.query("SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer", [req.session.userId, internalUserId, propertyId]);
+      if (accessCheck.rows.length === 0) return res.status(403).json({ error: "Access denied to this property." });
+    }
+
+    // Comp set logic (no changes needed here)
+    let competitorIds;
+    const compSetResult = await pgPool.query("SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1", [propertyId]);
+    if (compSetResult.rows.length > 0) {
+      competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+    } else {
+      const categoryResult = await pgPool.query("SELECT category FROM hotels WHERE hotel_id = $1", [propertyId]);
+      const category = categoryResult.rows[0]?.category;
+      if (category) {
+        const categoryCompSetResult = await pgPool.query("SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2", [category, propertyId]);
+        competitorIds = categoryCompSetResult.rows.map((row) => row.hotel_id);
+      } else {
+        competitorIds = [];
+      }
+    }
+
+    // 2. Use the existing 'getPeriod' helper function.
+    const period = getPeriod(granularity);
+
+    // 3. This is the updated query that uses the dynamic period for grouping.
+    const query = `
+      WITH AllData AS (
+        -- First, get all the raw daily data for both the hotel and its market.
+        SELECT
+          ${period} AS period,
+          CASE WHEN hotel_id = $1 THEN occupancy_direct ELSE NULL END AS your_occupancy,
+          CASE WHEN hotel_id = $1 THEN gross_adr ELSE NULL END AS your_adr,
+          CASE WHEN hotel_id = $1 THEN gross_revpar ELSE NULL END AS your_revpar,
+          CASE WHEN hotel_id != $1 THEN occupancy_direct ELSE NULL END AS market_occupancy,
+          CASE WHEN hotel_id != $1 THEN gross_adr ELSE NULL END AS market_adr,
+          CASE WHEN hotel_id != $1 THEN gross_revpar ELSE NULL END AS market_revpar
+        FROM daily_metrics_snapshots
+        WHERE 
+          (hotel_id = $1 OR hotel_id = ANY($4::int[])) AND
+          stay_date BETWEEN $2 AND $3
+      )
+      -- Then, aggregate that data based on the selected period (day, week, or month).
+      SELECT
+        period AS date, -- Alias 'period' to 'date' for frontend consistency.
+        json_build_object(
+          'occupancy', COALESCE(AVG(your_occupancy), 0),
+          'adr', COALESCE(AVG(your_adr), 0),
+          'revpar', COALESCE(AVG(your_revpar), 0)
+        ) AS "yourHotel",
+        json_build_object(
+          'occupancy', COALESCE(AVG(market_occupancy), 0),
+          'adr', COALESCE(AVG(market_adr), 0),
+          'revpar', COALESCE(AVG(market_revpar), 0)
+        ) AS "market"
+      FROM AllData
+      GROUP BY period
+      ORDER BY period ASC;
+    `;
+    
+    const result = await pgPool.query(query, [propertyId, startDate, endDate, competitorIds]);
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error("Error in /api/dashboard-chart:", error);
+    res.status(500).json({ error: "Failed to fetch dashboard chart data." });
+  }
+});
 
 module.exports = router;

@@ -321,11 +321,17 @@ module.exports = async (req, res) => {
       // If no reportId is provided, this is a normal cron job run.
       console.log("Cron job: Checking for reports based on schedule.");
       const now = new Date();
-      const currentTime = `${now
+const currentTime = `${now
         .getUTCHours()
         .toString()
         .padStart(2, "0")}:${now.getUTCMinutes().toString().padStart(2, "0")}`;
-      const currentDayOfWeek = now.getUTCDay();
+      
+      // [FIX] Normalize Sunday from 0 (JS getUTCDay()) to 7 (ISO standard used in DB)
+      let currentDayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday...
+      if (currentDayOfWeek === 0) {
+        currentDayOfWeek = 7; // Convert Sunday to 7 to match frontend/DB
+      }
+
       const currentDayOfMonth = now.getUTCDate();
 
       const result = await pgPool.query(

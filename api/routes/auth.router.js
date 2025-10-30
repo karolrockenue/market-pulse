@@ -5,6 +5,7 @@ const fetch = require("node-fetch");
 const crypto = require("crypto");
 const sgMail = require("@sendgrid/mail");
 const pgPool = require("../utils/db");
+const { getMagicLinkEmailHTML } = require("../utils/emailTemplates.js"); // [NEW] Import our new template function
 
 const { requireUserApi } = require("../utils/middleware");
 
@@ -54,14 +55,14 @@ router.post("/login", async (req, res) => {
     );
 
     const loginLink = `https://www.market-pulse.io/api/auth/magic-link-callback?token=${token}`;
-    const msg = {
-      to: user.email,
-      from: { name: "Market Pulse", email: "login@market-pulse.io" },
-      subject: "Your Market Pulse Login Link",
-      html: `<p>Hello ${
-        user.first_name || "there"
-      },</p><p>Click the link below to log in to your Market Pulse dashboard. This link will expire in 15 minutes.</p><p><a href="${loginLink}" style="font-size: 16px; font-weight: bold; padding: 10px 15px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px;">Log in to Market Pulse</a></p>`,
-    };
+const msg = {
+  to: user.email,
+  // [FIX] Use your verified SendGrid sending domain to avoid spam filters
+  from: { name: "Market Pulse", email: "login@em4689.market-pulse.io" }, 
+  subject: "Your Market Pulse Login Link",
+  // [NEW] Call the imported function to get the robust HTML
+  html: getMagicLinkEmailHTML(user.first_name || "there", loginLink),
+};
     await sgMail.send(msg);
     res.status(200).json({ success: true, message: "Login link sent." });
   } catch (error) {

@@ -21,9 +21,9 @@ async function runSync(propertyId) {
   // Use a single database client for the entire operation
   const client = await pgPool.connect();
   try {
-    // NEW: First, determine the PMS type for this property
+// [NEW] First, determine the PMS type AND locked_years for this property
     const hotelResult = await client.query(
-      "SELECT pms_type FROM hotels WHERE hotel_id = $1",
+      "SELECT pms_type, locked_years FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
 
@@ -36,13 +36,31 @@ async function runSync(propertyId) {
     // Start a transaction for the entire sync operation
     await client.query("BEGIN");
 
-    // Clear all existing metric snapshots for this property to ensure a clean import.
+// [NEW] Clear existing metric snapshots, RESPECTING LOCKED YEARS
     console.log(`Clearing existing metric data for property ${propertyId}...`);
-    await client.query(
-      "DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1",
-      [propertyId]
+
+    // Get the hotel's locked_years from the result we fetched earlier
+    const lockedYears = (hotelResult.rows[0].locked_years || []).map((y) =>
+      parseInt(y, 10)
     );
-    console.log("✅ Existing data cleared.");
+
+    // Dynamically build a WHERE clause to exclude locked years from deletion
+    let deleteQuery = "DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1";
+    if (lockedYears.length > 0) {
+      // Append the condition to NOT delete records where the year is in our locked list
+      deleteQuery += ` AND EXTRACT(YEAR FROM stay_date) NOT IN (${lockedYears.join(
+        ","
+      )})`;
+      console.log(
+        `File lock active. Will NOT delete data for years: ${lockedYears.join(
+          ", "
+        )}`
+      );
+    }
+    
+    // Execute the safe, dynamic delete query
+    await client.query(deleteQuery, [propertyId]);
+    console.log("✅ Existing data cleared (respecting locks).");
 
     // /api/initial-sync.js
 
@@ -191,10 +209,29 @@ async function runSync(propertyId) {
         );
       }
 
-      const datesToUpdate = Object.keys(allProcessedData);
+ const datesToUpdate = Object.keys(allProcessedData);
 
-      if (datesToUpdate.length > 0) {
-        const bulkInsertValues = datesToUpdate.map((date) => {
+      // [NEW] Filter out any records from a locked year before insertion
+      // We already have 'lockedYears' array defined from the delete step
+      const filteredDatesToUpdate = datesToUpdate.filter((date) => {
+        const metricYear = new Date(date).getUTCFullYear(); // Use UTCFullYear for date strings
+        // Return true (keep) if the year is NOT in the lockedYears array
+        return !lockedYears.includes(metricYear);
+      });
+
+      // Log if we filtered anything
+      if (datesToUpdate.length !== filteredDatesToUpdate.length) {
+        console.log(
+          `File lock: Filtered out ${
+            datesToUpdate.length - filteredDatesToUpdate.length
+          } records from locked years.`
+        );
+      }
+
+      // Now, continue with the filtered list
+      if (filteredDatesToUpdate.length > 0) {
+        // Use the filtered list for bulk insertion
+        const bulkInsertValues = filteredDatesToUpdate.map((date) => {
           const metrics = allProcessedData[date];
           return [
             date,
@@ -404,9 +441,31 @@ async function runSync(propertyId) {
       }
       // --- END NEW LOGIC ---
 
+  // --- END NEW LOGIC ---
+
       const datesToUpdate = Object.keys(allProcessedData);
-      if (datesToUpdate.length > 0) {
-        const bulkInsertValues = datesToUpdate.map((date) => {
+
+      // [NEW] Filter out any records from a locked year before insertion
+      // We already have 'lockedYears' array defined from the delete step
+      const filteredDatesToUpdate = datesToUpdate.filter((date) => {
+        const metricYear = new Date(date).getUTCFullYear(); // Use UTCFullYear for date strings
+        // Return true (keep) if the year is NOT in the lockedYears array
+        return !lockedYears.includes(metricYear);
+      });
+
+      // Log if we filtered anything
+      if (datesToUpdate.length !== filteredDatesToUpdate.length) {
+        console.log(
+          `File lock: Filtered out ${
+            datesToUpdate.length - filteredDatesToUpdate.length
+          } records from locked years.`
+        );
+      }
+
+      // Now, continue with the filtered list
+      if (filteredDatesToUpdate.length > 0) {
+        // Use the filtered list for bulk insertion
+        const bulkInsertValues = filteredDatesToUpdate.map((date) => {
           const metrics = allProcessedData[date];
           const net_adr =
             metrics.rooms_sold > 0

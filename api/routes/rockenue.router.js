@@ -349,4 +349,216 @@ router.get("/shreeji-report", async (req, res) => {
   }
 });
 
+
+/**
+ * GET /api/rockenue/portfolio
+ * Fetches ALL assets (Live & Off-Platform) for the portfolio.
+ * This single endpoint powers the entire page and its KPI cards.
+ */
+router.get('/portfolio', async (req, res) => {
+  // This route is already protected by the super_admin check in server.js
+  
+  try {
+// This query selects all assets and dynamically creates the 'status'
+      // and 'hotelName' fields to match the prototype's data structure.
+      const query = `
+        SELECT 
+          id, 
+          asset_name AS "hotelName", 
+          city, 
+          total_rooms AS "totalRooms", 
+          management_group AS "group", 
+          monthly_fee AS "monthlyFee",
+          market_pulse_hotel_id, -- Keep this for the 'Delete' button logic
+          
+          -- Create the 'status' field dynamically
+          CASE 
+            WHEN market_pulse_hotel_id IS NOT NULL THEN 'Live' 
+            ELSE 'Off-Platform' 
+          END AS status
+        FROM 
+          rockenue_managed_assets
+        ORDER BY
+          status DESC, -- Show 'Live' properties first
+          "hotelName" ASC;
+      `;
+      
+      // [FIX] Use pool.query() directly
+      const { rows } = await pool.query(query);
+      res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching Rockenue portfolio:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * POST /api/rockenue/portfolio
+ * Adds a new "Off-Platform" property to the portfolio.
+ * This matches the prototype's "Add New Property" button.
+ */
+router.post('/portfolio', async (req, res) => {
+  try {
+// Create a new, blank "Off-Platform" asset, matching the
+      // defaults in the prototype's addProperty function.
+      const query = `
+        INSERT INTO rockenue_managed_assets (
+          asset_name, 
+          city, 
+          total_rooms, 
+          management_group, 
+          monthly_fee,
+          market_pulse_hotel_id -- This is explicitly NULL
+        )
+        VALUES 
+          ('New Property', 'City', 0, 'Group A', 0.00, NULL)
+        RETURNING 
+          id, 
+          asset_name AS "hotelName", 
+          city, 
+          total_rooms AS "totalRooms", 
+          management_group AS "group", 
+          monthly_fee AS "monthlyFee",
+          market_pulse_hotel_id,
+          'Off-Platform' AS status; -- Return the new row in the correct format
+      `;
+      
+      // [FIX] Use pool.query() directly
+      const { rows } = await pool.query(query);
+      res.status(201).json(rows[0]); // Send the new property back to the frontend
+  } catch (error) {
+    console.error('Error adding new portfolio property:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * PUT /api/rockenue/portfolio/:id
+ * Updates the 'monthly_fee' for any property (Live or Off-Platform).
+ * This matches the prototype's "handleFeeUpdate" function.
+ */
+router.put('/portfolio/:id', async (req, res) => {
+  const { id } = req.params;
+  // [MODIFIED] Destructure all fields from the body
+  const {
+    monthlyFee,
+    hotelName, // Corresponds to asset_name
+    city,
+    totalRooms,
+    group
+  } = req.body;
+
+  // [MODIFIED] Validate all required fields for a full update
+  // We only require monthlyFee, as others can be set to empty/0
+  if (monthlyFee === undefined || isNaN(parseFloat(monthlyFee))) {
+    return res.status(400).json({ error: 'Invalid monthlyFee (number) is required.' });
+  }
+
+  // [NEW] Sanitize inputs
+  const fee = parseFloat(monthlyFee);
+  const rooms = parseInt(totalRooms, 10) || 0;
+  const assetNameValue = hotelName || 'New Property'; // Default name if empty
+  const cityValue = city || 'City'; // Default city if empty
+  const groupValue = group || null; // Allow setting group to null
+
+  try {
+    // [MODIFIED] Upgraded query to handle business logic in SQL.
+    // - monthly_fee is ALWAYS updated.
+    // - Other fields are ONLY updated if market_pulse_hotel_id IS NULL (i.e., "Off-Platform").
+    const query = `
+      UPDATE rockenue_managed_assets
+      SET
+        monthly_fee = $1,
+        asset_name = CASE
+          WHEN market_pulse_hotel_id IS NULL THEN $3
+          ELSE asset_name
+        END,
+        city = CASE
+          WHEN market_pulse_hotel_id IS NULL THEN $4
+          ELSE city
+        END,
+        total_rooms = CASE
+          WHEN market_pulse_hotel_id IS NULL THEN $5
+          ELSE total_rooms
+        END,
+        management_group = CASE
+          WHEN market_pulse_hotel_id IS NULL THEN $6
+          ELSE management_group
+        END,
+        updated_at = NOW()
+      WHERE
+        id = $2
+      RETURNING
+        id,
+        asset_name AS "hotelName",
+        city,
+        total_rooms AS "totalRooms",
+        management_group AS "group",
+        monthly_fee AS "monthlyFee",
+        market_pulse_hotel_id,
+        CASE
+          WHEN market_pulse_hotel_id IS NOT NULL THEN 'Live'
+          ELSE 'Off-Platform'
+        END AS status; -- Return the updated row in the correct frontend format
+    `;
+
+    // [MODIFIED] Pass all new parameters to the query
+    const { rows } = await pool.query(query, [
+      fee,
+      id,
+      assetNameValue,
+      cityValue,
+      rooms,
+      groupValue
+    ]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Property not found.' });
+    }
+
+    res.status(200).json(rows[0]); // Send the fully updated row back
+
+  } catch (error) {
+    console.error(`Error updating asset ${id}:`, error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * DELETE /api/rockenue/portfolio/:id
+ * Deletes an "Off-Platform" property.
+ * This matches the prototype's "deleteProperty" function.
+ */
+router.delete('/portfolio/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+// CRITICAL: We add "AND market_pulse_hotel_id IS NULL"
+      // This makes it impossible to delete a "Live" property that is
+      // synced from the main 'hotels' table, matching the prototype's logic.
+      const query = `
+        DELETE FROM rockenue_managed_assets 
+        WHERE 
+          id = $1 
+          AND market_pulse_hotel_id IS NULL;
+      `;
+      
+      // [FIX] Use pool.query() directly
+      const result = await pool.query(query, [id]);
+      
+      if (result.rowCount === 0) {
+        return res.status(404).json({ 
+          error: 'Property not found or is a "Live" property and cannot be deleted.' 
+        });
+      }
+      
+      res.status(200).json({ message: 'Off-Platform property deleted.' });
+  } catch (error) {
+    console.error(`Error deleting asset ${id}:`, error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ... (Your module.exports = router; line at the end of the file)
+
 module.exports = router;

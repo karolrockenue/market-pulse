@@ -23,6 +23,8 @@ const publicPath = path.join(process.cwd(), "public");
 const userRoutes = require("./api/routes/users.router.js");
 const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
+const supportRoutes = require("./api/routes/support.router.js"); // [NEW] Import the support router
+const budgetsRouter = require('./api/routes/budgets.router.js'); // [FIX] Corrected path relative to server.js
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
@@ -39,7 +41,11 @@ if (process.env.VERCEL_ENV !== "production") {
 }
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // During development, allow requests from any localhost origin or no origin (e.g., Postman).
+    const isDevelopment = process.env.VERCEL_ENV !== 'production';
+    const isAllowed = isDevelopment && (!origin || origin.startsWith('http://localhost'));
+
+    if (isAllowed || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -125,6 +131,8 @@ app.use(
 // This must come BEFORE any of the page-serving routes.
 app.use(express.static(path.join(process.cwd(), "public")));
 
+
+
 // /server.js
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
@@ -173,12 +181,13 @@ if (process.env.VERCEL_ENV !== "production") {
 // Mount all the dedicated routers to their respective paths.
 app.use("/api/auth", authRoutes);
 app.use("/api", dashboardRoutes);
-app.use("/api", reportsRoutes);
+app.use("/api/reports", reportsRoutes);
 app.use("/api/admin", adminRoutes); // FIX: Use a specific path for the admin router
 app.use("/api/users", userRoutes); // Add this line
 app.use("/api/market", marketRouter);
 app.use("/api/rockenue", rockenueRoutes);
-
+app.use("/api/support", supportRoutes); // [NEW] Mount the support router
+app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
 // --- STATIC AND FALLBACK ROUTES ---
 
 app.get("/", (req, res) => {

@@ -10,6 +10,9 @@ const { requireUserApi } = require("../utils/middleware");
 // --- NEW TRENDS ENDPOINT ---
 router.get("/trends", requireUserApi, async (req, res) => {
   try {
+    // DEBUG: Log the exact query parameters received from the frontend.
+    console.log("--- Received query parameters for /trends: ---", req.query);
+
     // --- 1. Get and Validate Filters from Frontend ---
     const { city, years } = req.query;
     const tierArray = req.query.tiers
@@ -53,10 +56,11 @@ router.get("/trends", requireUserApi, async (req, res) => {
                 GROUP BY h.hotel_id
                 HAVING COUNT(DISTINCT dms.stay_date::date) >= $4
             )
-            SELECT
+       SELECT
                 date_trunc('month', dms.stay_date) as period,
                 h.category,
-                AVG(dms.occupancy_direct) as occupancy,
+                -- [FIX] Correctly calculate occupancy from source columns
+                (SUM(dms.rooms_sold)::numeric / NULLIF(SUM(dms.capacity_count), 0)) as occupancy,
                 -- THE FIX: Use the new gross columns for consistency
                 AVG(dms.gross_adr) as adr,
                 AVG(dms.gross_revpar) as revpar
@@ -113,10 +117,13 @@ router.get("/kpis", requireUserApi, async (req, res) => {
             h.hotel_id,
             AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_revpar END) as current_revpar,
             AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.gross_revpar END) as prior_revpar,
-            AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_adr END) as current_adr,
+           AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_adr END) as current_adr,
             AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.gross_adr END) as prior_adr,
-            AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.occupancy_direct END) as current_occupancy,
-            AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.occupancy_direct END) as prior_occupancy
+            -- [FIX] Correctly calculate occupancy from source columns
+            (SUM(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.rooms_sold END)::numeric /
+             NULLIF(SUM(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.capacity_count END), 0)) as current_occupancy,
+            (SUM(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.rooms_sold END)::numeric /
+             NULLIF(SUM(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.capacity_count END), 0)) as prior_occupancy
         FROM hotels h
         JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
         CROSS JOIN DateRanges dr
@@ -184,11 +191,12 @@ router.get("/neighborhoods", requireUserApi, async (req, res) => {
     NeighborhoodMetricsCurrent AS (
         SELECT
             h.neighborhood,
-            COUNT(DISTINCT h.hotel_id) as hotel_count,
+           COUNT(DISTINCT h.hotel_id) as hotel_count,
             -- THE FIX: Use the new gross columns
             AVG(dms.gross_revpar) AS revpar,
             AVG(dms.gross_adr) AS adr,
-            AVG(dms.occupancy_direct) AS occupancy
+            -- [FIX] Correctly calculate occupancy from source columns
+            (SUM(dms.rooms_sold)::numeric / NULLIF(SUM(dms.capacity_count), 0)) AS occupancy
         FROM hotels h
         JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
         CROSS JOIN DateRanges

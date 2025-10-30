@@ -191,8 +191,9 @@ router.get("/team", requireUserApi, async (req, res) => {
     const teamUserIds = userIdsResult.rows.map((row) => row.user_id);
 
     if (teamUserIds.length > 0) {
-      const teamResult = await pgPool.query(
-        `SELECT first_name, last_name, email, role FROM users
+const teamResult = await pgPool.query(
+        // [MODIFIED] Add user_id to the SELECT statement
+        `SELECT user_id, first_name, last_name, email, role FROM users
          WHERE cloudbeds_user_id = ANY($1::text[]) OR user_id::text = ANY($1::text[])`,
         [teamUserIds]
       );
@@ -202,12 +203,15 @@ router.get("/team", requireUserApi, async (req, res) => {
         owner: "Owner",
         user: "User",
       };
-      activeUsers = teamResult.rows
+activeUsers = teamResult.rows
         .map((user) => ({
-          name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+          // [MODIFIED] Pass the raw fields the frontend component expects
+          user_id: user.user_id,
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
           email: user.email,
           status: "Active",
-          role: roleMap[user.role] || "User",
+          role: user.role, // Pass the raw role (e.g., 'owner', 'user')
         }))
         .filter((user) => user.email);
     }
@@ -217,14 +221,15 @@ router.get("/team", requireUserApi, async (req, res) => {
       `SELECT invitee_first_name, invitee_last_name, invitee_email FROM user_invitations WHERE property_id = $1::integer AND status = 'pending'`,
       [propertyId]
     );
-    const pendingInvites = pendingInvitesResult.rows
+const pendingInvites = pendingInvitesResult.rows
       .map((invite) => ({
-        name: `${invite.invitee_first_name || ""} ${
-          invite.invitee_last_name || ""
-        }`.trim(),
+        // [MODIFIED] Match the same data shape for the frontend
+        user_id: `invite-${invite.invitee_email}`, // Create a unique key
+        first_name: invite.invitee_first_name || '',
+        last_name: invite.invitee_last_name || '',
         email: invite.invitee_email,
         status: "Pending",
-        role: "User",
+        role: "user", // Pass lowercase 'user' role
       }))
       .filter((invite) => invite.email);
 

@@ -76,11 +76,13 @@ async function getAdminAccessToken(adminUserId, propertyId) {
 // --- ADMIN API ENDPOINTS ---
 // All routes are now protected by the requireAdminApi middleware.
 
+// /api/routes/admin.router.js
 router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
   try {
     const { rows } = await pgPool.query(
-      // Select the new 'category' column instead of 'star_rating'
-      "SELECT hotel_id, property_name, property_type, city, category, neighborhood FROM hotels ORDER BY property_name"
+      // [FIX] Add the new 'total_rooms' column to the SELECT statement
+      // Added is_rockenue_managed and management_group for Rockenue tools
+      "SELECT hotel_id, property_name, total_rooms, property_type, city, category, neighborhood, is_rockenue_managed, management_group FROM hotels ORDER BY property_name"
     );
     res.json(rows);
   } catch (error) {
@@ -399,6 +401,59 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
       // Handle cases where the PMS type is unknown or not supported yet.
       throw new Error(`Sync logic not implemented for PMS type: '${pmsType}'`);
     }
+// --- [NEW] Calculate and save Total Rooms ---
+// We re-use the logic from the backfill endpoint within this transaction.
+console.log(`[Admin Sync] Now calculating total rooms for hotel: ${propertyId}`);
+let totalRooms = 0;
+try {
+  // 1. Get credentials and PMS info
+  const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
+    propertyId
+  );
+
+  // 2. Call the PMS API function
+  const apiResponse = await getRoomTypesFromPMS(
+    propertyId, 
+    pms_type, 
+    credentials, 
+    pms_property_id
+  );
+
+  // 3. Sum the 'roomTypeUnits', skipping "virtual" rooms
+  if (apiResponse && Array.isArray(apiResponse.data)) {
+    totalRooms = apiResponse.data.reduce(
+      (sum, roomType) => {
+        const roomName = roomType.roomTypeName || roomType.Name || "";
+        if (roomName.toLowerCase().includes('virtual')) {
+          console.log(` -- Skipping room: "${roomName}" (virtual)`);
+          return sum;
+        }
+        return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
+      },
+      0
+    );
+  } else {
+    throw new Error("Invalid API response structure. Expected { data: [...] }");
+  }
+
+  // 4. Save to the database
+  if (totalRooms > 0) {
+    await client.query(
+      "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+      [totalRooms, propertyId]
+    );
+    console.log(`[Admin Sync] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${propertyId}.`);
+  } else {
+    console.warn(`[Admin Sync] Calculated total rooms was 0 for hotel ${propertyId}. Skipping update.`);
+  }
+
+} catch (roomError) {
+  // Log the error but do not fail the whole transaction
+  // This ensures that hotel info (like name, city) can still be synced
+  // even if the room count fails.
+  console.error(`[Admin Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`);
+}
+// --- [END NEW] ---
 
     // If all operations were successful, commit the transaction.
     await client.query("COMMIT");
@@ -461,6 +516,180 @@ async function getMewsCredentials(propertyId) {
     clientToken: storedCredentials.clientToken,
     accessToken: decryptedToken,
   };
+}
+
+/**
+ * Helper function to get the necessary credentials for any hotel.
+ * This is used by the backfill endpoint.
+ * @param {string} hotelId The internal hotel_id
+ * @returns {Promise<{credentials: object, pms_type: string}>}
+ */
+async function getCredentialsForHotel(hotelId) {
+  const result = await pgPool.query(
+    // We fetch the stored credentials and the pms_type
+    `SELECT up.pms_credentials, h.pms_type 
+     FROM user_properties up
+     JOIN hotels h ON up.property_id = h.hotel_id
+     WHERE up.property_id = $1 
+     AND up.pms_credentials IS NOT NULL
+     LIMIT 1`,
+    [hotelId]
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`No credentials found for hotel ${hotelId}`);
+  }
+
+  // For Mews, we must decrypt the access token before returning
+  if (result.rows[0].pms_type === 'mews') {
+    const storedCredentials = result.rows[0].pms_credentials;
+    // Re-use the existing getMewsCredentials logic, but adapt it
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+    const [ivHex, authTagHex, encryptedToken] =
+      storedCredentials.accessToken.split(":");
+    if (!ivHex || !authTagHex || !encryptedToken) {
+      throw new Error("Stored Mews credentials are in an invalid format.");
+    }
+
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(authTagHex, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+
+    let decryptedToken = decipher.update(encryptedToken, "hex", "utf8");
+    decryptedToken += decipher.final("utf8");
+
+    return {
+      credentials: {
+        clientToken: storedCredentials.clientToken,
+        accessToken: decryptedToken
+      },
+      pms_type: 'mews'
+    };
+  }
+
+  // For Cloudbeds, just return the stored credentials object
+  return {
+    credentials: result.rows[0].pms_credentials,
+    pms_type: result.rows[0].pms_type
+  };
+}
+/**
+ * Helper function to get the necessary credentials for any hotel.
+ * This is used by the backfill endpoint.
+ * @param {string} hotelId The internal hotel_id
+ * @returns {Promise<{credentials: object, pms_type: string, pms_property_id: string}>}
+ */
+async function getCredentialsForHotel(hotelId) {
+  const result = await pgPool.query(
+    // We fetch the stored credentials, pms_type, and the external pms_property_id
+    `SELECT up.pms_credentials, h.pms_type, h.pms_property_id
+     FROM user_properties up
+     JOIN hotels h ON up.property_id = h.hotel_id
+     WHERE up.property_id = $1 
+     AND up.pms_credentials IS NOT NULL
+     LIMIT 1`,
+    [hotelId]
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`No credentials or hotel entry found for hotel ${hotelId}`);
+  }
+
+  const { pms_credentials, pms_type, pms_property_id } = result.rows[0];
+
+  // For Mews, we must decrypt the access token before returning
+  if (pms_type === 'mews') {
+    const storedCredentials = pms_credentials;
+    // Re-use the existing getMewsCredentials logic
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+    const [ivHex, authTagHex, encryptedToken] =
+      storedCredentials.accessToken.split(":");
+    if (!ivHex || !authTagHex || !encryptedToken) {
+      throw new Error("Stored Mews credentials are in an invalid format.");
+    }
+
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(authTagHex, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+
+    let decryptedToken = decipher.update(encryptedToken, "hex", "utf8");
+    decryptedToken += decipher.final("utf8");
+
+    return {
+      credentials: {
+        clientToken: storedCredentials.clientToken,
+        accessToken: decryptedToken
+      },
+      pms_type: 'mews',
+      pms_property_id: pms_property_id
+    };
+  }
+
+  // For Cloudbeds, just return the stored credentials object
+  return {
+    credentials: pms_credentials, // This contains the refresh_token
+    pms_type: 'cloudbeds',
+    pms_property_id: pms_property_id
+  };
+}
+/**
+ * Fetches room type data directly from the PMS API.
+ * This function contains the logic that was missing from the adapters.
+ * @param {string} hotelId Internal hotel_id (for getting the *right* token)
+ * @param {string} pms_type 'cloudbeds' or 'mews'
+ * @param {object} credentials The credentials object from getCredentialsForHotel
+ * @param {string} pms_property_id The external PMS property ID (Cloudbeds needs this)
+ * @returns {Promise<object>} The raw API response (expected to have a .data property)
+ */
+async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_id) {
+  if (pms_type === 'cloudbeds') {
+    // --- Cloudbeds Logic ---
+    // 1. Get a fresh Access Token using the stored refresh_token
+    // We use the internal hotelId to find the right refresh token
+    const { accessToken } = await getAdminAccessToken("admin", hotelId); // Re-use existing admin helper
+
+    // 2. Use the external pms_property_id for the API call
+    const cloudbedsApiId = pms_property_id || hotelId; // Fallback for older hotels
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomTypes?propertyID=${cloudbedsApiId}`;
+
+    const response = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": cloudbedsApiId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Cloudbeds API error: ${response.statusText}`);
+    }
+    return response.json(); // Returns { success: true, data: [...] }
+
+  } else if (pms_type === 'mews') {
+    // --- Mews Logic ---
+    // Credentials are pre-decrypted by getCredentialsForHotel
+    const targetUrl = "https://api.mews.com/api/connector/v1/roomTypes/getAll";
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${credentials.accessToken}`,
+      },
+      body: JSON.stringify({
+        ClientToken: credentials.clientToken,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mews API error: ${response.statusText}`);
+    }
+    const mewsData = await response.json();
+    // Mews data format is { RoomTypes: [...] }. We adapt it to match the
+    // Cloudbeds format { data: [...] } for consistent processing.
+    return { data: mewsData.RoomTypes || [] };
+  } else {
+    throw new Error(`PMS type "${pms_type}" not supported for getRoomTypes.`);
+  }
 }
 
 // SECURE MEWS TEST ROUTE for Connection & Configuration
@@ -1019,5 +1248,171 @@ router.post("/hotel/:hotelId/compset", requireAdminApi, async (req, res) => {
     client.release(); // ALWAYS release client
   }
 });
+// --- NEW ENDPOINT TO BACKFILL TOTAL ROOMS (FIXED) ---
+router.get(
+  "/backfill-room-counts",
+  requireAdminApi, // Protected for admins
+  async (req, res) => {
+    // Double-check for super_admin role
+    if (req.session.role !== "super_admin") {
+      return res.status(403).json({ error: "Access denied." });
+    }
+
+    let updatedCount = 0;
+    let failedCount = 0;
+    const logs = [];
+
+    // [FIX] We no longer need the broken adapterGetRoomTypes object
+
+    try {
+      // 1. Get all hotels
+      const { rows: hotels } = await pgPool.query(
+        "SELECT hotel_id, property_name, pms_type FROM hotels"
+      );
+
+      logs.push(`Found ${hotels.length} hotels to process...`);
+
+      // 2. Loop through each hotel
+      for (const hotel of hotels) {
+        let totalRooms = 0;
+        try {
+          // 3. Get credentials and PMS info using our new helper
+          const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
+            hotel.hotel_id
+          );
+
+          // 4. Call our new, self-contained PMS API function
+          const apiResponse = await getRoomTypesFromPMS(
+            hotel.hotel_id, 
+            pms_type, 
+            credentials, 
+            pms_property_id
+          );
+
+      // 5. Sum the 'roomTypeUnits' from the response
+// This field name is 'roomTypeUnits' in Cloudbeds
+// and 'RoomTypeUnits' in Mews. We check for both.
+if (apiResponse && Array.isArray(apiResponse.data)) {
+  totalRooms = apiResponse.data.reduce(
+    (sum, roomType) => {
+      // Get the room name. Cloudbeds uses 'roomTypeName', Mews uses 'Name'.
+      const roomName = roomType.roomTypeName || roomType.Name || ""; // Default to empty string
+
+      // Check if the name includes 'virtual'
+      if (roomName.toLowerCase().includes('virtual')) {
+        logs.push(` -- Skipping room: "${roomName}" (contains 'virtual')`); // Add a log entry
+        return sum; // Return the current sum without adding
+      }
+
+      // If not virtual, add its units to the sum
+      return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
+    },
+    0 // Initial value for sum
+  );
+} else {
+  throw new Error("Invalid API response structure. Expected { data: [...] }");
+}
+
+          // 6. Save to the database
+          if (totalRooms > 0) {
+            await pgPool.query(
+              "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+              [totalRooms, hotel.hotel_id]
+            );
+            logs.push(
+              `SUCCESS: ${hotel.property_name} (ID: ${hotel.hotel_id}) -> ${totalRooms} rooms.`
+            );
+            updatedCount++;
+          } else {
+            // This is a safety check. If a hotel has 0 rooms, log it as a fail.
+            throw new Error("Calculated total rooms was 0. Skipping update.");
+          }
+        } catch (error) {
+          logs.push(
+            `FAILED: ${hotel.property_name} (ID: ${hotel.hotel_id}) -> ${error.message}`
+          );
+          failedCount++;
+        }
+      }
+
+      logs.push("--- Backfill Complete ---");
+      logs.push(`Successfully updated: ${updatedCount}`);
+      logs.push(`Failed: ${failedCount}`);
+
+      // 7. Send the log report
+      res.json({
+        message: "Backfill complete.",
+        updated: updatedCount,
+        failed: failedCount,
+        logs: logs,
+      });
+
+    } catch (error) {
+      res.status(500).json({ error: "Fatal error during backfill", details: error.message });
+    }
+  }
+);
+// --- END OF NEW ENDPOINT ---
+
+
+// --- END OF NEW ENDPOINT ---
+
+// NEW: Endpoint to update a hotel's management status or group
+router.post("/update-hotel-management", requireAdminApi, async (req, res) => {
+  const { hotelId, field, value } = req.body;
+
+  // 1. Validate the field name to prevent SQL injection
+  const allowedFields = ["is_rockenue_managed", "management_group"];
+  if (!allowedFields.includes(field)) {
+    return res.status(400).json({ error: "Invalid field specified." });
+  }
+
+  // 2. Validate the hotelId
+  if (!hotelId) {
+    return res.status(400).json({ error: "Hotel ID is required." });
+  }
+
+  try {
+    // 3. Build and execute the query
+    // We use pg-format %I (Identifier) to safely insert the column name (field)
+    // and %L (Literal) to safely insert the value.
+    const updateQuery = format(
+      "UPDATE hotels SET %I = %L WHERE hotel_id = %L",
+      field, // Safely inserts the column name
+      value, // Safely inserts the new value
+      hotelId // Safely inserts the hotel ID
+    );
+
+    const result = await pgPool.query(updateQuery);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Hotel not found." });
+    }
+
+    res.status(200).json({ message: "Management info updated successfully." });
+} catch (error) {
+    console.error("Error updating hotel management info:", error);
+    res.status(500).json({ error: "Failed to update management info." });
+  }
+});
+
+// NEW: Endpoint to get a distinct list of management groups for the combobox
+router.get("/management-groups", requireAdminApi, async (req, res) => {
+  try {
+    const { rows } = await pgPool.query(
+      `SELECT DISTINCT management_group 
+       FROM hotels 
+       WHERE management_group IS NOT NULL AND management_group != '' 
+       ORDER BY management_group`
+    );
+    // Pluck the names from the objects to return a simple array of strings
+    const groups = rows.map(row => row.management_group);
+    res.status(200).json(groups);
+  } catch (error) {
+    console.error("Error fetching management groups:", error);
+    res.status(500).json({ error: "Failed to fetch management groups." });
+  }
+});
+
 
 module.exports = router;

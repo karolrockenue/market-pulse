@@ -112,9 +112,7 @@ market-pulse/
 │ │ └── middleware.js
 │ ├── daily-refresh.js
 │ ├── initial-sync.js
-│ ├── ota-crawler.js
 │ ├── send-scheduled-reports.js
-│ └── index.js
 ├── public/
 │ ├── admin/
 │ │ ├── admin.mjs
@@ -145,6 +143,7 @@ market-pulse/
 │ └── terms.html
 ├── .env
 ├── package.json
+└── server.js
 └── vercel.json
 6.0 API Endpoints
 The API is organized into feature-based routers. All are mounted under /api.
@@ -281,6 +280,147 @@ Dependency Upgrade: The standard playwright package was replaced with the server
 
 Configuration Simplification: A "UI-first" configuration model was adopted. All file-based overrides for the Node.js version (engines in package.json) were removed, making the Vercel Dashboard setting the single source of truth.
 
-Architectural Refactor: The project was converted to a fully serverless pattern by moving the main server.js entry point to api/index.js, eliminating ambiguity for Vercel's build system.
+
 
 Outcome: The refactor was a success, resolving all deployment and runtime errors. This enabled the successful deployment of the automated OTA crawler and established a stable, modern architectural pattern for the entire application on Vercel.
+
+
+October 22, 2025
+Task: Implement Data Override & Lock for Jubilee Hotel (ID 230719).
+
+Progress:
+
+Problem: The 2024 data for the Jubilee Hotel (ID 230719) was found to be corrupt in the database, with inaccurate monthly totals for revenue and occupancy. We were provided with a definitive list of correct monthly gross revenue and occupancy totals for 2024.
+
+Objective: To permanently correct the 2024 data in the database and protect it from being overwritten by future initial-sync or daily-refresh jobs.
+
+Action 1: Modify Sync Logic:
+
+We modified api/initial-sync.js to make the sync process "aware" of a new data lock feature.
+
+The script now fetches a new locked_years (JSONB) column from the hotels table.
+
+The DELETE query was replaced with a dynamic query that respects this lock, skipping the deletion of any data from a year present in the locked_years array.
+
+We added filter logic to both the Cloudbeds and Mews data insertion paths to prevent initial-sync from writing new (corrupt) data into a locked year.
+
+We intentionally skipped modifying api/daily-refresh.js, as its logic only fetches future-looking data and was not a threat to the historical 2024 data.
+
+Action 2: One-Time Data Correction (SQL):
+
+We executed a one-time "pro-rata spread" SQL script (v5) to fix the 2024 data.
+
+Debugged DB Trigger: The script's UPDATE command initially failed due to a faulty, user-defined database trigger. We successfully bypassed this by wrapping the update logic in ALTER TABLE daily_metrics_snapshots DISABLE TRIGGER USER; and ... ENABLE TRIGGER USER;.
+
+Pro-Rata Logic: For each month of 2024, the script:
+
+Calculated the "Corrupt" gross_revenue and rooms_sold totals from the database.
+
+Calculated the "Correct" totals using the gross revenue and occupancy percentages provided by the user.
+
+Calculated correction factors (e.g., Correct_Total / Corrupt_Total) for both metrics.
+
+Applied these factors proportionally to gross_revenue, net_revenue, and rooms_sold for every single day of that month.
+
+Recalculated all derived metrics (adr, revpar, occupancy) for all corrected rows to ensure full data consistency.
+
+Result: This script successfully updated the total 2024 gross revenue for hotel 230719 to the correct £1,306,291.
+
+Action 3: Final Activation:
+
+We ran the final SQL command to officially "flip the switch" and activate the lock:
+
+UPDATE hotels SET locked_years = '["2024"]' WHERE hotel_id = '230719';.
+
+The 2024 data for this hotel is now considered correct, stable, and permanently protected from automated overwrites.
+
+12.0 Architectural Milestone: Reliable Room Count Implementation
+
+(October 22, 2025)
+
+Problem
+
+The GET /api/competitor-metrics endpoint, used by the Dashboard's "Comp Set Breakdown" card, was initially calculating hotel room counts by querying the daily_metrics_snapshots table for the most recent capacity_count. This approach proved unreliable due to:
+
+Corrupt Data: Future-dated or incorrect capacity_count values existed in the snapshots table, leading to wildly inaccurate room counts (e.g., displaying "7 rooms" for a 30-room hotel).
+
+Semantic Error: The capacity_count metric actually represents available rooms for a given day, not the total physical room count of the property.
+
+Solution
+
+A multi-step solution was implemented to establish a permanent and reliable "source of truth" for total room counts:
+
+Database Schema Change:
+
+Where: hotels table.
+
+How: An INTEGER column named total_rooms was added using ALTER TABLE hotels ADD COLUMN total_rooms INTEGER;. This column is designed to store the definitive physical room count for each property.
+
+Admin Backfill Endpoint:
+
+Where: api/routes/admin.router.js.
+
+Endpoint Added: GET /api/admin/backfill-room-counts.
+
+How: This new, admin-protected endpoint was created. When triggered, it:
+
+Fetches all hotels from the hotels table.
+
+For each hotel, retrieves the necessary PMS credentials (using new helper functions getCredentialsForHotel and getRoomTypesFromPMS added within admin.router.js).
+
+Calls the relevant PMS API (Cloudbeds getRoomTypes or Mews roomTypes/getAll) to get the list of room types.
+
+Sums the roomTypeUnits (Cloudbeds) or RoomTypeUnits (Mews) from the API response to calculate the true total room count.
+
+Updates the hotels.total_rooms column in the database with this correct value.
+
+Purpose: This endpoint provides a mechanism to populate and refresh the total_rooms data directly from the PMS source of truth.
+
+Dashboard API Update:
+
+Where: api/routes/dashboard.router.js.
+
+How: The competitorDetailsQuery within the GET /api/competitor-metrics endpoint was completely rewritten. Instead of querying daily_metrics_snapshots, it now performs a simple SELECT h.total_rooms FROM hotels h WHERE h.hotel_id = ANY(...).
+
+Outcome
+
+The Dashboard's "Comp Set Breakdown" card now displays accurate and stable room counts, directly read from the hotels.total_rooms column.
+
+The system is no longer reliant on the volatile or potentially corrupt capacity_count from the daily snapshots for determining the total physical room inventory.
+
+The new backfill endpoint ensures data integrity can be maintained by refreshing room counts from the PMS source of truth when needed.
+
+
+13.0 Architectural Milestone: Occupancy Data Refactor
+
+(October 25, 2025)
+
+Problem
+A critical data integrity bug was identified where Occupancy figures across the application were displaying incorrect values (e.g., 6.3% instead of 84.4%).
+
+Root Cause
+The root cause was traced to the occupancy_direct column in the daily_metrics_snapshots table. This column was found to contain unreliable, incorrect decimal values. Several key API endpoints were reading this incorrect column directly instead of calculating occupancy from the source of truth (rooms_sold and capacity_count).
+
+Solution
+A system-wide refactor of the backend API was performed to eradicate all use of the occupancy_direct column for calculations. All affected SQL queries were modified to use the correct on-the-fly calculation: (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)).
+
+The following API endpoints were corrected:
+
+api/routes/dashboard.router.js
+
+GET /api/market-ranking: The HotelPerformance CTE was updated to calculate occupancy correctly before ranking.
+
+api/routes/reports.router.js
+
+POST /api/reports/year-on-year: The conditional aggregation logic for y1_occupancy and y2_occupancy was replaced with the correct calculation.
+
+api/routes/market.router.js
+
+GET /market/trends: The query was updated to use the correct calculation.
+
+GET /market/kpis: The HotelYoY CTE was updated to calculate current_occupancy and prior_occupancy correctly.
+
+GET /market/neighborhoods: The NeighborhoodMetricsCurrent CTE was updated to use the correct calculation.
+
+Outcome
+All API endpoints in the application now provide correct, reliable occupancy figures. The occupancy_direct column is considered deprecated and must not be used for any future development. All occupancy calculations must be derived from rooms_sold and capacity_count.
