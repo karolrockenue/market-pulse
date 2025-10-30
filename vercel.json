@@ -5,7 +5,7 @@
       "src": "web/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "outputDirectory": "react-build"
+        "outputDirectory": "build"
       }
     },
     {
@@ -13,7 +13,7 @@
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "react-build/**"
+          "build/**"
         ]
       }
     }
@@ -25,11 +25,11 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/react-build/assets/$1"
+      "dest": "/build/assets/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/react-build/index.html"
+      "dest": "/build/index.html"
     }
   ]
 }
