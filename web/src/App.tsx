@@ -114,9 +114,11 @@ export default function App() {
 // [NEW] Add a state to track the initial session check
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   // [MODIFIED] Default activeView to null while we check the session
-  const [activeView, setActiveView] = useState<string | null>(null);
+// [FIXED] Default activeView to 'landing' to prevent blank screen when no session is active
+const [activeView, setActiveView] = useState<string | null>('landing');
 // [NEW] Add state to remember the view before navigating to a legal page
-  const [previousView, setPreviousView] = useState<string | null>(null);
+const [previousView, setPreviousView] = useState<string | null>(null);
+
   
 // [MODIFIED] Add the user's role to the userInfo state object
   const [userInfo, setUserInfo] = useState<{ firstName: string; lastName: string; email: string; role: string; } | null>(null);
@@ -240,30 +242,36 @@ if (data.currency_code) {
   
   // Effect to fetch the list of properties once on load.
 // Effect to fetch the list of properties once on load and set the active property.
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const response = await fetch('/api/my-properties');
-        if (!response.ok) throw new Error('Failed to fetch properties');
-        const data: Property[] = await response.json();
-        setProperties(data);
 
-        // Check the URL for a propertyId parameter.
-        const urlParams = new URLSearchParams(window.location.search);
-        const propertyIdFromUrl = urlParams.get('propertyId');
+ // Effect to fetch the list of properties once session is ready & user is logged in.
+useEffect(() => {
+  // Don’t run until the session is checked, and only when logged in
+  if (isSessionLoading || activeView === 'landing' || !userInfo) return;
 
-        // If a valid propertyId is in the URL, use it. Otherwise, default to the first property.
-        if (propertyIdFromUrl && data.some(p => p.property_id.toString() === propertyIdFromUrl)) {
-          setProperty(propertyIdFromUrl);
-        } else if (data.length > 0) {
-          setProperty(data[0].property_id.toString());
-        }
-      } catch (error) {
-        console.error("Error fetching properties:", error);
+  const fetchProperties = async () => {
+    try {
+      const response = await fetch('/api/my-properties', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch properties');
+      const data: Property[] = await response.json();
+      setProperties(data);
+
+      // Support ?propertyId= in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const propertyIdFromUrl = urlParams.get('propertyId');
+
+      if (propertyIdFromUrl && data.some(p => p.property_id.toString() === propertyIdFromUrl)) {
+        setProperty(propertyIdFromUrl);
+      } else if (data.length > 0) {
+        setProperty(data[0].property_id.toString());
       }
-    };
-    fetchProperties();
-  }, []);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+    }
+  };
+
+  fetchProperties();
+}, [isSessionLoading, activeView, userInfo]);
+
 
   // Effect to update the URL whenever the selected property changes.
   useEffect(() => {
@@ -1408,18 +1416,29 @@ const handleRemoveUser = (userId: string) => {
   }).format(kpiData.yourHotel.totalRevenue || 0);
   
   // [NEW] Show a full-screen loader while checking the session
-  if (isSessionLoading) {
-    return (
-      <div className="min-h-screen bg-[#1a1a18] flex items-center justify-center">
-        {/* Simple loader */}
-        <div className="w-12 h-12 border-4 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+// [NEW] Show a full-screen loader while checking the session
+if (isSessionLoading) {
+  return (
+    <div className="min-h-screen bg-[#1a1a18] flex items-center justify-center">
+      {/* Simple loader */}
+      <div className="w-12 h-12 border-4 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
+// [FIXED] If activeView is null or undefined, render Landing as safe fallback
+if (!activeView) {
+  return (
+    <LandingPage
+      onSignIn={() => setActiveView('dashboard')}
+      onViewChange={handleViewChange}
+    />
+  );
+}
 
 // [NEW] If the view is 'landing', render *only* the LandingPage component.
-  // This fulfills the requirement of not showing the TopNav.
-  if (activeView === 'landing') {
+if (activeView === 'landing') {
+
     return (
       <LandingPage
         onSignIn={() => setActiveView('dashboard')}
