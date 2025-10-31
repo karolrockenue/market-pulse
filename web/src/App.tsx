@@ -395,7 +395,6 @@ if (data.currency_code) {
         const data: MarketCompositionData = await response.json();
 
         // [DEBUG] Log the raw data from the API to the console
-        console.log("--- RAW /api/competitor-metrics RESPONSE ---", data);
 
         setMarketCompositionData(data);
       } catch (error) {
@@ -605,12 +604,11 @@ if (data.currency_code) {
 }
       const data = await response.json();
 
-// [DEBUG] Log the data from the API to check its structure
-      // console.log("--- SCHEDULES FROM API ---", data);
+
       
       setSchedules(data);
     } catch (error: any) {
-      console.error("Error fetching schedules:", error);
+     
       toast.error('Failed to load schedules', { description: error.message });
     }
   };
@@ -779,7 +777,6 @@ setStartDate(formatDate(newStartDate));
 // [NEW] This effect hook fetches data needed for the Settings page
   // It runs when the settings view is opened.
 useEffect(() => {
-    console.log('[Settings Hook] Fired. activeView:', activeView); // [DEBUG] Add this log
 
     // Function to fetch the user's editable profile
     const fetchUserProfile = async () => {
@@ -804,7 +801,6 @@ useEffect(() => {
 
  // [NEW] Function to fetch the list of team members
     const fetchTeamMembers = async () => {
-      console.log('[Settings Hook] fetchTeamMembers() CALLED'); // [DEBUG] Add this log
       try {
        // [MODIFIED] Call the team endpoint with cache-busting options
 // [MODIFIED] Pass the currently selected 'property' state as a query parameter
@@ -828,7 +824,6 @@ useEffect(() => {
 
 // [MODIFIED] Only run these fetches if the settings view is active
     if (activeView === 'settings') {
-      console.log('[Settings Hook] activeView is "settings", proceeding to fetch.'); // [DEBUG] Add this log
 
       // Fetch profile only if we don't have it
       if (!userInfo || userInfo.email === 'email@placeholder.com') {
@@ -838,14 +833,11 @@ useEffect(() => {
       fetchTeamMembers();
 }
   }, [activeView, userInfo, property]); // [MODIFIED] Add 'property' so the team list updates when the property changes
-// [NEW] Effect to check session on initial app load
+// web/src/App.tsx
+
   useEffect(() => {
     const checkUserSession = async () => {
-      
-      console.log('[DEBUG] 1. checkUserSession() started.'); // DEBUG LOG
       try {
-        console.log('[DEBUG] 2. Calling fetch /api/auth/session-info...'); // DEBUG LOG
-        // Fetch session info from the backend
         const response = await fetch('/api/auth/session-info', { 
           credentials: 'include',
           cache: 'no-store', 
@@ -855,22 +847,13 @@ useEffect(() => {
           }
         });
         
-        console.log(`[DEBUG] 3. Fetch response received. Status: ${response.status}`); // DEBUG LOG
-
-        // If the response is not OK (e.g., 401 Unauthorized), throw an error
-        // to be handled by the 'catch' block.
         if (!response.ok) {
-          console.log(`[DEBUG] 4. Response was NOT OK (${response.status}). Throwing error.`); // DEBUG LOG
           throw new Error(`No active session found. Status: ${response.status}`);
         }
 
-        // If response IS ok, proceed to parse JSON
-        console.log('[DEBUG] 5. Response was OK. Calling response.json()...'); // DEBUG LOG
         const session = await response.json();
-        console.log('[DEBUG] 6. JSON parsed successfully.', session); // DEBUG LOG
         
         if (session.isLoggedIn) {
-          console.log('[DEBUG] 7. Session is logged in. Setting user info and view.'); // DEBUG LOG
           setUserInfo({
             firstName: session.firstName || 'User',
             lastName: session.lastName || '',
@@ -880,23 +863,18 @@ useEffect(() => {
           const lastView = sessionStorage.getItem('marketPulseActiveView');
           setActiveView(lastView || 'dashboard');
         } else {
-          console.log('[DEBUG] 7. Session is NOT logged in. Setting view to landing.'); // DEBUG LOG
           setActiveView('landing');
         }
       } catch (error) {
-        console.error("[DEBUG] 8. CATCH BLOCK HIT. A critical error occurred.", error); // DEBUG LOG
-        // On ANY error (fetch error, 401, or JSON parse error),
-        // safely send the user to the landing page.
+        console.error("Error checking user session:", error); 
         setActiveView('landing');
       } finally {
-        console.log('[DEBUG] 9. FINALLY block hit. Setting isSessionLoading to false.'); // DEBUG LOG
-        // Stop the loading state
         setIsSessionLoading(false);
       }
     };
 
     checkUserSession();
-  }, []); // The empty array ensures this runs only once on mount
+  }, []);
 
   // --- HANDLER FUNCTIONS ---
 // [NEW] Handler for the property classification modal
@@ -907,25 +885,7 @@ useEffect(() => {
     }
 
     try {
-      // [NEW] We will need a new endpoint to save this.
-      // For now, we'll log it and prepare the fetch call.
-      console.log(`Saving tier "${tier}" for propertyId ${property}`);
-      
-      // const response = await fetch(`/api/hotel-details/${property}/classify`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ tier }),
-      // });
-
-      // if (!response.ok) {
-      //   throw new Error('Failed to save property classification');
-      // }
-      
-      // const result = await response.json();
-      
-      // On success:
-      // toast.success(`Property classified as ${tier}`);
-      // setShowPropertySetup(false); // Close the modal
+     
 
     } catch (error: any) {
       console.error("Error saving property classification:", error);

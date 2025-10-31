@@ -282,9 +282,9 @@ router.get("/accept-invitation", async (req, res) => {
 });
 
 // api/routes/auth.router.js
+// /api/routes/auth.router.js
 
 router.get("/session-info", async (req, res) => {
-  // FORCING A NEW VERCEL DEPLOYMENT
   if (req.session && req.session.userId) {
     try {
       const userResult = await pgPool.query(
@@ -292,7 +292,6 @@ router.get("/session-info", async (req, res) => {
         [req.session.userId]
       );
       if (userResult.rows.length === 0) {
-        // This case should not happen if the session is valid, but it's good practice to handle it.
         console.error("[CRITICAL] User from session not found in DB.");
         return res.json({ isLoggedIn: false });
       }
@@ -300,16 +299,11 @@ router.get("/session-info", async (req, res) => {
 
       const responsePayload = {
         isLoggedIn: true,
-        // --- FIX: Send both the new 'role' and the old 'isAdmin' flag for compatibility ---
         role: user.role,
-        isAdmin: user.role === "super_admin" || user.role === "owner", // Re-create the isAdmin flag for the old header code
+        isAdmin: user.role === "super_admin" || user.role === "owner", 
         firstName: user.first_name,
         lastName: user.last_name,
       };
-
-      // --- [DEBUG LOG 1] ---
-      console.log("[DEBUG] /session-info: Sending LOGGED IN response", responsePayload);
-      // --- [END DEBUG LOG] ---
 
       res.json(responsePayload);
     } catch (error) {
@@ -320,20 +314,12 @@ router.get("/session-info", async (req, res) => {
       res.status(500).json({ error: "Could not retrieve session info." });
     }
   } else {
-    // --- BREADCRUMB 8d: LOG THE SESSION FAILURE CASE ---
     console.error(
       "[CRITICAL] /session-info endpoint hit, but session or userId was missing."
     );
-
-    // --- [DEBUG LOG 2] ---
-    const responsePayload = { isLoggedIn: false };
-    console.log("[DEBUG] /session-info: Sending LOGGED OUT response", responsePayload);
-    // --- [END DEBUG LOG] ---
     res.json({ isLoggedIn: false });
   }
 });
-// --- MEWS ONBOARDING: STEP 1 - VALIDATE TOKEN & USER ---
-// --- MEWS ONBOARDING: STEP 1 - VALIDATE TOKEN & USER ---
 router.post("/mews/validate", async (req, res) => {
   // Destructure and validate the incoming data from the frontend form
   const { firstName, lastName, email, accessToken } = req.body;
@@ -358,10 +344,8 @@ router.post("/mews/validate", async (req, res) => {
     // --- FIX: Combine the server's ClientToken with the user's AccessToken ---
     const clientToken = process.env.MEWS_CLIENT_TOKEN;
     // --- DIAGNOSTIC LOG ---
-    console.log("MEWS_CLIENT_TOKEN from server environment:", clientToken);
     // --- END DIAGNOSTIC LOG ---
     if (!clientToken) {
-      console.error("MEWS_CLIENT_TOKEN is not set in environment variables.");
       return res.status(500).json({ message: "Server configuration error." });
     }
     const credentials = { clientToken, accessToken };
@@ -698,11 +682,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
       }
     );
     const tokenResponse = await tokenRes.json();
-    // --- TEMPORARY DEBUG LOG ---
-    console.log(
-      "--- CLOUDBEDS TOKEN RESPONSE ---",
-      JSON.stringify(tokenResponse, null, 2)
-    );
 
     if (!tokenResponse.access_token) {
       console.error("[BREADCRUMB FAIL] Token exchange failed.");
