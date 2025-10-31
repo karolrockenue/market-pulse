@@ -841,6 +841,7 @@ useEffect(() => {
 // [NEW] Effect to check session on initial app load
   useEffect(() => {
     const checkUserSession = async () => {
+      
       console.log('[DEBUG] 1. checkUserSession() started.'); // DEBUG LOG
       try {
         console.log('[DEBUG] 2. Calling fetch /api/auth/session-info...'); // DEBUG LOG

@@ -307,6 +307,10 @@ router.get("/session-info", async (req, res) => {
         lastName: user.last_name,
       };
 
+      // --- [DEBUG LOG 1] ---
+      console.log("[DEBUG] /session-info: Sending LOGGED IN response", responsePayload);
+      // --- [END DEBUG LOG] ---
+
       res.json(responsePayload);
     } catch (error) {
       console.error(
@@ -320,6 +324,11 @@ router.get("/session-info", async (req, res) => {
     console.error(
       "[CRITICAL] /session-info endpoint hit, but session or userId was missing."
     );
+
+    // --- [DEBUG LOG 2] ---
+    const responsePayload = { isLoggedIn: false };
+    console.log("[DEBUG] /session-info: Sending LOGGED OUT response", responsePayload);
+    // --- [END DEBUG LOG] ---
     res.json({ isLoggedIn: false });
   }
 });
