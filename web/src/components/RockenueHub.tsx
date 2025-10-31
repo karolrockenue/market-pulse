@@ -116,10 +116,34 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
-                      {/* [FIX] Replaced Tailwind w-5/h-5 classes with the lucide 'size' prop 
-                        for correct, conflict-free rendering.
-                      */}
-                      <Icon className="text-[#faff6a]" size={20} />
+               <div className="flex items-start justify-between mb-4">
+                    <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
+                      
+                      {/* [START] REPLACE THE <Icon ... /> COMPONENT WITH THIS SVG */}
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        stroke-width="2" 
+                        stroke-linecap="round" 
+                        stroke-linejoin="round"
+                        style={{
+                          display: "inline-block",
+                          width: "20px", 
+                          height: "20px", 
+                          stroke: "#faff6a", 
+                          fill: "none"
+                        }}
+                      >
+                        <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+                        <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+                        <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+                        <rect width="7" height="5" x="3" y="16" rx="1"></rect>
+                      </svg>
+                      {/* [END] REPLACEMENT */}
+
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
+                  </div>
                     </div>
                     {/* The chevron icon is fine, no change needed */}
                     <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
