@@ -116,9 +116,12 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
-                      {/* [FIX] Removed fill="currentColor" */}
-                      <Icon className="w-5 h-5 text-[#faff6a]" />
+                      {/* [FIX] Replaced Tailwind w-5/h-5 classes with the lucide 'size' prop 
+                        for correct, conflict-free rendering.
+                      */}
+                      <Icon className="text-[#faff6a]" size={20} />
                     </div>
+                    {/* The chevron icon is fine, no change needed */}
                     <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
                   </div>
                   
@@ -129,7 +132,6 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                   <p className="text-[#9ca3af] text-sm leading-snug mb-3">
                     {tool.description}
                   </p>
-                  {/* [FIX] The invalid text has been removed and the tag is correctly closed. */}
 
                   <div className="flex items-center gap-2 pt-3 border-t border-[#3a3a35]">
                     <Activity className="w-3 h-3 text-[#6b6b68]" />
@@ -158,13 +160,14 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#2a2a27] flex items-center justify-center">
-                      {/* [FIX] Removed fill="currentColor" */}
-                      <Icon className="w-5 h-5 text-[#6b6b68]" />
+                      {/* [FIX] Replaced w-5/h-5 with size={20} */}
+                      <Icon className="text-[#6b6b68]" size={20} />
                     </div>
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2a2a27]">
-                      {/* [FIX] Removed fill="currentColor" */}
-                      <Lock className="w-3 h-3 text-[#6b6b68]" />
-                      <span className="text-[9px] uppercase tracking-wider text-[#6b6b68]">Soon</span>
+                      {/* [FIX] Replaced w-3/h-3 with size={12} */}
+.
+                      <Lock className="text-[#6b6b68]" size={12} />
+                      <span className="text-[9px] uppercase tracking-wider text-[#6B6B68]">Soon</span>
                     </div>
                   </div>
                   
