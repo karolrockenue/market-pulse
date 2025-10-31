@@ -284,6 +284,7 @@ router.get("/accept-invitation", async (req, res) => {
 // api/routes/auth.router.js
 
 router.get("/session-info", async (req, res) => {
+  // FORCING A NEW VERCEL DEPLOYMENT
   if (req.session && req.session.userId) {
     try {
       const userResult = await pgPool.query(
