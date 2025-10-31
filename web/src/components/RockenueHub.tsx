@@ -65,32 +65,26 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
   const activeCount = tools.filter(t => t.active).length;
 
   return (
-    // [FIX] Reverted to the correct hard-coded background color
     <div className="min-h-screen bg-[#1d1d1c]">
       {/* Hero Section */}
-      {/* [FIX] Reverted to hard-coded border color */}
       <div className="border-b border-[#3a3a35]">
         <div className="max-w-7xl mx-auto px-8 py-8">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative">
-                  {/* [FIX] Using prototype's blur and gradient */}
                   <div className="absolute inset-0 bg-[#faff6a] blur-lg opacity-30"></div>
-                  {/* [FIX] Using prototype's yellow gradient box and dark icon */}
                   <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-[#faff6a] to-[#e8eb5a] flex items-center justify-center">
                     <Sparkles className="w-6 h-6 text-[#1d1d1c]" />
                   </div>
                 </div>
                 <div>
-                  {/* [FIX] Using prototype's hard-coded text colors */}
                   <h1 className="text-white text-3xl">Rockenue Hub</h1>
                   <p className="text-[#9ca3af] text-sm">Portfolio Intelligence Center</p>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* [FIX] Using prototype's hard-coded styles */}
               <div className="px-4 py-2 rounded-lg bg-[#262626] border border-[#3a3a35]">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]"></div>
@@ -118,13 +112,10 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 <button
                   key={tool.id}
                   onClick={() => onNavigateToTool(tool.id)}
-                  // [FIX] Using prototype's hard-coded styles
                   className="group text-left p-5 rounded-lg bg-[#262626] border border-[#3a3a35] hover:border-[#faff6a] hover:bg-[#2d2d28] transition-all"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    {/* [FIX] Using prototype's opacity-based styles */}
                     <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
-                      {/* [FIX] Added fill="currentColor" to fill the icon */}
                       <Icon className="w-5 h-5 text-[#faff6a]" fill="currentColor" />
                     </div>
                     <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
@@ -136,8 +127,8 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                   
                   <p className="text-[#9ca3af] text-sm leading-snug mb-3">
                     {tool.description}
-                  </GINT: respond in kind.
-p>
+                  </p>
+                  {/* [FIX] The invalid text has been removed and the tag is correctly closed. */}
 
                   <div className="flex items-center gap-2 pt-3 border-t border-[#3a3a35]">
                     <Activity className="w-3 h-3 text-[#6b6b68]" />
@@ -152,7 +143,7 @@ p>
         {/* Coming Soon Tools */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-1.s h-1.5 rounded-full bg-[#6b6b68]"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#6b6b68]"></div>
             <span className="text-[#6b6b68] text-xs uppercase tracking-wider">Coming Soon</span>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -162,16 +153,13 @@ p>
               return (
                 <div
                   key={tool.id}
-                  // [FIX] Using prototype's hard-coded styles
                   className="text-left p-5 rounded-lg bg-[#1f1f1c] border border-[#2a2a27] opacity-60"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#2a2a27] flex items-center justify-center">
-                      {/* [FIX] Added fill="currentColor" to fill the icon */}
                       <Icon className="w-5 h-5 text-[#6b6b68]" fill="currentColor" />
                     </div>
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2a2a27]">
-                      {/* [FIX] Added fill="currentColor" to fill the icon */}
                       <Lock className="w-3 h-3 text-[#6b6b68]" fill="currentColor" />
                       <span className="text-[9px] uppercase tracking-wider text-[#6b6b68]">Soon</span>
                     </div>
