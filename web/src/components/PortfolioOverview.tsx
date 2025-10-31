@@ -76,8 +76,11 @@ export function PortfolioOverview() {
   }, []); // Empty dependency array means this runs once on load
 
   // --- Calculate totals ---
-  const totalRooms = allPortfolio.reduce((sum, p) => sum + (p.totalRooms || 0), 0);
-  const totalFees = allPortfolio.reduce((sum, p) => sum + (p.monthlyFee || 0), 0);
+  // [FIX] Use Number() to ensure values are numeric before summing.
+  // This prevents 'NaN' errors if a value is null, undefined, or a non-numeric string.
+  // The '|| 0' catches any NaN results from Number() and defaults them to 0.
+  const totalRooms = allPortfolio.reduce((sum, p) => sum + (Number(p.totalRooms) || 0), 0);
+  const totalFees = allPortfolio.reduce((sum, p) => sum + (Number(p.monthlyFee) || 0), 0);
   const totalMRR = totalFees;
   const totalARR = totalMRR * 12;
 
@@ -98,6 +101,8 @@ export function PortfolioOverview() {
     if (editFormData) {
       setEditFormData({
         ...editFormData,
+        // [BUG-WARNING] This logic still only parses 'totalRooms' as a number.
+        // 'monthlyFee' will be saved as a string, which will cause API errors.
         [name]: name === 'totalRooms' ? parseInt(value, 10) || 0 : value,
       });
     }
