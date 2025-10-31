@@ -84,11 +84,8 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative">
-                  {/* [FIX] Still use primary for the glow effect */}
                   <div className="absolute inset-0 bg-primary blur-lg opacity-30"></div>
-                  {/* [FIX] Swapped to a dark 'bg-card' box */}
                   <div className="relative w-12 h-12 rounded-xl bg-card flex items-center justify-center">
-                    {/* [FIX] Swapped to 'text-primary' icon and added 'flex-shrink-0' */}
                     <Sparkles className="w-6 h-6 text-primary flex-shrink-0" />
                   </div>
                 </div>
@@ -101,7 +98,6 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
             <div className="flex items-center gap-3">
               <div className="px-4 py-2 rounded-lg bg-card border border-border">
                 <div className="flex items-center gap-2">
-                  {/* [FIX] Added 'flex-shrink-0' */}
                   <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0"></div>
                   <span className="text-muted-foreground text-sm">{activeCount} Tools Active</span>
                 </div>
@@ -116,7 +112,6 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
         {/* Active Tools */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            {/* [FIX] Added 'flex-shrink-0' */}
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0"></div>
             <span className="text-muted-foreground text-xs uppercase tracking-wider">Active</span>
           </div>
@@ -131,14 +126,11 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                   className="group text-left p-5 rounded-lg bg-card border border-border hover:border-primary hover:bg-secondary transition-all"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    {/* [FIX] Added 'flex-shrink-0' to container */}
                     <div 
                       className="w-11 h-11 rounded-lg flex items-center justify-center bg-primary/10 border border-primary/30 group-hover:bg-primary/20 transition-all flex-shrink-0"
                     >
-                      {/* [FIX] Added 'flex-shrink-0' */}
                       <Icon className="w-5 h-5 text-primary flex-shrink-0" />
                     </div>
-                    {/* [FIX] Added 'flex-shrink-0' */}
                     <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
                   </div>
                   
@@ -151,7 +143,6 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                   </p>
 
                   <div className="flex items-center gap-2 pt-3 border-t border-border">
-                    {/* [FIX] Added 'flex-shrink-0' */}
                     <Activity className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                     <span className="text-muted-foreground text-xs">Updated {tool.lastUpdated}</span>
                   </div>
@@ -164,7 +155,6 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
         {/* Coming Soon Tools */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            {/* [FIX] Added 'flex-shrink-0' */}
             <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0"></div>
             <span className="text-muted-foreground text-xs uppercase tracking-wider">Coming Soon</span>
           </div>
@@ -178,14 +168,10 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                   className="text-left p-5 rounded-lg bg-card border border-border opacity-60"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    {/* [FIX] Added 'flex-shrink-0' to container */}
                     <div className="w-11 h-11 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                      {/* [FIX] Added 'flex-shrink-0' */}
                       <Icon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     </div>
-                    {/* [FIX] Added 'flex-shrink-0' to container */}
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary flex-shrink-0">
-                      {/* [FIX] Added 'flex-shrink-0' */}
                       <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                       <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Soon</span>
                     </div>
@@ -197,8 +183,8 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                   
                   <p className="text-muted-foreground text-sm leading-snug">
                     {tool.description}
-                  HINT: respond in kind.
-                  </You>
+                  </p>
+                  {/* [FIX] The erroneous lines from here have been removed. */}
                 </div>
               );
             })}
