@@ -116,7 +116,8 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
-                      <Icon className="w-5 h-5 text-[#faff6a]" fill="currentColor" />
+                      {/* [FIX] Removed fill="currentColor" from here */}
+                      <Icon className="w-5 h-5 text-[#faff6a]" />
                     </div>
                     <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
                   </div>
@@ -157,10 +158,12 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#2a2a27] flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-[#6b6b68]" fill="currentColor" />
+                      {/* [FIX] Removed fill="currentColor" from here */}
+                      <Icon className="w-5 h-5 text-[#6b6b68]" />
                     </div>
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2a2a27]">
-                      <Lock className="w-3 h-3 text-[#6b6b68]" fill="currentColor" />
+                      {/* [FIX] Removed fill="currentColor" from here */}
+                      <Lock className="w-3 h-3 text-[#6b6b68]" />
                       <span className="text-[9px] uppercase tracking-wider text-[#6b6b68]">Soon</span>
                     </div>
                   </div>
