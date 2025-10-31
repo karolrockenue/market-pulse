@@ -10,7 +10,7 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
       id: 'portfolio-overview',
       title: 'Portfolio Overview',
       description: 'Comprehensive view of portfolio performance and insights',
-      icon: LayoutDashboard,
+      icon: LayoutDashboard, // We still use this to find the right tool
       active: true,
       status: 'operational',
       lastUpdated: '2 min ago',
@@ -33,6 +33,7 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
       status: 'operational',
       lastUpdated: '12 min ago',
     },
+    // ... (rest of the tools array is fine)
     {
       id: 'pricing-analyzer',
       title: 'Pricing Analyzer',
@@ -66,9 +67,10 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
 
   return (
     <div className="min-h-screen bg-[#1d1d1c]">
-      {/* Hero Section */}
+      {/* Hero Section (No changes) */}
       <div className="border-b border-[#3a3a35]">
         <div className="max-w-7xl mx-auto px-8 py-8">
+          {/* ... (all hero section code is correct) ... */}
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 mb-3">
@@ -106,7 +108,7 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
           </div>
           <div className="grid grid-cols-3 gap-4">
             {tools.filter(t => t.active).map((tool) => {
-              const Icon = tool.icon;
+              // const Icon = tool.icon; // We no longer need this
               
               return (
                 <button
@@ -116,34 +118,30 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
-               <div className="flex items-start justify-between mb-4">
-                    <div className="w-11 h-11 rounded-lg bg-[#faff6a]/10 border border-[#faff6a]/30 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-all">
                       
-                      {/* [START] REPLACE THE <Icon ... /> COMPONENT WITH THIS SVG */}
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 24 24" 
-                        stroke-width="2" 
-                        stroke-linecap="round" 
-                        stroke-linejoin="round"
-                        style={{
-                          display: "inline-block",
-                          width: "20px", 
-                          height: "20px", 
-                          stroke: "#faff6a", 
-                          fill: "none"
-                        }}
-                      >
-                        <rect width="7" height="9" x="3" y="3" rx="1"></rect>
-                        <rect width="7" height="5" x="14" y="3" rx="1"></rect>
-                        <rect width="7" height="9" x="14" y="12" rx="1"></rect>
-                        <rect width="7" height="5" x="3" y="16" rx="1"></rect>
-                      </svg>
-                      {/* [END] REPLACEMENT */}
+                      {/* === [FIX] ===
+                        I am replacing the <Icon> component with inline SVGs to
+                        force the correct styling and bypass all CSS conflicts.
+                      */}
+                      
+                      {tool.id === 'portfolio-overview' && (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ display: "inline-block", width: "20px", height: "20px", stroke: "#faff6a", fill: "none" }}>
+                          <rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect>
+                        </svg>
+                      )}
 
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
-                  </div>
+                      {tool.id === 'portfolio-risk' && (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ display: "inline-block", width: "20px", height: "20px", stroke: "#faff6a", fill: "none" }}>
+                          <path d="M2.5 2.5h3l10 10l5-5v3l-3.5 3.5l-8-8L2.5 18.5v-3l5-5l-5-5z"></path><path d="m21.5 2.5 v3l-5.5 5.5l-2.5-2.5L21.5 2.5z"></path>
+                        </svg>
+                      )}
+
+                      {tool.id === 'shreeji-report' && (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ display: "inline-block", width: "20px", height: "20px", stroke: "#faff6a", fill: "none" }}>
+                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path>
+                        </svg>
+                      )}
+                      
                     </div>
                     {/* The chevron icon is fine, no change needed */}
                     <ChevronRight className="w-4 h-4 text-[#6b6b68] group-hover:text-[#faff6a] transition-colors" />
@@ -175,7 +173,7 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
           </div>
           <div className="grid grid-cols-3 gap-4">
             {tools.filter(t => !t.active).map((tool) => {
-              const Icon = tool.icon;
+              const Icon = tool.icon; // This is fine for the disabled ones
               
               return (
                 <div
@@ -184,13 +182,19 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-11 h-11 rounded-lg bg-[#2a2a27] flex items-center justify-center">
-                      {/* [FIX] Replaced w-5/h-5 with size={20} */}
+                      {/* [FIX] Using size prop for these, but they should also be fixed */}
                       <Icon className="text-[#6b6b68]" size={20} />
                     </div>
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2a2a27]">
-                      {/* [FIX] Replaced w-3/h-3 with size={12} */}
-.
-                      <Lock className="text-[#6b6b68]" size={12} />
+                      
+                      {/* === [FIX] ===
+                        Replacing the <Lock> component with an inline SVG
+                        to force the correct styling.
+                      */}
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ display: "inline-block", width: "12px", height: "12px", stroke: "#6b6b68", fill: "none" }}>
+                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                      
                       <span className="text-[9px] uppercase tracking-wider text-[#6B6B68]">Soon</span>
                     </div>
                   </div>
