@@ -838,11 +838,12 @@ useEffect(() => {
       fetchTeamMembers();
 }
   }, [activeView, userInfo, property]); // [MODIFIED] Add 'property' so the team list updates when the property changes
-
 // [NEW] Effect to check session on initial app load
   useEffect(() => {
     const checkUserSession = async () => {
+      console.log('[DEBUG] 1. checkUserSession() started.'); // DEBUG LOG
       try {
+        console.log('[DEBUG] 2. Calling fetch /api/auth/session-info...'); // DEBUG LOG
         // Fetch session info from the backend
         const response = await fetch('/api/auth/session-info', { 
           credentials: 'include',
@@ -853,17 +854,22 @@ useEffect(() => {
           }
         });
         
-        // [FIX] ADDED THIS CHECK. This is the main fix.
+        console.log(`[DEBUG] 3. Fetch response received. Status: ${response.status}`); // DEBUG LOG
+
         // If the response is not OK (e.g., 401 Unauthorized), throw an error
         // to be handled by the 'catch' block.
         if (!response.ok) {
-          throw new Error('No active session found');
+          console.log(`[DEBUG] 4. Response was NOT OK (${response.status}). Throwing error.`); // DEBUG LOG
+          throw new Error(`No active session found. Status: ${response.status}`);
         }
 
         // If response IS ok, proceed to parse JSON
+        console.log('[DEBUG] 5. Response was OK. Calling response.json()...'); // DEBUG LOG
         const session = await response.json();
+        console.log('[DEBUG] 6. JSON parsed successfully.', session); // DEBUG LOG
         
         if (session.isLoggedIn) {
+          console.log('[DEBUG] 7. Session is logged in. Setting user info and view.'); // DEBUG LOG
           setUserInfo({
             firstName: session.firstName || 'User',
             lastName: session.lastName || '',
@@ -873,15 +879,16 @@ useEffect(() => {
           const lastView = sessionStorage.getItem('marketPulseActiveView');
           setActiveView(lastView || 'dashboard');
         } else {
-          // This case might be redundant now but is safe to keep
+          console.log('[DEBUG] 7. Session is NOT logged in. Setting view to landing.'); // DEBUG LOG
           setActiveView('landing');
         }
       } catch (error) {
-        console.error("Error checking session:", error);
+        console.error("[DEBUG] 8. CATCH BLOCK HIT. A critical error occurred.", error); // DEBUG LOG
         // On ANY error (fetch error, 401, or JSON parse error),
         // safely send the user to the landing page.
         setActiveView('landing');
       } finally {
+        console.log('[DEBUG] 9. FINALLY block hit. Setting isSessionLoading to false.'); // DEBUG LOG
         // Stop the loading state
         setIsSessionLoading(false);
       }
