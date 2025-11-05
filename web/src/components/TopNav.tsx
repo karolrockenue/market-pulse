@@ -68,26 +68,20 @@ export function TopNav({ activeView, onViewChange, property, onPropertyChange, p
       window.location.reload();
     }
   };
-// [MODIFIED] Update navItems to add the "Planning" dropdown
+// [MODIFIED] Update navItems to remove dropdowns and re-order
 const allNavItems = [
-    // [FIX] Removed the "Home" button as requested.
     { label: 'Dashboard', value: 'dashboard', icon: LayoutDashboard, isAdmin: false },
     { label: 'Reports', value: 'reports', icon: FileText, isAdmin: false },
-    { label: 'Market Overview', value: 'market', icon: BarChart3, isAdmin: false },
- 
+    
+    // [NEW] "Planning" items are now top-level.
+    { label: 'Budget', value: 'budget', icon: ClipboardList, isAdmin: false },
+    { label: 'Demand & Pace', value: 'demand-pace', icon: BarChart3, isAdmin: false },
+
+    // [REMOVED] "Market Overview" has been deleted.
+
+    // [MODIFIED] Admin links are now at the end.
     { label: 'Rockenue', value: 'rockenue', icon: Zap, isAdmin: true },
     { label: 'Admin', value: 'admin', icon: Zap, isAdmin: true },
-    // [MODIFIED] Moved "Planning" to the end and changed icon
-    { 
-      label: 'Planning', 
-      value: 'planning', // This is a group value, 'budget' is the activeView
-      icon: ClipboardList, // [MODIFIED] Changed icon
-      isAdmin: false,
-      isDropdown: true, // [NEW] Flag to indicate this is a dropdown
-      items: [ // [NEW] Sub-items for the dropdown
-        { label: 'Budget', value: 'budget', icon: ClipboardList } // [MODIFIED] Changed icon
-      ]
-    },
   ];
 
   // [NEW] Filter nav items based on user role, only show admin items to super_admin

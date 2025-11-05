@@ -1,4 +1,3 @@
-// This one line correctly imports all the necessary hooks from React.
 import { useState, useMemo, useEffect, useRef } from 'react';
 
 import { TopNav } from './components/TopNav';
@@ -6,14 +5,13 @@ import { KPICard } from './components/KPICard';
 import { DashboardControls } from './components/DashboardControls';
 import { PerformanceChart } from './components/PerformanceChart';
 import { DataTable } from './components/DataTable';
-// Import the new, alternative Market Composition Card component.
-// Import the new, alternative Market Composition Card component and its data types.
 import { 
   MarketCompositionCardAlt as MarketCompositionCard,
-  type MarketCompositionData, // [FIX] Import the correct type
-  type CategoryBreakdown      // [FIX] Import the nested type
+  type MarketCompositionData, 
+  type CategoryBreakdown     
 } from './components/MarketCompositionCardAlt';
 import { MarketRankingCard } from './components/MarketRankingCard';
+import { DemandPace } from './components/DemandPace';
 import { InsightsCard } from './components/InsightsCard';
 import { MiniMetricCard } from './components/MiniMetricCard';
 import { ReportControls } from './components/ReportControls';
@@ -55,6 +53,7 @@ import { PropertyClassificationModal, type PropertyTier } from './components/Pro
 import { RockenueHub } from './components/RockenueHub';
 import { ShreejiReport } from './components/ShreejiReport';
 import { PortfolioOverview } from './components/PortfolioOverview'; // [NEW] Import the new component
+import { PortfolioRiskOverview } from './components/PortfolioRiskOverview';
 import { Budgeting } from './components/Budgeting'; // [NEW] Import the Budgeting component
 import { LandingPage } from './components/LandingPage';
 // [NEW] Import the legal page components
@@ -125,8 +124,7 @@ export default function App() {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
 // [MODIFIED] Add 'portfolio-overview' to the sub-view state types
-const [rockenueSubView, setRockenueSubView] = useState<'hub' | 'shreeji-report' | 'portfolio-overview'>('hub');
-  
+const [rockenueSubView, setRockenueSubView] = useState<'hub' | 'shreeji-report' | 'portfolio-overview' | 'portfolio-risk'>('hub');  
   // [NEW] State to show the sync screen, mirroring dashboard.mjs 'isSyncing'
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -193,16 +191,13 @@ const [marketCompositionData, setMarketCompositionData] = useState<MarketComposi
 const [allHotels, setAllHotels] = useState<any[]>([]);
 // New state to hold the value of the Admin Property Selector
 const [adminSelectedPropertyId, setAdminSelectedPropertyId] = useState<string>('');
-  // [NEW] Add state to hold the list of management groups for the combobox
 const [managementGroups, setManagementGroups] = useState<string[]>([]);
 // Add state to hold the list of scheduled reports
 const [scheduledReports, setScheduledReports] = useState<any[]>([]);
-  // Add state to hold the list of scheduled reports
-
-  // Add a state to hold the currency symbol for the selected property.
-// Store the currency CODE (e.g., 'USD', 'GBP') instead of the symbol
 const [currencyCode, setCurrencyCode] = useState('USD');
+  const [selectedPropertyDetails, setSelectedPropertyDetails] = useState<any>(null);
   const [showInviteUser, setShowInviteUser] = useState(false);
+  
   const [showGrantAccess, setShowGrantAccess] = useState(false);
   // Add loading state for the report generator
 const [reportIsLoading, setReportIsLoading] = useState(false);
@@ -213,27 +208,41 @@ const isMetricsEffectMount = useRef(true);
 // [NEW] Ref to access the YearOnYearReport component's internal state
 const yoyReportRef = useRef<any>(null);
 
-// Effect to fetch hotel-specific details like currency when the property changes.
+// Effect to fetch hotel-specific details (currency, total_rooms, city) when the property changes.
   useEffect(() => {
-
     const fetchHotelDetails = async () => {
+      // Don't run if the property ID (string) is empty
       if (!property) return;
+      
       try {
+        // Call the endpoint that gets details from the 'hotels' table
         const response = await fetch(`/api/hotel-details/${property}`);
         if (!response.ok) throw new Error('Failed to fetch hotel details');
+        
+        // Store the *entire* hotel object in our new state
+        // This object includes hotel_id, total_rooms, city, currency_code, etc.
+        //
         const data = await response.json();
-if (data.currency_code) {
-        // Directly set the currency CODE state
-        setCurrencyCode(data.currency_code);
-      } else {
-         // Default to 'USD' if no code is returned
-        setCurrencyCode('USD');
+        setSelectedPropertyDetails(data);
+
+        // --- DEBUG LOGGING ---
+        console.log("App.tsx: Fetched and set selectedPropertyDetails:", data);
+        // --- END DEBUG LOGGING ---
+
+        // Also set the currency code from the same data
+        if (data.currency_code) {
+          setCurrencyCode(data.currency_code);
+        } else {
+          setCurrencyCode('USD'); // Default
+        }
+
+      } catch (error) {
+        console.error("Error fetching hotel details:", error);
+        setCurrencyCode('USD'); // Default on error
+        setSelectedPropertyDetails(null); // Clear details on error
       }
-    } catch (error) {
-      console.error("Error fetching hotel details for currency:", error);
-      setCurrencyCode('USD'); // Default to 'USD' on any error.
-    }
     };
+
     fetchHotelDetails();
   }, [property]); // This hook runs whenever the selected 'property' changes.
   // --- DATA FETCHING EFFECTS ---
@@ -673,7 +682,7 @@ try {
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
     
     // We use the current date of October 17, 2025 for consistent calculations.
-    const today = new Date('2025-10-17T12:00:00Z');
+const today = new Date();
     // Get year, month, and day in UTC to prevent timezone skew.
     const currentYear = today.getUTCFullYear();
     const currentMonth = today.getUTCMonth();
@@ -717,7 +726,7 @@ setStartDate(formatDate(newStartDate));
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
     
     // We use the current date of October 17, 2025 for consistent calculations.
-    const today = new Date('2025-10-17T12:00:00Z');
+   const today = new Date();
     // Get year, month, and day in UTC to prevent timezone skew.
     const currentYear = today.getUTCFullYear();
     const currentMonth = today.getUTCMonth();
@@ -2108,23 +2117,68 @@ onManageSchedules={() => setShowManageSchedules(true)}
           </div>
         </div>
       )}
+
+      
  {/* [NEW] Render the Budgeting page */}
       {activeView === 'budget' && (
         // [MODIFIED] Pass the selected property ID
         <Budgeting propertyId={property} />
       )}
+
+
+{/* [NEW] Render the Demand & Pace page */}
+      {activeView === 'demand-pace' && (
+        // [FIX] Add a conditional check.
+        // We must wait until 'selectedPropertyDetails' (which includes city and total_rooms)
+        // has been fetched before we can render the component that depends on it.
+        selectedPropertyDetails ? (
+<DemandPace
+            // We can now safely use 'selectedPropertyDetails' for ALL props,
+            // as we know it's not null.
+            propertyId={selectedPropertyDetails.hotel_id}
+            
+            // Pass the currencyCode we already have in state
+            currencyCode={currencyCode}
+            
+            // Pass the 'city' string from our details object
+            citySlug={selectedPropertyDetails.city}
+          />
+        ) : (
+          // [NEW] Render a simple loader while we wait for the property details to load.
+          // This covers the brief moment between selecting a property and the API returning its details.
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '80vh',
+            background: '#252521',
+            color: '#e5e5e5',
+            padding: '24px'
+          }}>
+            <div className="w-8 h-8 border-4 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
+            <h2 className="text-xl">Loading Property Details...</h2>
+            <p className="text-[#9ca3af]">Fetching city and room count for this property.</p>
+          </div>
+        )
+      )}
+
+
+
 {activeView === 'rockenue' && (
         <>
           {rockenueSubView === 'hub' && (
             <RockenueHub
-              onNavigateToTool={(toolId) => {
-                // [MODIFIED] Handle navigation for both tools
-                if (toolId === 'shreeji-report') {
-                  setRockenueSubView('shreeji-report');
-                } else if (toolId === 'portfolio-overview') {
-                  setRockenueSubView('portfolio-overview');
-                }
-              }}
+     onNavigateToTool={(toolId) => {
+  // [MODIFIED] Handle navigation for all tools
+  if (toolId === 'shreeji-report') {
+    setRockenueSubView('shreeji-report');
+  } else if (toolId === 'portfolio-overview') {
+    setRockenueSubView('portfolio-overview');
+  } else if (toolId === 'portfolio-risk') { // --- This is the line you added ---
+    setRockenueSubView('portfolio-risk');
+  }
+}}
             />
           )}
           {rockenueSubView === 'shreeji-report' && (
@@ -2140,10 +2194,10 @@ onManageSchedules={() => setShowManageSchedules(true)}
               <ShreejiReport />
             </div>
           )}
-          {/* [NEW] Add the render block for the Portfolio Overview */}
+          {/* [THIS IS THE ORIGINAL BLOCK] */}
           {rockenueSubView === 'portfolio-overview' && (
             <div>
-              <div className="p-4 border-b border-[#3a3a35] bg-[#262626]">
+              <div className="p-4 border-b border-[#3a3a3D] bg-[#262626]">
                 <button
                   onClick={() => setRockenueSubView('hub')}
                   className="text-[#9ca3af] hover:text-[#faff6a] text-sm transition-colors"
@@ -2154,9 +2208,26 @@ onManageSchedules={() => setShowManageSchedules(true)}
               <PortfolioOverview />
             </div>
           )}
+
+          {/* [THIS IS THE NEW BLOCK YOU ADDED] */}
+          {rockenueSubView === 'portfolio-risk' && (
+            <div>
+              <div className="p-4 border-b border-[#3a3a35] bg-[#262626]">
+                <button
+                  onClick={() => setRockenueSubView('hub')}
+                  className="text-[#9ca3af] hover:text-[#faff6a] text-sm transition-colors"
+                >
+                  ← Back to Rockenue Tools
+                </button>
+              </div>
+              <PortfolioRiskOverview />
+            </div>
+          )}
+          {/* --- END OF ADDITION --- */}
+
         </>
       )}
-
+    
 
       {/* Modals */}
       <CreateScheduleModal open={showCreateSchedule} onClose={() => setShowCreateSchedule(false)} onSave={handleSaveSchedule} />

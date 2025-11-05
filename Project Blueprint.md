@@ -6,11 +6,11 @@
 
 This document is the single source of truth for the project. All future AI-assisted development must adhere to the following principles:
 
-* **Analyze First:** The AI must analyze all provided project files at the start of a session and confirm with "Done".  
+* **Analyze First:** The AI must analyze all provided project files at the start of a session and confirm with "Done". User wants concise responses 
 * **Plan Before Action:** A bullet-point plan must be presented before any code is modified.  
-* **Clarify Ambiguity:** The AI must ask clarifying questions instead of making assumptions, especially regarding files and function names.  
+* **Clarify Ambiguity:** The AI must ask clarifying questions instead of making assumptions, especially regarding files and function names. Do not provide the code until user is satisfied that a plan has been established.
 * **One Step at a Time:** Provide clear, sequential instructions, modifying only one file at a time.  
-* **Heavy Commenting:** All new or changed code must be thoroughly commented.  
+* **Commenting:** We are no longer heavily commenting the code, only comments are at the start of new functions or endpoints to keep overall structure clear  
 * **Test Incrementally:** Provide a "Test Point" after each step with specific verification instructions.  
 * **Request Files:** If a file is needed for a change but has not been uploaded, the AI must ask for it.
 
@@ -45,7 +45,7 @@ The Vercel build process (vercel-build) first builds the React app into /web/bui
 ### **2.2 Backend: Fully Serverless & Adapter Pattern**
 
 * **Fully Serverless Architecture:** The backend is a single Node.js/Express server (server.js) that mounts all API endpoints from feature-based router files within the /api/routes/ directory.  
-* **Shared Utilities:** Reusable logic, such as database connections (db.js) and authentication middleware (middleware.js), is centralized in /api/utils/.  
+* **Shared Utilities:** Reusable logic, such as database connections (db.js), authentication middleware (middleware.js), and the unified pacing logic (**benchmark.utils.js**), is centralized in /api/utils/.
 * **PMS-Agnostic Adapter Pattern:** All communication with external Property Management Systems (PMS) is abstracted into adapters located in /api/adapters/ (e.g., cloudbedsAdapter.js, mewsAdapter.js). The core application logic is decoupled from any specific vendor.
 
 ### **2.3 Frontend: React SPA & Shared State**
@@ -54,6 +54,8 @@ The Vercel build process (vercel-build) first builds the React app into /web/bui
 * **Figma AI Prototype:** The React prototype is generated using Figma AI. This means the AI understands all design principles, and development prompts do not need to specify styles (colors, fonts, etc.), allowing for creative freedom within the established design system.  
 * **Single Entry Point:** App.tsx handles all top-level concerns, including session checking, routing, and fetching shared data (e.g., property lists, user info).  
 * **Data Flow:** App.tsx performs all primary API calls inside useEffect hooks. The resulting data is passed down as props to child components (e.g., kpiData is passed to KPICard and InsightsCard).
+
+* **Styling Workaround:**: The project's global web/src/index.css file is a static artifact and is not rebuilt to scan for new classes. Standard utility classes (e.g., p-4, grid) will not work. All new or modified layout styling must be implemented using inline style props. Styles for existing shadcn/ui components (like <Button> or <Input>) will continue to work via their className prop, as their styles are already included in the static CSS file.
 
 ---
 
@@ -167,6 +169,8 @@ Stores daily data from the "Market Codex" crawler.
 * facet\_price\_histogram (jsonb)  
 * min\_price\_anchor (numeric)  
 * max\_price\_anchor (numeric)
+* `weighted_avg_price (numeric)` - **GENERATED COLUMN**
+* `hotel_count (integer)` - **GENERATED COLUMN**
 
 ### **users**
 
@@ -214,12 +218,16 @@ market-pulse/
 │   │   ├── budgets.router.js    \# \[NEW\] Budgeting feature  
 │   │   ├── dashboard.router.js  
 │   │   ├── market.router.js  
+│   │   ├── portfolio.router.js
 │   │   ├── reports.router.js  
 │   │   ├── rockenue.router.js  
 │   │   ├── support.router.js    \# \[NEW\] Support form endpoint  
-│   │   └── users.router.js  
+│   │   └── users.router.js 
+│   │   ├── planning.router.js   \# \[NEW\] 
 │   ├── utils/  
-│   │   ├── db.js                \# PostgreSQL connection pool  
+│   │   ├── db.js                \# PostgreSQL connection pool 
+│   │   ├── benchmark.utils.js           \# Single source of truth for pacing benchmarks 
+│   │   ├── market-codex.utils.js
 │   │   ├── emailTemplates.js    \# \[NEW\] HTML for magic link email  
 │   │   └── middleware.js        \# Auth & role-based middleware  
 │   ├── daily-refresh.js         \# CRON: Syncs 365-day forecast  
@@ -276,6 +284,25 @@ All endpoints are mounted under /api in server.js.
 * **\[NEW\]** GET /reports/available-years: Fetches a clean list of years with valid data for a property, respecting go\_live\_date.  
 * **\[NEW\]** POST /reports/year-on-year: Provides a 12-month comparison for two selected years.
 
+### portfolio.router.js
+
+*All routes are protected by requireSuperAdmin middleware*.
+
+* **\[NEW\]** GET /portfolio/occupancy-problem-list: Fetches hotels ranked by forward 30-day occupancy to power the "Problem List".
+* **[NEW]** GET /portfolio/pacing-overview: Fetches data for the "Risk Quadrant Chart" and "Budget Pacing Problem List". **Refactored to use benchmark.utils.js** for its Pacing Rate Pressure calculation, aligning it with the Budgeting page.
+* **\[NEW\]** GET /portfolio/occupancy-matrix: Fetches forward 45-day occupancy data for the "Occupancy Matrix" component.
+
+### **planning.router.js**
+
+* GET /planning/forward-view: Fetches the 90-day forward-looking data. Runs a resilient DISTINCT ON (checkin_date) query to get the latest scrape for each day. Passes data to the Logic Hub to calculate MPSS and Market Demand.
+
+* GET /planning/pace: Fetches 90-day pace data. Uses a resilient two-query method to compare "latest" vs. "past" (N-day-ago) scrapes. Passes data to the Logic Hub to calculate deltas.
+
+* GET /planning/history: Fetches the 30-day scrape history for a single check-in date, used for on-demand drill-downs.
+
+* GET /planning/market-trend: Powers the "Market Outlook" banner. It performs a "Split-Half" comparison of available data (e.g., 11 days vs. 11 days) to calculate the rolling trend of the 30-day forward-looking supply and WAP.
+
+
 ### **users.router.js**
 
 * POST /users/invite: Sends an invitation to a new user for a specific property.  
@@ -317,8 +344,7 @@ All endpoints are mounted under /api in server.js.
 
 * **\[NEW\]** GET /budgets/:hotelId/:year: Fetches the 12-month budget for a property.  
 * **\[NEW\]** POST /budgets/:hotelId/:year: Saves or updates the 12-month budget in a transaction.  
-* **\[NEW\]** GET /budgets/benchmarks/:hotelId/:month/:year: Provides dynamic benchmark ADR/Occ (L30D or SMLY) for the pacing logic.
-
+* **[NEW]** GET /budgets/benchmarks/:hotelId/:month/:year: Provides dynamic benchmark ADR/Occ by calling the unified **benchmark.utils.js** utility, ensuring consistent pacing logic across the app.
 ### **support.router.js**
 
 * **\[NEW\]** POST /support/submit: Handles the "Contact Us" form submission, sending a formatted email via SendGrid to the support inbox.
@@ -337,14 +363,30 @@ All endpoints are mounted under /api in server.js.
 ## **8.0 Architectural Milestones**
 
 * **11.0: OTA Crawler & Vercel Deployment (Oct 2025):** Deployed a Playwright-based scraper to Vercel, requiring a switch to playwright-core and @sparticuz/chromium to resolve build errors.  
+
 * **12.0: Reliable Room Count (Oct 2025):** Fixed unreliable room counts by adding a total\_rooms column to the hotels table. Created the GET /api/admin/backfill-room-counts endpoint to populate this column directly from the PMS source of truth.  
+
 * **13.0: Occupancy Data Refactor (Oct 2025):** A critical bug was fixed where occupancy was being read from an unreliable occupancy\_direct column. All API endpoints (in dashboard.router.js, reports.router.js, market.router.js) were refactored to calculate occupancy on-the-fly using (SUM(rooms\_sold)::numeric / NULLIF(SUM(capacity\_count), 0)). The occupancy\_direct column is now considered deprecated.  
+
 * **14.0: Budget Pacing Logic (Oct 2025):** Implemented the core business logic for the Budgeting feature. It provides a "Green / Yellow / Red" status for a budget month by comparing the **Required ADR** (rate needed on unsold rooms to hit the target) against a **Benchmark ADR** (a realistic rate derived from L30D/SMLY data via GET /api/budgets/benchmarks).  
 * **15.0: Rockenue Management Data Model (Oct 2025):** Implemented a hybrid data model for internal tools, visible **only to super\_admin users**.  
   * hotels table was extended with is\_rockenue\_managed (BOOLEAN) and management\_group (TEXT).  
   * A private rockenue\_managed\_assets table was created to serve as a financial ledger, allowing super\_admin users to track monthly\_fee for both "Live" Market Pulse properties and **"Off-Platform" assets** that are not part of the main application.  
 * **16.0: React Migration & Monorepo Deployment (Oct 2025):** The original Alpine.js /public folder was replaced with a new /web React application. The deployment architecture was pivoted to a single-server monorepo, where server.js acts as the single entry point, serving both the API and the static React index.html file.
+* **17.0: Unified Pacing Benchmark Logic (Nov 2025):** Resolved a critical bug where the Portfolio Risk Overview and Budgeting pages showed different risk statuses for the same property. The discrepancy was caused by two conflicting "sources of truth" for benchmark ADR (flawed L30D/SMLY logic vs. correct full-month-average logic).
+  * **Solution:** Created a new shared utility file, **/api/utils/benchmark.utils.js**, which contains the single, correct benchmark calculation (full-month average).
+  * **Refactor:** Modified **/api/routes/portfolio.router.js** and **/api/routes/budgets.router.js** to remove all local benchmark logic and call this new shared utility, ensuring 100% consistency.
 
+* **18.0: Market Codex & "Demand & Pace" (Nov 2025):** Deployed the new "Demand & Pace" feature, a major initiative to provide live, forward-looking market intelligence. This involved several new architectural patterns:
+
+  Database Pre-calculation: A migration added two STORED generated columns (weighted_avg_price, hotel_count) to the market_availability_snapshots table. This moves heavy WAP and JSON parsing logic from read-time to insert-time, making all future queries extremely fast.
+
+  "Logic Hub" Implementation: Created a new api/utils/market-codex.utils.js file. This "Logic Hub" centralizes all business-facing logic (like calculatePriceIndex and calculateMarketDemand), allowing for easy updates without changing the API or database.
+
+  New API Router: Deployed a new api/routes/planning.router.js with resilient DISTINCT ON queries to serve the 90-day grid (/forward-view) and pace charts (/pace).
+
+  New "Market Outlook" Logic: Defined and implemented a "Split-Half" methodology for the GET /planning/market-trend endpoint. This logic compares the average 30-day forward-looking forecast from a "Recent" period (e.g., last 11 days) against a "Past" period (e.g., first 11 days) to determine if the market is "Softening" or "Strengthening".
+  
 ---
 
 ## **9.0 Frontend Architecture**
@@ -388,20 +430,24 @@ web/
     │   ├── CreateScheduleModal.tsx  
     │   ├── DashboardControls.tsx  
     │   ├── DataTable.tsx  
+    │.  ├── DemandPace.tsx
     │   ├── HotelManagementTable.tsx  
     │   ├── InitialSyncScreen.tsx  
     │   ├── InsightsCard.tsx  
     │   ├── KPICard.tsx  
     │   ├── LandingPage.tsx  
     │   ├── ManageCompSetModal.tsx  
+    │   ├── MarketDemandPatterns.tsx
     │   ├── ManageSchedulesModal.tsx  
     │   ├── MarketCompositionCardAlt.tsx  
-    │   ├── MarketRankingCard.tsx  
+    │   ├── MarketRankingCard.tsx 
+    │   ├── MarketOutlookBanner.tsx  
     │   ├── MewsOnboarding.tsx  
     │   ├── MiniMetricCard.tsx  
     │   ├── MyProfile.tsx  
     │   ├── PerformanceChart.tsx  
-    │   ├── PortfolioOverview.tsx  
+    │   ├── PortfolioOverview.tsx
+    │   ├── PortfolioRiskOverview.tsx  
     │   ├── PrivacyPolicy.tsx  
     │   ├── ReportActions.tsx  
     │   ├── ReportControls.tsx  
@@ -438,4 +484,4 @@ web/
 | **SystemHealth.tsx** | **Admin widget for testing connections.** props: propertyId, lastRefreshTime, onRefreshData. |
 | **CloudbedsAPIExplorer.tsx** | **Admin widget for raw API calls.** props: propertyId. |
 | **PortfolioOverview.tsx** | **Private super\_admin page for financial tracking.** (Managed internally). |
-
+| **PortfolioRiskOverview.tsx** | **Private super_admin diagnostic page. Combines volume and pacing risk into a portfolio-wide view. (Managed internally).** | **DemandPace.tsx**  | New 'Demand & Pace' feature page. Displays 90-day grid, charts, and market highlights. | propertyId, currencyCode, city |

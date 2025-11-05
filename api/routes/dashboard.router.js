@@ -148,10 +148,16 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
       }
     }
 
-    // Fetches hotel details, now including the 'category' field.
-    // Fetches hotel details, now including the 'category' field.
+// Fetches hotel details.
+    // [FIX] Add 'city' and 'hotel_id' to the SELECT statement.
+    // 'city' is required by DemandPace.tsx for its market data API call.
+    // 'total_rooms' is no longer needed for DemandPace, but 'hotel_id' is good practice.
     const hotelResult = await pgPool.query(
-      "SELECT property_name, currency_code, tax_rate, tax_type, tax_name, category FROM hotels WHERE hotel_id = $1",
+      `SELECT 
+         property_name, currency_code, tax_rate, tax_type, tax_name, category,
+         city, hotel_id 
+       FROM hotels 
+       WHERE hotel_id = $1`,
       [propertyId]
     );
     if (hotelResult.rows.length === 0) {

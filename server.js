@@ -28,6 +28,10 @@ const marketRouter = require("./api/routes/market.router.js");
 const rockenueRoutes = require("./api/routes/rockenue.router.js");
 const supportRoutes = require("./api/routes/support.router.js"); // [NEW] Import the support router
 const budgetsRouter = require('./api/routes/budgets.router.js'); // [FIX] Corrected path relative to server.js
+const portfolioRoutes = require("./api/routes/portfolio.router.js");
+
+// [NEW] Import the planning router
+const planningRoutes = require("./api/routes/planning.router.js");
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
@@ -48,6 +52,8 @@ const allowedOrigins = [
 if (process.env.VERCEL_ENV !== "production") {
   allowedOrigins.push("http://localhost:3000");
 }
+
+
 const corsOptions = {
 origin: function (origin, callback) {
     // Check if it's a Vercel preview deployment (any .vercel.app domain)
@@ -197,6 +203,10 @@ app.use("/api/market", marketRouter);
 app.use("/api/rockenue", rockenueRoutes);
 app.use("/api/support", supportRoutes); // [NEW] Mount the support router
 app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
+app.use("/api/portfolio", portfolioRoutes);
+
+// [NEW] Mount the planning router
+app.use("/api/planning", planningRoutes);
 
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
@@ -232,5 +242,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
-
-

@@ -30,6 +30,7 @@
             "@radix-ui/react-toggle-group": "^1.1.2",
             "@radix-ui/react-tooltip": "^1.1.8",
             "@sendgrid/mail": "^8.1.6",
+            "@vitejs/plugin-react-swc": "^3.10.2",
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
@@ -48,12 +49,11 @@
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
             "vaul": "^1.1.2",
-            "xlsx": "^0.18.5",
-            "@vitejs/plugin-react-swc": "^3.10.2",
-            "vite": "6.3.5"
+            "vite": "6.3.5",
+            "xlsx": "^0.18.5"
       },
       "devDependencies": {
-           "@types/node": "^20.10.0"
+            "@types/node": "^20.10.0"
       },
       "scripts": {
             "dev": "vite",

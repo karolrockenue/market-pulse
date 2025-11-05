@@ -21,5 +21,13 @@ const pgPool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// --- [NEW] UNHANDLED ERROR FIX ---
+// This prevents an idle connection timeout from Neon DB (or any network error)
+// from crashing the entire Node.js server.
+pgPool.on('error', (err, client) => {
+  console.error('[UNHANDLED DB POOL ERROR]', err.message, err.stack);
+});
+// --- END FIX ---
+
 // Export the pool so other files can use it.
 module.exports = pgPool;
