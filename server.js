@@ -53,29 +53,34 @@ if (process.env.VERCEL_ENV !== "production") {
   allowedOrigins.push("http://localhost:3000");
 }
 
+// This is the new, more robust block to add
 const corsOptions = {
   origin: function (origin, callback) {
-    // 1. Check if it's a Vercel preview deployment (any .vercel.app domain)
-    const isPreview = origin && origin.endsWith('.vercel.app');
     
-    // 2. Check if it's one of the hardcoded production origins
-    const isProductionOrigin = allowedOrigins.indexOf(origin) !== -1;
-
-    // 3. Check for local development
-    const isDevelopment = process.env.VERCEL_ENV !== 'production';
-    const isLocalDev = isDevelopment && (!origin || origin.startsWith('http://localhost'));
-
-    // Allow if it's:
-    // - A hardcoded production origin (e.g., www.market-pulse.io)
-    // - Any Vercel preview URL
-    // - A local development request (e.g., localhost or Postman)
-    if (isProductionOrigin || isPreview || isLocalDev) {
+    // 1. Allow local dev, Postman, mobile apps (no origin)
+    if (!origin || origin.startsWith('http://localhost')) {
       callback(null, true);
-    } else {
-      // Otherwise, reject the request
-      console.error(`CORS Error: Origin ${origin} not allowed.`);
-      callback(new Error("Not allowed by CORS"));
+      return;
     }
+    
+    // 2. Allow any Vercel preview deployment
+    if (origin.endsWith('.vercel.app')) {
+      callback(null, true);
+      return;
+    }
+
+    // 3. Check if the origin starts with one of our allowed production domains
+    // This handles cases like 'https://www.market-pulse.io'
+    const isAllowedProduction = allowedOrigins.some(allowed => origin.startsWith(allowed));
+    
+    if (isAllowedProduction) {
+      callback(null, true);
+      return;
+    }
+
+    // 4. If none of the above, reject it.
+    console.error(`CORS Error: Origin ${origin} not allowed.`);
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
 };
