@@ -885,9 +885,7 @@ useEffect(() => {
     checkUserSession();
   }, []);
 
-  // --- HANDLER FUNCTIONS ---
-// [NEW] Handler for the property classification modal
-  const handlePropertySetupComplete = async (tier: PropertyTier) => {
+const handlePropertySetupComplete = async (tier: PropertyTier) => {
     if (!property) {
       toast.error("No property selected. Cannot save classification.");
       return;
@@ -904,6 +902,9 @@ useEffect(() => {
     // For testing, let's just close the modal and show the toast
     toast.success(`Property classified as ${tier}`);
     setShowPropertySetup(false);
+
+    // [THE FIX] Force a page reload to fetch fresh dashboard data
+    window.location.reload();
   };
   // --- HANDLER FUNCTIONS ---
 

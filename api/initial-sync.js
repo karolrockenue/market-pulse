@@ -112,6 +112,57 @@ async function runSync(propertyId) {
 
       console.log("✅ Hotel metadata sync complete.");
 
+      // --- [NEW] Calculate and save Total Rooms (copied from admin.router.js) ---
+console.log(`[Initial Sync] Now calculating total rooms for hotel: ${propertyId}`);
+let totalRooms = 0;
+try {
+  // 1. Get credentials and PMS info
+  const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
+    propertyId
+  );
+
+  // 2. Call the PMS API function
+  const apiResponse = await getRoomTypesFromPMS(
+    propertyId, 
+    pms_type, 
+    credentials, 
+    pms_property_id
+  );
+
+  // 3. Sum the 'roomTypeUnits', skipping "virtual" rooms
+  if (apiResponse && Array.isArray(apiResponse.data)) {
+    totalRooms = apiResponse.data.reduce(
+      (sum, roomType) => {
+        const roomName = roomType.roomTypeName || roomType.Name || "";
+        if (roomName.toLowerCase().includes('virtual')) {
+          console.log(` -- Skipping room: "${roomName}" (virtual)`);
+          return sum;
+        }
+        return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
+      },
+      0
+    );
+  } else {
+    throw new Error("Invalid API response structure. Expected { data: [...] }");
+  }
+
+  // 4. Save to the database
+  if (totalRooms > 0) {
+    await client.query(
+      "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+      [totalRooms, propertyId]
+    );
+    console.log(`[Initial Sync] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${propertyId}.`);
+  } else {
+    console.warn(`[Initial Sync] Calculated total rooms was 0 for hotel ${propertyId}. Skipping update.`);
+  }
+
+} catch (roomError) {
+  // Log the error but do not fail the whole transaction
+  console.error(`[Initial Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`);
+}
+// --- [END NEW] ---
+
       // Fetch historical metrics
       const taxRate = hotelDetailsResult.rows[0]?.tax_rate || 0;
       const pricingModel = hotelDetailsResult.rows[0]?.tax_type || "inclusive";
