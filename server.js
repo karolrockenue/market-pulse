@@ -53,21 +53,27 @@ if (process.env.VERCEL_ENV !== "production") {
   allowedOrigins.push("http://localhost:3000");
 }
 
-
 const corsOptions = {
-origin: function (origin, callback) {
-    // Check if it's a Vercel preview deployment (any .vercel.app domain)
+  origin: function (origin, callback) {
+    // 1. Check if it's a Vercel preview deployment (any .vercel.app domain)
     const isPreview = origin && origin.endsWith('.vercel.app');
+    
+    // 2. Check if it's one of the hardcoded production origins
+    const isProductionOrigin = allowedOrigins.indexOf(origin) !== -1;
 
-    // During development (non-production), allow localhost, no origin (Postman), AND Vercel previews.
+    // 3. Check for local development
     const isDevelopment = process.env.VERCEL_ENV !== 'production';
-    const isAllowedDev = isDevelopment && (!origin || origin.startsWith('http://localhost') || isPreview);
+    const isLocalDev = isDevelopment && (!origin || origin.startsWith('http://localhost'));
 
-    // Allow if it's an allowed dev origin OR it's one of the hardcoded production origins
-    if (isAllowedDev || allowedOrigins.indexOf(origin) !== -1) {
+    // Allow if it's:
+    // - A hardcoded production origin (e.g., www.market-pulse.io)
+    // - Any Vercel preview URL
+    // - A local development request (e.g., localhost or Postman)
+    if (isProductionOrigin || isPreview || isLocalDev) {
       callback(null, true);
     } else {
       // Otherwise, reject the request
+      console.error(`CORS Error: Origin ${origin} not allowed.`);
       callback(new Error("Not allowed by CORS"));
     }
   },
