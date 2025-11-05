@@ -809,49 +809,74 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
         // --- [NEW] START INITIAL SYNC TRIGGER ---
         
-        // 1. Determine the correct base URL (copied from magic link logic)
+ // This is the new, enhanced-logging code
+        
+        // 1. Determine the correct base URL
         let baseUrl;
         if (process.env.VERCEL_ENV === 'production') {
           baseUrl = 'https://www.market-pulse.io';
         } else if (process.env.VERCEL_BRANCH_URL) { 
           baseUrl = `https://${process.env.VERCEL_BRANCH_URL}`;
         } else if (process.env.VERCEL_URL) {
-          baseUrl = `https://${process.env.VERCEL_URL}`;
+          baseUrl = `https://{process.env.VERCEL_URL}`;
         } else {
-          baseUrl = 'http://localhost:3000'; // Assumes backend runs on 3000
+          // --- [DEBUG FIX] ---
+          // Vercel serverless functions run on a different port than the frontend
+          // We must call the server's *own* port, not the React dev server port.
+          // Or, better yet, use an internal path relative to the server root.
+          // Let's try the absolute URL first as it's more robust.
+          baseUrl = `http://localhost:${process.env.PORT || 3000}`; 
+          console.log(`[AUTH CALLBACK] DEBUG: Using localhost baseUrl: ${baseUrl}`);
         }
 
-        // 2. Loop through all new hotels and trigger the sync for each
+        // 2. Loop through all new hotels and trigger the sync
+        console.log(`[AUTH CALLBACK] DEBUG: Found ${newlySyncedInternalIds.length} new hotels to sync.`);
+        
         for (const hotelId of newlySyncedInternalIds) {
-          // Call the documented admin endpoint to trigger the initial-sync.js job
           const syncUrl = `${baseUrl}/api/admin/initial-sync`;
-          
-          console.log(`[AUTH CALLBACK] Triggering initial sync for new hotel ${hotelId} via ${syncUrl}`);
+          const bodyPayload = JSON.stringify({ propertyId: hotelId });
+          const internalSecret = process.env.INTERNAL_API_SECRET;
 
-          // We do this asynchronously and don't wait for the response.
-          // The user gets redirected immediately, and the sync runs
-          // in the background. The .catch() is just for logging.
+          console.log(`[AUTH CALLBACK] DEBUG: Preparing to trigger sync for hotel ${hotelId} via POST to ${syncUrl}`);
+          
+          if (!internalSecret) {
+            console.error(`[AUTH CALLBACK] CRITICAL FAILURE: INTERNAL_API_SECRET is not set. Cannot trigger sync.`);
+            continue; // Skip to next hotel
+          }
+
+          // We do this asynchronously and log the result.
           fetch(syncUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              // Use the internal secret, just like the Mews handler
-              "Authorization": `Bearer ${process.env.INTERNAL_API_SECRET}`,
+              "Authorization": `Bearer ${internalSecret}`,
             },
-            body: JSON.stringify({ propertyId: hotelId }),
-          }).catch((syncErr) =>
+            body: bodyPayload,
+          })
+          .then(async (res) => {
+            // Check if the response was OK (status 200-299)
+            if (res.ok) {
+              const responseData = await res.json();
+              console.log(`[AUTH CALLBACK] SUCCESS: Triggered sync for hotel ${hotelId}. Server responded:`, responseData.message);
+            } else {
+              // If the response was not OK, log the error
+              const errorData = await res.text(); // Get text in case JSON parse fails
+              console.error(`[AUTH CALLBACK] FAILURE: Trigger for hotel ${hotelId} failed. Status: ${res.status}. Response: ${errorData}`);
+            }
+          })
+          .catch((syncErr) => {
+            // This catches network errors (e.g., fetch itself failed)
             console.error(
-              `[AUTH CALLBACK] Failed to trigger initial sync for hotel ${hotelId}:`,
-              syncErr
-            )
-          );
+              `[AUTH CALLBACK] CRITICAL FETCH ERROR: Failed to trigger initial sync for hotel ${hotelId}:`,
+              syncErr.message
+            );
+          });
         }
-        // --- [END] INITIAL SYNC TRIGGER ---
+        // --- [END] INITIAL SYNC TRIGGER (WITH LOGGING) ---
 
 
         // 3. Redirect the user (this logic is unchanged)
         const primaryNewPropertyId = newlySyncedInternalIds[0];
-
         if (primaryNewPropertyId) {
           res.redirect(
             `/app/?newConnection=true&propertyId=${primaryNewPropertyId}`
