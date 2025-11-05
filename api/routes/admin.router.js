@@ -230,11 +230,36 @@ router.get("/daily-refresh", requireAdminApi, async (req, res) => {
 });
 
 // NEW: Route to manually trigger the initial sync job
-router.post("/initial-sync", requireAdminApi, async (req, res) => {
-  console.log("Admin panel manually triggering initial-sync job...");
-  // We call the handler directly, passing the request and response objects.
-  await initialSyncHandler(req, res);
-});
+router.post(
+  "/initial-sync",
+  // [THE FIX] Use the same internal secret auth as the /record-job-success route
+  (req, res, next) => {
+    const authHeader = req.headers["authorization"];
+    const expectedToken = `Bearer ${process.env.INTERNAL_API_SECRET}`;
+
+    if (authHeader !== expectedToken) {
+      console.error("[AUTH FAILURE] /initial-sync received invalid token.");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    // Token is valid, proceed.
+    next();
+  },
+  async (req, res) => {
+    // This handler now triggers the sync job
+    try {
+      console.log("[INITIAL SYNC] Job triggered by authorized request...");
+      // We call the handler directly, passing the request and response objects.
+      // This handler will now run and eventually send its own response.
+      await initialSyncHandler(req, res);
+    } catch (error) {
+      console.error("[INITIAL SYNC] Handler call failed:", error.message);
+      // This is a fallback in case the handler itself throws an early error
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to start sync handler." });
+      }
+    }
+  }
+);
 // NEW: Route to manually trigger the scheduled reports job
 // UPDATED: Route to manually trigger a *single* scheduled report.
 // It's now a POST request to accept a reportId in the body.
