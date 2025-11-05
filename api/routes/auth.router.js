@@ -795,6 +795,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
       req.session.userId = cloudbedsUser.user_id;
       req.session.role = userRole;
 
+// This is the new, corrected code
       req.session.save((err) => {
         if (err) {
           console.error(
@@ -806,13 +807,52 @@ router.get("/cloudbeds/callback", async (req, res) => {
             .send("Your account was connected, but we could not log you in.");
         }
 
-        // THE FIX: Use the first ID from the list of properties we *just* synced.
-        // This guarantees we redirect to the new property, not an old one.
+        // --- [NEW] START INITIAL SYNC TRIGGER ---
+        
+        // 1. Determine the correct base URL (copied from magic link logic)
+        let baseUrl;
+        if (process.env.VERCEL_ENV === 'production') {
+          baseUrl = 'https://www.market-pulse.io';
+        } else if (process.env.VERCEL_BRANCH_URL) { 
+          baseUrl = `https://${process.env.VERCEL_BRANCH_URL}`;
+        } else if (process.env.VERCEL_URL) {
+          baseUrl = `https://${process.env.VERCEL_URL}`;
+        } else {
+          baseUrl = 'http://localhost:3000'; // Assumes backend runs on 3000
+        }
+
+        // 2. Loop through all new hotels and trigger the sync for each
+        for (const hotelId of newlySyncedInternalIds) {
+          // Call the documented admin endpoint to trigger the initial-sync.js job
+          const syncUrl = `${baseUrl}/api/admin/initial-sync`;
+          
+          console.log(`[AUTH CALLBACK] Triggering initial sync for new hotel ${hotelId} via ${syncUrl}`);
+
+          // We do this asynchronously and don't wait for the response.
+          // The user gets redirected immediately, and the sync runs
+          // in the background. The .catch() is just for logging.
+          fetch(syncUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              // Use the internal secret, just like the Mews handler
+              "Authorization": `Bearer ${process.env.INTERNAL_API_SECRET}`,
+            },
+            body: JSON.stringify({ propertyId: hotelId }),
+          }).catch((syncErr) =>
+            console.error(
+              `[AUTH CALLBACK] Failed to trigger initial sync for hotel ${hotelId}:`,
+              syncErr
+            )
+          );
+        }
+        // --- [END] INITIAL SYNC TRIGGER ---
+
+
+        // 3. Redirect the user (this logic is unchanged)
         const primaryNewPropertyId = newlySyncedInternalIds[0];
 
         if (primaryNewPropertyId) {
-          // We no longer trigger the sync from the backend. We just redirect.
-          // The frontend will now handle the sync trigger reliably.
           res.redirect(
             `/app/?newConnection=true&propertyId=${primaryNewPropertyId}`
           );
@@ -824,6 +864,8 @@ router.get("/cloudbeds/callback", async (req, res) => {
           res.redirect("/app/");
         }
       });
+
+
     } catch (dbError) {
       await client.query("ROLLBACK");
       console.error(
