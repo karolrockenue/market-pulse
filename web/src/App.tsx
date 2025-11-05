@@ -171,7 +171,7 @@ const [showMarketComparisons, setShowMarketComparisons] = useState(false); // De
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
   const [showManageSchedules, setShowManageSchedules] = useState(false);
 const [schedules, setSchedules] = useState<any[]>([]);
-
+const [isInviting, setIsInviting] = useState(false);
 // This state now matches the complex interface expected by the card component.
 const [marketCompositionData, setMarketCompositionData] = useState<MarketCompositionData>({
   competitorCount: 0,
@@ -782,10 +782,32 @@ setStartDate(formatDate(newStartDate));
 
 // App.tsx
   // [NEW] This effect hook fetches the user's editable profile info (first/last name)
-  // It runs when the settings view is opened.
-// [NEW] This effect hook fetches data needed for the Settings page
-  // It runs when the settings view is opened.
-useEffect(() => {
+ // [NEW] Function to fetch the list of team members (hoisted)
+  const fetchTeamMembers = async () => {
+    // [THE FIX] Don't fetch if property isn't set yet
+    if (!property) return; 
+
+    try {
+      const response = await fetch(`/api/users/team?propertyId=${property}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch team members');
+      const teamData = await response.json();
+      setTeamMembers(teamData);
+    } catch (error: any) {
+      console.error("Error fetching team members:", error);
+      toast.error('Could not load team members', { description: error.message });
+      setTeamMembers([]);
+    }
+  };
+
+  // [MODIFIED] This effect hook now fetches data needed for the Settings page
+  useEffect(() => {
 
     // Function to fetch the user's editable profile
     const fetchUserProfile = async () => {
@@ -794,10 +816,8 @@ useEffect(() => {
         if (!response.ok) throw new Error('Failed to fetch profile');
         const profileData = await response.json();
         
-// [MODIFIED] Update the userInfo state using the functional form
-        // This merges the new profile data while *preserving* the existing 'role'
         setUserInfo(prev => ({
-          ...prev!, // Keep existing properties (like role)
+          ...prev!, 
           firstName: profileData.first_name || '',
           lastName: profileData.last_name || '',
           email: profileData.email || '', 
@@ -808,41 +828,17 @@ useEffect(() => {
       }
     };
 
- // [NEW] Function to fetch the list of team members
-    const fetchTeamMembers = async () => {
-      try {
-       // [MODIFIED] Call the team endpoint with cache-busting options
-// [MODIFIED] Pass the currently selected 'property' state as a query parameter
-        const response = await fetch(`/api/users/team?propertyId=${property}`, {
-          credentials: 'include', // [NEW] Ensure cookies are sent
-          cache: 'no-store', // [NEW] This is the fix for 304 Not Modified
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          }
-        });
-        if (!response.ok) throw new Error('Failed to fetch team members');
-        const teamData = await response.json();
-        setTeamMembers(teamData); // [NEW] Store team data in state
-      } catch (error: any) {
-        console.error("Error fetching team members:", error);
-        toast.error('Could not load team members', { description: error.message });
-        setTeamMembers([]); // [NEW] Clear state on error
-      }
-    };
-
-// [MODIFIED] Only run these fetches if the settings view is active
+    // [MODIFIED] Only run these fetches if the settings view is active
     if (activeView === 'settings') {
-
       // Fetch profile only if we don't have it
       if (!userInfo || userInfo.email === 'email@placeholder.com') {
         fetchUserProfile();
       }
       // Always fetch the latest team list
       fetchTeamMembers();
-}
-  }, [activeView, userInfo, property]); // [MODIFIED] Add 'property' so the team list updates when the property changes
-// web/src/App.tsx
+    }
+  }, [activeView, userInfo, property]); // 'fetchTeamMembers' is stable, but 'property' is the key dependency
+
 
   useEffect(() => {
     const checkUserSession = async () => {
@@ -930,7 +926,49 @@ const handleViewChange = (newView: string) => {
   const handleToggleMetric = (metric: string) => {
     setSelectedMetrics(prev => prev.includes(metric) ? prev.filter(m => m !== metric) : [...prev, metric]);
   };
+// [NEW] Handler for sending a user invitation
+  const handleSendInvite = async (data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    propertyId: string;
+  }) => {
+    setIsInviting(true); // Start loading
+    try {
+      const response = await fetch('/api/users/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invitee_email: data.email,
+          invitee_first_name: data.firstName,
+          invitee_last_name: data.lastName,
+          property_id: data.propertyId,
+        }),
+      });
 
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send invitation');
+      }
+
+      toast.success(result.message || 'Invitation sent successfully!');
+      setShowInviteUser(false); // Close the modal on success
+      
+      // [THE FIX] Refresh the team list to show the new pending user
+      // We must call the function that fetches team members.
+      // Based on your code, that logic is inside this useEffect hook (lines 740-771)
+      // Let's create a dedicated function for it.
+      
+      // (See Step 2a below - we need to refactor fetchTeamMembers)
+      fetchTeamMembers(); 
+
+    } catch (error: any) {
+      console.error("Error sending invitation:", error);
+      toast.error('Error sending invitation', { description: error.message });
+    } finally {
+      setIsInviting(false); // Stop loading
+    }
+  };
   // [NEW] Function to handle saving the user's profile
   const handleUpdateProfile = async (firstName: string, lastName: string) => {
     try {
@@ -2242,7 +2280,13 @@ onManageSchedules={() => setShowManageSchedules(true)}
         // Pass the full list of hotels
         allHotels={allHotels}
       />
-<InviteUserModal open={showInviteUser} onClose={() => setShowInviteUser(false)} />
+<InviteUserModal 
+  open={showInviteUser} 
+  onClose={() => setShowInviteUser(false)} 
+  properties={properties}
+  onSendInvite={handleSendInvite}
+  isLoading={isInviting}
+/>
       <GrantAccessModal open={showGrantAccess} onClose={() => setShowGrantAccess(false)} />
 <PropertyClassificationModal 
         isOpen={showPropertySetup} // [MODIFIED] Prop renamed
