@@ -154,7 +154,6 @@ router.get("/magic-link-callback", async (req, res) => {
           return res.status(500).send("An error occurred during login.");
         }
 
-        // --- THE FIX: Proactively clear the HOST-ONLY cookie by NOT specifying a domain. ---
 
 
         res.status(200).send(`
