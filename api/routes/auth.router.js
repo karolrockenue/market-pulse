@@ -155,7 +155,7 @@ router.get("/magic-link-callback", async (req, res) => {
         }
 
         // --- THE FIX: Proactively clear the HOST-ONLY cookie by NOT specifying a domain. ---
-        res.clearCookie("connect.sid", { path: "/" });
+
 
         res.status(200).send(`
                     <!DOCTYPE html>
