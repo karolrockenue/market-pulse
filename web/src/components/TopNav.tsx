@@ -91,7 +91,7 @@ const allNavItems = [
       return true;
     }
     // If it IS an admin item, only show it if the user is a super_admin
-    return userInfo?.role === 'super_admin';
+  return userInfo?.role === 'super_admin' || userInfo?.role === 'admin';
   });
 
 const showPropertySelector = activeView !== 'landing';
