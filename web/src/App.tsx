@@ -2206,9 +2206,10 @@ onManageSchedules={() => setShowManageSchedules(true)}
 
 {activeView === 'rockenue' && (
         <>
-          {rockenueSubView === 'hub' && (
-            <RockenueHub
-     onNavigateToTool={(toolId) => {
+{rockenueSubView === 'hub' && (
+        <RockenueHub
+ userInfo={userInfo} // <-- [NEW] PASS THE PROP HERE
+ onNavigateToTool={(toolId) => {
   // [MODIFIED] Handle navigation for all tools
   if (toolId === 'shreeji-report') {
     setRockenueSubView('shreeji-report');

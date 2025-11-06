@@ -2,6 +2,8 @@ import { FileText, TrendingUp, TrendingDown, Users, RefreshCw, Lock, LayoutDashb
 
 interface RockenueHubProps {
   onNavigateToTool: (toolId: string) => void;
+  // [NEW] Add userInfo to check the user's role
+  userInfo: { role: string } | null;
 }
 
 // [NEW] Inline styles to replace broken Tailwind classes
@@ -200,7 +202,7 @@ const styles = {
 };
 
 
-export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
+export function RockenueHub({ onNavigateToTool, userInfo }: RockenueHubProps) {
   const tools = [
     {
       id: 'portfolio-overview',
@@ -301,16 +303,52 @@ export function RockenueHub({ onNavigateToTool }: RockenueHubProps) {
             <span style={styles.sectionTitle}>Active</span>
           </div>
           <div style={styles.grid}>
-           {tools.filter(t => t.active).map((tool) => {
-              // [MODIFIED] Get the Icon component directly from the array
-              const Icon = tool.icon;
-              
-              return (
-                <button
-                  key={tool.id}
-                  onClick={() => onNavigateToTool(tool.id)}
-                  style={styles.toolCard}
-                >
+   {tools.filter(t => t.active).map((tool) => {
+          // [MODIFIED] Get the Icon component directly from the array
+          const Icon = tool.icon;
+
+          // [NEW] Check if this tool should be disabled for 'admin' role
+          const isPortfolioOverview = tool.id === 'portfolio-overview';
+          const isAdmin = userInfo?.role === 'admin';
+
+          if (isPortfolioOverview && isAdmin) {
+            // Render a disabled card for 'admin' users
+            return (
+              <div
+                key={tool.id}
+                style={styles.toolCardDisabled}
+              >
+                <div style={styles.toolCardHeader}>
+                  <div style={styles.toolIconWrapperDisabled}>
+                    <Icon style={{ width: '20px', height: '20px', color: '#6b6b68' }} />
+                  </div>
+                  <div style={styles.soonBadge}>
+                    {/* Use the Lock icon from lucide-react */}
+                    <Lock style={{ width: "12px", height: "12px", stroke: "#6b6b68" }} />
+                    <span style={styles.soonText}>Restricted</span>
+                  </div>
+                </div>
+                <h3 style={styles.toolCardTitleDisabled}>
+                  {tool.title}
+                </h3>
+                <p style={styles.toolCardDescriptionDisabled}>
+                  {tool.description}
+                </p>
+                <div style={styles.toolCardFooter}>
+                  <Activity style={{ width: '12px', height: '12px', color: '#6b6b68' }} />
+                  <span style={styles.toolCardFooterText}>Access denied</span>
+                </div>
+              </div>
+            );
+          }
+
+          // Render the normal, clickable card for everyone else
+          return (
+            <button
+              key={tool.id}
+              onClick={() => onNavigateToTool(tool.id)}
+              style={styles.toolCard}
+            >
                   <div style={styles.toolCardHeader}>
                     <div style={styles.toolIconWrapper}>
                       
