@@ -10,7 +10,8 @@ const crypto = require("crypto"); // For Mews credential decryption
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const { requireAdminApi } = require("../utils/middleware");
+// [MODIFIED] Import the permissive 'requireAdminApi' and the strict 'requireSuperAdminOnly'
+const { requireAdminApi, requireSuperAdminOnly } = require("../utils/middleware");
 
 // NEW: Import the handlers for the serverless cron jobs
 const dailyRefreshHandler = require("../daily-refresh.js");
@@ -1273,15 +1274,10 @@ router.post("/hotel/:hotelId/compset", requireAdminApi, async (req, res) => {
     client.release(); // ALWAYS release client
   }
 });
-// --- NEW ENDPOINT TO BACKFILL TOTAL ROOMS (FIXED) ---
 router.get(
   "/backfill-room-counts",
-  requireAdminApi, // Protected for admins
+  requireSuperAdminOnly, // [MODIFIED] Protected for super-admin only
   async (req, res) => {
-    // Double-check for super_admin role
-    if (req.session.role !== "super_admin") {
-      return res.status(403).json({ error: "Access denied." });
-    }
 
     let updatedCount = 0;
     let failedCount = 0;
