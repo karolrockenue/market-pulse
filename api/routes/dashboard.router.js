@@ -60,7 +60,7 @@ router.put("/user/profile", requireUserApi, async (req, res) => {
 router.get("/my-properties", requireUserApi, async (req, res) => {
   try {
     // --- FIX: Check for the 'super_admin' role instead of the old isAdmin flag ---
-    if (req.session.role === "super_admin") {
+ if (req.session.role === "super_admin" || req.session.role === "admin") {
       // If the user is a super_admin, fetch all hotels directly from the hotels table.
       // This ensures they can see every property in the system.
       const query = `
@@ -118,7 +118,7 @@ router.get("/hotel-details/:propertyId", requireUserApi, async (req, res) => {
 
     // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
     // Security check to ensure the user has access to the requested property.
-    if (req.session.role !== "super_admin") {
+  if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       // Step 1: Get the user's internal integer ID from their session ID.
       // This is necessary because the user_properties table can link via either the string-based cloudbeds_user_id or the internal user_id.
       const userResult = await pgPool.query(
@@ -185,7 +185,7 @@ router.get("/sync-status/:propertyId", requireUserApi, async (req, res) => {
 
     // --- FIX: Check for 'super_admin' role to bypass the ownership check ---
     // Security check to ensure the user has access to the requested property.
-    if (req.session.role !== "super_admin") {
+  if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       // Step 1: Get the user's internal integer ID from their session ID.
       // This is necessary because the user_properties table can link via either the string-based cloudbeds_user_id or the internal user_id.
       const userResult = await pgPool.query(
@@ -257,7 +257,7 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       return res.status(400).json({ error: "A propertyId is required." });
 
     // Security check to ensure the user has access to the requested property.
-    if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
@@ -392,7 +392,7 @@ router.get("/metrics-from-db", requireUserApi, async (req, res) => {
       return res.status(400).json({ error: "A propertyId is required." });
 
     // Security check (No changes needed here)
-    if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
@@ -533,7 +533,7 @@ router.get("/competitor-metrics", requireUserApi, async (req, res) => {
       return res.status(400).json({ error: "A propertyId is required." });
 
     // Security: Ensure the user has access to the requested property
-    if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       const accessCheck = await pgPool.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [req.session.userId, propertyId]
@@ -719,7 +719,7 @@ router.patch(
 
       // Security check: For regular users, verify they have access to this property.
       // super_admin users can bypass this check.
-      if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
         // THE FIX: Explicitly cast the propertyId from the URL to an integer.
         // This prevents a hard crash in the database driver from a type mismatch.
         const accessCheck = await pgPool.query(
@@ -765,7 +765,7 @@ router.get("/market-ranking", requireUserApi, async (req, res) => {
     }
 
     // Security: Ensure the user has access to the requested property
-    if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       const accessCheck = await pgPool.query(
         "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2",
         [req.session.userId, propertyId]
@@ -912,7 +912,7 @@ router.patch(
 
     try {
       // Security Check: Only a super_admin or a user directly linked to the property can update it.
-      if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
         const accessCheck = await pgPool.query(
           "SELECT 1 FROM user_properties WHERE user_id = $1 AND property_id = $2::integer",
           [req.session.userId, propertyId]
@@ -959,7 +959,7 @@ router.get("/dashboard-chart", requireUserApi, async (req, res) => {
     }
 
     // Security check (no changes needed here)
-    if (req.session.role !== "super_admin") {
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
       // Logic to check user access to the property
       const userResult = await pgPool.query("SELECT user_id FROM users WHERE cloudbeds_user_id = $1", [req.session.userId]);
       if (userResult.rows.length === 0) return res.status(403).json({ error: "Access denied: User not found." });

@@ -21,7 +21,7 @@ const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 const requireInvitePermission = (req, res, next) => {
   if (
     !req.session.role ||
-    !["owner", "super_admin"].includes(req.session.role)
+!["owner", "super_admin", "admin"].includes(req.session.role)
   ) {
     return res.status(403).json({
       error: "Forbidden: You do not have permission to invite users.",
@@ -156,7 +156,7 @@ router.get("/team", requireUserApi, async (req, res) => {
 
     // --- NEW: UNIFIED SECURITY CHECK ---
     // For non-admins, we must verify they have access to the requested property.
-    if (role !== "super_admin") {
+if (role !== "super_admin" && role !== "admin") {
       const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [userId]
@@ -484,7 +484,7 @@ router.get("/owned-properties", requireUserApi, async (req, res) => {
   const userCloudbedsId = req.session.userId;
   try {
     // --- FIX: Check the user's role from the session ---
-    if (req.session.role === "super_admin") {
+if (req.session.role === "super_admin" || req.session.role === "admin") {
       const propertiesResult = await pgPool.query(
         `SELECT hotel_id AS property_id, property_name FROM hotels ORDER BY property_name`
       );
