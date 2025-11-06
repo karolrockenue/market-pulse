@@ -70,6 +70,10 @@ import { toast } from 'sonner';
 // [NEW] Import the local Toaster component from the correct 'ui' folder
 import { Toaster } from './components/ui/sonner';
 import * as XLSX from 'xlsx'; // Import the Excel library
+import { HotelDashboard } from './components/HotelDashboard'; // [NEW] Import the new dashboard
+
+
+// --- TYPE DEFINITIONS ---
 
 
 // --- TYPE DEFINITIONS ---
@@ -202,6 +206,10 @@ const [currencyCode, setCurrencyCode] = useState('USD');
   // Add loading state for the report generator
 const [reportIsLoading, setReportIsLoading] = useState(false);
 const [showPropertySetup, setShowPropertySetup] = useState(false); // [MODIFIED] Default to false
+  
+  // [NEW] State for the unified hotel dashboard
+  const [hotelDashboardData, setHotelDashboardData] = useState<any>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
 // Refs to track initial component mount to prevent unwanted effects
 const isTaxEffectMount = useRef(true);
 const isMetricsEffectMount = useRef(true);
@@ -246,6 +254,42 @@ const yoyReportRef = useRef<any>(null);
     fetchHotelDetails();
   }, [property]); // This hook runs whenever the selected 'property' changes.
   // --- DATA FETCHING EFFECTS ---
+
+
+  // [NEW] Effect to fetch the unified dashboard summary
+  useEffect(() => {
+    // Only run if the dashboard is active AND we have property details (which contain the city)
+    if (activeView === 'dashboard' && selectedPropertyDetails) {
+      
+      const fetchDashboardSummary = async () => {
+        setIsDashboardLoading(true);
+        try {
+          const propertyId = selectedPropertyDetails.hotel_id;
+          const city = selectedPropertyDetails.city;
+
+          if (!propertyId || !city) {
+            console.warn("Missing propertyId or city, skipping dashboard fetch.");
+            return;
+          }
+
+          const response = await fetch(`/api/dashboard/summary?propertyId=${propertyId}&city=${city}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch dashboard summary');
+          }
+          const data = await response.json();
+          setHotelDashboardData(data);
+
+        } catch (error) {
+          console.error("Error fetching dashboard summary:", error);
+          setHotelDashboardData(null); // Clear data on error
+        } finally {
+          setIsDashboardLoading(false);
+        }
+      };
+
+      fetchDashboardSummary();
+    }
+  }, [activeView, selectedPropertyDetails]); // Runs when view changes or property details (city) load
   
   // Effect to fetch the list of properties once on load.
 // Effect to fetch the list of properties once on load and set the active property.
@@ -903,9 +947,11 @@ const handlePropertySetupComplete = async (tier: PropertyTier) => {
     window.location.reload();
   };
   // --- HANDLER FUNCTIONS ---
-
-  // [NEW] This function handles all view changes and tracks the previous view
+// [NEW] This function handles all view changes and tracks the previous view
 const handleViewChange = (newView: string) => {
+    // [FIX] Scroll to the top of the page on every view change
+    window.scrollTo(0, 0);
+  
     // If we are navigating TO a legal page, store the current view
     if (newView === 'privacy' || newView === 'terms') {
       setPreviousView(activeView);
@@ -919,7 +965,6 @@ const handleViewChange = (newView: string) => {
       sessionStorage.setItem('marketPulseActiveView', newView);
     }
   };
-
 
 
 // App.tsx
@@ -1490,10 +1535,18 @@ return (
           // [NEW] Pass the user info down to the TopNav
           userInfo={userInfo}
         />
+{/* Landing View block is now removed and handled above */}
 
-      {/* Landing View block is now removed and handled above */}
+{activeView === 'dashboard' && (
+        // [NEW] Render the new HotelDashboard with live data
+        <HotelDashboard 
+          onNavigate={handleViewChange} 
+          data={hotelDashboardData}
+          isLoading={isDashboardLoading}
+        />
+      )}
       
-      {activeView === 'dashboard' && (
+      {activeView === 'youVsCompSet' && ( // [MODIFIED] This was 'dashboard'
         <div className="p-4">
           <div className="mb-6 bg-[#1a1a18] rounded-lg border border-[#262626] px-5 py-3.5">
             <div className="flex items-center justify-between">

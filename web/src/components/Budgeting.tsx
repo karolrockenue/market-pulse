@@ -39,7 +39,11 @@ export function Budgeting({ propertyId }: BudgetingProps) { // [MODIFIED] Accept
   const [monthlyData, setMonthlyData] = useState<MonthBudgetData[]>([]);
 const [budgetExists, setBudgetExists] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set(['Oct'])); // October open by default
+const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => {
+    // Get the current month's short name (e.g., "Oct")
+    const currentMonthName = new Date().toLocaleString('en-US', { month: 'short' });
+    return new Set([currentMonthName]); // Set default to current month
+  });
 const [isLoading, setIsLoading] = useState<boolean>(true); // Loading state
   const [actualsData, setActualsData] = useState<any[]>([]); // [NEW] State to hold actuals fetched from API
   const [benchmarkData, setBenchmarkData] = useState<Record<string, any>>({});

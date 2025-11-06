@@ -68,9 +68,9 @@ export function TopNav({ activeView, onViewChange, property, onPropertyChange, p
       window.location.reload();
     }
   };
-// [MODIFIED] Update navItems to remove dropdowns and re-order
 const allNavItems = [
     { label: 'Dashboard', value: 'dashboard', icon: LayoutDashboard, isAdmin: false },
+    { label: 'You vs. Comp Set', value: 'youVsCompSet', icon: Sliders, isAdmin: false }, // [NEW] Link to the old dashboard
     { label: 'Reports', value: 'reports', icon: FileText, isAdmin: false },
     
     // [NEW] "Planning" items are now top-level.

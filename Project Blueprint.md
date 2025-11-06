@@ -69,16 +69,18 @@ The Vercel build process (vercel-build) first builds the React app into /web/bui
 * **User Invitations:** Existing owner or super\_admin users can invite new team members via POST /api/users/invite.  
 * **Local Dev Login:** In non-production environments, a POST /api/dev-login endpoint allows developers to create a session by sending their email.
 
-### **3.2 Role-Based Access Control (RBAC)**
+### 3.2 Role-Based Access Control (RBAC)
 
 The system uses a role column in the users table and in the session to manage permissions.
 
-* **super\_admin:** Full system access. Can view all properties, access the Admin & Rockenue pages, and manage all settings.  
-* **owner:** Can manage properties they are linked to via pms\_credentials in user\_properties. Can invite/manage team members for those properties.  
+* **super\_admin:** The highest-level role, for founders/executives. Has "eyes-only" access to sensitive financial reports (e.g., Portfolio Overview) in addition to all `admin` permissions.
+* **admin:** The standard staff role. Can view all properties, access the Admin & Rockenue pages (except for "eyes-only" reports), and manage all settings and team members.
+* **owner:** Can manage properties they are linked to via pms\_credentials in user\_properties. Can invite/manage team members *only* for those properties.
 * **user:** Basic access. Can view data for properties they are linked to but cannot manage settings or team members.
 
-All API routes are protected by middleware from api/utils/middleware.js (e.g., requireUserApi, requireAdminApi, requireSuperAdmin).
-
+All API routes are protected by middleware from api/utils/middleware.js. This middleware has two levels:
+* **`requireAdminApi`:** Permissive middleware for staff. Grants access to `admin` AND `super\_admin` roles.
+* **`requireSuperAdminOnly`:** Strict middleware for founders. Grants access *only* to the `super\_admin` role.
 ---
 
 ## **4.0 Database Schema**
@@ -181,7 +183,7 @@ Stores user account information.
 * email (character varying)  
 * first\_name (text)  
 * last\_name (text)  
-* role (character varying, NOT NULL) \- super\_admin, owner, or user.  
+* role (character varying, NOT NULL) \- super\_admin, admin, owner, or user.
 * pms\_type (character varying, NOT NULL)
 
 ### **user\_properties**
@@ -289,7 +291,7 @@ All endpoints are mounted under /api in server.js.
 
 ### portfolio.router.js
 
-*All routes are protected by requireSuperAdmin middleware*.
+*All routes are protected by the permissive `requireAdminApi` middleware (staff access)*.
 
 * **\[NEW\]** GET /portfolio/occupancy-problem-list: Fetches hotels ranked by forward 30-day occupancy to power the "Problem List".
 * **[NEW]** GET /portfolio/pacing-overview: Fetches data for the "Risk Quadrant Chart" and "Budget Pacing Problem List". **Refactored to use benchmark.utils.js** for its Pacing Rate Pressure calculation, aligning it with the Budgeting page.
@@ -330,9 +332,10 @@ All endpoints are mounted under /api in server.js.
 * GET /admin/explore/:endpoint: A wrapper endpoint to power the Cloudbeds API Explorer tool.  
 * GET /admin/test-mews-connection, GET /admin/test-mews-occupancy, GET /admin/test-mews-revenue: Secure test endpoints for Mews API debugging.
 
-### **rockenue.router.js**
+### rockenue.router.js
 
-*All routes are protected by requireSuperAdmin middleware*.
+*The router file is protected by the permissive `requireAdminApi` (staff access).*
+*Specific "eyes-only" routes (e.g., GET /rockenue/portfolio) are protected by the strict `requireSuperAdminOnly` middleware.*
 
 * GET /rockenue/hotels: Fetches a list of all hotels for report dropdowns.  
 * GET /rockenue/shreeji-report: Generates the data for the in-house guest balance report.  
