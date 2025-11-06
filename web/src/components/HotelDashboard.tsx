@@ -506,9 +506,9 @@ const trendData = data?.forwardDemandChartData || [];
               <div className="w-10 h-10 rounded-lg bg-[#faff6a]/10 flex items-center justify-center group-hover:bg-[#faff6a]/20 transition-colors">
                 <BarChart3 className="w-5 h-5 text-[#faff6a]" />
               </div>
-              <div>
+          <div>
                 <h3 className="text-[#e5e5e5] mb-1">90-Day Market Demand</h3>
-                <p className="text-[#6b7280] text-xs">Forward-looking outlook</p>
+                <p className="text-[#6b7280] text-xs">Total market supply and demand patterns (90-day).</p>
               </div>
             </div>
             <div 
