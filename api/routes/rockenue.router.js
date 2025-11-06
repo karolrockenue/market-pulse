@@ -9,23 +9,19 @@ const fetch = require("node-fetch");
 const pool = require("../utils/db");
 
 // Import the PMS adapters. This is crucial for communicating with Cloudbeds, Mews, etc.
+// Import the PMS adapters. This is crucial for communicating with Cloudbeds, Mews, etc.
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 const mewsAdapter = require("../adapters/mewsAdapter");
 
-/**
- * Middleware to protect routes, ensuring they are only accessible by super_admin users.
- */
-const requireSuperAdmin = (req, res, next) => {
-  if (req.session && req.session.role === "super_admin") {
-    return next();
-  } else {
-    res.status(403).json({
-      error: "Forbidden: Access is restricted to super administrators.",
-    });
-  }
-};
+// --- [NEW] Import both permission middlewares ---
+const { requireAdminApi, requireSuperAdminOnly } = require("../utils/middleware");
 
-router.use(requireSuperAdmin);
+/**
+ * Middleware to protect routes, ensuring they are accessible by staff.
+ * [MODIFIED] This is now the permissive check for 'admin' OR 'super_admin'.
+ * We use the global 'requireAdminApi' function.
+ */
+router.use(requireAdminApi);
 
 /**
  * A helper function to get a valid Cloudbeds access token for a given property.
@@ -355,8 +351,8 @@ router.get("/shreeji-report", async (req, res) => {
  * Fetches ALL assets (Live & Off-Platform) for the portfolio.
  * This single endpoint powers the entire page and its KPI cards.
  */
-router.get('/portfolio', async (req, res) => {
-  // This route is already protected by the super_admin check in server.js
+// --- [SECURED] We add the strict 'requireSuperAdminOnly' middleware here ---
+router.get('/portfolio', requireSuperAdminOnly, async (req, res) => {
   
   try {
 // This query selects all assets and dynamically creates the 'status'
@@ -397,7 +393,8 @@ router.get('/portfolio', async (req, res) => {
  * Adds a new "Off-Platform" property to the portfolio.
  * This matches the prototype's "Add New Property" button.
  */
-router.post('/portfolio', async (req, res) => {
+// --- [SECURED] We add the strict 'requireSuperAdminOnly' middleware here ---
+router.post('/portfolio', requireSuperAdminOnly, async (req, res) => {
   try {
 // Create a new, blank "Off-Platform" asset, matching the
       // defaults in the prototype's addProperty function.
@@ -437,7 +434,8 @@ router.post('/portfolio', async (req, res) => {
  * Updates the 'monthly_fee' for any property (Live or Off-Platform).
  * This matches the prototype's "handleFeeUpdate" function.
  */
-router.put('/portfolio/:id', async (req, res) => {
+// --- [SECURED] We add the strict 'requireSuperAdminOnly' middleware here ---
+router.put('/portfolio/:id', requireSuperAdminOnly, async (req, res) => {
   const { id } = req.params;
   // [MODIFIED] Destructure all fields from the body
   const {
@@ -529,7 +527,8 @@ router.put('/portfolio/:id', async (req, res) => {
  * Deletes an "Off-Platform" property.
  * This matches the prototype's "deleteProperty" function.
  */
-router.delete('/portfolio/:id', async (req, res) => {
+// --- [SECURED] We add the strict 'requireSuperAdminOnly' middleware here ---
+router.delete('/portfolio/:id', requireSuperAdminOnly, async (req, res) => {
   const { id } = req.params;
 
   try {

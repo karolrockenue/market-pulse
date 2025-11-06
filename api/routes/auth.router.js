@@ -300,7 +300,7 @@ router.get("/session-info", async (req, res) => {
       const responsePayload = {
         isLoggedIn: true,
         role: user.role,
-        isAdmin: user.role === "super_admin" || user.role === "owner", 
+   isAdmin: user.role === "super_admin" || user.role === "owner" || user.role === "admin",
         firstName: user.first_name,
         lastName: user.last_name,
       };

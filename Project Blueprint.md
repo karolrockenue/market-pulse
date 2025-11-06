@@ -4,12 +4,12 @@
 
 ## **0.0 AI Development Workflow**
 
-This document is the single source of truth for the project. All future AI-assisted development must adhere to the following principles:
+This document is the single source of truth for the project. All future AI-assisted development MUST adhere to the following principles:
 
 * **Analyze First:** The AI must analyze all provided project files at the start of a session and confirm with "Done". User wants concise responses 
 * **Plan Before Action:** A bullet-point plan must be presented before any code is modified.  
 * **Clarify Ambiguity:** The AI must ask clarifying questions instead of making assumptions, especially regarding files and function names. Do not provide the code until user is satisfied that a plan has been established.
-* **One Step at a Time:** Provide clear, sequential instructions, modifying only one file at a time.  
+* **One Step at a Time:** Provide clear, sequential instructions, modifying only one file at a time. Don't provide full file to replace unless specifically asked. Instead use find and replace strategy- show user code block to replace with a new one.
 * **Commenting:** We are no longer heavily commenting the code, only comments are at the start of new functions or endpoints to keep overall structure clear  
 * **Test Incrementally:** Provide a "Test Point" after each step with specific verification instructions.  
 * **Request Files:** If a file is needed for a change but has not been uploaded, the AI must ask for it.
@@ -236,6 +236,9 @@ market-pulse/
 │   └── sync-rockenue-assets.js \# \[NEW\] CRON: Syncs hotels to private ledger  
 │  
 ├── web/                         \# \[NEW\] React Frontend (See Section 9.0)  
+├── scripts/
+│   └── import-monthly-history.js # [NEW] Developer tool for historical import (monthly data)
+│   └── import-daily-history.js   # [NEW] Developer tool for historical import (daily data)
 │  
 ├── .env                         \# All project secrets  
 ├── package.json                 \# Root (Backend) dependencies & build scripts  
@@ -360,6 +363,38 @@ All endpoints are mounted under /api in server.js.
 
 ---
 
+## **7.5 Developer Scripts & Tooling**
+
+This section documents internal scripts used by developers for data management and maintenance. These are not part of the deployed application and are run manually from the command line.
+
+### **scripts/import-monthly-history.js**
+
+* **Purpose:** A high-safety, idempotent script to import historical *monthly* performance data from a CSV.
+* **Methodology:**
+    1.  Accepts monthly CSV totals (`total_net_revenue`, `total_rooms_sold`).
+    2.  Fetches the hotel's `total_rooms` and `tax_rate` from the `hotels` table.
+    3.  Uses a "Pattern Hotel" (either itself or an external hotel) to disaggregate monthly totals into realistic daily records.
+    4.  Calculates gross revenue, ADR, and RevPAR using the hotel's `tax_rate`.
+    5.  Atomically deletes old data, inserts new data, and updates the `hotels.locked_years` array in a single database transaction.
+
+* **Usage:**
+    ```bash
+    node scripts/import-monthly-history.js \
+    --hotelId=<target_hotel_id> \
+    --csv="/path/to/data.csv" \
+    --lockYears="<year1,year2>" \
+    --patternHotelId=<optional_pattern_hotel_id>
+    ```
+
+* **Required CSV Format:**
+    The script requires a CSV file with the following headers. The `month` column must be in `YYYY-MM` format.
+    ```csv
+    month,total_rooms_sold,total_net_revenue
+    2023-01,500,75000
+    2023-02,450,68000
+    2023-03,510,77000
+    ```
+
 ## **8.0 Architectural Milestones**
 
 * **11.0: OTA Crawler & Vercel Deployment (Oct 2025):** Deployed a Playwright-based scraper to Vercel, requiring a switch to playwright-core and @sparticuz/chromium to resolve build errors.  
@@ -386,8 +421,38 @@ All endpoints are mounted under /api in server.js.
   New API Router: Deployed a new api/routes/planning.router.js with resilient DISTINCT ON queries to serve the 90-day grid (/forward-view) and pace charts (/pace).
 
   New "Market Outlook" Logic: Defined and implemented a "Split-Half" methodology for the GET /planning/market-trend endpoint. This logic compares the average 30-day forward-looking forecast from a "Recent" period (e.g., last 11 days) against a "Past" period (e.g., first 11 days) to determine if the market is "Softening" or "Strengthening".
-  
----
+
+* **[NEW] 19.0: Historical Data Import Tool (Nov 2025):** Resolved a major business and data-integrity problem where importing historical data was a high-risk, manual SQL task.
+    * **Problem:** The manual process was unscalable, error-prone, and could not handle the common client requirement of providing *monthly* totals instead of daily records.
+    * **Solution:** Created a new developer-facing script, `scripts/import-monthly-history.js`.
+    * **Core Logic:** The tool implements a "monthly-to-daily" disaggregation strategy. It uses a daily distribution pattern from a "Pattern Hotel" (either the hotel's own data from other years or an external hotel) to intelligently spread monthly totals across the days of the month.
+    * **Data Integrity:** The script ensures data completeness by fetching the hotel's `tax_rate` to populate both `net_revenue` and `gross_revenue` columns.
+    * **Safety:** The entire operation is wrapped in a single transaction and, on success, atomically adds the imported years to the `hotels.locked_years` array, protecting the new data from the `initial-sync.js` job.
+
+    ### Tool 2: Daily Data Import Script (`import-daily-history.js`)
+
+* **Purpose:** Used when the hotel provides a CSV that *already contains* daily-level data. This script bypasses all "pattern" and "disaggregation" logic.
+* **Usage:**
+    ```bash
+    node scripts/import-daily-history.js \
+    --hotelId=318238 \
+    --csv="/path/to/daily-data.csv" \
+    --lockYears="2022,2023"
+    ```
+* **CSV Format:** Expects `date`, `revenue_gross`, and `occupancy`.
+    > **CRITICAL:** The `occupancy` column **must** be a decimal (e.g., `0.8214`), **not** a percentage (e.g., `82.14`).
+    ```csv
+    date,revenue_gross,adr_gross,occupancy
+    2022-01-01,1598.66,69.50,0.821429
+    2022-01-02,996.50,55.36,0.642857
+    ```
+* **Core Logic:**
+    1.  Fetches the hotel's `total_rooms` (as `capacityCount`) and `tax_rate` from the `hotels` table.
+    2.  Ignores the `adr_gross` column in the CSV (it's considered unreliable).
+    3.  Loops through each daily row in the CSV.
+    4.  Calculates the definitive `rooms_sold` using the formula: `Math.round(occupancy * capacityCount)`.
+    5.  Calculates all other metrics (`net_revenue`, `net_adr`, `gross_adr`, `net_revpar`, `gross_revpar`) based on this `rooms_sold` value.
+    6.  Wraps the entire `DELETE` and `INSERT` operation in a single transaction and locks the years, just like the monthly script.
 
 ## **9.0 Frontend Architecture**
 
@@ -485,3 +550,4 @@ web/
 | **CloudbedsAPIExplorer.tsx** | **Admin widget for raw API calls.** props: propertyId. |
 | **PortfolioOverview.tsx** | **Private super\_admin page for financial tracking.** (Managed internally). |
 | **PortfolioRiskOverview.tsx** | **Private super_admin diagnostic page. Combines volume and pacing risk into a portfolio-wide view. (Managed internally).** | **DemandPace.tsx**  | New 'Demand & Pace' feature page. Displays 90-day grid, charts, and market highlights. | propertyId, currencyCode, city |
+

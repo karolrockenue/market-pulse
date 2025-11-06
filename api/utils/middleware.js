@@ -48,22 +48,37 @@ async function requireUserApi(req, res, next) {
   }
 }
 
-// --- EXISTING UNCHANGED MIDDLEWARE ---
+// --- [NEW] Permissive middleware for Staff ('admin' + 'super_admin') ---
 const requireAdminApi = (req, res, next) => {
-  // First, check if the user is logged in at all.
   if (!req.session.userId) {
     return res
       .status(401)
       .json({ error: "Unauthorized: User session required." });
   }
-  // Second, check if the user's role in the session is 'super_admin'.
-  // This is the core of our security fix.
+  
+  // Allows access for 'admin' (staff) AND 'super_admin' (you).
+  const allowedRoles = ["admin", "super_admin"];
+  if (!allowedRoles.includes(req.session.role)) {
+    return res
+      .status(403)
+      .json({ error: "Forbidden: Administrator access required." });
+  }
+  next();
+};
+
+// --- [RENAMED] Strict "Karol-only" middleware ---
+const requireSuperAdminOnly = (req, res, next) => {
+  if (!req.session.userId) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized: User session required." });
+  }
+  // This logic is unchanged: it *only* allows 'super_admin'
   if (req.session.role !== "super_admin") {
     return res
       .status(403)
       .json({ error: "Forbidden: Super administrator access required." });
   }
-  // If both checks pass, allow the request to proceed.
   next();
 };
 
@@ -139,15 +154,17 @@ async function requireAccountOwner(req, res, next) {
 
 /**
  * Middleware to ensure the user has management permissions.
- * Allows 'owner' and 'super_admin' roles to proceed.
+ * Allows 'owner', 'super_admin', and 'admin' roles to proceed.
  */
 const requireManagePermission = (req, res, next) => {
-  // Check if the user's role from the session is one of the allowed roles.
-  if (req.session && ["owner", "super_admin"].includes(req.session.role)) {
-    // If they have permission, continue to the next function in the chain.
+  // --- MODIFICATION ---
+  // Add 'admin' to the list of roles that can manage users/properties.
+  const allowedRoles = ["owner", "super_admin", "admin"];
+  if (req.session && allowedRoles.includes(req.session.role)) {
     return next();
   }
-  // If they do not have permission, send a 'Forbidden' error.
+  // --- END MODIFICATION ---
+  
   res.status(403).json({
     error: "Forbidden: You do not have permission to perform this action.",
   });
@@ -155,9 +172,9 @@ const requireManagePermission = (req, res, next) => {
 
 module.exports = {
   requireUserApi,
-  requireAdminApi,
+  requireAdminApi, // Export the new permissive middleware
+  requireSuperAdminOnly, // Export the new strict middleware
   requirePageLogin,
   requireAccountOwner,
-  // Export the new middleware function so other files can use it.
   requireManagePermission,
 };
