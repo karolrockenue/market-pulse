@@ -328,10 +328,10 @@ const trendData = data?.forwardDemandChartData || [];
             }}
 >
             <div className="text-[#6b7280] text-xs mb-2">Budget</div>
-   <RevenuePacingDisplay
+<RevenuePacingDisplay
               currentRevenue={snapshot.lastMonth.revenue}
               targetRevenue={snapshot.lastMonth.targetRevenue}
-              onNavigate={() => onNavigate('budgeting')}
+              onNavigate={() => onNavigate('budget')}
             />
           </div>
         </div>
@@ -400,7 +400,7 @@ const trendData = data?.forwardDemandChartData || [];
       <RevenuePacingDisplay
               currentRevenue={snapshot.currentMonth.revenue}
               targetRevenue={snapshot.currentMonth.targetRevenue}
-              onNavigate={() => onNavigate('budgeting')}
+              onNavigate={() => onNavigate('budget')}
             />
           </div>
         </div>
@@ -469,7 +469,7 @@ const trendData = data?.forwardDemandChartData || [];
      <RevenuePacingDisplay
               currentRevenue={snapshot.nextMonth.revenue}
               targetRevenue={snapshot.nextMonth.targetRevenue}
-              onNavigate={() => onNavigate('budgeting')}
+              onNavigate={() => onNavigate('budget')}
             />
           </div>
         </div>
