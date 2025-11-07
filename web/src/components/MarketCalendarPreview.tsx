@@ -106,7 +106,7 @@ export function MarketCalendarPreview() {
             <p className="text-[#9ca3af] text-sm">Forward-looking demand and pricing forecast</p>
           </div>
           
-          <div className="text-[#e5e5e5] px-6 py-2 bg-[#262626] rounded border border-[#3a3a35]">
+          <div className="text-[#e5e5e5] px-6 py-2 bg-[#2C2C2C] rounded border border-[#3a3a35]">
             {monthName}
           </div>
         </div>

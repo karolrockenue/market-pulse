@@ -15,14 +15,14 @@ export function MarketSeasonality() {
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[#e5e5e5] text-sm">Seasonality Heatmap</h2>
         <Select value={selectedYear} onValueChange={setSelectedYear}>
           <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] h-7 w-20 text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+          <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
             <SelectItem value="2025">2025</SelectItem>
             <SelectItem value="2024">2024</SelectItem>
             <SelectItem value="2023">2023</SelectItem>

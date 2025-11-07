@@ -626,7 +626,7 @@ return {
       </div>
 
       {/* Page Controls */}
-      <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-4 mb-6">
+      <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {/* Year Selector */}
@@ -695,7 +695,7 @@ return {
 
 {/* No Budget State - Only show if NOT loading and budget doesn't exist */}
       {!isLoading && !budgetExists && (
-        <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-12 text-center mb-6">
+        <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-12 text-center mb-6">
           <div className="w-16 h-16 rounded-full bg-[#faff6a]/20 flex items-center justify-center mx-auto mb-4">
             <Target className="w-8 h-8 text-[#faff6a]" />
           </div>
@@ -715,7 +715,7 @@ return {
 
 {/* [NEW] Show Loading Indicator */}
       {isLoading && (
-         <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-12 text-center mb-6">
+         <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-12 text-center mb-6">
           <div className="w-8 h-8 border-4 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-[#9ca3af]">Loading budget data...</p>
         </div>
@@ -724,7 +724,7 @@ return {
       {/* Budget & Pacing Table - Only show if budget exists AND not loading */}
       {!isLoading && budgetExists && (
         <>
-          <div className="bg-[#262626] border border-[#3a3a35] rounded-lg overflow-hidden">
+          <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg overflow-hidden">
             <div className="px-6 py-3 border-b border-[#3a3a35] flex items-center justify-between">
               <div>
                 <h2 className="text-[#e5e5e5]">Budget & Pacing Table</h2>

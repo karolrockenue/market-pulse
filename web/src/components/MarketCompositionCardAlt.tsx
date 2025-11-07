@@ -53,7 +53,7 @@ export function MarketCompositionCardAlt({
   }));
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
       <div className="mb-4">
         <h3 className="text-[#e5e5e5] mb-3">Comp Set Breakdown</h3>
         
@@ -97,7 +97,7 @@ export function MarketCompositionCardAlt({
             </div>
             
             {/* Room Count Bar, now functional */}
-            <div className="w-full bg-[#262626] rounded-full h-1.5 mb-2 overflow-hidden">
+            <div className="w-full bg-[#2C2C2C] rounded-full h-1.5 mb-2 overflow-hidden">
               <div 
                 className="h-full rounded-full"
                 style={{ 
@@ -112,7 +112,7 @@ export function MarketCompositionCardAlt({
               {tier.areas.map((area, areaIndex) => (
                 <div 
                   key={areaIndex}
-                  className="flex items-center gap-1 bg-[#262626] rounded px-2 py-0.5"
+                  className="flex items-center gap-1 bg-[#2C2C2C] rounded px-2 py-0.5"
                 >
                   <div 
                     className="w-1.5 h-1.5 rounded-full" 

@@ -249,7 +249,7 @@ const handleSave = () => {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
         className={`
-          bg-[#262626] border-[#3a3a35] text-[#e5e5e5] overflow-hidden flex flex-col p-0
+          bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] overflow-hidden flex flex-col p-0
           ${step === 'edit' 
             ? '!max-w-[85vw] !w-[85vw] !h-[85vh] !max-h-[85vh]' 
             : '!max-w-[600px] !w-[600px] max-h-[80vh]'
@@ -394,7 +394,7 @@ const handleSave = () => {
                       <div className="w-full border-t border-[#3a3a35]"></div>
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="bg-[#262626] px-3 text-[#6b7280] text-xs">Or start fresh</span>
+                      <span className="bg-[#2C2C2C] px-3 text-[#6b7280] text-xs">Or start fresh</span>
                     </div>
                   </div>
                 )}
@@ -506,7 +506,7 @@ const handleSave = () => {
                         type="number"
                         value={percentageIncrease}
                         onChange={(e) => setPercentageIncrease(e.target.value)}
-                        className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] text-center pr-7 h-8 text-xs"
+                        className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] text-center pr-7 h-8 text-xs"
                         placeholder="0"
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af] text-xs">%</span>

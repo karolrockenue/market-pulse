@@ -179,7 +179,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                       placeholder="your@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-12 bg-[#262626] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="h-12 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
 <Button
                   type="submit"
@@ -225,7 +225,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                   <div className="space-y-3">
                     <Button
                       onClick={() => handlePMSConnect('Cloudbeds')}
-                      className="w-full h-12 bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a]/50 transition-all"
+                      className="w-full h-12 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a]/50 transition-all"
                     >
                       <div className="flex items-center justify-center gap-3">
                         <div className="w-6 h-6 rounded bg-[#4a9eff] flex items-center justify-center text-white text-xs font-bold">
@@ -237,7 +237,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
 
                     <Button
                       onClick={() => handlePMSConnect('Mews')}
-                      className="w-full h-12 bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a]/50 transition-all"
+                      className="w-full h-12 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a]/50 transition-all"
                     >
                       <div className="flex items-center justify-center gap-3">
                         <div className="w-6 h-6 rounded bg-[#00c9a7] flex items-center justify-center text-white text-xs font-bold">
@@ -286,7 +286,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                   
                   <div className="grid grid-cols-2 gap-4">
                     {/* Occupancy Card */}
-                    <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-4">
+                    <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4">
                       <div className="text-[#9ca3af] text-xs mb-2">Occupancy</div>
                       <div className="flex items-end gap-4">
                         <div>
@@ -305,7 +305,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                     </div>
 
                     {/* ADR Card */}
-                    <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-4">
+                    <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4">
                       <div className="text-[#9ca3af] text-xs mb-2">ADR</div>
                       <div className="flex items-end gap-4">
                         <div>
@@ -324,7 +324,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                     </div>
 
                     {/* RevPAR Card */}
-                    <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-4">
+                    <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4">
                       <div className="text-[#9ca3af] text-xs mb-2">RevPAR</div>
                       <div className="flex items-end gap-4">
                         <div>
@@ -379,7 +379,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                   { icon: Sparkles, title: 'Market Rankings', desc: 'Know your position in the market instantly' },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-[#262626] border border-[#3a3a35] flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-[#2C2C2C] border border-[#3a3a35] flex items-center justify-center flex-shrink-0">
                       <item.icon className="w-5 h-5 text-[#faff6a]" />
                     </div>
                     <div>
@@ -461,7 +461,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                     { date: 'Dec 12', occ: '88.1%', adr: '$251', revpar: '$221', trend: 'up' },
                     { date: 'Dec 11', occ: '76.4%', adr: '$239', revpar: '$182', trend: 'up' },
                   ].map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-4 gap-2 py-2 border-b border-[#3a3a35]/50 hover:bg-[#262626]/50 transition-colors">
+                    <div key={idx} className="grid grid-cols-4 gap-2 py-2 border-b border-[#3a3a35]/50 hover:bg-[#2C2C2C]/50 transition-colors">
                       <div className="text-[#e5e5e5] text-sm">{row.date}</div>
                       <div className="text-[#e5e5e5] text-sm text-right">{row.occ}</div>
                       <div className="text-[#e5e5e5] text-sm text-right">{row.adr}</div>
@@ -473,7 +473,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                   ))}
 
 {/* Summary Row */}
-                  <div className="grid grid-cols-4 gap-2 pt-2 bg-[#262626] -mx-6 px-6 py-3">
+                  <div className="grid grid-cols-4 gap-2 pt-2 bg-[#2C2C2C] -mx-6 px-6 py-3">
                     <div className="text-[#faff6a] text-sm">Average</div>
                     <div className="text-[#faff6a] text-sm text-right">80.4%</div>
                     <div className="text-[#faff6a] text-sm text-right">$243</div>
@@ -620,7 +620,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                   placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 bg-[#262626] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                  className="h-12 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]"
                 />
                 <Button
                   type="submit"
@@ -644,7 +644,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   onClick={() => handlePMSConnect('Cloudbeds')}
-                  className="h-11 bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] transition-all text-sm"
+                  className="h-11 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] transition-all text-sm"
                 >
                   <div className="w-5 h-5 rounded bg-[#4a9eff] flex items-center justify-center text-white text-xs font-bold mr-2">
                     CB
@@ -653,7 +653,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
                 </Button>
                 <Button
                   onClick={() => handlePMSConnect('Mews')}
-                  className="h-11 bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] transition-all text-sm"
+                  className="h-11 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] transition-all text-sm"
                 >
                   <div className="w-5 h-5 rounded bg-[#00c9a7] flex items-center justify-center text-white text-xs font-bold mr-2">
                     M

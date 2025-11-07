@@ -9,7 +9,7 @@ export function TopPerformers() {
   ];
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
       <div className="flex items-center gap-2 mb-3">
         <Trophy className="w-4 h-4 text-[#faff6a]" />
         <h2 className="text-[#e5e5e5] text-sm">Top Performers</h2>

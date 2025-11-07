@@ -140,7 +140,7 @@ export function ManageCompSetModal({ open, onClose, hotelId, hotelName, allHotel
 {/* REMOVED sm:!max-w-[1200px] to prevent potential conflict */}
 {/* Remove Tailwind max-w classes and apply max-width directly via inline style */}
 <DialogContent 
-  className="w-[95vw] bg-[#262626] border-[#3a3a35] text-[#e5e5e5]" 
+  className="w-[95vw] bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]" 
   style={{ maxWidth: '1200px' }}
 >
         <DialogHeader>

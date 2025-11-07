@@ -1548,7 +1548,7 @@ return (
       
       {activeView === 'youVsCompSet' && ( // [MODIFIED] This was 'dashboard'
         <div className="p-4">
-          <div className="mb-6 bg-[#1a1a18] rounded-lg border border-[#262626] px-5 py-3.5">
+          <div className="mb-6 bg-[#1a1a18] rounded-lg border border-[#2C2C2C] px-5 py-3.5">
             <div className="flex items-center justify-between">
   <div className="flex items-center gap-4">
                 {/* Date Range Picker */}
@@ -1558,27 +1558,27 @@ return (
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-36 h-8 bg-[#252521] border-[#262626] text-[#e5e5e5] text-xs"
+                    className="w-36 h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs"
                   />
                   <span className="text-[#6b7280] text-xs">to</span>
                   <Input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-36 h-8 bg-[#252521] border-[#262626] text-[#e5e5e5] text-xs"
+                    className="w-36 h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs"
                   />
                 </div>
 
-                <div className="h-8 w-px bg-[#262626]" />
+                <div className="h-8 w-px bg-[#2C2C2C]" />
 
                 {/* Preset Dropdown */}
                 <div className="flex items-center gap-2">
                   <label className="text-[#6b7280] text-xs">or Preset:</label>
                   <Select value={datePreset} onValueChange={setDatePreset}>
-                    <SelectTrigger className="w-36 h-8 bg-[#252521] border-[#262626] text-[#e5e5e5] text-xs">
+                    <SelectTrigger className="w-36 h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs">
                       <SelectValue placeholder="Select preset..." />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1a1a18] border-[#262626] text-[#e5e5e5]">
+                    <SelectContent className="bg-[#1a1a18] border-[#2C2C2C] text-[#e5e5e5]">
                       <SelectItem value="previous-month">Previous Month</SelectItem>
                       <SelectItem value="current-month">Current Month</SelectItem>
                       <SelectItem value="next-month">Next Month</SelectItem>
@@ -1588,7 +1588,7 @@ return (
                   </Select>
                 </div>
 
-                <div className="h-8 w-px bg-[#262626]" />
+                <div className="h-8 w-px bg-[#2C2C2C]" />
 
                 {/* Granularity Buttons */}
                 <div className="flex items-center gap-2">
@@ -1600,7 +1600,7 @@ return (
                         onClick={() => setGranularity(option)}
                         className={`px-3 py-1.5 rounded text-xs transition-colors ${
                           granularity === option
-                            ? 'bg-[#262626] text-[#e5e5e5]'
+                            ? 'bg-[#2C2C2C] text-[#e5e5e5]'
                             : 'bg-transparent text-[#9ca3af] hover:text-[#e5e5e5]'
                         }`}
                       >
@@ -1610,19 +1610,19 @@ return (
                   </div>
                 </div>
 
-                <div className="h-8 w-px bg-[#262626]" />
+                <div className="h-8 w-px bg-[#2C2C2C]" />
 
                 {/* Metric Dropdown */}
                 <div className="flex items-center gap-2">
                   <label className="text-[#6b7280] text-xs">Metric:</label>
                   <Select value={comparisonMetric} onValueChange={setComparisonMetric}>
                     <SelectTrigger 
-                      className="h-8 bg-[#252521] border-[#262626] text-[#e5e5e5] text-xs"
+                      className="h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs"
                       style={{ minWidth: '6rem' }}
                     >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1a1a18] border-[#262626] text-[#e5e5e5]">
+                    <SelectContent className="bg-[#1a1a18] border-[#2C2C2C] text-[#e5e5e5]">
                       <SelectItem value="occupancy">Occupancy</SelectItem>
                       <SelectItem value="adr">ADR</SelectItem>
                       <SelectItem value="revpar">RevPAR</SelectItem>
@@ -1809,7 +1809,7 @@ return (
             />
 
             {/* Add the MetricSelector and FormattingOptions back in */}
-            <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+            <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
               <div className="grid grid-cols-2 gap-6">
                 <MetricSelector
                   selectedMetrics={selectedMetrics}
@@ -2099,7 +2099,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
        <MewsOnboarding />
 
         {/* Add the API Target Property Selector just above the API Explorer */}
-        <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+        <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-[#e5e5e5]">
               API Target Property:
@@ -2111,7 +2111,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
               <SelectTrigger className="w-72 h-9 bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue placeholder="Select a property..." />
               </SelectTrigger>
-              <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 {allHotels.map((hotel) => (
                   <SelectItem 
                     key={hotel.hotel_id} 
@@ -2276,7 +2276,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
           )}
           {rockenueSubView === 'shreeji-report' && (
             <div>
-              <div className="p-4 border-b border-[#3a3a35] bg-[#262626]">
+              <div className="p-4 border-b border-[#3a3a35] bg-[#2C2C2C]">
                 <button
                   onClick={() => setRockenueSubView('hub')}
                   className="text-[#9ca3af] hover:text-[#faff6a] text-sm transition-colors"
@@ -2290,7 +2290,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
           {/* [THIS IS THE ORIGINAL BLOCK] */}
           {rockenueSubView === 'portfolio-overview' && (
             <div>
-              <div className="p-4 border-b border-[#3a3a3D] bg-[#262626]">
+              <div className="p-4 border-b border-[#3a3a3D] bg-[#2C2C2C]">
                 <button
                   onClick={() => setRockenueSubView('hub')}
                   className="text-[#9ca3af] hover:text-[#faff6a] text-sm transition-colors"
@@ -2305,7 +2305,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
           {/* [THIS IS THE NEW BLOCK YOU ADDED] */}
           {rockenueSubView === 'portfolio-risk' && (
             <div>
-              <div className="p-4 border-b border-[#3a3a35] bg-[#262626]">
+              <div className="p-4 border-b border-[#3a3a35] bg-[#2C2C2C]">
                 <button
                   onClick={() => setRockenueSubView('hub')}
                   className="text-[#9ca3af] hover:text-[#faff6a] text-sm transition-colors"

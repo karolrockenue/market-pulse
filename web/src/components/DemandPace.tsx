@@ -593,7 +593,7 @@ const getPriceIndexColor = (index: number) => {
         </p>
         
         {/* Market Badge */}
-        <div className="mt-3 inline-flex items-center gap-2 bg-[#262626] border border-[#3a3a35] rounded-full px-4 py-2">
+        <div className="mt-3 inline-flex items-center gap-2 bg-[#2C2C2C] border border-[#3a3a35] rounded-full px-4 py-2">
           <MapPin className="w-4 h-4 text-[#faff6a]" />
           <span className="text-[#e5e5e5] text-sm">London Market</span>
           <span className="text-[#6b7280] text-xs">•</span>
@@ -613,7 +613,7 @@ const getPriceIndexColor = (index: number) => {
       {/* Main Content Sections */}
       <div className="space-y-6">
         {/* Channel Manager Grid Section */}
-        <div className="bg-[#262626] rounded-lg border border-[#3a3a35] p-5">
+        <div className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-5">
   <div className="mb-5">
             <h2 className="text-[#e5e5e5] text-lg mb-1">90-Day Planning Grid</h2>
          <p className="text-[#9ca3af] text-xs">
@@ -684,7 +684,7 @@ const getPriceIndexColor = (index: number) => {
                 <tbody>
           
                   {/* Row 2: Market Demand */}
-                  <tr className="border-b border-[#3a3a35] transition-colors bg-[#262626]/30">
+                  <tr className="border-b border-[#3a3a35] transition-colors bg-[#2C2C2C]/30">
 <td
   className="sticky left-0 z-20 bg-[#1f1f1c] border-r border-[#3a3a35]"
   style={{
@@ -764,7 +764,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/10 border-r-[#faff6a]/50'
                               : isHovered
                               ? 'hover:bg-[#faff6a]/15'
-                              : 'hover:bg-[#262626]/50'
+                              : 'hover:bg-[#2C2C2C]/50'
                           }`}
                           style={{ 
                             width: '77px',
@@ -790,7 +790,7 @@ const getPriceIndexColor = (index: number) => {
 
   
 {/* Row 3: [NEW] Static Market Pace (7-Day Supply Change) */}
-                  <tr className="border-b border-[#3a3a35] hover:bg-[#262626]/30 transition-colors">
+                  <tr className="border-b border-[#3a3a35] hover:bg-[#2C2C2C]/30 transition-colors">
                     <td className="sticky left-0 bg-[#1f1f1c] text-[#e5e5e5] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
                       <div className="flex items-center gap-2">
                         <TrendingUp className="w-4 h-4 text-[#9ca3af]" />
@@ -814,7 +814,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/10 border-[#3a3a35]'
                               : isHovered
                               ? 'bg-[#faff6a]/15'
-                              : demandStyle.hoverBg || 'hover:bg-[#262626]/50'
+                              : demandStyle.hoverBg || 'hover:bg-[#2C2C2C]/50'
                           }`}
                           style={{ 
                             width: '77px',
@@ -832,7 +832,7 @@ const getPriceIndexColor = (index: number) => {
                     })}
                   </tr>
                   {/* Row 4: Price Index */}
-                  <tr className="border-b-2 border-[#faff6a]/20 hover:bg-[#262626]/30 transition-colors">
+                  <tr className="border-b-2 border-[#faff6a]/20 hover:bg-[#2C2C2C]/30 transition-colors">
           <td className="sticky left-0 bg-[#1f1f1c] text-[#e5e5e5] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
                       <div className="flex items-center gap-2">
                         <BarChart3 className="w-4 h-4 text-[#9ca3af]" />
@@ -855,7 +855,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/10'
                               : isHovered
                               ? 'bg-[#faff6a]/15'
-                              : 'hover:bg-[#262626]/50'
+                              : 'hover:bg-[#2C2C2C]/50'
                           }`}
                           style={{ width: '77px' }}
                         >
@@ -868,7 +868,7 @@ const getPriceIndexColor = (index: number) => {
                   </tr>
 
 {/* Separator for Hotel Metrics */}
-<tr className="bg-[#262626]/50">
+<tr className="bg-[#2C2C2C]/50">
   {/* Sticky first column (matches other sticky metric cells) */}
   <td
     className="sticky left-0 z-20 bg-[#1f1f1c] border-t border-b border-[#3a3a35]"
@@ -890,14 +890,14 @@ const getPriceIndexColor = (index: number) => {
   {/* Scrolling filler to span remaining columns */}
 <td
     colSpan={90}
-    className="border-t border-b border-[#3a3a35] bg-[#262626]"
+    className="border-t border-b border-[#3a3a35] bg-[#2C2C2C]"
     style={{ padding: '0.5rem 0' }}
   />
 </tr>
 
 
                   {/* Row 5: Hotel Occupancy */}
-                  <tr className="border-b border-[#3a3a35] hover:bg-[#262626]/30 transition-colors">
+                  <tr className="border-b border-[#3a3a35] hover:bg-[#2C2C2C]/30 transition-colors">
      <td className="sticky left-0 bg-[#1f1f1c] text-[#e5e5e5] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
                       <div className="flex items-center gap-2">
                         <Activity className="w-4 h-4 text-[#faff6a]" />
@@ -919,7 +919,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/10'
                               : isHovered
                               ? 'bg-[#faff6a]/15'
-                              : 'hover:bg-[#262626]/50'
+                              : 'hover:bg-[#2C2C2C]/50'
                           }`}
                           style={{ width: '77px' }}
                         >
@@ -932,7 +932,7 @@ const getPriceIndexColor = (index: number) => {
                   </tr>
 
                   {/* Row 6: Available Rooms to Sell */}
-                  <tr className="border-b border-[#3a3a35] hover:bg-[#262626]/30 transition-colors">
+                  <tr className="border-b border-[#3a3a35] hover:bg-[#2C2C2C]/30 transition-colors">
 <td className="sticky left-0 bg-[#1f1f1c] text-[#e5e5e5] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
                       <div className="flex items-center gap-2">
                         <DoorOpen className="w-4 h-4 text-[#faff6a]" />
@@ -954,7 +954,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/10'
                               : isHovered
                               ? 'bg-[#faff6a]/15'
-                              : 'hover:bg-[#262626]/50'
+                              : 'hover:bg-[#2C2C2C]/50'
                           }`}
                           style={{ width: '77px' }}
                         >
@@ -967,7 +967,7 @@ const getPriceIndexColor = (index: number) => {
                   </tr>
 
                   {/* Row 7: ADR */}
-                  <tr className="hover:bg-[#262626]/30 transition-colors">
+                  <tr className="hover:bg-[#2C2C2C]/30 transition-colors">
      <td className="sticky left-0 bg-[#1f1f1c] text-[#e5e5e5] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-[#faff6a]" />
@@ -989,7 +989,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/10'
                               : isHovered
                               ? 'bg-[#faff6a]/15'
-                              : 'hover:bg-[#262626]/50'
+                              : 'hover:bg-[#2C2C2C]/50'
                           }`}
                           style={{ width: '77px' }}
                         >
@@ -1047,7 +1047,7 @@ const getPriceIndexColor = (index: number) => {
                     <div className="w-3 h-px bg-[#faff6a]/30" />
                     <span>Market Metrics</span>
                   </div>
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">Demand</span>
                     <div className="flex items-center gap-1.5">
                       <div 
@@ -1058,12 +1058,12 @@ const getPriceIndexColor = (index: number) => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">Pace</span>
                     <span className="text-[#e5e5e5] text-xs">{getPaceLabel(selectedDay.marketPace)}</span>
                   </div>
                   
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">WAP</span>
                     <span className="text-[#e5e5e5] text-xs">£{selectedDay.marketWAP}</span>
                   </div>
@@ -1075,22 +1075,22 @@ const getPriceIndexColor = (index: number) => {
                     <div className="w-3 h-px bg-[#faff6a]/30" />
                     <span>Your Property</span>
                   </div>
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">Occupancy</span>
                     <span className="text-[#faff6a] text-xs">{selectedDay.hotelOccupancy}%</span>
                   </div>
                   
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">Rooms to Sell</span>
                     <span className="text-[#e5e5e5] text-xs">{selectedDay.hotelRoomsUnsold}</span>
                   </div>
                   
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">ADR</span>
                     <span className="text-[#e5e5e5] text-xs">£{selectedDay.hotelADR}</span>
                   </div>
                   
-                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#262626]/40 border border-[#3a3a35]/50 rounded">
+                  <div className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/40 border border-[#3a3a35]/50 rounded">
                     <span className="text-[#9ca3af] text-xs">Revenue</span>
                     <span className="text-[#e5e5e5] text-xs">£{selectedDay.hotelRevenue.toLocaleString()}</span>
                   </div>
@@ -1102,7 +1102,7 @@ const getPriceIndexColor = (index: number) => {
         )}
 
         {/* Combined 90-Day Market Analytics - 4 Synchronized Charts */}
-        <div className="bg-[#262626] rounded-lg border border-[#3a3a35] p-5">
+        <div className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-5">
   {/* [MODIFIED] Dropdown has been moved to Chart 4 */}
           <div className="mb-5">
             <div>
@@ -1321,9 +1321,9 @@ const getPriceIndexColor = (index: number) => {
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="bg-[#1f1f1c] border-[#3a3a35]">
-          <SelectItem value="1" className="text-[#e5e5e5] focus:bg-[#262626] focus:text-[#faff6a]">1 Day</SelectItem>
-          <SelectItem value="3" className="text-[#e5e5e5] focus:bg-[#262626] focus:text-[#faff6a]">3 Days</SelectItem>
-          <SelectItem value="7" className="text-[#e5e5e5] focus:bg-[#262626] focus:text-[#faff6a]">7 Days</SelectItem>
+          <SelectItem value="1" className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#faff6a]">1 Day</SelectItem>
+          <SelectItem value="3" className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#faff6a]">3 Days</SelectItem>
+          <SelectItem value="7" className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#faff6a]">7 Days</SelectItem>
         </SelectContent>
       </Select>
     </div>

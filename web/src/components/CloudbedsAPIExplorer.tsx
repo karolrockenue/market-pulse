@@ -234,9 +234,9 @@ const handleDimensionToggle = (dimensionColumn: string) => {
   ];
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
       {/* Header with Property Selection */}
-      <div className="px-6 py-4 border-b border-[#3a3a35] bg-gradient-to-r from-[#2a2a26] to-[#262626]">
+      <div className="px-6 py-4 border-b border-[#3a3a35] bg-gradient-to-r from-[#2a2a26] to-[#2C2C2C]">
         <div className="flex items-start justify-between gap-6">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
@@ -327,7 +327,7 @@ const handleDimensionToggle = (dimensionColumn: string) => {
                       className={`p-3 rounded border cursor-pointer transition-all ${
                         datasetId === ds.id
                           ? 'border-[#faff6a] bg-[#faff6a]/10'
-                          : 'border-[#3a3a35] hover:border-[#4a4a45] bg-[#262626]'
+                          : 'border-[#3a3a35] hover:border-[#4a4a45] bg-[#2C2C2C]'
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -387,7 +387,7 @@ const handleDimensionToggle = (dimensionColumn: string) => {
                           type="date"
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
-                          className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] h-9 text-sm"
+                          className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] h-9 text-sm"
                         />
                       </div>
                       <div>
@@ -399,7 +399,7 @@ const handleDimensionToggle = (dimensionColumn: string) => {
                           type="date"
                           value={endDate}
                           onChange={(e) => setEndDate(e.target.value)}
-                          className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] h-9 text-sm"
+                          className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] h-9 text-sm"
                         />
                       </div>
                     </div>
@@ -418,7 +418,7 @@ const handleDimensionToggle = (dimensionColumn: string) => {
                           </Tooltip>
                         </TooltipProvider>
                       </label>
-                      <div className="bg-[#262626] rounded p-2.5 space-y-1.5 max-h-32 overflow-y-auto border border-[#3a3a35]">
+                      <div className="bg-[#2C2C2C] rounded p-2.5 space-y-1.5 max-h-32 overflow-y-auto border border-[#3a3a35]">
                         {availableDimensions.map(dimension => (
                       <label key={dimension.column} className="flex items-start gap-2 cursor-pointer group"> {/* Use column as key */}
                        <input
@@ -451,7 +451,7 @@ const handleDimensionToggle = (dimensionColumn: string) => {
                     </Badge>
                   </div>
                   
-                  <div className="bg-[#262626] rounded p-2.5 space-y-1.5 max-h-56 overflow-y-auto border border-[#3a3a35]">
+                  <div className="bg-[#2C2C2C] rounded p-2.5 space-y-1.5 max-h-56 overflow-y-auto border border-[#3a3a35]">
                    {availableMetrics.map(metric => (
                 <label key={metric.column} className="flex items-start gap-2 cursor-pointer group"> {/* Use column as key */}
                         <input
@@ -562,7 +562,7 @@ const handleDimensionToggle = (dimensionColumn: string) => {
                             onClick={() => handleGeneralEndpoint(endpoint)}
                             disabled={loadingEndpoint === endpoint}
                             variant="outline"
-                            className="w-full bg-[#262626] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a] justify-start h-auto py-3 group"
+                            className="w-full bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a] justify-start h-auto py-3 group"
                           >
                             {loadingEndpoint === endpoint ? (
                               <Loader2 className="w-4 h-4 mr-2.5 flex-shrink-0 animate-spin text-[#faff6a]" />

@@ -36,7 +36,7 @@ export function AreaPerformanceTable() {
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
       <div className="px-4 py-3 border-b border-[#3a3a35] flex items-center justify-between">
         <h2 className="text-[#e5e5e5] text-sm">Area Performance</h2>
         <div className="flex gap-1">

@@ -35,7 +35,7 @@ export function HistoricalTrendsChart() {
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[#e5e5e5] text-sm">Historical Trends</h2>
         <div className="flex gap-1">
@@ -88,7 +88,7 @@ export function HistoricalTrendsChart() {
           />
           <Tooltip 
             contentStyle={{ 
-              backgroundColor: '#262626', 
+              backgroundColor: '#2C2C2C', 
               border: '1px solid #3a3a35',
               borderRadius: '4px',
               fontSize: '11px',

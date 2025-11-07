@@ -11,7 +11,7 @@ export function MarketKPIGrid() {
   return (
     <div className="grid grid-cols-6 gap-3">
       {kpis.map((kpi) => (
-        <div key={kpi.label} className="bg-[#262626] rounded border border-[#3a3a35] p-3">
+        <div key={kpi.label} className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-3">
           <div className="text-[#9ca3af] text-[10px] mb-1 uppercase tracking-wider">{kpi.label}</div>
           <div className="text-white text-lg mb-1">{kpi.value}</div>
           <div className={`text-[10px] ${kpi.trend === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>

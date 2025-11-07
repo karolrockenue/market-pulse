@@ -22,7 +22,7 @@ const Toaster = ({ theme, toastOptions, ...props }: ToasterProps) => {
 
   // [FIX] Define our default styling class. 
   // Removed 'group toast' to fix the extra padding bug.
-  const defaultClassName = 'group-[.toaster]:bg-[#262626] group-[.toaster]:text-[#e5e5e5] group-[.toaster]:border-[#3a3a35]';
+  const defaultClassName = 'group-[.toaster]:bg-[#2C2C2C] group-[.toaster]:text-[#e5e5e5] group-[.toaster]:border-[#3a3a35]';
 
   // [NEW] Merge the default class with any class passed from props (like in App.tsx)
   const mergedClassName = `${defaultClassName} ${toastOptions?.className || ''}`.trim();

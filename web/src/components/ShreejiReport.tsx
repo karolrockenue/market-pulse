@@ -89,7 +89,7 @@ export function ShreejiReport() {
       </div>
 
       {/* Report Controls */}
-      <div className="bg-[#262626] rounded border border-[#3a3a35] p-5 mb-6">
+      <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5 mb-6">
         <h2 className="text-[#e5e5e5] text-lg mb-4">Report Configuration</h2>
         
         <div className="flex gap-4 items-end">
@@ -101,7 +101,7 @@ export function ShreejiReport() {
               <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue placeholder="Choose a hotel..." />
               </SelectTrigger>
-              <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 {hotels.map(hotel => (
                   <SelectItem key={hotel.id} value={hotel.id}>
                     {hotel.name}
@@ -125,13 +125,13 @@ export function ShreejiReport() {
                   {reportDate ? formatDatePicker(reportDate) : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-[#262626] border-[#3a3a35]" align="start">
+              <PopoverContent className="w-auto p-0 bg-[#2C2C2C] border-[#3a3a35]" align="start">
                 <Calendar
                   mode="single"
                   selected={reportDate}
                   onSelect={setReportDate}
                   initialFocus
-                  className="bg-[#262626] text-[#e5e5e5]"
+                  className="bg-[#2C2C2C] text-[#e5e5e5]"
                 />
               </PopoverContent>
             </Popover>
@@ -148,7 +148,7 @@ export function ShreejiReport() {
           {reportGenerated && (
             <Button
               variant="outline"
-              className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-10 px-6"
+              className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-10 px-6"
             >
               <Download className="w-4 h-4 mr-2" />
               Export
@@ -161,7 +161,7 @@ export function ShreejiReport() {
       {reportGenerated && (
         <div className="space-y-6">
           {/* Report Header */}
-          <div className="bg-[#262626] rounded border border-[#3a3a35] p-6 text-center">
+          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-6 text-center">
             <h2 className="text-[#faff6a] text-2xl mb-2">
               {selectedHotelName} - DAILY CHART
             </h2>
@@ -169,7 +169,7 @@ export function ShreejiReport() {
           </div>
 
           {/* Guest List Table */}
-          <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#3a3a35]">
               <h3 className="text-[#e5e5e5] text-lg">In-House Guests</h3>
             </div>
@@ -207,7 +207,7 @@ export function ShreejiReport() {
           </div>
 
           {/* Performance Summary Bar */}
-          <div className="bg-[#262626] rounded border-2 border-[#faff6a]/30 p-4">
+          <div className="bg-[#2C2C2C] rounded border-2 border-[#faff6a]/30 p-4">
             <h3 className="text-[#faff6a] text-sm mb-3 uppercase tracking-wider">Daily Performance Summary</h3>
             <div className="grid grid-cols-7 gap-4">
               <div className="bg-[#1f1f1c] rounded p-3 text-center">
@@ -244,7 +244,7 @@ export function ShreejiReport() {
           {/* Ancillary Data Sections */}
           <div className="grid grid-cols-2 gap-6">
             {/* Daily Upsells */}
-            <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+            <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
               <div className="px-5 py-4 border-b border-[#3a3a35]">
                 <h3 className="text-[#e5e5e5] text-lg">Daily Upsells</h3>
               </div>
@@ -269,7 +269,7 @@ export function ShreejiReport() {
             </div>
 
             {/* Daily Takings Summary */}
-            <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+            <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
               <div className="px-5 py-4 border-b border-[#3a3a35]">
                 <h3 className="text-[#e5e5e5] text-lg">Daily Takings Summary</h3>
               </div>

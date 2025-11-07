@@ -147,7 +147,7 @@ export function ReportSelector({ onSelectReport }: ReportSelectorProps) {
                         // [MODIFIED] Removed 'mt-auto' from className
                         className={`w-full ${
                           report.available
-                            ? 'bg-[#262626] text-[#e5e5e5] hover:bg-[#faff6a] hover:text-[#1a1a18] border border-[#3a3a35] hover:border-[#faff6a]'
+                            ? 'bg-[#2C2C2C] text-[#e5e5e5] hover:bg-[#faff6a] hover:text-[#1a1a18] border border-[#3a3a35] hover:border-[#faff6a]'
                             : 'bg-[#2a2a25] text-[#6b7280] cursor-not-allowed'
                         }`}
                         // [FIX] Added inline style

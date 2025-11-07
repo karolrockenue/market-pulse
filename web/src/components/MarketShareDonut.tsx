@@ -10,7 +10,7 @@ export function MarketShareDonut() {
   ];
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
       <h2 className="text-[#e5e5e5] text-sm mb-3">Market Share by Tier</h2>
       
       <div className="flex items-center gap-4">
@@ -31,7 +31,7 @@ export function MarketShareDonut() {
             </Pie>
             <Tooltip 
               contentStyle={{ 
-                backgroundColor: '#262626', 
+                backgroundColor: '#2C2C2C', 
                 border: '1px solid #3a3a35',
                 borderRadius: '4px',
                 fontSize: '11px',

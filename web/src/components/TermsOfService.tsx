@@ -208,7 +208,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
           <section className="space-y-4">
             <h2 className="text-2xl text-[#e5e5e5]">Disclaimers and Limitations</h2>
             
-            <div className="bg-[#262626] border border-[#3a3a35] rounded-lg p-6 space-y-4">
+            <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-6 space-y-4">
               <div>
                 <h3 className="text-lg text-[#faff6a] mb-2">"AS IS" Basis</h3>
                 <p>

@@ -66,7 +66,7 @@ const styles = {
   activeBadge: {
     padding: '8px 16px',
     borderRadius: '0.5rem',
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
   },
   activeIndicator: {
@@ -103,7 +103,7 @@ const styles = {
     textAlign: 'left' as 'left',
     padding: '20px', // p-5
     borderRadius: '0.5rem', // rounded-lg
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     transition: 'all 0.2s',
     cursor: 'pointer',

@@ -109,7 +109,7 @@ export function SystemHealth({ propertyId, lastRefreshTime, onRefreshData }: Sys
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
       <h2 className="text-[#e5e5e5] text-lg mb-4">System Status & Health</h2>
       
       {/* Back to a 3-column grid, as Mews test is not in the original */}
@@ -132,7 +132,7 @@ export function SystemHealth({ propertyId, lastRefreshTime, onRefreshData }: Sys
           <Button
             onClick={testDatabase}
             disabled={dbStatus === 'testing'}
-            className="w-full h-8 bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] text-xs"
+            className="w-full h-8 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] text-xs"
           >
             Test Database
           </Button>
@@ -156,7 +156,7 @@ export function SystemHealth({ propertyId, lastRefreshTime, onRefreshData }: Sys
           <Button
             onClick={testCloudbeds}
             disabled={cloudbedsStatus === 'testing'}
-            className="w-full h-8 bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] text-xs"
+            className="w-full h-8 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] text-xs"
           >
             Test Auth
           </Button>

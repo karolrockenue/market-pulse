@@ -43,7 +43,7 @@ export function MyProfile({ userInfo, onSave }: MyProfileProps) {
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
       <h2 className="text-[#e5e5e5] text-lg mb-4">My Profile</h2>
       
       <div className="grid grid-cols-2 gap-4 mb-6">

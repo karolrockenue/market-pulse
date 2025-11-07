@@ -207,43 +207,43 @@ const styles = {
   colSpan2: { gridColumn: 'span 2 / span 2' },
   colSpan3: { gridColumn: 'span 3 / span 3' },
   card: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '8px',
     padding: '16px',
   },
   cardPadded: { // p-6
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '8px',
     padding: '24px',
   },
   cardCriticalBorder: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid rgba(239, 68, 68, 0.2)', // border-[#ef4444]/20
     borderRadius: '8px',
     padding: '16px',
   },
   cardModerateBorder: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid rgba(245, 158, 11, 0.2)', // border-[#f59e0b]/20
     borderRadius: '8px',
     padding: '16px',
   },
   cardYellowBorder: { // For Rate Strategy Risk
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid rgba(250, 255, 106, 0.3)', // border-[#faff6a]/30
     borderRadius: '8px',
     padding: '16px',
   },
   cardOrangeBorder: { // For Fill Risk
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid rgba(245, 158, 11, 0.3)', // border-[#f59e0b]/30
     borderRadius: '8px',
     padding: '16px',
   },
   cardRedBorder: { // For Critical Risk
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid rgba(239, 68, 68, 0.3)', // border-red-500/30
     borderRadius: '8px',
     padding: '16px',
@@ -306,7 +306,7 @@ const styles = {
   
   // Matrix Styles
   matrixControls: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '8px',
     padding: '16px',
@@ -316,7 +316,7 @@ const styles = {
     justifyContent: 'space-between',
   },
   matrixTableWrapper: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '8px',
     overflow: 'hidden',
@@ -360,7 +360,7 @@ matrixDateHeader: {
     position: 'sticky' as 'sticky',
     left: 0,
     zIndex: 10,
-    backgroundColor: '#262626', // Base color
+    backgroundColor: '#2C2C2C', // Base color
     // hover:bg-[#1f1f1c]/50 is not possible
     borderRight: '1px solid #3a3a35',
     width: '256px',
@@ -411,7 +411,7 @@ matrixDataCell: {
   },
   quadrantChartWrapper: {
     gridColumn: 'span 2 / span 2',
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '8px',
     padding: '24px',
@@ -759,7 +759,7 @@ useEffect(() => {
       {/* [NEW] Global Filter Bar (Prototype-Aligned) */}
       <div style={{
         marginBottom: '24px',
-        backgroundColor: '#262626',
+        backgroundColor: '#2C2C2C',
         borderRadius: '8px',
         border: '1px solid #3a3a35',
         padding: '12px 20px',
@@ -860,7 +860,7 @@ useEffect(() => {
                           setGlobalSelectedHotel(hotel.hotel_id.toString());
                           setGlobalHotelSearchOpen(false);
                         }}
-                        className="text-[#e5e5e5] aria-selected:bg-[#262626] aria-selected:text-[#faff6a]"
+                        className="text-[#e5e5e5] aria-selected:bg-[#2C2C2C] aria-selected:text-[#faff6a]"
                       >
                         <Check className={`mr-2 h-4 w-4 ${globalSelectedHotel === hotel.hotel_id.toString() ? 'opacity-100' : 'opacity-0'}`} />
                         <div style={styles.flexCol}>
@@ -889,7 +889,7 @@ useEffect(() => {
                 <SelectValue />
               </div>
             </SelectTrigger>
-            <SelectContent className="bg-[#262626] border-[#3a3a35]">
+            <SelectContent className="bg-[#2C2C2C] border-[#3a3a35]">
               {/* This is the "All Portfolio" option, as requested */}
               <SelectItem value="all" className="text-[#e5e5e5] focus:bg-[#1a1a18] focus:text-[#faff6a] text-xs">
                 All Portfolio ({globalHotelGroups.length} groups, {allHotels.length} hotels)

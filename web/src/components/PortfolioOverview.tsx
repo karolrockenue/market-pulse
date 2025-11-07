@@ -85,7 +85,7 @@ const styles = {
     marginBottom: '24px',
   },
   kpiCard: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '0.5rem',
     padding: '16px',
@@ -134,7 +134,7 @@ const styles = {
     marginBottom: '32px',
   },
   groupCard: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '0.5rem',
     padding: '14px',
@@ -234,7 +234,7 @@ const styles = {
     color: '#6b7280',
   },
   tableContainer: {
-    backgroundColor: '#262626',
+    backgroundColor: '#2C2C2C',
     border: '1px solid #3a3a35',
     borderRadius: '0.5rem',
     overflow: 'hidden',
@@ -610,15 +610,15 @@ export function PortfolioOverview() {
               placeholder="Search hotels or cities..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-[#262626] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]" // These classes are from shadcn/ui, they should work
+              className="pl-10 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]" // These classes are from shadcn/ui, they should work
             />
           </div>
           
           <Select value={filterGroup} onValueChange={setFilterGroup}>
-            <SelectTrigger className="w-[180px] bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+            <SelectTrigger className="w-[180px] bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
               <SelectValue placeholder="Filter by Group" />
             </SelectTrigger>
-            <SelectContent className="bg-[#262626] border-[#3a3a35]">
+            <SelectContent className="bg-[#2C2C2C] border-[#3a3a35]">
               <SelectItem value="all" className="text-[#e5e5e5]">All Groups</SelectItem>
               {Array.from(new Set(allPortfolio.map(p => p.group).filter(Boolean))).map(group => (
                 <SelectItem key={group} value={group!} className="text-[#e5e5e5]">{group}</SelectItem>
@@ -627,10 +627,10 @@ export function PortfolioOverview() {
           </Select>
 
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[180px] bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+            <SelectTrigger className="w-[180px] bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
               <SelectValue placeholder="Filter by Status" />
             </SelectTrigger>
-            <SelectContent className="bg-[#262626] border-[#3a3a35]">
+            <SelectContent className="bg-[#2C2C2C] border-[#3a3a35]">
               <SelectItem value="all" className="text-[#e5e5e5]">All Status</SelectItem>
               <SelectItem value="Live" className="text-[#e5e5e5]">Live</SelectItem>
               <SelectItem value="Off-Platform" className="text-[#e5e5e5]">Off-Platform</SelectItem>
@@ -638,10 +638,10 @@ export function PortfolioOverview() {
           </Select>
 
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px] bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+            <SelectTrigger className="w-[180px] bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
-            <SelectContent className="bg-[#262626] border-[#3a3a35]">
+            <SelectContent className="bg-[#2C2C2C] border-[#3a3a35]">
               <SelectItem value="name" className="text-[#e5e5e5]">Name</SelectItem>
               <SelectItem value="city" className="text-[#e5e5e5]">City</SelectItem>
               <SelectItem value="rooms" className="text-[#e5e5e5]">Rooms</SelectItem>
@@ -653,7 +653,7 @@ export function PortfolioOverview() {
           <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
             title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
-            style={{ ...styles.iconButton, padding: '8px', border: '1px solid #3a3a35', backgroundColor: '#262626' }}
+            style={{ ...styles.iconButton, padding: '8px', border: '1px solid #3a3a35', backgroundColor: '#2C2C2C' }}
           >
             <ArrowUpDown style={{ width: '16px', height: '16px', color: '#9ca3af' }} />
           </button>

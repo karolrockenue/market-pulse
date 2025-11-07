@@ -18,7 +18,7 @@ export function DashboardControls({
   setComparisonMetric,
 }: DashboardControlsProps) {
   return (
-    <div className="bg-[#262626]/30 rounded border border-[#3a3a35]/50 p-3 flex items-center gap-4 flex-wrap">
+    <div className="bg-[#2C2C2C]/30 rounded border border-[#3a3a35]/50 p-3 flex items-center gap-4 flex-wrap">
       <div className="flex items-center gap-2">
         <label className="text-[#6b7280] text-xs">View:</label>
         <div className="flex gap-1">
@@ -46,7 +46,7 @@ export function DashboardControls({
           <SelectTrigger className="w-36 h-7 bg-[#3a3a35] border-[#4a4a45] text-[#e5e5e5] text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+          <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
             <SelectItem value="previous-month">Previous Month</SelectItem>
             <SelectItem value="current-month">Current Month</SelectItem>
             <SelectItem value="next-month">Next Month</SelectItem>
@@ -62,7 +62,7 @@ export function DashboardControls({
           <SelectTrigger className="w-32 h-7 bg-[#3a3a35] border-[#4a4a45] text-[#e5e5e5] text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+          <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
             <SelectItem value="occupancy">Occupancy</SelectItem>
             <SelectItem value="adr">ADR</SelectItem>
             <SelectItem value="revpar">RevPAR</SelectItem>

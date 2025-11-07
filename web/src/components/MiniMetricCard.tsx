@@ -9,7 +9,7 @@ interface MiniMetricCardProps {
 export function MiniMetricCard({ label, value, subtext, highlight, comingSoon }: MiniMetricCardProps) {
   return (
     // [MODIFIED] Add opacity if comingSoon is true
-    <div className={`bg-[#262626] rounded border border-[#3a3a35] p-3 ${comingSoon ? 'opacity-90' : ''}`}>
+    <div className={`bg-[#2C2C2C] rounded border border-[#3a3a35] p-3 ${comingSoon ? 'opacity-90' : ''}`}>
       {/* [MODIFIED] Add flex wrapper to hold label and badge */}
       <div className="flex items-center gap-1.5 mb-1">
         <div className="text-[#9ca3af] text-xs">{label}</div>

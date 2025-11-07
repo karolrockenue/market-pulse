@@ -127,7 +127,7 @@ onRemoveUser,
             onSave={onUpdateProfile}
           />
           
-          <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
             <h3 className="text-[#e5e5e5] mb-4">Authentication Method</h3>
             <div className="flex items-start gap-4 p-4 bg-[#1f1f1c] rounded">
               <div className="w-10 h-10 bg-[#faff6a]/10 rounded-full flex items-center justify-center flex-shrink-0">
@@ -163,7 +163,7 @@ onRemoveUser,
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
-          <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
             <h3 className="text-[#e5e5e5] mb-4">Email Notifications</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-[#3a3a35]">
@@ -228,7 +228,7 @@ onRemoveUser,
 
         {/* Integrations Tab */}
         <TabsContent value="integrations" className="space-y-6">
-          <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
             <h3 className="text-[#e5e5e5] mb-4">Connected Integrations</h3>
             
             <div className="space-y-3">
@@ -294,7 +294,7 @@ onRemoveUser,
               <p className="text-[#9ca3af] text-sm mb-4">
                 Contact our support team to request additional integrations for your property management workflow.
               </p>
-              <Button className="bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35]">
+              <Button className="bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35]">
                 Request Integration
               </Button>
             </div>

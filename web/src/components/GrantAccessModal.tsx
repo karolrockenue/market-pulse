@@ -23,7 +23,7 @@ export function GrantAccessModal({ open, onClose }: GrantAccessModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] max-w-md">
+      <DialogContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] max-w-md">
         <DialogHeader>
           <DialogTitle className="text-[#faff6a] text-xl">Grant Access</DialogTitle>
           <DialogDescription className="text-[#9ca3af]">
@@ -53,7 +53,7 @@ export function GrantAccessModal({ open, onClose }: GrantAccessModalProps) {
               <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue placeholder="Select property..." />
               </SelectTrigger>
-              <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectItem value="HTL001">Grand Plaza Hotel</SelectItem>
                 <SelectItem value="HTL002">Seaside Resort</SelectItem>
                 <SelectItem value="HTL003">Downtown Suites</SelectItem>

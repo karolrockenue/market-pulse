@@ -8,9 +8,9 @@
   --font-size: 14px;
   --background: #252521;
   --foreground: #e5e5e5;
-  --card: #262626;
+  --card: #2C2C2C;
   --card-foreground: #e5e5e5;
-  --popover: #262626;
+  --popover: #2C2C2C;
   --popover-foreground: #e5e5e5;
   --primary: #faff6a;
   --primary-foreground: #252521;
@@ -24,7 +24,7 @@
   --destructive-foreground: #ffffff;
   --border: #3a3a35;
   --input: #3a3a35;
-  --input-background: #262626;
+  --input-background: #2C2C2C;
   --switch-background: #3a3a35;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -39,7 +39,7 @@
   --sidebar-foreground: #e5e5e5;
   --sidebar-primary: #faff6a;
   --sidebar-primary-foreground: #252521;
-  --sidebar-accent: #262626;
+  --sidebar-accent: #2C2C2C;
   --sidebar-accent-foreground: #e5e5e5;
   --sidebar-border: #3a3a35;
   --sidebar-ring: #faff6a;

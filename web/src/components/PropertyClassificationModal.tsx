@@ -73,7 +73,7 @@ export function PropertyClassificationModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
 <DialogContent 
-        className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]" 
+        className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]" 
         style={{ maxWidth: '960px' }} // [FIX] Use inline style to bypass static CSS build issue
       >
         <DialogHeader>

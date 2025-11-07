@@ -136,7 +136,7 @@ const handleSave = () => {
     - in the static CSS build, so it must be applied as an inline style.
 */}
       <DialogContent 
-        className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]" 
+        className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]" 
         style={{ 
           maxWidth: '1200px',
           maxHeight: '90vh', 
@@ -173,7 +173,7 @@ const handleSave = () => {
                     value={reportName}
                     onChange={(e) => setReportName(e.target.value)}
                     placeholder="e.g., Weekly Performance Summary"
-                    className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]"
+                    className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
                   />
                 {/* [FIX] Increased top margin from mt-1.5 to mt-2 */}
                   <p className="text-[#6b7280] text-xs mt-2">This appears in email subject and filename</p>
@@ -184,10 +184,10 @@ const handleSave = () => {
                     Report Period
                   </label>
                   <Select value={reportPeriod} onValueChange={setReportPeriod}>
-                    <SelectTrigger className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                    <SelectTrigger className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                    <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                       <SelectItem value="previous-week">Previous Week (Mon-Sun)</SelectItem>
                       <SelectItem value="current-week">Current Week (Mon-Sun)</SelectItem>
                       <SelectItem value="previous-month">Previous Month (Full)</SelectItem>
@@ -216,10 +216,10 @@ const handleSave = () => {
                       Frequency
                     </label>
                     <Select value={frequency} onValueChange={setFrequency}>
-                      <SelectTrigger className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                      <SelectTrigger className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                      <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                         <SelectItem value="daily">Daily</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
@@ -236,7 +236,7 @@ const handleSave = () => {
                       type="time"
                       value={timeOfDay}
                       onChange={(e) => setTimeOfDay(e.target.value)}
-                      className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]"
+                      className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
                       // [FIX] Add step="300" (300 seconds = 5 minutes)
                       // This forces the time input to align with the 5-minute cron job in vercel.json.
                       step="300"
@@ -254,10 +254,10 @@ const handleSave = () => {
                       Day of Week
                     </label>
                     <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
-                      <SelectTrigger className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                      <SelectTrigger className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                      <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                         <SelectItem value="monday">Monday</SelectItem>
                         <SelectItem value="tuesday">Tuesday</SelectItem>
                         <SelectItem value="wednesday">Wednesday</SelectItem>
@@ -289,7 +289,7 @@ const handleSave = () => {
                   value={emailRecipients}
                   onChange={(e) => setEmailRecipients(e.target.value)}
                   placeholder="manager@hotel.com, owner@hotel.com"
-                  className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]"
+                  className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
                 />
          {/* [FIX] Increased top margin from mt-1.5 to mt-2 */}
                 <p className="text-[#6b7280] text-xs mt-2">
@@ -423,7 +423,7 @@ const handleSave = () => {
                 </div>
 
                 {/* What Happens Next */}
-                <div className="bg-[#262626] rounded-lg p-4 border border-[#3a3a35]">
+                <div className="bg-[#2C2C2C] rounded-lg p-4 border border-[#3a3a35]">
                   <h4 className="text-[#e5e5e5] mb-3 flex items-center gap-2">
                     <Info className="w-4 h-4 text-[#faff6a]" />
                     What happens next?

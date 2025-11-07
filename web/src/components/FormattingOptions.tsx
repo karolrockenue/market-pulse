@@ -32,7 +32,7 @@ export function FormattingOptions({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-9"
+          className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-9"
         >
           <Settings2 className="w-4 h-4 mr-2" />
           Formatting
@@ -43,7 +43,7 @@ export function FormattingOptions({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] w-80" align="end">
+      <PopoverContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] w-80" align="end">
         <div className="space-y-3">
           <h3 className="text-[#e5e5e5] text-sm mb-3">Formatting Options</h3>
           
@@ -92,7 +92,7 @@ export function FormattingOptions({
                 <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] text-sm h-9">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                   <SelectItem value="group-by-metric">Group by Metric</SelectItem>
                   <SelectItem value="group-by-source">Group by Source</SelectItem>
                 </SelectContent>

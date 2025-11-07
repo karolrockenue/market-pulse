@@ -21,13 +21,13 @@ interface UserManagementProps {
 // [MODIFIED] Destructure the 'users' prop and remove mock data
 export function UserManagement({ onInviteUser, onGrantAccess, onRemoveUser, users }: UserManagementProps) {
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
       <div className="px-6 py-4 border-b border-[#3a3a35] flex items-center justify-between">
         <h2 className="text-[#e5e5e5] text-lg">User Management</h2>
         <div className="flex gap-3">
           <Button
             onClick={onInviteUser}
-            className="bg-[#262626] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-9"
+            className="bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-9"
           >
             <UserPlus className="w-4 h-4 mr-2" />
             Invite User

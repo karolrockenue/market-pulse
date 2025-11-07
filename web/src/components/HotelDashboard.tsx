@@ -274,7 +274,7 @@ const trendData = data?.forwardDemandChartData || [];
         }}
       >
         {/* === Last Month Card === */}
-        <div className="bg-[#262626] rounded-lg border border-[#3a3a35] p-5">
+        <div className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-5">
           <div 
             style={{
               display: 'flex',
@@ -344,7 +344,7 @@ const trendData = data?.forwardDemandChartData || [];
         </div>
 
         {/* === Current Month MTD Card === */}
-        <div className="bg-[#262626] rounded-lg border border-[#3a3a35] p-5">
+        <div className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-5">
           <div 
             style={{
               display: 'flex',
@@ -414,7 +414,7 @@ const trendData = data?.forwardDemandChartData || [];
         </div>
 
         {/* === Next Month OTB Card === */}
-        <div className="bg-[#262626] rounded-lg border border-[#3a3a35] p-5">
+        <div className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-5">
           <div 
             style={{
               display: 'flex',
@@ -495,7 +495,7 @@ const trendData = data?.forwardDemandChartData || [];
         {/* Tile 2: 90-Day Market Demand */}
         <button
           onClick={() => onNavigate('demand-pace')} // [FIX] Navigate to correct page
-          className="bg-[#262626] rounded-lg border border-[#3a3a35] p-6 text-left hover:border-[#faff6a]/50 hover:shadow-[0_0_20px_rgba(250,255,106,0.15)] transition-all group"
+          className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-6 text-left hover:border-[#faff6a]/50 hover:shadow-[0_0_20px_rgba(250,255,106,0.15)] transition-all group"
         >
           <div 
             style={{
@@ -796,7 +796,7 @@ const trendData = data?.forwardDemandChartData || [];
         <div style={{ gridColumn: 'span 2' }}>
           <button
             onClick={() => onNavigate('youVsCompSet')} // [FIX] Navigate to correct page
-            className="w-full bg-[#262626] rounded-lg border border-[#3a3a35] p-6 text-left hover:border-[#faff6a]/50 hover:shadow-[0_0_20px_rgba(250,255,106,0.15)] transition-all group"
+            className="w-full bg-[#2C2C2C] rounded-lg border border-[#3a3a35] p-6 text-left hover:border-[#faff6a]/50 hover:shadow-[0_0_20px_rgba(250,255,106,0.15)] transition-all group"
           >
             <div 
               style={{

@@ -96,7 +96,7 @@ export function InsightsCard({ kpiData, currencyCode }: InsightsCardProps) {
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-3">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-3">
       <h3 className="text-[#e5e5e5] mb-3 text-sm">Your Hotel vs Comp Set</h3>
       <div className="space-y-2">
         {metrics.map((metric, index) => {

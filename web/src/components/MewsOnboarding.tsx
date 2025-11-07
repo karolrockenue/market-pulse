@@ -99,7 +99,7 @@ export function MewsOnboarding() { // Changed function name back to MewsOnboardi
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
       <h2 className="text-[#e5e5e5] text-lg mb-4">Mews Property Onboarding</h2>
 
       {/* Changed to 4 columns to fit all fields */}

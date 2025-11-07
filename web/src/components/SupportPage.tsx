@@ -116,7 +116,7 @@ return (
           {/* Main Form */}
           {/* [FIX] Main form now spans 8 of 12 columns */}
           <div className="col-span-8">
-   <Card className="bg-[#1a1a18] border-[#262626] p-6">
+   <Card className="bg-[#1a1a18] border-[#2C2C2C] p-6">
   {/* [REMOVED] The 'submitted' success screen is no longer needed; toasts handle this. */}
   <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Request Type Selection */}
@@ -135,7 +135,7 @@ return (
                             className={`p-4 rounded-lg border-2 transition-all ${
                               requestType === type.value
                                 ? 'border-[#faff6a] bg-[#faff6a]/5'
-                                : 'border-[#262626] bg-[#252521] hover:border-[#3a3a35]'
+                                : 'border-[#2C2C2C] bg-[#252521] hover:border-[#3a3a35]'
                             }`}
                           >
                             <Icon
@@ -168,7 +168,7 @@ return (
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="bg-[#252521] border-[#262626] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
                   </div>
 
@@ -190,7 +190,7 @@ return (
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       required
-                      className="bg-[#252521] border-[#262626] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
                   </div>
 
@@ -203,11 +203,11 @@ return (
                       <Select value={pmsType} onValueChange={setPmsType} required>
                         <SelectTrigger
                           id="pms-type"
-                          className="bg-[#252521] border-[#262626] text-[#e5e5e5]"
+                          className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5]"
                         >
                           <SelectValue placeholder="Select your PMS" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#1a1a18] border-[#262626] text-[#e5e5e5]">
+                        <SelectContent className="bg-[#1a1a18] border-[#2C2C2C] text-[#e5e5e5]">
                           {pmsOptions.map((pms) => (
                             <SelectItem key={pms} value={pms}>
                               {pms}
@@ -240,7 +240,7 @@ return (
                       onChange={(e) => setMessage(e.target.value)}
                       required
                       rows={6}
-                      className="bg-[#252521] border-[#262626] text-[#e5e5e5] placeholder:text-[#6b7280] resize-none"
+                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280] resize-none"
                     />
                   </div>
 {/* Submit Button */}
@@ -267,7 +267,7 @@ return (
           {/* [FIX] Sidebar now spans the remaining 4 of 12 columns */}
           <div className="col-span-4 space-y-6">
             {/* Direct Contact */}
-            <Card className="bg-[#1a1a18] border-[#262626] p-6">
+            <Card className="bg-[#1a1a18] border-[#2C2C2C] p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Mail className="w-5 h-5 text-[#faff6a]" />
                 <h3 className="text-[#e5e5e5]">Direct Contact</h3>
@@ -290,7 +290,7 @@ return (
             </Card>
 
             {/* Response Time */}
-            <Card className="bg-[#1a1a18] border-[#262626] p-6">
+            <Card className="bg-[#1a1a18] border-[#2C2C2C] p-6">
               <h3 className="text-[#e5e5e5] mb-3">Response Time</h3>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
@@ -315,7 +315,7 @@ return (
             </Card>
 
             {/* Popular Requests */}
-            <Card className="bg-[#1a1a18] border-[#262626] p-6">
+            <Card className="bg-[#1a1a18] border-[#2C2C2C] p-6">
               <h3 className="text-[#e5e5e5] mb-3">Popular Requests</h3>
               <ul className="space-y-2 text-sm text-[#9ca3af]">
                 <li className="flex items-start gap-2">

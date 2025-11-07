@@ -42,14 +42,14 @@ export function DataTable({ data, comparisonMetric, currencyCode }: DataTablePro
   return (
     // The main container now also serves as the scrollable area.
     <div
-      className="bg-[#262626] rounded border border-[#3a3a35] overflow-y-auto"
+      className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-y-auto"
       style={{ maxHeight: '500px' }}
     >
       {/* A single table is used for both the header and body. 
           'table-layout-fixed' is crucial for performance and consistent column widths. */}
       <table className="w-full" style={{ tableLayout: 'fixed' }}>
         {/* The 'thead' is now sticky. It will stay at the top of the scrolling container. */}
-        <thead className="sticky top-0 bg-[#262626] z-10">
+        <thead className="sticky top-0 bg-[#2C2C2C] z-10">
           <tr className="border-b border-[#3a3a35]">
             <th className="px-6 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Date</th>
             <th colSpan={3} className="px-6 py-3 text-center text-[#e5e5e5] text-xs uppercase tracking-wider border-l border-[#3a3a35]">

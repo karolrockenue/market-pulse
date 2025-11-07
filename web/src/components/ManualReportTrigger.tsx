@@ -59,7 +59,7 @@ const handleSendReport = async () => {
   };
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
       <h2 className="text-[#e5e5e5] text-lg mb-4">Manual Report Trigger</h2>
       
       <div className="flex gap-3 items-end">
@@ -71,7 +71,7 @@ const handleSendReport = async () => {
             <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
               <SelectValue placeholder="Choose a scheduled report..." />
             </SelectTrigger>
-     <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+     <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
               {/* Check if reports have loaded */}
               {reports.length === 0 ? (
                 <SelectItem value="loading" disabled>Loading reports...</SelectItem>

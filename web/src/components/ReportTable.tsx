@@ -69,7 +69,7 @@ export function ReportTable({
   // Render message if no data
   if (!data || data.length === 0) {
     return (
-      <div className="bg-[#262626] rounded border border-[#3a3a35] p-12 text-center">
+      <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-12 text-center">
         <div className="text-[#9ca3af] text-sm">
           No report data available. Click "Run Report" to generate.
         </div>
@@ -79,7 +79,7 @@ export function ReportTable({
 
   // Main component render
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
       {/* Header showing date range and granularity */}
       <div className="px-6 py-4 border-b border-[#3a3a35]">
         <div className="text-[#e5e5e5] text-sm">
@@ -92,9 +92,9 @@ export function ReportTable({
       {/* Scrollable table container */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-[#262626]">
+          <thead className="bg-[#2C2C2C]">
             <tr className="border-b border-[#3a3a35]">
-              <th className="px-6 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider sticky left-0 bg-[#262626]">
+              <th className="px-6 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider sticky left-0 bg-[#2C2C2C]">
                 Date
               </th>
               {selectedMetrics.map(metric => (
@@ -114,7 +114,7 @@ export function ReportTable({
           <tbody>{/* [FIX] No whitespace or comments after this tag */}
             {data.map((row, index) => (
               <tr key={index} className="border-t border-[#3a3a35] hover:bg-[#3a3a35]/30 transition-colors">
-                <td className="px-6 py-3 text-[#e5e5e5] text-xs sticky left-0 bg-[#262626]">
+                <td className="px-6 py-3 text-[#e5e5e5] text-xs sticky left-0 bg-[#2C2C2C]">
                   {new Date(row.period).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </td>
                 {selectedMetrics.map(metric => (

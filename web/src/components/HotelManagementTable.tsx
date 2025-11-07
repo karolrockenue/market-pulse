@@ -150,7 +150,7 @@ const [syncingHotelId, setSyncingHotelId] = useState<number | null>(null);
 
   // The static 'hotels' array has been removed.
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] overflow-hidden">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
       <div className="px-6 py-4 border-b border-[#3a3a35]">
         <h2 className="text-[#e5e5e5] text-lg">Hotel Management</h2>
       </div>
@@ -197,7 +197,7 @@ const [syncingHotelId, setSyncingHotelId] = useState<number | null>(null);
                     <SelectTrigger className="w-32 h-8 bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+                    <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                       {/* Map over the valid category list from the backend */}
                       {validCategories.map((cat) => (
                         <SelectItem key={cat} value={cat}>{cat}</SelectItem>
@@ -367,8 +367,8 @@ function GroupCombobox({ value, existingGroups, onChange, disabled }: GroupCombo
           <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-0 bg-[#262626] border-[#3a3a35]" align="start">
-        <Command className="bg-[#262626]">
+      <PopoverContent className="w-64 p-0 bg-[#2C2C2C] border-[#3a3a35]" align="start">
+        <Command className="bg-[#2C2C2C]">
           <CommandInput
             placeholder="Search or create group..."
             value={searchValue}

@@ -55,13 +55,13 @@ export function MetricSelector({ selectedMetrics, onToggleMetric }: MetricSelect
             <Button
               variant="outline"
               size="sm"
-              className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-7 text-xs"
+              className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-7 text-xs"
             >
               <ChevronDown className="w-3 h-3 mr-1" />
               Add Metrics
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5] w-80" align="start">
+          <PopoverContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] w-80" align="start">
             <div className="space-y-4">
               <div>
                 <h4 className="text-[#9ca3af] text-xs mb-2 uppercase tracking-wider">Hotel Metrics</h4>

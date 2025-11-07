@@ -39,7 +39,7 @@ isLoading, // Destructure the new prop
   ];
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
       <h3 className="text-[#e5e5e5] mb-4">Report Period</h3>
       
       <div className="grid grid-cols-4 gap-4 mb-4">
@@ -49,7 +49,7 @@ isLoading, // Destructure the new prop
             <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] text-sm">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+            <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
               {presets.map(preset => (
                 <SelectItem key={preset.value} value={preset.value}>{preset.label}</SelectItem>
               ))}
@@ -83,7 +83,7 @@ isLoading, // Destructure the new prop
             <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] text-sm">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+            <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
               <SelectItem value="daily">Daily</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>

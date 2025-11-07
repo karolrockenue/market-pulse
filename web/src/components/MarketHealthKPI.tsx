@@ -9,7 +9,7 @@ export function MarketHealthKPI({ status, change }: MarketHealthKPIProps) {
   const isUp = status === 'up';
 
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-3">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-3">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[#9ca3af] text-xs mb-1">Market Health</div>

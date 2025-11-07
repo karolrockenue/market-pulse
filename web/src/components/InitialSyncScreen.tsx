@@ -53,7 +53,7 @@ export function InitialSyncScreen() {
         </div>
 
         {/* Dynamic Status Text */}
-        <div className="bg-[#262626] rounded border border-[#3a3a35] p-4">
+        <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[#9ca3af] text-xs uppercase tracking-wider">Progress</span>
             <span className="text-[#faff6a] text-xs">Step {currentStep + 1} of {steps.length}</span>

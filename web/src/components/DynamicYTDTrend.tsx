@@ -37,7 +37,7 @@ export function DynamicYTDTrend({ onNavigate, data: propData }: DynamicYTDTrendP
   return (
     <button
       // The className prop is still valid for shadcn/ui components and interactivity
-      className="bg-[#262626] rounded-lg border border-[#3a3a35] w-full text-left hover:border-[#faff6a]/50 hover:shadow-[0_0_20px_rgba(250,255,106,0.15)] transition-all group"
+      className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] w-full text-left hover:border-[#faff6a]/50 hover:shadow-[0_0_20px_rgba(250,255,106,0.15)] transition-all group"
       // [FIX] Add inline style for padding
       style={{ padding: '24px' }}
 onClick={onNavigate ? () => onNavigate('reports') : undefined}

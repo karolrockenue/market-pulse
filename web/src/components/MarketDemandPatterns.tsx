@@ -35,7 +35,7 @@ export function MarketDemandPatterns({ patterns }: MarketDemandPatternsProps) {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   };
   return (
-    <div className="bg-[#262626] rounded border border-[#3a3a35] p-5">
+    <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5">
       <div className="mb-5">
         {/* [MODIFIED] Heading and sub-heading updated */}
         <h2 className="text-[#e5e5e5] text-lg mb-1">90-Day Planning Highlights</h2>

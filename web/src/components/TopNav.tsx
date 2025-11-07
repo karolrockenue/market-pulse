@@ -157,8 +157,8 @@ const showPropertySelector = activeView !== 'landing';
                           <DropdownMenuItem
                             key={child.value}
                             onSelect={() => onViewChange(child.value)}
-                            className={`focus:bg-[#262626] focus:text-[#faff6a] ${
-                              activeView === child.value ? 'bg-[#262626] text-[#faff6a]' : ''
+                            className={`focus:bg-[#2C2C2C] focus:text-[#faff6a] ${
+                              activeView === child.value ? 'bg-[#2C2C2C] text-[#faff6a]' : ''
                             }`}
                           >
                             <ChildIcon className="w-4 h-4 mr-2" />
@@ -204,10 +204,10 @@ const showPropertySelector = activeView !== 'landing';
           <>
             <div className="text-xs text-[#6b7280] mr-1">Property:</div>
             <Select value={property} onValueChange={onPropertyChange}>
-              <SelectTrigger className="w-56 h-9 bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectTrigger className="w-56 h-9 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a18] border-[#262626] text-[#e5e5e5]">
+              <SelectContent className="bg-[#1a1a18] border-[#2C2C2C] text-[#e5e5e5]">
      {properties.map((prop) => (
                   // Use the correct property name 'property_id' from the API data.
                   <SelectItem key={prop.property_id} value={prop.property_id.toString()}>
@@ -219,7 +219,7 @@ const showPropertySelector = activeView !== 'landing';
             <div className="h-6 w-px bg-[#3a3a35]" />
           </>
         )}
-<div className="text-xs text-[#9ca3af] bg-[#262626] px-3 py-1.5 rounded">
+<div className="text-xs text-[#9ca3af] bg-[#2C2C2C] px-3 py-1.5 rounded">
           {/* Check if the lastUpdatedAt prop is loaded */}
           {lastUpdatedAt ? (
     `Last updated: ${new Date(lastUpdatedAt).toLocaleString()}`
@@ -255,7 +255,7 @@ const showPropertySelector = activeView !== 'landing';
 {/* [NEW] Add menu items that use the onViewChange prop to navigate */}
    {/* [NEW] Add Settings link to dropdown */}
             <DropdownMenuItem
-              className="focus:bg-[#262626] focus:text-[#faff6a]"
+              className="focus:bg-[#2C2C2C] focus:text-[#faff6a]"
               onSelect={() => onViewChange('settings')}
             >
               <Settings className="w-4 h-4 mr-2" />
@@ -264,7 +264,7 @@ const showPropertySelector = activeView !== 'landing';
 
             {/* [FIX] Re-enabled the Support menu item */}
             <DropdownMenuItem
-              className="focus:bg-[#262626] focus:text-[#faff6a]"
+              className="focus:bg-[#2C2C2C] focus:text-[#faff6a]"
               onSelect={() => onViewChange('support')}
             >
               <LifeBuoy className="w-4 h-4 mr-2" />
@@ -272,7 +272,7 @@ const showPropertySelector = activeView !== 'landing';
             </DropdownMenuItem>{/* [NEW] Add menu items that use the onViewChange prop to navigate */}
   
           <DropdownMenuItem
-              className="focus:bg-[#262626] focus:text-[#faff6a]"
+              className="focus:bg-[#2C2C2C] focus:text-[#faff6a]"
               onSelect={() => onViewChange('privacy')}
             >
               {/* [FIX] Changed from FileShield to Shield */}
@@ -280,7 +280,7 @@ const showPropertySelector = activeView !== 'landing';
               <span>Privacy Policy</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="focus:bg-[#262626] focus:text-[#faff6a]"
+              className="focus:bg-[#2C2C2C] focus:text-[#faff6a]"
               onSelect={() => onViewChange('terms')}
             >
               {/* [FIX] Changed from FileTextIcon to FileText */}

@@ -488,10 +488,10 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
           <div className="flex items-center gap-3">
             <span className="text-[#9ca3af] text-sm">Compare:</span>
             <Select value={year1} onValueChange={setYear1} disabled={isLoading}>
-              <SelectTrigger className="w-24 h-9 bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectTrigger className="w-24 h-9 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 {availableYears.map(year => (
                   <SelectItem key={year} value={year}>{year}</SelectItem>
                 ))}
@@ -499,10 +499,10 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
             </Select>
             <span className="text-[#9ca3af]">vs</span>
             <Select value={year2} onValueChange={setYear2} disabled={isLoading}>
-              <SelectTrigger className="w-24 h-9 bg-[#262626] border-[#3a3a35] text-[#faff6a]">
+              <SelectTrigger className="w-24 h-9 bg-[#2C2C2C] border-[#3a3a35] text-[#faff6a]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#262626] border-[#3a3a35] text-[#e5e5e5]">
+              <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
                 {availableYears.map(year => (
                   <SelectItem key={year} value={year}>{year}</SelectItem>
                 ))}
@@ -528,7 +528,7 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
                   className={`px-3 py-1.5 rounded text-sm transition-all ${
                     selectedDeltaMetric === metric.id
                       ? 'bg-[#faff6a] text-[#1f1f1c]'
-                      : 'bg-[#262626] text-[#9ca3af] hover:text-[#e5e5e5] hover:bg-[#3a3a35]'
+                      : 'bg-[#2C2C2C] text-[#9ca3af] hover:text-[#e5e5e5] hover:bg-[#3a3a35]'
                   }`}
                   disabled={isLoading}
                 >
@@ -546,7 +546,7 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
       </div>
 
       {/* Detailed Table - [MODIFIED] to use 'reportData' and formatted currency */}
-      <div className="bg-[#262626] rounded-lg border border-[#3a3a35] overflow-hidden">
+      <div className="bg-[#2C2C2C] rounded-lg border border-[#3a3a35] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -584,7 +584,7 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
               <tr 
                 className="border-b border-[#3a3a35] hover:bg-[#2a2a25] transition-colors"
                   >
-                    <td className="px-4 py-3 text-[#e5e5e5] text-sm sticky left-0 z-10 bg-[#262626]">
+                    <td className="px-4 py-3 text-[#e5e5e5] text-sm sticky left-0 z-10 bg-[#2C2C2C]">
                       {data.month}
                     </td>
                     
