@@ -70,12 +70,13 @@ export function TopNav({ activeView, onViewChange, property, onPropertyChange, p
   };
 const allNavItems = [
     { label: 'Dashboard', value: 'dashboard', icon: LayoutDashboard, isAdmin: false },
-    { label: 'You vs. Comp Set', value: 'youVsCompSet', icon: Sliders, isAdmin: false }, // [NEW] Link to the old dashboard
     { label: 'Reports', value: 'reports', icon: FileText, isAdmin: false },
-    
+
     // [NEW] "Planning" items are now top-level.
     { label: 'Budget', value: 'budget', icon: ClipboardList, isAdmin: false },
     { label: 'Demand & Pace', value: 'demand-pace', icon: BarChart3, isAdmin: false },
+
+    { label: 'You vs. Comp Set', value: 'youVsCompSet', icon: Sliders, isAdmin: false }, // [MOVED] Link to the old dashboard
 
     // [REMOVED] "Market Overview" has been deleted.
 
