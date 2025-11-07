@@ -1426,30 +1426,20 @@ const result = await pgPool.query(updateQuery);
       return res.status(404).json({ error: "Hotel not found." });
     }
 
-    // --- [NEW] Instant Sync Logic ---
-    // If the field updated was 'is_rockenue_managed' AND the new value is 'true',
-    // immediately run the sync logic for this single hotel.
+   // --- [NEW] Instant Sync Logic (v2) ---
+    // This logic instantly adds or removes a hotel from the Rockenue assets
+    // table when the 'is_rockenue_managed' toggle is changed.
+    
     if (field === 'is_rockenue_managed' && value === true) {
+      // --- ADD TO ASSETS ---
       console.log(`[Admin Sync] Toggle set to true for ${hotelId}. Running instant Rockenue sync...`);
       
-      // This is the sync query from sync-rockenue-assets.js,
-      // but targeted at this one specific hotel.
       const syncQuery = `
         INSERT INTO rockenue_managed_assets (
-            market_pulse_hotel_id, 
-            asset_name, 
-            city, 
-            total_rooms, 
-            management_group,
-            monthly_fee
+            market_pulse_hotel_id, asset_name, city, total_rooms, management_group, monthly_fee
         )
         SELECT 
-            h.hotel_id::text, 
-            h.property_name, 
-            h.city, 
-            h.total_rooms, 
-            h.management_group,
-            0.00 -- Default monthly_fee
+            h.hotel_id::text, h.property_name, h.city, h.total_rooms, h.management_group, 0.00
         FROM 
             hotels h
         LEFT JOIN 
@@ -1460,8 +1450,6 @@ const result = await pgPool.query(updateQuery);
             AND rma.market_pulse_hotel_id IS NULL; -- Only insert if missing
       `;
       
-      // We run this query but don't stop the main request.
-      // We log the result for debugging.
       try {
         const syncResult = await pgPool.query(syncQuery, [hotelId]);
         if (syncResult.rowCount > 0) {
@@ -1470,8 +1458,27 @@ const result = await pgPool.query(updateQuery);
           console.log(`[Admin Sync] Hotel ${hotelId} was already synced. No changes made.`);
         }
       } catch (syncError) {
-        // If this fails, log it, but don't fail the main API call
         console.error(`[Admin Sync] CRITICAL: Failed to auto-sync hotel ${hotelId} to Rockenue assets:`, syncError);
+      }
+
+    } else if (field === 'is_rockenue_managed' && value === false) {
+      // --- [NEW] REMOVE FROM ASSETS ---
+      console.log(`[Admin Sync] Toggle set to false for ${hotelId}. Removing from Rockenue assets...`);
+      
+      const deleteQuery = `
+        DELETE FROM rockenue_managed_assets
+        WHERE market_pulse_hotel_id = $1::text;
+      `;
+      
+      try {
+        const deleteResult = await pgPool.query(deleteQuery, [hotelId]);
+        if (deleteResult.rowCount > 0) {
+          console.log(`[Admin Sync] Successfully removed hotel ${hotelId} from rockenue_managed_assets.`);
+        } else {
+          console.log(`[Admin Sync] Hotel ${hotelId} was not in Rockenue assets. No changes made.`);
+        }
+      } catch (deleteError) {
+        console.error(`[Admin Sync] CRITICAL: Failed to remove hotel ${hotelId} from Rockenue assets:`, deleteError);
       }
     }
     // --- [END] Instant Sync Logic ---
