@@ -228,10 +228,11 @@ market-pulse/
 │   │   ├── planning.router.js   \# \[NEW\] 
 │   ├── utils/  
 │   │   ├── db.js                \# PostgreSQL connection pool 
-│   │   ├── benchmark.utils.js           \# Single source of truth for pacing benchmarks 
-│   │   ├── market-codex.utils.js
+│   │   ├── benchmark.utils.js   \# Single source of truth for pacing benchmarks 
+│   │   ├── market-codex.utils.js \# Logic hub for market demand/MPSS
+│   │   ├── pacing.utils.js      \# [NEW] Logic hub for dashboard/budget pacing status
 │   │   ├── emailTemplates.js    \# \[NEW\] HTML for magic link email  
-│   │   └── middleware.js        \# Auth & role-based middleware  
+│   │   └── middleware.js        \# Auth & role-based middleware
 │   ├── daily-refresh.js         \# CRON: Syncs 365-day forecast  
 │   ├── initial-sync.js          \# JOB: Syncs 5-year history  
 │   ├── send-scheduled-reports.js \# CRON: Generates & emails reports  
@@ -413,7 +414,8 @@ This section documents internal scripts used by developers for data management a
   * A private rockenue\_managed\_assets table was created to serve as a financial ledger, allowing super\_admin users to track monthly\_fee for both "Live" Market Pulse properties and **"Off-Platform" assets** that are not part of the main application.  
 * **16.0: React Migration & Monorepo Deployment (Oct 2025):** The original Alpine.js /public folder was replaced with a new /web React application. The deployment architecture was pivoted to a single-server monorepo, where server.js acts as the single entry point, serving both the API and the static React index.html file.
 * **17.0: Unified Pacing Benchmark Logic (Nov 2025):** Resolved a critical bug where the Portfolio Risk Overview and Budgeting pages showed different risk statuses for the same property. The discrepancy was caused by two conflicting "sources of truth" for benchmark ADR (flawed L30D/SMLY logic vs. correct full-month-average logic).
-  * **Solution:** Created a new shared utility file, **/api/utils/benchmark.utils.js**, which contains the single, correct benchmark calculation (full-month average).
+* **Solution:** Created a new shared utility file, **/api/utils/benchmark.utils.js**, to house the single source of truth for benchmark data.
+  * **[EDIT]** This logic was later corrected to prioritize **Last 30 Days (L30D)** data as the primary benchmark. If L30D data is unavailable, it falls back to **Same Month Last Year (SMLY)**, and finally to a hard-coded default.
   * **Refactor:** Modified **/api/routes/portfolio.router.js** and **/api/routes/budgets.router.js** to remove all local benchmark logic and call this new shared utility, ensuring 100% consistency.
 
 * **18.0: Market Codex & "Demand & Pace" (Nov 2025):** Deployed the new "Demand & Pace" feature, a major initiative to provide live, forward-looking market intelligence. This involved several new architectural patterns:
@@ -463,6 +465,11 @@ This section documents internal scripts used by developers for data management a
     * **Unified Endpoint:** Created a new `GET /api/dashboard/summary` endpoint that fetches all dashboard data (Snapshots, YTD, Market, Ranks) in a single parallelized API call.
     * **View Routing:** Refactored `App.tsx` to make the new dashboard the default `'dashboard'` view and moved the legacy chart/table view to `'youVsCompSet'`.
     * **Logic Centralization:** Refactored the "Market Outlook" (Strengthening/Softening) logic out of both `planning.router.js` and `dashboard.router.js` and into a single, new function (`getMarketOutlook`) in the `api/utils/market-codex.utils.js` "Logic Hub" to ensure 100% consistency between the two pages.
+
+* **[NEW] 21.0: UI/Logic Consistency Fixes (Nov 2025):**
+    * **Logo & Favicon Refactor:** Replaced the dynamic JavaScript-based favicon (`Favicon.tsx`) with a static, embedded SVG in `index.html` to fix scaling/squishing issues. Replaced the nav bar's image logo with the correct text-based `( MARKET PULSE )` logo from the prototype, aligning it with `items-baseline` and pixel-nudging for visual perfection.
+    * **Pacing Logic Unification (Dashboard):** Centralized the "At Risk" / "On Target" logic for the Hotel Dashboard into the new `api/utils/pacing.utils.js` hub. This logic is now executed by the `GET /api/dashboard/summary` endpoint, removing all calculation responsibility from the `HotelDashboard.tsx` component and ensuring consistency.
+    * **Benchmark Logic Correction:** Corrected the core business logic in `api/utils/benchmark.utils.js`. The system now correctly prioritizes L30D data over SMLY data when calculating benchmarks, fixing a major logical flaw.
 
 ## **9.0 Frontend Architecture**
 

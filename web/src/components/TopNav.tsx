@@ -222,8 +222,7 @@ const showPropertySelector = activeView !== 'landing';
 <div className="text-xs text-[#9ca3af] bg-[#262626] px-3 py-1.5 rounded">
           {/* Check if the lastUpdatedAt prop is loaded */}
           {lastUpdatedAt ? (
-            // If loaded, create a Date object and format it to a time string
-            `Last updated: ${new Date(lastUpdatedAt).toLocaleTimeString()}`
+    `Last updated: ${new Date(lastUpdatedAt).toLocaleString()}`
           ) : (
             // Otherwise, show a loading message
             'Loading update time...'

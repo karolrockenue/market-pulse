@@ -16,5 +16,19 @@
       "source": "/(.*)",
       "destination": "/server.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/daily-refresh",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/send-scheduled-reports",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/sync-rockenue-assets",
+      "schedule": "0 6 * * *"
+    }
   ]
 }
