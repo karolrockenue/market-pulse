@@ -235,22 +235,11 @@ router.get("/daily-refresh", requireAdminApi, async (req, res) => {
 // NEW: Route to manually trigger the initial sync job
 router.post(
   "/initial-sync",
-  // [THE FIX] Use the same internal secret auth as the /record-job-success route
-  (req, res, next) => {
-    const authHeader = req.headers["authorization"];
-    const expectedToken = `Bearer ${process.env.INTERNAL_API_SECRET}`;
-
-    if (authHeader !== expectedToken) {
-      console.error("[AUTH FAILURE] /initial-sync received invalid token.");
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    // Token is valid, proceed.
-    next();
-  },
+  requireAdminApi, // <-- [THE FIX] Use the correct session-based admin middleware
   async (req, res) => {
     // This handler now triggers the sync job
     try {
-      console.log("[INITIAL SYNC] Job triggered by authorized request...");
+      console.log("[INITIAL SYNC] Job triggered by authorized admin user...");
       // We call the handler directly, passing the request and response objects.
       // This handler will now run and eventually send its own response.
       await initialSyncHandler(req, res);
