@@ -33,27 +33,27 @@ router.get("/available-years", requireUserApi, async (req, res) => {
       return res.status(400).json({ error: "propertyId is required" });
     }
 
-    // --- Security Check ---
-    if (req.session.role !== "super_admin") {
-      const userResult = await pgPool.query(
-        "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-        [req.session.userId]
-      );
-      if (userResult.rows.length === 0) {
-        return res.status(403).json({ error: "Access denied: User not found." });
-      }
-      const internalUserId = userResult.rows[0].user_id;
-      const accessCheck = await pgPool.query(
-        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
-        [req.session.userId, internalUserId, propertyId]
-      );
-      if (accessCheck.rows.length === 0) {
-        return res
-          .status(403)
-          .json({ error: "Access denied to this property." });
-      }
-    }
-    // --- End Security Check ---
+// --- Security Check ---
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
+  const userResult = await pgPool.query(
+    "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+    [req.session.userId]
+  );
+  if (userResult.rows.length === 0) {
+    return res.status(403).json({ error: "Access denied: User not found." });
+  }
+  const internalUserId = userResult.rows[0].user_id;
+  const accessCheck = await pgPool.query(
+    "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3::integer",
+    [req.session.userId, internalUserId, propertyId]
+  );
+  if (accessCheck.rows.length === 0) {
+    return res
+      .status(403)
+      .json({ error: "Access denied to this property." });
+  }
+}
+// --- End Security Check ---
 
 // [MODIFIED] This query is now much smarter
     const query = `
