@@ -166,7 +166,7 @@ try {
       // Fetch historical metrics
       const taxRate = hotelDetailsResult.rows[0]?.tax_rate || 0;
       const pricingModel = hotelDetailsResult.rows[0]?.tax_type || "inclusive";
-  const totalRooms = hotelDetailsResult.rows[0]?.total_rooms; // <--
+const staticTotalRooms = hotelDetailsResult.rows[0]?.total_rooms;
 
       let allProcessedData = {};
       const startYear = new Date().getFullYear() - 5;
