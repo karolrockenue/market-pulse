@@ -166,7 +166,7 @@ try {
       // Fetch historical metrics
       const taxRate = hotelDetailsResult.rows[0]?.tax_rate || 0;
       const pricingModel = hotelDetailsResult.rows[0]?.tax_type || "inclusive";
-      const totalRooms = hotelDetailsResult.rows[0]?.total_rooms; // <-- ADDED
+  const totalRooms = hotelDetailsResult.rows[0]?.total_rooms; // <--
 
       let allProcessedData = {};
       const startYear = new Date().getFullYear() - 5;
@@ -289,7 +289,7 @@ try {
             date,
             propertyId,
             metrics.rooms_sold || 0,
-        totalRooms || metrics.capacity_count || 0, // <-- REPLACED: Prioritizes static total_rooms
+staticTotalRooms || metrics.capacity_count || 0, // <-- REPLACED: Uses non-conflicting variable
             metrics.occupancy || 0,
             user.cloudbeds_user_id,
             metrics.net_revenue || 0,
