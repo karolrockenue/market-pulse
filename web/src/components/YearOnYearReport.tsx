@@ -62,7 +62,7 @@ export const YearOnYearReport = forwardRef(({ propertyId, currencyCode }: YearOn
 
         // --- [NEW] Logic to set correct defaults ---
         // Get the project's current year from its "today" date (based on changelogs)
-        const projectToday = new Date('2025-10-21'); 
+     const projectToday = new Date(); // Use the actual current date
         const projectCurrentYear = projectToday.getFullYear(); // This will be 2025
 
         // Filter out any years that are in the future
@@ -153,7 +153,7 @@ const formatCurrencyDynamic = (value: number) => {
 };
 
   // Define the project's "current" date (October 2025)
-  const projectToday = new Date('2025-10-21');
+const projectToday = new Date(); // Use the actual current date
   const currentYear = projectToday.getFullYear().toString(); // "2025"
   // [FIX] Get the index of the *last complete month* (9 for October -> 8 for September)
   const lastCompleteMonthIndex = projectToday.getMonth() - 1; 
@@ -622,14 +622,14 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
                     </td>
           </tr>
 
-                  {currentPeriodSummary && data.month === lastCompleteMonthName && (
+               
+</React.Fragment>
+          ))}
+            {currentPeriodSummary && (
                     <tr className="border-b border-[#3a/35]" style={{ backgroundColor: 'rgba(31, 31, 28, 0.8)' }}>
-                      <td className="px-4 py-3 text-[#e5e5e5] text-sm sticky left-0 z-10 relative" style={{ backgroundColor: 'rgba(31, 31, 28, 0.8)' }}>
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#9ca3af]" />
-                        <div className="pl-3">
-                          <strong>{currentPeriodSummary.periodLabel}</strong>
-                        </div>
-                      </td>
+   <td className="px-4 py-3 text-[#faff6a] text-sm sticky left-0 z-10" style={{ backgroundColor: 'rgba(31, 31, 28, 0.8)' }}>
+                    <strong>{currentPeriodSummary.periodLabel}</strong>
+                  </td>
                       
                       {/* Year 1 YTD - with new background class */}
                       <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm border-l-2 border-[#3a3a35] ${getColumnHighlight('occupancy')}`} style={{ backgroundColor: 'rgba(31, 31, 28, 0.6)' }}>
@@ -665,8 +665,6 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
                       </td>
                     </tr>
                   )}
-</React.Fragment>
-          ))}
 
           {/* The "Full Year" row remains at the bottom */}
           <tr className="border-t-2 border-[#faff6a]/30 bg-[#1f1f1c]">
@@ -681,12 +679,12 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
                 <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('adr')}`}>
                   <strong>{formatCurrency(summary.avg1.adr)}</strong>
                 </td>
-                <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('revpar')}`}>
-                  <strong>{formatCurrency(summary.avg1.revpar)}</strong>
-                </td>
-                <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('revenue')}`}>
-                  <strong>{formatCurrencyDynamic(summary.total1.revenue)}</strong>
-                </td>
+            <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('revpar')}`}>
+              <strong>{formatCurrency(summary.avg1.revpar)}</strong>
+            </td>
+            <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm`}>
+              <strong>{formatCurrencyDynamic(summary.total1.revenue)}</strong>
+            </td>
                 
                 {/* Year 2 Averages/Totals */}
                 <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm border-l-2 border-[#3a3a35] ${getColumnHighlight('occupancy')}`}>
@@ -695,12 +693,12 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
                 <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('adr')}`}>
                   <strong>{formatCurrency(summary.avg2.adr)}</strong>
                 </td>
-                <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('revpar')}`}>
-                  <strong>{formatCurrency(summary.avg2.revpar)}</strong>
-                </td>
-                <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('revenue')}`}>
-                  <strong>{formatCurrencyDynamic(summary.total2.revenue)}</strong>
-                </td>
+          <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm ${getColumnHighlight('revpar')}`}>
+              <strong>{formatCurrency(summary.avg2.revpar)}</strong>
+            </td>
+            <td className={`px-3 py-3 text-center text-[#e5e5e5] text-sm`}>
+              <strong>{formatCurrencyDynamic(summary.total2.revenue)}</strong>
+            </td>
                 
                 {/* Delta Total/Average */}
                 <td className="px-3 py-3 text-center border-l-2 border-[#3a3a35]">
