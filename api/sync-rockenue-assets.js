@@ -24,13 +24,7 @@ module.exports = async (req, res) => {
  client = await db.connect(); // Get a client from our db.js pool
     console.log('Running daily Rockenue asset sync...');
 
-    // This is the core logic.
-    // It finds all 'hotel_id's from 'hotels' where 'is_rockenue_managed' is true
-    // AND that 'hotel_id' does not already exist in 'rockenue_managed_assets'.
-    //
-    // It then inserts the missing hotels into 'rockenue_managed_assets'
-    // with a default 'monthly_fee' of 0.
-    const query = `
+const query = `
       INSERT INTO rockenue_managed_assets (
           market_pulse_hotel_id, 
           asset_name, 
@@ -40,14 +34,15 @@ module.exports = async (req, res) => {
           monthly_fee
       )
       SELECT 
-          h.hotel_id, 
+          h.hotel_id::text, -- [FIX 2] Cast integer ID to text for insertion
           h.property_name, 
           h.city, 
           h.total_rooms, 
           h.management_group,
           0.00 -- Default monthly_fee
       FROM 
-LEFT JOIN 
+          hotels h -- [FIX 1] Added the 'hotels h' table here
+      LEFT JOIN 
           rockenue_managed_assets rma ON h.hotel_id = rma.market_pulse_hotel_id::integer
       WHERE 
           h.is_rockenue_managed = true 
