@@ -22,21 +22,23 @@ module.exports = async (request, response) => {
     // It also fetches the pms_type and timezone needed for branching.
     const propertiesResult = await pgPool.query(
       // /api/daily-refresh.js
+// /api/daily-refresh.js
 
-      "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type FROM hotels"
+      "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
     );
     const allProperties = propertiesResult.rows;
     console.log(`Found ${allProperties.length} properties to process.`);
 
     // Step 2: Loop through each property.
     for (const hotel of allProperties) {
-      const {
+  const {
         hotel_id,
         property_name,
         pms_type,
         timezone,
         tax_rate,
         tax_type,
+        total_rooms, // <-- ADDED
       } = hotel;
       console.log(
         `--- Processing: ${property_name} (ID: ${hotel_id}, PMS: ${pms_type}) ---`
@@ -205,7 +207,7 @@ module.exports = async (request, response) => {
               date,
               hotel_id,
               metrics.rooms_sold || 0,
-              metrics.capacity_count || 0,
+    total_rooms || metrics.capacity_count || 0, // <-- REPLACED: Prioritizes static total_rooms
               cloudbedsUserId, // Legacy column
               metrics.net_revenue || 0,
               metrics.gross_revenue || 0,
