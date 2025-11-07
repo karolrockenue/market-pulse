@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
 
   let client;
   try {
-    client = await db.getClient(); // Get a client from our db.js pool
+ client = await db.connect(); // Get a client from our db.js pool
     console.log('Running daily Rockenue asset sync...');
 
     // This is the core logic.
