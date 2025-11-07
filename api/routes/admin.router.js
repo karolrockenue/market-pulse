@@ -18,6 +18,8 @@ const dailyRefreshHandler = require("../daily-refresh.js");
 const initialSyncHandler = require("../initial-sync.js");
 // NEW: Import the handler for the scheduled reports job.
 const scheduledReportsHandler = require("../send-scheduled-reports.js");
+// [NEW] Import the Rockenue asset sync handler
+const rockenueSyncHandler = require("../sync-rockenue-assets.js");
 
 // Add this line with the other require statements
 
@@ -276,6 +278,20 @@ router.post("/run-scheduled-report", requireAdminApi, async (req, res) => {
   // The handler will see the reportId in the req.body and run the
   // logic for a single report.
   await scheduledReportsHandler(req, res);
+});
+
+// [NEW] Route to manually trigger the Rockenue asset sync job
+router.get("/sync-rockenue-assets", requireAdminApi, async (req, res) => {
+  console.log("Admin panel manually triggering Rockenue asset sync...");
+  try {
+    // [FIX] Use the 'rockenueSyncHandler' variable we imported at the top
+    await rockenueSyncHandler(req, res);
+  } catch (error) {
+    console.error("Failed to manually trigger Rockenue asset sync:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to start sync handler." });
+    }
+  }
 });
 
 // /api/routes/admin.router.js
