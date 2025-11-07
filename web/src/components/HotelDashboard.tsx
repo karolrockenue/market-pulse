@@ -323,7 +323,7 @@ const trendData = data?.forwardDemandChartData || [];
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
-              <div className="text-[#e5e5e5] text-2xl">£{snapshot.lastMonth.revenue.toLocaleString()}</div>
+ <div className="text-[#e5e5e5] text-2xl">£{snapshot.lastMonth.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
           </div>
           <div 
@@ -393,7 +393,7 @@ const trendData = data?.forwardDemandChartData || [];
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
-              <div className="text-[#e5e5e5] text-2xl">£{snapshot.currentMonth.revenue.toLocaleString()}</div>
+<div className="text-[#e5e5e5] text-2xl">£{snapshot.currentMonth.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
           </div>
           <div 
@@ -463,7 +463,7 @@ const trendData = data?.forwardDemandChartData || [];
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
-              <div className="text-[#e5e5e5] text-2xl">£{snapshot.nextMonth.revenue.toLocaleString()}</div>
+ <div className="text-[#e5e5e5] text-2xl">£{snapshot.nextMonth.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
           </div>
           <div 
