@@ -1799,8 +1799,8 @@
     border-color: oklab(69.5873% -.142158 .0448781 / .3);
   }
 
-  .border-\[\#262626\] {
-    border-color: #262626;
+  .border-\[\#2C2C2C\] {
+    border-color: #2C2C2C;
   }
 
   .border-\[\#ef4444\] {
@@ -1967,11 +1967,11 @@
     background-color: #252521;
   }
 
-  .bg-\[\#262626\] {
-    background-color: #262626;
+  .bg-\[\#2C2C2C\] {
+    background-color: #2C2C2C;
   }
 
-  .bg-\[\#262626\]\/50 {
+  .bg-\[\#2C2C2C\]\/50 {
     background-color: oklab(26.8618% 4.47035e-8 0 / .5);
   }
 
@@ -2187,8 +2187,8 @@
     --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
   }
 
-  .to-\[\#262626\] {
-    --tw-gradient-to: #262626;
+  .to-\[\#2C2C2C\] {
+    --tw-gradient-to: #2C2C2C;
     --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
   }
 
@@ -3199,19 +3199,19 @@
   }
 
   @media (hover: hover) {
-    .hover\:bg-\[\#262626\]:hover {
-      background-color: #262626;
+    .hover\:bg-\[\#2C2C2C\]:hover {
+      background-color: #2C2C2C;
     }
   }
 
   @media (hover: hover) {
-    .hover\:bg-\[\#262626\]\/30:hover {
+    .hover\:bg-\[\#2C2C2C\]\/30:hover {
       background-color: oklab(26.8618% 4.47035e-8 0 / .3);
     }
   }
 
   @media (hover: hover) {
-    .hover\:bg-\[\#262626\]\/50:hover {
+    .hover\:bg-\[\#2C2C2C\]\/50:hover {
       background-color: oklab(26.8618% 4.47035e-8 0 / .5);
     }
   }
@@ -3412,8 +3412,8 @@
     background-color: #3a3a35;
   }
 
-  .focus\:bg-\[\#262626\]:focus {
-    background-color: #262626;
+  .focus\:bg-\[\#2C2C2C\]:focus {
+    background-color: #2C2C2C;
   }
 
   .focus\:bg-accent:focus {
@@ -4163,9 +4163,9 @@
   --font-size: 14px;
   --background: #252521;
   --foreground: #e5e5e5;
-  --card: #262626;
+  --card: #2C2C2C;
   --card-foreground: #e5e5e5;
-  --popover: #262626;
+  --popover: #2C2C2C;
   --popover-foreground: #e5e5e5;
   --primary: #faff6a;
   --primary-foreground: #252521;
@@ -4179,7 +4179,7 @@
   --destructive-foreground: #fff;
   --border: #3a3a35;
   --input: #3a3a35;
-  --input-background: #262626;
+  --input-background: #2C2C2C;
   --switch-background: #3a3a35;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -4194,7 +4194,7 @@
   --sidebar-foreground: #e5e5e5;
   --sidebar-primary: #faff6a;
   --sidebar-primary-foreground: #252521;
-  --sidebar-accent: #262626;
+  --sidebar-accent: #2C2C2C;
   --sidebar-accent-foreground: #e5e5e5;
   --sidebar-border: #3a3a35;
   --sidebar-ring: #faff6a;
