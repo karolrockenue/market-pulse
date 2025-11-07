@@ -58,15 +58,19 @@ interface HotelDashboardProps {
   data: DashboardData | null;
   isLoading: boolean;
 }
-// [NEW] Internal helper component for rendering revenue budget pacing
-// [NEW] Internal helper component for rendering revenue budget pacing
+
+
+
+// [REFACTORED] Internal helper component for rendering revenue budget pacing
 function RevenuePacingDisplay({
   currentRevenue,
   targetRevenue,
+  pacingStatus, // [NEW] Accept the status object from the API
   onNavigate,
 }: {
   currentRevenue: number;
   targetRevenue: number | null;
+  pacingStatus: { statusTier: string; statusText: string } | null; // [NEW] Define prop type
   onNavigate: () => void;
 }) {
   // Case 1: Budget is not configured (targetRevenue is null or 0)
@@ -83,15 +87,20 @@ function RevenuePacingDisplay({
   }
 
   // Case 2: Budget is configured
-  // 1. Calculate pacing and deltas
+  // 1. Calculate pacing
   const pacePercent = (currentRevenue / targetRevenue) * 100;
-  const deltaAmount = currentRevenue - targetRevenue;
   
-  // 2. Determine labels and colors
-  const statusLabel = deltaAmount >= 0 ? "On Target" : "Off Target";
-  const color = deltaAmount >= 0 ? '#10b981' : '#ef4444'; // Green or Red
+  // 2. [NEW] Determine labels and colors from the API-driven pacingStatus
+  const statusLabel = pacingStatus?.statusText || '...';
+  let color = '#9ca3af'; // Default color
+  if (pacingStatus?.statusTier === 'green') color = '#10b981';
+  if (pacingStatus?.statusTier === 'yellow') color = '#f59e0b'; // Use the budget page's yellow
+  if (pacingStatus?.statusTier === 'red') color = '#ef4444';
   
   const formattedTarget = `£${targetRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  
+  // [NEW] Calculate delta for display, but it no longer controls the logic
+  const deltaAmount = currentRevenue - targetRevenue;
   const formattedDelta = `£${Math.abs(deltaAmount).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   return (
@@ -119,29 +128,26 @@ function RevenuePacingDisplay({
           backgroundColor: '#1a1a18', // Bar background
           overflow: 'hidden',
           marginBottom: '4px',
-          // [FIX] Add 2px top/bottom markings (border)
           borderTop: '2px solid #3a3a35',
           borderBottom: '2px solid #3a3a35',
-          // Adjust height to account for borders
-          height: '12px', // 8px bar + 4px border
+          height: '12px',
           display: 'flex',
           alignItems: 'center',
-          padding: '2px 0', // Visual padding inside borders
+          padding: '2px 0',
         }}
       >
         <div
-          className="h-2 rounded-full" // This is the inner bar
+          className="h-2 rounded-full"
           style={{
             width: `${Math.min(pacePercent, 100)}%`,
-            // [FIX] Use the correct fill color from prototype
             backgroundColor: '#9DA3AF', 
             transition: 'width 0.5s',
-            height: '8px', // Bar height
+            height: '8px',
           }}
         />
       </div>
       
-      {/* Row 3: Status vs Delta */}
+      {/* Row 3: [REFACTORED] Status vs Delta */}
       <div
         style={{
           display: 'flex',
@@ -153,7 +159,7 @@ function RevenuePacingDisplay({
           className="text-xs"
           style={{ color: color, fontWeight: 500 }}
         >
-          {statusLabel}
+          {statusLabel} 
         </div>
         <div
           className="text-xs"
@@ -168,13 +174,13 @@ function RevenuePacingDisplay({
 
 export function HotelDashboard({ onNavigate, data, isLoading }: HotelDashboardProps) {
 
-  // [NEW] Get data from props, with fallbacks for loading state
+// [NEW] Get data from props, with fallbacks for loading state
 // [NEW] Get data from props, with fallbacks for loading state
 // [NEW] Get data from props, with fallbacks for loading state
   const snapshot = data?.snapshot || {
-    lastMonth: { label: '...', revenue: 0, occupancy: 0, adr: 0, yoyChange: 0, targetRevenue: null },
-    currentMonth: { label: '...', revenue: 0, occupancy: 0, adr: 0, yoyChange: 0, targetRevenue: null },
-    nextMonth: { label: '...', revenue: 0, occupancy: 0, adr: 0, yoyChange: 0, targetRevenue: null },
+    lastMonth: { label: '...', revenue: 0, occupancy: 0, adr: 0, yoyChange: 0, targetRevenue: null, pacingStatus: null },
+    currentMonth: { label: '...', revenue: 0, occupancy: 0, adr: 0, yoyChange: 0, targetRevenue: null, pacingStatus: null },
+    nextMonth: { label: '...', revenue: 0, occupancy: 0, adr: 0, yoyChange: 0, targetRevenue: null, pacingStatus: null },
   };
 
   const marketOutlook = data?.marketOutlook || {
@@ -329,10 +335,11 @@ const trendData = data?.forwardDemandChartData || [];
 >
             <div className="text-[#6b7280] text-xs mb-2">Budget</div>
 <RevenuePacingDisplay
-              currentRevenue={snapshot.lastMonth.revenue}
-              targetRevenue={snapshot.lastMonth.targetRevenue}
-              onNavigate={() => onNavigate('budget')}
-            />
+  currentRevenue={snapshot.lastMonth.revenue}
+  targetRevenue={snapshot.lastMonth.targetRevenue}
+  pacingStatus={snapshot.lastMonth.pacingStatus}
+  onNavigate={() => onNavigate('budget')}
+/>
           </div>
         </div>
 
@@ -397,11 +404,12 @@ const trendData = data?.forwardDemandChartData || [];
             }}
 >
             <div className="text-[#6b7280] text-xs mb-2">Budget</div>
-      <RevenuePacingDisplay
-              currentRevenue={snapshot.currentMonth.revenue}
-              targetRevenue={snapshot.currentMonth.targetRevenue}
-              onNavigate={() => onNavigate('budget')}
-            />
+<RevenuePacingDisplay
+  currentRevenue={snapshot.currentMonth.revenue}
+  targetRevenue={snapshot.currentMonth.targetRevenue}
+  pacingStatus={snapshot.currentMonth.pacingStatus}
+  onNavigate={() => onNavigate('budget')}
+/>
           </div>
         </div>
 
@@ -466,11 +474,12 @@ const trendData = data?.forwardDemandChartData || [];
             }}
           >
             <div className="text-[#6b7280] text-xs mb-2">Budget</div>
-     <RevenuePacingDisplay
-              currentRevenue={snapshot.nextMonth.revenue}
-              targetRevenue={snapshot.nextMonth.targetRevenue}
-              onNavigate={() => onNavigate('budget')}
-            />
+<RevenuePacingDisplay
+  currentRevenue={snapshot.nextMonth.revenue}
+  targetRevenue={snapshot.nextMonth.targetRevenue}
+  pacingStatus={snapshot.nextMonth.pacingStatus}
+  onNavigate={() => onNavigate('budget')}
+/>
           </div>
         </div>
       </div>

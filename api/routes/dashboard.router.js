@@ -10,7 +10,8 @@ const { requireUserApi } = require("../utils/middleware");
 const { getBenchmarks } = require("../utils/benchmark.utils.js");
 const { 
   calculatePriceIndex, 
-  calculateMarketDemand 
+  calculateMarketDemand,
+  getMarketOutlook // [NEW] Import the refactored function
 } = require("../utils/market-codex.utils.js");
 const { format, subMonths, addMonths, getYear, getMonth, startOfMonth, endOfMonth, parseISO } = require('date-fns');
 
@@ -20,6 +21,12 @@ const getPeriod = (granularity) => {
   if (granularity === "weekly") return "date_trunc('week', stay_date)";
   return "stay_date";
 };
+
+// [NEW] Import the new pacing logic hub
+const { 
+  calculatePacingStatus, 
+  getDaysInMonth 
+} = require("../utils/pacing.utils.js");
 
 // --- USER PROFILE API ENDPOINTS ---
 router.get("/user/profile", requireUserApi, async (req, res) => {
@@ -1034,8 +1041,7 @@ if (req.session.role !== "super_admin" && req.session.role !== "admin") {
     res.status(500).json({ error: "Failed to fetch dashboard chart data." });
   }
 });
-
-// --- [NEW] UNIFIED HOTEL DASHBOARD ENDPOINT ---
+// --- [NEW] UNIFIED HOTEL DASHBOARD ENDPOINT (V2 - WITH PACING LOGIC) ---
 router.get("/dashboard/summary", requireUserApi, async (req, res) => {
   // Prevent API response caching
   res.set({
@@ -1069,25 +1075,27 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
   }
   // --- End Security Check ---
 
-try {
-    console.log(`[DEBUG] /summary START: propertyId=${propertyId}, city=${city}`);
+  try {
+    console.log(`[API /summary] START: propertyId=${propertyId}, city=${city}`);
+    
+    // --- Date Definitions ---
     const today = new Date(); // Use server's UTC date
+    const lastMonthDate = subMonths(today, 1);
+    const nextMonthDate = addMonths(today, 1);
     const citySlug = city.toLowerCase();
 
-  // [NEW] Define years for YTD Trend
+    // Define years for YTD Trend
     const currentYear = today.getFullYear();
     const lastYear = currentYear - 1;
 
-    // --- 1. PERFORMANCE SNAPSHOT ---
-
-    // --- 1. PERFORMANCE SNAPSHOT ---
-    // Get data for Last Month, Current Month, Next Month, and their YOY comps
+    // --- 1. PERFORMANCE SNAPSHOT (UPGRADED) ---
+    // Now fetches capacity and sold rooms needed for pacing logic
     const snapshotSql = `
       WITH MonthlyData AS (
         SELECT
           date_trunc('month', stay_date) AS month_start,
-          SUM(rooms_sold) AS rooms_sold,
-          SUM(capacity_count) AS capacity,
+          SUM(rooms_sold) AS total_sold_room_nights,
+          SUM(capacity_count) AS capacity_count,
           SUM(gross_revenue) AS revenue,
           AVG(gross_adr) AS adr,
           (SUM(rooms_sold)::numeric / NULLIF(SUM(capacity_count), 0)) AS occupancy
@@ -1098,59 +1106,17 @@ try {
         GROUP BY 1
       )
       SELECT
-        -- Use TO_CHAR for stable YYYY-MM formatting
         TO_CHAR(month_start, 'YYYY-MM') as period,
         occupancy,
         revenue,
-        adr
+        adr,
+        total_sold_room_nights,
+        capacity_count
       FROM MonthlyData;
     `;
 
-    // --- 2. MARKET OUTLOOK ---
-    // (Copied directly from planning.router.js)
-    const marketOutlookSql = `
-      WITH DateRange AS (
-        SELECT MIN((scraped_at AT TIME ZONE 'UTC')::date) AS start_date,
-               MAX((scraped_at AT TIME ZONE 'UTC')::date) AS end_date
- FROM market_availability_snapshots WHERE city_slug = $1
-      ), Config AS (
-        SELECT end_date, LEAST((end_date - start_date + 1), 30) AS total_window_days
-        FROM DateRange
-      ), Periods AS (
-        SELECT
-          FLOOR(total_window_days / 2) AS half_window_days,
-          end_date AS recent_period_end,
-          (end_date - (FLOOR(total_window_days / 2) - 1) * INTERVAL '1 day') AS recent_period_start,
-          (end_date - FLOOR(total_window_days / 2) * INTERVAL '1 day') AS past_period_end,
-          (end_date - (FLOOR(total_window_days / 2) * 2 - 1) * INTERVAL '1 day') AS past_period_start
-        FROM Config
-      ), Past_Forecast_Snapshots AS (
-        SELECT AVG(total_results) AS avg_30day_supply, AVG(weighted_avg_price) AS avg_30day_wap
-    FROM market_availability_snapshots, Periods p
-        WHERE city_slug = $1
-          AND (scraped_at AT TIME ZONE 'UTC')::date BETWEEN p.past_period_start AND p.past_period_end
-          AND checkin_date BETWEEN (scraped_at AT TIME ZONE 'UTC')::date AND ((scraped_at AT TIME ZONE 'UTC')::date + INTERVAL '29 days')
-        GROUP BY (scraped_at AT TIME ZONE 'UTC')::date
-      ), Past_Outlook AS (
-        SELECT AVG(avg_30day_supply) AS past_supply, AVG(avg_30day_wap) AS past_wap
-        FROM Past_Forecast_Snapshots
-      ), Recent_Forecast_Snapshots AS (
-        SELECT AVG(total_results) AS avg_30day_supply, AVG(weighted_avg_price) AS avg_30day_wap
-    FROM market_availability_snapshots, Periods p
-        WHERE city_slug = $1
-          AND (scraped_at AT TIME ZONE 'UTC')::date BETWEEN p.recent_period_start AND p.recent_period_end
-          AND checkin_date BETWEEN (scraped_at AT TIME ZONE 'UTC')::date AND ((scraped_at AT TIME ZONE 'UTC')::date + INTERVAL '29 days')
-        GROUP BY (scraped_at AT TIME ZONE 'UTC')::date
-      ), Recent_Outlook AS (
-        SELECT AVG(avg_30day_supply) AS recent_supply, AVG(avg_30day_wap) AS recent_wap
-        FROM Recent_Forecast_Snapshots
-      )
-      SELECT p.half_window_days, po.past_supply, po.past_wap, ro.recent_supply, ro.recent_wap
-      FROM Periods p, Past_Outlook po, Recent_Outlook ro;
-    `;
-
-// --- 3. 90-DAY FORWARD DEMAND (CHART) ---
-    // (Copied directly from planning.router.js)
+    // --- 2. 90-DAY FORWARD DEMAND (CHART) ---
+    // (Unchanged)
     const forwardDemandSql = `
       SELECT DISTINCT ON (checkin_date)
         checkin_date,
@@ -1166,11 +1132,8 @@ try {
         scraped_at DESC;
     `;
 
-
-
-    // --- 5. COMP SET RANK ---
-    // (Copied directly from /market-ranking in this file)
-    // We need to get the comp set IDs first
+    // --- 3. COMP SET RANK ---
+    // (Unchanged)
     let competitorIds;
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
@@ -1197,7 +1160,7 @@ try {
     }
 
     const allHotelIds = [propertyId, ...competitorIds];
-const rankingSql = `
+    const rankingSql = `
       WITH HotelPerformance AS (
         SELECT
           hotel_id,
@@ -1223,18 +1186,13 @@ const rankingSql = `
       WHERE hotel_id = $2;
     `;
 
-    // --- [NEW] 6. YTD TREND ---
-    // (Copied from reports.router.js)
+    // --- 4. YTD TREND ---
+    // (Unchanged)
     const ytdTrendSql = `
       SELECT
         date_part('month', stay_date) AS month_number,
-        
-        -- Aggregates for Year 1 (Last Year)
         COALESCE(SUM(CASE WHEN date_part('year', stay_date) = $2 THEN gross_revenue END), 0) AS y1_revenue,
-
-        -- Aggregates for Year 2 (Current Year)
         COALESCE(SUM(CASE WHEN date_part('year', stay_date) = $3 THEN gross_revenue END), 0) AS y2_revenue
-        
       FROM daily_metrics_snapshots
       WHERE
         hotel_id = $1 AND
@@ -1243,9 +1201,8 @@ const rankingSql = `
       ORDER BY month_number ASC;
     `;
 
-
-    // --- [NEW] 7. BUDGETS ---
-    // Get the gross revenue targets for the 3-month snapshot
+    // --- 5. BUDGETS ---
+    // (Unchanged)
     const budgetSql = `
       SELECT
         budget_year,
@@ -1261,69 +1218,124 @@ const rankingSql = `
         );
     `;
 
-    // --- 6. BUDGET BENCHMARKS ---
-    // (Calls the benchmark.utils.js function)
-    const currentMonthStr = format(today, 'MMM');
-    const currentYearStr = format(today, 'yyyy');
-    
-const [
+    // --- [NEW] 6. PHYSICAL UNSOLD ROOMS ---
+    // (Copied from metrics-from-db)
+    // Fetches physical unsold inventory *from today forward* for the *current month*.
+    const physicalUnsoldSql = `
+      SELECT SUM(capacity_count - rooms_sold) AS physical_unsold_remaining
+      FROM daily_metrics_snapshots
+      WHERE hotel_id = $1
+      AND stay_date >= CURRENT_DATE
+      AND date_trunc('month', stay_date) = date_trunc('month', CURRENT_DATE);
+    `;
+
+
+    // --- 7. RUN ALL QUERIES IN PARALLEL ---
+    const [
       snapshotResult,
-      marketOutlookResult,
+      marketOutlook,
       forwardDemandResult,
       rankingResult,
-      budgetBenchmark,
-      budgetResult, // [NEW]
-      ytdTrendResult // [NEW]
+      benchmarkLast,     // [MODIFIED]
+      benchmarkCurrent,  // [MODIFIED]
+      benchmarkNext,     // [MODIFIED]
+      budgetResult,
+      ytdTrendResult,
+      physicalUnsoldResult // [NEW]
     ] = await Promise.all([
       pgPool.query(snapshotSql, [propertyId]),
-      pgPool.query(marketOutlookSql, [citySlug]),
+      getMarketOutlook(citySlug),
       pgPool.query(forwardDemandSql, [citySlug]),
       pgPool.query(rankingSql, [allHotelIds, propertyId]),
-      getBenchmarks(propertyId, currentMonthStr, currentYearStr),
-      pgPool.query(budgetSql, [propertyId]), // [NEW]
-      pgPool.query(ytdTrendSql, [propertyId, lastYear, currentYear]) // [NEW]
+      
+      // [NEW] Fetch benchmarks for all 3 snapshot months
+      getBenchmarks(propertyId, format(lastMonthDate, 'MMM'), format(lastMonthDate, 'yyyy')),
+      getBenchmarks(propertyId, format(today, 'MMM'), format(today, 'yyyy')),
+      getBenchmarks(propertyId, format(nextMonthDate, 'MMM'), format(nextMonthDate, 'yyyy')),
+
+      pgPool.query(budgetSql, [propertyId]),
+      pgPool.query(ytdTrendSql, [propertyId, lastYear, currentYear]),
+      pgPool.query(physicalUnsoldSql, [propertyId]) // [NEW]
     ]);
 
-// --- 7. PROCESS & FORMAT ALL RESULTS ---
-console.log(`[DEBUG] /summary: Processing results...`);
+    // --- 8. PROCESS & FORMAT ALL RESULTS ---
+    console.log(`[API /summary]: Processing results...`);
 
-    // 7.0 Process Budgets into a lookup map
+    // 8.0 Process Budgets into a lookup map
     const budgetMap = new Map();
     budgetResult.rows.forEach(r => {
-      // Create a key like "2025-11"
       const key = `${r.budget_year}-${r.month.toString().padStart(2, '0')}`;
       budgetMap.set(key, parseFloat(r.target_revenue_gross));
     });
 
-    // 7.1 Process Performance Snapshot
-    // 7.1 Process Performance Snapshot
+    // 8.1 Process Unsold Rooms
+    const physicalUnsoldRemaining = physicalUnsoldResult.rows[0]?.physical_unsold_remaining
+      ? parseInt(physicalUnsoldResult.rows[0].physical_unsold_remaining, 10)
+      : 0;
+
+    // 8.2 Process Performance Snapshot
     const snapshotData = {};
     snapshotResult.rows.forEach(r => { snapshotData[r.period] = r; });
     
-    const formatPeriod = (date) => format(date, 'yyyy-MM');
-    const lastMonth = snapshotData[formatPeriod(subMonths(today, 1))] || {};
-    const currentMonth = snapshotData[formatPeriod(today)] || {};
-    const nextMonth = snapshotData[formatPeriod(addMonths(today, 1))] || {};
-    const lastMonthLY = snapshotData[formatPeriod(subMonths(today, 13))] || {};
-    const currentMonthLY = snapshotData[formatPeriod(subMonths(today, 12))] || {};
-    const nextMonthLY = snapshotData[formatPeriod(subMonths(today, 11))] || {};
+    const formatPeriodKey = (date) => format(date, 'yyyy-MM');
+    
+    const lastMonth = snapshotData[formatPeriodKey(lastMonthDate)] || {};
+    const currentMonth = snapshotData[formatPeriodKey(today)] || {};
+    const nextMonth = snapshotData[formatPeriodKey(nextMonthDate)] || {};
+    
+    // YOY Comps
+    const lastMonthLY = snapshotData[formatPeriodKey(subMonths(today, 13))] || {};
+    const currentMonthLY = snapshotData[formatPeriodKey(subMonths(today, 12))] || {};
+    const nextMonthLY = snapshotData[formatPeriodKey(subMonths(today, 11))] || {};
 
     const calcYOY = (current, past) => {
       if (!current || !past) return 0;
       return ((current - past) / past) * 100;
     };
-    
-// Helper to get budget from map: e.g., budgetMap.get('2025-10')
-    const formatPeriodKey = (date) => format(date, 'yyyy-MM');
 
+    // --- [NEW] 8.3 CALCULATE PACING STATUS ---
+    
+    const lastMonthPacing = calculatePacingStatus({
+      targetRev: budgetMap.get(formatPeriodKey(lastMonthDate)) || 0,
+      actualRev: parseFloat(lastMonth.revenue || 0),
+      capacityCount: parseFloat(lastMonth.capacity_count || 0),
+      totalSoldRoomNights: parseFloat(lastMonth.total_sold_room_nights || 0),
+      benchmarks: benchmarkLast,
+      year: lastMonthDate.getFullYear(),
+      monthIndex: lastMonthDate.getMonth()
+    });
+
+    const currentMonthPacing = calculatePacingStatus({
+      targetRev: budgetMap.get(formatPeriodKey(today)) || 0,
+      actualRev: parseFloat(currentMonth.revenue || 0),
+      capacityCount: parseFloat(currentMonth.capacity_count || 0),
+      totalSoldRoomNights: parseFloat(currentMonth.total_sold_room_nights || 0),
+      physicalUnsoldRemaining: physicalUnsoldRemaining, // Pass the specific value
+      benchmarks: benchmarkCurrent,
+      year: today.getFullYear(),
+      monthIndex: today.getMonth()
+    });
+    
+    const nextMonthPacing = calculatePacingStatus({
+      targetRev: budgetMap.get(formatPeriodKey(nextMonthDate)) || 0,
+      actualRev: parseFloat(nextMonth.revenue || 0),
+      capacityCount: parseFloat(nextMonth.capacity_count || 0),
+      totalSoldRoomNights: parseFloat(nextMonth.total_sold_room_nights || 0),
+      benchmarks: benchmarkNext,
+      year: nextMonthDate.getFullYear(),
+      monthIndex: nextMonthDate.getMonth()
+    });
+    
+    // --- 8.4 Build Snapshot Response ---
     const snapshot = {
       lastMonth: {
-        label: format(subMonths(today, 1), "MMMM '(Final)'"),
+        label: format(lastMonthDate, "MMMM '(Final)'"),
         revenue: parseFloat(lastMonth.revenue || 0),
         occupancy: parseFloat(lastMonth.occupancy || 0) * 100,
         adr: parseFloat(lastMonth.adr || 0),
         yoyChange: calcYOY(lastMonth.revenue, lastMonthLY.revenue),
-        targetRevenue: budgetMap.get(formatPeriodKey(subMonths(today, 1))) || null
+        targetRevenue: budgetMap.get(formatPeriodKey(lastMonthDate)) || null,
+        pacingStatus: lastMonthPacing // [NEW]
       },
       currentMonth: {
         label: format(today, "MMMM '(MTD)'"),
@@ -1331,7 +1343,8 @@ console.log(`[DEBUG] /summary: Processing results...`);
         occupancy: parseFloat(currentMonth.occupancy || 0) * 100,
         adr: parseFloat(currentMonth.adr || 0),
         yoyChange: calcYOY(currentMonth.revenue, currentMonthLY.revenue),
-        targetRevenue: budgetMap.get(formatPeriodKey(today)) || null
+        targetRevenue: budgetMap.get(formatPeriodKey(today)) || null,
+        pacingStatus: currentMonthPacing // [NEW]
       },
       nextMonth: {
         label: format(addMonths(today, 1), "MMMM '(OTB)'"),
@@ -1339,29 +1352,12 @@ console.log(`[DEBUG] /summary: Processing results...`);
         occupancy: parseFloat(nextMonth.occupancy || 0) * 100,
         adr: parseFloat(nextMonth.adr || 0),
         yoyChange: calcYOY(nextMonth.revenue, nextMonthLY.revenue),
-        targetRevenue: budgetMap.get(formatPeriodKey(addMonths(today, 1))) || null
+        targetRevenue: budgetMap.get(formatPeriodKey(addMonths(today, 1))) || null,
+        pacingStatus: nextMonthPacing // [NEW]
       }
     };
     
-    // 7.2 Process Market Outlook
-    let marketOutlook = { status: 'stable', metric: '...' };
-    if (marketOutlookResult.rows.length > 0) {
-      const data = marketOutlookResult.rows[0];
-      const pastSupply = parseFloat(data.past_supply);
-      const recentSupply = parseFloat(data.recent_supply);
-      const marketDemandDelta = -(((recentSupply - pastSupply) / pastSupply) * 100);
-
-      if (marketDemandDelta > 1) status = 'strengthening';
-      else if (marketDemandDelta < -1) status = 'softening';
-      else status = 'stable';
-      
-      marketOutlook = {
-        status: status,
-        metric: `${marketDemandDelta > 0 ? '+' : ''}${marketDemandDelta.toFixed(1)}%`
-      };
-    }
-
-    // 7.3 Process 90-Day Demand (Chart)
+    // 8.5 Process 90-Day Demand (Chart)
     let processedDemand = calculatePriceIndex(forwardDemandResult.rows);
     processedDemand = calculateMarketDemand(processedDemand);
     const forwardDemandChartData = processedDemand.map((row, i) => ({
@@ -1370,30 +1366,22 @@ console.log(`[DEBUG] /summary: Processing results...`);
       marketSupply: parseInt(row.total_results, 10),
     }));
 
-// 7.4 Process Demand Patterns (Busiest/Quietest)
-    // [FIX] Reuse the 90-day forward data from the chart (section 7.3)
-    // processedDemand is already calculated, filtered, and processed.
+    // 8.6 Process Demand Patterns (Busiest/Quietest)
     const validPatterns = processedDemand.filter(r => r.market_demand_score != null);
-
-    // Busiest = Highest demand score (descending)
     const sortedByDemandDesc = [...validPatterns].sort((a, b) => b.market_demand_score - a.market_demand_score);
-    
-    // [FIX] Quietest = Lowest demand score (ascending)
     const sortedByDemandAsc = [...validPatterns].sort((a, b) => a.market_demand_score - b.market_demand_score);
-
     const formatPatternRow = (row) => ({
       date: row.checkin_date,
       dayOfWeek: format(parseISO(row.checkin_date), 'E'),
-      availability: row.market_demand_score, // This is the market demand
+      availability: row.market_demand_score,
       supply: parseInt(row.total_results, 10)
     });
-
     const demandPatterns = {
       busiestDays: sortedByDemandDesc.slice(0, 5).map(formatPatternRow),
       quietestDays: sortedByDemandAsc.slice(0, 5).map(formatPatternRow)
     };
 
-    // 7.5 Process Comp Set Rank
+    // 8.7 Process Comp Set Rank
     let rankings = {
       occupancy: { rank: '-', total: '-' },
       adr: { rank: '-', total: '-' },
@@ -1408,38 +1396,30 @@ console.log(`[DEBUG] /summary: Processing results...`);
       };
     }
 
-// 7.6 Process YTD Trend (Live Data)
+    // 8.8 Process YTD Trend (Live Data)
     const ytdTrend = [];
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentMonthIndex = today.getMonth(); // 0-11
-
-    // Create a simple lookup map from the query results
     const ytdResultMap = new Map();
     ytdTrendResult.rows.forEach(r => {
       ytdResultMap.set(parseInt(r.month_number, 10), r);
     });
-
-    // Loop only up to the current month, matching the frontend component's logic
     for (let i = 0; i <= currentMonthIndex; i++) {
-      const monthNum = i + 1; // 1-12
+      const monthNum = i + 1;
       const row = ytdResultMap.get(monthNum);
       const isMTD = (i === currentMonthIndex);
-
       let thisYear = 0;
       let lastYear = 0;
-
       if (row) {
-        thisYear = parseFloat(row.y2_revenue); // y2 is currentYear
-        lastYear = parseFloat(row.y1_revenue); // y1 is lastYear
+        thisYear = parseFloat(row.y2_revenue);
+        lastYear = parseFloat(row.y1_revenue);
       }
-      
       let variance = 0;
       if (lastYear > 0) {
         variance = ((thisYear - lastYear) / lastYear) * 100;
       } else if (thisYear > 0) {
-        variance = 100; // Handle divide-by-zero if last year was 0
+        variance = 100;
       }
-
       ytdTrend.push({
         month: monthNames[i],
         monthIndex: i,
@@ -1449,7 +1429,8 @@ console.log(`[DEBUG] /summary: Processing results...`);
         isMTD: isMTD
       });
     }
-    // --- 8. FINAL ASSEMBLY ---
+
+    // --- 9. FINAL ASSEMBLY ---
     res.json({
       snapshot,
       marketOutlook,
@@ -1457,14 +1438,12 @@ console.log(`[DEBUG] /summary: Processing results...`);
       demandPatterns,
       rankings,
       ytdTrend,
-      budgetBenchmark // Pass this through
+      budgetBenchmark: benchmarkCurrent // Pass current month's benchmark
     });
 
   } catch (err) {
-  
+    console.error(`[API /summary] FAILED: propertyId=${propertyId}`, err);
     res.status(500).json({ error: "Failed to fetch dashboard summary", details: err.message });
-  
-    // [FIX] Removed redundant console.error and res.status(500) call
   }
 });
 

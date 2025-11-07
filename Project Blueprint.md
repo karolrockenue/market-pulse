@@ -266,6 +266,7 @@ All endpoints are mounted under /api in server.js.
 
 ### **dashboard.router.js**
 
+* GET /dashboard/summary: Fetches all data for the unified Hotel Dashboard in a single, parallelized request.
 * GET /my-properties: Fetches properties a user has access to (all properties for super\_admin).  
 * GET /hotel-details/:propertyId: Fetches details for a single hotel (currency, tax rate, etc.).  
 * GET /kpi-summary: Fetches aggregated KPI data (Occ, ADR, RevPAR) for the dashboard cards, including market comparison.  
@@ -457,6 +458,12 @@ This section documents internal scripts used by developers for data management a
     5.  Calculates all other metrics (`net_revenue`, `net_adr`, `gross_adr`, `net_revpar`, `gross_revpar`) based on this `rooms_sold` value.
     6.  Wraps the entire `DELETE` and `INSERT` operation in a single transaction and locks the years, just like the monthly script.
 
+
+* **[NEW] 20.0: Unified Hotel Dashboard & Logic Refactor (Nov 2025):** Deployed the new primary dashboard (`HotelDashboard.tsx`) to replace the original "You vs. Comp Set" view.
+    * **Unified Endpoint:** Created a new `GET /api/dashboard/summary` endpoint that fetches all dashboard data (Snapshots, YTD, Market, Ranks) in a single parallelized API call.
+    * **View Routing:** Refactored `App.tsx` to make the new dashboard the default `'dashboard'` view and moved the legacy chart/table view to `'youVsCompSet'`.
+    * **Logic Centralization:** Refactored the "Market Outlook" (Strengthening/Softening) logic out of both `planning.router.js` and `dashboard.router.js` and into a single, new function (`getMarketOutlook`) in the `api/utils/market-codex.utils.js` "Logic Hub" to ensure 100% consistency between the two pages.
+
 ## **9.0 Frontend Architecture**
 
 This section details the new React-based frontend architecture, which resides in the /web directory of the monorepo.
@@ -499,7 +506,9 @@ web/
     │   ├── DashboardControls.tsx  
     │   ├── DataTable.tsx  
     │.  ├── DemandPace.tsx
-    │   ├── HotelManagementTable.tsx  
+    │   ├── DynamicYTDTrend.tsx  
+    │   ├── HotelDashboard.tsx  
+    │   ├── HotelManagementTable.tsx
     │   ├── InitialSyncScreen.tsx  
     │   ├── InsightsCard.tsx  
     │   ├── KPICard.tsx  
@@ -552,5 +561,7 @@ web/
 | **SystemHealth.tsx** | **Admin widget for testing connections.** props: propertyId, lastRefreshTime, onRefreshData. |
 | **CloudbedsAPIExplorer.tsx** | **Admin widget for raw API calls.** props: propertyId. |
 | **PortfolioOverview.tsx** | **Private super\_admin page for financial tracking.** (Managed internally). |
-| **PortfolioRiskOverview.tsx** | **Private super_admin diagnostic page. Combines volume and pacing risk into a portfolio-wide view. (Managed internally).** | **DemandPace.tsx**  | New 'Demand & Pace' feature page. Displays 90-day grid, charts, and market highlights. | propertyId, currencyCode, city |
+| **PortfolioRiskOverview.tsx** | **Private super_admin diagnostic page. Combines volume and pacing risk into a portfolio-wide view. (Managed internally).** | **DemandPace.tsx**  | New 'Demand & Pace' feature page. Displays 90-day grid, charts, and market highlights. | propertyId, currencyCode, city 
+| **HotelDashboard.tsx** | **[NEW] The main application dashboard.** Displays performance snapshots, 90-day demand, YTD trend, and comp set rank. | onNavigate, data, isLoading 
+| **DynamicYTDTrend.tsx** | **[NEW] Sub-component for the dashboard.** Displays the YTD vs. Last Year revenue table. | onNavigate, data |
 

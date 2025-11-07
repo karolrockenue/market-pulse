@@ -1,3 +1,5 @@
+const pgPool = require('../utils/db'); // [NEW] Import the db pool
+
 // This file is the "Logic Hub" for the Market Codex / Planning feature.
 // It contains all the business-facing logic for normalizing and
 // processing raw database data into the metrics required by the frontend.
@@ -222,11 +224,112 @@ const calculatePace = (latest_rows, past_rows) => {
       // [NEW] Add the Weighted Average Price (WAP) delta
       wap_delta: getDelta(latestRow.weighted_avg_price, pastRow.weighted_avg_price),
     };
-  });
+});
+};
+
+/**
+ * [NEW] Calculates the "Market Outlook" using the "Split-Half" methodology.
+ * This is the single source of truth for the banner logic.
+ * @param {string} citySlug - The city slug (e.g., 'london')
+ * @param {Object} dbPool - The pgPool instance (defaults to imported pool)
+ * @returns {Promise<Object>} - A promise that resolves to { status, metric }
+ */
+const getMarketOutlook = async (citySlug, dbPool = pgPool) => {
+  const query = `
+    WITH DateRange AS (
+      SELECT MIN((scraped_at AT TIME ZONE 'UTC')::date) AS start_date,
+             MAX((scraped_at AT TIME ZONE 'UTC')::date) AS end_date
+      FROM market_availability_snapshots WHERE city_slug = $1
+    ), Config AS (
+      SELECT end_date, LEAST((end_date - start_date + 1), 30) AS total_window_days
+      FROM DateRange
+    ), Periods AS (
+      SELECT
+        FLOOR(total_window_days / 2) AS half_window_days,
+        end_date AS recent_period_end,
+        (end_date - (FLOOR(total_window_days / 2) - 1) * INTERVAL '1 day') AS recent_period_start,
+        (end_date - FLOOR(total_window_days / 2) * INTERVAL '1 day') AS past_period_end,
+        (end_date - (FLOOR(total_window_days / 2) * 2 - 1) * INTERVAL '1 day') AS past_period_start
+      FROM Config
+    ), Past_Forecast_Snapshots AS (
+      SELECT AVG(total_results) AS avg_30day_supply, AVG(weighted_avg_price) AS avg_30day_wap
+      FROM market_availability_snapshots, Periods p
+      WHERE city_slug = $1
+        AND (scraped_at AT TIME ZONE 'UTC')::date BETWEEN p.past_period_start AND p.past_period_end
+        AND checkin_date BETWEEN (scraped_at AT TIME ZONE 'UTC')::date AND ((scraped_at AT TIME ZONE 'UTC')::date + INTERVAL '29 days')
+      GROUP BY (scraped_at AT TIME ZONE 'UTC')::date
+    ), Past_Outlook AS (
+      SELECT AVG(avg_30day_supply) AS past_supply, AVG(avg_30day_wap) AS past_wap
+      FROM Past_Forecast_Snapshots
+    ), Recent_Forecast_Snapshots AS (
+      SELECT AVG(total_results) AS avg_30day_supply, AVG(weighted_avg_price) AS avg_30day_wap
+      FROM market_availability_snapshots, Periods p
+      WHERE city_slug = $1
+        AND (scraped_at AT TIME ZONE 'UTC')::date BETWEEN p.recent_period_start AND p.recent_period_end
+        AND checkin_date BETWEEN (scraped_at AT TIME ZONE 'UTC')::date AND ((scraped_at AT TIME ZONE 'UTC')::date + INTERVAL '29 days')
+      GROUP BY (scraped_at AT TIME ZONE 'UTC')::date
+    ), Recent_Outlook AS (
+      SELECT AVG(avg_30day_supply) AS recent_supply, AVG(avg_30day_wap) AS recent_wap
+      FROM Recent_Forecast_Snapshots
+    )
+    SELECT p.half_window_days, po.past_supply, po.past_wap, ro.recent_supply, ro.recent_wap
+    FROM Periods p, Past_Outlook po, Recent_Outlook ro;
+  `;
+
+  try {
+    const { rows } = await dbPool.query(query, [citySlug.toLowerCase()]);
+
+    if (!rows.length || !rows[0].recent_supply) {
+      return { status: 'stable', metric: 'Data Populating' };
+    }
+
+    const data = rows[0];
+    const pastSupply = parseFloat(data.past_supply);
+    const recentSupply = parseFloat(data.recent_supply);
+    const pastWap = parseFloat(data.past_wap);
+    const recentWap = parseFloat(data.recent_wap);
+
+    // Handle potential division by zero if pastSupply is 0
+    const supplyDelta = (pastSupply !== 0) ? ((recentSupply - pastSupply) / pastSupply) * 100 : (recentSupply > 0 ? 100 : 0);
+    const wapDelta = (pastWap !== 0) ? ((recentWap - pastWap) / pastWap) * 100 : (recentWap > 0 ? 100 : 0);
+    const marketDemandDelta = -supplyDelta;
+
+    let status = 'stable';
+    let metric = '';
+
+    // 1. Primary check: Market Demand
+    if (marketDemandDelta > 1) {
+      status = 'strengthening';
+      metric = `+${marketDemandDelta.toFixed(1)}%`;
+    } else if (marketDemandDelta < -1) {
+      status = 'softening';
+      metric = `${marketDemandDelta.toFixed(1)}%`;
+    }
+    // 2. Secondary check: Price
+    else if (wapDelta > 1) {
+      status = 'strengthening';
+      metric = `+${wapDelta.toFixed(1)}%`;
+    } else if (wapDelta < -1) {
+      status = 'softening';
+      metric = `${wapDelta.toFixed(1)}%`;
+    }
+    // 3. Both are stable
+    else {
+      status = 'stable';
+      metric = `${marketDemandDelta > 0 ? '+' : ''}${marketDemandDelta.toFixed(1)}%`;
+    }
+
+    return { status, metric };
+
+  } catch (err) {
+    console.error('Error in getMarketOutlook:', err);
+    return { status: 'stable', metric: 'Error' };
+  }
 };
 
 module.exports = {
   calculatePriceIndex,
   calculateMarketDemand,
   calculatePace,
+  getMarketOutlook, // [NEW] Export the new function
 };

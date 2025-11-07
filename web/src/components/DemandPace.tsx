@@ -1182,15 +1182,16 @@ const getPriceIndexColor = (index: number) => {
                       itemStyle={{ fontSize: '11px', color: '#e5e5e5' }}
                     />
                     
-                    <Line 
+      <Area 
                       yAxisId="right"
                       type="monotone" 
                       dataKey="marketSupply" 
                       stroke="#3b82f6" 
                       strokeWidth={1.5}
-                      strokeOpacity={0.4}
-                      dot={false}
-                      name="Available Properties"
+                      strokeOpacity={0.3}
+                      fill="#3b82f6"
+                      fillOpacity={0.08}
+                      name="Market Supply (Properties)"
                     />
 <Bar 
                       yAxisId="left"
