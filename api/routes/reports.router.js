@@ -241,9 +241,9 @@ router.post("/run", requireUserApi, async (req, res) => {
       return res.status(400).json({ error: "Missing required report parameters." });
     }
 
-    // --- 2. Security Check (re-using logic from dashboard) ---
-    if (req.session.role !== "super_admin") {
-      const userResult = await pgPool.query(
+// --- 2. Security Check (re-using logic from dashboard) ---
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
+  const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
       );
@@ -441,10 +441,9 @@ router.post("/year-on-year", requireUserApi, async (req, res) => {
     if (!propertyId || !year1 || !year2) {
       return res.status(400).json({ error: "Missing required parameters: propertyId, year1, and year2." });
     }
-
-    // --- 2. Security Check (re-using logic from /run endpoint) ---
-    if (req.session.role !== "super_admin") {
-      const userResult = await pgPool.query(
+// --- 2. Security Check (re-using logic from /run endpoint) ---
+if (req.session.role !== "super_admin" && req.session.role !== "admin") {
+  const userResult = await pgPool.query(
         "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
         [req.session.userId]
       );
