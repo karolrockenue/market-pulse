@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="32" height="32" fill="#1d1d1c"/>
+  
+  <!-- Filled Diamond - Solid Premium Mark -->
+  <path d="M16 6 L22 12 L16 26 L10 12 Z" fill="#faff6a" opacity="0.9"/>
+  
+  <!-- Highlight facets -->
+  <path d="M16 6 L22 12 L16 18 Z" fill="#ffffff" opacity="0.15"/>
+  <path d="M16 6 L10 12 L16 18 Z" fill="#000000" opacity="0.1"/>
+</svg>

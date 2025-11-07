@@ -1398,7 +1398,7 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
 
     // 8.8 Process YTD Trend (Live Data)
     const ytdTrend = [];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const currentMonthIndex = today.getMonth(); // 0-11
     const ytdResultMap = new Map();
     ytdTrendResult.rows.forEach(r => {

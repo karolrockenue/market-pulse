@@ -1,0 +1,7 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="32" height="32" fill="#1d1d1c"/>
+  
+  <!-- Minimal Diamond - Clean outline only -->
+  <path d="M16 7 L21 12 L16 25 L11 12 Z" fill="none" stroke="#faff6a" stroke-width="2" stroke-linejoin="miter"/>
+</svg>

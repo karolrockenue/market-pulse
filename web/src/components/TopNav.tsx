@@ -99,9 +99,16 @@ const showPropertySelector = activeView !== 'landing';
   return (
     <div className="bg-[#1f1f1c] border-b border-[#3a3a35] px-6 py-4 flex items-center justify-between shadow-lg">
       <div className="flex items-center gap-10">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-6 bg-[#faff6a]" />
-          <div className="text-[#faff6a] tracking-widest">MARKET PULSE</div>
+  
+<div className="flex items-center gap-1">
+          <span className="text-[#faff6a] text-2xl">(</span>
+          <span 
+            className="text-[#e5e5e5] text-sm tracking-wide"
+            style={{ position: 'relative', top: '2px' }} 
+          >
+            MARKET PULSE
+          </span>
+          <span className="text-[#faff6a] text-2xl">)</span>
         </div>
         
 <nav className="flex gap-6">

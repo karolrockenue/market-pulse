@@ -1,0 +1,10 @@
+<svg width="200" height="40" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Left Parenthesis -->
+  <text x="5" y="32" font-family="sans-serif" font-size="36" fill="#faff6a">(</text>
+  
+  <!-- MARKET PULSE Text -->
+  <text x="25" y="24" font-family="sans-serif" font-size="14" fill="#e5e5e5" letter-spacing="1.5">MARKET PULSE</text>
+  
+  <!-- Right Parenthesis -->
+  <text x="177" y="32" font-family="sans-serif" font-size="36" fill="#faff6a">)</text>
+</svg>

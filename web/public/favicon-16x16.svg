@@ -1,0 +1,11 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="16" height="16" fill="#1d1d1c"/>
+  
+  <!-- Diamond Shape - Optimized for 16x16 -->
+  <path d="M8 3 L11 6 L8 13 L5 6 Z" fill="none" stroke="#faff6a" stroke-width="1.2" stroke-linejoin="miter"/>
+  
+  <!-- Inner line for depth -->
+  <path d="M8 3 L8 13" stroke="#faff6a" stroke-width="0.4" opacity="0.6"/>
+  <path d="M5 6 L11 6" stroke="#faff6a" stroke-width="0.4" opacity="0.5"/>
+</svg>
