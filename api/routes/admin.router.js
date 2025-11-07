@@ -1420,11 +1420,61 @@ router.post("/update-hotel-management", requireAdminApi, async (req, res) => {
       hotelId // Safely inserts the hotel ID
     );
 
-    const result = await pgPool.query(updateQuery);
+const result = await pgPool.query(updateQuery);
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Hotel not found." });
     }
+
+    // --- [NEW] Instant Sync Logic ---
+    // If the field updated was 'is_rockenue_managed' AND the new value is 'true',
+    // immediately run the sync logic for this single hotel.
+    if (field === 'is_rockenue_managed' && value === true) {
+      console.log(`[Admin Sync] Toggle set to true for ${hotelId}. Running instant Rockenue sync...`);
+      
+      // This is the sync query from sync-rockenue-assets.js,
+      // but targeted at this one specific hotel.
+      const syncQuery = `
+        INSERT INTO rockenue_managed_assets (
+            market_pulse_hotel_id, 
+            asset_name, 
+            city, 
+            total_rooms, 
+            management_group,
+            monthly_fee
+        )
+        SELECT 
+            h.hotel_id::text, 
+            h.property_name, 
+            h.city, 
+            h.total_rooms, 
+            h.management_group,
+            0.00 -- Default monthly_fee
+        FROM 
+            hotels h
+        LEFT JOIN 
+            rockenue_managed_assets rma ON h.hotel_id = rma.market_pulse_hotel_id::integer
+        WHERE 
+            h.hotel_id = $1
+            AND h.is_rockenue_managed = true 
+            AND rma.market_pulse_hotel_id IS NULL; -- Only insert if missing
+      `;
+      
+      // We run this query but don't stop the main request.
+      // We log the result for debugging.
+      try {
+        const syncResult = await pgPool.query(syncQuery, [hotelId]);
+        if (syncResult.rowCount > 0) {
+          console.log(`[Admin Sync] Successfully synced hotel ${hotelId} to rockenue_managed_assets.`);
+        } else {
+          console.log(`[Admin Sync] Hotel ${hotelId} was already synced. No changes made.`);
+        }
+      } catch (syncError) {
+        // If this fails, log it, but don't fail the main API call
+        console.error(`[Admin Sync] CRITICAL: Failed to auto-sync hotel ${hotelId} to Rockenue assets:`, syncError);
+      }
+    }
+    // --- [END] Instant Sync Logic ---
 
     res.status(200).json({ message: "Management info updated successfully." });
 } catch (error) {
