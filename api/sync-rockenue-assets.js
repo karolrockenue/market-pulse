@@ -47,9 +47,8 @@ module.exports = async (req, res) => {
           h.management_group,
           0.00 -- Default monthly_fee
       FROM 
-          hotels h
-      LEFT JOIN 
-          rockenue_managed_assets rma ON h.hotel_id = rma.market_pulse_hotel_id
+LEFT JOIN 
+          rockenue_managed_assets rma ON h.hotel_id = rma.market_pulse_hotel_id::integer
       WHERE 
           h.is_rockenue_managed = true 
           AND rma.market_pulse_hotel_id IS NULL; -- The magic: only insert if missing
