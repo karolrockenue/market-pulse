@@ -10,7 +10,7 @@ module.exports = async (request, response) => {
   // The job now fetches all connected properties directly, making it property-centric
   // instead of user-centric. This is more robust.
   console.log("Starting daily FORECAST refresh job for ALL PROPERTIES...");
-  let totalRecordsUpdated = 0;
+
 
   try {
     // More descriptive logging for the job's purpose.
@@ -24,9 +24,10 @@ module.exports = async (request, response) => {
       // /api/daily-refresh.js
 // /api/daily-refresh.js
 
-      "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
-    );
-    const allProperties = propertiesResult.rows;
+"SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
+);
+console.log("...Initial property fetch query complete.");
+const allProperties = propertiesResult.rows;
     console.log(`Found ${allProperties.length} properties to process.`);
 
     // Step 2: Loop through each property.
@@ -259,19 +260,25 @@ module.exports = async (request, response) => {
       }
     }
 
-    // Update the system_state table to record that the job ran successfully.
-    console.log(
-      "✅ Daily forecast refresh job complete. Updating system_state table..."
-    );
-    const jobData = { timestamp: new Date().toISOString() };
-    // THE FIX: Corrected the key to match what the dashboard API endpoint reads.
-    await pgPool.query(
-      "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
-      ["last_successful_refresh", jobData]
-    );
-    console.log("System state updated successfully.");
+console.log(
+  "✅ Daily forecast refresh job complete. Attempting to update system_state table..."
+);
+const jobData = { timestamp: new Date().toISOString() };
 
-    response.status(200).json({
+// --- GATELOG: About to update system_state ---
+console.log("GATELOG: Writing new timestamp to system_state...");
+
+// THE FIX: Corrected the key to match what the dashboard API endpoint reads.
+await pgPool.query(
+  "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
+  ["last_successful_refresh", jobData]
+);
+
+// --- GATELOG: Finished updating system_state ---
+console.log("GATELOG: Write to system_state complete.");
+console.log("System state updated successfully.");
+
+response.status(200).json({
       status: "Success",
       processedProperties: allProperties.length,
       totalRecordsUpdated: totalRecordsUpdated,
