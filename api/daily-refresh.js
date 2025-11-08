@@ -8,26 +8,31 @@ const format = require("pg-format");
 module.exports = async (request, response) => {
   // ** REFACTORED LOGIC **
   // The job now fetches all connected properties directly, making it property-centric
-  // instead of user-centric. This is more robust.
-  console.log("Starting daily FORECAST refresh job for ALL PROPERTIES...");
+
 
 
   try {
     // More descriptive logging for the job's purpose.
-    console.log("Starting daily forecast refresh job for all properties...");
-    let totalRecordsUpdated = 0;
+console.log("Starting daily forecast refresh job for all properties...");
+let totalRecordsUpdated = 0;
+let allProperties = []; // Define here to ensure it's in scope
 
-    // Step 1: Get a list of all hotels and their essential info.
-    // This is more efficient as it's one query for all properties.
-    // It also fetches the pms_type and timezone needed for branching.
-    const propertiesResult = await pgPool.query(
-      // /api/daily-refresh.js
-// /api/daily-refresh.js
-
-"SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
-);
-console.log("...Initial property fetch query complete.");
-const allProperties = propertiesResult.rows;
+// Step 1: Get a list of all hotels and their essential info.
+// This is more efficient as it's one query for all properties.
+// It also fetches the pms_type and timezone needed for branching.
+const propertiesClient = await pgPool.connect();
+try {
+  const propertiesResult = await propertiesClient.query(
+    "SELECT hotel_id, pms_property_id, property_name, p.ms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
+  );
+  console.log("...Initial property fetch query complete.");
+  allProperties = propertiesResult.rows;
+} catch (e) {
+  console.error("CRITICAL: Failed to fetch initial property list.", e.message);
+  throw e; // Re-throw to be caught by main catch block
+} finally {
+  propertiesClient.release();
+}
     console.log(`Found ${allProperties.length} properties to process.`);
 
     // Step 2: Loop through each property.
@@ -264,19 +269,25 @@ console.log(
   "✅ Daily forecast refresh job complete. Attempting to update system_state table..."
 );
 const jobData = { timestamp: new Date().toISOString() };
+const stateClient = await pgPool.connect();
+try {
+  // --- GATELOG: About to update system_state ---
+  console.log("GATELOG: Writing new timestamp to system_state...");
 
-// --- GATELOG: About to update system_state ---
-console.log("GATELOG: Writing new timestamp to system_state...");
+  // THE FIX: Corrected the key to match what the dashboard API endpoint reads.
+  await stateClient.query(
+    "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
+    ["last_successful_refresh", jobData]
+  );
 
-// THE FIX: Corrected the key to match what the dashboard API endpoint reads.
-await pgPool.query(
-  "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
-  ["last_successful_refresh", jobData]
-);
-
-// --- GATELOG: Finished updating system_state ---
-console.log("GATELOG: Write to system_state complete.");
-console.log("System state updated successfully.");
+  // --- GATELOG: Finished updating system_state ---
+  console.log("GATELOG: Write to system_state complete.");
+} catch (e) {
+  console.error("CRITICAL: Failed to update system_state.", e.message);
+  throw e; // Re-throw to be caught by main catch block
+} finally {
+  stateClient.release();
+}
 
 response.status(200).json({
       status: "Success",
