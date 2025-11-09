@@ -18,13 +18,13 @@
     }
   ],
   "crons": [
-    {
-      "path": "/api/daily-refresh",
+{
+      "path": "/api/admin/daily-refresh",
       "schedule": "0 5 * * *"
     },
     {
       "path": "/api/send-scheduled-reports",
-      "schedule": "*/5 * * * *"
+"schedule": "53 6 * * *"
     },
     {
       "path": "/api/sync-rockenue-assets",
