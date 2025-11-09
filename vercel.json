@@ -20,11 +20,11 @@
   "crons": [
 {
       "path": "/api/admin/daily-refresh",
-      "schedule": "0 5 * * *"
+      "schedule": "5 7 * * *"
     },
     {
       "path": "/api/send-scheduled-reports",
-"schedule": "53 6 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/sync-rockenue-assets",
