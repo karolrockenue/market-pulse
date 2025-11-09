@@ -20,7 +20,7 @@
   "crons": [
 {
       "path": "/api/cron/daily-refresh?secret=Overkill123*",
-      "schedule": "33 7 * * *"
+"schedule": "0 6 * * *"
     },
     {
       "path": "/api/send-scheduled-reports",
