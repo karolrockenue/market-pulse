@@ -13,7 +13,8 @@ const path = require("path");
 // --- SHARED UTILITIES AND ROUTERS ---
 const pgPool = require("./api/utils/db");
 const { requirePageLogin } = require("./api/utils/middleware");
-
+// [NEW] Import the daily-refresh job handler
+const dailyRefreshHandler = require("./api/daily-refresh.js");
 // Import all the router files.
 const authRoutes = require("./api/routes/auth.router.js");
 const dashboardRoutes = require("./api/routes/dashboard.router.js");
@@ -159,7 +160,22 @@ app.use(
   })
 );
 
-// /server.js
+// --- [NEW] SECURE CRON JOB ENDPOINT ---
+app.get("/api/cron/daily-refresh", (req, res) => {
+  // Check for the secret key in the query parameters
+  const { secret } = req.query;
+
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    console.warn("CRON JOB FAILED: Unauthorized attempt at /api/cron/daily-refresh");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // If secret is valid, run the handler.
+  // We pass the 'req' and 'res' objects directly to it.
+  console.log("CRON JOB ACCEPTED: Running daily-refresh...");
+  return dailyRefreshHandler(req, res);
+});
+
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
   app.post("/api/dev-login", async (req, res) => {
@@ -202,6 +218,10 @@ if (process.env.VERCEL_ENV !== "production") {
     }
   });
 }
+
+
+
+
 
 // --- API ROUTERS ---
 // Mount all the dedicated routers to their respective paths.
