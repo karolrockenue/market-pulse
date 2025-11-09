@@ -22,8 +22,8 @@ let allProperties = []; // Define here to ensure it's in scope
 // It also fetches the pms_type and timezone needed for branching.
 const propertiesClient = await pgPool.connect();
 try {
-  const propertiesResult = await propertiesClient.query(
-    "SELECT hotel_id, pms_property_id, property_name, p.ms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
+const propertiesResult = await propertiesClient.query(
+    "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
   );
   console.log("...Initial property fetch query complete.");
   allProperties = propertiesResult.rows;
