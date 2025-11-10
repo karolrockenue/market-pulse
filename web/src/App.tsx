@@ -1587,7 +1587,7 @@ const handleRemoveUser = (userId: string) => {
   // We also check that activeView is not null to satisfy TypeScript.
 return (
     activeView && (
-<div className="min-h-screen bg-[#252521]">
+<div className="min-h-screen bg-[#232320]">
     
     {/* [NEW] Conditionally render the InitialSyncScreen as a full-screen overlay
         based on the new `isSyncing` state, which mimics the original app. 
@@ -1629,14 +1629,14 @@ return (
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-36 h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs"
+                    className="w-36 h-8 bg-[#232320] border-[#2C2C2C] text-[#e5e5e5] text-xs"
                   />
                   <span className="text-[#6b7280] text-xs">to</span>
                   <Input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-36 h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs"
+                    className="w-36 h-8 bg-[#232320] border-[#2C2C2C] text-[#e5e5e5] text-xs"
                   />
                 </div>
 
@@ -1646,7 +1646,7 @@ return (
                 <div className="flex items-center gap-2">
                   <label className="text-[#6b7280] text-xs">or Preset:</label>
                   <Select value={datePreset} onValueChange={setDatePreset}>
-                    <SelectTrigger className="w-36 h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs">
+                    <SelectTrigger className="w-36 h-8 bg-[#232320] border-[#2C2C2C] text-[#e5e5e5] text-xs">
                       <SelectValue placeholder="Select preset..." />
                     </SelectTrigger>
                     <SelectContent className="bg-[#1a1a18] border-[#2C2C2C] text-[#e5e5e5]">
@@ -1688,7 +1688,7 @@ return (
                   <label className="text-[#6b7280] text-xs">Metric:</label>
                   <Select value={comparisonMetric} onValueChange={setComparisonMetric}>
                     <SelectTrigger 
-                      className="h-8 bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] text-xs"
+                      className="h-8 bg-[#232320] border-[#2C2C2C] text-[#e5e5e5] text-xs"
                       style={{ minWidth: '6rem' }}
                     >
                       <SelectValue />
@@ -2315,7 +2315,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
             alignItems: 'center',
             justifyContent: 'center',
             minHeight: '80vh',
-            background: '#252521',
+            background: '#232320',
             color: '#e5e5e5',
             padding: '24px'
           }}>
