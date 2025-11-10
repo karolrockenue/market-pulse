@@ -97,7 +97,7 @@ export function MarketCalendarPreview() {
   const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="bg-[#23231F] rounded-xl border border-[#3a3a35] overflow-hidden shadow-2xl">
+    <div className="bg-[#252521] rounded-xl border border-[#3a3a35] overflow-hidden shadow-2xl">
       {/* Header - Static */}
       <div className="p-6 border-b border-[#3a3a35]">
         <div className="flex items-center justify-between mb-4">
@@ -112,7 +112,7 @@ export function MarketCalendarPreview() {
         </div>
 
         {/* Static View Mode Indicator */}
-        <div className="inline-flex items-center gap-2 bg-[#faff6a] text-[#23231F] px-4 py-2 rounded">
+        <div className="inline-flex items-center gap-2 bg-[#faff6a] text-[#252521] px-4 py-2 rounded">
           <TrendingUp className="w-4 h-4" />
           <span className="text-sm">Market Demand View</span>
         </div>

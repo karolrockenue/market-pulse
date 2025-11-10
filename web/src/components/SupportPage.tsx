@@ -135,7 +135,7 @@ return (
                             className={`p-4 rounded-lg border-2 transition-all ${
                               requestType === type.value
                                 ? 'border-[#faff6a] bg-[#faff6a]/5'
-                                : 'border-[#2C2C2C] bg-[#23231F] hover:border-[#3a3a35]'
+                                : 'border-[#2C2C2C] bg-[#252521] hover:border-[#3a3a35]'
                             }`}
                           >
                             <Icon
@@ -168,7 +168,7 @@ return (
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="bg-[#23231F] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
                   </div>
 
@@ -190,7 +190,7 @@ return (
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       required
-                      className="bg-[#23231F] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
                   </div>
 
@@ -203,7 +203,7 @@ return (
                       <Select value={pmsType} onValueChange={setPmsType} required>
                         <SelectTrigger
                           id="pms-type"
-                          className="bg-[#23231F] border-[#2C2C2C] text-[#e5e5e5]"
+                          className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5]"
                         >
                           <SelectValue placeholder="Select your PMS" />
                         </SelectTrigger>
@@ -240,7 +240,7 @@ return (
                       onChange={(e) => setMessage(e.target.value)}
                       required
                       rows={6}
-                      className="bg-[#23231F] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280] resize-none"
+                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280] resize-none"
                     />
                   </div>
 {/* Submit Button */}

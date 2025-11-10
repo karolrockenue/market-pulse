@@ -15,7 +15,7 @@ export function MagicLinkEmail({ userFirstName = "there", magicLinkUrl = "#" }: 
         style={{
           maxWidth: '600px',
           margin: '0 auto',
-          backgroundColor: '#23231F',
+          backgroundColor: '#252521',
           borderRadius: '8px',
           overflow: 'hidden',
         }}
@@ -172,7 +172,7 @@ export function getMagicLinkEmailHTML(userFirstName: string = "there", magicLink
     <tr>
       <td align="center" style="padding: 40px 20px;">
         <!-- Email Container -->
-        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #23231F; border-radius: 8px;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #252521; border-radius: 8px;">
           <tr>
             <td style="padding: 32px;">
               <!-- Header -->

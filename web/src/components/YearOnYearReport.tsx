@@ -408,7 +408,7 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
     <div className="space-y-5 relative">
       {/* [NEW] Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-[#23231F]/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+        <div className="absolute inset-0 bg-[#252521]/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
           <div className="w-8 h-8 border-2 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin"></div>
         </div>
       )}

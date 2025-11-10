@@ -84,7 +84,7 @@ const getRankColor = (rank: number, total: number) => {
               
               <div className="flex items-center gap-2">
                 <div className="flex-1">
-                  <div className="h-2 bg-[#23231F] rounded-full overflow-hidden">
+                  <div className="h-2 bg-[#252521] rounded-full overflow-hidden">
                     <div 
                       className="h-full rounded-full transition-all"
                       style={{ 

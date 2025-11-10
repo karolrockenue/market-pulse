@@ -911,7 +911,7 @@ const trendData = data?.forwardDemandChartData || [];
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <div className="h-1.5 bg-[#23231F] rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-[#252521] rounded-full overflow-hidden">
                           <div 
                             className="h-full rounded-full transition-all"
                             style={{ 
