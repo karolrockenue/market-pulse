@@ -135,7 +135,7 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
     const internalUserId = userResult.rows[0].user_id;
 
     // --- [NEW] Handle different report types ---
-    const {
+const {
       // COMMON FIELDS
       propertyId,
       reportName,
@@ -145,7 +145,7 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
       dayOfMonth,
       timeOfDay,
       // NEW TYPE DISCRIMINATOR
-      report_type, // "standard" or "shreeji"
+      reportType, // "standard" or "shreeji"
       // STANDARD REPORT FIELDS
       metricsHotel,
       metricsMarket,
@@ -158,7 +158,8 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
     } = req.body;
 
     // --- [NEW] Set defaults and nullify params based on type ---
-    const safeReportType = report_type || 'standard';
+// --- [NEW] Set defaults and nullify params based on type ---
+    const safeReportType = reportType || 'standard';
     const isShreeji = safeReportType === 'shreeji';
 
     // These values are for "Standard" reports. If it's a Shreeji report,
