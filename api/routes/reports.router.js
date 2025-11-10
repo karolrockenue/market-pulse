@@ -157,23 +157,22 @@ const {
       attachmentFormats,
     } = req.body;
 
-    // --- [NEW] Set defaults and nullify params based on type ---
 // --- [NEW] Set defaults and nullify params based on type ---
     const safeReportType = reportType || 'standard';
     const isShreeji = safeReportType === 'shreeji';
 
     // These values are for "Standard" reports. If it's a Shreeji report,
-    // we nullify them to save space and avoid confusion.
-    // These values are for "Standard" reports. If it's a Shreeji report,
     // we set them to non-null defaults to satisfy database constraints.
     const safeMetricsHotel = isShreeji ? [] : metricsHotel;
     const safeMetricsMarket = isShreeji ? [] : (Array.isArray(metricsMarket) ? metricsMarket : []);
     const safeAddComparisons = isShreeji ? false : !!addComparisons;
-    const safeDisplayOrder = isShreeji ? null : (displayOrder ?? "metric");
+    
+    // [FIX] All columns below must have a non-null default to prevent constraint errors.
+    const safeDisplayOrder = isShreeji ? "metric" : (displayOrder ?? "metric");
     const safeDisplayTotals = isShreeji ? false : displayTotals;
     const safeIncludeTaxes = isShreeji ? false : (includeTaxes ?? true);
-    const safeReportPeriod = isShreeji ? null : reportPeriod;
-    const safeAttachmentFormats = isShreeji ? null : attachmentFormats;
+    const safeReportPeriod = isShreeji ? "daily" : (reportPeriod ?? "daily"); // Provide a non-null default
+    const safeAttachmentFormats = isShreeji ? [] : (attachmentFormats ?? []); // Provide a non-null default
     // --- [END NEW LOGIC] ---
 
     const result = await pgPool.query(
