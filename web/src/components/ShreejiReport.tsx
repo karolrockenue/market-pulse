@@ -394,6 +394,7 @@ timeOfDay: scheduleTime,
   <SelectItem value="06:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">06:00</SelectItem>
   <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
   <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
+  {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
 <SelectItem value="15:00" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
   <SelectItem value="15:05" className="text-[#faff6a] focus:bg-[#3a3a35]">15:05 (Test)</SelectItem>
   <SelectItem value="15:10" className="text-[#faff6a] focus:bg-[#3a3a35]">15:10 (Test)</SelectItem>
@@ -408,6 +409,7 @@ timeOfDay: scheduleTime,
   <SelectItem value="15:55" className="text-[#faff6a] focus:bg-[#3a3a35]">15:55 (Test)</SelectItem>
   <SelectItem value="16:00" className="text-[#faff6a] focus:bg-[#3a3a35]">16:00 (Test)</SelectItem>
 </SelectContent>
+              </Select>
             </div>
             
             {/* Frequency (hidden, defaulting to Daily) */}
