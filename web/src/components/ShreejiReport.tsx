@@ -278,7 +278,7 @@ export function ShreejiReport({
       </div>
 
       {/* Report Controls (existing) */}
-      <Card className="bg-[#262626] border-[#3a3a35] p-6">
+<Card className="border-[#3a3a35] p-6" style={{ backgroundColor: '#2C2C2C' }}>
         <div className="grid grid-cols-4 gap-4 items-end">
           {/* Select Hotel */}
           <div className="space-y-2">
@@ -287,7 +287,7 @@ export function ShreejiReport({
               <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue placeholder="Choose a hotel" />
               </SelectTrigger>
-         <SelectContent style={{ backgroundColor: '#262626', border: '1px solid #3a3a35' }}>
+         <SelectContent style={{ backgroundColor: '#2C2C2C', border: '1px solid #3a3a35' }}>
                 {hotels.length === 0 && (
                   <SelectItem value="loading" disabled className="text-[#9ca3af]">
                     Loading hotels...
@@ -313,13 +313,13 @@ export function ShreejiReport({
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-left bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#262626] hover:text-[#faff6a]"
+                  className="w-full justify-start text-left bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#2C2C2C] hover:text-[#faff6a]"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {selectedDate ? selectedDate.toLocaleDateString('en-GB') : 'Pick a date'}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-[#262626] border-[#3a3a35]" align="start">
+              <PopoverContent className="w-auto p-0 bg-[#2C2C2C] border-[#3a3a35]" align="start">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
@@ -328,7 +328,7 @@ export function ShreejiReport({
                     setDatePickerOpen(false);
                   }}
                   initialFocus
-                  className="bg-[#262626]"
+                  className="bg-[#2C2C2C]"
                 />
               </PopoverContent>
             </Popover>
@@ -340,7 +340,7 @@ export function ShreejiReport({
               variant="outline"
               onClick={handlePreview}
               disabled={isLoading}
-              className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#262626] hover:text-[#faff6a]"
+              className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#2C2C2C] hover:text-[#faff6a]"
             >
               <FileText className="mr-2 h-4 w-4" />
               Preview Report
@@ -362,7 +362,7 @@ export function ShreejiReport({
         <h2 className="text-white text-xl">Report Schedules</h2>
         
         {/* Create New Schedule Form */}
-        <Card className="bg-[#262626] border-[#3a3a35] p-6">
+        <Card className="bg-[#2C2C2C] border-[#3a3a35] p-6">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
             {/* Report Name */}
             <div className="space-y-2 md:col-span-2">
@@ -382,7 +382,7 @@ export function ShreejiReport({
                 <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
                   <SelectValue placeholder="Choose hotel" />
                 </SelectTrigger>
-        <SelectContent style={{ backgroundColor: '#262626', border: '1px solid #3a3a35' }}>
+        <SelectContent style={{ backgroundColor: '#2C2C2C', border: '1px solid #3a3a35' }}>
                   {hotels.map((hotel) => (
                     <SelectItem
                       key={hotel.hotel_id}
@@ -403,7 +403,7 @@ export function ShreejiReport({
                 <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
                   <SelectValue />
                 </SelectTrigger>
-   <SelectContent style={{ backgroundColor: '#262626', border: '1px solid #3a3a35' }}>
+   <SelectContent style={{ backgroundColor: '#2C2C2C', border: '1px solid #3a3a35' }}>
   <SelectItem value="06:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">06:00</SelectItem>
   <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
   <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
@@ -452,11 +452,11 @@ export function ShreejiReport({
         </Card>
 
         {/* Existing Schedules Table */}
-        <Card className="bg-[#262626] border-[#3a3a35]">
+        <Card className="bg-[#2C2C2C] border-[#3a3a35]">
           <Table>
             <TableHeader>
               <TableRow className="border-[#3a3a35] hover:bg-transparent">
-                <TableHead className="text-[#9ca3af]">Report Name</TableHead>
+         <TableHead className="text-[#9ca3af]" style={{ paddingLeft: '24px' }}>Report Name</TableHead>
                 <TableHead className="text-[#9ca3af]">Hotel</TableHead>
                 <TableHead className="text-[#9ca3af]">Recipients</TableHead>
                 <TableHead className="text-[#9ca3af]">Schedule</TableHead>
@@ -481,7 +481,7 @@ export function ShreejiReport({
               )}
               {!isLoadingSchedules && scheduledReports.map((report) => (
                 <TableRow key={report.id} className="border-[#3a3a35] hover:bg-[#1a1a18]">
-                  <TableCell className="text-[#e5e5e5]">{report.report_name}</TableCell>
+               <TableCell className="text-[#e5e5e5]" style={{ paddingLeft: '24px' }}>{report.report_name}</TableCell>
                   <TableCell className="text-[#e5e5e5]">{getHotelName(report.property_id)}</TableCell>
                   <TableCell className="text-[#9ca3af] text-xs">{report.recipients}</TableCell>
                   <TableCell className="text-[#e5e5e5]">
@@ -512,7 +512,7 @@ export function ShreejiReport({
       <div>
         {/* Default State */}
         {!reportData && !isLoading && (
-          <Card className="bg-[#262626] border-[#3a3a35] p-12 text-center">
+          <Card className="bg-[#2C2C2C] border-[#3a3a35] p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-[#faff6a]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileText className="w-8 h-8 text-[#faff6a]" />
@@ -527,7 +527,7 @@ export function ShreejiReport({
 
         {/* Loading State */}
         {isLoading && (
-          <Card className="bg-[#262626] border-[#3a3a35] p-12 text-center">
+          <Card className="bg-[#2C2C2C] border-[#3a3a35] p-12 text-center">
             <div className="max-w-md mx-auto">
               <Loader2 className="w-12 h-12 text-[#faff6a] animate-spin mx-auto mb-4" />
               <p className="text-[#9ca3af] text-sm">Generating report...</p>
@@ -547,7 +547,7 @@ export function ShreejiReport({
             </div>
 
             {/* Summary Bar */}
-            <Card className="bg-[#262626] border-[#3a3a35] p-6">
+            <Card className="bg-[#2C2C2C] border-[#3a3a35] p-6">
               <div className="grid grid-cols-7 gap-4">
                 <div className="text-center">
                   <div className="text-[#9ca3af] text-xs mb-1">Vacant</div>
@@ -585,7 +585,7 @@ export function ShreejiReport({
 
             {/* Data Tabs (existing) */}
             <Tabs defaultValue="guests" className="w-full">
-              <TabsList className="bg-[#262626] border border-[#3a3a35] p-1">
+              <TabsList className="bg-[#2C2C2C] border border-[#3a3a35] p-1">
                 <TabsTrigger
                   value="guests"
                   className="data-[state=active]:bg-[#faff6a] data-[state=active]:text-[#1d1d1c] text-[#9ca3af]"
@@ -608,7 +608,7 @@ export function ShreejiReport({
 
               {/* In-House Guests Tab */}
               <TabsContent value="guests" className="mt-4">
-                <Card className="bg-[#262626] border-[#3a3a35]">
+                <Card className="bg-[#2C2C2C] border-[#3a3a35]">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -647,7 +647,7 @@ export function ShreejiReport({
 
               {/* Daily Takings Tab */}
               <TabsContent value="takings" className="mt-4">
-                <Card className="bg-[#262626] border-[#3a3a35] p-6">
+                <Card className="bg-[#2C2C2C] border-[#3a3a35] p-6">
                   <div className="max-w-md">
                     <div className="mb-6 pb-4 border-b border-[#3a3a35]">
                       <div className="text-[#9ca3af] text-sm mb-1">Total Taken</div>
@@ -671,7 +671,7 @@ export function ShreejiReport({
 
               {/* Blocked Rooms Tab */}
               <TabsContent value="blocked" className="mt-4">
-                <Card className="bg-[#262626] border-[#3a3a35] p-6">
+                <Card className="bg-[#2C2C2C] border-[#3a3a35] p-6">
                   {reportData.blockedRooms.length > 0 ? (
                     <div className="space-y-2">
                       {reportData.blockedRooms.map((room, idx) => (
