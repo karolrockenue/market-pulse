@@ -317,12 +317,12 @@ module.exports = async (req, res) => {
     // We check if req.body exists before trying to get reportId from it.
     const reportId = req.body?.reportId;
 
-    // If a reportId is provided, this is a manual trigger for a single report.
+// If a reportId is provided, this is a manual trigger for a single report.
     if (reportId) {
       console.log(`Manual trigger: Fetching report with ID: ${reportId}`);
       const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
-FROM scheduled_reports sr
+         FROM scheduled_reports sr
          LEFT JOIN hotels h
            ON (
              CASE
@@ -330,7 +330,7 @@ FROM scheduled_reports sr
                ELSE NULL
              END
            ) = h.hotel_id
-         WHERE sr.time_of_day = $1 AND (
+         WHERE sr.id = $1`,
         [reportId]
       );
       dueReports = result.rows;
