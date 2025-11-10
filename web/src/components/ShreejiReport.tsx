@@ -345,13 +345,13 @@ export function ShreejiReport({
               <FileText className="mr-2 h-4 w-4" />
               Preview Report
             </Button>
-            <Button
-              onClick={handleDownloadPDF}
-              disabled={!selectedHotel || !selectedDate || isLoading}
+    <Button
+              onClick={handleSaveSchedule}
+              disabled={isSaving}
               className="bg-[#faff6a] text-[#1d1d1c] hover:bg-[#faff6a]/90"
             >
-              <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Save Schedule
             </Button>
           </div>
         </div>

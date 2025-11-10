@@ -343,10 +343,16 @@ const currentTime = `${now
 
       const currentDayOfMonth = now.getUTCDate();
 
-      const result = await pgPool.query(
+ const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
          FROM scheduled_reports sr
-         JOIN hotels h ON sr.property_id::integer = h.hotel_id
+         LEFT JOIN hotels h
+           ON (
+             CASE
+               WHEN sr.property_id ~ '^[0-9]+$' THEN sr.property_id::int
+               ELSE NULL
+             END
+           ) = h.hotel_id
          WHERE sr.time_of_day = $1 AND (
            (sr.frequency = 'Daily') OR
            (sr.frequency = 'Weekly' AND sr.day_of_week = $2) OR
