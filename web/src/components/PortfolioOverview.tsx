@@ -60,7 +60,7 @@ const formatCurrencyK = (value: number) => {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#252521',
+    backgroundColor: '#23231F',
     padding: '24px',
     color: '#e5e5e5',
   },

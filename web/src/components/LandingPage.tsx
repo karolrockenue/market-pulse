@@ -87,7 +87,7 @@ const handleMagicLink = async (e: React.FormEvent) => {
         {/* Radial Gradient Background */}
         <div className="absolute inset-0">
           {/* Center radial gradient */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#faff6a]/8 via-[#252521] to-[#0a0a09]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#faff6a]/8 via-[#23231F] to-[#0a0a09]" />
           
           {/* Additional accent gradients */}
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle,_var(--tw-gradient-stops))] from-[#10b981]/10 via-transparent to-transparent blur-2xl" />

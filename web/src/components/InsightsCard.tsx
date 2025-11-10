@@ -109,7 +109,7 @@ export function InsightsCard({ kpiData, currencyCode }: InsightsCardProps) {
           return (
             <div 
               key={index} 
-              className="flex items-center justify-between p-2.5 bg-[#1f1f1c] rounded hover:bg-[#252521] transition-colors"
+              className="flex items-center justify-between p-2.5 bg-[#1f1f1c] rounded hover:bg-[#23231F] transition-colors"
             >
               {/* Left side: Icon + Metric Name */}
               <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -134,7 +134,7 @@ export function InsightsCard({ kpiData, currencyCode }: InsightsCardProps) {
                 </div>
 
                 {/* Difference Badge */}
-                <div className="bg-[#252521] border border-[#3a3a35] rounded px-2 py-0.5">
+                <div className="bg-[#23231F] border border-[#3a3a35] rounded px-2 py-0.5">
                   <span 
                     className="text-[10px] font-medium"
                     style={{ color: differenceColor }}

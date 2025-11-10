@@ -160,7 +160,7 @@ const styles = {
   // [MODIFIED] FONT SIZES ARE SCALED DOWN
   pageWrapper: {
     minHeight: '100vh',
-    backgroundColor: '#252521',
+    backgroundColor: '#23231F',
     padding: '24px', // p-6
   },
   mb6: { marginBottom: '24px' }, // mb-6
@@ -454,7 +454,7 @@ matrixDataCell: {
   loadingOverlay: {
     position: 'absolute' as 'absolute',
     inset: 0,
-    backgroundColor: 'rgba(37, 37, 33, 0.8)', // bg-[#252521]/80
+    backgroundColor: 'rgba(37, 37, 33, 0.8)', // bg-[#23231F]/80
     display: 'flex',
     flexDirection: 'column' as 'column',
     alignItems: 'center',

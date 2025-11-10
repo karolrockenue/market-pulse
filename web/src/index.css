@@ -1963,8 +1963,8 @@
     background-color: oklab(69.5873% -.142158 .0448781 / .2);
   }
 
-  .bg-\[\#252521\] {
-    background-color: #252521;
+  .bg-\[\#23231F\] {
+    background-color: #23231F;
   }
 
   .bg-\[\#2C2C2C\] {
@@ -2160,8 +2160,8 @@
     --tw-gradient-stops: var(--tw-gradient-via-stops);
   }
 
-  .via-\[\#252521\] {
-    --tw-gradient-via: #252521;
+  .via-\[\#23231F\] {
+    --tw-gradient-via: #23231F;
     --tw-gradient-via-stops: var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
     --tw-gradient-stops: var(--tw-gradient-via-stops);
   }
@@ -2638,8 +2638,8 @@
     color: #10b981;
   }
 
-  .text-\[\#252521\] {
-    color: #252521;
+  .text-\[\#23231F\] {
+    color: #23231F;
   }
 
   .text-\[\#b4b8bd\] {
@@ -3193,8 +3193,8 @@
   }
 
   @media (hover: hover) {
-    .hover\:bg-\[\#252521\]:hover {
-      background-color: #252521;
+    .hover\:bg-\[\#23231F\]:hover {
+      background-color: #23231F;
     }
   }
 
@@ -4161,20 +4161,20 @@
 
 :root {
   --font-size: 14px;
-  --background: #252521;
+  --background: #23231F;
   --foreground: #e5e5e5;
   --card: #2C2C2C;
   --card-foreground: #e5e5e5;
   --popover: #2C2C2C;
   --popover-foreground: #e5e5e5;
   --primary: #faff6a;
-  --primary-foreground: #252521;
+  --primary-foreground: #23231F;
   --secondary: #3a3a35;
   --secondary-foreground: #e5e5e5;
   --muted: #3a3a35;
   --muted-foreground: #9ca3af;
   --accent: #faff6a;
-  --accent-foreground: #252521;
+  --accent-foreground: #23231F;
   --destructive: #ef4444;
   --destructive-foreground: #fff;
   --border: #3a3a35;
@@ -4193,7 +4193,7 @@
   --sidebar: #1f1f1c;
   --sidebar-foreground: #e5e5e5;
   --sidebar-primary: #faff6a;
-  --sidebar-primary-foreground: #252521;
+  --sidebar-primary-foreground: #23231F;
   --sidebar-accent: #2C2C2C;
   --sidebar-accent-foreground: #e5e5e5;
   --sidebar-border: #3a3a35;

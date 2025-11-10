@@ -19,7 +19,7 @@ function getMagicLinkEmailHTML(userFirstName = "there", magicLinkUrl) {
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #1A1A18;">
     <tr>
       <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #252521; border-radius: 8px;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #23231F; border-radius: 8px;">
           <tr>
             <td style="padding: 32px;">
               <h1 style="color: #FAFF6A; font-size: 24px; font-weight: 600; margin: 0 0 32px 0; letter-spacing: -0.5px;">Market Pulse</h1>
@@ -77,7 +77,7 @@ function getShreejiReportEmailHTML(reportName, hotelName, reportDate, recipientN
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #1A1A18;">
     <tr>
       <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #252521; border-radius: 8px;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #23231F; border-radius: 8px;">
           <tr>
             <td style="padding: 32px;">
               <h1 style="color: #FAFF6A; font-size: 24px; font-weight: 600; margin: 0 0 32px 0; letter-spacing: -0.5px;">Market Pulse</h1>

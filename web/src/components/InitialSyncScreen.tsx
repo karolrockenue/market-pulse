@@ -21,7 +21,7 @@ export function InitialSyncScreen() {
   const CurrentIcon = steps[currentStep].icon;
 
   return (
-    <div className="fixed inset-0 bg-[#252521] flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-[#23231F] flex items-center justify-center z-50">
       <div className="max-w-md w-full px-6 text-center">
         {/* Animated Icon */}
         <div className="mb-8 flex justify-center">

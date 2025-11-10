@@ -538,7 +538,7 @@ const getPriceIndexColor = (index: number) => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#252521',
+        background: '#23231F',
         color: '#e5e5e5',
         padding: '24px'
       }}>
@@ -557,7 +557,7 @@ const getPriceIndexColor = (index: number) => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#252521',
+        background: '#23231F',
         color: '#e5e5e5',
         padding: '24px',
         textAlign: 'center'
@@ -581,7 +581,7 @@ const getPriceIndexColor = (index: number) => {
 
   // --- Main Component Render ---
   return (
-    <div style={{ minHeight: '100vh', background: '#252521', padding: '24px' }}>
+    <div style={{ minHeight: '100vh', background: '#23231F', padding: '24px' }}>
       {/* Page Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
@@ -626,8 +626,8 @@ const getPriceIndexColor = (index: number) => {
             <div style={{ overflowX: 'auto' }}>
               <table className="w-full text-xs table-fixed" style={{ minWidth: '2471px' }}>
           <thead>
-                  <tr className="bg-[#252521] border-b border-[#3a3a35]">
-                    <th className="sticky left-0 bg-[#252521] text-left text-[#9ca3af] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
+                  <tr className="bg-[#23231F] border-b border-[#3a3a35]">
+                    <th className="sticky left-0 bg-[#23231F] text-left text-[#9ca3af] border-r border-[#3a3a35] z-10" style={{ width: '161px', padding: '0.75rem', position: 'sticky', left: 0, zIndex: 10 }}>
                       <span className="text-xs uppercase tracking-wide">Metric</span>
                     </th>
                     {futureData.map((day, idx) => {
@@ -654,7 +654,7 @@ const getPriceIndexColor = (index: number) => {
                               ? 'bg-[#faff6a]/20 text-[#faff6a]'
                               : isHovered
                               ? 'bg-[#faff6a]/15 text-[#e5e5e5]'
-                              : `text-[#9ca3af] ${isOddMonth ? 'bg-[#1a1a18]' : 'bg-[#252521]'} ${demandStyle.hoverBg || 'hover:bg-[#faff6a]/10'} hover:text-[#e5e5e5]`
+                              : `text-[#9ca3af] ${isOddMonth ? 'bg-[#1a1a18]' : 'bg-[#23231F]'} ${demandStyle.hoverBg || 'hover:bg-[#faff6a]/10'} hover:text-[#e5e5e5]`
                           }`}
                           style={{ 
                             width: '77px',
@@ -1003,7 +1003,7 @@ const getPriceIndexColor = (index: number) => {
                 </tbody>
               </table>
             </div>
-            <div className="p-3 bg-[#252521] border-t border-[#3a3a35] flex items-center justify-center gap-2 text-[#6b7280] text-[10px]">
+            <div className="p-3 bg-[#23231F] border-t border-[#3a3a35] flex items-center justify-center gap-2 text-[#6b7280] text-[10px]">
               <Info className="w-3 h-3" />
              <span>Scroll horizontally to view all 90 days • Click any day column to view details below</span>
             </div>
