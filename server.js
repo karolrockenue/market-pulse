@@ -14,7 +14,13 @@ const path = require("path");
 const pgPool = require("./api/utils/db");
 const { requirePageLogin } = require("./api/utils/middleware");
 // [NEW] Import the daily-refresh job handler
+// [WITH THIS]
+
+// [NEW] Import all cron job handlers
 const dailyRefreshHandler = require("./api/daily-refresh.js");
+const sendScheduledReportsHandler = require("./api/send-scheduled-reports.js");
+const syncRockenueAssetsHandler = require("./api/sync-rockenue-assets.js");
+
 // Import all the router files.
 const authRoutes = require("./api/routes/auth.router.js");
 const dashboardRoutes = require("./api/routes/dashboard.router.js");
@@ -172,9 +178,27 @@ app.get("/api/cron/daily-refresh", (req, res) => {
 
   // If secret is valid, run the handler.
   // We pass the 'req' and 'res' objects directly to it.
+// [WITH THIS]
+
   console.log("CRON JOB ACCEPTED: Running daily-refresh...");
   return dailyRefreshHandler(req, res);
 });
+
+// [NEW] SECURE CRON JOB ENDPOINT FOR SCHEDULED REPORTS
+app.get("/api/send-scheduled-reports", (req, res) => {
+  // NOTE: This job runs every 5 mins and does not need a secret.
+  // It checks the DB for its own schedule.
+  console.log("CRON JOB ACCEPTED: Running send-scheduled-reports...");
+  return sendScheduledReportsHandler(req, res);
+});
+
+// [NEW] SECURE CRON JOB ENDPOINT FOR ROCKENUE ASSETS
+app.get("/api/sync-rockenue-assets", (req, res) => {
+  // NOTE: This job also does not need a secret as it's not parameterized.
+  console.log("CRON JOB ACCEPTED: Running sync-rockenue-assets...");
+  return syncRockenueAssetsHandler(req, res);
+});
+
 
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
