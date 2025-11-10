@@ -309,7 +309,9 @@ async function generateXLSX(data, report) {
 // --- MAIN HANDLER ---
 // --- MAIN HANDLER ---
 module.exports = async (req, res) => {
+  console.log("--- [CRON START] /api/send-scheduled-reports function executing ---");
   try {
+    
     let dueReports;
     // THE FIX: Safely access reportId from req.body, which might be undefined in a cron job.
     // We check if req.body exists before trying to get reportId from it.
@@ -320,9 +322,15 @@ module.exports = async (req, res) => {
       console.log(`Manual trigger: Fetching report with ID: ${reportId}`);
       const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
-         FROM scheduled_reports sr
-         JOIN hotels h ON sr.property_id::integer = h.hotel_id
-         WHERE sr.id = $1`,
+FROM scheduled_reports sr
+         LEFT JOIN hotels h
+           ON (
+             CASE
+               WHEN sr.property_id ~ '^[0-9]+$' THEN sr.property_id::int
+               ELSE NULL
+             END
+           ) = h.hotel_id
+         WHERE sr.time_of_day = $1 AND (
         [reportId]
       );
       dueReports = result.rows;
@@ -343,7 +351,12 @@ const currentTime = `${now
 
       const currentDayOfMonth = now.getUTCDate();
 
- const result = await pgPool.query(
+      console.log(`[CRON DEBUG] Querying for:`);
+      console.log(`[CRON DEBUG] time_of_day = ${currentTime}`);
+      console.log(`[CRON DEBUG] day_of_week = ${currentDayOfWeek}`);
+      console.log(`[CRON DEBUG] day_of_month = ${currentDayOfMonth}`);
+
+const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
          FROM scheduled_reports sr
          LEFT JOIN hotels h
@@ -363,11 +376,13 @@ const currentTime = `${now
       dueReports = result.rows;
     }
 
+console.log(`[CRON DEBUG] Database query returned ${dueReports.length} report(s).`);
+
     if (dueReports.length === 0) {
       const message = reportId
         ? `Report with ID ${reportId} not found.`
         : `No reports due at this time.`;
-      console.log(message);
+console.log(`[CRON EXIT] ${message} - Exiting cleanly.`);
       return res.status(reportId ? 404 : 200).send(message);
     }
 
