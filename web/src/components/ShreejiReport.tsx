@@ -221,16 +221,25 @@ export function ShreejiReport({
     }
 
     setIsSaving(true);
-    const payload = {
-      report_type: 'shreeji', // This is critical
+const payload = {
+      report_type: 'shreeji',
       propertyId: scheduleHotelId,
       reportName: scheduleName,
       recipients: scheduleRecipients.split(',').map((e) => e.trim()),
       frequency: scheduleFrequency,
-timeOfDay: scheduleTime,
-      // We set day_of_week/month to null or a default
-      day_of_week: scheduleFrequency === 'Weekly' ? 1 : null, // Default to Monday
-      day_of_month: scheduleFrequency === 'Monthly' ? 1 : null, // Default to 1st
+      timeOfDay: scheduleTime, // This is the fix from last time
+      day_of_week: scheduleFrequency === 'Weekly' ? 1 : null,
+      day_of_month: scheduleFrequency === 'Monthly' ? 1 : null,
+
+      // --- [NEW] ADD ALL THESE DEFAULT VALUES ---
+      metrics_hotel: [], // Satisfies not-null constraint
+      metrics_market: [],
+      add_comparisons: false,
+      display_order: 'group-by-metric',
+      display_totals: false,
+      include_taxes: false,
+      report_period: 'current-week', // Default, won't be used
+      attachment_formats: ['pdf'] // Default, won't be used
     };
 
     await onSaveSchedule(payload); // Call prop
