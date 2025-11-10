@@ -1,29 +1,28 @@
+
 {
   "version": 2,
-"builds": [
-    { "src": "api/send-scheduled-reports.js", "use": "@vercel/node" },
-    { "src": "api/daily-refresh.js", "use": "@vercel/node" },
-    { "src": "api/sync-rockenue-assets.js", "use": "@vercel/node" },
+  "builds": [
     {
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "web/build/**"
+          "web/build/**", 
+          "api/**"
         ]
       }
     }
   ],
-"rewrites": [
+  "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/server.js"
     }
   ],
   "crons": [
-{
+    {
       "path": "/api/cron/daily-refresh?secret=Overkill123*",
-"schedule": "0 6 * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/send-scheduled-reports",

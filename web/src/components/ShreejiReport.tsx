@@ -408,18 +408,22 @@ export function ShreejiReport({
   <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
   <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
   {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
-<SelectItem value="17:00" className="text-[#faff6a] focus:bg-[#3a3a35]">17:00 (Test)</SelectItem>
-  <SelectItem value="17:05" className="text-[#faff6a] focus:bg-[#3a3a35]">17:05 (Test)</SelectItem>
-  <SelectItem value="17:10" className="text-[#faff6a] focus:bg-[#3a3a35]">17:10 (Test)</SelectItem>
-  <SelectItem value="17:15" className="text-[#faff6a] focus:bg-[#3a3a35]">17:15 (Test)</SelectItem>
-  <SelectItem value="17:20" className="text-[#faff6a] focus:bg-[#3a3a35]">17:20 (Test)</SelectItem>
-  <SelectItem value="17:25" className="text-[#faff6a] focus:bg-[#3a3a35]">17:25 (Test)</SelectItem>
-  <SelectItem value="17:30" className="text-[#faff6a] focus:bg-[#3a3a35]">17:30 (Test)</SelectItem>
-  <SelectItem value="17:35" className="text-[#faff6a] focus:bg-[#3a3a35]">17:35 (Test)</SelectItem>
-  <SelectItem value="17:40" className="text-[#faff6a] focus:bg-[#3a3a35]">17:40 (Test)</SelectItem>
-  <SelectItem value="17:45" className="text-[#faff6a] focus:bg-[#3a3D35]">17:45 (Test)</SelectItem>
-  <SelectItem value="17:50" className="text-[#faff6a] focus:bg-[#3a3a35]">17:50 (Test)</SelectItem>
-  <SelectItem value="17:55" className="text-[#faff6a] focus:bg-[#3a3a35]">17:55 (Test)</SelectItem>
+<SelectItem value="18:45" className="text-[#faff6a] focus:bg-[#3a3a35]">18:45 (Test)</SelectItem>
+<SelectItem value="18:50" className="text-[#faff6a] focus:bg-[#3a3a35]">18:50 (Test)</SelectItem>
+<SelectItem value="18:55" className="text-[#faff6a] focus:bg-[#3a3a35]">18:55 (Test)</SelectItem>
+<SelectItem value="19:00" className="text-[#faff6a] focus:bg-[#3a3a35]">19:00 (Test)</SelectItem>
+<SelectItem value="19:05" className="text-[#faff6a] focus:bg-[#3a3a35]">19:05 (Test)</SelectItem>
+<SelectItem value="19:10" className="text-[#faff6a] focus:bg-[#3a3a35]">19:10 (Test)</SelectItem>
+<SelectItem value="19:15" className="text-[#faff6a] focus:bg-[#3a3a35]">19:15 (Test)</SelectItem>
+<SelectItem value="19:20" className="text-[#faff6a] focus:bg-[#3a3a35]">19:20 (Test)</SelectItem>
+<SelectItem value="19:25" className="text-[#faff6a] focus:bg-[#3a3a35]">19:25 (Test)</SelectItem>
+<SelectItem value="19:30" className="text-[#faff6a] focus:bg-[#3a3a35]">19:30 (Test)</SelectItem>
+<SelectItem value="19:35" className="text-[#faff6a] focus:bg-[#3a3a35]">19:35 (Test)</SelectItem>
+<SelectItem value="19:40" className="text-[#faff6a] focus:bg-[#3a3a35]">19:40 (Test)</SelectItem>
+<SelectItem value="19:45" className="text-[#faff6a] focus:bg-[#3a3a35]">19:45 (Test)</SelectItem>
+<SelectItem value="19:50" className="text-[#faff6a] focus:bg-[#3a3a35]">19:50 (Test)</SelectItem>
+<SelectItem value="19:55" className="text-[#faff6a] focus:bg-[#3a3a35]">19:55 (Test)</SelectItem>
+<SelectItem value="20:00" className="text-[#faff6a] focus:bg-[#3a3a35]">20:00 (Test)</SelectItem>
 </SelectContent>
               </Select>
             </div>
