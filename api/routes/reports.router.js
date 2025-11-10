@@ -164,8 +164,10 @@ const {
 
     // These values are for "Standard" reports. If it's a Shreeji report,
     // we nullify them to save space and avoid confusion.
-    const safeMetricsHotel = isShreeji ? null : metricsHotel;
-    const safeMetricsMarket = isShreeji ? null : (Array.isArray(metricsMarket) ? metricsMarket : []);
+    // These values are for "Standard" reports. If it's a Shreeji report,
+    // we set them to non-null defaults to satisfy database constraints.
+    const safeMetricsHotel = isShreeji ? [] : metricsHotel;
+    const safeMetricsMarket = isShreeji ? [] : (Array.isArray(metricsMarket) ? metricsMarket : []);
     const safeAddComparisons = isShreeji ? false : !!addComparisons;
     const safeDisplayOrder = isShreeji ? null : (displayOrder ?? "metric");
     const safeDisplayTotals = isShreeji ? false : displayTotals;
