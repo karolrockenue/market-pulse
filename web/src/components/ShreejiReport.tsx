@@ -227,7 +227,7 @@ export function ShreejiReport({
       reportName: scheduleName,
       recipients: scheduleRecipients.split(',').map((e) => e.trim()),
       frequency: scheduleFrequency,
-      time_of_day: scheduleTime,
+timeOfDay: scheduleTime,
       // We set day_of_week/month to null or a default
       day_of_week: scheduleFrequency === 'Weekly' ? 1 : null, // Default to Monday
       day_of_month: scheduleFrequency === 'Monthly' ? 1 : null, // Default to 1st
@@ -394,13 +394,20 @@ export function ShreejiReport({
   <SelectItem value="06:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">06:00</SelectItem>
   <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
   <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
-  {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
-  <SelectItem value="14:55" className="text-[#faff6a] focus:bg-[#3a3a35]">14:55 (Test)</SelectItem>
-  <SelectItem value="15:00" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
-    <SelectItem value="15:05" className="text-[#faff6a] focus:bg-[#3a3a35]">14:55 (Test)</SelectItem>
-  <SelectItem value="15:10" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
+<SelectItem value="15:00" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
+  <SelectItem value="15:05" className="text-[#faff6a] focus:bg-[#3a3a35]">15:05 (Test)</SelectItem>
+  <SelectItem value="15:10" className="text-[#faff6a] focus:bg-[#3a3a35]">15:10 (Test)</SelectItem>
+  <SelectItem value="15:15" className="text-[#faff6a] focus:bg-[#3a3a35]">15:15 (Test)</SelectItem>
+  <SelectItem value="15:20" className="text-[#faff6a] focus:bg-[#3a3a35]">15:20 (Test)</SelectItem>
+  <SelectItem value="15:25" className="text-[#faff6a] focus:bg-[#3a3a35]">15:25 (Test)</SelectItem>
+  <SelectItem value="15:30" className="text-[#faff6a] focus:bg-[#3a3a35]">15:30 (Test)</SelectItem>
+  <SelectItem value="15:35" className="text-[#faff6a] focus:bg-[#3a3a35]">15:35 (Test)</SelectItem>
+  <SelectItem value="15:40" className="text-[#faff6a] focus:bg-[#3a3a35]">15:40 (Test)</SelectItem>
+  <SelectItem value="15:45" className="text-[#faff6a] focus:bg-[#3a3a35]">15:45 (Test)</SelectItem>
+  <SelectItem value="15:50" className="text-[#faff6a] focus:bg-[#3a3a35]">15:50 (Test)</SelectItem>
+  <SelectItem value="15:55" className="text-[#faff6a] focus:bg-[#3a3a35]">15:55 (Test)</SelectItem>
+  <SelectItem value="16:00" className="text-[#faff6a] focus:bg-[#3a3a35]">16:00 (Test)</SelectItem>
 </SelectContent>
-              </Select>
             </div>
             
             {/* Frequency (hidden, defaulting to Daily) */}
