@@ -408,8 +408,7 @@ export function ShreejiReport({
   <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
   <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
   {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
-<SelectItem value="15:00" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
-  <SelectItem value="15:05" className="text-[#faff6a] focus:bg-[#3a3a35]">15:05 (Test)</SelectItem>
+<SelectItem value="15:05" className="text-[#faff6a] focus:bg-[#3a3a35]">15:05 (Test)</SelectItem>
   <SelectItem value="15:10" className="text-[#faff6a] focus:bg-[#3a3a35]">15:10 (Test)</SelectItem>
   <SelectItem value="15:15" className="text-[#faff6a] focus:bg-[#3a3a35]">15:15 (Test)</SelectItem>
   <SelectItem value="15:20" className="text-[#faff6a] focus:bg-[#3a3a35]">15:20 (Test)</SelectItem>
