@@ -49,26 +49,25 @@ web/src/components/ShreejiReport.tsx: The file was fully replaced with a new ver
 web/src/App.tsx: All state (shreejiScheduledReports) and handlers (handleSaveShreejiSchedule) are correctly implemented and passed as props. All ReferenceError bugs are fixed.
 
 4.0 Unresolved Issues & Next Steps
-After fixing all database, build, and frontend state issues, the application now appears to save the new schedule successfully. However, the feature is still not working as expected.
+After a deep debugging session, the initial "ghost schedule" bug has been fixed, but a more severe, system-level bug was uncovered. The feature remains **non-functional**.
 
-Unresolved Bug
-A new "ghost" schedule bug has been identified:
+Original Bug (Resolved)
+The initial "ghost schedule" bug was resolved.
+* **Root Cause:** The `POST /api/reports/scheduled-reports` endpoint was sending `null` values for several columns (`metrics_hotel`, `display_order`, etc.), which violated the database's `NOT NULL` constraints and caused the `INSERT` to fail silently.
+* **Fix:** The endpoint was updated to provide safe, non-null default values for all columns, successfully fixing the data-saving bug.
 
-UI Success: A new Shreeji schedule is created in the UI and appears correctly in the "Existing Schedules" table.
-
-Email Failure: The scheduled time passes (e.g., 15:55 UTC), but the email report never arrives.
-
-Data Disappears: When the page is manually refreshed, the newly created schedule disappears from the table, as if it was never saved.
-
-Root Cause Analysis (Hypothesis)
-This behavior strongly suggests a transactional rollback or a silent data-saving error. The POST /api/reports/scheduled-reports endpoint is likely sending a "Success" (200 OK) response back to the frontend before the database transaction is fully committed (or after it has failed and rolled back).
-
-The cron job (api/send-scheduled-reports.js) then fails to find the new schedule (because it was never truly saved), so no email is sent. The page refresh confirms this by fetching an empty list from the database.
-
-This is almost certainly caused by a final, missed mismatch between the camelCase keys in the frontend payload (e.g., reportType) and the snake_case keys expected by the backend SQL query (e.g., report_type).
+Current Unresolved Bug
+The cron job `api/send-scheduled-reports.js` is not running, and no email is being sent.
+* **Symptom:** The Vercel logs for the scheduled time show "No logs found for this request." This means the function is not being executed.
+* **Root Cause Analysis (Hypothesis):** This is a critical **deployment failure**.
+    1.  The `vercel.json` file is misconfigured. The `api/**/*.js` build rule is too slow and its `rewrites` are likely breaking other application API calls.
+    2.  A fatal `SyntaxError` (a copy-paste error of `[reportId]`) was found in `api/send-scheduled-reports.js`.
+* **Conclusion:** The `SyntaxError` is causing the entire Vercel deployment to **fail to build**. Because the build fails, the cron job function is never successfully deployed, which is why Vercel reports "No logs found" when the cron tries to run it.
 
 Next Steps (What's Left)
-The only remaining task is to debug the POST /api/reports/scheduled-reports endpoint in api/routes/reports.router.js to find and fix the silent data-saving error.
+The only remaining task is to deploy the two files that fix this build and deployment failure.
+1.  Deploy the corrected `api/send-scheduled-reports.js` (with the `SyntaxError` fixed).
+2.  Deploy the new, optimized `vercel.json` (to fix build times and routing).
 
 5.0 ⚠️ Project Blueprint Update Required
 The Project Blueprint.md file is now out of date. A future developer must update it to reflect the following changes:
