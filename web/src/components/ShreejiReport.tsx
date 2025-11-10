@@ -221,27 +221,31 @@ export function ShreejiReport({
     }
 
     setIsSaving(true);
-const payload = {
-      report_type: 'shreeji',
+// [REPLACE YOUR PAYLOAD OBJECT WITH THIS]
+    const payload = {
+      // --- Core Shreeji Fields (using camelCase) ---
+      reportType: 'shreeji',
       propertyId: scheduleHotelId,
       reportName: scheduleName,
       recipients: scheduleRecipients.split(',').map((e) => e.trim()),
       frequency: scheduleFrequency,
-      timeOfDay: scheduleTime, // This is the fix from last time
-      day_of_week: scheduleFrequency === 'Weekly' ? 1 : null,
-      day_of_month: scheduleFrequency === 'Monthly' ? 1 : null,
+      timeOfDay: scheduleTime,
+      dayOfWeek: scheduleFrequency === 'Weekly' ? 1 : null,
+      dayOfMonth: scheduleFrequency === 'Monthly' ? 1 : null,
 
-      // --- [NEW] ADD ALL THESE DEFAULT VALUES ---
-      metrics_hotel: [], // Satisfies not-null constraint
-      metrics_market: [],
-      add_comparisons: false,
-      display_order: 'group-by-metric',
-      display_totals: false,
-      include_taxes: false,
-      report_period: 'current-week', // Default, won't be used
-      attachment_formats: ['pdf'] // Default, won't be used
+      // --- Default Values to Satisfy NOT NULL Constraints ---
+      metricsHotel: [],
+      metricsMarket: [],
+      addComparisons: false,
+      displayOrder: 'group-by-metric',
+      displayTotals: false,
+      includeTaxes: false,
+      reportPeriod: 'current-week',
+      attachmentFormats: [], // Will be ignored by backend, but satisfies constraint
+      year1: null, // For YoY report type
+      year2: null  // For YoY report type
     };
-
+    // [END OF REPLACEMENT]
     await onSaveSchedule(payload); // Call prop
     
     // Clear form
