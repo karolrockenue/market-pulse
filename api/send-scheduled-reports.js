@@ -7,9 +7,15 @@ const { subDays, format } = require("date-fns"); // For calculating "yesterday"
 const { formatInTimeZone } = require("date-fns-tz"); // For email date formatting
 
 // [NEW] Import all our new utility functions
+// [WITH THIS]
+
+// [NEW] Import all our new utility functions
 const { sendEmail } = require("./utils/email.utils");
 const { generateShreejiReport } = require("./utils/report.generators");
-const { getShreejiReportEmailHTML } = require("./utils/emailTemplates");
+const { 
+  getShreejiReportEmailHTML,
+  getStandardReportEmailHTML // [NEW] Import the standard report template
+} = require("./utils/emailTemplates");
 
 
 
@@ -425,7 +431,7 @@ for (const report of dueReports) {
       // --- 3. SEND EMAIL WITH ATTACHMENT ---
       await sendEmail({
         to: recipients,
-        subject: `Your Scheduled Report: ${report.report_name} for ${hotelName}`,
+    subject: report.report_name,
         html: emailHtml,
         attachments: [
           {
@@ -493,6 +499,18 @@ for (const report of dueReports) {
       }
 
       if (attachments.length > 0) {
+// [WITH THIS]
+
+// [WITH THIS]
+
+        // [NEW] Generate the branded HTML for the standard report
+        const emailHtml = getStandardReportEmailHTML(
+          report.report_name,
+          report.report_period,
+          startDate,
+          endDate
+        );
+
         const msg = {
           to: report.recipients.split(",").map((e) => e.trim()),
           // [MODIFIED] Use a "from" object matching our new email util
@@ -500,8 +518,9 @@ for (const report of dueReports) {
             name: "Market Pulse Reports",
             email: process.env.SENDGRID_FROM_EMAIL || "reports@market-pulse.io",
           },
-          subject: `Your Scheduled Report: ${report.report_name}`,
-          text: `Hello,\n\nPlease find your scheduled report, "${report.report_name}", attached.\n\nThis report was generated for the period of ${startDate} to ${endDate}.\n\nRegards,\nThe Market Pulse Team`,
+          subject: report.report_name, // Subject is just the report name
+          html: emailHtml, // [NEW] Use the new HTML template
+          // [REMOVED] The plain-text 'text' property is gone
           attachments: attachments,
         };
 
