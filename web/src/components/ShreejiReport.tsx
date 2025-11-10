@@ -1,300 +1,670 @@
+import { useState, useEffect } from 'react';
+import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Button } from './ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { useState } from 'react';
-import { CalendarIcon, FileText, Download } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+// [NEW] Import new icons and components
+import { CalendarIcon, Download, FileText, Loader2, Trash2, Clock, Plus } from 'lucide-react';
+import { Input } from './ui/input'; // [NEW]
 import { toast } from 'sonner@2.0.3';
 
-// Helper function to format date
-const formatDate = (date: Date) => {
-  const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-  const day = days[date.getDay()];
-  const dateStr = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day} ${dateStr}-${month}-${year}`;
-};
+// ... [interfaces GuestData, DailyTakings, ReportData remain the same] ...
+interface GuestData {
+  room: string;
+  pax: number;
+  guestName: string;
+  totalRate: number;
+  arrival: string;
+  departure: string;
+  outstanding: number;
+  agency: string;
+}
 
-const formatDatePicker = (date: Date) => {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-};
+interface DailyTakings {
+  [key: string]: number;
+}
 
-export function ShreejiReport() {
-  const [selectedHotel, setSelectedHotel] = useState('');
-  const [reportDate, setReportDate] = useState<Date>();
-  const [reportGenerated, setReportGenerated] = useState(false);
-
-  const hotels = [
-    { id: 'jade', name: 'The Jade Hotel' },
-    { id: 'grand-plaza', name: 'Grand Plaza Hotel' },
-    { id: 'seaside', name: 'Seaside Resort' },
-  ];
-
-  const guestData = [
-    { room: '101', pax: 2, name: 'Smith, John', rate: 185.00, arrival: '14-10-2025', departure: '18-10-2025', outstanding: 740.00, agency: 'Direct' },
-    { room: '203', pax: 1, name: 'Johnson, Sarah', rate: 165.00, arrival: '15-10-2025', departure: '17-10-2025', outstanding: 330.00, agency: 'Booking.com' },
-    { room: '305', pax: 2, name: 'Williams, Robert', rate: 210.00, arrival: '13-10-2025', departure: '20-10-2025', outstanding: 1470.00, agency: 'Expedia' },
-    { room: '412', pax: 3, name: 'Brown, Jennifer', rate: 245.00, arrival: '16-10-2025', departure: '19-10-2025', outstanding: 735.00, agency: 'Direct' },
-    { room: '508', pax: 2, name: 'Davis, Michael', rate: 195.00, arrival: '14-10-2025', departure: '21-10-2025', outstanding: 1365.00, agency: 'Agoda' },
-  ];
-
-  const performanceSummary = {
-    vacant: 12,
-    blocked: 3,
-    sold: 35,
-    occupancy: 70.0,
-    revpar: 136.5,
-    adr: 195.0,
-    dayRevenue: 6825.00,
+interface ReportData {
+  hotelName: string;
+  date: Date;
+  summary: {
+    vacant: number | string;
+    blocked: number | string;
+    sold: number;
+    occupancy: number;
+    revpar: number;
+    adr: number;
+    dayRevenue: number;
   };
+  inHouseGuests: GuestData[];
+  dailyTakings: DailyTakings;
+  blockedRooms: string[];
+}
 
-  const dailyUpsells = [
-    { item: 'Breakfast', amount: 450.00 },
-    { item: 'Spa Services', amount: 320.00 },
-    { item: 'Room Upgrade', amount: 180.00 },
-    { item: 'Late Checkout', amount: 95.00 },
-  ];
+// [NEW] Interface for scheduled report prop
+interface ScheduledReport {
+  id: string;
+  report_name: string;
+  property_id: string;
+  recipients: string;
+  frequency: string;
+  time_of_day: string;
+  day_of_week?: number;
+  day_of_month?: number;
+}
 
-  const dailyTakings = [
-    { method: 'Cash', amount: 1250.00 },
-    { method: 'Card', amount: 4875.00 },
-    { method: 'Bank Transfer', amount: 700.00 },
-  ];
+// [NEW] Interface for component props
+interface ShreejiReportProps {
+  scheduledReports: ScheduledReport[];
+  isLoadingSchedules: boolean;
+  onSaveSchedule: (payload: any) => Promise<void>;
+  onDeleteSchedule: (id: string) => Promise<void>;
+}
 
-  const handleGenerateReport = () => {
-    if (!selectedHotel || !reportDate) {
-      toast.error('Please select hotel and date');
+/**
+ * Formats a Date object to YYYY-MM-DD string for API calls
+ */
+const formatDateForApi = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+// [MODIFIED] Update function signature to accept props
+export function ShreejiReport({
+  scheduledReports,
+  isLoadingSchedules,
+  onSaveSchedule,
+  onDeleteSchedule,
+}: ShreejiReportProps) {
+  const [selectedHotel, setSelectedHotel] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [hotels, setHotels] = useState<{ hotel_id: string; property_name: string }[]>([]);
+
+  // --- [NEW] State for the schedule form ---
+  const [scheduleName, setScheduleName] = useState('');
+  const [scheduleHotelId, setScheduleHotelId] = useState('');
+  const [scheduleRecipients, setScheduleRecipients] = useState('');
+  const [scheduleFrequency, setScheduleFrequency] = useState('Daily');
+  const [scheduleTime, setScheduleTime] = useState('06:00'); // 6am UTC default
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch hotels on component mount (existing logic)
+  useEffect(() => {
+    const fetchHotels = async () => {
+      try {
+        const response = await fetch('/api/rockenue/hotels');
+        if (!response.ok) {
+          throw new Error('Failed to fetch hotels');
+        }
+        const data = await response.json();
+        setHotels(data);
+      } catch (error) {
+        console.error(error);
+        toast.error(error.message || 'Could not load hotels');
+      }
+    };
+    fetchHotels();
+  }, []);
+
+  // ... [handlePreview, handleDownloadPDF, formatCurrency, formatDate, getTotalTakings remain the same] ...
+  const handlePreview = async () => {
+    if (!selectedHotel || !selectedDate) {
+      toast.error('Please select both hotel and date');
       return;
     }
-    setReportGenerated(true);
-    toast.success('Report generated successfully');
+    setIsLoading(true);
+    setReportData(null);
+    try {
+      const hotel = hotels.find((h) => h.hotel_id === selectedHotel);
+      if (!hotel) {
+        toast.error('Selected hotel not found.');
+        return;
+      }
+      const dateStr = formatDateForApi(selectedDate);
+      const response = await fetch(
+        `/api/rockenue/shreeji-report?hotel_id=${selectedHotel}&date=${dateStr}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate report');
+      }
+      const mappedData: ReportData = {
+        hotelName: hotel.property_name,
+        date: selectedDate,
+        summary: {
+          vacant: data.summary.vacant,
+          blocked: data.summary.blocked,
+          sold: data.summary.sold,
+          occupancy: data.summary.occupancy,
+          revpar: data.summary.revpar,
+          adr: data.summary.adr,
+          dayRevenue: data.summary.revenue,
+        },
+        inHouseGuests: data.reportData.map((guest: any) => ({
+          room: guest.roomName,
+          pax: guest.pax,
+          guestName: guest.guestName,
+          totalRate: guest.grandTotal,
+          arrival: guest.checkInDate,
+          departure: guest.checkOutDate,
+          outstanding: guest.balance,
+          agency: guest.source,
+        })),
+        dailyTakings: data.takings,
+        blockedRooms: data.blocks.names,
+      };
+      setReportData(mappedData);
+      toast.success('Report generated successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const selectedHotelName = hotels.find(h => h.id === selectedHotel)?.name || '';
-  const formattedDate = reportDate ? formatDate(reportDate) : '';
+  const handleDownloadPDF = () => {
+    if (!selectedHotel || !selectedDate) {
+      toast.error('Please select a hotel and date first');
+      return;
+    }
+    try {
+      const dateStr = formatDateForApi(selectedDate);
+      const hotel = hotels.find((h) => h.hotel_id === selectedHotel);
+      const hotelName = hotel?.property_name.replace(/\s/g, '_') || 'Report';
+      const downloadUrl = `/api/rockenue/shreeji-report/download?hotel_id=${selectedHotel}&date=${dateStr}`;
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute(
+        'download',
+        `Shreeji_Report_${hotelName}_${dateStr}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('PDF download started');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to start PDF download');
+    }
+  };
 
+  const formatCurrency = (value: number | string) => {
+    const num = parseFloat(String(value));
+    if (isNaN(num)) {
+      return '£0.00';
+    }
+    return `£${num.toFixed(2)}`;
+  };
+
+  const formatDate = (date: Date) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = days[date.getDay()];
+    const formatted = date.toLocaleDateString('en-GB');
+    return { dayName, formatted };
+  };
+
+  const getTotalTakings = (takings: DailyTakings) => {
+    return Object.values(takings).reduce((sum, val) => sum + val, 0);
+  };
+
+  // --- [NEW] Handler for saving a schedule ---
+  const handleSaveSchedule = async () => {
+    if (!scheduleName || !scheduleHotelId || !scheduleRecipients) {
+      toast.error('Please fill out Report Name, Hotel, and Recipients.');
+      return;
+    }
+
+    setIsSaving(true);
+    const payload = {
+      report_type: 'shreeji', // This is critical
+      propertyId: scheduleHotelId,
+      reportName: scheduleName,
+      recipients: scheduleRecipients.split(',').map((e) => e.trim()),
+      frequency: scheduleFrequency,
+      time_of_day: scheduleTime,
+      // We set day_of_week/month to null or a default
+      day_of_week: scheduleFrequency === 'Weekly' ? 1 : null, // Default to Monday
+      day_of_month: scheduleFrequency === 'Monthly' ? 1 : null, // Default to 1st
+    };
+
+    await onSaveSchedule(payload); // Call prop
+    
+    // Clear form
+    setScheduleName('');
+    setScheduleHotelId('');
+    setScheduleRecipients('');
+    setIsSaving(false);
+  };
+
+  // --- [NEW] Helper to format schedule text ---
+  const formatScheduleText = (report: ScheduledReport) => {
+    if (report.frequency === 'Daily') {
+      return `Daily at ${report.time_of_day} UTC`;
+    }
+    // Add more logic for Weekly/Monthly as needed
+    return `${report.frequency} at ${report.time_of_day} UTC`;
+  };
+
+  const getHotelName = (hotelId: string) => {
+    return hotels.find(h => h.hotel_id === hotelId)?.property_name || `Hotel ID: ${hotelId}`;
+  };
+
+  // --- [START OF JSX] ---
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <FileText className="w-6 h-6 text-[#faff6a]" />
-          <h1 className="text-white text-2xl">Shreeji Report</h1>
-        </div>
-        <p className="text-[#9ca3af] text-sm">
-          Pulls a list of all in-house guests with their current balances for the previous day
-        </p>
+    <div className="p-6 space-y-6">
+      {/* Page Header (existing) */}
+      <div>
+        <h1 className="text-white text-2xl mb-2">Shreeji Report</h1>
+        <p className="text-[#9ca3af] text-sm">Generate and schedule daily financial reports for property management</p>
       </div>
 
-      {/* Report Controls */}
-      <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-5 mb-6">
-        <h2 className="text-[#e5e5e5] text-lg mb-4">Report Configuration</h2>
-        
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="text-[#9ca3af] text-xs mb-2 block uppercase tracking-wider">
-              Select Hotel
-            </label>
+      {/* Report Controls (existing) */}
+      <Card className="bg-[#262626] border-[#3a3a35] p-6">
+        <div className="grid grid-cols-4 gap-4 items-end">
+          {/* Select Hotel */}
+          <div className="space-y-2">
+            <label className="text-[#e5e5e5] text-sm">Select Hotel</label>
             <Select value={selectedHotel} onValueChange={setSelectedHotel}>
-              <SelectTrigger className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
-                <SelectValue placeholder="Choose a hotel..." />
+              <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
+                <SelectValue placeholder="Choose a hotel" />
               </SelectTrigger>
-              <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                {hotels.map(hotel => (
-                  <SelectItem key={hotel.id} value={hotel.id}>
-                    {hotel.name}
+              <SelectContent className="bg-[#262626] border-[#3a3a35]">
+                {hotels.length === 0 && (
+                  <SelectItem value="loading" disabled className="text-[#9ca3af]">
+                    Loading hotels...
+                  </SelectItem>
+                )}
+                {hotels.map((hotel) => (
+                  <SelectItem
+                    key={hotel.hotel_id}
+                    value={hotel.hotel_id}
+                    className="text-[#e5e5e5] focus:bg-[#3a3a35] focus:text-[#faff6a]"
+                  >
+                    {hotel.property_name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="flex-1">
-            <label className="text-[#9ca3af] text-xs mb-2 block uppercase tracking-wider">
-              Report Date
-            </label>
-            <Popover>
+          {/* Report Date */}
+          <div className="space-y-2">
+            <label className="text-[#e5e5e5] text-sm">Report Date</label>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-left bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35]"
+                  className="w-full justify-start text-left bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#262626] hover:text-[#faff6a]"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {reportDate ? formatDatePicker(reportDate) : <span>Pick a date</span>}
+                  {selectedDate ? selectedDate.toLocaleDateString('en-GB') : 'Pick a date'}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-[#2C2C2C] border-[#3a3a35]" align="start">
+              <PopoverContent className="w-auto p-0 bg-[#262626] border-[#3a3a35]" align="start">
                 <Calendar
                   mode="single"
-                  selected={reportDate}
-                  onSelect={setReportDate}
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setDatePickerOpen(false);
+                  }}
                   initialFocus
-                  className="bg-[#2C2C2C] text-[#e5e5e5]"
+                  className="bg-[#262626]"
                 />
               </PopoverContent>
             </Popover>
           </div>
 
-          <Button
-            onClick={handleGenerateReport}
-            disabled={!selectedHotel || !reportDate}
-            className="bg-[#faff6a] text-[#1f1f1c] hover:bg-[#e8ef5a] h-10 px-6"
-          >
-            Generate Report
-          </Button>
-
-          {reportGenerated && (
+          {/* Actions (existing) */}
+          <div className="col-span-2 flex gap-3 justify-end">
             <Button
               variant="outline"
-              className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-10 px-6"
+              onClick={handlePreview}
+              disabled={isLoading}
+              className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#262626] hover:text-[#faff6a]"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Export
+              <FileText className="mr-2 h-4 w-4" />
+              Preview Report
             </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Report Display */}
-      {reportGenerated && (
-        <div className="space-y-6">
-          {/* Report Header */}
-          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-6 text-center">
-            <h2 className="text-[#faff6a] text-2xl mb-2">
-              {selectedHotelName} - DAILY CHART
-            </h2>
-            <p className="text-[#e5e5e5] text-lg">{formattedDate}</p>
+            <Button
+              onClick={handleDownloadPDF}
+              disabled={!selectedHotel || !selectedDate || isLoading}
+              className="bg-[#faff6a] text-[#1d1d1c] hover:bg-[#faff6a]/90"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download PDF
+            </Button>
           </div>
+        </div>
+      </Card>
 
-          {/* Guest List Table */}
-          <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#3a3a35]">
-              <h3 className="text-[#e5e5e5] text-lg">In-House Guests</h3>
+      {/* --- [NEW] Report Schedules Section --- */}
+      <div className="space-y-4">
+        <h2 className="text-white text-xl">Report Schedules</h2>
+        
+        {/* Create New Schedule Form */}
+        <Card className="bg-[#262626] border-[#3a3a35] p-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            {/* Report Name */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[#e5e5e5] text-sm">Report Name</label>
+              <Input
+                placeholder="E.g. Daily Management Report"
+                value={scheduleName}
+                onChange={(e) => setScheduleName(e.target.value)}
+                className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]"
+              />
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#3a3a35] bg-[#1f1f1c]">
-                    <th className="px-4 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Room</th>
-                    <th className="px-4 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Pax</th>
-                    <th className="px-4 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Guest Name</th>
-                    <th className="px-4 py-3 text-right text-[#9ca3af] text-xs uppercase tracking-wider">Total Rate</th>
-                    <th className="px-4 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Arrival</th>
-                    <th className="px-4 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Departure</th>
-                    <th className="px-4 py-3 text-right text-[#9ca3af] text-xs uppercase tracking-wider">Outstanding</th>
-                    <th className="px-4 py-3 text-left text-[#9ca3af] text-xs uppercase tracking-wider">Agency</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {guestData.map((guest, index) => (
-                    <tr key={index} className="border-b border-[#3a3a35] hover:bg-[#3a3a35]/30 transition-colors">
-                      <td className="px-4 py-3 text-[#faff6a] text-sm">{guest.room}</td>
-                      <td className="px-4 py-3 text-[#e5e5e5] text-sm">{guest.pax}</td>
-                      <td className="px-4 py-3 text-[#e5e5e5] text-sm">{guest.name}</td>
-                      <td className="px-4 py-3 text-white text-sm text-right">${guest.rate.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-[#9ca3af] text-sm">{guest.arrival}</td>
-                      <td className="px-4 py-3 text-[#9ca3af] text-sm">{guest.departure}</td>
-                      <td className="px-4 py-3 text-white text-sm text-right">${guest.outstanding.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-[#9ca3af] text-sm">{guest.agency}</td>
-                    </tr>
+            {/* Hotel */}
+            <div className="space-y-2">
+              <label className="text-[#e5e5e5] text-sm">Hotel</label>
+              <Select value={scheduleHotelId} onValueChange={setScheduleHotelId}>
+                <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
+                  <SelectValue placeholder="Choose hotel" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#262626] border-[#3a3a35]">
+                  {hotels.map((hotel) => (
+                    <SelectItem
+                      key={hotel.hotel_id}
+                      value={hotel.hotel_id}
+                      className="text-[#e5e5e5] focus:bg-[#3a3a35] focus:text-[#faff6a]"
+                    >
+                      {hotel.property_name}
+                    </SelectItem>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Performance Summary Bar */}
-          <div className="bg-[#2C2C2C] rounded border-2 border-[#faff6a]/30 p-4">
-            <h3 className="text-[#faff6a] text-sm mb-3 uppercase tracking-wider">Daily Performance Summary</h3>
-            <div className="grid grid-cols-7 gap-4">
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">VACANT</div>
-                <div className="text-white text-xl">{performanceSummary.vacant}</div>
-              </div>
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">BLOCKED</div>
-                <div className="text-white text-xl">{performanceSummary.blocked}</div>
-              </div>
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">SOLD</div>
-                <div className="text-white text-xl">{performanceSummary.sold}</div>
-              </div>
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">OCCUPANCY</div>
-                <div className="text-[#10b981] text-xl">{performanceSummary.occupancy}%</div>
-              </div>
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">RevPAR</div>
-                <div className="text-white text-xl">${performanceSummary.revpar}</div>
-              </div>
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">ADR</div>
-                <div className="text-white text-xl">${performanceSummary.adr}</div>
-              </div>
-              <div className="bg-[#1f1f1c] rounded p-3 text-center">
-                <div className="text-[#9ca3af] text-xs mb-1">DAY REVENUE</div>
-                <div className="text-[#faff6a] text-xl">${performanceSummary.dayRevenue.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Ancillary Data Sections */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Daily Upsells */}
-            <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#3a3a35]">
-                <h3 className="text-[#e5e5e5] text-lg">Daily Upsells</h3>
-              </div>
-              <div className="p-5">
-                <table className="w-full">
-                  <tbody>
-                    {dailyUpsells.map((upsell, index) => (
-                      <tr key={index} className="border-b border-[#3a3a35] last:border-0">
-                        <td className="py-3 text-[#e5e5e5] text-sm">{upsell.item}</td>
-                        <td className="py-3 text-white text-sm text-right">${upsell.amount.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-[#faff6a]/30">
-                      <td className="py-3 text-[#faff6a] text-sm">Total Upsells</td>
-                      <td className="py-3 text-[#faff6a] text-sm text-right">
-                        ${dailyUpsells.reduce((sum, u) => sum + u.amount, 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Daily Takings Summary */}
-            <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#3a3a35]">
-                <h3 className="text-[#e5e5e5] text-lg">Daily Takings Summary</h3>
-              </div>
-              <div className="p-5">
-                <table className="w-full">
-                  <tbody>
-                    {dailyTakings.map((taking, index) => (
-                      <tr key={index} className="border-b border-[#3a3a35] last:border-0">
-                        <td className="py-3 text-[#e5e5e5] text-sm">{taking.method}</td>
-                        <td className="py-3 text-white text-sm text-right">${taking.amount.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-[#faff6a]/30">
-                      <td className="py-3 text-[#faff6a] text-sm">Takings Total</td>
-                      <td className="py-3 text-[#faff6a] text-sm text-right">
-                        ${dailyTakings.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            {/* Time */}
+            <div className="space-y-2">
+              <label className="text-[#e5e5e5] text-sm">Time (UTC)</label>
+              <Select value={scheduleTime} onValueChange={setScheduleTime}>
+                <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#262626] border-[#3a3a35]">
+                  <SelectItem value="06:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">06:00</SelectItem>
+                  <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
+                  <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Frequency (hidden, defaulting to Daily) */}
+            {/* <input type="hidden" value={scheduleFrequency} /> */}
+            
+            {/* Save Button */}
+            <Button
+              onClick={handleSaveSchedule}
+              disabled={isSaving}
+              className="bg-[#faff6a] text-[#1d1d1c] hover:bg-[#faff6a]/90"
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Save Schedule
+            </Button>
+            
+            {/* Recipients (Full Width) */}
+            <div className="space-y-2 md:col-span-5">
+              <label className="text-[#e5e5e5] text-sm">Recipient Emails</label>
+              <Input
+                placeholder="user1@example.com, user2@example.com"
+                value={scheduleRecipients}
+                onChange={(e) => setScheduleRecipients(e.target.value)}
+                className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]"
+              />
             </div>
           </div>
-        </div>
-      )}
+        </Card>
+
+        {/* Existing Schedules Table */}
+        <Card className="bg-[#262626] border-[#3a3a35]">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-[#3a3a35] hover:bg-transparent">
+                <TableHead className="text-[#9ca3af]">Report Name</TableHead>
+                <TableHead className="text-[#9ca3af]">Hotel</TableHead>
+                <TableHead className="text-[#9ca3af]">Recipients</TableHead>
+                <TableHead className="text-[#9ca3af]">Schedule</TableHead>
+                <TableHead className="text-[#9ca3af] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingSchedules && (
+                <TableRow className="border-0">
+                  <TableCell colSpan={5} className="text-center text-[#9ca3af]">
+                    <Loader2 className="h-4 w-4 animate-spin inline-block mr-2" />
+                    Loading schedules...
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoadingSchedules && scheduledReports.length === 0 && (
+                <TableRow className="border-0">
+                  <TableCell colSpan={5} className="text-center text-[#9ca3af]">
+                    No schedules found.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoadingSchedules && scheduledReports.map((report) => (
+                <TableRow key={report.id} className="border-[#3a3a35] hover:bg-[#1a1a18]">
+                  <TableCell className="text-[#e5e5e5]">{report.report_name}</TableCell>
+                  <TableCell className="text-[#e5e5e5]">{getHotelName(report.property_id)}</TableCell>
+                  <TableCell className="text-[#9ca3af] text-xs">{report.recipients}</TableCell>
+                  <TableCell className="text-[#e5e5e5]">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-[#9ca3af]" />
+                      {formatScheduleText(report)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDeleteSchedule(report.id)}
+                      className="text-[#9ca3af] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+      {/* --- [END NEW SECTION] --- */}
+
+      {/* Preview Area (existing) */}
+      <div>
+        {/* Default State */}
+        {!reportData && !isLoading && (
+          <Card className="bg-[#262626] border-[#3a3a35] p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 bg-[#faff6a]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-[#faff6a]" />
+              </div>
+              <h3 className="text-[#e5e5e5] text-lg mb-2">No Report Generated</h3>
+              <p className="text-[#9ca3af] text-sm">
+                Please select a hotel and date to preview the report
+              </p>
+            </div>
+          </Card>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <Card className="bg-[#262626] border-[#3a3a35] p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <Loader2 className="w-12 h-12 text-[#faff6a] animate-spin mx-auto mb-4" />
+              <p className="text-[#9ca3af] text-sm">Generating report...</p>
+            </div>
+          </Card>
+        )}
+
+        {/* Data Loaded State */}
+        {reportData && !isLoading && (
+          <div className="space-y-4">
+            {/* Dynamic Title */}
+            <div className="text-center mb-6">
+              <h2 className="text-white text-3xl mb-1">{reportData.hotelName} - DAILY CHART</h2>
+              <p className="text-[#9ca3af] text-lg">
+                {formatDate(reportData.date).dayName} {formatDate(reportData.date).formatted}
+              </p>
+            </div>
+
+            {/* Summary Bar */}
+            <Card className="bg-[#262626] border-[#3a3a35] p-6">
+              <div className="grid grid-cols-7 gap-4">
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">Vacant</div>
+                  <div className="text-[#e5e5e5] text-2xl">{reportData.summary.vacant}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">Blocked</div>
+                  <div className={`text-2xl ${reportData.summary.blocked > 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]'}`}>
+                    {reportData.summary.blocked}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">Sold</div>
+                  <div className="text-[#e5e5e5] text-2xl">{reportData.summary.sold}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">Occupancy</div>
+                  {/* [FIX] Add toFixed(2) for occupancy in summary bar */}
+                  <div className="text-[#e5e5e5] text-2xl">{reportData.summary.occupancy.toFixed(2)}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">RevPAR</div>
+                  <div className="text-[#e5e5e5] text-2xl">{formatCurrency(reportData.summary.revpar)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">ADR</div>
+                  <div className="text-[#e5e5e5] text-2xl">{formatCurrency(reportData.summary.adr)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[#9ca3af] text-xs mb-1">Day Revenue</div>
+                  <div className="text-[#faff6a] text-2xl">{formatCurrency(reportData.summary.dayRevenue)}</div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Data Tabs (existing) */}
+            <Tabs defaultValue="guests" className="w-full">
+              <TabsList className="bg-[#262626] border border-[#3a3a35] p-1">
+                <TabsTrigger
+                  value="guests"
+                  className="data-[state=active]:bg-[#faff6a] data-[state=active]:text-[#1d1d1c] text-[#9ca3af]"
+                >
+                  In-House Guests
+                </TabsTrigger>
+                <TabsTrigger
+                  value="takings"
+                  className="data-[state=active]:bg-[#faff6a] data-[state=active]:text-[#1d1d1c] text-[#9ca3af]"
+                >
+                  Daily Takings
+                </TabsTrigger>
+                <TabsTrigger
+                  value="blocked"
+                  className="data-[state=active]:bg-[#faff6a] data-[state=active]:text-[#1d1d1c] text-[#9ca3af]"
+                >
+                  Blocked Rooms
+                </TabsTrigger>
+              </TabsList>
+
+              {/* In-House Guests Tab */}
+              <TabsContent value="guests" className="mt-4">
+                <Card className="bg-[#262626] border-[#3a3a35]">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-[#3a3a35] hover:bg-transparent">
+                          <TableHead className="text-[#9ca3af]">Room</TableHead>
+                          <TableHead className="text-[#9ca3af]">Pax</TableHead>
+                          <TableHead className="text-[#9ca3af]">Guest Name</TableHead>
+                          <TableHead className="text-[#9ca3af]">Total Rate</TableHead>
+                          <TableHead className="text-[#9ca3af]">Arrival</TableHead>
+                          <TableHead className="text-[#9ca3af]">Departure</TableHead>
+                          <TableHead className="text-[#9ca3af]">Outstanding</TableHead>
+                          <TableHead className="text-[#9ca3af]">Agency</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.inHouseGuests.map((guest, idx) => (
+                          <TableRow key={idx} className="border-[#3a3a35] hover:bg-[#1a1a18]">
+                            <TableCell className="text-[#e5e5e5]">{guest.room}</TableCell>
+                            <TableCell className="text-[#e5e5e5]">{guest.pax}</TableCell>
+                            <TableCell className="text-[#e5e5e5]">{guest.guestName}</TableCell>
+                            <TableCell className="text-[#e5e5e5]">{formatCurrency(guest.totalRate)}</TableCell>
+                            <TableCell className="text-[#e5e5e5]">{guest.arrival}</TableCell>
+                            <TableCell className="text-[#e5e5e5]">{guest.departure}</TableCell>
+                            {/* [FIX] More robust outstanding logic */}
+                            <TableCell className={parseFloat(String(guest.outstanding)) > 0 ? 'text-[#ef4444]' : 'text-[#e5e5e5]'}>
+                              {parseFloat(String(guest.outstanding)) > 0 ? formatCurrency(guest.outstanding) : (guest.guestName !== '---' ? formatCurrency(0) : '—')}
+                            </TableCell>
+                            <TableCell className="text-[#e5e5e5]">{guest.agency}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              {/* Daily Takings Tab */}
+              <TabsContent value="takings" className="mt-4">
+                <Card className="bg-[#262626] border-[#3a3a35] p-6">
+                  <div className="max-w-md">
+                    <div className="mb-6 pb-4 border-b border-[#3a3a35]">
+                      <div className="text-[#9ca3af] text-sm mb-1">Total Taken</div>
+                      <div className="text-[#faff6a] text-3xl">{formatCurrency(getTotalTakings(reportData.dailyTakings))}</div>
+                    </div>
+                    <div className="space-y-3">
+                      {Object.entries(reportData.dailyTakings).length > 0 ? (
+                        Object.entries(reportData.dailyTakings).map(([method, amount]) => (
+                          <div key={method} className="flex justify-between items-center">
+                            <span className="text-[#9ca3af] capitalize">{method.replace(/_/g, ' ')}</span>
+                            <span className="text-[#e5e5e5]">{formatCurrency(amount)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[#9ca3af] text-sm">No takings data for this day.</p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              {/* Blocked Rooms Tab */}
+              <TabsContent value="blocked" className="mt-4">
+                <Card className="bg-[#262626] border-[#3a3a35] p-6">
+                  {reportData.blockedRooms.length > 0 ? (
+                    <div className="space-y-2">
+                      {reportData.blockedRooms.map((room, idx) => (
+                        <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-[#1a1a18] rounded border border-[#3a3a35]">
+                          <div className="w-2 h-2 rounded-full bg-[#ef4444]"></div>
+                          <span className="text-[#e5e5e5]">{room}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-[#9ca3af]">No blocked rooms for this date</p>
+                    </div>
+                  )}
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

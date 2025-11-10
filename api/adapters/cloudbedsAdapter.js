@@ -1159,7 +1159,7 @@ async function getRoomBlocks(accessToken, propertyId, date) {
   const pageSize = 100;
   let hasMore = true;
   while (hasMore) {
-    const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${propertyId}&startDate=${date}&endDate=${date}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,

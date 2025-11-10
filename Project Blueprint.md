@@ -227,12 +227,14 @@ market-pulse/
 │   │   └── users.router.js 
 │   │   ├── planning.router.js   \# \[NEW\] 
 │   ├── utils/  
+│   │   ├── report-templates/    \# \[NEW\] HTML templates for PDF generation
 │   │   ├── db.js                \# PostgreSQL connection pool 
 │   │   ├── benchmark.utils.js   \# Single source of truth for pacing benchmarks 
 │   │   ├── market-codex.utils.js \# Logic hub for market demand/MPSS
 │   │   ├── pacing.utils.js      \# [NEW] Logic hub for dashboard/budget pacing status
 │   │   ├── emailTemplates.js    \# \[NEW\] HTML for magic link email  
-│   │   └── middleware.js        \# Auth & role-based middleware
+│   │   ├── middleware.js        \# Auth & role-based middleware
+│   │   └── pdf.utils.js         \# \[NEW\] PDF generation utility (Playwright)
 │   ├── daily-refresh.js         \# CRON: Syncs 365-day forecast  
 │   ├── initial-sync.js          \# JOB: Syncs 5-year history  
 │   ├── send-scheduled-reports.js \# CRON: Generates & emails reports  
@@ -340,7 +342,8 @@ All endpoints are mounted under /api in server.js.
 *Specific "eyes-only" routes (e.g., GET /rockenue/portfolio) are protected by the strict `requireSuperAdminOnly` middleware.*
 
 * GET /rockenue/hotels: Fetches a list of all hotels for report dropdowns.  
-* GET /rockenue/shreeji-report: Generates the data for the in-house guest balance report.  
+* GET /rockenue/shreeji-report: Generates the JSON data for the in-house guest balance report.  
+* **\[NEW\]** GET /rockenue/shreeji-report/download: Generates and downloads a PDF of the in-house guest balance report.
 * **\[NEW\]** GET /rockenue/portfolio: Fetches all assets from the rockenue\_managed\_assets table.  
 * **\[NEW\]** POST /rockenue/portfolio: Adds a new "Off-Platform" asset to the private ledger.  
 * **\[NEW\]** PUT /rockenue/portfolio/:id: Updates an asset's details. Only allows monthly\_fee to be changed for "Live" assets.  

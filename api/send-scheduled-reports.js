@@ -1,10 +1,19 @@
 // /api/send-scheduled-reports.js
+// /api/send-scheduled-reports.js
 require("dotenv").config();
 const { Pool } = require("pg");
-const sgMail = require("@sendgrid/mail");
 const exceljs = require("exceljs");
+const { subDays, format } = require("date-fns"); // For calculating "yesterday"
+const { formatInTimeZone } = require("date-fns-tz"); // For email date formatting
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// [NEW] Import all our new utility functions
+const { sendEmail } = require("./utils/email.utils");
+const { generateShreejiReport } = require("./utils/report.generators");
+const { getShreejiReportEmailHTML } = require("./utils/emailTemplates");
+
+
+
+
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // --- HELPER FUNCTIONS (Date, Data Processing) ---
@@ -356,10 +365,68 @@ const currentTime = `${now
       return res.status(reportId ? 404 : 200).send(message);
     }
 
-    console.log(`Found ${dueReports.length} report(s) to process.`);
-    let sentCount = 0;
+   console.log(`Found ${dueReports.length} report(s) to process.`);
+let sentCount = 0;
 
-    for (const report of dueReports) {
+for (const report of dueReports) {
+  // [NEW] Check for the 'shreeji' report type (which the UI will save).
+  // We assume 'standard' or undefined is the default P&L report.
+  if (report.report_type === 'shreeji') {
+    try {
+      // --- 1. GENERATE SHREEJI REPORT ---
+      // This report is always for "yesterday".
+      const yesterday = subDays(new Date(), 1);
+      const reportDateStr = format(yesterday, "yyyy-MM-dd");
+      const hotelId = report.property_id; // Use the property_id from the scheduled report
+
+      console.log(`[Cron] Generating Shreeji Report for hotel ${hotelId} on ${reportDateStr}...`);
+
+      const { pdfBuffer, fileName, hotelName, reportDate } =
+        await generateShreejiReport(hotelId, reportDateStr);
+
+      // --- 2. PREPARE EMAIL ---
+      // Format the date nicely for the email body
+      const emailDate = formatInTimeZone(
+        yesterday,
+        "Europe/London", // Use UK timezone as requested
+        "MMMM d, yyyy"
+      );
+
+      const emailHtml = getShreejiReportEmailHTML(
+        report.report_name,
+        hotelName,
+        emailDate,
+        "Team"
+      );
+
+      const recipients = report.recipients.split(",").map((e) => e.trim());
+
+      // --- 3. SEND EMAIL WITH ATTACHMENT ---
+      await sendEmail({
+        to: recipients,
+        subject: `Your Scheduled Report: ${report.report_name} for ${hotelName}`,
+        html: emailHtml,
+        attachments: [
+          {
+            content: pdfBuffer.toString("base64"),
+            filename: fileName,
+            type: "application/pdf",
+            disposition: "attachment",
+          },
+        ],
+      });
+
+      console.log(`[Cron] Successfully sent Shreeji Report "${report.report_name}"`);
+      sentCount++;
+
+    } catch (shreejiError) {
+      console.error(`[Cron] Failed to process Shreeji Report "${report.report_name}":`, shreejiError);
+      // We could optionally email an admin here, but for now we just log
+    }
+
+  } else {
+    // --- 4. ELSE, RUN EXISTING STANDARD REPORT LOGIC ---
+    try {
       const { startDate, endDate } = calculateDateRange(report.report_period);
       const hotelData = await getHotelMetrics(
         report.property_id,
@@ -377,7 +444,7 @@ const currentTime = `${now
       const processedData = processData(hotelData, marketData);
 
       if (processedData.length === 0) {
-        console.log(`No data for report "${report.report_name}", skipping.`);
+        console.log(`[Cron] No data for standard report "${report.report_name}", skipping.`);
         continue;
       }
 
@@ -407,25 +474,33 @@ const currentTime = `${now
       if (attachments.length > 0) {
         const msg = {
           to: report.recipients.split(",").map((e) => e.trim()),
+          // [MODIFIED] Use a "from" object matching our new email util
           from: {
             name: "Market Pulse Reports",
-            email: "reports@market-pulse.io",
+            email: process.env.SENDGRID_FROM_EMAIL || "reports@market-pulse.io",
           },
           subject: `Your Scheduled Report: ${report.report_name}`,
           text: `Hello,\n\nPlease find your scheduled report, "${report.report_name}", attached.\n\nThis report was generated for the period of ${startDate} to ${endDate}.\n\nRegards,\nThe Market Pulse Team`,
           attachments: attachments,
         };
-        await sgMail.send(msg);
+
+        // [MODIFIED] Use the new sendEmail utility
+        await sendEmail(msg);
+
         console.log(
-          `Successfully sent report "${report.report_name}" to ${report.recipients}`
+          `[Cron] Successfully sent standard report "${report.report_name}" to ${report.recipients}`
         );
         sentCount++;
       }
+    } catch (standardReportError) {
+      console.error(`[Cron] Failed to process Standard Report "${report.report_name}":`, standardReportError);
     }
+  }
+} // End for-loop
 
-    res
-      .status(200)
-      .json({ message: `Successfully sent ${sentCount} report(s).` });
+res
+  .status(200)
+  .json({ message: `Successfully sent ${sentCount} report(s).` });
   } catch (error) {
     console.error("Report job failed:", error);
     res.status(500).json({ error: "Failed to process scheduled reports." });

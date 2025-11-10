@@ -121,9 +121,6 @@ router.get("/scheduled-reports", requireUserApi, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// --- SCHEDULED REPORTS API ENDPOINTS ---
-// Create new scheduled report
 // Create new scheduled report
 router.post("/scheduled-reports", requireUserApi, async (req, res) => {
   try {
@@ -137,7 +134,9 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
     }
     const internalUserId = userResult.rows[0].user_id;
 
+    // --- [NEW] Handle different report types ---
     const {
+      // COMMON FIELDS
       propertyId,
       reportName,
       recipients, // This is an array from the frontend, e.g., ["a@b.com", "c@d.com"]
@@ -145,6 +144,9 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
       dayOfWeek,
       dayOfMonth,
       timeOfDay,
+      // NEW TYPE DISCRIMINATOR
+      report_type, // "standard" or "shreeji"
+      // STANDARD REPORT FIELDS
       metricsHotel,
       metricsMarket,
       addComparisons,
@@ -155,11 +157,21 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
       attachmentFormats,
     } = req.body;
 
-    // Defaults to satisfy NOT NULLs and keep consistent types
-    const safeMetricsMarket = Array.isArray(metricsMarket) ? metricsMarket : [];
-    const safeAddComparisons = !!addComparisons;
-    const safeDisplayOrder = displayOrder ?? "metric"; // "metric" | "source"
-    const safeIncludeTaxes = includeTaxes ?? true;
+    // --- [NEW] Set defaults and nullify params based on type ---
+    const safeReportType = report_type || 'standard';
+    const isShreeji = safeReportType === 'shreeji';
+
+    // These values are for "Standard" reports. If it's a Shreeji report,
+    // we nullify them to save space and avoid confusion.
+    const safeMetricsHotel = isShreeji ? null : metricsHotel;
+    const safeMetricsMarket = isShreeji ? null : (Array.isArray(metricsMarket) ? metricsMarket : []);
+    const safeAddComparisons = isShreeji ? false : !!addComparisons;
+    const safeDisplayOrder = isShreeji ? null : (displayOrder ?? "metric");
+    const safeDisplayTotals = isShreeji ? false : displayTotals;
+    const safeIncludeTaxes = isShreeji ? false : (includeTaxes ?? true);
+    const safeReportPeriod = isShreeji ? null : reportPeriod;
+    const safeAttachmentFormats = isShreeji ? null : attachmentFormats;
+    // --- [END NEW LOGIC] ---
 
     const result = await pgPool.query(
       `
@@ -179,31 +191,32 @@ router.post("/scheduled-reports", requireUserApi, async (req, res) => {
           display_totals,
           include_taxes,
           report_period,
-          attachment_formats
+          attachment_formats,
+          report_type 
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, $17)
         RETURNING *
       `,
- [
+      [
         internalUserId, // $1
         propertyId, // $2
         reportName, // $3
-        // [FIX] Join the recipients array into a simple comma-separated string
-        // This ensures data is stored in a consistent format (e.g., "a@b.com,c@d.com")
-        // which the send-scheduled-reports.js script can correctly parse.
         Array.isArray(recipients) ? recipients.join(',') : recipients, // $4
         frequency, // $5
         dayOfWeek, // $6
         dayOfMonth, // $7
         timeOfDay, // $8
-        metricsHotel, // $9
+        // [MODIFIED] Use the new "safe" variables
+        safeMetricsHotel, // $9
         safeMetricsMarket, // $10
         safeAddComparisons, // $11
         safeDisplayOrder, // $12
-        displayTotals, // $13
+        safeDisplayTotals, // $13
         safeIncludeTaxes, // $14
-        reportPeriod, // $15
-        attachmentFormats, // $16
+        safeReportPeriod, // $15
+        safeAttachmentFormats, // $16
+        // [NEW] Save the report type
+        safeReportType, // $17
       ]
     );
 

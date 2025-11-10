@@ -73,7 +73,6 @@ import * as XLSX from 'xlsx'; // Import the Excel library
 import { HotelDashboard } from './components/HotelDashboard'; // [NEW] Import the new dashboard
 
 
-// --- TYPE DEFINITIONS ---
 
 
 // --- TYPE DEFINITIONS ---
@@ -176,6 +175,10 @@ const [showMarketComparisons, setShowMarketComparisons] = useState(false); // De
   const [showManageSchedules, setShowManageSchedules] = useState(false);
 const [schedules, setSchedules] = useState<any[]>([]);
 const [isInviting, setIsInviting] = useState(false);
+
+// [NEW] Add state for the Shreeji-specific schedules
+const [shreejiScheduledReports, setShreejiScheduledReports] = useState<any[]>([]);
+const [isLoadingShreejiSchedules, setIsLoadingShreejiSchedules] = useState(true);
 // This state now matches the complex interface expected by the card component.
 const [marketCompositionData, setMarketCompositionData] = useState<MarketCompositionData>({
   competitorCount: 0,
@@ -255,6 +258,33 @@ const yoyReportRef = useRef<any>(null);
   }, [property]); // This hook runs whenever the selected 'property' changes.
   // --- DATA FETCHING EFFECTS ---
 
+useEffect(() => {
+  const fetchShreejiSchedules = async () => {
+    if (!userInfo || (userInfo.role !== 'admin' && userInfo.role !== 'super_admin')) {
+      setIsLoadingShreejiSchedules(false);
+      return; // Don't fetch if user is not an admin
+    }
+    
+    try {
+      setIsLoadingShreejiSchedules(true);
+      const res = await fetch('/api/reports/scheduled-reports');
+      const data = await res.json();
+      if (res.ok) {
+        // Filter to only get 'shreeji' reports
+        const shreejiReports = data.filter((r: any) => r.report_type === 'shreeji');
+        setShreejiScheduledReports(shreejiReports);
+      } else {
+        throw new Error(data.error || 'Failed to load schedules');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load Shreeji schedules.');
+    } finally {
+      setIsLoadingShreejiSchedules(false);
+    }
+  };
+  fetchShreejiSchedules();
+}, [userInfo]); // Re-run when user info is loaded
 
   // [NEW] Effect to fetch the unified dashboard summary
   useEffect(() => {
@@ -965,6 +995,47 @@ const handleViewChange = (newView: string) => {
       sessionStorage.setItem('marketPulseActiveView', newView);
     }
   };
+
+
+const handleSaveShreejiSchedule = async (payload) => {
+  try {
+    const res = await fetch('/api/reports/scheduled-reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const newSchedule = await res.json();
+    if (!res.ok) {
+      throw new Error(newSchedule.error || 'Failed to save schedule');
+    }
+    // Add new schedule to the top of the list
+    setShreejiScheduledReports([newSchedule, ...shreejiScheduledReports]);
+    toast.success('Schedule saved!');
+  } catch (err) {
+    console.error(err);
+    toast.error(err.message);
+  }
+};
+
+const handleDeleteShreejiSchedule = async (scheduleId) => {
+  if (!confirm('Are you sure you want to delete this schedule?')) return;
+
+  try {
+    const res = await fetch(`/api/reports/scheduled-reports/${scheduleId}`, {
+      method: 'DELETE',
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to delete schedule');
+    }
+    // Remove the schedule from the state
+    setShreejiScheduledReports(shreejiScheduledReports.filter((r) => r.id !== scheduleId));
+    toast.success('Schedule deleted.');
+  } catch (err) {
+    console.error(err);
+    toast.error(err.message);
+  }
+};
 
 
 // App.tsx
@@ -2274,7 +2345,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
 }}
             />
           )}
-          {rockenueSubView === 'shreeji-report' && (
+{rockenueSubView === 'shreeji-report' && (
             <div>
               <div className="p-4 border-b border-[#3a3a35] bg-[#2C2C2C]">
                 <button
@@ -2284,7 +2355,13 @@ onManageSchedules={() => setShowManageSchedules(true)}
                   ← Back to Rockenue Tools
                 </button>
               </div>
-              <ShreejiReport />
+              <ShreejiReport
+                // Pass the renamed state and handlers
+                scheduledReports={shreejiScheduledReports}
+                isLoadingSchedules={isLoadingShreejiSchedules}
+                onSaveSchedule={handleSaveShreejiSchedule}
+                onDeleteSchedule={handleDeleteShreejiSchedule}
+              />
             </div>
           )}
           {/* [THIS IS THE ORIGINAL BLOCK] */}

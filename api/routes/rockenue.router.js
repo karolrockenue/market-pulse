@@ -16,6 +16,10 @@ const mewsAdapter = require("../adapters/mewsAdapter");
 // --- [NEW] Import both permission middlewares ---
 const { requireAdminApi, requireSuperAdminOnly } = require("../utils/middleware");
 
+// --- [NEW] Import the PDF generation utility ---
+const { generatePdfFromHtml } = require("../utils/pdf.utils.js");
+
+const { generateShreejiReport } = require("../utils/report.generators.js");
 /**
  * Middleware to protect routes, ensuring they are accessible by staff.
  * [MODIFIED] This is now the permissive check for 'admin' OR 'super_admin'.
@@ -78,7 +82,7 @@ router.get("/hotels", async (req, res) => {
 });
 
 // /api/routes/rockenue.router.js
-
+// [This is the original endpoint, unchanged]
 router.get("/shreeji-report", async (req, res) => {
   const { hotel_id, date } = req.query;
   if (!hotel_id || !date) {
@@ -251,45 +255,71 @@ router.get("/shreeji-report", async (req, res) => {
         return checkInDateOnly <= date && checkOutDateOnly > date;
       });
 
+  // [REPLACE WITH THIS DEBUG BLOCK]
       const occupiedRoomsData = new Map();
-      if (inHouseReservations.length > 0) {
-        const reservationIDs = inHouseReservations.map(
-          (res) => res.reservationID
-        );
-        const detailedReservations =
-          await cloudbedsAdapter.getReservationsWithDetails(
-            accessToken,
-            externalPropertyId,
-            { reservationID: reservationIDs.join(",") }
+      try {
+        if (inHouseReservations.length > 0) {
+          const reservationIDs = inHouseReservations.map(
+            (res) => res.reservationID
           );
+          
+          // --- [DEBUG 1] ---
+          console.log(`[Shreeji Debug] Found ${inHouseReservations.length} in-house reservations. Calling getReservationsWithDetails...`);
+          console.log(`[Shreeji Debug] Reservation IDs: ${reservationIDs.join(",")}`);
+          
+          const detailedReservations =
+            await cloudbedsAdapter.getReservationsWithDetails(
+              accessToken,
+              externalPropertyId,
+              { reservationID: reservationIDs.join(",") }
+            );
 
-        for (const res of detailedReservations) {
-          if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
-            const roomName = res.rooms[0].roomName;
+          // --- [DEBUG 2] ---
+          console.log(`[Shreeji Debug] Successfully fetched ${detailedReservations.length} detailed reservations.`);
 
-            // THE FIX: The adults and children counts are nested within the first room object of the reservation.
-            // We now access them from the correct location: res.rooms[0].
-            const roomDetails = res.rooms[0];
-            const adults = parseInt(roomDetails.adults, 10) || 0;
-            const children = parseInt(roomDetails.children, 10) || 0;
+          for (const res of detailedReservations) {
+            // --- [DEBUG 3] ---
+            // console.log(`[Shreeji Debug] Processing reservation ID: ${res.reservationID}`); // Uncomment this if you need to see every loop
 
-            let paxString = `${adults}`;
-            if (children > 0) {
-              paxString += `+${children}`;
+            if (res.rooms && res.rooms.length > 0 && res.rooms[0].roomName) {
+              const roomName = res.rooms[0].roomName;
+              const roomDetails = res.rooms[0];
+              const adults = parseInt(roomDetails.adults, 10) || 0;
+              const children = parseInt(roomDetails.children, 10) || 0;
+
+              let paxString = `${adults}`;
+              if (children > 0) {
+                paxString += `+${children}`;
+              }
+
+              occupiedRoomsData.set(roomName, {
+                guestName: res.guestName || "N/A",
+                pax: paxString,
+                balance: res.balance || 0,
+                source: res.sourceName || "N/A",
+                checkInDate: res.reservationCheckIn,
+                checkOutDate: res.reservationCheckOut,
+                grandTotal: parseFloat(res.total) || 0,
+              });
+            } else {
+              // --- [DEBUG 4] ---
+              console.log(`[Shreeji Debug] Skipping reservation ${res.reservationID}: Missing roomName or room data.`);
             }
-
-            occupiedRoomsData.set(roomName, {
-              guestName: res.guestName || "N/A",
-              pax: paxString, // Add the new pax string to the data object.
-              balance: res.balance || 0,
-              source: res.sourceName || "N/A",
-              checkInDate: res.reservationCheckIn,
-              checkOutDate: res.reservationCheckOut,
-              grandTotal: parseFloat(res.total) || 0,
-            });
           }
+          // --- [DEBUG 5] ---
+          console.log("[Shreeji Debug] Finished processing detailed reservations.");
+          
+        } else {
+          // --- [DEBUG 6] ---
+          console.log("[Shreeji Debug] No in-house reservations found. Skipping detailed fetch.");
         }
+      } catch (error) {
+        // --- [DEBUG 7] ---
+        console.error("[Shreeji Debug] CRITICAL ERROR processing detailed reservations:", error);
+        // We re-throw the error to send a 500 response
+        throw error;
       }
+// [END OF REPLACEMENT BLOCK]
 
       reportData = allHotelRooms.map((room) => {
         const occupiedData = occupiedRoomsData.get(room.roomName);
@@ -322,6 +352,8 @@ router.get("/shreeji-report", async (req, res) => {
     reportData.sort((a, b) =>
       a.roomName.localeCompare(b.roomName, undefined, { numeric: true })
     );
+    
+    // [This is the original response]
     res.status(200).json({
       reportData,
       summary,
@@ -344,8 +376,43 @@ router.get("/shreeji-report", async (req, res) => {
     });
   }
 });
+/**
+ * --- [NEW] PDF Download Endpoint ---
+ * GET /api/rockenue/shreeji-report/download
+ *
+ * [MODIFIED] This endpoint now calls the central report generator
+ * from /api/utils/report.generators.js.
+ */
+router.get("/shreeji-report/download", async (req, res) => {
+  const { hotel_id, date } = req.query;
+  if (!hotel_id || !date) {
+    return res.status(400).json({ error: "hotel_id and date are required." });
+  }
 
+  try {
+    // --- 1. CALL THE CENTRAL GENERATOR ---
+    // All logic is now centralized in this one function.
+    const { pdfBuffer, fileName } = await generateShreejiReport(
+      hotel_id,
+      date
+    );
 
+    // --- 2. SEND PDF TO CLIENT ---
+    // Set headers to trigger a download
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error(
+      `Error generating Shreeji Report PDF for hotel ${hotel_id}:`,
+      error
+    );
+    res.status(500).json({
+      error: "An internal server error occurred while generating the PDF.",
+    });
+  }
+});
 /**
  * GET /api/rockenue/portfolio
  * Fetches ALL assets (Live & Off-Platform) for the portfolio.

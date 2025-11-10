@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shreeji Report</title>
+    
+    <style>
+      /* This is a minified blob of all Tailwind CSS classes used in this template */
+      *,:after,:before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}body{margin:0;line-height:inherit}html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji}h1,h2{font-size:inherit;font-weight:inherit}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input{font-family:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}button{text-transform:none}[type=button],button{-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}::-webkit-search-decoration{-webkit-appearance:none}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity))}.p-8{padding:2rem}.mb-8{margin-bottom:2rem}.mb-4{margin-bottom:1rem}.grid{display:grid}.max-w-5xl{max-width:64rem}.max-w-7xl{max-width:80rem}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-around{justify-content:space-around}.justify-between{justify-content:space-between}.gap-x-6{column-gap:1.5rem}.gap-y-2{row-gap:.5rem}.gap-6{gap:1.5rem}.overflow-x-auto{overflow-x:auto}.overflow-y-auto{overflow-y:auto}.rounded-lg{border-radius:.5rem}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-l{border-left-width:1px}.border-r{border-right-width:1px}.border-t{border-top-width:1px}.border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235 / var(--tw-border-opacity))}.p-4{padding:1rem}.space-y-2>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.5rem * var(--tw-space-y-reverse))}.h-64{height:16rem}.min-w-full{min-width:100%}.divide-y>:not([hidden])~:not([hidden]){--tw-divide-y-reverse:0;border-top-width:calc(1px * calc(1 - var(--tw-divide-y-reverse)));border-bottom-width:calc(1px * var(--tw-divide-y-reverse))}.divide-x>:not([hidden])~:not([hidden]){--tw-divide-x-reverse:0;border-right-width:calc(1px * var(--tw-divide-x-reverse));border-left-width:calc(1px * calc(1 - var(--tw-divide-x-reverse)))}.divide-gray-200>:not([hidden])~:not([hidden]){--tw-border-opacity:1;border-color:rgb(229 231 235 / var(--tw-border-opacity))}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.text-left{text-align:left}.text-right{text-align:right}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-base{font-size:1rem;line-height:1.5rem}.font-bold{font-weight:700}.font-semibold{font-weight:600}.font-medium{font-weight:500}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128 / var(--tw-text-opacity))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity))}.text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55 / var(--tw-text-opacity))}.text-gray-900{--tw-text-opacity:1;color:rgb(17 24 39 / var(--tw-text-opacity))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity))}.whitespace-nowrap{white-space:nowrap}@media (min-width:768px){.md\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}.mx-auto{margin-left:auto;margin-right:auto}
+    </style>
+  </head>
+  <body class="bg-white">
+    <main class="max-w-5xl mx-auto p-8">
+      <div class="max-w-7xl mx-auto">
+        <h1 id="report-title" class="text-3xl font-bold text-gray-800">
+          Report Title
+        </h1>
+        <p id="report-date-display" class="mt-2 text-xl font-semibold text-gray-800 mb-8">
+          Report Date
+        </p>
+
+
+        <div class="bg-white rounded-lg">
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">
+            In-House Guests
+          </h2>
+          <div
+            class="overflow-x-auto border-t border-l border-r border-b border-gray-200"
+            id="report-results-table"
+          >
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr class="divide-x divide-gray-200">
+           <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Room</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Pax</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Guest Name</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Total Rate</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Arrival</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Departure</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Outstanding</th>
+                  <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500" style="font-size: 0.65rem;">Agency</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td class="px-6 py-2" colspan="8">Generating report...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+
+        <div class="mb-8 border border-gray-200 rounded-lg p-4">
+  <div
+            class="flex flex-wrap justify-around items-center text-sm font-semibold text-gray-700"
+          >
+            <span class="px-6">VACANT: <span id="summary-vacant">--</span></span>
+            <span class="text-gray-500">|</span>
+            <span class="px-6">BLOCKED: <span id="summary-blocked">--</span></span>
+            <span class="text-gray-500">|</span>
+            <span class="px-6">SOLD: <span id="summary-sold">--</span></span>
+            <span class="text-gray-500">|</span>
+            <span class="px-6">OCCUPANCY: <span id="summary-occupancy">--</span>%</span>
+            <span class="text-gray-500">|</span>
+            <span class="px-6">RevPAR: <span id="summary-revpar">--</span></span>
+            <span class="text-gray-500">|</span>
+            <span class="px-6">ADR: <span id="summary-adr">--</span></span>
+            <span class="text-gray-500">|</span>
+            <span class="px-6 text-base text-blue-600"
+              >DAY REVENUE: <span id="summary-revenue">--</span></s
+            >
+          </div>
+        </div>
+
+<div class="mt-6">
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">
+            Daily Takings Summary
+          </h2>
+          <div id="takings-summary-container" class="border border-gray-200 rounded-lg p-4 space-y-2">
+            <p class="text-xs text-gray-500">No takings data found.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      window.renderReport = (data) => {
+        try {
+          const { reportData, summary, takings, blocks, hotelName, reportDate } = data;
+
+          // --- Helper Function ---
+          const formatCurrency = (amount) => {
+            const numericAmount = parseFloat(amount) || 0;
+            return new Intl.NumberFormat("en-GB", {
+              style: "currency",
+              currency: "GBP",
+            }).format(numericAmount);
+          };
+
+          // --- 1. Populate Header ---
+          const date = new Date(reportDate + "T00:00:00");
+          const dayOfWeek = date.toLocaleDateString("en-GB", { weekday: "long" }).toUpperCase();
+          const day = String(date.getDate()).padStart(2, "0");
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const year = date.getFullYear();
+          const formattedDate = `${dayOfWeek} ${day}-${month}-${year}`;
+
+          document.getElementById("report-title").textContent = `${hotelName} - DAILY CHART`;
+          document.getElementById("report-date-display").textContent = formattedDate;
+
+          // --- 2. Populate Summary Bar ---
+          document.getElementById("summary-vacant").textContent = summary.vacant;
+          const blockedSpan = document.getElementById("summary-blocked");
+          blockedSpan.textContent = summary.blocked;
+          if (summary.blocked > 0) {
+            blockedSpan.classList.add("text-red-600"); //
+          }
+          document.getElementById("summary-sold").textContent = summary.sold;
+          document.getElementById("summary-occupancy").textContent =
+            typeof summary.occupancy === "number" ? summary.occupancy.toFixed(2) : "0.00";
+          document.getElementById("summary-revpar").textContent = formatCurrency(summary.revpar);
+          document.getElementById("summary-adr").textContent = formatCurrency(summary.adr);
+          document.getElementById("summary-revenue").textContent = formatCurrency(summary.revenue);
+
+          // --- 3. Populate In-House Guests Table ---
+          const tableBody = document.querySelector("#report-results-table tbody");
+          tableBody.innerHTML = ""; // Clear loader
+          if (reportData && reportData.length > 0) {
+            reportData.forEach((row) => {
+              const tr = document.createElement("tr");
+              tr.className = "divide-x divide-gray-200"; //
+              // Use blank cells for "---" or 0 values
+              tr.innerHTML = `
+                <td class="px-6 py-2 whitespace-nowrap text-xs font-medium text-gray-900">${row.roomName}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${row.pax !== "---" ? row.pax : ""}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${row.guestName !== "---" ? row.guestName : ""}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500 text-right">${row.grandTotal !== 0 ? formatCurrency(row.grandTotal) : ""}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${row.checkInDate !== "---" ? row.checkInDate : ""}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${row.checkOutDate !== "---" ? row.checkOutDate : ""}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500 text-right font-semibold">${row.balance !== 0 ? formatCurrency(row.balance) : ""}</td>
+                <td class="px-6 py-2 whitespace-nowrap text-xs text-gray-500">${row.source !== "---" ? row.source : ""}</td>
+              `;
+              tableBody.appendChild(tr);
+            });
+          } else {
+            tableBody.innerHTML = `<tr><td class="px-6 py-2" colspan="8">No in-house guests found.</td></tr>`;
+          }
+          
+// --- 4. Populate Blocked Rooms (REMOVED) ---
+          // This section was removed as per user request.
+
+          // --- 5. Populate Takings Summary ---
+          const takingsContainer = document.getElementById("takings-summary-container");
+          takingsContainer.innerHTML = ""; // Clear loader
+          if (takings && Object.keys(takings).length > 0) {
+            const totalTakings = Object.values(takings).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
+
+            const totalDiv = document.createElement("div");
+totalDiv.className = "flex justify-between font-semibold text-xs text-gray-800 pb-2 mb-3 border-b border-gray-200";
+            totalDiv.innerHTML = `<span>Taken Total:</span><span>${formatCurrency(totalTakings)}</span>`;
+            takingsContainer.appendChild(totalDiv);
+
+            for (const method in takings) {
+              const itemDiv = document.createElement("div");
+              itemDiv.className = "flex justify-between text-xs text-gray-500";
+              itemDiv.innerHTML = `<span>${method}:</span><span>${formatCurrency(takings[method])}</span>`;
+              takingsContainer.appendChild(itemDiv);
+            }
+          } else {
+            takingsContainer.innerHTML = `<p class="text-xs text-gray-500">No takings data found.</p>`;
+          }
+          
+          // --- 6. Add 'ready' class to body so Playwright knows we are done ---
+          document.body.classList.add('ready');
+        } catch (e) {
+          console.error('Error in window.renderReport:', e);
+          document.body.innerHTML = `<h1>PDF Generation Error: ${e.message}</h1>`;
+        }
+      };
+
+      // --- [FIX 2] Add 'script-ready' class to signal the function is defined ---
+      document.body.classList.add('script-ready');
+
+    </script>
+  </body>
+</html>
