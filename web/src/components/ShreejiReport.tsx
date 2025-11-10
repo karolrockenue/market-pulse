@@ -274,7 +274,7 @@ export function ShreejiReport({
               <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
                 <SelectValue placeholder="Choose a hotel" />
               </SelectTrigger>
-              <SelectContent className="bg-[#262626] border-[#3a3a35]">
+         <SelectContent style={{ backgroundColor: '#262626', border: '1px solid #3a3a35' }}>
                 {hotels.length === 0 && (
                   <SelectItem value="loading" disabled className="text-[#9ca3af]">
                     Loading hotels...
@@ -369,7 +369,7 @@ export function ShreejiReport({
                 <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
                   <SelectValue placeholder="Choose hotel" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#262626] border-[#3a3a35]">
+        <SelectContent style={{ backgroundColor: '#262626', border: '1px solid #3a3a35' }}>
                   {hotels.map((hotel) => (
                     <SelectItem
                       key={hotel.hotel_id}
@@ -390,11 +390,16 @@ export function ShreejiReport({
                 <SelectTrigger className="bg-[#1a1a18] border-[#3a3a35] text-[#e5e5e5]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#262626] border-[#3a3a35]">
-                  <SelectItem value="06:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">06:00</SelectItem>
-                  <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
-                  <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
-                </SelectContent>
+   <SelectContent style={{ backgroundColor: '#262626', border: '1px solid #3a3a35' }}>
+  <SelectItem value="06:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">06:00</SelectItem>
+  <SelectItem value="07:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">07:00</SelectItem>
+  <SelectItem value="08:00" className="text-[#e5e5e5] focus:bg-[#3a3a35]">08:00</SelectItem>
+  {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
+  <SelectItem value="14:55" className="text-[#faff6a] focus:bg-[#3a3a35]">14:55 (Test)</SelectItem>
+  <SelectItem value="15:00" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
+    <SelectItem value="15:05" className="text-[#faff6a] focus:bg-[#3a3a35]">14:55 (Test)</SelectItem>
+  <SelectItem value="15:10" className="text-[#faff6a] focus:bg-[#3a3a35]">15:00 (Test)</SelectItem>
+</SelectContent>
               </Select>
             </div>
             
