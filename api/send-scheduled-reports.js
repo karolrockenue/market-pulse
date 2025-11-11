@@ -429,9 +429,12 @@ for (const report of dueReports) {
       const recipients = report.recipients.split(",").map((e) => e.trim());
 
       // --- 3. SEND EMAIL WITH ATTACHMENT ---
+ // [WITH THIS]
+
+      // --- 3. SEND EMAIL WITH ATTACHMENT ---
       await sendEmail({
         to: recipients,
-    subject: report.report_name,
+        subject: `Daily Chart - ${hotelName} - ${emailDate}`, // [NEW] Use dynamic subject
         html: emailHtml,
         attachments: [
           {
