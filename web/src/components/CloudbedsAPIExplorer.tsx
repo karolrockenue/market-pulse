@@ -170,13 +170,14 @@ const handleGetInsightsData = () => {
   const handleGeneralEndpoint = (endpoint: string) => { // 'endpoint' here is the button text
     // --- Map button text back to endpoint slugs ---
     // (This mapping needs to be maintained if button text changes)
-    const generalEndpointsMap: Record<string, string> = {
+const generalEndpointsMap: Record<string, string> = {
       'Get Hotel Info': 'sample-hotel',
       'Get Sample Guest': 'sample-guest',
       'Get Taxes & Fees': 'taxes-fees',
       'Get Room Types': 'sample-room',
       'Get Rate Plans': 'sample-rate', // Placeholder, confirm if backend supports 'sample-rate' slug
       'Get Amenities': 'user-info', // Placeholder, confirm if backend supports 'user-info' or similar slug
+      'Get Webhooks': 'get-webhooks', // <-- ADD THIS NEW LINE
       // Add other mappings as needed
     };
     const endpointSlug = generalEndpointsMap[endpoint];
@@ -226,10 +227,10 @@ const handleDimensionToggle = (dimensionColumn: string) => {
       icon: Users,
       endpoints: ['Get Sample Guest'],
     },
-    {
+{
       name: 'Configuration',
       icon: Settings2,
-      endpoints: ['Get Taxes & Fees', 'Get Room Types', 'Get Rate Plans', 'Get Amenities'],
+      endpoints: ['Get Taxes & Fees', 'Get Room Types', 'Get Rate Plans', 'Get Amenities', 'Get Webhooks'], // <-- ADD 'Get Webhooks' HERE
     },
   ];
 

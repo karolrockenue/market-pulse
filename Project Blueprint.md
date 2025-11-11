@@ -227,14 +227,16 @@ market-pulse/
 │   │   └── users.router.js 
 │   │   ├── planning.router.js   \# \[NEW\] 
 │   ├── utils/  
-│   │   ├── report-templates/    \# \[NEW\] HTML templates for PDF generation
+│   │   ├── report-templates/    \# \[NEW] HTML templates for PDF generation
 │   │   ├── db.js                \# PostgreSQL connection pool 
 │   │   ├── benchmark.utils.js   \# Single source of truth for pacing benchmarks 
 │   │   ├── market-codex.utils.js \# Logic hub for market demand/MPSS
 │   │   ├── pacing.utils.js      \# [NEW] Logic hub for dashboard/budget pacing status
-│   │   ├── emailTemplates.js    \# \[NEW\] HTML for magic link email  
+│   │   ├── email.utils.js       \# \[NEW] Centralized utility for all SendGrid email ops
+│   │   ├── emailTemplates.js    \# \[NEW] HTML for magic link & scheduled report emails
+│   │   ├── report.generators.js \# \[NEW] Logic Hub for generating PDF/Excel reports
 │   │   ├── middleware.js        \# Auth & role-based middleware
-│   │   └── pdf.utils.js         \# \[NEW\] PDF generation utility (Playwright)
+│   │   └── pdf.utils.js         \# \[NEW] PDF generation utility (Playwright)
 │   ├── daily-refresh.js         \# CRON: Syncs 365-day forecast  
 │   ├── initial-sync.js          \# JOB: Syncs 5-year history  
 │   ├── send-scheduled-reports.js \# CRON: Generates & emails reports  
@@ -288,8 +290,11 @@ All endpoints are mounted under /api in server.js.
 
 ### **reports.router.js**
 
-* GET /reports/scheduled-reports, POST /reports/scheduled-reports, DELETE /reports/scheduled-reports/:id: Manages report scheduling configuration.  
-* **\[NEW\]** POST /reports/run: Consolidated endpoint for the React report builder. Dynamically builds a SQL query based on selected metrics, granularity, and tax settings.  
+### reports.router.js
+
+* GET /reports/scheduled-reports, DELETE /reports/scheduled-reports/:id: Fetches and deletes scheduled reports.
+* POST /reports/scheduled-reports: **\[MODIFIED]** Saves a report schedule. Now accepts a `report_type` (e.g., 'standard' or 'shreeji') to differentiate between report types.
+* **\[NEW]** POST /reports/run: Consolidated endpoint for the React report builder. Dynamically builds a SQL query based on selected metrics, granularity, and tax settings. 
 * **\[NEW\]** GET /reports/available-years: Fetches a clean list of years with valid data for a property, respecting go\_live\_date.  
 * **\[NEW\]** POST /reports/year-on-year: Provides a 12-month comparison for two selected years.
 
@@ -343,8 +348,8 @@ All endpoints are mounted under /api in server.js.
 
 * GET /rockenue/hotels: Fetches a list of all hotels for report dropdowns.  
 * GET /rockenue/shreeji-report: Generates the JSON data for the in-house guest balance report.  
-* **\[NEW\]** GET /rockenue/shreeji-report/download: Generates and downloads a PDF of the in-house guest balance report.
-* **\[NEW\]** GET /rockenue/portfolio: Fetches all assets from the rockenue\_managed\_assets table.  
+* **\[MODIFIED]** GET /rockenue/shreeji-report/download: **Refactored** to call the `report.generators.js` hub; its internal PDF logic was removed.
+* **\[NEW]** GET /rockenue/portfolio: Fetches all assets from the rockenue\_managed\_assets table.
 * **\[NEW\]** POST /rockenue/portfolio: Adds a new "Off-Platform" asset to the private ledger.  
 * **\[NEW\]** PUT /rockenue/portfolio/:id: Updates an asset's details. Only allows monthly\_fee to be changed for "Live" assets.  
 * **\[NEW\]** DELETE /rockenue/portfolio/:id: Deletes an asset *only if* it is "Off-Platform".
@@ -365,8 +370,8 @@ All endpoints are mounted under /api in server.js.
 ## **7.0 Automated Jobs (Vercel Cron Jobs)**
 
 * api/daily-refresh.js: Runs daily. Fetches the next 365 days of forecast data (Occupancy, ADR, Revenue) for **all** connected properties from their respective PMS (Cloudbeds or Mews). Updates last\_successful\_refresh in system\_state on completion.  
-* api/send-scheduled-reports.js: Runs every 5 minutes (\*/5 \* \* \* \*). Checks the scheduled\_reports table for jobs due at the current UTC time and emails them.  
-* api/ota-crawler.js: Runs daily. Scrapes aggregate market availability data. (Note: This job is part of the Market Pulse repo, distinct from the Market Codex crawler).  
+* api/send-scheduled-reports.js: **\[MODIFIED]** Runs every 5 minutes. This job is now "type-aware." It checks the `report_type` column and routes to the correct generator (Standard P&L or Shreeji PDF).  
+* api/ota-crawler.js: Runs daily. Scrapes aggregate market availability data. (Note: This job is part of the Market Pulse repo, distinct from the Market Codex crawler).
 * **\[NEW\]** api/sync-rockenue-assets.js: Runs daily. Syncs any hotel with is\_rockenue\_managed \= true into the rockenue\_managed\_assets table.
 
 ---
@@ -559,7 +564,7 @@ web/
 
 | Component | Purpose & Key Props |
 | :---- | :---- |
-| **App.tsx** | **Main application container.** Holds all shared state and view-routing logic. |
+| **App.tsx** | **Main application container.** Holds all shared state and view-routing logic. **[MODIFIED]** Now also contains state (`shreejiScheduledReports`) and handlers (`handleSaveShreejiSchedule`) for the Shreeji scheduling UI, passing them as props. |
 | **TopNav.tsx** | **Global navigation bar.** props: activeView, onViewChange, property, onPropertyChange, properties, lastUpdatedAt, userInfo. |
 | **LandingPage.tsx** | **Public login/marketing page.** props: onSignIn, onViewChange. |
 | **Budgeting.tsx** | **Budgeting & Pacing page.** props: propertyId, currencyCode. |
