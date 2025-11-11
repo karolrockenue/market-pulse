@@ -926,7 +926,7 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
     // --- CORRECTED LOGIC ---
     // Each case will now handle its own fetch and response.
     switch (endpoint) {
- case "get-webhooks":
+case "get-webhooks":
         // This endpoint requires the propertyID as a query parameter
         targetUrl = `https://api.cloudbeds.com/api/v1.3/getWebhooks?propertyID=${cloudbedsApiId}`;
         // This endpoint uses the user-level token, not a property-specific one
@@ -934,7 +934,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         // We'll remove the header just to be safe.
         delete options.headers["X-PROPERTY-ID"];
         break;
-    
       case "sample-hotel":
         targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${cloudbedsApiId}`;
         break;
