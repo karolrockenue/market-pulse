@@ -7,6 +7,7 @@ const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const mewsAdapter = require("./adapters/mewsAdapter.js"); // NEW: Require Mews adapter
 const format = require("pg-format");
+const { getCredentialsForHotel, getRoomTypesFromPMS } = require("./routes/admin.router.js"); // <-- ADD THIS LINE
 
 /**
  * The core logic for the initial sync process. Now supports Mews and Cloudbeds.
