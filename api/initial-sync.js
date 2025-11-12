@@ -7,7 +7,7 @@ const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const mewsAdapter = require("./adapters/mewsAdapter.js"); // NEW: Require Mews adapter
 const format = require("pg-format");
-const fetch = require("node-fetch");
+
 // const { getCredentialsForHotel, getRoomTypesFromPMS } = require("./routes/admin.router.js"); // <-- ADD THIS LINE
 
 /**
