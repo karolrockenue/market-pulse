@@ -7,6 +7,7 @@ const pgPool = require("./utils/db");
 const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 const mewsAdapter = require("./adapters/mewsAdapter.js"); // NEW: Require Mews adapter
 const format = require("pg-format");
+const fetch = require("node-fetch");
 // const { getCredentialsForHotel, getRoomTypesFromPMS } = require("./routes/admin.router.js"); // <-- ADD THIS LINE
 
 /**
@@ -577,6 +578,178 @@ staticTotalRooms || metrics.capacity_count || 0, // <-- REPLACED: Uses non-confl
     client.release();
   }
 }
+
+// --- HELPER FUNCTIONS COPIED FROM ADMIN.ROUTER.JS ---
+// This breaks the circular dependency.
+
+/**
+ * Gets a fresh admin access token for Cloudbeds.
+ * NOTE: This is a copy of the function in admin.router.js.
+ */
+async function getAdminAccessToken(adminUserId, propertyId) {
+  if (!propertyId) {
+    throw new Error("A propertyId is required to get an access token.");
+  }
+
+  const credsResult = await pgPool.query(
+    `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
+    [propertyId]
+  );
+
+  const refreshToken = credsResult.rows[0]?.pms_credentials?.refresh_token;
+
+  if (!refreshToken) {
+    throw new Error(
+      `Could not find a valid refresh token for property ${propertyId}.`
+    );
+  }
+
+  const { CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET } = process.env;
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLOUDBEDS_CLIENT_ID,
+    client_secret: CLOUDBEDS_CLIENT_SECRET,
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(
+    "https://hotels.cloudbeds.com/api/v1.1/access_token",
+    { method: "POST", body: params }
+  );
+  const tokenData = await response.json();
+
+  if (!tokenData.access_token) {
+    console.error("Token refresh failed for admin user:", tokenData);
+    throw new Error("Cloudbeds authentication failed for admin user.");
+  }
+
+  return { accessToken: tokenData.access_token, propertyId: propertyId };
+}
+
+/**
+ * Helper function to get the necessary credentials for any hotel.
+ * NOTE: This is a copy of the function in admin.router.js.
+ * @param {string} hotelId The internal hotel_id
+ * @returns {Promise<{credentials: object, pms_type: string, pms_property_id: string}>}
+ */
+async function getCredentialsForHotel(hotelId) {
+  const result = await pgPool.query(
+    // We fetch the stored credentials, pms_type, and the external pms_property_id
+    `SELECT up.pms_credentials, h.pms_type, h.pms_property_id
+     FROM user_properties up
+     JOIN hotels h ON up.property_id = h.hotel_id
+     WHERE up.property_id = $1 
+     AND up.pms_credentials IS NOT NULL
+     LIMIT 1`,
+    [hotelId]
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`No credentials or hotel entry found for hotel ${hotelId}`);
+  }
+
+  const { pms_credentials, pms_type, pms_property_id } = result.rows[0];
+
+  // For Mews, we must decrypt the access token before returning
+  if (pms_type === 'mews') {
+    const storedCredentials = pms_credentials;
+    // Re-use the existing getMewsCredentials logic
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+    const [ivHex, authTagHex, encryptedToken] =
+      storedCredentials.accessToken.split(":");
+    if (!ivHex || !authTagHex || !encryptedToken) {
+      throw new Error("Stored Mews credentials are in an invalid format.");
+    }
+
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(authTagHex, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+
+    let decryptedToken = decipher.update(encryptedToken, "hex", "utf8");
+    decryptedToken += decipher.final("utf8");
+
+    return {
+      credentials: {
+        clientToken: storedCredentials.clientToken,
+        accessToken: decryptedToken
+      },
+      pms_type: 'mews',
+      pms_property_id: pms_property_id
+    };
+  }
+
+  // For Cloudbeds, just return the stored credentials object
+  return {
+    credentials: pms_credentials, // This contains the refresh_token
+    pms_type: 'cloudbeds',
+    pms_property_id: pms_property_id
+  };
+}
+
+/**
+ * Fetches room type data directly from the PMS API.
+ * NOTE: This is a copy of the function in admin.router.js.
+ * @param {string} hotelId Internal hotel_id (for getting the *right* token)
+ * @param {string} pms_type 'cloudbeds' or 'mews'
+ * @param {object} credentials The credentials object from getCredentialsForHotel
+ * @param {string} pms_property_id The external PMS property ID (Cloudbeds needs this)
+ * @returns {Promise<object>} The raw API response (expected to have a .data property)
+ */
+async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_id) {
+  if (pms_type === 'cloudbeds') {
+    // --- Cloudbeds Logic ---
+    // 1. Get a fresh Access Token using the stored refresh_token
+    // We use the internal hotelId to find the right refresh token
+    const { accessToken } = await getAdminAccessToken("admin", hotelId); // Re-use existing admin helper
+
+    // 2. Use the external pms_property_id for the API call
+    const cloudbedsApiId = pms_property_id || hotelId; // Fallback for older hotels
+    const targetUrl = `https://api.cloudbeds.com/api/v1.1/getRoomTypes?propertyID=${cloudbedsApiId}`;
+
+    const response = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-PROPERTY-ID": cloudbedsApiId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Cloudbeds API error: ${response.statusText}`);
+    }
+    return response.json(); // Returns { success: true, data: [...] }
+
+  } else if (pms_type === 'mews') {
+    // --- Mews Logic ---
+    // Credentials are pre-decrypted by getCredentialsForHotel
+    const targetUrl = "https://api.mews.com/api/connector/v1/roomTypes/getAll";
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${credentials.accessToken}`,
+      },
+      body: JSON.stringify({
+        ClientToken: credentials.clientToken,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mews API error: ${response.statusText}`);
+    }
+    const mewsData = await response.json();
+    // Mews data format is { RoomTypes: [...] }. We adapt it to match the
+    // Cloudbeds format { data: [...] } for consistent processing.
+    return { data: mewsData.RoomTypes || [] };
+  } else {
+    throw new Error(`PMS type "${pms_type}" not supported for getRoomTypes.`);
+  }
+}
+
+// --- END OF COPIED FUNCTIONS ---
+
+
+
 
 // Wrapper and command-line execution logic remains unchanged...
 const serverlessWrapper = async (request, response) => {
