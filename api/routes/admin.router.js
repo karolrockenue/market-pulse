@@ -1505,8 +1505,5 @@ router.get("/management-groups", requireAdminApi, async (req, res) => {
   }
 });
 
-module.exports = {
-  router,
-  getCredentialsForHotel,
-  getRoomTypesFromPMS,
-};
+
+module.exports = router;
