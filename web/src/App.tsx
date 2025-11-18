@@ -54,6 +54,10 @@ import { RockenueHub } from './components/RockenueHub';
 import { ShreejiReport } from './components/ShreejiReport';
 import { PortfolioOverview } from './components/PortfolioOverview'; // [NEW] Import the new component
 import { PortfolioRiskOverview } from './components/PortfolioRiskOverview';
+import { ShadowfaxPage } from './components/ShadowfaxPage'; // [NEW] Import the Shadowfax page
+import { PropertyHubPage } from './components/PropertyHubPage'; // [NEW] Import the Property Hub page
+import { SentinelControlPanel } from './components/SentinelControlPanel'; // [NEW] Import the Sentinel page
+import { SentinelRateManager } from './components/SentinelRateManager'; // [NEW] ADD THIS IMPORT
 import { Budgeting } from './components/Budgeting'; // [NEW] Import the Budgeting component
 import { LandingPage } from './components/LandingPage';
 // [NEW] Import the legal page components
@@ -733,7 +737,9 @@ try {
   }
     };
     // Only run the fetch logic if the admin view is the one being shown
-    if (activeView === 'admin') {
+// [Replace With]
+    // Only run the fetch logic if the admin, sentinel, or rateManager view is active
+    if (activeView === 'admin' || activeView === 'sentinel' || activeView === 'rateManager') {
       fetchAdminData();
     }
   }, [activeView]); // This hook runs whenever activeView changes
@@ -2397,7 +2403,30 @@ onManageSchedules={() => setShowManageSchedules(true)}
 
         </>
       )}
-    
+
+
+
+{/* [NEW] Render the Shadowfax Price Checker page */}
+  {activeView === 'shadowfax' && (
+    <ShadowfaxPage />
+  )}
+
+{/* [NEW] Render the Sentinel AI Control Panel page */}
+  {activeView === 'sentinel' && (
+    <SentinelControlPanel allHotels={allHotels} />
+  )}
+
+  {/* [NEW] Render the Sentinel Rate Manager page */}
+  {activeView === 'rateManager' && (
+    <SentinelRateManager allHotels={allHotels} />
+  )}
+
+{/* [NEW] Render the Property Hub page */}
+  {activeView === 'propertyHub' && (
+    <PropertyHubPage />
+  )}
+
+
 
       {/* Modals */}
       <CreateScheduleModal open={showCreateSchedule} onClose={() => setShowCreateSchedule(false)} onSave={handleSaveSchedule} />

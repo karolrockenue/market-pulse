@@ -1,4 +1,4 @@
-# **Project "Market Pulse" \- Technical Handbook 2.0**
+# **Project "Market Pulse" - Technical Handbook 2.0 (LEAN)**
 
 **Last Updated:** October 30, 2025
 
@@ -17,8 +17,6 @@ This document is the single source of truth for the project. All future AI-assis
 ---
 
 ## **1.0 Project Overview & Technology Stack**
-
-Market Pulse is a multi-tenant SaaS application designed to provide hotel operators with competitive market intelligence. Users can compare their property's performance (Occupancy, ADR, RevPAR) against a curated or dynamically generated market competitive set, track forward-looking market pace, and set internal performance budgets.
 
 * **Backend:** Node.js with Express.js  
 * **Frontend:** React (Vite)  
@@ -102,8 +100,7 @@ Stores daily performance data.
 * gross\_adr (numeric)  
 * net\_revpar (numeric)  
 * gross\_revpar (numeric)  
-* occupancy\_direct (numeric) \- **DEPRECATED**  
-* ... (other legacy/raw data columns)
+* occupancy\_direct (numeric) \- **DEPRECATED** * ... (other legacy/raw data columns)
 
 ### **hotels**
 
@@ -128,6 +125,7 @@ Stores property details.
 * locked\_years (jsonb) \- Array of years (e.g., \["2024"\]) to protect from sync overwrites.  
 * is\_rockenue\_managed (boolean)  
 * management\_group (text)
+* `booking_com_url (text)` - **[NEW]** URL for the Shadowfax price checker.
 
 ### **hotel\_budgets**
 
@@ -226,6 +224,7 @@ market-pulse/
 │   │   ├── support.router.js    \# \[NEW\] Support form endpoint  
 │   │   └── users.router.js 
 │   │   ├── planning.router.js   \# \[NEW\] 
+│   │   ├── scraper.router.js  \# \[NEW] Shadowfax price checker
 │   ├── utils/  
 │   │   ├── report-templates/    \# \[NEW] HTML templates for PDF generation
 │   │   ├── db.js                \# PostgreSQL connection pool 
@@ -236,7 +235,8 @@ market-pulse/
 │   │   ├── emailTemplates.js    \# \[NEW] HTML for magic link & scheduled report emails
 │   │   ├── report.generators.js \# \[NEW] Logic Hub for generating PDF/Excel reports
 │   │   ├── middleware.js        \# Auth & role-based middleware
-│   │   └── pdf.utils.js         \# \[NEW] PDF generation utility (Playwright)
+│   │   ├── pdf.utils.js         \# \[NEW] PDF generation utility (Playwright)
+│   │   ├── scraper.utils.js     \# \[NEW] Shadowfax price checker logic hub
 │   ├── daily-refresh.js         \# CRON: Syncs 365-day forecast  
 │   ├── initial-sync.js          \# JOB: Syncs 5-year history  
 │   ├── send-scheduled-reports.js \# CRON: Generates & emails reports  
@@ -361,10 +361,16 @@ All endpoints are mounted under /api in server.js.
 * **\[NEW\]** GET /budgets/:hotelId/:year: Fetches the 12-month budget for a property.  
 * **\[NEW\]** POST /budgets/:hotelId/:year: Saves or updates the 12-month budget in a transaction.  
 * **[NEW]** GET /budgets/benchmarks/:hotelId/:month/:year: Provides dynamic benchmark ADR/Occ by calling the unified **benchmark.utils.js** utility, ensuring consistent pacing logic across the app.
+
 ### **support.router.js**
 
-* **\[NEW\]** POST /support/submit: Handles the "Contact Us" form submission, sending a formatted email via SendGrid to the support inbox.
+* **\[NEW]** POST /support/submit: Handles the "Contact Us" form submission, sending a formatted email via SendGrid to the support inbox.
 
+### **scraper.router.js**
+
+*All routes are protected by requireAdminApi middleware*.
+
+* **\[NEW]** POST /scraper/get-price: Triggers the "Shadowfax" on-demand price checker. Launches Playwright to scrape a live price from a hotel's `booking_com_url`.
 ---
 
 ## **7.0 Automated Jobs (Vercel Cron Jobs)**
@@ -378,106 +384,10 @@ All endpoints are mounted under /api in server.js.
 
 ## **7.5 Developer Scripts & Tooling**
 
-This section documents internal scripts used by developers for data management and maintenance. These are not part of the deployed application and are run manually from the command line.
+* **scripts/import-monthly-history.js:** Developer tool to import historical *monthly* totals from a CSV. It disaggregates this data into daily records using a "Pattern Hotel" logic.
+* **scripts/import-daily-history.js:** Developer tool to import historical data that is *already* in a daily-level CSV format.
 
-### **scripts/import-monthly-history.js**
-
-* **Purpose:** A high-safety, idempotent script to import historical *monthly* performance data from a CSV.
-* **Methodology:**
-    1.  Accepts monthly CSV totals (`total_net_revenue`, `total_rooms_sold`).
-    2.  Fetches the hotel's `total_rooms` and `tax_rate` from the `hotels` table.
-    3.  Uses a "Pattern Hotel" (either itself or an external hotel) to disaggregate monthly totals into realistic daily records.
-    4.  Calculates gross revenue, ADR, and RevPAR using the hotel's `tax_rate`.
-    5.  Atomically deletes old data, inserts new data, and updates the `hotels.locked_years` array in a single database transaction.
-
-* **Usage:**
-    ```bash
-    node scripts/import-monthly-history.js \
-    --hotelId=<target_hotel_id> \
-    --csv="/path/to/data.csv" \
-    --lockYears="<year1,year2>" \
-    --patternHotelId=<optional_pattern_hotel_id>
-    ```
-
-* **Required CSV Format:**
-    The script requires a CSV file with the following headers. The `month` column must be in `YYYY-MM` format.
-    ```csv
-    month,total_rooms_sold,total_net_revenue
-    2023-01,500,75000
-    2023-02,450,68000
-    2023-03,510,77000
-    ```
-
-## **8.0 Architectural Milestones**
-
-* **11.0: OTA Crawler & Vercel Deployment (Oct 2025):** Deployed a Playwright-based scraper to Vercel, requiring a switch to playwright-core and @sparticuz/chromium to resolve build errors.  
-
-* **12.0: Reliable Room Count (Oct 2025):** Fixed unreliable room counts by adding a total\_rooms column to the hotels table. Created the GET /api/admin/backfill-room-counts endpoint to populate this column directly from the PMS source of truth.  
-
-* **13.0: Occupancy Data Refactor (Oct 2025):** A critical bug was fixed where occupancy was being read from an unreliable occupancy\_direct column. All API endpoints (in dashboard.router.js, reports.router.js, market.router.js) were refactored to calculate occupancy on-the-fly using (SUM(rooms\_sold)::numeric / NULLIF(SUM(capacity\_count), 0)). The occupancy\_direct column is now considered deprecated.  
-
-* **14.0: Budget Pacing Logic (Oct 2025):** Implemented the core business logic for the Budgeting feature. It provides a "Green / Yellow / Red" status for a budget month by comparing the **Required ADR** (rate needed on unsold rooms to hit the target) against a **Benchmark ADR** (a realistic rate derived from L30D/SMLY data via GET /api/budgets/benchmarks).  
-* **15.0: Rockenue Management Data Model (Oct 2025):** Implemented a hybrid data model for internal tools, visible **only to super\_admin users**.  
-  * hotels table was extended with is\_rockenue\_managed (BOOLEAN) and management\_group (TEXT).  
-  * A private rockenue\_managed\_assets table was created to serve as a financial ledger, allowing super\_admin users to track monthly\_fee for both "Live" Market Pulse properties and **"Off-Platform" assets** that are not part of the main application.  
-* **16.0: React Migration & Monorepo Deployment (Oct 2025):** The original Alpine.js /public folder was replaced with a new /web React application. The deployment architecture was pivoted to a single-server monorepo, where server.js acts as the single entry point, serving both the API and the static React index.html file.
-* **17.0: Unified Pacing Benchmark Logic (Nov 2025):** Resolved a critical bug where the Portfolio Risk Overview and Budgeting pages showed different risk statuses for the same property. The discrepancy was caused by two conflicting "sources of truth" for benchmark ADR (flawed L30D/SMLY logic vs. correct full-month-average logic).
-* **Solution:** Created a new shared utility file, **/api/utils/benchmark.utils.js**, to house the single source of truth for benchmark data.
-  * **[EDIT]** This logic was later corrected to prioritize **Last 30 Days (L30D)** data as the primary benchmark. If L30D data is unavailable, it falls back to **Same Month Last Year (SMLY)**, and finally to a hard-coded default.
-  * **Refactor:** Modified **/api/routes/portfolio.router.js** and **/api/routes/budgets.router.js** to remove all local benchmark logic and call this new shared utility, ensuring 100% consistency.
-
-* **18.0: Market Codex & "Demand & Pace" (Nov 2025):** Deployed the new "Demand & Pace" feature, a major initiative to provide live, forward-looking market intelligence. This involved several new architectural patterns:
-
-  Database Pre-calculation: A migration added two STORED generated columns (weighted_avg_price, hotel_count) to the market_availability_snapshots table. This moves heavy WAP and JSON parsing logic from read-time to insert-time, making all future queries extremely fast.
-
-  "Logic Hub" Implementation: Created a new api/utils/market-codex.utils.js file. This "Logic Hub" centralizes all business-facing logic (like calculatePriceIndex and calculateMarketDemand), allowing for easy updates without changing the API or database.
-
-  New API Router: Deployed a new api/routes/planning.router.js with resilient DISTINCT ON queries to serve the 90-day grid (/forward-view) and pace charts (/pace).
-
-  New "Market Outlook" Logic: Defined and implemented a "Split-Half" methodology for the GET /planning/market-trend endpoint. This logic compares the average 30-day forward-looking forecast from a "Recent" period (e.g., last 11 days) against a "Past" period (e.g., first 11 days) to determine if the market is "Softening" or "Strengthening".
-
-* **[NEW] 19.0: Historical Data Import Tool (Nov 2025):** Resolved a major business and data-integrity problem where importing historical data was a high-risk, manual SQL task.
-    * **Problem:** The manual process was unscalable, error-prone, and could not handle the common client requirement of providing *monthly* totals instead of daily records.
-    * **Solution:** Created a new developer-facing script, `scripts/import-monthly-history.js`.
-    * **Core Logic:** The tool implements a "monthly-to-daily" disaggregation strategy. It uses a daily distribution pattern from a "Pattern Hotel" (either the hotel's own data from other years or an external hotel) to intelligently spread monthly totals across the days of the month.
-    * **Data Integrity:** The script ensures data completeness by fetching the hotel's `tax_rate` to populate both `net_revenue` and `gross_revenue` columns.
-    * **Safety:** The entire operation is wrapped in a single transaction and, on success, atomically adds the imported years to the `hotels.locked_years` array, protecting the new data from the `initial-sync.js` job.
-
-    ### Tool 2: Daily Data Import Script (`import-daily-history.js`)
-
-* **Purpose:** Used when the hotel provides a CSV that *already contains* daily-level data. This script bypasses all "pattern" and "disaggregation" logic.
-* **Usage:**
-    ```bash
-    node scripts/import-daily-history.js \
-    --hotelId=318238 \
-    --csv="/path/to/daily-data.csv" \
-    --lockYears="2022,2023"
-    ```
-* **CSV Format:** Expects `date`, `revenue_gross`, and `occupancy`.
-    > **CRITICAL:** The `occupancy` column **must** be a decimal (e.g., `0.8214`), **not** a percentage (e.g., `82.14`).
-    ```csv
-    date,revenue_gross,adr_gross,occupancy
-    2022-01-01,1598.66,69.50,0.821429
-    2022-01-02,996.50,55.36,0.642857
-    ```
-* **Core Logic:**
-    1.  Fetches the hotel's `total_rooms` (as `capacityCount`) and `tax_rate` from the `hotels` table.
-    2.  Ignores the `adr_gross` column in the CSV (it's considered unreliable).
-    3.  Loops through each daily row in the CSV.
-    4.  Calculates the definitive `rooms_sold` using the formula: `Math.round(occupancy * capacityCount)`.
-    5.  Calculates all other metrics (`net_revenue`, `net_adr`, `gross_adr`, `net_revpar`, `gross_revpar`) based on this `rooms_sold` value.
-    6.  Wraps the entire `DELETE` and `INSERT` operation in a single transaction and locks the years, just like the monthly script.
-
-
-* **[NEW] 20.0: Unified Hotel Dashboard & Logic Refactor (Nov 2025):** Deployed the new primary dashboard (`HotelDashboard.tsx`) to replace the original "You vs. Comp Set" view.
-    * **Unified Endpoint:** Created a new `GET /api/dashboard/summary` endpoint that fetches all dashboard data (Snapshots, YTD, Market, Ranks) in a single parallelized API call.
-    * **View Routing:** Refactored `App.tsx` to make the new dashboard the default `'dashboard'` view and moved the legacy chart/table view to `'youVsCompSet'`.
-    * **Logic Centralization:** Refactored the "Market Outlook" (Strengthening/Softening) logic out of both `planning.router.js` and `dashboard.router.js` and into a single, new function (`getMarketOutlook`) in the `api/utils/market-codex.utils.js` "Logic Hub" to ensure 100% consistency between the two pages.
-
-* **[NEW] 21.0: UI/Logic Consistency Fixes (Nov 2025):**
-    * **Logo & Favicon Refactor:** Replaced the dynamic JavaScript-based favicon (`Favicon.tsx`) with a static, embedded SVG in `index.html` to fix scaling/squishing issues. Replaced the nav bar's image logo with the correct text-based `( MARKET PULSE )` logo from the prototype, aligning it with `items-baseline` and pixel-nudging for visual perfection.
-    * **Pacing Logic Unification (Dashboard):** Centralized the "At Risk" / "On Target" logic for the Hotel Dashboard into the new `api/utils/pacing.utils.js` hub. This logic is now executed by the `GET /api/dashboard/summary` endpoint, removing all calculation responsibility from the `HotelDashboard.tsx` component and ensuring consistency.
-    * **Benchmark Logic Correction:** Corrected the core business logic in `api/utils/benchmark.utils.js`. The system now correctly prioritizes L30D data over SMLY data when calculating benchmarks, fixing a major logical flaw.
+---
 
 ## **9.0 Frontend Architecture**
 
@@ -546,6 +456,7 @@ web/
     │   ├── ReportSelector.tsx  
     │   ├── ReportTable.tsx  
     │   ├── SettingsPage.tsx  
+    │   ├── ShadowfaxPage.tsx    \# \[NEW]
     │   ├── ShreejiReport.tsx  
     │   ├── SupportPage.tsx  
     │   ├── SystemHealth.tsx  
@@ -560,9 +471,7 @@ web/
 ├── vite.config.ts           \# (Vite config with proxy to backend)  
 └── yarn.lock
 
-### **9.4 Key Component Analysis**
-
-| Component | Purpose & Key Props |
+Component | Purpose & Key Props |
 | :---- | :---- |
 | **App.tsx** | **Main application container.** Holds all shared state and view-routing logic. **[MODIFIED]** Now also contains state (`shreejiScheduledReports`) and handlers (`handleSaveShreejiSchedule`) for the Shreeji scheduling UI, passing them as props. |
 | **TopNav.tsx** | **Global navigation bar.** props: activeView, onViewChange, property, onPropertyChange, properties, lastUpdatedAt, userInfo. |
@@ -576,7 +485,7 @@ web/
 | **SystemHealth.tsx** | **Admin widget for testing connections.** props: propertyId, lastRefreshTime, onRefreshData. |
 | **CloudbedsAPIExplorer.tsx** | **Admin widget for raw API calls.** props: propertyId. |
 | **PortfolioOverview.tsx** | **Private super\_admin page for financial tracking.** (Managed internally). |
-| **PortfolioRiskOverview.tsx** | **Private super_admin diagnostic page. Combines volume and pacing risk into a portfolio-wide view. (Managed internally).** | **DemandPace.tsx**  | New 'Demand & Pace' feature page. Displays 90-day grid, charts, and market highlights. | propertyId, currencyCode, city 
+| **PortfolioRiskOverview.tsx** | **Private super_admin diagnostic page. Combines volume and pacing risk into a portfolio-wide view. (Managed internally).** | **DemandPace.tsx** | New 'Demand & Pace' feature page. Displays 90-day grid, charts, and market highlights. | propertyId, currencyCode, city 
 | **HotelDashboard.tsx** | **[NEW] The main application dashboard.** Displays performance snapshots, 90-day demand, YTD trend, and comp set rank. | onNavigate, data, isLoading 
 | **DynamicYTDTrend.tsx** | **[NEW] Sub-component for the dashboard.** Displays the YTD vs. Last Year revenue table. | onNavigate, data |
-
+| **ShadowfaxPage.tsx** | **[NEW] "Sentinel" tool for on-demand price scraping.** (Managed internally). | (None) |

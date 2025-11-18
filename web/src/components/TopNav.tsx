@@ -1,4 +1,3 @@
-// [MODIFIED] Import new icons for Planning dropdown
 import {
   BarChart3,
   LayoutDashboard,
@@ -12,6 +11,10 @@ import {
   Zap, // [NEW] Add Zap icon for admin/rockenue links
   ClipboardList, // [NEW] Replaced Target with ClipboardList
   ChevronDown, // [NEW] Icon for dropdown arrow
+  Tag, // [NEW] Icon for Price Checker
+  Home, // [NEW] Icon for Property Hub
+  TerminalSquare, // [NEW] Icon for Sentinel Panel
+  DollarSign, // [NEW] Icon for Rate Manager
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 // [MODIFIED] Import DropdownMenu components, including DropdownMenuGroup
@@ -23,6 +26,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+
 } from './ui/dropdown-menu';
 
 interface Property {
@@ -83,16 +87,36 @@ const allNavItems = [
     // [MODIFIED] Admin links are now at the end.
     { label: 'Rockenue', value: 'rockenue', icon: Zap, isAdmin: true },
     { label: 'Admin', value: 'admin', icon: Zap, isAdmin: true },
+// [NEW] "Sentinel" dropdown for super_admin only
+{
+  label: 'Sentinel',
+  value: 'sentinel-group',
+  icon: Zap,
+  isDropdown: true,
+  isSuperAdminOnly: true, // This is a new property for super_admin ONLY
+items: [
+    { label: 'Control Panel', value: 'sentinel', icon: TerminalSquare },
+    { label: 'Rate Manager', value: 'rateManager', icon: DollarSign },
+    { label: 'Property Hub', value: 'propertyHub', icon: Home },
+    { label: 'Shadowfax', value: 'shadowfax', icon: Tag },
+  ],
+},
   ];
 
-  // [NEW] Filter nav items based on user role, only show admin items to super_admin
+// [NEW] Filter nav items based on user role
   const navItems = allNavItems.filter(item => {
-    // If it's not an admin item, always show it
-    if (!item.isAdmin) {
-      return true;
+    // 1. New Super Admin Only items
+    if ((item as any).isSuperAdminOnly) {
+      return userInfo?.role === 'super_admin';
     }
-    // If it IS an admin item, only show it if the user is a super_admin
-  return userInfo?.role === 'super_admin' || userInfo?.role === 'admin';
+
+    // 2. Existing Admin items (admin + super_admin)
+    if (item.isAdmin) {
+      return userInfo?.role === 'super_admin' || userInfo?.role === 'admin';
+    }
+
+    // 3. Regular items
+    return true;
   });
 
 const showPropertySelector = activeView !== 'landing';

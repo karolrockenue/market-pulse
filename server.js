@@ -36,10 +36,12 @@ const rockenueRoutes = require("./api/routes/rockenue.router.js");
 const supportRoutes = require("./api/routes/support.router.js"); // [NEW] Import the support router
 const budgetsRouter = require('./api/routes/budgets.router.js'); // [FIX] Corrected path relative to server.js
 const portfolioRoutes = require("./api/routes/portfolio.router.js");
+const propertyHubRoutes = require('./api/routes/property-hub.router.js');
 
 // [NEW] Import the planning router
 const planningRoutes = require("./api/routes/planning.router.js");
-
+const scraperRoutes = require("./api/routes/scraper.router.js"); // [NEW] Shadowfax module
+const sentinelRoutes = require("./api/routes/sentinel.router.js"); // [NEW] Sentinel module
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -50,6 +52,7 @@ app.set("trust proxy", 1);
 // This MUST come BEFORE any CORS or session middleware, as static files
 // don't need authentication and should be served immediately.
 app.use(express.static(publicPath));
+
 
 // --- MIDDLEWARE SETUP (CORS, Session) ---
 const allowedOrigins = [
@@ -259,10 +262,12 @@ app.use("/api/rockenue", rockenueRoutes);
 app.use("/api/support", supportRoutes); // [NEW] Mount the support router
 app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
 app.use("/api/portfolio", portfolioRoutes);
-
+app.use('/api/property-hub', propertyHubRoutes); // <-- ADD THE LINE HERE
 // [NEW] Mount the planning router
 app.use("/api/planning", planningRoutes);
-
+// [NEW] Mount the Shadowfax scraper router
+app.use("/api/scraper", scraperRoutes);
+app.use("/api/sentinel", sentinelRoutes); // [NEW] Sentinel module
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
