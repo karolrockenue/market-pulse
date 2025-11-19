@@ -232,20 +232,42 @@ router.get("/daily-refresh", requireAdminApi, async (req, res) => {
   await dailyRefreshHandler(req, res);
 });
 
+// [Find the existing /initial-sync route around line 194 and REPLACE the whole block with this:]
+
 // NEW: Route to manually trigger the initial sync job
+// [MODIFIED] Uses a Hybrid Guard: Accepts EITHER a valid Admin Session OR the Internal Secret
 router.post(
   "/initial-sync",
-  requireAdminApi, // <-- [THE FIX] Use the correct session-based admin middleware
+  (req, res, next) => {
+    // 1. Check for Internal Secret (Server-to-Server bypass)
+    const authHeader = req.headers["authorization"];
+    const internalSecret = process.env.INTERNAL_API_SECRET;
+    
+    if (internalSecret && authHeader === `Bearer ${internalSecret}`) {
+      // Whitelisted internal call - allow access
+      return next();
+    }
+
+    // 2. If no secret, enforce standard Admin Session check (Manual Trigger)
+    if (!req.session || !req.session.userId) {
+       return res.status(401).json({ error: "Unauthorized: User session required." });
+    }
+    const allowedRoles = ["admin", "super_admin"];
+    if (!req.session.role || !allowedRoles.includes(req.session.role)) {
+      return res.status(403).json({ error: "Forbidden: Administrator access required." });
+    }
+    
+    // valid session - allow accessss
+    next();
+  },
   async (req, res) => {
     // This handler now triggers the sync job
     try {
-      console.log("[INITIAL SYNC] Job triggered by authorized admin user...");
+      console.log("[INITIAL SYNC] Job triggered...");
       // We call the handler directly, passing the request and response objects.
-      // This handler will now run and eventually send its own response.
       await initialSyncHandler(req, res);
     } catch (error) {
       console.error("[INITIAL SYNC] Handler call failed:", error.message);
-      // This is a fallback in case the handler itself throws an early error
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to start sync handler." });
       }
