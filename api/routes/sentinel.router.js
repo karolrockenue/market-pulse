@@ -6,13 +6,14 @@
  */
 const express = require('express');
 const router = express.Router();
-const { requireSuperAdminOnly } = require('../utils/middleware');
+const { requireAdminApi } = require('../utils/middleware'); // [MODIFIED] Allow Admin access
 const sentinelAdapter = require('../adapters/sentinel.adapter.js');
 const db = require('../utils/db'); // <-- [NEW] Import database connection
 
 // Apply super_admin protection to all routes in this file
 // Apply super_admin protection to all routes in this file
-router.use(requireSuperAdminOnly);
+// Apply permissive Admin protection (Staff + Founders)
+router.use(requireAdminApi);
 
 
 /**

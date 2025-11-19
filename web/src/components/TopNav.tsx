@@ -80,7 +80,7 @@ const allNavItems = [
     { label: 'Budget', value: 'budget', icon: ClipboardList, isAdmin: false },
     { label: 'Demand & Pace', value: 'demand-pace', icon: BarChart3, isAdmin: false },
 
-    { label: 'You vs. Comp Set', value: 'youVsCompSet', icon: Sliders, isAdmin: false }, // [MOVED] Link to the old dashboard
+   // { label: 'You vs. Comp Set', value: 'youVsCompSet', icon: Sliders, isAdmin: false }, // [MOVED] Link to the old dashboard
 
     // [REMOVED] "Market Overview" has been deleted.
 
