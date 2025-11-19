@@ -288,11 +288,18 @@ if (showGridLoader)
       });
       
       setCalendarData(mergedCalendar);
-      
-      if (showToast) {
+if (showToast) {
         // Use the hotel name from state, which is fine for a toast
         const hotelName = currentConfigInState?.property_name || `Hotel ID ${hotel_id}`;
-        toast.success(`Rate calendar loaded for ${hotelName}.`);
+        toast.message(`Rate calendar loaded`, {
+          description: `Live data for ${hotelName}`,
+          icon: <Zap className="w-4 h-4 text-[#39BDF8]" />,
+          style: {
+            backgroundColor: '#0f151a', // Dark blue-grey tint
+            border: '1px solid rgba(57, 189, 248, 0.3)',
+            color: '#e5e5e5',
+          }
+        });
       }
 
     } catch (err: any) {
@@ -405,9 +412,15 @@ if (showGridLoader)
         throw new Error(result.message || 'Failed to queue changes.');
       }
 
-      // 4. Success Feedback
-      toast.success('Updates Queued', {
+// 4. Success Feedback (Sentinel Style)
+      toast.message('Updates Queued', {
         description: 'The Sentinel Worker is processing your rates.',
+        icon: <Zap className="w-4 h-4 text-[#39BDF8]" />,
+        style: {
+          backgroundColor: '#0f151a', // Dark blue-grey tint
+          border: '1px solid rgba(57, 189, 248, 0.3)',
+          color: '#e5e5e5',
+        }
       });
 
       // Note: We do NOT reload rates here. 
@@ -608,15 +621,18 @@ if (showGridLoader)
     color: isHidden ? '#6b7280' : '#39BDF8',
   });
 
-  const gridContainerStyle: CSSProperties = {
+const gridContainerStyle: CSSProperties = {
+    position: 'relative', // [NEW] Anchor for overlay
+    minHeight: '400px',   // [NEW] Prevent collapse
     backgroundColor: '#1a1a1a',
     borderRadius: '8px',
     border: '1px solid #2a2a2a',
     overflow: 'hidden',
   };
 
-  const tableWrapperStyle: CSSProperties = {
+const tableWrapperStyle: CSSProperties = {
     overflowX: 'auto',
+    paddingBottom: '4px', // Give the scrollbar some breathing room
   };
 
   const tableStyle: CSSProperties = {
@@ -683,8 +699,27 @@ if (showGridLoader)
     padding: '2px 4px',
   };
 
-  return (
+return (
     <div style={containerStyle}>
+      {/* [NEW] Inject Scrollbar Styles */}
+      <style>{`
+        /* Custom Sentinel Scrollbar */
+        ::-webkit-scrollbar {
+          height: 8px;
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #1a1a1a;
+          border-top: 1px solid #2a2a2a;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #333;
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #39BDF8;
+        }
+      `}</style>
       <div style={backgroundGradientStyle}></div>
       <div style={gridOverlayStyle}></div>
 
@@ -915,11 +950,22 @@ if (showGridLoader)
 
           {/* Grid Container */}
           <div style={gridContainerStyle}>
-            {/* [NEW] Loading, Error, and Empty States */}
+ {/* [NEW] Loading Overlay (Graceful) */}
             {isLoading && (
-              <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#9ca3af' }}>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Loading 365-day calendar...</span>
+              <div style={{ 
+                position: 'absolute',
+                inset: 0,
+                zIndex: 50, // Above sticky headers
+                backgroundColor: 'rgba(26, 26, 26, 0.65)', // Semi-transparent dark
+                backdropFilter: 'blur(2px)', // Graceful blur
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '12px', 
+                color: '#39BDF8' // Sentinel Blue
+              }}>
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span style={{fontSize: '14px', fontWeight: 500, letterSpacing: '0.02em'}}>Syncing 365-Day Calendar...</span>
               </div>
             )}
             {error && !isLoading && (
@@ -1498,10 +1544,10 @@ if (showGridLoader)
                 </table>
               </div>
         
-            <div style={{ padding: '12px', backgroundColor: '#1A1A1A', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#6b7280', fontSize: '12px' }}>
+       <div style={{ padding: '12px', backgroundColor: '#1A1A1A', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#6b7280', fontSize: '12px' }}>
               <Info style={{ width: '14px', height: '14px' }} />
-              <span>Scroll horizontally to view all days • Click 'Effective Rate' to override • 'Live PMS Rate' is for certification</span>
- </div>
+              <span>Scroll to view 365 days • Click 'Override' cells to set manual rates • Live PMS sync active</span>
+            </div>
           </div>
         </div>
         ) : (
