@@ -70,7 +70,6 @@ const DEFAULT_CALCULATOR_STATE: CalculatorState = {
 };
 
 // --- PURE MATH FUNCTIONS ---
-
 // --- PURE MATH FUNCTIONS ---
 
 const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
@@ -80,46 +79,6 @@ const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
     } catch {
       return false;
     }
-};
-
-// DIRECTION: Target Sell Rate -> Required PMS Rate (Reverse Engineering)
-const calculateRequiredPMSRate = (targetRate: number, geniusPct: number, state: CalculatorState) => {
-    let currentRate = targetRate;
-
-    // 1. Check Deep Deals (Exclusive Override)
-    const deepDeal = state.campaigns.find(c => ['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(state.testStayDate, c));
-
-    if (deepDeal) {
-        // Unwind Deep Deal (Exclusive)
-        currentRate = currentRate / (1 - Number(deepDeal.discount) / 100);
-    } else {
-        // Unwind Daisy Chain (Reverse Order: Country -> Mobile -> Campaign -> Genius)
-        
-        // D. Country
-        if (state.countryRateActive) currentRate = currentRate / (1 - Number(state.countryRatePercent) / 100);
-        
-        // C. Mobile
-        if (state.mobileActive) currentRate = currentRate / (1 - Number(state.mobilePercent) / 100);
-
-        // B. Campaign
-        const validStandard = state.campaigns.filter(c => !['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(state.testStayDate, c));
-        if (validStandard.length > 0) {
-             const best = validStandard.reduce((p, c) => (p.discount > c.discount) ? p : c);
-             currentRate = currentRate / (1 - Number(best.discount) / 100);
-        }
-
-        // A. Genius
-        if (geniusPct > 0) currentRate = currentRate / (1 - Number(geniusPct) / 100);
-    }
-
-    // 2. Unwind Non-Ref (Base Modifier)
-    // This applies before any discounts, so we unwind it last (before multiplier)
-    if (state.nonRefundableActive) {
-        currentRate = currentRate / (1 - Number(state.nonRefundablePercent) / 100);
-    }
-
-    // 3. Unwind Multiplier
-    return currentRate / state.multiplier;
 };
 
 // DIRECTION: PMS Rate -> Final Sell Rate (The Waterfall)
@@ -136,7 +95,7 @@ const calculateSellRate = (pmsRate: number, geniusPct: number, state: Calculator
     const deepDeal = state.campaigns.find(c => ['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(state.testStayDate, c));
 
     if (deepDeal) {
-        // Exclusive Override
+        // Exclusive Override (Deep Deal applies to Level 1 price)
         currentRate = currentRate * (1 - Number(deepDeal.discount) / 100);
     } else {
         // Sequential Daisy Chain (Genius -> Campaign -> Mobile -> Country)
@@ -152,20 +111,73 @@ const calculateSellRate = (pmsRate: number, geniusPct: number, state: Calculator
              const best = validStandard.reduce((p, c) => (p.discount > c.discount) ? p : c);
              currentRate = currentRate * (1 - Number(best.discount) / 100);
         }
+        
+        // --- MOBILE RATE OVERRIDE LOGIC (Forward) ---
+        // Check for deals that block Mobile Rate (Deep Deals OR specific Standard Campaigns)
+        const isMobileBlocked = !!deepDeal || validStandard.some(c => ['early-deal', 'late-escape', 'getaway-deal'].includes(c.slug));
 
-        // C. Mobile (Applies to post-Campaign price)
-        if (state.mobileActive) {
+        // Step C: Mobile (Applies to post-Campaign price ONLY IF NOT BLOCKED)
+        if (state.mobileActive && !isMobileBlocked) {
              currentRate = currentRate * (1 - Number(state.mobilePercent) / 100);
         }
+        // --- END MOBILE RATE OVERRIDE LOGIC ---
 
         // D. Country
-        if (state.countryRateActive) {
+        if (state.countryRateActive) { 
              currentRate = currentRate * (1 - Number(state.countryRatePercent) / 100);
         }
     }
 
     return currentRate;
 };
+
+// DIRECTION: Target Sell Rate -> Required PMS Rate (Reverse Engineering)
+const calculateRequiredPMSRate = (targetRate: number, geniusPct: number, state: CalculatorState) => {
+    let currentRate = targetRate;
+
+    // 1. Check Deep Deals (Exclusive Override)
+    const deepDeal = state.campaigns.find(c => ['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(state.testStayDate, c));
+
+    if (deepDeal) {
+        // Unwind Deep Deal (Exclusive)
+        currentRate = currentRate / (1 - Number(deepDeal.discount) / 100);
+    } else {
+        // Sequential Daisy Chain (Reverse Order: Country -> Mobile -> Campaign -> Genius)
+        
+        // D. Country
+        if (state.countryRateActive) currentRate = currentRate / (1 - Number(state.countryRatePercent) / 100);
+        
+        // B. Campaign (Need to identify blocking deals before checking Mobile)
+        const validStandard = state.campaigns.filter(c => !['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(state.testStayDate, c));
+        
+        // --- MOBILE RATE OVERRIDE LOGIC (Reverse) ---
+        const isMobileBlocked = !!deepDeal || validStandard.some(c => ['early-deal', 'late-escape', 'getaway-deal'].includes(c.slug));
+
+        // C. Mobile (Unwind ONLY IF NOT BLOCKED)
+        if (state.mobileActive && !isMobileBlocked) currentRate = currentRate / (1 - Number(state.mobilePercent) / 100);
+        // --- END MOBILE RATE OVERRIDE LOGIC ---
+        
+        // B. Campaign
+        if (validStandard.length > 0) {
+             const best = validStandard.reduce((p, c) => (p.discount > c.discount) ? p : c);
+             currentRate = currentRate / (1 - Number(best.discount) / 100);
+        }
+
+        // A. Genius
+        if (geniusPct > 0) currentRate = currentRate / (1 - Number(geniusPct) / 100);
+    }
+
+    // 2. Unwind Non-Ref (Base Modifier)
+    if (state.nonRefundableActive) {
+        currentRate = currentRate / (1 - Number(state.nonRefundablePercent) / 100);
+    }
+
+    // 3. Unwind Multiplier
+    return currentRate / state.multiplier;
+};
+
+// --- INLINE STYLES ---
+// --- INLINE STYLES ---
 // --- INLINE STYLES ---
 
 // --- INLINE STYLES ---
@@ -1077,13 +1089,15 @@ if (newState.editingField === 'target') {
                                                             currentRate = currentRate * (1 - Number(best.discount) / 100);
                                                             steps.push({ label: `${best.name} (-${best.discount}%)`, rate: currentRate, indent: 1 });
                                                         }
+// Step C: Mobile (Applied to Post-Campaign)
+                                                   const isMobileBlocked = !!deepDeal || validStandard.some(c => ['early-deal', 'late-escape', 'getaway-deal'].includes(c.slug));
 
-                                                        // Step C: Mobile (Applied to Post-Campaign)
-                                                        if (calcState.mobileActive) { 
+                                                        if (calcState.mobileActive && !isMobileBlocked) { 
                                                             currentRate = currentRate * (1 - Number(calcState.mobilePercent) / 100); 
                                                             steps.push({ label: `Mobile Rate (-${calcState.mobilePercent}%)`, rate: currentRate, indent: 1 });
+                                                        } else if (calcState.mobileActive && isMobileBlocked) {
+                                                            steps.push({ label: `Mobile Rate (BLOCKED by Campaign)`, rate: currentRate, indent: 1, isInfo: true });
                                                         }
-                                                        
                                                         // Step D: Country (Applied to Post-Mobile)
                                                         if (calcState.countryRateActive) { 
                                                             currentRate = currentRate * (1 - Number(calcState.countryRatePercent) / 100); 
