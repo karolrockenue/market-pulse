@@ -88,12 +88,13 @@ const allNavItems = [
     { label: 'Rockenue', value: 'rockenue', icon: Zap, isAdmin: true },
     { label: 'Admin', value: 'admin', icon: Zap, isAdmin: true },
 // [NEW] "Sentinel" dropdown for super_admin only
+// [NEW] "Sentinel" dropdown for admin and super_admin
 {
   label: 'Sentinel',
   value: 'sentinel-group',
   icon: Zap,
   isDropdown: true,
-  isSuperAdminOnly: true, // This is a new property for super_admin ONLY
+  isAdmin: true, // <-- SET TO isAdmin: true
 items: [
     { label: 'Control Panel', value: 'sentinel', icon: TerminalSquare },
     { label: 'Rate Manager', value: 'rateManager', icon: DollarSign },
