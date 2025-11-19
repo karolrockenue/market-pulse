@@ -350,14 +350,17 @@ export function PropertyHubPage({ onViewChange }: PropertyHubPageProps) {
         body: JSON.stringify(payload),
       });
       
+
       if (!response.ok) throw new Error('Failed to save changes');
       const savedAsset = await response.json();
       
-      toast.success('Settings saved successfully');
+      toast.dismiss(); // Dismiss any currently visible toasts
+      toast.success('Settings saved successfully'); 
       return true;
     } catch (error) {
       console.error(error);
-      toast.error('Failed to save changes.');
+      toast.dismiss(); // Dismiss any currently visible toasts
+      toast.error('Failed to save changes.'); 
       return false;
     }
   };
