@@ -1,3 +1,11 @@
+// Temporary Debugging Block
+console.log('--- MIDDLEWARE DEBUG ---');
+console.log('Path:', req.path);
+console.log('Incoming Cookie Header:', req.headers.cookie); 
+console.log('Session ID:', req.sessionID);
+console.log('Session Data:', req.session);
+console.log('------------------------');
+
 // /api/utils/middleware.js (with extensive debugging)
 const pgPool = require("./db");
 
