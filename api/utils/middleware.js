@@ -6,6 +6,12 @@ const pgPool = require("./db");
 
 
 async function requireUserApi(req, res, next) {
+
+  console.log(`[AUTH DEBUG] Path: ${req.path}`);
+  console.log(`[AUTH DEBUG] Session ID: ${req.sessionID}`);
+  console.log(`[AUTH DEBUG] User ID in Session: ${req.session ? req.session.userId : 'No Session Object'}`);
+  console.log(`[AUTH DEBUG] Cookie Header: ${req.headers.cookie ? 'Present' : 'MISSING'}`);
+  // --- DEBUG END ---
   // --- NEW DIAGNOSTIC LOG ---
   // We are logging the session content at the very start of the middleware.
   // This will tell us if the session is missing entirely or if the userId is missing.
