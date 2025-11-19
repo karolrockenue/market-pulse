@@ -411,61 +411,120 @@ try {
   }
 });
 
+/**
+ * [SHARED WORKER FUNCTION]
+ * This runs the queue logic. We extract it so we can call it 
+ * directly from the Producer without needing a network request.
+ */
+async function runBackgroundWorker() {
+  console.log('[Sentinel Worker] Waking up...');
+  
+  // Use a fresh client for transaction handling
+ const client = await db.connect();
+  try {
+    await client.query('BEGIN');
 
+    // 1. Fetch Pending Jobs (FIFO)
+    // SKIP LOCKED ensures multiple workers don't grab the same job
+    const { rows: jobs } = await client.query(
+      `SELECT id, payload FROM sentinel_job_queue 
+       WHERE status = 'PENDING' 
+       ORDER BY created_at ASC 
+       LIMIT 5 
+       FOR UPDATE SKIP LOCKED`
+    );
+
+    if (jobs.length === 0) {
+      await client.query('COMMIT');
+      // console.log('[Sentinel Worker] No pending jobs.'); 
+      return;
+    }
+
+    console.log(`[Sentinel Worker] Processing ${jobs.length} jobs...`);
+
+    // 2. Process Each Job
+    for (const job of jobs) {
+      const { pmsPropertyId, rates } = job.payload;
+
+      try {
+        // Call the Batch Adapter (Optimized API Call)
+        await sentinelAdapter.postRateBatch(pmsPropertyId, rates);
+
+        // Mark Complete
+        await client.query(
+          `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+          [job.id]
+        );
+
+      } catch (err) {
+        console.error(`[Sentinel Worker] Job ${job.id} Failed:`, err.message);
+        
+        // Mark Failed
+        await client.query(
+          `UPDATE sentinel_job_queue 
+           SET status = 'FAILED', last_error = $2, updated_at = NOW() 
+           WHERE id = $1`,
+          [job.id, err.message]
+        );
+
+        // Create Notification for User
+        await client.query(
+          `INSERT INTO sentinel_notifications (type, title, message) VALUES ($1, $2, $3)`,
+          ['ERROR', 'Rate Update Failed', `Failed to push ${rates.length} rates: ${err.message}`]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    console.log(`[Sentinel Worker] Batch complete.`);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('[Sentinel Worker] Critical Error:', error);
+  } finally {
+    client.release();
+  }
+}
 
 /**
- * [UPGRADED] POST /api/sentinel/overrides
- * Handles "Submit Changes" and now calculates/pushes differentials
- * for all managed rooms.
+ * [PRODUCER] POST /api/sentinel/overrides
+ * 1. Saves rates to Queue.
+ * 2. "Kicks" the worker internally (Reliable).
+ * 3. Returns OK instantly.
  */
 router.post('/overrides', async (req, res) => {
   const { hotelId, pmsPropertyId, roomTypeId, overrides } = req.body;
-  console.log(`[Sentinel Router] Received post-overrides for base room ${hotelId}/${roomTypeId}`);
+  console.log(`[Sentinel Producer] Received overrides for hotel ${hotelId}`);
 
   if (!hotelId || !pmsPropertyId || !roomTypeId || !overrides || !Array.isArray(overrides)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Missing required fields: hotelId, pmsPropertyId, roomTypeId, overrides array.',
-    });
+    return res.status(400).json({ success: false, message: 'Missing required fields.' });
   }
 
-try {
-    // 1. [NEW LOGIC] Get the config (map and rules)
+  try {
+    // 1. Get Config
     const configRes = await db.query(
       `SELECT rate_id_map, room_differentials FROM sentinel_configurations WHERE hotel_id = $1`,
       [hotelId]
     );
-    if (configRes.rows.length === 0) {
-      throw new Error('No configuration found for this hotel.');
-    }
+    
+    if (configRes.rows.length === 0) throw new Error('No configuration found.');
+    const { rate_id_map: rateIdMap, room_differentials: roomDifferentials } = configRes.rows[0];
 
- const { rate_id_map: rateIdMap, room_differentials: roomDifferentials } = configRes.rows[0];
+    // 2. Prepare Payload
+    const batchPayload = [];
 
-    // --- [START DEBUGGING LOG] ---
-    console.log(`[DEBUG /overrides] Fetched rate_id_map:`, JSON.stringify(rateIdMap, null, 2));
-    console.log(`[DEBUG /overrides] Fetched room_differentials:`, JSON.stringify(roomDifferentials, null, 2));
-    // --- [END DEBUGGING LOG] ---
-
-    if (!rateIdMap || Object.keys(rateIdMap).length === 0) {
-      console.warn(`[DEBUG /overrides] 'rate_id_map' is empty or missing. Aborting.`); // [DEBUG]
-      throw new Error(`Config Error: 'rate_id_map' is empty. Please 'Save Changes' in Control Panel.`);
-    }
-
-    // 2. Process each date override
     for (const override of overrides) {
       const { date, rate } = override;
       const baseRate = parseFloat(rate);
 
-      // 3a. "Padlock" the base rate
+      // A. Update Local DB (Rule Book)
       const jsonPatch = { [date]: baseRate };
       await db.query(
-        `UPDATE sentinel_configurations
-         SET rate_overrides = rate_overrides || $1
-         WHERE hotel_id = $2`,
+        `UPDATE sentinel_configurations SET rate_overrides = rate_overrides || $1 WHERE hotel_id = $2`,
         [JSON.stringify(jsonPatch), hotelId]
       );
 
-      // 3b. "Update Live State" for the base room
+      // B. Update Calendar (Live State)
       await db.query(
         `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
          VALUES ($1, $2, $3, $4, 'Manual', NOW())
@@ -474,76 +533,72 @@ try {
         [hotelId, date, roomTypeId, baseRate]
       );
 
-      // 3c. [DIFFERENTIAL LOGIC] Push all rates to PMS
-
-      // --- PUSH BASE RATE ---
+      // C. Calculate Payload (Base)
       const baseRateId = rateIdMap[roomTypeId];
-      if (!baseRateId) {
-        console.warn(`[Sentinel Overrides] Skipping push for Base Room (${roomTypeId}): No 'rateID' found in map.`);
-      } else {
-        console.log(`[Sentinel Overrides] Pushing Base Rate: ${baseRate} for ${date} (RateID: ${baseRateId})`);
-        await sentinelAdapter.postRate(pmsPropertyId, baseRateId, date, baseRate);
+      if (baseRateId) {
+        batchPayload.push({ rateId: baseRateId, date, rate: baseRate });
       }
 
-      // --- PUSH DIFFERENTIAL RATES ---
+      // D. Calculate Payload (Differentials)
       if (roomDifferentials && Array.isArray(roomDifferentials)) {
         for (const rule of roomDifferentials) {
-          // [FIX] Add check to ensure rule and value exist
-          if (!rule || rule.value === undefined || rule.value === null) {
-            continue;
-          }
+          if (!rule || rule.value === undefined || rule.roomTypeId === roomTypeId) continue;
           
-          // [FIX #2] Skip this rule if it's for the Base Room
-          // (we already pushed it)
-          if (rule.roomTypeId === roomTypeId) {
-            continue;
-          }
-
-     const diffRoomId = rule.roomTypeId;
+          const diffRoomId = rule.roomTypeId;
           const diffRateId = rateIdMap[diffRoomId];
-
-          if (!diffRateId) {
-            // --- [DEBUGGING LOG] ---
-            console.warn(`[DEBUG /overrides] SKIPPING differential room.
-              - RoomTypeID: ${diffRoomId}
-              - Rule: ${JSON.stringify(rule)}
-              - Reason: No 'rateID' found in the rateIdMap for this room.
-            `);
-            // --- [END DEBUGGING LOG] ---
-            continue;
+          if (diffRateId) {
+            const value = parseFloat(rule.value);
+            let newRate = rule.operator === '+' 
+              ? baseRate * (1 + (value / 100))
+              : baseRate * (1 - (value / 100));
+            batchPayload.push({ rateId: diffRateId, date, rate: parseFloat(newRate.toFixed(2)) });
           }
-          // Calculate rate
-          const value = parseFloat(rule.value);
-          let newRate = baseRate;
-          if (rule.operator === '+') {
-            newRate = baseRate * (1 + (value / 100));
-          } else {
-            newRate = baseRate * (1 - (value / 100));
-          }
-          const finalRate = parseFloat(newRate.toFixed(2));
-
-          console.log(`[Sentinel Overrides] Pushing Diff Rate: ${finalRate} for ${date} (Room: ${diffRoomId}, RateID: ${diffRateId})`);
-          await sentinelAdapter.postRate(pmsPropertyId, diffRateId, date, finalRate);
         }
       }
     }
+// 3. Insert into Job Queue (Chunked)
+    // Cloudbeds has a strict limit of 30 items per API call.
+    // We split the payload into chunks to ensure success.
+    if (batchPayload.length > 0) {
+      const CHUNK_SIZE = 30; 
+      
+      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
+        const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
+        
+        await db.query(
+          `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
+          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
+        );
+      }
 
-    res.status(200).json({
-      success: true,
-      message: 'Overrides and all differentials pushed successfully.',
+      const jobCount = Math.ceil(batchPayload.length / CHUNK_SIZE);
+      console.log(`[Sentinel Producer] Queued ${batchPayload.length} rates across ${jobCount} jobs.`);
+    }
+
+    // 4. THE KICK (Internal Function Call)
+    // This replaces the failed 'fetch' logic. 
+    // setImmediate ensures it runs on the next tick, keeping the API response fast.
+    setImmediate(() => {
+      runBackgroundWorker().catch(err => console.error('Worker Background Error:', err));
     });
 
-  } catch (error)
-   {
-    console.error(`[Sentinel Router] post-overrides failed:`, error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process overrides.',
-      error: error.message,
-    });
+    // 5. Return Instantly
+    res.status(200).json({ success: true, message: 'Updates queued.' });
+
+  } catch (error) {
+    console.error(`[Sentinel Producer] Failed:`, error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
-// [Add this new, simpler version in its place]
+
+/**
+ * [MANUAL TRIGGER] POST /api/sentinel/process-queue
+ * Useful for debugging or CRON jobs.
+ */
+router.post('/process-queue', async (req, res) => {
+  await runBackgroundWorker(); 
+  res.status(200).json({ success: true, message: 'Worker cycle complete.' });
+});
 
 /**
  * [NEW & SIMPLIFIED] GET /api/sentinel/rates/:hotelId/:roomTypeId
@@ -651,6 +706,74 @@ router.get('/rates/:hotelId/:roomTypeId', async (req, res) => {
       message: 'Failed to fetch rate calendar.',
       error: error.message,
     });
+  }
+});
+
+// ... existing imports and code ...
+
+/**
+ * [FIXED] GET /api/sentinel/notifications
+ * Fetches the 20 most recent notifications.
+ */
+router.get('/notifications', async (req, res) => {
+  try {
+    // [FIX] robust query with safety limit
+    const { rows } = await db.query(
+      `SELECT * FROM sentinel_notifications 
+       ORDER BY created_at DESC 
+       LIMIT 20`
+    );
+    
+    // [FIX] Return standard format strictly
+    res.status(200).json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    console.error('[Sentinel Router] Fetch notifications failed:', error.message);
+    // Return empty list on error so UI doesn't break
+    res.status(200).json({ success: false, data: [], error: error.message }); 
+  }
+});
+
+/**
+ * [FIXED] POST /api/sentinel/notifications/mark-read
+ * Marks all notifications as read.
+ */
+router.post('/notifications/mark-read', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      // Mark specific IDs
+      await db.query(
+        `UPDATE sentinel_notifications SET is_read = TRUE WHERE id = ANY($1::uuid[])`,
+        [ids]
+      );
+    } else {
+      // Mark ALL
+      await db.query(`UPDATE sentinel_notifications SET is_read = TRUE WHERE is_read = FALSE`);
+    }
+    
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[Sentinel Router] Mark read failed:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * [NEW] DELETE /api/sentinel/notifications/:id
+ * Permanently deletes a notification.
+ */
+router.delete('/notifications/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query('DELETE FROM sentinel_notifications WHERE id = $1', [id]);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[Sentinel Router] Delete notification failed:', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

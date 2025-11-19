@@ -357,30 +357,38 @@ if (showGridLoader)
   };
   // [NEW] Handler for the "Submit Changes" button
 // [Replace With]
- const handleSubmitChanges = async () => {
+ // [NEW] Optimistic "Fire-and-Forget" Submit Handler
+  const handleSubmitChanges = async () => {
     if (!selectedHotelData || !selectedHotelData.pms_property_id) {
-      toast.error('Submitting too fast!', {
-        description: 'Wait for all hotel data to load before submitting.',
-      });
-      console.error('Submit Clicked before pms_property_id was loaded:', selectedHotelData);
+      toast.error('Wait for data to load.');
       return;
     }
-    
-    // [MODIFIED] Submit PENDING overrides, not all overrides
-    const overrideList = Object.keys(pendingOverrides).map(date => ({
+
+    // 1. Snapshot the data to submit
+    const overridesToSubmit = { ...pendingOverrides };
+    const overrideList = Object.keys(overridesToSubmit).map(date => ({
       date: date,
-      rate: pendingOverrides[date],
+      rate: overridesToSubmit[date],
     }));
 
-    if (overrideList.length === 0) {
-      toast.info('No new overrides to submit.');
-      return;
-    }
+    if (overrideList.length === 0) return;
 
     const { hotel_id, pms_property_id, base_room_type_id } = selectedHotelData;
 
+    // 2. OPTIMISTIC UPDATE: Update UI immediately (Turn Yellow -> Blue)
+    // We trust the queue will handle it.
+    setSavedOverrides(prev => ({ ...prev, ...overridesToSubmit }));
+    setPendingOverrides({}); // Clear pending to reset the button
+    
+    // Show a non-blocking toast
+    toast.message('Syncing...', {
+      description: `Queuing ${overrideList.length} rate updates in background.`,
+    });
+
     setIsSubmitting(true);
+
     try {
+      // 3. Call the "Producer" API (This returns instantly now)
       const response = await fetch('/api/sentinel/overrides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -394,24 +402,29 @@ if (showGridLoader)
 
       const result = await response.json();
       if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Failed to submit changes.');
+        throw new Error(result.message || 'Failed to queue changes.');
       }
 
-      toast.success('Changes submitted successfully!', {
-        description: `${overrideList.length} rate(s) pushed and "padlocked".`,
+      // 4. Success Feedback
+      toast.success('Updates Queued', {
+        description: 'The Sentinel Worker is processing your rates.',
       });
 
-      // [FIX] REORDERED OPERATIONS FOR SMOOTH UI
-      // 1. Refresh the data first (while overrides are still yellow/pending)
-      // We pass 'true' for keepPending to prevent the "flash" of old data
-      await handleLoadRates(false, false, true);
-      
-      // 2. ONLY after a successful reload, clear the pending state.
-      setPendingOverrides({});
+      // Note: We do NOT reload rates here. 
+      // The local UI is already up to date via the Optimistic Update.
 
     } catch (err: any) {
       console.error("Error submitting changes:", err);
-      toast.error('Failed to submit changes', { description: err.message });
+      
+      // Revert Strategy (Optional but recommended):
+      // In a full prod app, we might revert the savedOverrides here.
+      // For now, we alert the user to refresh.
+      toast.error('Queue Failed', { 
+        description: 'Please refresh the page to verify data.',
+      });
+      
+      // Restore the pending overrides so user doesn't lose work
+      setPendingOverrides(overridesToSubmit);
     } finally {
       setIsSubmitting(false);
     }

@@ -384,11 +384,65 @@ async function getRates(propertyId, roomTypeId, startDate, endDate) {
     }
   }
 }
+/**
+ * [NEW] Posts a BATCH of rate updates to Cloudbeds in a single API call.
+ * This drastically reduces latency compared to serial requests.
+ * @param {string} propertyId - The Cloudbeds property ID.
+ * @param {Array} ratesArray - Array of objects: { rateId, date, rate }
+ * @returns {Promise<object>} - The API response containing the jobReferenceID.
+ */
+async function postRateBatch(propertyId, ratesArray) {
+  console.log(`[Sentinel] Batch posting ${ratesArray.length} rates for property ${propertyId}`);
+
+  if (!ratesArray || ratesArray.length === 0) {
+    return { success: true, message: 'No rates to post.' };
+  }
+
+  try {
+    // 1. Get the isolated Sentinel access token
+    const accessToken = await getSentinelAccessToken();
+
+    // 2. Define the API endpoint
+    const endpoint = `${CLOUDBEDS_API_URL}/putRate`; // v1.3 supports batching
+
+    // 3. Build the Batch Form Data payload
+    // Cloudbeds expects array keys like: rates[0][rateID], rates[1][rateID], etc.
+    const params = new URLSearchParams();
+
+    ratesArray.forEach((item, index) => {
+      params.append(`rates[${index}][rateID]`, item.rateId);
+      params.append(`rates[${index}][interval][0][startDate]`, item.date);
+      params.append(`rates[${index}][interval][0][endDate]`, item.date);
+      params.append(`rates[${index}][interval][0][rate]`, item.rate);
+    });
+
+    // 4. Make the API call
+    const response = await axios.post(endpoint, params, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-PROPERTY-ID': propertyId,
+      },
+    });
+
+    console.log(`[Sentinel] Batch update successful. Job ID: ${response.data.jobReferenceID}`);
+    return response.data;
+
+  } catch (error) {
+    // Reuse existing error handling logic
+    if (error.response) {
+      console.error(`[Sentinel] Batch Post Error:`, error.response.data);
+      throw new Error(`Sentinel batch post failed: ${JSON.stringify(error.response.data)}`);
+    } else {
+      throw error;
+    }
+  }
+}
+
 module.exports = {
   postRate,
+  postRateBatch, // <-- [NEW] Export
   getRatePlans,
   getJobStatus,
   getRoomTypes,
-  getRates, // <-- [NEW] Export the new function
+  getRates,
 };
-

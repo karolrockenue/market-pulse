@@ -2460,13 +2460,15 @@ onManageSchedules={() => setShowManageSchedules(true)}
 
 
 <Toaster 
-  theme="dark" 
-  position="top-center" 
-  toastOptions={{
-    // Add an inline style to the toast itself
-    style: { zIndex: 9999 } 
-  }} 
-/>
+        theme="dark" 
+        richColors      // Adds distinct Green/Red colors for success/error
+        expand={true}   // <--- THIS FIXES THE OVERLAP (stacks them vertically)
+        position="top-right" // Right side is usually better for vertical stacking
+        closeButton
+        toastOptions={{
+          style: { zIndex: 9999 } 
+        }} 
+      />
     </div>
     ) // [NEW] This closes the conditional render from `activeView && (`
   );

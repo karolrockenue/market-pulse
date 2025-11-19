@@ -859,8 +859,30 @@ if (newState.editingField === 'target') {
                                                                               <PopoverContent className="w-auto p-0 bg-[#1a1a18] border-[#2a2a2a]">
                                                         <Calendar 
                                                             mode="single" 
-                                                            selected={calcState.testStayDate} 
-                                                            onSelect={(d) => updateCalculatorState(asset.id, {testStayDate: d})} 
+                                                            selected={camp.startDate} 
+                                                            onSelect={(d) => updateCampaign(asset.id, camp.id, {startDate: d})} 
+                                                            // [UI FIX] Remove confusing background from 'Today' so only Selected looks selected
+                                                            classNames={{
+                                                                day_today: "text-[#39BDF8] font-bold"
+                                                            }}
+                                                        />
+                                                    </PopoverContent>
+                                                                            </Popover>
+                                                                        </div>
+                                                                        <div>
+                                                                            <Label style={{fontSize: '10px', color: '#9ca3af', marginBottom: '4px'}}>End Date</Label>
+                                                                            <Popover>
+                                                                                <PopoverTrigger asChild>
+                                                                                    <Button variant="outline" className="w-full h-8 text-xs border-[#39BDF8]/30 bg-[#0f0f0f] text-[#e5e5e5] justify-start text-left font-normal">
+                                                                                        <CalendarIcon className="mr-2 h-3 w-3 opacity-50" />
+                                                                                        {camp.endDate ? format(camp.endDate, 'MMM d') : 'Pick date'}
+                                                                                    </Button>
+                                                                                </PopoverTrigger>
+                                                                             <PopoverContent className="w-auto p-0 bg-[#1a1a18] border-[#2a2a2a]">
+                                                        <Calendar 
+                                                            mode="single" 
+                                                            selected={camp.endDate} 
+                                                            onSelect={(d) => updateCampaign(asset.id, camp.id, {endDate: d})} 
                                                             // [UI FIX] Remove confusing background from 'Today' so only Selected looks selected
                                                             classNames={{
                                                                 day_today: "text-[#39BDF8] font-bold"
