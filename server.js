@@ -99,21 +99,17 @@ app.use(cors(corsOptions));
 
 // --- NEW: EXPLICITLY DEFINE AND LOG COOKIE CONFIG ---
 // server.js
-
-// server.js
-
-// server.js
-// server.js
-
+// --- NEW: EXPLICITLY DEFINE AND LOG COOKIE CONFIG ---
 const cookieConfig = {
   secure: process.env.VERCEL_ENV === "production",
   httpOnly: true,
-  sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
+  // [MODIFIED] Use 'lax' to ensure cookie survives the OAuth redirect
+  sameSite: "lax",
   maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
-  domain:
-    process.env.VERCEL_ENV === "production" ? ".market-pulse.io" : undefined,
+  // [MODIFIED] Set to undefined so the cookie works on ANY domain (production OR Vercel preview)
+  domain: undefined,
+  
   // --- NEW: Add a custom serializer function ---
-  // This function manually builds the cookie string to ensure it is formatted correctly.
   serialize: (name, val) => {
     const parts = [`${name}=${val}`];
     parts.push(`Max-Age=${Math.floor(cookieConfig.maxAge / 1000)}`);
@@ -140,11 +136,8 @@ console.log(
   cookieConfig
 );
 
-// server.js
-
 app.use(
   session({
-    // --- FIX: The name of the cookie is a top-level option ---
     name: "connect.sid",
     store: new pgSession({
       pool: pgPool,
@@ -155,15 +148,13 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      // name is no longer here
       secure: process.env.VERCEL_ENV === "production",
       httpOnly: true,
-      sameSite: process.env.VERCEL_ENV === "production" ? "none" : "lax",
+      // [MODIFIED] Match the config above
+      sameSite: "lax",
       maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
-      domain:
-        process.env.VERCEL_ENV === "production"
-          ? ".market-pulse.io"
-          : undefined,
+      // [MODIFIED] Set to undefined so the cookie works on ANY domain
+      domain: undefined,
       path: "/",
     },
   })
