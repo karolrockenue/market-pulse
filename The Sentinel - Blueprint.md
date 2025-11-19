@@ -733,3 +733,33 @@ Visual Polish: The main AccordionItem has been styled to match the prototype.
 It now has a prominent 4px borderLeft to indicate its status (green-tint for "Active" hotels, yellow-tint for "Paused").
 
 The "Floor Rate," "Rate Freeze," and "Differentials" badges are all correctly wired to their respective configuration settings, showing active (Blue/Orange) or inactive (Grey) states.
+
+
+Changelog: Sentinel Rate Manager (v0.9) - "Current Rates" Live Sync
+This session focused on closing the "data loop" by enabling the Sentinel Rate Manager to display live, real-time rates from Cloudbeds alongside our internal AI/Manual rates. This feature is critical for the "Two-Way" certification requirement, proving that the system can read the current state before overwriting it.
+
+🚀 Added & Implemented
+
+Live Rate Sync (Backend):
+
+Upgraded the GET /api/sentinel/rates/:hotelId/:roomTypeId endpoint to perform a parallel fetch: it now queries the local sentinel_rates_calendar table and calls the new sentinelAdapter.getRates function simultaneously.
+
+Implemented robust data merging logic to combine the local DB rows with the live API data into a single response object.
+
+v1.3 API Integration:
+
+Identified and fixed a critical "404 HTML Error" by hard-coding the adapter to use the correct Cloudbeds v1.3 /getRate endpoint (instead of the default v1.1).
+
+Implemented a "Data Drilling" fix to correctly parse the deep-nested roomRateDetailed JSON array returned by the v1.3 API, resolving the "blank rates" issue.
+
+"Current Rates" UI Row:
+
+Renamed the placeholder "Data 3" row to "Current Rates" in SentinelRateManager.tsx.
+
+Wired this row to the new liveRate data field. It now displays the actual price currently live on the PMS.
+
+Added a visual "Zap" icon to indicate this data is live from the source.
+
+✅ Verified
+
+End-to-End Read: Confirmed that clicking "Load Rates" now successfully triggers the API call, retrieves the 365-day rate schedule from Cloudbeds, and correctly renders the live prices (e.g., £222) in the grid.

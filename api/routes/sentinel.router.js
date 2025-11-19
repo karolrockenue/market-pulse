@@ -550,49 +550,108 @@ try {
  * Fetches the 365-day rate calendar for a single room *only* from our
  * local sentinel_rates_calendar table.
  */
+/**
+ * [UPDATED] GET /api/sentinel/rates/:hotelId/:roomTypeId
+ * Fetches 365-day calendar from DB + Live Cloudbeds Sync
+ */
 router.get('/rates/:hotelId/:roomTypeId', async (req, res) => {
   const { hotelId, roomTypeId } = req.params;
-  console.log(`[Sentinel Router] Received get-rates for ${hotelId}/${roomTypeId} (DB ONLY)`);
+  console.log(`[Sentinel Router] Received get-rates for ${hotelId}/${roomTypeId}`);
 
   try {
-    // 1. Define date range (today for 365 days)
-    const today = new Date().toISOString().split('T')[0];
-    
-    // 2. Fetch "Saved" rates from our local database
-    const { rows } = await db.query(
-      `SELECT stay_date, rate, source 
-       FROM sentinel_rates_calendar 
-       WHERE hotel_id = $1 
-         AND room_type_id = $2 
-         AND stay_date >= $3
-       ORDER BY stay_date ASC`,
-      [hotelId, roomTypeId, today]
-    );
+    // 1. Define date range (Today to Today + 365 days)
+    const today = new Date();
+    const future = new Date();
+    future.setDate(today.getDate() + 365);
 
-    // 3. Process and format the data
-    const savedRates = rows.map(row => ({
-      date: new Date(row.stay_date).toISOString().split('T')[0],
-      rate: parseFloat(row.rate),
-      source: row.source,
-      liveRate: 0, // [NEW] Send 0, as we are not checking the live API
-    }));
+    const startDateStr = today.toISOString().split('T')[0];
+    const endDateStr = future.toISOString().split('T')[0];
+
+    // 2. Get PMS Property ID for the external call
+    const hotelRes = await db.query('SELECT pms_property_id FROM hotels WHERE hotel_id = $1', [hotelId]);
+    if (hotelRes.rows.length === 0) throw new Error('Hotel not found');
+    const pmsPropertyId = hotelRes.rows[0].pms_property_id;
+
+    // 3. Run Queries in Parallel (DB + Live Cloudbeds)
+    const [dbRes, pmsRes] = await Promise.all([
+      db.query(
+        `SELECT stay_date, rate, source 
+         FROM sentinel_rates_calendar 
+         WHERE hotel_id = $1 
+           AND room_type_id = $2 
+           AND stay_date >= $3
+         ORDER BY stay_date ASC`,
+        [hotelId, roomTypeId, startDateStr]
+      ),
+      sentinelAdapter.getRates(pmsPropertyId, roomTypeId, startDateStr, endDateStr)
+    ]);
+
+    // 4. Create a Lookup Map for Live Rates
+    // [FIXED] Target the 'roomRateDetailed' array found in the X-Ray logs
+    let liveRatesList = [];
     
+    if (pmsRes && pmsRes.data && Array.isArray(pmsRes.data.roomRateDetailed)) {
+      liveRatesList = pmsRes.data.roomRateDetailed;
+    } else {
+      console.warn('[Sentinel Router] Warning: roomRateDetailed array not found in PMS response.');
+    }
+
+    const liveRateMap = {};
+    liveRatesList.forEach(item => {
+      // The logs confirm keys are 'date' and 'rate'
+      if (item.date && item.rate) {
+        liveRateMap[item.date] = parseFloat(item.rate);
+      }
+    });
+// 5. [FIXED] Merge Data (Union of DB & Live)
+    // We must combine dates from DB AND Cloudbeds to catch rates 
+    // that exist in Cloudbeds but haven't been touched in Sentinel yet.
+
+    // A. Create a Map for easy DB lookup
+    const dbMap = {};
+    dbRes.rows.forEach(row => {
+      const dateStr = new Date(row.stay_date).toISOString().split('T')[0];
+      dbMap[dateStr] = row;
+    });
+
+    // B. Create a Set of ALL unique dates (DB keys + Live keys)
+    const allDates = new Set([
+      ...Object.keys(dbMap),
+      ...Object.keys(liveRateMap)
+    ]);
+
+    // C. Build the final array
+    const savedRates = [];
+    allDates.forEach(dateStr => {
+      const dbRow = dbMap[dateStr];
+      
+      savedRates.push({
+        date: dateStr,
+        // If in DB, use DB rate. If not, 0 (Sentinel treats 0 as 'empty/default')
+        rate: dbRow ? parseFloat(dbRow.rate) : 0, 
+        // If in DB, use DB source. If not, default to 'AI' (or 'External' logic in frontend)
+        source: dbRow ? dbRow.source : 'AI',
+        // Always inject the live rate if we found one
+        liveRate: liveRateMap[dateStr] || 0, 
+      });
+    });
+    
+    // 6. Send Response
     res.status(200).json({
       success: true,
-      message: 'Rate calendar fetched from local DB successfully.',
+      message: 'Rate calendar fetched (DB + Live Sync).',
       data: savedRates,
     });
 
   } catch (error) {
-    console.error(`[Sentinel Router] get-rates (DB ONLY) failed for ${hotelId}:`, error.message);
+    // ... (Error handling remains the same)
+    console.error(`[Sentinel Router] get-rates failed for ${hotelId}:`, error.message);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch rate calendar from database.',
+      message: 'Failed to fetch rate calendar.',
       error: error.message,
     });
   }
 });
-// [Replace it with this corrected version]
-
 
 module.exports = router;

@@ -342,23 +342,28 @@ async function getRoomTypes(propertyId) {
  * @param {string} endDate - The end date (YYYY-MM-DD).
  * @returns {Promise<object>} - The API response from Cloudbeds (list of rates).
  */
+/**
+ * [FIXED] Fetches rates for a specific room type from Cloudbeds.
+ * Matches the official v1.3/getRate documentation.
+ */
 async function getRates(propertyId, roomTypeId, startDate, endDate) {
   console.log(`[Sentinel] Fetching rates for room ${roomTypeId} on property ${propertyId}`);
 
   try {
-    // 1. Get the isolated Sentinel access token
     const accessToken = await getSentinelAccessToken();
 
-// [Replace With]
-    // 2. Define the API endpoint and query parameters
-    const endpoint = `${CLOUDBEDS_API_URL}/getRates`; // v1.1
+    // [FIX] explicit v1.3 endpoint (v1.1 returns 404 HTML)
+    const endpoint = 'https://api.cloudbeds.com/api/v1.3/getRate';
+
+    // [FIX] Remove 'propertyIDs' (not supported in getRate). 
+    // The 'X-PROPERTY-ID' header handles the property context.
     const params = new URLSearchParams({
-      propertyIDs: propertyId, // [FIX] Add propertyIDs to the query string
       roomTypeID: roomTypeId,
       startDate: startDate,
       endDate: endDate,
+      detailedRates: 'false' // Optional: keeps response lighter
     });
-    // 3. Make the API call
+
     const response = await axios.get(`${endpoint}?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -366,35 +371,19 @@ async function getRates(propertyId, roomTypeId, startDate, endDate) {
       },
     });
 
-    console.log(`[Sentinel] Successfully fetched rates for ${roomTypeId}`);
+    console.log(`[Sentinel] Successfully fetched live rates for ${roomTypeId}`);
     return response.data;
 
   } catch (error) {
-    // ... (Reusing the same robust error handling pattern) ...
     if (error.response) {
-      const contentType = error.response.headers['content-type'];
-      let errorMsg = 'Unknown error';
-
-      if (contentType && contentType.includes('application/json')) {
-        errorMsg = JSON.stringify(error.response.data);
-      } else {
-        const responseData = typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : 'Non-string error body';
-        errorMsg = `Non-JSON response (HTML Error Page?): ${responseData}...`;
-      }
-      console.error(`[Sentinel] Error in getRates for ${roomTypeId}. Status: ${error.response.status}.`, errorMsg);
-      throw new Error(`Sentinel getRates failed: ${errorMsg}`);
-    } else if (error.request) {
-      console.error(`[Sentinel] Error in getRates for ${roomTypeId}: No response received.`, error.request);
-      throw new Error('Sentinel getRates failed: No response from server.');
+        // Reuse your existing detailed error logger here
+        console.error(`[Sentinel] Error in getRate:`, error.response.data);
+        throw new Error(`Sentinel getRate failed: ${JSON.stringify(error.response.data)}`);
     } else {
-      console.error(`[Sentinel] Error in getRates for ${roomTypeId} (Setup):`, error.message);
-      throw new Error(`Sentinel getRates failed (Setup): ${error.message}`);
+        throw error;
     }
   }
 }
-
 module.exports = {
   postRate,
   getRatePlans,

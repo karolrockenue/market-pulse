@@ -141,7 +141,8 @@ export function SentinelRateManager({ allHotels = [] }: { allHotels: any[] }) {
 // [MODIFIED] Handler for the "Load Rates" button
 // [MODIFIED] Handler for the "Load Rates" button
  // In SentinelRateManager.tsx
-  const handleLoadRates = async (showToast = true, showGridLoader = true) => {
+// [MODIFIED] Added 'keepPending' flag to support smooth submit transitions
+  const handleLoadRates = async (showToast = true, showGridLoader = true, keepPending = false) => {
     // [FIX] We get hotel_id from state, not the memo, as memo might be stale
     if (!selectedHotelId) {
       if (showToast) toast.error('No hotel selected.');
@@ -164,11 +165,13 @@ export function SentinelRateManager({ allHotels = [] }: { allHotels: any[] }) {
     const hotel_id = parseInt(selectedHotelId, 10);
 
 if (showGridLoader) 
-  setIsLoading(true); // [FIX] Only show grid loader if requested
+      setIsLoading(true); // [FIX] Only show grid loader if requested
     setError(null);
     
-    // We still clear pending changes on any load
-    setPendingOverrides({}); 
+    // [MODIFIED] Only clear pending changes if we aren't explicitly keeping them
+    if (!keepPending) {
+      setPendingOverrides({}); 
+    }
 
     try {
       // --- THIS IS THE REAL FIX ---
@@ -260,11 +263,12 @@ if (showGridLoader)
         throw new Error(result.message || 'Failed to fetch rate calendar.');
       }
 
-      // 6. Create a map of the data
+// 6. Create a map of the data
       const savedRateMap = result.data.reduce((acc: any, day: any) => {
         acc[day.date] = {
           rate: parseFloat(day.rate),
           source: day.source,
+          liveRate: parseFloat(day.liveRate || 0), // <--- [FIX] Catch the liveRate!
         };
         return acc;
       }, {});
@@ -277,6 +281,7 @@ if (showGridLoader)
             ...day,
             rate: savedData.rate,
             source: savedData.source,
+            liveRate: savedData.liveRate, // <--- [FIX] Merge it into the grid
           };
         }
         return day;
@@ -352,7 +357,7 @@ if (showGridLoader)
   };
   // [NEW] Handler for the "Submit Changes" button
 // [Replace With]
-  const handleSubmitChanges = async () => {
+ const handleSubmitChanges = async () => {
     if (!selectedHotelData || !selectedHotelData.pms_property_id) {
       toast.error('Submitting too fast!', {
         description: 'Wait for all hotel data to load before submitting.',
@@ -368,7 +373,7 @@ if (showGridLoader)
     }));
 
     if (overrideList.length === 0) {
-      toast.info('No new overrides to submit.'); // [MODIFIED]
+      toast.info('No new overrides to submit.');
       return;
     }
 
@@ -396,14 +401,15 @@ if (showGridLoader)
         description: `${overrideList.length} rate(s) pushed and "padlocked".`,
       });
 
-// [NEW] Clear the PENDING changes, they are now "saved"
-// [NEW] Clear the PENDING changes, they are now "saved"
+      // [FIX] REORDERED OPERATIONS FOR SMOOTH UI
+      // 1. Refresh the data first (while overrides are still yellow/pending)
+      // We pass 'true' for keepPending to prevent the "flash" of old data
+      await handleLoadRates(false, false, true);
+      
+      // 2. ONLY after a successful reload, clear the pending state.
       setPendingOverrides({});
 
-      // [MODIFIED] AWAIT the reload to get fresh data before finishing
-// In SentinelRateManager.tsx
-      // [MODIFIED] AWAIT the reload, but pass `false` to prevent the grid loader "jerk"
-      await handleLoadRates(false, false);
+    } catch (err: any) {
       console.error("Error submitting changes:", err);
       toast.error('Failed to submit changes', { description: err.message });
     } finally {
@@ -777,11 +783,11 @@ if (showGridLoader)
         </div>
 
     
-
-        {/* Grid Section */}
-        <div style={gridSectionStyle}>
-          {/* Row Visibility Controls */}
-          <div style={rowVisibilityContainerStyle}>
+{/* [MODIFIED] Grid Section - Only renders when data is loaded */}
+        {calendarData.length > 0 ? (
+          <div style={gridSectionStyle}>
+            {/* Row Visibility Controls */}
+            <div style={rowVisibilityContainerStyle}>
             <div style={rowVisibilityInnerStyle}>
               <div style={rowVisibilityLeftStyle}>
                 <span style={rowVisibilityLabelStyle}>Row Visibility:</span>
@@ -1164,36 +1170,39 @@ if (showGridLoader)
                       </tr>
                     )}
 
-                    {/* [NEW] Row 2.3: Data 3 (From Prototype) */}
-                    {!hiddenRows.has('data3') && (
-                      <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
-                        <td style={tdStickyStyle}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '13px', color: '#6b7280' }}>Data 3</span>
-                            <button
-                              onClick={() => toggleRowVisibility('data3')}
-                              style={{ marginLeft: 'auto', padding: '2px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}
-                            >
-                              <Eye style={{ width: '14px', height: '14px', color: '#6b7280' }} />
-                            </button>
-                          </div>
-                        </td>
-                        {visibleCalendarData.map((day) => {
-                          const isSelected = hoveredColumn === day.date;
-                          
-                          return (
-                            <td 
-                              key={day.date}
-                              onMouseEnter={() => setHoveredColumn(day.date)}
-                              onMouseLeave={() => setHoveredColumn(null)}
-                              style={getCellStyle(isSelected)}
-                            >
-                              <div style={{ fontSize: '12px', color: '#4a4a48' }}>-</div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    )}
+    {/* [UPDATED] Row 2.3: Current Rates (Live Data) */}
+{!hiddenRows.has('data3') && (
+  <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+    <td style={tdStickyStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Zap style={{ width: '14px', height: '14px', color: '#6b7280' }} /> {/* Icon change */}
+        <span style={{ fontSize: '13px', color: '#6b7280' }}>Current Rates</span>
+        <button
+          onClick={() => toggleRowVisibility('data3')}
+          style={{ marginLeft: 'auto', padding: '2px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}
+        >
+          <Eye style={{ width: '14px', height: '14px', color: '#6b7280' }} />
+        </button>
+      </div>
+    </td>
+    {visibleCalendarData.map((day) => {
+      const isSelected = hoveredColumn === day.date;
+      return (
+        <td 
+          key={day.date}
+          onMouseEnter={() => setHoveredColumn(day.date)}
+          onMouseLeave={() => setHoveredColumn(null)}
+          style={getCellStyle(isSelected)}
+        >
+          {/* Display the LIVE rate here */}
+          <div style={{ fontSize: '12px', color: day.liveRate > 0 ? '#e5e5e5' : '#4a4a48', fontFamily: 'monospace' }}>
+            {day.liveRate > 0 ? `£${day.liveRate}` : '-'}
+          </div>
+        </td>
+      );
+    })}
+  </tr>
+)}
 
 
            {/* Row 2.1: Min Rate (Guardrail) */}
@@ -1479,9 +1488,25 @@ if (showGridLoader)
             <div style={{ padding: '12px', backgroundColor: '#1A1A1A', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#6b7280', fontSize: '12px' }}>
               <Info style={{ width: '14px', height: '14px' }} />
               <span>Scroll horizontally to view all days • Click 'Effective Rate' to override • 'Live PMS Rate' is for certification</span>
-            </div>
+ </div>
           </div>
         </div>
+        ) : (
+          // [NEW] Optional: A clean "Empty State" placeholder
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            height: '400px', 
+            border: '1px dashed #2a2a2a', 
+            borderRadius: '8px', 
+            color: '#6b7280' 
+          }}>
+            <Zap className="w-12 h-12 mb-4 opacity-20" />
+            <p>Select a hotel and click "Load Rates" to begin.</p>
+          </div>
+        )}
       </div>
     </div>
   );
