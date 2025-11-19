@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../utils/db');
-const { requireSuperAdminOnly } = require('../utils/middleware');
+const { requireAdminApi } = require('../utils/middleware'); // <-- Import permissive middleware
 
 // Protect all routes in this file
-router.use(requireSuperAdminOnly);
+router.use(requireAdminApi); // <-- Use permissive middleware
 
 // GET /api/property-hub/assets
 // Fetches assets JOINED with their Sentinel Configuration
