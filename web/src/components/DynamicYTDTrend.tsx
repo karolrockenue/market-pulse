@@ -27,9 +27,10 @@ export function DynamicYTDTrend({ onNavigate, data: propData }: DynamicYTDTrendP
     return `£${Math.round(value).toLocaleString()}`;
   };
 
-  const formatVariance = (variance: number): string => {
-    const sign = variance >= 0 ? '+' : '';
-    return `${sign}${variance.toFixed(1)}%`;
+const formatVariance = (variance: number): string => {
+    const val = variance || 0;
+    const sign = val >= 0 ? '+' : '';
+    return `${sign}${val.toFixed(1)}%`;
   };
 
 

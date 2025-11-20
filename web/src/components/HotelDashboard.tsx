@@ -319,7 +319,7 @@ const trendData = data?.forwardDemandChartData || [];
           >
             <div>
               <div className="text-[#6b7280] text-xs mb-1">Occupancy</div>
-              <div className="text-[#e5e5e5]">{snapshot.lastMonth.occupancy.toFixed(1)}%</div>
+ <div className="text-[#e5e5e5]">{(snapshot.lastMonth.occupancy || 0).toFixed(1)}%</div>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
@@ -389,7 +389,7 @@ const trendData = data?.forwardDemandChartData || [];
           >
             <div>
               <div className="text-[#6b7280] text-xs mb-1">Occupancy</div>
-              <div className="text-[#e5e5e5]">{snapshot.currentMonth.occupancy.toFixed(1)}%</div>
+       <div className="text-[#e5e5e5]">{(snapshot.currentMonth.occupancy || 0).toFixed(1)}%</div>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
@@ -459,7 +459,7 @@ const trendData = data?.forwardDemandChartData || [];
           >
             <div>
               <div className="text-[#6b7280] text-xs mb-1">Occupancy</div>
-              <div className="text-[#e5e5e5]">{snapshot.nextMonth.occupancy.toFixed(1)}%</div>
+   <div className="text-[#e5e5e5]">{(snapshot.nextMonth.occupancy || 0).toFixed(1)}%</div>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
