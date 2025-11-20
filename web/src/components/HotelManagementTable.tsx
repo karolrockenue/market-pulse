@@ -10,6 +10,7 @@ import { Badge } from './ui/badge'; // [NEW] From prototype
 // Import the toast function from sonner
 // [FIX] Removed the invalid '@2.0.3' version from the import path
 import { toast } from 'sonner';
+import { sentinelToast } from './ui/sentinel-toast';
 
 interface Hotel {
   hotel_id: number;

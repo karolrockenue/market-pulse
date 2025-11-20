@@ -1,15 +1,10 @@
-"use client"; // Keep this directive
+"use client";
 
-// [FIX] Removed invalid '@2.0.3' from import and removed unused ToasterProps
-import { Toaster as Sonner } from "sonner"; 
-// [FIX] Removed the unused 'next-themes' import
+import { Toaster as Sonner } from "sonner";
 
-// [MODIFIED] Define the expected props directly, simplifying the component
-// We expect 'theme' to be passed directly from App.tsx
 interface ToasterProps {
   theme?: "light" | "dark" | "system";
-  position?: string; 
-  // [NEW] Explicitly define toastOptions in the component's props
+  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top-center" | "bottom-center";
   toastOptions?: {
     className?: string;
     style?: React.CSSProperties;
@@ -18,30 +13,38 @@ interface ToasterProps {
 }
 
 const Toaster = ({ theme, toastOptions, ...props }: ToasterProps) => {
-  // [FIX] Removed the useTheme hook entirely
+  // Define the base Sentinel style to reuse
+  const sentinelStyle = "group toast group-[.toaster]:bg-[#0f151a] group-[.toaster]:text-[#e5e5e5] group-[.toaster]:border-[1px] group-[.toaster]:border-[rgba(57,189,248,0.3)] group-[.toaster]:shadow-lg font-sans";
 
-  // [FIX] Define our default styling class. 
-  // Removed 'group toast' to fix the extra padding bug.
-  const defaultClassName = 'group-[.toaster]:bg-[#2C2C2C] group-[.toaster]:text-[#e5e5e5] group-[.toaster]:border-[#3a3a35]';
-
-  // [NEW] Merge the default class with any class passed from props (like in App.tsx)
-  const mergedClassName = `${defaultClassName} ${toastOptions?.className || ''}`.trim();
-
-  // [NEW] Combine our merged class with the rest of the toastOptions from props
-  const mergedToastOptions = {
-    ...toastOptions, // This brings in `style: { zIndex: 9999 }` from App.tsx
-    className: mergedClassName, // This adds our styling class
-  };
-  
   return (
     <Sonner
-      // [MODIFIED] Pass the theme prop directly. Default to 'dark' if nothing is passed.
-      theme={theme || 'dark'} 
+      theme={theme || 'dark'}
       className="toaster group"
-      
-      // [FIX] Pass the newly merged options
-      toastOptions={mergedToastOptions}
-      {...props} // Pass through any other props like 'position'
+      toastOptions={{
+        classNames: {
+          // 1. Apply Sentinel Style to ALL types explicitly
+          toast: sentinelStyle,
+          error: sentinelStyle,
+          success: sentinelStyle,
+          warning: sentinelStyle,
+          info: sentinelStyle,
+
+          // 2. Style the text
+          description: "group-[.toast]:text-muted-foreground",
+          
+          // 3. Custom Close Button (Dark Grey Circle)
+          closeButton: "group-[.toast]:bg-[#1a1a1a] group-[.toast]:text-[#e5e5e5] group-[.toast]:border-[#333] group-[.toast]:hover:bg-[#2a2a2a] group-[.toast]:hover:text-white !left-0 !top-0",
+          
+          // 4. Action buttons
+          actionButton: "group-[.toast]:bg-[#39BDF8] group-[.toast]:text-[#1d1d1c]",
+          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+        },
+        ...toastOptions, 
+        style: {
+             ...toastOptions?.style,
+        }
+      }}
+      {...props}
     />
   );
 };

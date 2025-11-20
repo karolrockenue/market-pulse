@@ -1,0 +1,125 @@
+# GEMINI PROJECT INITIALISATION + STRICT CODE MODIFICATION PROTOCOL
+This file tells Gemini **exactly** how to behave in every coding session involving the Market Pulse + Sentinel system.
+
+It is written in a style Gemini follows reliably: short, direct, mechanical, zero ambiguity.
+
+---
+
+# 1. FILE LOADING RULES
+When I upload the blueprint file **Blueprint.md**, you must:
+
+## 1.1 Read silently
+- Do NOT summarise  
+- Do NOT rewrite  
+- Do NOT extract bullet points  
+- Do NOT interpret  
+- Do NOT start solving problems  
+
+After fully reading the file, respond with:
+
+**“File loaded.”**
+
+Nothing else.
+
+## 1.2 Treat it as the ONLY valid architecture
+You must ignore:
+- memory from earlier chats  
+- assumptions  
+- best practices  
+- external examples  
+- old designs  
+- old versions of the system  
+
+If something is unclear or missing → **ask**.
+
+---
+
+# 2. HOW TO MODIFY CODE (STRICT MODE)
+
+Gemini often ignores instructions, so these rules must be followed **mechanically**:
+
+## 2.1 Before writing any code
+You MUST output:
+
+**“Plan ready.”**
+
+Then wait for my approval.
+
+No code is allowed before approval.
+
+---
+
+# 3. SEARCH & REPLACE FORMAT (MANDATORY)
+
+Every code change must be delivered in **this exact structure**, with no additional text.
+
+### 3.1 SEARCH block
+This must contain the **exact** code already present in my file.
+
+```
+SEARCH:
+```code
+<exact code from my file>
+```
+```
+
+### 3.2 REPLACE block
+This is the exact replacement.
+
+```
+REPLACE WITH:
+```code
+<new code>
+```
+```
+
+### 3.3 HARD RULES
+You must NOT:
+- rewrite entire files  
+- paraphrase or “improve” code  
+- merge multiple changes  
+- generate additional commentary  
+- alter code formatting unless explicitly asked  
+- guess missing code  
+
+If you cannot find the exact snippet, you MUST say:
+
+**“I cannot find this code. Provide the exact snippet.”**
+
+---
+
+# 4. GENERAL CODING RULES
+
+## 4.1 One file at a time
+Never modify more than one file per instruction.
+
+## 4.2 No invented logic
+If a function, field, endpoint or rule is not described in the blueprint, ask before proceeding.
+
+## 4.3 Ask for missing files
+If the change relates to a file you do not have, request it.
+
+## 4.4 Minimal commenting
+In your replacement blocks only comment overall functions or endpoints. Don't comment every small function..
+
+---
+
+# 5. EXPECTED RESPONSES
+
+### After I upload the blueprint:
+**“File loaded.”**
+
+### When I request a code change:
+**“Plan ready.”**
+
+### After I approve the plan:
+Provide ONLY:
+
+- SEARCH block  
+- REPLACE block  
+
+Nothing else.
+
+---
+
+# END OF FILE

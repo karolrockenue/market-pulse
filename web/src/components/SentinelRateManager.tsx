@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isWithinInterval } from 'date-fns';
 import { Input } from './ui/input';
 
 interface CalendarDay {
@@ -33,15 +33,94 @@ interface CalendarDay {
 }
 
 // [NEW] Helper to format a Date object to YYYY-MM-DD
+// [NEW] Helper to format a Date object to YYYY-MM-DD
+// [FIX] Use date-fns format to ensure consistency with local timezone logic used elsewhere
+// [FIX] Use UTC string construction to match Backend API exactly (YYYY-MM-DD)
 const formatDate = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
+// --- NEW: Calculator Interfaces & Logic ---
+interface Campaign {
+  id: string;
+  slug: string;
+  name: string;
+  discount: number;
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  active: boolean;
+}
+
+interface CalculatorState {
+  multiplier: number;
+  campaigns: Campaign[];
+  mobileActive: boolean;
+  mobilePercent: number;
+  nonRefundableActive: boolean;
+  nonRefundablePercent: number;
+  countryRateActive: boolean;
+  countryRatePercent: number;
+  testStayDate: Date | undefined;
+}
+
+const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
+    if (!testDate || !camp.active || !camp.startDate || !camp.endDate) return false;
+    try {
+      return isWithinInterval(testDate, { start: camp.startDate, end: camp.endDate });
+    } catch {
+      return false;
+    }
+};
+
+const calculateSellRate = (pmsRate: number, geniusPct: number, state: CalculatorState, dateStr: string) => {
+    if (!pmsRate) return 0;
+    const cellDate = new Date(dateStr);
+
+    // 1. Apply Multiplier (Assume LiveRate is the PMS rate input)
+    let currentRate = pmsRate * state.multiplier;
+
+    // 2. Apply Non-Ref
+    if (state.nonRefundableActive) {
+        currentRate = currentRate * (1 - Number(state.nonRefundablePercent) / 100);
+    }
+
+    // 3. Check Deep Deals
+    const deepDeal = state.campaigns.find(c => ['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(cellDate, c));
+
+    if (deepDeal) {
+        currentRate = currentRate * (1 - Number(deepDeal.discount) / 100);
+    } else {
+        // A. Genius
+        if (geniusPct > 0) {
+            currentRate = currentRate * (1 - Number(geniusPct) / 100);
+        }
+        // B. Campaign
+        const validStandard = state.campaigns.filter(c => !['black-friday', 'limited-time'].includes(c.slug) && isCampaignValidForDate(cellDate, c));
+        if (validStandard.length > 0) {
+             const best = validStandard.reduce((p, c) => (p.discount > c.discount) ? p : c);
+             currentRate = currentRate * (1 - Number(best.discount) / 100);
+        }
+        // C. Mobile
+        const isMobileBlocked = !!deepDeal || validStandard.some(c => ['early-deal', 'late-escape', 'getaway-deal'].includes(c.slug));
+        if (state.mobileActive && !isMobileBlocked) {
+             currentRate = currentRate * (1 - Number(state.mobilePercent) / 100);
+        }
+        // D. Country
+        if (state.countryRateActive) { 
+             currentRate = currentRate * (1 - Number(state.countryRatePercent) / 100);
+        }
+    }
+    return currentRate;
+};
+
 export function SentinelRateManager({ allHotels = [] }: { allHotels: any[] }) {
   // --- Component State ---
-  const [activeSentinelHotels, setActiveSentinelHotels] = useState<any[]>([]);
-// [Replace With]
-  const [selectedHotelId, setSelectedHotelId] = useState<string>(''); 
+const [activeSentinelHotels, setActiveSentinelHotels] = useState<any[]>([]);
+  // [MODIFIED] Initialize from localStorage to persist selection across navigation
+  const [selectedHotelId, setSelectedHotelId] = useState<string>(() => {
+    return localStorage.getItem('sentinel_last_hotel_id') || '';
+  });
+  // [NEW] State to hold the map of hotel_id -> pms_property_id
   // [NEW] State to hold the map of hotel_id -> pms_property_id
   const [pmsIdMap, setPmsIdMap] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -59,7 +138,11 @@ export function SentinelRateManager({ allHotels = [] }: { allHotels: any[] }) {
   const [pendingOverrides, setPendingOverrides] = useState<Record<string, number>>({}); // Holds new changes not yet submitted
   const [editingCell, setEditingCell] = useState<string | null>(null); // Uses date string
   
-  const [hoveredColumn, setHoveredColumn] = useState<string | null>(null); // Uses date string
+const [hoveredColumn, setHoveredColumn] = useState<string | null>(null); // Uses date string
+  
+  // [NEW] Calculator State
+  const [activeCalculatorState, setActiveCalculatorState] = useState<CalculatorState | null>(null);
+  const [activeGeniusPct, setActiveGeniusPct] = useState<number>(0);
   // In web/src/components/SentinelRateManager.tsx
   const isEscaping = useRef(false);
   const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
@@ -90,12 +173,23 @@ export function SentinelRateManager({ allHotels = [] }: { allHotels: any[] }) {
           setPmsIdMap(idMapResult.data);
         }
 
-        // Set the active hotels state
+// Set the active hotels state
         const configs = (configResult && Array.isArray(configResult.data)) ? configResult.data : [];
         setActiveSentinelHotels(configs);
         
         if (configs.length > 0) {
-          setSelectedHotelId(configs[0].hotel_id.toString());
+          // [MODIFIED] Check if the stored ID is valid for the current user's list
+          const storedId = localStorage.getItem('sentinel_last_hotel_id');
+          const isStoredValid = storedId && configs.some(c => c.hotel_id.toString() === storedId);
+
+          if (isStoredValid) {
+            setSelectedHotelId(storedId as string);
+          } else if (!selectedHotelId) {
+            // Only default to first if no valid selection exists
+            const defaultId = configs[0].hotel_id.toString();
+            setSelectedHotelId(defaultId);
+            localStorage.setItem('sentinel_last_hotel_id', defaultId);
+          }
         }
       } catch (error) {
         console.error("Error fetching Sentinel data:", error);
@@ -143,103 +237,152 @@ export function SentinelRateManager({ allHotels = [] }: { allHotels: any[] }) {
  // In SentinelRateManager.tsx
 // [MODIFIED] Added 'keepPending' flag to support smooth submit transitions
   const handleLoadRates = async (showToast = true, showGridLoader = true, keepPending = false) => {
-    // [FIX] We get hotel_id from state, not the memo, as memo might be stale
     if (!selectedHotelId) {
       if (showToast) toast.error('No hotel selected.');
-      setCalendarData([]); // Clear grid
+      setCalendarData([]); 
       return;
     }
     
-    // [FIX] Find the base room ID from the *active configs* state
     const currentConfigInState = activeSentinelHotels.find(h => h.hotel_id.toString() === selectedHotelId);
     const base_room_type_id = currentConfigInState?.base_room_type_id;
 
     if (!base_room_type_id) {
-      toast.error('Selected hotel has no "Base Room Type" configured.', {
-        description: 'Please set the Base Room Type in the Sentinel ControlPanel.',
-      });
-      setCalendarData([]); // Clear grid
+      toast.error('Selected hotel has no "Base Room Type" configured.');
+      setCalendarData([]);
       return;
     }
     
     const hotel_id = parseInt(selectedHotelId, 10);
-
-if (showGridLoader) 
-      setIsLoading(true); // [FIX] Only show grid loader if requested
+    if (showGridLoader) setIsLoading(true);
     setError(null);
     
-    // [MODIFIED] Only clear pending changes if we aren't explicitly keeping them
-    if (!keepPending) {
-      setPendingOverrides({}); 
-    }
+    if (!keepPending) setPendingOverrides({});
 
     try {
-      // --- THIS IS THE REAL FIX ---
-      // 1. ALWAYS fetch the main config
-      const configResponse = await fetch(`/api/sentinel/config/${hotel_id}`);
-      const configResult = await configResponse.json(); // Get the full result
-
-      if (!configResponse.ok || !configResult.success) {
-        throw new Error(configResult.message || 'Failed to fetch fresh hotel configuration.');
-      }
+      // Define the 365-day window for stats
+// [FIX] Define 365-day window using UTC to align with Backend
+      const today = new Date();
+      const utcToday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+      const endOfWindow = new Date(utcToday);
+      endOfWindow.setUTCDate(utcToday.getUTCDate() + 365);
       
-      // [!] CRITICAL FIX: Destructure from 'configResult.data', not the root object
+      const startStr = utcToday.toISOString().split('T')[0];
+      const endStr = endOfWindow.toISOString().split('T')[0];
+
+   // 1. PARALLEL FETCH: Config, Assets, and Dashboard Stats via Reports API
+      const [configResponse, assetResponse, statsResponse] = await Promise.all([
+        fetch(`/api/sentinel/config/${hotel_id}`),
+        fetch('/api/property-hub/assets'),
+        // [UPDATED] Use Reports API (POST) to get robust data and avoid 500 errors
+        fetch('/api/reports/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                propertyId: hotel_id,
+                startDate: startStr,
+                endDate: endStr,
+                granularity: 'daily',
+                metrics: {
+                    hotel: ['rooms-sold', 'rooms-unsold', 'adr'] 
+                },
+                includeTaxes: true // This forces Gross ADR
+            })
+        })
+      ]);
+
+      // Process Config
+      const configResult = await configResponse.json();
+      if (!configResponse.ok || !configResult.success) throw new Error(configResult.message || 'Failed to fetch configuration.');
       const configData = configResult.data;
-      
-      // 2. Destructure the FRESH rules from configData
-      const { 
-        monthly_min_rates,
-        last_minute_floor,
-        rate_freeze_period,
-        rate_overrides // This is now guaranteed to be the latest from the DB
-      } = configData;
-      
-      // 3. [CRITICAL FIX] Load "padlocked" overrides with a safety check
-      if (rate_overrides) {
-        setSavedOverrides(rate_overrides);
-      } else {
-        setSavedOverrides({}); // Use empty object, NOT null
-      }
-      // --- END FIX ---
 
-      // 4. Generate the 365-day skeleton calendar
+      // Process Assets (Calculator Settings)
+      if (assetResponse.ok) {
+        const assets = await assetResponse.json();
+        const match = assets.find((a: any) => String(a.market_pulse_hotel_id) === String(hotel_id));
+        if (match) {
+            const s = match.calculator_settings || {};
+            setActiveCalculatorState({
+                multiplier: match.strategic_multiplier ? parseFloat(match.strategic_multiplier) : 1.3,
+                campaigns: s.campaigns ? s.campaigns.map((c: any) => ({
+                    ...c,
+                    startDate: c.startDate ? new Date(c.startDate) : undefined,
+                    endDate: c.endDate ? new Date(c.endDate) : undefined,
+                    active: c.active ?? true
+                })) : [],
+                mobileActive: s.mobile?.active ?? true,
+                mobilePercent: s.mobile?.percent ?? 10,
+                nonRefundableActive: s.nonRef?.active ?? true,
+                nonRefundablePercent: s.nonRef?.percent ?? 15,
+                countryRateActive: s.country?.active ?? false,
+                countryRatePercent: s.country?.percent ?? 5,
+                testStayDate: undefined
+            });
+            setActiveGeniusPct(match.genius_discount_pct || 0);
+        } else {
+            setActiveCalculatorState(null);
+        }
+      }
+
+      // Process Stats (Create a Map: Date -> { occ, adr })
+      const statsMap: Record<string, { occupancy: number; adr: number }> = {};
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        
+        if (Array.isArray(statsData)) {
+            statsData.forEach((row: any) => {
+    // Reports API returns "period" e.g. "2023-10-27 00:00:00+00" (Postgres format)
+                // We split by space to extract just the date part.
+       // [FIX] Use substring for robust date extraction (works with 'T' or space separator)
+                const dateKey = row.period.substring(0, 10);
+                
+                // Calculate Occupancy Manually to avoid DB errors
+                const sold = parseFloat(row['rooms-sold']) || 0;
+                const unsold = parseFloat(row['rooms-unsold']) || 0;
+                const totalCap = sold + unsold;
+                const calculatedOcc = totalCap > 0 ? (sold / totalCap) * 100 : 0;
+
+                statsMap[dateKey] = {
+                    occupancy: calculatedOcc,
+                    adr: parseFloat(row['adr']) || 0
+                };
+            });
+        }
+      }
+      // 3. GENERATE SKELETON
+      const { monthly_min_rates, last_minute_floor, rate_freeze_period, rate_overrides } = configData;
+      setSavedOverrides(rate_overrides || {});
+
       const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
       const dayNamesShort = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
       const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-      const today = new Date(new Date().setHours(0, 0, 0, 0));
       const skeletonCalendar: CalendarDay[] = [];
 
-      // Parse LMF rules from FRESH config
       const lmfEnabled = last_minute_floor?.enabled || false;
       const lmfDays = parseInt(last_minute_floor?.days || '0', 10);
       const lmfRate = parseFloat(last_minute_floor?.rate || '0');
       const lmfDow = new Set(last_minute_floor?.dow || []);
-      
-      // Get the monthly rates map from FRESH config
       const monthlyRatesMap = monthly_min_rates || {};
-
-      // Get the real freeze period from FRESH config
       const freezePeriod = parseInt(rate_freeze_period || '0', 10);
 
-      for (let i = 0; i < 365; i++) {
-        const date = addDays(today, i);
+for (let i = 0; i < 365; i++) {
+        // [FIX] Generate dates in UTC
+        const date = new Date(utcToday);
+        date.setUTCDate(utcToday.getUTCDate() + i);
+        
+        const dateStr = date.toISOString().split('T')[0];
         const dayOfWeekShort = dayNamesShort[date.getUTCDay()];
         const monthKey = monthNames[date.getUTCMonth()].toLowerCase();
         const monthlyMinRate = parseFloat(monthlyRatesMap[monthKey] || '0');
         const isFrozen = i <= freezePeriod;
 
         let activeFloorRate = null;
-        if (
-          lmfEnabled &&
-          !isFrozen && 
-          i <= lmfDays && 
-          lmfDow.has(dayOfWeekShort)
-        ) {
-          activeFloorRate = lmfRate;
-        }
+        if (lmfEnabled && !isFrozen && i <= lmfDays && lmfDow.has(dayOfWeekShort)) activeFloorRate = lmfRate;
+        
+        // Lookup real stats or default to 0
+        const daysStats = statsMap[dateStr] || { occupancy: 0, adr: 0 };
 
         skeletonCalendar.push({
-          date: formatDate(date),
+          date: dateStr,
           rate: 0,
           source: 'External',
           liveRate: 0,
@@ -248,32 +391,27 @@ if (showGridLoader)
           dayNumber: date.getUTCDate(),
           month: monthNames[date.getUTCMonth()],
           isFrozen: isFrozen,
-          occupancy: 60 + Math.random() * 30,
-          adr: 170 + Math.random() * 50,
+          occupancy: daysStats.occupancy, // [UPDATED] Real data
+          adr: daysStats.adr,             // [UPDATED] Real data
           guardrailMin: monthlyMinRate,
           floorRateLMF: activeFloorRate,
         });
       }
 
-      // 5. Fetch the rate calendar data
-      const response = await fetch(`/api/sentinel/rates/${hotel_id}/${base_room_type_id}`);
-      const result = await response.json();
+      // 4. FETCH & MERGE RATES
+      const ratesResponse = await fetch(`/api/sentinel/rates/${hotel_id}/${base_room_type_id}`);
+      const ratesResult = await ratesResponse.json();
+      if (!ratesResponse.ok || !ratesResult.success) throw new Error(ratesResult.message || 'Failed to fetch rates.');
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Failed to fetch rate calendar.');
-      }
-
-// 6. Create a map of the data
-      const savedRateMap = result.data.reduce((acc: any, day: any) => {
+      const savedRateMap = ratesResult.data.reduce((acc: any, day: any) => {
         acc[day.date] = {
           rate: parseFloat(day.rate),
           source: day.source,
-          liveRate: parseFloat(day.liveRate || 0), // <--- [FIX] Catch the liveRate!
+          liveRate: parseFloat(day.liveRate || 0),
         };
         return acc;
       }, {});
 
-      // 7. Merge the DB data into the skeleton
       const mergedCalendar = skeletonCalendar.map(day => {
         const savedData = savedRateMap[day.date];
         if (savedData) {
@@ -281,21 +419,21 @@ if (showGridLoader)
             ...day,
             rate: savedData.rate,
             source: savedData.source,
-            liveRate: savedData.liveRate, // <--- [FIX] Merge it into the grid
+            liveRate: savedData.liveRate,
           };
         }
         return day;
       });
       
       setCalendarData(mergedCalendar);
-if (showToast) {
-        // Use the hotel name from state, which is fine for a toast
+
+      if (showToast) {
         const hotelName = currentConfigInState?.property_name || `Hotel ID ${hotel_id}`;
         toast.message(`Rate calendar loaded`, {
           description: `Live data for ${hotelName}`,
           icon: <Zap className="w-4 h-4 text-[#39BDF8]" />,
           style: {
-            backgroundColor: '#0f151a', // Dark blue-grey tint
+            backgroundColor: '#0f151a',
             border: '1px solid rgba(57, 189, 248, 0.3)',
             color: '#e5e5e5',
           }
@@ -306,9 +444,9 @@ if (showToast) {
       console.error("Error loading rates:", err);
       setError(err.message);
       toast.error('Failed to load rates', { description: err.message });
-      setCalendarData([]); // Clear grid on error
-} finally {
-      if (showGridLoader) setIsLoading(false); // [FIX] Only clear grid loader if it was shown
+      setCalendarData([]);
+    } finally {
+      if (showGridLoader) setIsLoading(false);
     }
   };
 
@@ -635,14 +773,14 @@ const tableWrapperStyle: CSSProperties = {
     paddingBottom: '4px', // Give the scrollbar some breathing room
   };
 
-  const tableStyle: CSSProperties = {
+const tableStyle: CSSProperties = {
     width: '100%',
     fontSize: '13px',
     tableLayout: 'fixed',
-    minWidth: `${190 + (visibleCalendarData.length * 84)}px`, // Dynamic min-width
+    minWidth: `${240 + (visibleCalendarData.length * 84)}px`, // [UPDATED] Increased first col width
   };
 
-  const thStyle: CSSProperties = {
+const thStyle: CSSProperties = {
     backgroundColor: '#1A1A1A',
     borderBottom: '1px solid #2a2a2a',
     position: 'sticky',
@@ -652,7 +790,7 @@ const tableWrapperStyle: CSSProperties = {
     padding: '12px 16px',
     borderRight: '1px solid #2a2a2a',
     zIndex: 10,
-    width: '190px',
+    width: '240px', // [UPDATED] Increased width
   };
 
   const getColumnHeaderStyle = (isSelected: boolean, isOddMonth: boolean): CSSProperties => ({
@@ -665,7 +803,7 @@ const tableWrapperStyle: CSSProperties = {
     width: '84px',
   });
 
-  const tdStickyStyle: CSSProperties = {
+const tdStickyStyle: CSSProperties = {
     position: 'sticky',
     left: 0,
     backgroundColor: '#1A1A1A',
@@ -673,7 +811,7 @@ const tableWrapperStyle: CSSProperties = {
     padding: '12px 16px',
     borderRight: '1px solid #2a2a2a',
     zIndex: 10,
-    width: '190px',
+    width: '240px', // [UPDATED] Increased width
   };
 
   const getCellStyle = (isSelected: boolean, additionalBg?: string): CSSProperties => ({
@@ -734,11 +872,14 @@ return (
           <div style={flexBetweenStyle}>
             <div style={flexRowStyle}>
               {/* Hotel Dropdown */}
-              <div style={formGroupStyle}>
+    <div style={formGroupStyle}>
                 <label style={labelStyle}>Select Hotel</label>
                 <Select 
                   value={selectedHotelId}
-                  onValueChange={setSelectedHotelId}
+                  onValueChange={(val) => {
+                    setSelectedHotelId(val);
+                    localStorage.setItem('sentinel_last_hotel_id', val);
+                  }}
                 >
                   <SelectTrigger 
                     className="w-56 h-9 bg-[#0f0f0f] border-[#2a2a2a] text-[#e5e5e5] text-sm"
@@ -1229,42 +1370,7 @@ return (
                       </tr>
                     )}
 
-    {/* [UPDATED] Row 2.3: Current Rates (Live Data) */}
-{!hiddenRows.has('data3') && (
-  <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
-    <td style={tdStickyStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <Zap style={{ width: '14px', height: '14px', color: '#6b7280' }} /> {/* Icon change */}
-        <span style={{ fontSize: '13px', color: '#6b7280' }}>Current Rates</span>
-        <button
-          onClick={() => toggleRowVisibility('data3')}
-          style={{ marginLeft: 'auto', padding: '2px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}
-        >
-          <Eye style={{ width: '14px', height: '14px', color: '#6b7280' }} />
-        </button>
-      </div>
-    </td>
-    {visibleCalendarData.map((day) => {
-      const isSelected = hoveredColumn === day.date;
-      return (
-        <td 
-          key={day.date}
-          onMouseEnter={() => setHoveredColumn(day.date)}
-          onMouseLeave={() => setHoveredColumn(null)}
-          style={getCellStyle(isSelected)}
-        >
-          {/* Display the LIVE rate here */}
-          <div style={{ fontSize: '12px', color: day.liveRate > 0 ? '#e5e5e5' : '#4a4a48', fontFamily: 'monospace' }}>
-            {day.liveRate > 0 ? `£${day.liveRate}` : '-'}
-          </div>
-        </td>
-      );
-    })}
-  </tr>
-)}
-
-
-           {/* Row 2.1: Min Rate (Guardrail) */}
+{/* [MOVED] Row 2.1: Min Rate (Guardrail) */}
                     {!hiddenRows.has('minRate') && (
                       <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
                         <td style={tdStickyStyle}>
@@ -1299,7 +1405,7 @@ return (
                     )}
 
 
-          {/* Row 2.2: Floor Rate (LMF) */}
+          {/* [MOVED] Row 2.2: Floor Rate (LMF) */}
                     {!hiddenRows.has('floorRate') && (
                       <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
                         <td style={tdStickyStyle}>
@@ -1334,74 +1440,94 @@ return (
                       </tr>
                     )}
 
+    {/* [NEW] Separator Row */}
+    <tr style={{ height: '12px', backgroundColor: '#1a1a1a' }}>
+      <td colSpan={visibleCalendarData.length + 1} style={{ borderBottom: '1px dashed #2a2a2a' }}></td>
+    </tr>
+
+{/* [UPDATED] Row 2.3: Current PMS Rates (Renamed) */}
+    {!hiddenRows.has('data3') && (
+      <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+        <td style={tdStickyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap style={{ width: '14px', height: '14px', color: '#6b7280' }} />
+            <span style={{ fontSize: '13px', color: '#6b7280' }}>Current PMS Rates</span>
+            <button
+              onClick={() => toggleRowVisibility('data3')}
+              style={{ marginLeft: 'auto', padding: '2px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}
+            >
+              <Eye style={{ width: '14px', height: '14px', color: '#6b7280' }} />
+            </button>
+          </div>
+        </td>
+        {visibleCalendarData.map((day) => {
+          const isSelected = hoveredColumn === day.date;
+          return (
+            <td 
+              key={day.date}
+              onMouseEnter={() => setHoveredColumn(day.date)}
+              onMouseLeave={() => setHoveredColumn(null)}
+              style={getCellStyle(isSelected)}
+            >
+              <div style={{ fontSize: '12px', color: day.liveRate > 0 ? '#e5e5e5' : '#4a4a48', fontFamily: 'monospace' }}>
+                {day.liveRate > 0 ? `£${day.liveRate}` : '-'}
+              </div>
+            </td>
+          );
+        })}
+      </tr>
+    )}
+
+    {/* [MOVED & RENAMED] Current Sell Rate (Calculated) */}
+    <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+      <td style={tdStickyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', color: '#10b981' }}>Current Sell Rate</span>
+          <Info style={{ width: '12px', height: '12px', color: '#6b7280' }} />
+        </div>
+      </td>
+      {visibleCalendarData.map((day) => {
+        const isSelected = hoveredColumn === day.date;
+        // Calculate the rate
+        let calculated = 0;
+        if (activeCalculatorState && day.liveRate > 0) {
+            calculated = calculateSellRate(day.liveRate, activeGeniusPct, activeCalculatorState, day.date);
+        }
+
+        return (
+          <td 
+            key={day.date}
+            onMouseEnter={() => setHoveredColumn(day.date)}
+            onMouseLeave={() => setHoveredColumn(null)}
+            style={{
+              ...getCellStyle(isSelected),
+              opacity: day.isFrozen ? 0.4 : 1,
+            }}
+          >
+            <div style={{ 
+                fontSize: '12px', 
+                color: calculated > 0 ? '#10b981' : '#4a4a48', 
+                fontFamily: 'monospace',
+                fontWeight: calculated > 0 ? 'bold' : 'normal'
+            }}>
+              {calculated > 0 ? `£${Math.round(calculated)}` : '-'}
+            </div>
+          </td>
+        );
+      })}
+    </tr>
+
+{/* Old Min/Floor Removed */}
                     {/* Empty Space Row */}
                     <tr style={{ backgroundColor: '#1A1A1A' }}>
                       <td colSpan={visibleCalendarData.length + 1} style={{ height: '16px' }}></td>
                     </tr>
 
-    {/* Row 4: Effective Rate (This is our local DB rate) */}
-                    <tr style={{ borderTop: '1px solid #2a2a2a', borderBottom: '1px solid #2a2a2a' }}>
-                      <td style={tdStickyStyle}>
-                        <span style={{ fontSize: '13px', color: '#6b7280' }}>Effective Rate</span>
-                      </td>
-                      {visibleCalendarData.map((day) => {
-                        const isSelected = hoveredColumn === day.date;
-                        
-                        // [FIX] Use the new refactored states
-                        const overrideValue = pendingOverrides[day.date] ?? savedOverrides[day.date];
-                        const hasAnyOverride = overrideValue !== undefined;
-                        const displayRate = hasAnyOverride ? overrideValue : day.rate;
-                        
-                        return (
-              <td 
-                            key={day.date}
-                            onMouseEnter={() => setHoveredColumn(day.date)}
-                            onMouseLeave={() => setHoveredColumn(null)}
-                            onClick={() => {
-                              if (!day.isFrozen) {
-                                // [FIX] This row is for future dev, so we make it non-editable
-                                // setEditingCell(day.date);
-                              }
-                            }}
-                            style={{
-                              ...getCellStyle(isSelected, hasAnyOverride ? 'rgba(250, 255, 106, 0.05)' : undefined),
-                              opacity: day.isFrozen ? 0.4 : 0.2, // [FIX] Lower opacity
-                            }}
-                          >
-                            {editingCell === day.date && !day.isFrozen ? (
-                              <input
-                                type="text"
-                                defaultValue={displayRate}
-                                autoFocus
-                                onBlur={(e) => {
-                                  // This row is non-functional, but we'll leave handler logic
-                                  // in case we enable it later.
-                                  handleRateChange(day.date, e.target.value);
-                                  setEditingCell(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleRateChange(day.date, e.currentTarget.value);
-                                    setEditingCell(null);
-                                  }
-                                  if (e.key === 'Escape') {
-                                    setEditingCell(null);
-                                  }
-                                }}
-                                style={inputCellStyle}
-                              />
-                            ) : (
-                              <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#6b7280' }}>
-                                - {/* [FIX] Per user, this is for future dev. */}
-                              </div>
-                            )}
-                          </td>
-                );
-                      })}
-                    </tr>
+{/* [MOVED] Effective Rate removed from here */}
+                    
 
 
-        {/* Row 5: Live PMS Rate (The "Sentinel" rate) */}
+{/* Row 5: Sentinel AI Rate (Future Placeholder) */}
                     <tr style={{ borderBottom: '2px solid rgba(57, 189, 248, 0.4)', backgroundColor: 'rgba(57, 189, 248, 0.02)' }}>
                       <td style={{ ...tdStickyStyle, padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1413,11 +1539,6 @@ return (
                         const isSelected = hoveredColumn === day.date;
                         const isFirstOfMonth = day.dayNumber === 1;
                         
-                        // [FIX] Use the new refactored states
-                        const hasPendingOverride = pendingOverrides[day.date] !== undefined;
-                        const overrideValue = pendingOverrides[day.date] ?? savedOverrides[day.date];
-                        const hasAnyOverride = overrideValue !== undefined;
-                        
                         return (
                           <td 
                             key={day.date}
@@ -1426,27 +1547,70 @@ return (
                             style={{
                               textAlign: 'center',
                               padding: '16px 8px',
-                              cursor: 'pointer',
+                              cursor: 'default',
                               transition: 'all 0.2s',
                               backgroundColor: isSelected ? 'rgba(57, 189, 248, 0.1)' : 'rgba(57, 189, 248, 0.02)',
                               width: '84px',
                               borderRight: isFirstOfMonth ? '2px solid #2a2a2a' : '1px solid #2a2a2a',
-                              // [FIX] Dim this row if day is frozen or has ANY override (pending or saved)
-                              opacity: hasAnyOverride || day.isFrozen ? 0.4 : 1,
                             }}
                           >
-                            <div style={{ fontSize: '14px', color: '#39BDF8', fontWeight: 600 }}>
-                              £{day.liveRate}
+                            {/* [UPDATED] Empty placeholder for future AI integration */}
+                            <div style={{ fontSize: '14px', color: '#4a4a48', fontWeight: 600 }}>
+                              -
                             </div>
                           </td>
                         );
                       })}
                     </tr>
 
-                    {/* Empty Space Row */}
+
+{/* Empty Space Row */}
                     <tr style={{ backgroundColor: '#1A1A1A' }}>
                       <td colSpan={visibleCalendarData.length + 1} style={{ height: '16px' }}></td>
                     </tr>
+
+{/* [NEW] Effective Sell Rate (Simulation) */}
+    <tr style={{ borderBottom: '1px solid #2a2a2a', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>
+      <td style={tdStickyStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', color: '#10b981' }}>Effective Sell Rate</span>
+          <Info style={{ width: '12px', height: '12px', color: '#6b7280' }} />
+        </div>
+      </td>
+      {visibleCalendarData.map((day) => {
+        const isSelected = hoveredColumn === day.date;
+        
+        // Logic: Pending (Yellow) > Saved (White) > AI Rate (Blue)
+        // This enables the "Real Time" simulation feeling as soon as you hit enter on an override
+        const activeBase = pendingOverrides[day.date] ?? savedOverrides[day.date] ?? day.rate;
+
+        let calculated = 0;
+        if (activeCalculatorState && activeBase > 0) {
+            calculated = calculateSellRate(activeBase, activeGeniusPct, activeCalculatorState, day.date);
+        }
+
+        return (
+          <td 
+            key={day.date}
+            onMouseEnter={() => setHoveredColumn(day.date)}
+            onMouseLeave={() => setHoveredColumn(null)}
+            style={{
+              ...getCellStyle(isSelected),
+              opacity: day.isFrozen ? 0.4 : 1,
+            }}
+          >
+            <div style={{ 
+                fontSize: '12px', 
+                color: calculated > 0 ? '#10b981' : '#4a4a48', 
+                fontFamily: 'monospace',
+                fontWeight: calculated > 0 ? 'bold' : 'normal'
+            }}>
+              {calculated > 0 ? `£${Math.round(calculated)}` : '-'}
+            </div>
+          </td>
+        );
+      })}
+    </tr>
 
 {/* Row 6: Override Row */}
                     <tr style={{ borderTop: '1px solid #2a2a2a', borderBottom: '1px solid #2a2a2a' }}>

@@ -264,22 +264,25 @@ app.use("/api/sentinel", sentinelRoutes); // [NEW] Sentinel module
 
 // Fallback route for Single Page Application (SPA)
 // This catches all non-API GET requests (like /, /app, /reports)
-// and serves the React app's index.html. This is the fix for the
-// "ENOENT: no such file or directory, stat '/var/task/index.html'" error.
+// and serves the React app's index.html.
 app.get("*", (req, res) => {
-  // We construct the path to the index.html inside our 'web/build' directory
+  // [FIX] Prevent "Soft 404" for missing assets.
+  // If the request is looking for a file (e.g., .js, .css) but reached here,
+  // it means express.static didn't find it. We must return 404, not HTML.
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/)) {
+    return res.status(404).send("Asset not found");
+  }
+
+  // Otherwise, it's a navigation request -> serve index.html
   const indexPath = path.join(publicPath, "index.html");
 
   res.sendFile(indexPath, (err) => {
     if (err) {
-      // If the file can't be sent (e.g., build failed, path is wrong)
-      // log the error and send a 500 response.
       console.error("Error sending index.html:", err);
       res.status(500).send("Error serving the application.");
     }
   });
 });
-
 
 
 // --- SERVER START ---

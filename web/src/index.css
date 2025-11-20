@@ -4651,3 +4651,12 @@ html {
 .lucide {
   display: inline-block !important;
 }
+
+/* Sentinel-style override for Sonner close button */
+[data-sonner-toast] [data-close-button] svg {
+  color: #9ca3af; /* neutral grey */
+}
+
+[data-sonner-toast] [data-close-button]:hover svg {
+  color: #faff6a; /* your yellow accent on hover */
+}

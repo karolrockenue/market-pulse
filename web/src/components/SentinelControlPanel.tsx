@@ -836,6 +836,20 @@ const handleDifferentialChange = (hotelId: string, roomTypeId: string, field: 'o
 
   return (
 <div style={{ minHeight: '100vh', background: '#1d1d1c', position: 'relative', overflow: 'hidden' }}>
+  {/* --- PASTE THIS STYLE BLOCK HERE --- */}
+      <style>{`
+        /* Hide spin buttons for Chrome, Safari, Edge, Opera */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+        /* Hide spin buttons for Firefox */
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+      {/* ----------------------------------- */}
       {/* ... (background styles) ... */}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom right, rgba(57,189,248,0.05), transparent, rgba(250,255,106,0.05))' }}></div>
       <div style={{ 

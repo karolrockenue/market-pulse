@@ -93,6 +93,39 @@ router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
   }
 });
 
+// NEW: Endpoint to update a hotel's quality tier / category
+router.post("/update-hotel-category", requireAdminApi, async (req, res) => {
+  const { hotelId, category } = req.body;
+
+  // 1. Basic validation
+  if (!hotelId) {
+    return res.status(400).json({ error: "Hotel ID is required." });
+  }
+
+  const validCategories = ["Hostel", "Economy", "Midscale", "Upper Midscale", "Luxury"];
+  if (!category || !validCategories.includes(category)) {
+    return res.status(400).json({ error: "Invalid category specified." });
+  }
+
+  try {
+    // 2. Update the category in the hotels table
+    const result = await pgPool.query(
+      "UPDATE hotels SET category = $1 WHERE hotel_id = $2",
+      [category, hotelId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Hotel not found." });
+    }
+
+    // 3. Success
+    return res.status(200).json({ message: "Category updated successfully." });
+  } catch (error) {
+    console.error("Error updating hotel category:", error);
+    return res.status(500).json({ error: "Failed to update category." });
+  }
+});
+
 // New endpoint to fetch all scheduled reports for the admin panel dropdown.
 router.get("/get-scheduled-reports", requireAdminApi, async (req, res) => {
   try {

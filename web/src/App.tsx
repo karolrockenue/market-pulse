@@ -71,6 +71,7 @@ import { Download, RefreshCw } from 'lucide-react';
 // Import both the function `toast` and the component `Toaster`
 // [FIX] Removed the invalid '@2.0.3' version from the import path
 import { toast } from 'sonner'; 
+import { sentinelToast } from './components/ui/sentinel-toast';
 // [NEW] Import the local Toaster component from the correct 'ui' folder
 import { Toaster } from './components/ui/sonner';
 import * as XLSX from 'xlsx'; // Import the Excel library
@@ -962,26 +963,25 @@ setStartDate(formatDate(newStartDate));
   }, []);
 
 const handlePropertySetupComplete = async (tier: PropertyTier) => {
-    if (!property) {
-      toast.error("No property selected. Cannot save classification.");
-      return;
-    }
+  if (!property) {
+    sentinelToast.error('No property selected', 'Cannot save classification.');
+    return;
+  }
 
-    try {
-     
+  try {
+    // TODO: when backend endpoint is ready, call it here
+    // await fetch('/api/admin/save-property-tier', { ... })
+  } catch (error: any) {
+    console.error('Error saving property classification:', error);
+    sentinelToast.error('Error saving classification', error.message);
+    return;
+  }
 
-    } catch (error: any) {
-      console.error("Error saving property classification:", error);
-      toast.error('Error saving classification', { description: error.message });
-    }
+  sentinelToast.success(`Property classified as ${tier}`);
+  setShowPropertySetup(false);
+  window.location.reload();
+};
 
-    // For testing, let's just close the modal and show the toast
-    toast.success(`Property classified as ${tier}`);
-    setShowPropertySetup(false);
-
-    // [THE FIX] Force a page reload to fetch fresh dashboard data
-    window.location.reload();
-  };
   // --- HANDLER FUNCTIONS ---
 // [NEW] This function handles all view changes and tracks the previous view
 const handleViewChange = (newView: string) => {
@@ -1495,47 +1495,55 @@ const handleRemoveUser = (userId: string) => {
   /**
    * [NEW] Handles changes to the management status or group from the HotelManagementTable.
    */
-  const handleManagementChange = async (
-    hotelId: number, 
-    field: 'is_rockenue_managed' | 'management_group', 
-    value: string | boolean | null // [FIX] Allow null for deselecting a group
-  ) => {
-    const toastId = toast.loading('Updating management info...');
+const handleManagementChange = async (
+  hotelId: number, 
+  field: 'is_rockenue_managed' | 'management_group', 
+  value: string | boolean | null
+) => {
+  // Use Sentinel-styled loading toast
+  const toastId = sentinelToast.loading('Updating management info...');
 
-    try {
-      const response = await fetch('/api/admin/update-hotel-management', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hotelId, field, value }),
-      });
+  try {
+    const response = await fetch('/api/admin/update-hotel-management', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hotelId, field, value }),
+    });
 
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update management info');
-      }
-      
-      toast.success(result.message || 'Management info updated.', { id: toastId });
-
-      // --- [THE FIX] ---
-      // Manually update the 'allHotels' state to reflect the change immediately.
-      setAllHotels(currentHotels => 
-        currentHotels.map(hotel => 
-          hotel.hotel_id === hotelId 
-            ? { ...hotel, [field]: value } // Update the specific hotel
-            : hotel 
-        )
-      );
-
-      // [NEW] If a new management group was added, update the groups list
-      if (field === 'management_group' && typeof value === 'string' && value.trim() !== '' && !managementGroups.includes(value)) {
-        setManagementGroups(currentGroups => [...currentGroups, value].sort());
-      }
-
-    } catch (error: any) {
-      toast.error(`Update failed: ${error.message}`, { id: toastId });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update management info');
     }
-  };
-  
+
+    // Close loading + show Sentinel success toast
+    toast.dismiss(toastId);
+    sentinelToast.success(result.message || 'Management info updated.');
+
+    // Update allHotels state
+    setAllHotels(currentHotels =>
+      currentHotels.map(hotel =>
+        hotel.hotel_id === hotelId
+          ? { ...hotel, [field]: value }
+          : hotel
+      )
+    );
+
+    // If a new management group was added, update the groups list
+    if (
+      field === 'management_group' &&
+      typeof value === 'string' &&
+      value.trim() !== '' &&
+      !managementGroups.includes(value)
+    ) {
+      setManagementGroups(currentGroups => [...currentGroups, value].sort());
+    }
+
+  } catch (error: any) {
+    toast.dismiss(toastId);
+    sentinelToast.error('Update failed', error.message);
+  }
+};
+
 // App.tsx
   // --- RENDER ---
 
@@ -2461,7 +2469,7 @@ onManageSchedules={() => setShowManageSchedules(true)}
 
 <Toaster 
         theme="dark" 
-        richColors      // Adds distinct Green/Red colors for success/error
+   
         expand={true}   // <--- THIS FIXES THE OVERLAP (stacks them vertically)
         position="top-right" // Right side is usually better for vertical stacking
         closeButton

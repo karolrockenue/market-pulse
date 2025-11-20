@@ -88,13 +88,18 @@ router.get('/configs', async (req, res) => {
  * find the 'rateId' needed for testing.
  */
 router.get('/get-rate-plans/:propertyId', async (req, res) => {
-  const { propertyId } = req.params;
+  const { propertyId } = req.params; // This is the External PMS ID
 
   try {
     console.log(`[Sentinel Router] Received get-rate-plans for ${propertyId}`);
 
-    // Call the isolated, firewalled adapter function
-    const result = await sentinelAdapter.getRatePlans(propertyId);
+    // [BRIDGE UPDATE] Lookup Internal ID
+    const hotelRes = await db.query('SELECT hotel_id FROM hotels WHERE pms_property_id = $1', [propertyId]);
+    if (hotelRes.rows.length === 0) throw new Error('Hotel not found in database.');
+    const hotelId = hotelRes.rows[0].hotel_id;
+
+    // Pass BOTH IDs
+    const result = await sentinelAdapter.getRatePlans(hotelId, propertyId);
 
     res.status(200).json({
       success: true,
@@ -113,24 +118,23 @@ router.get('/get-rate-plans/:propertyId', async (req, res) => {
 
 router.post('/test-post-rate', async (req, res) => {
   try {
-    // The UI will now send 'rateId' instead of 'roomTypeId'
-    const { propertyId, rateId, date, rate } = req.body;
+    const { propertyId, rateId, date, rate } = req.body; // propertyId is External
 
     if (!propertyId || !rateId || !date || !rate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: propertyId, rateId, date, rate.',
-      });
+      return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
-    // Log the incoming request
-    console.log(`[Sentinel Router] Received test-post-rate for rateID ${rateId}`);
+    // [BRIDGE UPDATE] Lookup Internal ID
+    const hotelRes = await db.query('SELECT hotel_id FROM hotels WHERE pms_property_id = $1', [propertyId]);
+    if (hotelRes.rows.length === 0) throw new Error('Hotel not found in database.');
+    const hotelId = hotelRes.rows[0].hotel_id;
 
-    // Call the isolated, firewalled adapter function
+    // Pass BOTH IDs
     const result = await sentinelAdapter.postRate(
-      propertyId,
-      rateId,
-      date,
+      hotelId, 
+      propertyId, 
+      rateId, 
+      date, 
       rate
     );
 
@@ -160,10 +164,13 @@ router.get('/job-status/:propertyId/:jobId', async (req, res) => {
   const { propertyId, jobId } = req.params;
 
   try {
-    console.log(`[Sentinel Router] Received get-job-status for ${jobId} on property ${propertyId}`);
+    // [BRIDGE UPDATE] Lookup Internal ID
+    const hotelRes = await db.query('SELECT hotel_id FROM hotels WHERE pms_property_id = $1', [propertyId]);
+    if (hotelRes.rows.length === 0) throw new Error('Hotel not found in database.');
+    const hotelId = hotelRes.rows[0].hotel_id;
 
-    // Call the isolated, firewalled adapter function
-    const result = await sentinelAdapter.getJobStatus(propertyId, jobId);
+    // Pass BOTH IDs
+    const result = await sentinelAdapter.getJobStatus(hotelId, propertyId, jobId);
 
     res.status(200).json({
       success: true,
@@ -233,11 +240,11 @@ try {
     // [MODIFIED] Log both IDs
     console.log(`[Sentinel Router] Starting Facts Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`);
     
-    // 1. Fetch all "Facts" from PMS in parallel
+// 1. Fetch all "Facts" from PMS in parallel
+    // [BRIDGE UPDATE] Pass BOTH IDs
     const [roomTypesData, ratePlansData] = await Promise.all([
-      // [MODIFIED] Pass the correct PMS ID to the adapter
-      sentinelAdapter.getRoomTypes(pmsPropertyId),
-      sentinelAdapter.getRatePlans(pmsPropertyId),
+      sentinelAdapter.getRoomTypes(hotelId, pmsPropertyId),
+      sentinelAdapter.getRatePlans(hotelId, pmsPropertyId),
     ]);
 
     // 2. Save "Facts" to our database
@@ -417,17 +424,14 @@ try {
  * directly from the Producer without needing a network request.
  */
 async function runBackgroundWorker() {
-  console.log('[Sentinel Worker] Waking up...');
-  
-  // Use a fresh client for transaction handling
- const client = await db.connect();
+  // ... setup ...
+  const client = await db.connect();
   try {
     await client.query('BEGIN');
 
-    // 1. Fetch Pending Jobs (FIFO)
-    // SKIP LOCKED ensures multiple workers don't grab the same job
+    // [BRIDGE UPDATE] Select hotel_id column
     const { rows: jobs } = await client.query(
-      `SELECT id, payload FROM sentinel_job_queue 
+      `SELECT id, hotel_id, payload FROM sentinel_job_queue 
        WHERE status = 'PENDING' 
        ORDER BY created_at ASC 
        LIMIT 5 
@@ -442,13 +446,13 @@ async function runBackgroundWorker() {
 
     console.log(`[Sentinel Worker] Processing ${jobs.length} jobs...`);
 
-    // 2. Process Each Job
+// 2. Process Each Job
     for (const job of jobs) {
       const { pmsPropertyId, rates } = job.payload;
 
       try {
-        // Call the Batch Adapter (Optimized API Call)
-        await sentinelAdapter.postRateBatch(pmsPropertyId, rates);
+        // [BRIDGE UPDATE] Pass hotel_id from the job row
+        await sentinelAdapter.postRateBatch(job.hotel_id, pmsPropertyId, rates);
 
         // Mark Complete
         await client.query(
@@ -629,7 +633,7 @@ router.get('/rates/:hotelId/:roomTypeId', async (req, res) => {
 
     // 3. Run Queries in Parallel (DB + Live Cloudbeds)
     const [dbRes, pmsRes] = await Promise.all([
-      db.query(
+db.query(
         `SELECT stay_date, rate, source 
          FROM sentinel_rates_calendar 
          WHERE hotel_id = $1 
@@ -638,7 +642,8 @@ router.get('/rates/:hotelId/:roomTypeId', async (req, res) => {
          ORDER BY stay_date ASC`,
         [hotelId, roomTypeId, startDateStr]
       ),
-      sentinelAdapter.getRates(pmsPropertyId, roomTypeId, startDateStr, endDateStr)
+      // [BRIDGE UPDATE] Pass BOTH IDs
+      sentinelAdapter.getRates(hotelId, pmsPropertyId, roomTypeId, startDateStr, endDateStr)
     ]);
 
     // 4. Create a Lookup Map for Live Rates
