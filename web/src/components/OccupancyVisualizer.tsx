@@ -285,7 +285,7 @@ export function OccupancyVisualizer({ selectedHotel, startDate, hoveredDay, data
                             </div>
                           </TooltipTrigger>
 <TooltipContent 
-                            className="[&_svg]:!hidden after:!hidden before:!hidden"
+                            className="[&_svg]:fill-[#3a3a3a]"
                             style={{ backgroundColor: '#1f1f1c', borderColor: '#3a3a3a', color: '#e5e5e5' }}
                           >
                             <div style={{ fontSize: '0.75rem' }}>

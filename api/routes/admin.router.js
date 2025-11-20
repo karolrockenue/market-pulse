@@ -1561,4 +1561,93 @@ router.get("/management-groups", requireAdminApi, async (req, res) => {
 });
 
 
+// NEW: Endpoint to completely disconnect and delete a hotel
+router.post("/delete-hotel", requireAdminApi, async (req, res) => {
+  const { hotelId } = req.body;
+
+  if (!hotelId) {
+    return res.status(400).json({ error: "Hotel ID is required." });
+  }
+
+  const client = await pgPool.connect();
+
+  try {
+    console.log(`[Delete Hotel] Starting deletion process for hotel ${hotelId}...`);
+
+    // 1. Get credentials to notify Cloudbeds (if it's a Cloudbeds hotel)
+    // We try/catch this specific part so we can still delete the DB records 
+    // even if the Cloudbeds connection is already broken or token is invalid.
+    try {
+      const hotelResult = await client.query(
+        "SELECT pms_type, pms_property_id FROM hotels WHERE hotel_id = $1",
+        [hotelId]
+      );
+      
+      if (hotelResult.rows.length > 0 && hotelResult.rows[0].pms_type === 'cloudbeds') {
+        const { accessToken } = await getAdminAccessToken(req.session.userId, hotelId);
+        
+        if (accessToken) {
+          console.log(`[Delete Hotel] Disconnecting App State in Cloudbeds for ${hotelId}...`);
+          const cbResponse = await fetch("https://hotels.cloudbeds.com/api/v1.1/postAppState", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams({ app_state: "disabled" })
+          });
+          
+          const cbData = await cbResponse.json();
+          console.log(`[Delete Hotel] Cloudbeds response:`, cbData);
+        }
+      }
+    } catch (cbError) {
+      console.warn(`[Delete Hotel] Could not disconnect from Cloudbeds API (proceeding with DB delete): ${cbError.message}`);
+    }
+
+    // 2. Start Transaction for Database Cleanup
+    await client.query("BEGIN");
+
+    // Order matters to avoid foreign key constraint violations
+    
+    // A. Remove from Rockenue Assets
+    await client.query("DELETE FROM rockenue_managed_assets WHERE market_pulse_hotel_id = $1", [String(hotelId)]);
+    
+    // B. Remove Sentinel (AI) Configuration
+    await client.query("DELETE FROM sentinel_configurations WHERE hotel_id = $1", [hotelId]);
+    
+    // C. Remove Competitive Sets (both as subject and competitor)
+    await client.query("DELETE FROM hotel_comp_sets WHERE hotel_id = $1 OR competitor_hotel_id = $1", [hotelId]);
+    
+    // D. Remove Scheduled Reports
+    await client.query("DELETE FROM scheduled_reports WHERE property_id = $1", [String(hotelId)]);
+    
+    // E. Remove Budgets
+    await client.query("DELETE FROM hotel_budgets WHERE hotel_id = $1", [hotelId]);
+    
+    // F. Remove Daily Metrics (Historical Data)
+    await client.query("DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1", [hotelId]);
+    
+    // NOTE: market_availability_snapshots is EXCLUDED per user instruction.
+
+    // G. Remove User Links (Revoke Access)
+    await client.query("DELETE FROM user_properties WHERE property_id = $1", [hotelId]);
+    
+    // H. Finally, delete the Hotel record itself
+    await client.query("DELETE FROM hotels WHERE hotel_id = $1", [hotelId]);
+
+    await client.query("COMMIT");
+    
+    console.log(`[Delete Hotel] Successfully deleted hotel ${hotelId} and associated data.`);
+    res.status(200).json({ success: true, message: "Hotel disconnected and data removed." });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`[Delete Hotel] Critical error deleting hotel ${hotelId}:`, error);
+    res.status(500).json({ error: "Failed to delete hotel. " + error.message });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;

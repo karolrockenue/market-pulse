@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Button } from './ui/button';
-import { Building2, Unplug } from 'lucide-react';
+import { Building2, Unplug, Loader2 } from 'lucide-react';
 import { toast } from 'sonner'; // [FIX] Corrected import path
 
 // [NEW] Define the correct Property type to match App.tsx
@@ -14,10 +15,43 @@ interface ConnectedPropertiesProps {
 }
 
 export function ConnectedProperties({ properties }: ConnectedPropertiesProps) {
-  // [REMOVED] The hardcoded properties array is gone.
+  const [disconnectingId, setDisconnectingId] = useState<number | null>(null);
 
-  const handleDisconnect = (propertyName: string) => {
-    toast.success(`Disconnected from ${propertyName}`);
+  const handleDisconnect = async (propertyId: number, propertyName: string) => {
+    if (!window.confirm(`Are you sure you want to disconnect and delete ${propertyName}? This will remove all associated data and cannot be undone.`)) {
+      return;
+    }
+
+    setDisconnectingId(propertyId);
+    const toastId = toast.loading(`Disconnecting ${propertyName}...`);
+
+    try {
+      const response = await fetch('/api/admin/delete-hotel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hotelId: propertyId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to disconnect property');
+      }
+
+      toast.success(`Successfully disconnected ${propertyName}`);
+      
+      // Reload to reflect the changes in the UI (property list removal)
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('Disconnect error:', error);
+      toast.error(error.message || 'An error occurred while disconnecting');
+      setDisconnectingId(null);
+    } finally {
+      toast.dismiss(toastId);
+    }
   };
 
   return (
@@ -37,14 +71,19 @@ export function ConnectedProperties({ properties }: ConnectedPropertiesProps) {
                 <div className="text-[#9ca3af] text-xs">ID: {property.property_id}</div> {/* [MODIFIED] Use correct ID */}
               </div>
             </div>
-            <Button
-              onClick={() => handleDisconnect(property.property_name)} // [MODIFIED] Use correct name
+<Button
+              onClick={() => handleDisconnect(property.property_id, property.property_name)}
+              disabled={disconnectingId === property.property_id}
               variant="ghost"
               size="sm"
-              className="h-8 px-3 text-xs text-[#ef4444] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
+              className="h-8 px-3 text-xs text-[#ef4444] hover:text-[#ef4444] hover:bg-[#ef4444]/10 disabled:opacity-50"
             >
-              <Unplug className="w-3 h-3 mr-1" />
-              Disconnect
+              {disconnectingId === property.property_id ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <Unplug className="w-3 h-3 mr-1" />
+              )}
+              {disconnectingId === property.property_id ? 'Disconnecting...' : 'Disconnect'}
             </Button>
           </div>
         ))}
