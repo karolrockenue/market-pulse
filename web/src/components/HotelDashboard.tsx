@@ -200,8 +200,11 @@ const trendData = data?.forwardDemandChartData || [];
   const ytdTrendData = data?.ytdTrend || []; // [NEW] Add this line
   const budgetBenchmark = data?.budgetBenchmark;
   // [NEW] Helper to format the YOY change
+// [FIX] Added specific check for "change == null" to prevent crash
   const formatYOY = (change: number) => {
-    if (change === 0 || isNaN(change) || !isFinite(change)) return { trend: 'stable' as 'stable', label: '0.0%' };
+    if (change == null || change === 0 || isNaN(change) || !isFinite(change)) {
+      return { trend: 'stable' as 'stable', label: '0.0%' };
+    }
     const trend = change > 0 ? 'up' : 'down';
     const sign = change > 0 ? '+' : '';
     return {
@@ -209,7 +212,6 @@ const trendData = data?.forwardDemandChartData || [];
       label: `${sign}${change.toFixed(1)}%`,
     };
   };
-
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '...';
     const date = new Date(dateStr);
@@ -319,7 +321,7 @@ const trendData = data?.forwardDemandChartData || [];
           >
             <div>
               <div className="text-[#6b7280] text-xs mb-1">Occupancy</div>
- <div className="text-[#e5e5e5]">{(snapshot.lastMonth.occupancy || 0).toFixed(1)}%</div>
+<div className="text-[#e5e5e5]">{(snapshot.lastMonth.occupancy || 0).toFixed(1)}%</div>
             </div>
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div className="text-[#6b7280] text-xs mb-1">Revenue</div>
