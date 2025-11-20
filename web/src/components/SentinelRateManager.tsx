@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { format, addDays, isWithinInterval } from 'date-fns';
 import { Input } from './ui/input';
+import { OccupancyVisualizer } from './OccupancyVisualizer';
 
 interface CalendarDay {
   date: string; // YYYY-MM-DD
@@ -597,7 +598,7 @@ for (let i = 0; i < 365; i++) {
     });
   };
 
-  // [NEW] Memoized hook to filter the calendar by start date and nights
+// [NEW] Memoized hook to filter the calendar by start date and nights (Grid View)
   const visibleCalendarData = useMemo(() => {
     const startIndex = calendarData.findIndex(day => day.date === formatDate(startDate));
     if (startIndex === -1) {
@@ -614,7 +615,25 @@ for (let i = 0; i < 365; i++) {
     return calendarData.slice(startIndex, endIndex);
   }, [calendarData, startDate, nightsToView]);
 
-  const toggleRowVisibility = (rowId: string) => {
+  // [NEW] Visualizer specific dataset (Always 90 days)
+  const visualizerData = useMemo(() => {
+    const startIndex = calendarData.findIndex(day => day.date === formatDate(startDate));
+    const daysToShow = 90;
+
+    if (startIndex === -1) {
+      const formattedStartDate = formatDate(startDate);
+      const firstAvailableIndex = calendarData.findIndex(day => day.date >= formattedStartDate);
+      if (firstAvailableIndex === -1) return [];
+      
+      const endIndex = Math.min(firstAvailableIndex + daysToShow, calendarData.length);
+      return calendarData.slice(firstAvailableIndex, endIndex);
+    }
+    
+    const endIndex = Math.min(startIndex + daysToShow, calendarData.length);
+    return calendarData.slice(startIndex, endIndex);
+  }, [calendarData, startDate]);
+
+const toggleRowVisibility = (rowId: string) => {
     setHiddenRows(prev => {
       const newHidden = new Set(prev);
       if (newHidden.has(rowId)) {
@@ -625,6 +644,12 @@ for (let i = 0; i < 365; i++) {
       return newHidden;
     });
   };
+
+  // [NEW] Calculate the index for the visualizer based on the hovered date string in the grid
+  const hoveredDayIndex = useMemo(() => {
+    if (!hoveredColumn) return null;
+    return visibleCalendarData.findIndex(day => day.date === hoveredColumn);
+  }, [hoveredColumn, visibleCalendarData]);
 
   // Styles
   const containerStyle: CSSProperties = {
@@ -974,9 +999,18 @@ return (
     
 {/* [MODIFIED] Grid Section - Only renders when data is loaded */}
         {calendarData.length > 0 ? (
-          <div style={gridSectionStyle}>
-            {/* Row Visibility Controls */}
-            <div style={rowVisibilityContainerStyle}>
+          <>
+{/* [NEW] Occupancy Visualizer */}
+            <OccupancyVisualizer 
+              selectedHotel={selectedHotelData?.property_name || 'Selected Hotel'} 
+              startDate={startDate}
+              hoveredDay={hoveredDayIndex}
+              data={visualizerData}
+            />
+
+            <div style={gridSectionStyle}>
+              {/* Row Visibility Controls */}
+              <div style={rowVisibilityContainerStyle}>
             <div style={rowVisibilityInnerStyle}>
               <div style={rowVisibilityLeftStyle}>
                 <span style={rowVisibilityLabelStyle}>Row Visibility:</span>
@@ -1708,12 +1742,13 @@ return (
                 </table>
               </div>
         
-       <div style={{ padding: '12px', backgroundColor: '#1A1A1A', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#6b7280', fontSize: '12px' }}>
+ <div style={{ padding: '12px', backgroundColor: '#1A1A1A', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#6b7280', fontSize: '12px' }}>
               <Info style={{ width: '14px', height: '14px' }} />
               <span>Scroll to view 365 days • Click 'Override' cells to set manual rates • Live PMS sync active</span>
             </div>
           </div>
         </div>
+        </>
         ) : (
           // [NEW] Optional: A clean "Empty State" placeholder
           <div style={{ 
