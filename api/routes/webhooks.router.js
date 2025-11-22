@@ -130,13 +130,15 @@ router.post("/", async (req, res) => {
     }
 
     // 6. Calculate Metrics & Update DB
-    const rooms = resData.data.rooms || [];
+    // Cloudbeds splits rooms into 'assigned' and 'unassigned' arrays
+    const rooms = [...(resData.data.assigned || []), ...(resData.data.unassigned || [])];
     console.log(`[Webhook] Processing ${rooms.length} rooms for hotel ${hotel_id} (Multiplier: ${multiplier})`);
 
     for (const room of rooms) {
         const checkIn = new Date(room.startDate);
         const checkOut = new Date(room.endDate);
-        const totalRoomRevenue = parseFloat(room.total || 0);
+        // Cloudbeds uses 'roomTotal' in these objects
+        const totalRoomRevenue = parseFloat(room.roomTotal || room.total || 0);
         
         const diffTime = Math.abs(checkOut - checkIn);
         const numNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -232,8 +234,9 @@ router.get("/debug", async (req, res) => {
       return res.json({ success: false, logs });
     }
 
+
     // 3. Simulate Calculation
-    const rooms = resData.data.rooms || [];
+    const rooms = [...(resData.data.assigned || []), ...(resData.data.unassigned || [])];
     logs.push(`Step 6: Found ${rooms.length} rooms in reservation.`);
 
     if (rooms.length === 0) {
@@ -244,7 +247,7 @@ router.get("/debug", async (req, res) => {
     for (const room of rooms) {
         const checkIn = new Date(room.startDate);
         const checkOut = new Date(room.endDate);
-        const totalRoomRevenue = parseFloat(room.total || 0);
+        const totalRoomRevenue = parseFloat(room.roomTotal || room.total || 0);
         const diffTime = Math.abs(checkOut - checkIn);
         const numNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const dailyRevenue = numNights > 0 ? (totalRoomRevenue / numNights) : 0;
