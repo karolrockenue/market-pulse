@@ -59,8 +59,6 @@ async function fetchReservationDetails(reservationId, accessToken, propertyId) {
 }
 
 // POST /api/webhooks
-REPLACE WITH:
-// POST /api/webhooks
 router.post("/", async (req, res) => {
   const payload = req.body || {};
   console.log("--- [WEBHOOK RECEIVED] ---");
