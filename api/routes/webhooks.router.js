@@ -152,19 +152,17 @@ if (['canceled', 'no_show'].includes(status)) {
         for (let d = new Date(checkIn); d < checkOut; d.setDate(d.getDate() + 1)) {
             const stayDateStr = d.toISOString().split('T')[0];
             
-            // SQL Upsert: 
+// SQL Upsert: 
             // Note: We assume the row exists if we are cancelling. 
             // If it's a new booking in far future, INSERT works.
-      // SQL Upsert: 
-            // Note: We assume the row exists if we are cancelling. 
-            // If it's a new booking in far future, INSERT works.
+            // FIX: We cast 0 to 0::numeric to prevent Postgres from forcing float inputs into integers.
             const updateQuery = `
                 INSERT INTO daily_metrics_snapshots (hotel_id, stay_date, rooms_sold, gross_revenue)
-                VALUES ($1, $2, GREATEST(0, $3), GREATEST(0, $4))
+                VALUES ($1, $2, GREATEST(0::numeric, $3), GREATEST(0::numeric, $4))
                 ON CONFLICT (hotel_id, stay_date)
                 DO UPDATE SET 
-                    rooms_sold = GREATEST(0, COALESCE(daily_metrics_snapshots.rooms_sold, 0) + $5),
-                    gross_revenue = GREATEST(0, COALESCE(daily_metrics_snapshots.gross_revenue, 0) + $6);
+                    rooms_sold = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.rooms_sold, 0::numeric) + $5),
+                    gross_revenue = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.gross_revenue, 0::numeric) + $6);
             `;
             
             // Params: 
