@@ -1204,7 +1204,7 @@ const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${prope
       hasMore = false;
     }
   }
- REPLACE WITH:
+
   return allRoomBlocks;
 }
 
