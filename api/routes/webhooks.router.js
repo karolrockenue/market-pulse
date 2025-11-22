@@ -60,10 +60,8 @@ async function fetchReservationDetails(reservationId, accessToken, propertyId) {
 
 // POST /api/webhooks
 router.post("/", async (req, res) => {
-  // 1. Always acknowledge receipt quickly (200 OK) to satisfy Cloudbeds.
-  // We will process logic asynchronously or immediately after.
-  res.status(200).json({ success: true });
-
+  // REMOVED EARLY RESPONSE to prevent Vercel from freezing the process.
+  
   const payload = req.body;
   console.log("--- [WEBHOOK RECEIVED] ---");
   console.log(`Event: ${payload.event} | Res ID: ${payload.reservationID} | Property: ${payload.propertyID}`);
@@ -188,10 +186,16 @@ router.post("/", async (req, res) => {
         }
     }
 
+
     console.log(`[Webhook] Success. Metrics updated for Reservation ${reservationId}`);
 
   } catch (error) {
     console.error("[Webhook] Processing Error:", error);
+  }
+
+  // FINALLY respond to Cloudbeds after work is done
+  if (!res.headersSent) {
+      res.status(200).json({ success: true });
   }
 });
 
