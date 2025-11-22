@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const fetch = require("node-fetch");
 const pgPool = require("../utils/db");
+const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 
 /**
  * Helper: Find internal hotel_id and credentials by Cloudbeds Property ID
@@ -88,14 +89,17 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const { hotel_id, pms_credentials } = context;
-    const accessToken = pms_credentials.access_token || pms_credentials.accessToken; // Handle key casing variations
 
-    if (!accessToken) {
-      console.error(`[Webhook] ERROR: Credentials found but access_token is missing for hotel ${hotel_id}`);
-      return;
+    const { hotel_id } = context;
+    
+    // Use the adapter to get a FRESH token (handles auto-refresh if expired)
+    let accessToken;
+    try {
+        accessToken = await cloudbedsAdapter.getAccessToken(hotel_id);
+    } catch (tokenErr) {
+        console.error(`[Webhook] ERROR: Failed to refresh/get access token for hotel ${hotel_id}:`, tokenErr.message);
+        return;
     }
-
     // 4. Fetch Details
     console.log(`[Webhook] Fetching details for Res ID: ${reservationId}...`);
     const resData = await fetchReservationDetails(reservationId, accessToken, cloudbedsPropertyId);
@@ -205,14 +209,17 @@ router.get("/debug", async (req, res) => {
       logs.push("ERROR: getHotelContext returned null. Check pms_property_id mapping.");
       return res.json({ success: false, logs });
     }
+
     logs.push(`Step 2: Found Internal Hotel ID: ${context.hotel_id}`);
 
-    const accessToken = context.pms_credentials?.access_token || context.pms_credentials?.accessToken;
-    if (!accessToken) {
-      logs.push("ERROR: Credentials found, but access_token is missing.");
-      return res.json({ success: false, logs });
+    let accessToken;
+    try {
+        accessToken = await cloudbedsAdapter.getAccessToken(context.hotel_id);
+        logs.push("Step 3: Access Token retrieved via Adapter (Fresh).");
+    } catch (tokenErr) {
+        logs.push(`ERROR: Adapter failed to get token: ${tokenErr.message}`);
+        return res.json({ success: false, logs });
     }
-    logs.push("Step 3: Access Token found.");
 
     // 2. Fetch Details
     logs.push("Step 4: Calling Cloudbeds API...");
