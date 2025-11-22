@@ -1,9 +1,4 @@
-# GEMINI PROJECT INITIALISATION + STRICT CODE MODIFICATION PROTOCOL
-This file tells Gemini **exactly** how to behave in every coding session involving the Market Pulse + Sentinel system.
 
-It is written in a style Gemini follows reliably: short, direct, mechanical, zero ambiguity.
-
----
 
 # 1. FILE LOADING RULES
 When I upload the blueprint file **Blueprint.md**, you must:

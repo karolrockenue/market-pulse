@@ -1221,6 +1221,9 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
     // --- [NEW] 6. PHYSICAL UNSOLD ROOMS ---
     // (Copied from metrics-from-db)
     // Fetches physical unsold inventory *from today forward* for the *current month*.
+   // --- [NEW] 6. PHYSICAL UNSOLD ROOMS ---
+    // (Copied from metrics-from-db)
+    // Fetches physical unsold inventory *from today forward* for the *current month*.
     const physicalUnsoldSql = `
       SELECT SUM(capacity_count - rooms_sold) AS physical_unsold_remaining
       FROM daily_metrics_snapshots
@@ -1229,6 +1232,20 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
       AND date_trunc('month', stay_date) = date_trunc('month', CURRENT_DATE);
     `;
 
+    // --- [NEW] 6.5 PICKUP LOGIC (PACING STRATEGY) ---
+    // Fetch sums from "Yesterday's" snapshot (snapshot_date = Today - 1)
+    // to compare against Live data for pickup calculation.
+    const pickupSql = `
+      SELECT
+        TO_CHAR(date_trunc('month', stay_date), 'YYYY-MM') as period,
+        SUM(rooms_sold) as history_rooms_sold
+      FROM pacing_snapshots
+      WHERE hotel_id = $1
+        AND snapshot_date = CURRENT_DATE - INTERVAL '1 day'
+        AND stay_date >= date_trunc('month', CURRENT_DATE)
+        AND stay_date < date_trunc('month', CURRENT_DATE + INTERVAL '2 months')
+      GROUP BY 1;
+    `;
 
     // --- 7. RUN ALL QUERIES IN PARALLEL ---
     const [
@@ -1241,7 +1258,8 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
       benchmarkNext,     // [MODIFIED]
       budgetResult,
       ytdTrendResult,
-      physicalUnsoldResult // [NEW]
+      physicalUnsoldResult, // [NEW]
+      pickupResult          // [NEW: Pickup Data]
     ] = await Promise.all([
       pgPool.query(snapshotSql, [propertyId]),
       getMarketOutlook(citySlug),
@@ -1255,7 +1273,8 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
 
       pgPool.query(budgetSql, [propertyId]),
       pgPool.query(ytdTrendSql, [propertyId, lastYear, currentYear]),
-      pgPool.query(physicalUnsoldSql, [propertyId]) // [NEW]
+      pgPool.query(physicalUnsoldSql, [propertyId]), // [NEW]
+      pgPool.query(pickupSql, [propertyId])          // [NEW]
     ]);
 
     // --- 8. PROCESS & FORMAT ALL RESULTS ---
@@ -1272,6 +1291,18 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
     const physicalUnsoldRemaining = physicalUnsoldResult.rows[0]?.physical_unsold_remaining
       ? parseInt(physicalUnsoldResult.rows[0].physical_unsold_remaining, 10)
       : 0;
+
+    // 8.1.5 Process Pickup (Historian vs Live)
+    const pickupMap = new Map();
+    pickupResult.rows.forEach(r => {
+      pickupMap.set(r.period, parseInt(r.history_rooms_sold || 0, 10));
+    });
+
+    const calcPickup = (liveSold, periodKey) => {
+      const historySold = pickupMap.get(periodKey);
+      if (historySold === undefined) return null; // No history available yet
+      return (liveSold || 0) - historySold;
+    };
 
     // 8.2 Process Performance Snapshot
     const snapshotData = {};
@@ -1344,7 +1375,8 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
         adr: parseFloat(currentMonth.adr || 0),
         yoyChange: calcYOY(currentMonth.revenue, currentMonthLY.revenue),
         targetRevenue: budgetMap.get(formatPeriodKey(today)) || null,
-        pacingStatus: currentMonthPacing // [NEW]
+        pacingStatus: currentMonthPacing, // [NEW]
+        pickup: calcPickup(parseFloat(currentMonth.total_sold_room_nights), formatPeriodKey(today)) // [NEW: Pickup]
       },
       nextMonth: {
         label: format(addMonths(today, 1), "MMMM '(OTB)'"),
@@ -1353,7 +1385,8 @@ router.get("/dashboard/summary", requireUserApi, async (req, res) => {
         adr: parseFloat(nextMonth.adr || 0),
         yoyChange: calcYOY(nextMonth.revenue, nextMonthLY.revenue),
         targetRevenue: budgetMap.get(formatPeriodKey(addMonths(today, 1))) || null,
-        pacingStatus: nextMonthPacing // [NEW]
+        pacingStatus: nextMonthPacing, // [NEW]
+        pickup: calcPickup(parseFloat(nextMonth.total_sold_room_nights), formatPeriodKey(addMonths(today, 1))) // [NEW: Pickup]
       }
     };
     

@@ -177,7 +177,8 @@ const generalEndpointsMap: Record<string, string> = {
       'Get Room Types': 'sample-room',
       'Get Rate Plans': 'sample-rate', // Placeholder, confirm if backend supports 'sample-rate' slug
       'Get Amenities': 'user-info', // Placeholder, confirm if backend supports 'user-info' or similar slug
-      'Get Webhooks': 'get-webhooks', // <-- ADD THIS NEW LINE
+      'Get Webhooks': 'get-webhooks',
+      'Create Test Webhook': 'create-test-webhook',
       // Add other mappings as needed
     };
     const endpointSlug = generalEndpointsMap[endpoint];
@@ -227,10 +228,11 @@ const handleDimensionToggle = (dimensionColumn: string) => {
       icon: Users,
       endpoints: ['Get Sample Guest'],
     },
+
 {
       name: 'Configuration',
       icon: Settings2,
-      endpoints: ['Get Taxes & Fees', 'Get Room Types', 'Get Rate Plans', 'Get Amenities', 'Get Webhooks'], // <-- ADD 'Get Webhooks' HERE
+      endpoints: ['Get Taxes & Fees', 'Get Room Types', 'Get Rate Plans', 'Get Amenities', 'Get Webhooks', 'Create Test Webhook'],
     },
   ];
 

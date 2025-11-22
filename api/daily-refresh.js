@@ -226,7 +226,7 @@ const propertiesResult = await propertiesClient.query(
 
           // This single query works for both Cloudbeds and Mews data.
           // Note: occupancy_direct is no longer populated as it was a calculated field.
-          const query = format(
+ const query = format(
             `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, cloudbeds_user_id, net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
              VALUES %L
              ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
@@ -243,6 +243,21 @@ const propertiesResult = await propertiesClient.query(
           );
 
           await client.query(query);
+
+          // --- PACING SNAPSHOT (HISTORIAN) ---
+          // Archive the current future state for this hotel into the pacing_snapshots table.
+          // This allows us to calculate pickup (today vs yesterday) later.
+          const snapshotQuery = `
+            INSERT INTO pacing_snapshots (hotel_id, snapshot_date, stay_date, rooms_sold, capacity_count, net_revenue, gross_revenue)
+            SELECT hotel_id, CURRENT_DATE, stay_date, rooms_sold, capacity_count, net_revenue, gross_revenue
+            FROM daily_metrics_snapshots
+            WHERE hotel_id = $1
+              AND stay_date >= CURRENT_DATE
+              AND stay_date <= CURRENT_DATE + INTERVAL '365 days'
+            ON CONFLICT (hotel_id, snapshot_date, stay_date) DO NOTHING;
+          `;
+          await client.query(snapshotQuery, [hotel_id]);
+
           await client.query("COMMIT");
 
           totalRecordsUpdated += datesToUpdate.length;

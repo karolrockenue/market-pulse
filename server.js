@@ -39,9 +39,11 @@ const portfolioRoutes = require("./api/routes/portfolio.router.js");
 const propertyHubRoutes = require('./api/routes/property-hub.router.js');
 
 // [NEW] Import the planning router
+
 const planningRoutes = require("./api/routes/planning.router.js");
 const scraperRoutes = require("./api/routes/scraper.router.js"); // [NEW] Shadowfax module
 const sentinelRoutes = require("./api/routes/sentinel.router.js"); // [NEW] Sentinel module
+const webhooksRoutes = require("./api/routes/webhooks.router.js"); // [NEW] Webhooks module
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -259,6 +261,7 @@ app.use("/api/planning", planningRoutes);
 // [NEW] Mount the Shadowfax scraper router
 app.use("/api/scraper", scraperRoutes);
 app.use("/api/sentinel", sentinelRoutes); // [NEW] Sentinel module
+app.use("/api/webhooks", webhooksRoutes); // [NEW] Webhooks module
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
