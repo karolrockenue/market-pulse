@@ -189,4 +189,86 @@ router.post("/", async (req, res) => {
   }
 });
 
+
+// --- DEBUG ENDPOINT (TEMPORARY) ---
+// GET /api/webhooks/debug?reservationID=...&propertyID=...
+router.get("/debug", async (req, res) => {
+  const { reservationID, propertyID } = req.query;
+  const logs = [];
+
+  try {
+    logs.push(`Step 1: Starting Debug for Res ${reservationID}, Prop ${propertyID}`);
+
+    // 1. Context Lookup
+    const context = await getHotelContext(propertyID);
+    if (!context) {
+      logs.push("ERROR: getHotelContext returned null. Check pms_property_id mapping.");
+      return res.json({ success: false, logs });
+    }
+    logs.push(`Step 2: Found Internal Hotel ID: ${context.hotel_id}`);
+
+    const accessToken = context.pms_credentials?.access_token || context.pms_credentials?.accessToken;
+    if (!accessToken) {
+      logs.push("ERROR: Credentials found, but access_token is missing.");
+      return res.json({ success: false, logs });
+    }
+    logs.push("Step 3: Access Token found.");
+
+    // 2. Fetch Details
+    logs.push("Step 4: Calling Cloudbeds API...");
+    let resData;
+    try {
+      resData = await fetchReservationDetails(reservationID, accessToken, propertyID);
+      logs.push(`Step 5: Cloudbeds API Success. Status: ${resData.status || 'OK'}`);
+    } catch (apiErr) {
+      logs.push(`ERROR: Cloudbeds API Failed: ${apiErr.message}`);
+      return res.json({ success: false, logs });
+    }
+
+    // 3. Simulate Calculation
+    const rooms = resData.data.rooms || [];
+    logs.push(`Step 6: Found ${rooms.length} rooms in reservation.`);
+
+    if (rooms.length === 0) {
+        logs.push("WARNING: Reservation has 0 rooms? Check raw data.");
+        logs.push(JSON.stringify(resData));
+    }
+
+    for (const room of rooms) {
+        const checkIn = new Date(room.startDate);
+        const checkOut = new Date(room.endDate);
+        const totalRoomRevenue = parseFloat(room.total || 0);
+        const diffTime = Math.abs(checkOut - checkIn);
+        const numNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const dailyRevenue = numNights > 0 ? (totalRoomRevenue / numNights) : 0;
+        
+        logs.push(`   - Processing Room: ${checkIn.toISOString().split('T')[0]} to ${checkOut.toISOString().split('T')[0]} ($${dailyRevenue}/night)`);
+
+        for (let d = new Date(checkIn); d < checkOut; d.setDate(d.getDate() + 1)) {
+            const stayDateStr = d.toISOString().split('T')[0];
+            logs.push(`   - Attempting SQL Update for ${stayDateStr}...`);
+            
+             const updateQuery = `
+                INSERT INTO daily_metrics_snapshots (hotel_id, stay_date, rooms_sold, gross_revenue)
+                VALUES ($1, $2, 1, $3)
+                ON CONFLICT (hotel_id, stay_date)
+                DO UPDATE SET 
+                    rooms_sold = GREATEST(0, COALESCE(daily_metrics_snapshots.rooms_sold, 0) + 1),
+                    gross_revenue = GREATEST(0, COALESCE(daily_metrics_snapshots.gross_revenue, 0) + $3);
+            `;
+            
+            await pgPool.query(updateQuery, [context.hotel_id, stayDateStr, dailyRevenue]);
+            logs.push(`   - SQL Success for ${stayDateStr}`);
+        }
+    }
+
+    res.json({ success: true, logs, raw_cloudbeds: resData });
+
+  } catch (error) {
+    logs.push(`FATAL ERROR: ${error.message}`);
+    logs.push(error.stack);
+    res.status(500).json({ success: false, logs });
+  }
+});
+
 module.exports = router;
