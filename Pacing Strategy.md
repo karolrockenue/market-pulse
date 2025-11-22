@@ -203,5 +203,31 @@ Result:
 **Current System State:**
 * The backend is fully functional for **Daily Pickup**.
 * The database currently holds **manual test data** (simulating a +5 pickup) to allow for frontend development/testing.
-* **Next Actions:** Frontend UI implementation (Deferred), cleanup of test data, and Webhook integration.
+REPLACE WITH:
+## **4.0 PROGRESS (Status: Backend Complete - Daily + Pulse)**
+
+**Completed Items:**
+* **Schema:** `pacing_snapshots` table created.
+* **Recorder:** `api/daily-refresh.js` updated. Captures future horizon (Live -> Historian) after PMS sync.
+* **API Logic:** `api/routes/dashboard.router.js` updated to calculate `pickup` (`Live` - `Snapshot`).
+* **Webhooks (The Pulse):** `api/routes/webhooks.router.js` implemented.
+    * Listens for `reservation/created` (Adds to metrics).
+    * Listens for `reservation/status_changed` (Subtracts cancellations).
+    * Integrated `cloudbedsAdapter` for smart token refreshing.
+    * Logic handles Cloudbeds' `assigned`/`unassigned` data structure.
+* **Verification:**
+    * Daily Pacing verified via manual seeding.
+    * Pulse (Real-time) verified via live Cloudbeds booking/cancellation cycle (Database updates instantly).
+
+**Current System State:**
+* The Backend "Heart" is beating.
+* **Daily Refresh:** Handles the macroscopic 24h baseline.
+* **Webhooks:** Handles the microscopic real-time updates.
+* **Database:** `daily_metrics_snapshots` is now a true Real-Time Live Layer.
+
+**Next Actions:**
+1.  **Security Cleanup:** Remove the temporary `/debug` endpoint from `webhooks.router.js`.
+2.  **Documentation:** Update `Blueprint.md` to officially document the new Webhook Architecture and Router.
+3.  **Infrastructure:** Implement **Auto-Subscribe** logic in `cloudbedsAdapter` (Idempotent registration) so new hotels are connected automatically without manual "Create Webhook" clicks.
+4.  **Frontend:** Implement the "Pickup Badge" in the Dashboard UI to visualize the data.
 
