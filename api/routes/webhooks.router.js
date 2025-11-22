@@ -59,21 +59,31 @@ async function fetchReservationDetails(reservationId, accessToken, propertyId) {
 }
 
 // POST /api/webhooks
+REPLACE WITH:
+// POST /api/webhooks
 router.post("/", async (req, res) => {
-  // REMOVED EARLY RESPONSE to prevent Vercel from freezing the process.
-  
-  const payload = req.body;
+  const payload = req.body || {};
   console.log("--- [WEBHOOK RECEIVED] ---");
-  console.log(`Event: ${payload.event} | Res ID: ${payload.reservationID} | Property: ${payload.propertyID}`);
+  // Log safely in case properties are undefined
+  console.log(`Event: ${payload.event || 'UNKNOWN'} | Res ID: ${payload.reservationID || 'N/A'} | Property: ${payload.propertyID || 'N/A'}`);
 
+  // --- HELPER: Send 200 OK and exit ---
+  // This ensures we NEVER leave Vercel hanging, preventing timeouts.
+  const finish = (msg) => {
+    if (msg) console.log(`[Webhook] ${msg}`);
+    if (!res.headersSent) res.status(200).json({ success: true });
+  };
 
-  // 2. Filter for relevant events
-  // We handle 'created' (New Booking) and 'status_changed' (Cancellations)
+  // 1. Filter for relevant events
   const allowedEvents = ['reservation/created', 'reservation/status_changed'];
   
-  if (!allowedEvents.includes(payload.event)) {
-    console.log(`[Webhook] Skipping event type: ${payload.event}`);
-    return;
+  if (!payload.event || !allowedEvents.includes(payload.event)) {
+    return finish(`Skipping event type: ${payload.event}`);
+  }
+
+  // 2. Validate Payload Basics
+  if (!payload.reservationID || !payload.propertyID) {
+    return finish("Skipping invalid payload (Missing ID or PropertyID).");
   }
 
   try {
@@ -84,78 +94,71 @@ router.post("/", async (req, res) => {
     const context = await getHotelContext(cloudbedsPropertyId);
     if (!context) {
       console.error(`[Webhook] ERROR: Could not find internal hotel_id or credentials for Cloudbeds ID: ${cloudbedsPropertyId}`);
-      return;
+      return finish(); // Respond 200 to stop retries, but log the error
     }
-
 
     const { hotel_id } = context;
     
-    // Use the adapter to get a FRESH token (handles auto-refresh if expired)
+    // 4. Access Token
     let accessToken;
     try {
         accessToken = await cloudbedsAdapter.getAccessToken(hotel_id);
     } catch (tokenErr) {
         console.error(`[Webhook] ERROR: Failed to refresh/get access token for hotel ${hotel_id}:`, tokenErr.message);
-        return;
+        return finish();
     }
-    // 4. Fetch Details
+
+    // 5. Fetch Details
     console.log(`[Webhook] Fetching details for Res ID: ${reservationId}...`);
-    const resData = await fetchReservationDetails(reservationId, accessToken, cloudbedsPropertyId);
+    let resData;
+    try {
+        resData = await fetchReservationDetails(reservationId, accessToken, cloudbedsPropertyId);
+    } catch (fetchErr) {
+        console.error(`[Webhook] API Fetch Error: ${fetchErr.message}`);
+        return finish();
+    }
     
     if (!resData.success) {
       console.error(`[Webhook] API returned success:false for Res ID: ${reservationId}`, resData);
-      return;
+      return finish();
     }
 
-
-    // 5. Determine Direction (Add or Subtract)
-    // 'created' = Always Add
-    // 'status_changed' = Check if 'canceled' or 'no_show' -> Subtract. Otherwise ignore.
+    // 6. Determine Direction (Add or Subtract)
     let multiplier = 0;
     
     if (payload.event === 'reservation/created') {
-        multiplier = 1; // Add to metrics
+        multiplier = 1;
     } else if (payload.event === 'reservation/status_changed') {
         const status = resData.data.status || '';
         console.log(`[Webhook] Status Changed to: ${status}`);
         
-if (['canceled', 'no_show'].includes(status)) {
-            multiplier = -1; // Subtract from metrics
+        if (['canceled', 'no_show'].includes(status)) {
+            multiplier = -1;
         } else {
-            console.log(`[Webhook] Status is '${status}' (not a cancellation). No metric change needed.`);
-            // FIX: Send response before exiting, otherwise Vercel times out waiting for a reply.
-            if (!res.headersSent) res.status(200).json({ success: true });
-            return;
+            return finish(`Status is '${status}' (not a cancellation). No metric change needed.`);
         }
     }
 
-    // 6. Calculate Metrics & Update DB
-    // Cloudbeds splits rooms into 'assigned' and 'unassigned' arrays
+    // 7. Calculate & SQL Update
     const rooms = [...(resData.data.assigned || []), ...(resData.data.unassigned || [])];
     console.log(`[Webhook] Processing ${rooms.length} rooms for hotel ${hotel_id} (Multiplier: ${multiplier})`);
 
     for (const room of rooms) {
         const checkIn = new Date(room.startDate);
         const checkOut = new Date(room.endDate);
-        // Cloudbeds uses 'roomTotal' in these objects
         const totalRoomRevenue = parseFloat(room.roomTotal || room.total || 0);
         
         const diffTime = Math.abs(checkOut - checkIn);
         const numNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
         const dailyRevenue = numNights > 0 ? (totalRoomRevenue / numNights) : 0;
 
-        // Adjust values based on multiplier (Add or Subtract)
         const revenueDelta = dailyRevenue * multiplier;
         const roomDelta = 1 * multiplier;
 
         for (let d = new Date(checkIn); d < checkOut; d.setDate(d.getDate() + 1)) {
             const stayDateStr = d.toISOString().split('T')[0];
             
-// SQL Upsert: 
-            // Note: We assume the row exists if we are cancelling. 
-            // If it's a new booking in far future, INSERT works.
-            // FIX: We cast 0 to 0::numeric to prevent Postgres from forcing float inputs into integers.
+            // SQL: Note the 0::numeric casting for safety
             const updateQuery = `
                 INSERT INTO daily_metrics_snapshots (hotel_id, stay_date, rooms_sold, gross_revenue)
                 VALUES ($1, $2, GREATEST(0::numeric, $3), GREATEST(0::numeric, $4))
@@ -165,40 +168,23 @@ if (['canceled', 'no_show'].includes(status)) {
                     gross_revenue = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.gross_revenue, 0::numeric) + $6);
             `;
             
-            // Params: 
-            // $1: hotel_id
-            // $2: stay_date
-            // $3: Initial rooms (only if inserting new row, which only happens on 'created', so we use roomDelta)
-            // $4: Initial rev
-            // $5: roomDelta (Update value)
-            // $6: revenueDelta (Update value)
-            
             await pgPool.query(updateQuery, [
                 hotel_id, 
                 stayDateStr, 
-                Math.max(0, roomDelta), // Initial insert value (sanitized)
+                Math.max(0, roomDelta), 
                 Math.max(0, revenueDelta), 
                 roomDelta, 
                 revenueDelta
             ]);
-            
-            console.log(`   -> Updated ${stayDateStr}: ${roomDelta > 0 ? '+' : ''}${roomDelta} Room, ${revenueDelta > 0 ? '+' : ''}$${revenueDelta.toFixed(2)} Rev`);
         }
     }
-
-
-    console.log(`[Webhook] Success. Metrics updated for Reservation ${reservationId}`);
+    
+    return finish(`Success. Metrics updated for Reservation ${reservationId}`);
 
   } catch (error) {
-    console.error("[Webhook] Processing Error:", error);
-  }
-
-  // FINALLY respond to Cloudbeds after work is done
-  if (!res.headersSent) {
-      res.status(200).json({ success: true });
+    console.error("[Webhook] FATAL Processing Error:", error);
+    return finish(); // Always send 200 to stop retries, even on crash
   }
 });
-
-
 
 module.exports = router;
