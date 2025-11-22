@@ -154,11 +154,14 @@ Writes success/failure to DB
 
 Notification insertion via sentinel_notifications
 
-Webhooks System (Receiver / Processor / Reconciler)
 
-webhooks.router.js receives PMS events
+Webhooks System (The "Pulse" Engine)
 
-Queue processing + reconciliations planned (hybrid sync model)
+webhooks.router.js receives PMS events (Created, Status Changed)
+
+Directly fetches reservation details via cloudbedsAdapter
+
+Real-time SQL updates to `daily_metrics_snapshots` (Live Layer)
 
 File Services
 
@@ -239,7 +242,13 @@ GET /notifications
 
 POST /notifications/mark-read
 
-Webhooks Router
+Webhooks Router (api/routes/webhooks.router.js)
+
+Dedicated receiver for PMS events (Pulse)
+
+Fetches full reservation details to calculate net room/revenue change
+
+Updates `daily_metrics_snapshots` immediately
 
 Dedicated receiver for PMS events
 
@@ -573,11 +582,13 @@ POST /api/sentinel/notifications/mark-read
 Clears notifications
 
 5.2 Webhooks
-POST /api/webhooks/...
+POST /api/webhooks
 
 Receives PMS webhook events
 
-Queues for future hybrid reconciliation
+Triggers "Pulse" logic: Fetch -> Calculate -> Upsert to DB
+
+Handles `reservation/created` and `reservation/status_changed`
 
 5.3 Property Hub
 Rate Replicator
@@ -636,7 +647,8 @@ market-pulse/
 │   │   ├── scraper.router.js      # Shadowfax
 │   │   ├── sentinel.router.js     # Sentinel API
 │   │   ├── support.router.js
-│   │   └── users.router.js
+│   │   ├── users.router.js
+│   │   └── webhooks.router.js     # "Pulse" Engine
 │   ├── utils/
 │   │   ├── report-templates/      # HTML templates for PDF generation
 │   │   ├── benchmark.utils.js     # Pacing Benchmark Logic

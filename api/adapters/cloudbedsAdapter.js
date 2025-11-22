@@ -741,9 +741,20 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     internalHotelId = result.rows[0].hotel_id;
   }
 
+
   console.log(
     `[Sync Function] Successfully synced details for property ${propertyId}. Internal hotel_id is ${internalHotelId}.`
   );
+
+  // --- NEW: Auto-Subscribe to Webhooks (The Pulse) ---
+  // We perform this check every time a hotel is synced to ensure the "Heartbeat" is active.
+  // We use a try-catch block so a webhook failure doesn't crash the main sync.
+  try {
+    await ensureWebhookSubscriptions(accessToken, propertyId);
+  } catch (webhookError) {
+    console.error(`[Sync Function] WARNING: Webhook auto-subscribe failed: ${webhookError.message}`);
+  }
+
   return internalHotelId;
 }
 /**
@@ -1193,7 +1204,86 @@ const url = `https://api.cloudbeds.com/api/v1.3/getRoomBlocks?propertyID=${prope
       hasMore = false;
     }
   }
+ REPLACE WITH:
   return allRoomBlocks;
+}
+
+/**
+ * NEW: Idempotent Webhook Registration.
+ * Checks if the required "Pulse" webhooks exist for this property.
+ * If not, it registers them pointing to the production URL.
+ * @param {string} accessToken - Cloudbeds Access Token
+ * @param {string} propertyId - Cloudbeds Property ID
+ */
+async function ensureWebhookSubscriptions(accessToken, propertyId) {
+  const TARGET_URL = "https://market-pulse.io/api/webhooks";
+  
+  // The 4 events required for Sentinel's Pulse Engine
+  const REQUIRED_EVENTS = [
+    { object: "reservation", action: "created" },
+    { object: "reservation", action: "status_changed" },
+    { object: "reservation", action: "dates_changed" },
+    { object: "reservation", action: "accommodation_changed" }
+  ];
+
+  console.log(`[Webhooks] Ensuring subscriptions for property ${propertyId}...`);
+
+  // 1. Fetch existing subscriptions
+  const getUrl = `https://api.cloudbeds.com/api/v1.3/getWebhooks?propertyID=${propertyId}`;
+  const getResponse = await fetch(getUrl, {
+    headers: { "Authorization": `Bearer ${accessToken}` }
+  });
+  
+  // If we can't read webhooks, we can't safely register new ones without risking duplicates.
+  if (!getResponse.ok) {
+    const errText = await getResponse.text();
+    throw new Error(`Failed to list existing webhooks: ${errText}`);
+  }
+  
+  const getJson = await getResponse.json();
+  const existingWebhooks = getJson.data || [];
+
+  // 2. Check and Register Missing
+  for (const req of REQUIRED_EVENTS) {
+    // Does a webhook already exist for this Entity + Action + URL?
+    const exists = existingWebhooks.find(w => 
+      w.event.entity === req.object && 
+      w.event.action === req.action && 
+      w.subscriptionData?.url === TARGET_URL
+    );
+
+    if (exists) {
+      // console.log(`[Webhooks] Verified existing: ${req.action}`);
+      continue;
+    }
+
+    // If not, register it
+    console.log(`[Webhooks] Missing subscription for '${req.action}'. Registering now...`);
+    
+    const params = new URLSearchParams({
+      propertyID: propertyId,
+      object: req.object,
+      action: req.action,
+      endpointUrl: TARGET_URL
+    });
+
+    const postResponse = await fetch("https://api.cloudbeds.com/api/v1.1/postWebhook", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    const postJson = await postResponse.json();
+    if (!postResponse.ok || !postJson.success) {
+      console.error(`[Webhooks] Failed to register ${req.action}:`, postJson);
+    } else {
+      console.log(`[Webhooks] Successfully registered ${req.action}. ID: ${postJson.data?.subscriptionID}`);
+    }
+  }
+  console.log(`[Webhooks] Auto-subscribe check complete for ${propertyId}.`);
 }
 
 module.exports = {
@@ -1209,6 +1299,7 @@ module.exports = {
   getRooms,
   getReservations,
   getReservationsWithDetails,
-  getDailyTakings,
+getDailyTakings,
   getRoomBlocks,
+  ensureWebhookSubscriptions,
 };
