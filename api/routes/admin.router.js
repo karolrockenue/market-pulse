@@ -992,23 +992,45 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         delete options.headers["X-PROPERTY-ID"];
         break;
 
+
       case "create-test-webhook":
-        // Creates a REAL webhook subscription pointing to your production server
-        targetUrl = "https://api.cloudbeds.com/api/v1.1/postWebhook";
-        options.method = "POST";
-        options.headers["Content-Type"] = "application/x-www-form-urlencoded";
+        // REGISTER ALL SENTINEL WEBHOOKS (Loop)
+        // We hijack the standard flow here because we need to make MULTIPLE calls.
+        const myPublicUrl = "https://market-pulse.io/api/webhooks";
+        const actionsToRegister = [
+            'created',          // New Bookings
+            'status_changed',   // Cancellations
+            'dates_changed',    // Extending/Shortening stays
+            'accommodation_changed' // Moving rooms
+        ];
+        
+        const results = [];
 
-        // We use your PRODUCTION URL
-        const myPublicUrl = "https://market-pulse.io/api/webhooks"; 
+        for (const action of actionsToRegister) {
+            const params = new URLSearchParams({
+                propertyID: cloudbedsApiId,
+                object: "reservation",
+                action: action,
+                endpointUrl: myPublicUrl,
+            });
 
-        options.body = new URLSearchParams({
-          propertyID: cloudbedsApiId,
-          object: "reservation",
-          action: "created",
-          endpointUrl: myPublicUrl,
+            const resp = await fetch("https://api.cloudbeds.com/api/v1.1/postWebhook", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": options.headers.Authorization // Re-use the admin token
+                },
+                body: params
+            });
+            const data = await resp.json();
+            results.push({ action, success: data.success, id: data.data?.subscriptionID });
+        }
+
+        // Return immediately, skipping the default switch break flow
+        return res.status(200).json({ 
+            message: "Registered all Sentinel webhooks.", 
+            details: results 
         });
-        delete options.headers["X-PROPERTY-ID"];
-        break;
 
       case "sample-hotel":
         targetUrl = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${cloudbedsApiId}`;
