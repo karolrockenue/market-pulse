@@ -119,10 +119,12 @@ router.post("/", async (req, res) => {
         const status = resData.data.status || '';
         console.log(`[Webhook] Status Changed to: ${status}`);
         
-        if (['canceled', 'no_show'].includes(status)) {
+if (['canceled', 'no_show'].includes(status)) {
             multiplier = -1; // Subtract from metrics
         } else {
             console.log(`[Webhook] Status is '${status}' (not a cancellation). No metric change needed.`);
+            // FIX: Send response before exiting, otherwise Vercel times out waiting for a reply.
+            if (!res.headersSent) res.status(200).json({ success: true });
             return;
         }
     }
