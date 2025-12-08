@@ -11,7 +11,10 @@ const crypto = require("crypto"); // For Mews credential decryption
 // Import shared utilities
 const pgPool = require("../utils/db");
 // [MODIFIED] Import the permissive 'requireAdminApi' and the strict 'requireSuperAdminOnly'
-const { requireAdminApi, requireSuperAdminOnly } = require("../utils/middleware");
+const {
+  requireAdminApi,
+  requireSuperAdminOnly,
+} = require("../utils/middleware");
 
 // NEW: Import the handlers for the serverless cron jobs
 const dailyRefreshHandler = require("../daily-refresh.js");
@@ -78,79 +81,9 @@ async function getAdminAccessToken(adminUserId, propertyId) {
 
 // --- ADMIN API ENDPOINTS ---
 // All routes are now protected by the requireAdminApi middleware.
+// [MOVED] Hotel configuration endpoints (get-all-hotels, update-category, scheduled-reports)
+// have been moved to api/routes/hotels.router.js
 
-// /api/routes/admin.router.js
-router.get("/get-all-hotels", requireAdminApi, async (req, res) => {
-  try {
-    const { rows } = await pgPool.query(
-      // [FIX] Add the new 'total_rooms' column to the SELECT statement
-      // Added is_rockenue_managed and management_group for Rockenue tools
-      "SELECT hotel_id, property_name, total_rooms, property_type, city, category, neighborhood, is_rockenue_managed, management_group FROM hotels ORDER BY property_name"
-    );
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch hotels." });
-  }
-});
-
-// NEW: Endpoint to update a hotel's quality tier / category
-router.post("/update-hotel-category", requireAdminApi, async (req, res) => {
-  const { hotelId, category } = req.body;
-
-  // 1. Basic validation
-  if (!hotelId) {
-    return res.status(400).json({ error: "Hotel ID is required." });
-  }
-
-  const validCategories = ["Hostel", "Economy", "Midscale", "Upper Midscale", "Luxury"];
-  if (!category || !validCategories.includes(category)) {
-    return res.status(400).json({ error: "Invalid category specified." });
-  }
-
-  try {
-    // 2. Update the category in the hotels table
-    const result = await pgPool.query(
-      "UPDATE hotels SET category = $1 WHERE hotel_id = $2",
-      [category, hotelId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Hotel not found." });
-    }
-
-    // 3. Success
-    return res.status(200).json({ message: "Category updated successfully." });
-  } catch (error) {
-    console.error("Error updating hotel category:", error);
-    return res.status(500).json({ error: "Failed to update category." });
-  }
-});
-
-// New endpoint to fetch all scheduled reports for the admin panel dropdown.
-router.get("/get-scheduled-reports", requireAdminApi, async (req, res) => {
-  try {
-    // FINAL FIX: The primary key column is 'id', not 'report_id'.
-    // We select `sr.id` and alias it as `report_id` for clean output.
-    const query = `
-        SELECT 
-            sr.id AS report_id, 
-            sr.report_name,
-            h.property_name
-        FROM scheduled_reports sr
-        JOIN hotels h ON sr.property_id::integer = h.hotel_id
-        WHERE sr.property_id ~ '^[0-9]+$'
-        ORDER BY h.property_name, sr.report_name;
-    `;
-    const { rows } = await pgPool.query(query);
-    res.json(rows);
-  } catch (error) {
-    // Standard error handling if the database query fails.
-    console.error("Error fetching scheduled reports for admin panel:", error);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch scheduled reports from the database." });
-  }
-});
 router.get("/test-database", requireAdminApi, async (req, res) => {
   try {
     const client = await pgPool.connect();
@@ -275,7 +208,7 @@ router.post(
     // 1. Check for Internal Secret (Server-to-Server bypass)
     const authHeader = req.headers["authorization"];
     const internalSecret = process.env.INTERNAL_API_SECRET;
-    
+
     if (internalSecret && authHeader === `Bearer ${internalSecret}`) {
       // Whitelisted internal call - allow access
       return next();
@@ -283,13 +216,17 @@ router.post(
 
     // 2. If no secret, enforce standard Admin Session check (Manual Trigger)
     if (!req.session || !req.session.userId) {
-       return res.status(401).json({ error: "Unauthorized: User session required." });
+      return res
+        .status(401)
+        .json({ error: "Unauthorized: User session required." });
     }
     const allowedRoles = ["admin", "super_admin"];
     if (!req.session.role || !allowedRoles.includes(req.session.role)) {
-      return res.status(403).json({ error: "Forbidden: Administrator access required." });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Administrator access required." });
     }
-    
+
     // valid session - allow accessss
     next();
   },
@@ -487,59 +424,68 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
       // Handle cases where the PMS type is unknown or not supported yet.
       throw new Error(`Sync logic not implemented for PMS type: '${pmsType}'`);
     }
-// --- [NEW] Calculate and save Total Rooms ---
-// We re-use the logic from the backfill endpoint within this transaction.
-console.log(`[Admin Sync] Now calculating total rooms for hotel: ${propertyId}`);
-let totalRooms = 0;
-try {
-  // 1. Get credentials and PMS info
-  const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
-    propertyId
-  );
-
-  // 2. Call the PMS API function
-  const apiResponse = await getRoomTypesFromPMS(
-    propertyId, 
-    pms_type, 
-    credentials, 
-    pms_property_id
-  );
-
-  // 3. Sum the 'roomTypeUnits', skipping "virtual" rooms
-  if (apiResponse && Array.isArray(apiResponse.data)) {
-    totalRooms = apiResponse.data.reduce(
-      (sum, roomType) => {
-        const roomName = roomType.roomTypeName || roomType.Name || "";
-        if (roomName.toLowerCase().includes('virtual')) {
-          console.log(` -- Skipping room: "${roomName}" (virtual)`);
-          return sum;
-        }
-        return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
-      },
-      0
+    // --- [NEW] Calculate and save Total Rooms ---
+    // We re-use the logic from the backfill endpoint within this transaction.
+    console.log(
+      `[Admin Sync] Now calculating total rooms for hotel: ${propertyId}`
     );
-  } else {
-    throw new Error("Invalid API response structure. Expected { data: [...] }");
-  }
+    let totalRooms = 0;
+    try {
+      // 1. Get credentials and PMS info
+      const { credentials, pms_type, pms_property_id } =
+        await getCredentialsForHotel(propertyId);
 
-  // 4. Save to the database
-  if (totalRooms > 0) {
-    await client.query(
-      "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
-      [totalRooms, propertyId]
-    );
-    console.log(`[Admin Sync] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${propertyId}.`);
-  } else {
-    console.warn(`[Admin Sync] Calculated total rooms was 0 for hotel ${propertyId}. Skipping update.`);
-  }
+      // 2. Call the PMS API function
+      const apiResponse = await getRoomTypesFromPMS(
+        propertyId,
+        pms_type,
+        credentials,
+        pms_property_id
+      );
 
-} catch (roomError) {
-  // Log the error but do not fail the whole transaction
-  // This ensures that hotel info (like name, city) can still be synced
-  // even if the room count fails.
-  console.error(`[Admin Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`);
-}
-// --- [END NEW] ---
+      // 3. Sum the 'roomTypeUnits', skipping "virtual" rooms
+      if (apiResponse && Array.isArray(apiResponse.data)) {
+        totalRooms = apiResponse.data.reduce((sum, roomType) => {
+          const roomName = roomType.roomTypeName || roomType.Name || "";
+          // UPDATED: Now ignores both 'virtual' and 'day' (for Day Use) rooms
+          if (
+            roomName.toLowerCase().includes("virtual") ||
+            roomName.toLowerCase().includes("day")
+          ) {
+            console.log(` -- Skipping room: "${roomName}" (Virtual/Day Use)`);
+            return sum;
+          }
+          return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
+        }, 0);
+      } else {
+        throw new Error(
+          "Invalid API response structure. Expected { data: [...] }"
+        );
+      }
+
+      // 4. Save to the database
+      if (totalRooms > 0) {
+        await client.query(
+          "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+          [totalRooms, propertyId]
+        );
+        console.log(
+          `[Admin Sync] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${propertyId}.`
+        );
+      } else {
+        console.warn(
+          `[Admin Sync] Calculated total rooms was 0 for hotel ${propertyId}. Skipping update.`
+        );
+      }
+    } catch (roomError) {
+      // Log the error but do not fail the whole transaction
+      // This ensures that hotel info (like name, city) can still be synced
+      // even if the room count fails.
+      console.error(
+        `[Admin Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`
+      );
+    }
+    // --- [END NEW] ---
 
     // If all operations were successful, commit the transaction.
     await client.query("COMMIT");
@@ -626,7 +572,7 @@ async function getCredentialsForHotel(hotelId) {
   }
 
   // For Mews, we must decrypt the access token before returning
-  if (result.rows[0].pms_type === 'mews') {
+  if (result.rows[0].pms_type === "mews") {
     const storedCredentials = result.rows[0].pms_credentials;
     // Re-use the existing getMewsCredentials logic, but adapt it
     const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
@@ -647,16 +593,16 @@ async function getCredentialsForHotel(hotelId) {
     return {
       credentials: {
         clientToken: storedCredentials.clientToken,
-        accessToken: decryptedToken
+        accessToken: decryptedToken,
       },
-      pms_type: 'mews'
+      pms_type: "mews",
     };
   }
 
   // For Cloudbeds, just return the stored credentials object
   return {
     credentials: result.rows[0].pms_credentials,
-    pms_type: result.rows[0].pms_type
+    pms_type: result.rows[0].pms_type,
   };
 }
 /**
@@ -683,7 +629,7 @@ async function getCredentialsForHotel(hotelId) {
   const { pms_credentials, pms_type, pms_property_id } = result.rows[0];
 
   // For Mews, we must decrypt the access token before returning
-  if (pms_type === 'mews') {
+  if (pms_type === "mews") {
     const storedCredentials = pms_credentials;
     // Re-use the existing getMewsCredentials logic
     const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
@@ -704,18 +650,18 @@ async function getCredentialsForHotel(hotelId) {
     return {
       credentials: {
         clientToken: storedCredentials.clientToken,
-        accessToken: decryptedToken
+        accessToken: decryptedToken,
       },
-      pms_type: 'mews',
-      pms_property_id: pms_property_id
+      pms_type: "mews",
+      pms_property_id: pms_property_id,
     };
   }
 
   // For Cloudbeds, just return the stored credentials object
   return {
     credentials: pms_credentials, // This contains the refresh_token
-    pms_type: 'cloudbeds',
-    pms_property_id: pms_property_id
+    pms_type: "cloudbeds",
+    pms_property_id: pms_property_id,
   };
 }
 /**
@@ -727,8 +673,13 @@ async function getCredentialsForHotel(hotelId) {
  * @param {string} pms_property_id The external PMS property ID (Cloudbeds needs this)
  * @returns {Promise<object>} The raw API response (expected to have a .data property)
  */
-async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_id) {
-  if (pms_type === 'cloudbeds') {
+async function getRoomTypesFromPMS(
+  hotelId,
+  pms_type,
+  credentials,
+  pms_property_id
+) {
+  if (pms_type === "cloudbeds") {
     // --- Cloudbeds Logic ---
     // 1. Get a fresh Access Token using the stored refresh_token
     // We use the internal hotelId to find the right refresh token
@@ -750,8 +701,7 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
       throw new Error(`Cloudbeds API error: ${response.statusText}`);
     }
     return response.json(); // Returns { success: true, data: [...] }
-
-  } else if (pms_type === 'mews') {
+  } else if (pms_type === "mews") {
     // --- Mews Logic ---
     // Credentials are pre-decrypted by getCredentialsForHotel
     const targetUrl = "https://api.mews.com/api/connector/v1/roomTypes/getAll";
@@ -759,7 +709,7 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${credentials.accessToken}`,
+        Authorization: `Bearer ${credentials.accessToken}`,
       },
       body: JSON.stringify({
         ClientToken: credentials.clientToken,
@@ -981,8 +931,6 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
     // --- CORRECTED LOGIC ---
     // Each case will now handle its own fetch and response.
     switch (endpoint) {
-
-
       case "get-webhooks":
         // This endpoint requires the propertyID as a query parameter
         targetUrl = `https://api.cloudbeds.com/api/v1.3/getWebhooks?propertyID=${cloudbedsApiId}`;
@@ -992,44 +940,50 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
         delete options.headers["X-PROPERTY-ID"];
         break;
 
-
       case "create-test-webhook":
         // REGISTER ALL SENTINEL WEBHOOKS (Loop)
         // We hijack the standard flow here because we need to make MULTIPLE calls.
         const myPublicUrl = "https://market-pulse.io/api/webhooks";
         const actionsToRegister = [
-            'created',          // New Bookings
-            'status_changed',   // Cancellations
-            'dates_changed',    // Extending/Shortening stays
-            'accommodation_changed' // Moving rooms
+          "created", // New Bookings
+          "status_changed", // Cancellations
+          "dates_changed", // Extending/Shortening stays
+          "accommodation_changed", // Moving rooms
         ];
-        
+
         const results = [];
 
         for (const action of actionsToRegister) {
-            const params = new URLSearchParams({
-                propertyID: cloudbedsApiId,
-                object: "reservation",
-                action: action,
-                endpointUrl: myPublicUrl,
-            });
+          const params = new URLSearchParams({
+            propertyID: cloudbedsApiId,
+            object: "reservation",
+            action: action,
+            endpointUrl: myPublicUrl,
+          });
 
-            const resp = await fetch("https://api.cloudbeds.com/api/v1.1/postWebhook", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": options.headers.Authorization // Re-use the admin token
-                },
-                body: params
-            });
-            const data = await resp.json();
-            results.push({ action, success: data.success, id: data.data?.subscriptionID });
+          const resp = await fetch(
+            "https://api.cloudbeds.com/api/v1.1/postWebhook",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Authorization: options.headers.Authorization, // Re-use the admin token
+              },
+              body: params,
+            }
+          );
+          const data = await resp.json();
+          results.push({
+            action,
+            success: data.success,
+            id: data.data?.subscriptionID,
+          });
         }
 
         // Return immediately, skipping the default switch break flow
-        return res.status(200).json({ 
-            message: "Registered all Sentinel webhooks.", 
-            details: results 
+        return res.status(200).json({
+          message: "Registered all Sentinel webhooks.",
+          details: results,
         });
 
       case "sample-hotel":
@@ -1171,45 +1125,7 @@ router.get("/explore/:endpoint", requireAdminApi, async (req, res) => {
 // /api/routes/admin.router.js
 
 // NEW: Endpoint to update a hotel's category
-router.post("/update-hotel-category", requireAdminApi, async (req, res) => {
-  const { hotelId, category } = req.body;
-
-  // Validate that the category is one of the allowed values
-  // CORRECTED: Use the application-wide standard category list to validate input.
-  const allowedCategories = [
-    "Hostel",
-    "Economy",
-    "Midscale",
-    "Upper Midscale",
-    "Luxury",
-  ];
-  if (!allowedCategories.includes(category)) {
-    return res.status(400).json({ error: "Invalid category provided." });
-  }
-
-  if (!hotelId) {
-    return res.status(400).json({ error: "Hotel ID is required." });
-  }
-
-  try {
-    // Execute the update query
-    const result = await pgPool.query(
-      "UPDATE hotels SET category = $1 WHERE hotel_id = $2",
-      [category, hotelId]
-    );
-
-    // Check if any row was actually updated
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Hotel not found." });
-    }
-
-    // Send a success response
-    res.status(200).json({ message: "Category updated successfully." });
-  } catch (error) {
-    console.error("Error updating hotel category:", error);
-    res.status(500).json({ error: "Failed to update category." });
-  }
-});
+// [CLEANUP] Removed duplicate update-hotel-category endpoint
 // --- ADD THIS NEW ENDPOINT ---
 
 // NEW: Endpoint to record the successful completion of a background job.
@@ -1275,121 +1191,11 @@ router.post(
 );
 
 // --- Comp Set Management Endpoints ---
-
-/**
- * Gets the effective competitive set for a given hotel.
- *
- * It first checks for a manually defined comp set in the `hotel_comp_sets` table.
- * If found, it returns that list.
- * If not found, it falls back to finding all other hotels in the same category.
- */
-router.get("/hotel/:hotelId/compset", requireAdminApi, async (req, res) => {
-  const { hotelId } = req.params;
-
-  try {
-    // First, try to find a custom comp set for this hotel.
-    const customCompSetQuery = `
-      SELECT h.hotel_id, h.property_name, h.category, h.city
-      FROM hotels h
-      JOIN hotel_comp_sets cs ON h.hotel_id = cs.competitor_hotel_id
-      WHERE cs.hotel_id = $1
-      ORDER BY h.property_name;
-    `;
-    const { rows: customCompSet } = await pgPool.query(customCompSetQuery, [
-      hotelId,
-    ]);
-
-    // If a custom comp set exists (even if empty), return it.
-    if (customCompSet.length > 0) {
-      console.log(
-        `[Compset] Found ${customCompSet.length} custom competitors for hotel ${hotelId}.`
-      );
-      return res.json(customCompSet);
-    }
-
-    // If no custom comp set exists, fall back to category-based logic.
-    // First, get the category of the primary hotel.
-    const hotelInfo = await pgPool.query(
-      "SELECT category FROM hotels WHERE hotel_id = $1",
-      [hotelId]
-    );
-    if (hotelInfo.rows.length === 0) {
-      return res.status(404).json({ error: "Primary hotel not found." });
-    }
-    const category = hotelInfo.rows[0].category;
-
-    // Then, find all other hotels in that same category.
-    const categoryCompSetQuery = `
-      SELECT hotel_id, property_name, category, city
-      FROM hotels
-      WHERE category = $1 AND hotel_id != $2
-      ORDER BY property_name;
-    `;
-    const { rows: categoryCompSet } = await pgPool.query(categoryCompSetQuery, [
-      category,
-      hotelId,
-    ]);
-    console.log(
-      `[Compset] No custom set for hotel ${hotelId}. Falling back to category '${category}', found ${categoryCompSet.length} competitors.`
-    );
-    res.json(categoryCompSet);
-  } catch (error) {
-    console.error(`Error fetching comp set for hotel ${hotelId}:`, error);
-    res.status(500).json({ error: "Failed to fetch competitive set." });
-  }
-});
-
-/**
- * Sets the manual competitive set for a hotel.
- * This operation is transactional: it deletes all old entries and inserts all new ones.
- * Sending an empty array for competitorIds will simply clear the custom comp set.
- */
-router.post("/hotel/:hotelId/compset", requireAdminApi, async (req, res) => {
-  const { hotelId } = req.params;
-  const { competitorIds } = req.body; // Expect an array of hotel IDs
-
-  if (!Array.isArray(competitorIds)) {
-    return res.status(400).json({ error: "competitorIds must be an array." });
-  }
-
-  const client = await pgPool.connect();
-  try {
-    await client.query("BEGIN"); // Start transaction
-
-    // First, delete all existing comp set entries for this hotel.
-    await client.query("DELETE FROM hotel_comp_sets WHERE hotel_id = $1", [
-      hotelId,
-    ]);
-
-    // If there are new competitors to add, insert them.
-    if (competitorIds.length > 0) {
-      // Prepare the data for a bulk insert. Each inner array is a row: [hotel_id, competitor_hotel_id]
-      const values = competitorIds.map((id) => [hotelId, id]);
-      // Use pg-format to create a safe, multi-row INSERT statement.
-      const insertQuery = format(
-        "INSERT INTO hotel_comp_sets (hotel_id, competitor_hotel_id) VALUES %L",
-        values
-      );
-      await client.query(insertQuery);
-    }
-
-    await client.query("COMMIT"); // Commit transaction
-    res.status(200).json({
-      message: `Successfully updated competitive set for hotel ${hotelId}.`,
-    });
-  } catch (error) {
-    await client.query("ROLLBACK"); // Rollback on error
-    console.error(`Error setting comp set for hotel ${hotelId}:`, error);
-    res.status(500).json({ error: "Failed to update competitive set." });
-  } finally {
-    client.release(); // ALWAYS release client
-  }
-});
+// [MOVED] Compset management endpoints moved to hotels.router.js
 router.get(
   "/backfill-room-counts",
   requireSuperAdminOnly, // [MODIFIED] Protected for super-admin only
   async (req, res) => {
-
     let updatedCount = 0;
     let failedCount = 0;
     const logs = [];
@@ -1409,41 +1215,49 @@ router.get(
         let totalRooms = 0;
         try {
           // 3. Get credentials and PMS info using our new helper
-          const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
-            hotel.hotel_id
-          );
+          const { credentials, pms_type, pms_property_id } =
+            await getCredentialsForHotel(hotel.hotel_id);
 
           // 4. Call our new, self-contained PMS API function
           const apiResponse = await getRoomTypesFromPMS(
-            hotel.hotel_id, 
-            pms_type, 
-            credentials, 
+            hotel.hotel_id,
+            pms_type,
+            credentials,
             pms_property_id
           );
 
-      // 5. Sum the 'roomTypeUnits' from the response
-// This field name is 'roomTypeUnits' in Cloudbeds
-// and 'RoomTypeUnits' in Mews. We check for both.
-if (apiResponse && Array.isArray(apiResponse.data)) {
-  totalRooms = apiResponse.data.reduce(
-    (sum, roomType) => {
-      // Get the room name. Cloudbeds uses 'roomTypeName', Mews uses 'Name'.
-      const roomName = roomType.roomTypeName || roomType.Name || ""; // Default to empty string
+          // 5. Sum the 'roomTypeUnits' from the response
+          // This field name is 'roomTypeUnits' in Cloudbeds
+          // and 'RoomTypeUnits' in Mews. We check for both.
+          if (apiResponse && Array.isArray(apiResponse.data)) {
+            totalRooms = apiResponse.data.reduce(
+              (sum, roomType) => {
+                // Get the room name. Cloudbeds uses 'roomTypeName', Mews uses 'Name'.
+                const roomName = roomType.roomTypeName || roomType.Name || ""; // Default to empty string
 
-      // Check if the name includes 'virtual'
-      if (roomName.toLowerCase().includes('virtual')) {
-        logs.push(` -- Skipping room: "${roomName}" (contains 'virtual')`); // Add a log entry
-        return sum; // Return the current sum without adding
-      }
-
-      // If not virtual, add its units to the sum
-      return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
-    },
-    0 // Initial value for sum
-  );
-} else {
-  throw new Error("Invalid API response structure. Expected { data: [...] }");
-}
+                // Check if the name includes 'virtual'
+                // Check if the name includes 'virtual' or 'day'
+                if (
+                  roomName.toLowerCase().includes("virtual") ||
+                  roomName.toLowerCase().includes("day")
+                ) {
+                  logs.push(
+                    ` -- Skipping room: "${roomName}" (contains 'virtual' or 'day')`
+                  );
+                  return sum; // Return the current sum without adding
+                }
+                // If not virtual, add its units to the sum
+                return (
+                  sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0)
+                );
+              },
+              0 // Initial value for sum
+            );
+          } else {
+            throw new Error(
+              "Invalid API response structure. Expected { data: [...] }"
+            );
+          }
 
           // 6. Save to the database
           if (totalRooms > 0) {
@@ -1478,219 +1292,18 @@ if (apiResponse && Array.isArray(apiResponse.data)) {
         failed: failedCount,
         logs: logs,
       });
-
     } catch (error) {
-      res.status(500).json({ error: "Fatal error during backfill", details: error.message });
+      res
+        .status(500)
+        .json({ error: "Fatal error during backfill", details: error.message });
     }
   }
 );
 // --- END OF NEW ENDPOINT ---
 
-
+// --- END OF NEW ENDPOINT ---
 // --- END OF NEW ENDPOINT ---
 
-// NEW: Endpoint to update a hotel's management status or group
-router.post("/update-hotel-management", requireAdminApi, async (req, res) => {
-  const { hotelId, field, value } = req.body;
-
-  // 1. Validate the field name to prevent SQL injection
-  const allowedFields = ["is_rockenue_managed", "management_group"];
-  if (!allowedFields.includes(field)) {
-    return res.status(400).json({ error: "Invalid field specified." });
-  }
-
-  // 2. Validate the hotelId
-  if (!hotelId) {
-    return res.status(400).json({ error: "Hotel ID is required." });
-  }
-
-  try {
-    // 3. Build and execute the query
-    // We use pg-format %I (Identifier) to safely insert the column name (field)
-    // and %L (Literal) to safely insert the value.
-    const updateQuery = format(
-      "UPDATE hotels SET %I = %L WHERE hotel_id = %L",
-      field, // Safely inserts the column name
-      value, // Safely inserts the new value
-      hotelId // Safely inserts the hotel ID
-    );
-
-const result = await pgPool.query(updateQuery);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Hotel not found." });
-    }
-
-   // --- [NEW] Instant Sync Logic (v2) ---
-    // This logic instantly adds or removes a hotel from the Rockenue assets
-    // table when the 'is_rockenue_managed' toggle is changed.
-    
-    if (field === 'is_rockenue_managed' && value === true) {
-      // --- ADD TO ASSETS ---
-      console.log(`[Admin Sync] Toggle set to true for ${hotelId}. Running instant Rockenue sync...`);
-      
-      const syncQuery = `
-        INSERT INTO rockenue_managed_assets (
-            market_pulse_hotel_id, asset_name, city, total_rooms, management_group, monthly_fee
-        )
-        SELECT 
-            h.hotel_id::text, h.property_name, h.city, h.total_rooms, h.management_group, 0.00
-        FROM 
-            hotels h
-        LEFT JOIN 
-            rockenue_managed_assets rma ON h.hotel_id = rma.market_pulse_hotel_id::integer
-        WHERE 
-            h.hotel_id = $1
-            AND h.is_rockenue_managed = true 
-            AND rma.market_pulse_hotel_id IS NULL; -- Only insert if missing
-      `;
-      
-      try {
-        const syncResult = await pgPool.query(syncQuery, [hotelId]);
-        if (syncResult.rowCount > 0) {
-          console.log(`[Admin Sync] Successfully synced hotel ${hotelId} to rockenue_managed_assets.`);
-        } else {
-          console.log(`[Admin Sync] Hotel ${hotelId} was already synced. No changes made.`);
-        }
-      } catch (syncError) {
-        console.error(`[Admin Sync] CRITICAL: Failed to auto-sync hotel ${hotelId} to Rockenue assets:`, syncError);
-      }
-
-    } else if (field === 'is_rockenue_managed' && value === false) {
-      // --- [NEW] REMOVE FROM ASSETS ---
-      console.log(`[Admin Sync] Toggle set to false for ${hotelId}. Removing from Rockenue assets...`);
-      
-      const deleteQuery = `
-        DELETE FROM rockenue_managed_assets
-        WHERE market_pulse_hotel_id = $1::text;
-      `;
-      
-      try {
-        const deleteResult = await pgPool.query(deleteQuery, [hotelId]);
-        if (deleteResult.rowCount > 0) {
-          console.log(`[Admin Sync] Successfully removed hotel ${hotelId} from rockenue_managed_assets.`);
-        } else {
-          console.log(`[Admin Sync] Hotel ${hotelId} was not in Rockenue assets. No changes made.`);
-        }
-      } catch (deleteError) {
-        console.error(`[Admin Sync] CRITICAL: Failed to remove hotel ${hotelId} from Rockenue assets:`, deleteError);
-      }
-    }
-    // --- [END] Instant Sync Logic ---
-
-    res.status(200).json({ message: "Management info updated successfully." });
-} catch (error) {
-    console.error("Error updating hotel management info:", error);
-    res.status(500).json({ error: "Failed to update management info." });
-  }
-});
-
-// NEW: Endpoint to get a distinct list of management groups for the combobox
-router.get("/management-groups", requireAdminApi, async (req, res) => {
-  try {
-    const { rows } = await pgPool.query(
-      `SELECT DISTINCT management_group 
-       FROM hotels 
-       WHERE management_group IS NOT NULL AND management_group != '' 
-       ORDER BY management_group`
-    );
-    // Pluck the names from the objects to return a simple array of strings
-    const groups = rows.map(row => row.management_group);
-    res.status(200).json(groups);
-  } catch (error) {
-    console.error("Error fetching management groups:", error);
-    res.status(500).json({ error: "Failed to fetch management groups." });
-  }
-});
-
-
-// NEW: Endpoint to completely disconnect and delete a hotel
-router.post("/delete-hotel", requireAdminApi, async (req, res) => {
-  const { hotelId } = req.body;
-
-  if (!hotelId) {
-    return res.status(400).json({ error: "Hotel ID is required." });
-  }
-
-  const client = await pgPool.connect();
-
-  try {
-    console.log(`[Delete Hotel] Starting deletion process for hotel ${hotelId}...`);
-
-    // 1. Get credentials to notify Cloudbeds (if it's a Cloudbeds hotel)
-    // We try/catch this specific part so we can still delete the DB records 
-    // even if the Cloudbeds connection is already broken or token is invalid.
-    try {
-      const hotelResult = await client.query(
-        "SELECT pms_type, pms_property_id FROM hotels WHERE hotel_id = $1",
-        [hotelId]
-      );
-      
-      if (hotelResult.rows.length > 0 && hotelResult.rows[0].pms_type === 'cloudbeds') {
-        const { accessToken } = await getAdminAccessToken(req.session.userId, hotelId);
-        
-        if (accessToken) {
-          console.log(`[Delete Hotel] Disconnecting App State in Cloudbeds for ${hotelId}...`);
-          const cbResponse = await fetch("https://hotels.cloudbeds.com/api/v1.1/postAppState", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: new URLSearchParams({ app_state: "disabled" })
-          });
-          
-          const cbData = await cbResponse.json();
-          console.log(`[Delete Hotel] Cloudbeds response:`, cbData);
-        }
-      }
-    } catch (cbError) {
-      console.warn(`[Delete Hotel] Could not disconnect from Cloudbeds API (proceeding with DB delete): ${cbError.message}`);
-    }
-
-    // 2. Start Transaction for Database Cleanup
-    await client.query("BEGIN");
-
-    // Order matters to avoid foreign key constraint violations
-    
-    // A. Remove from Rockenue Assets
-    await client.query("DELETE FROM rockenue_managed_assets WHERE market_pulse_hotel_id = $1", [String(hotelId)]);
-    
-    // B. Remove Sentinel (AI) Configuration
-    await client.query("DELETE FROM sentinel_configurations WHERE hotel_id = $1", [hotelId]);
-    
-    // C. Remove Competitive Sets (both as subject and competitor)
-    await client.query("DELETE FROM hotel_comp_sets WHERE hotel_id = $1 OR competitor_hotel_id = $1", [hotelId]);
-    
-    // D. Remove Scheduled Reports
-    await client.query("DELETE FROM scheduled_reports WHERE property_id = $1", [String(hotelId)]);
-    
-    // E. Remove Budgets
-    await client.query("DELETE FROM hotel_budgets WHERE hotel_id = $1", [hotelId]);
-    
-    // F. Remove Daily Metrics (Historical Data)
-    await client.query("DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1", [hotelId]);
-    
-    // NOTE: market_availability_snapshots is EXCLUDED per user instruction.
-
-    // G. Remove User Links (Revoke Access)
-    await client.query("DELETE FROM user_properties WHERE property_id = $1", [hotelId]);
-    
-    // H. Finally, delete the Hotel record itself
-    await client.query("DELETE FROM hotels WHERE hotel_id = $1", [hotelId]);
-
-    await client.query("COMMIT");
-    
-    console.log(`[Delete Hotel] Successfully deleted hotel ${hotelId} and associated data.`);
-    res.status(200).json({ success: true, message: "Hotel disconnected and data removed." });
-
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error(`[Delete Hotel] Critical error deleting hotel ${hotelId}:`, error);
-    res.status(500).json({ error: "Failed to delete hotel. " + error.message });
-  } finally {
-    client.release();
-  }
-});
+// [MOVED] Hotel management, group listing, and deletion endpoints moved to hotels.router.js
 
 module.exports = router;

@@ -1,20 +1,45 @@
-// /api/routes/users.router.js
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-// Import the new 'requireManagePermission' function
-const {
-  requireUserApi,
-  requireAccountOwner,
-  requireManagePermission,
+const { 
+  requireUserApi, 
+  requireAccountOwner, 
+  requireManagePermission 
 } = require("../utils/middleware");
+
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-// Add this line with the other require statements at the top of the file.
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter");
+
+// --- User Profile Endpoints ---
+router.get("/profile", requireUserApi, async (req, res) => {
+  try {
+    const result = await pgPool.query(
+      "SELECT first_name, last_name, email FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "User not found." });
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch profile." });
+  }
+});
+
+router.put("/profile", requireUserApi, async (req, res) => {
+  try {
+    const { firstName, lastName } = req.body;
+    await pgPool.query(
+      "UPDATE users SET first_name = $1, last_name = $2 WHERE cloudbeds_user_id = $3",
+      [firstName, lastName, req.session.userId]
+    );
+    res.json({ message: "Profile updated.", user: { first_name: firstName, last_name: lastName } });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update profile." });
+  }
+});
 
 // --- NEW: Custom middleware to check if user can invite others ---
 // This allows both 'owner' and 'super_admin' roles to send invitations.

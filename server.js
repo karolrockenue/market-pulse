@@ -20,30 +20,24 @@ const { requirePageLogin } = require("./api/utils/middleware");
 const dailyRefreshHandler = require("./api/daily-refresh.js");
 const sendScheduledReportsHandler = require("./api/send-scheduled-reports.js");
 const syncRockenueAssetsHandler = require("./api/sync-rockenue-assets.js");
-
 // Import all the router files.
 const authRoutes = require("./api/routes/auth.router.js");
-const dashboardRoutes = require("./api/routes/dashboard.router.js");
-const reportsRoutes = require("./api/routes/reports.router.js");
 const adminRoutes = require("./api/routes/admin.router.js");
 // Point to the React build output directory
 // The React app is in the /web folder and builds to /web/build
 // This path is relative to the Vercel serverless function root (process.cwd())
 const publicPath = path.join(process.cwd(), "web", "build");
 const userRoutes = require("./api/routes/users.router.js");
-const marketRouter = require("./api/routes/market.router.js");
-const rockenueRoutes = require("./api/routes/rockenue.router.js");
-const supportRoutes = require("./api/routes/support.router.js"); // [NEW] Import the support router
-const budgetsRouter = require('./api/routes/budgets.router.js'); // [FIX] Corrected path relative to server.js
-const portfolioRoutes = require("./api/routes/portfolio.router.js");
-const propertyHubRoutes = require('./api/routes/property-hub.router.js');
+const supportRoutes = require("./api/routes/support.router.js"); 
+const sentinelRoutes = require("./api/routes/sentinel.router.js"); // Sentinel module
+const webhooksRoutes = require("./api/routes/webhooks.router.js"); // Webhooks module
 
-// [NEW] Import the planning router
+// --- NEW DOMAIN ROUTERS (SESSION 1) ---
+const metricsRoutes = require("./api/routes/metrics.router.js"); // Unified Metrics Engine
+const hotelsRoutes = require("./api/routes/hotels.router.js");   // Unified Hotel/Config Engine
+const marketRoutes = require("./api/routes/market.router.js");   // Unified Market/Planning Engine
+// --- EXPRESS APP INITIALIZATION ---
 
-const planningRoutes = require("./api/routes/planning.router.js");
-const scraperRoutes = require("./api/routes/scraper.router.js"); // [NEW] Shadowfax module
-const sentinelRoutes = require("./api/routes/sentinel.router.js"); // [NEW] Sentinel module
-const webhooksRoutes = require("./api/routes/webhooks.router.js"); // [NEW] Webhooks module
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -245,23 +239,21 @@ if (process.env.VERCEL_ENV !== "production") {
 
 // --- API ROUTERS ---
 // Mount all the dedicated routers to their respective paths.
+
+// 1. Core System Routers
 app.use("/api/auth", authRoutes);
-app.use("/api", dashboardRoutes);
-app.use("/api/reports", reportsRoutes);
-app.use("/api/admin", adminRoutes); // FIX: Use a specific path for the admin router
-app.use("/api/users", userRoutes); // Add this line
-app.use("/api/market", marketRouter);
-app.use("/api/rockenue", rockenueRoutes);
-app.use("/api/support", supportRoutes); // [NEW] Mount the support router
-app.use('/api/budgets', budgetsRouter); // [NEW] Mount budgets router
-app.use("/api/portfolio", portfolioRoutes);
-app.use('/api/property-hub', propertyHubRoutes); // <-- ADD THE LINE HERE
-// [NEW] Mount the planning router
-app.use("/api/planning", planningRoutes);
-// [NEW] Mount the Shadowfax scraper router
-app.use("/api/scraper", scraperRoutes);
-app.use("/api/sentinel", sentinelRoutes); // [NEW] Sentinel module
-app.use("/api/webhooks", webhooksRoutes); // [NEW] Webhooks module
+app.use("/api/admin", adminRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/support", supportRoutes);
+
+// 2. Domain Engines (New Architecture)
+app.use("/api/metrics", metricsRoutes); // KPI, Dashboard, Reports, Portfolio
+app.use("/api/hotels", hotelsRoutes);   // Config, Budgets, Assets, CompSets
+app.use("/api/market", marketRoutes);   // Trends, Pace, Scraper, Shadowfax
+
+// 3. Operational Engines
+app.use("/api/sentinel", sentinelRoutes); // AI Pricing
+app.use("/api/webhooks", webhooksRoutes); // PMS Events
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 

@@ -1,404 +1,472 @@
-0.0 AI PROTOCOL
-Rules the AI must follow inside this project
+0.0 AI PROTOCOL (FOR ALL AI AGENTS)
 
-Derived strictly from the source files:
+This section is binding. Ignore older docs, memories, assumptions, and “best practices” that contradict this.
 
 Analyze First
 
-The AI must read all provided project files before acting.
+Read all provided project files relevant to the task.
 
-AI confirms analysis with “Done” (internal protocol).
+Do not start coding before you understand:
 
-Plan Before Action
+Which layer you are touching (frontend / backend / DB).
 
-Before modifying any code, AI must output a bullet-point plan.
+Which module owns the logic (service vs router vs adapter vs React).
 
-Code is NOT written until user approves the plan.
+Plan Before Code
+
+Before any code change, output a short bullet-point plan.
+
+Wait for explicit user approval before writing code.
+
+If user explicitly asks for “full file replacement”, you may skip incremental patches for that request only.
 
 Clarify Ambiguity
 
-If any function/file/logic is unclear → AI must ask before assuming.
+If any function, file, or data flow is unclear → ask.
 
-One-File-At-A-Time Rule
+Do not invent new endpoints, types, or tables.
 
-The AI modifies only one file per instruction.
+One Logical Area at a Time
 
-No full-file replacements unless explicitly asked.
+Prefer modifying one logical area per instruction (e.g. one React feature file, or one router + its service).
 
-Find-and-Replace Strategy
+If a refactor spans multiple files, keep the changes tightly scoped and clearly grouped.
 
-Code changes must be delivered as specific replaceable fragments.
+Search & Replace Format (Default)
+
+When updating code, prefer:
+
+Show a find snippet.
+
+Show a replace snippet.
+
+Only do whole-file rewrites if the user explicitly asks for “entire file to paste”.
 
 Minimal Comments
 
-Only comment at the start of new functions or endpoints.
+Comments only where they add structural clarity (e.g. top of service functions, complex sections).
+
+Do not add commentary noise or “chatty” comments into the code.
 
 Incremental Testing
 
-After each change, the AI must give a “Test Point” with steps.
+After each non-trivial change, provide a Test Checklist:
+
+What to run (e.g. npm test, curl call, UI path).
+
+What a “pass” looks like.
 
 Request Missing Files
 
-If a required file is not provided, the AI must request it.
+If you need a file (e.g. a hook, service, component) and it’s not provided → explicitly ask for it rather than guessing.
 
 Strict Non-Hallucination Protocol
 
-No invented logic, endpoints, schemas, constants, or file names.
+Do not invent:
 
-All outputs must be explicitly present in the uploaded sources.
+Endpoints
+
+Tables / columns
+
+File names / paths
+
+Types / interfaces
+
+Business rules or formulas
+
+Everything must match existing sources and this Blueprint.
+
+If uncertain, ask instead of guessing.
 
 1.0 SYSTEM OVERVIEW
 1.1 High-Level Structure
 
-The Market Pulse + Sentinel system consists of two tightly connected subsystems:
+The system has two tightly connected subsystems:
 
 Market Pulse (Core Platform)
 
-Acts as the Data Hub
+Acts as the Data Hub.
 
-Manages hotels, users, metrics, budgeting, market data, scraping
+Manages:
 
-Hosts the UI for the Sentinel module
+Hotels, users, ownership, Rockenue-managed flags.
+
+Budgets, compsets, Rockenue assets.
+
+Internal KPIs, YoY, portfolio metrics.
+
+Market & pace data, including Shadowfax-sourced signals.
+
+Hosts the entire UI (including Sentinel screens).
 
 Sentinel (AI Pricing Engine)
 
-Consists of:
+Lives inside the Market Pulse backend and frontend.
 
-Control Panel (UI inside Market Pulse)
+Back-end responsibilities:
 
-Rate Manager (UI for daily pricing)
+Central pricing engine (canonical formulas, in Node).
 
-Async Engine (background queue processor)
+Async job queue for PMS rate pushes (sentinel_job_queue).
 
-Rate Push Engine (writes rates to PMS)
+Notifications for background job outcomes.
 
-Differential Engine (calculates room price spreads)
+Front-end responsibilities:
 
-Guardrails (min rate, max rate, freeze, LMF)
+Control Panel – configuration & guardrails.
 
-Connects to PMS via the Bridge Adapter
+Rate Manager – grid with live vs AI vs guardrails, overrides.
 
-Powered by DGX Spark for training (future) and local inference
+Property Hub (Rate Replicator) – OTA discount stack & math.
+
+Risk Overview – portfolio risk lens inside Sentinel.
+
+Shadowfax View – competitive pricing & scraped context for Sentinel usage.
+
+Connects to PMS via:
+
+cloudbedsAdapter.js (auth + generic operations).
+
+sentinel.adapter.js (pricing-focused write/read bridge).
 
 1.2 Key Boundaries
 
-UI ↔ Backend: All Sentinel UI components call /api/sentinel/....
+UI ↔ Backend
 
-Backend ↔ PMS: All PMS write operations pass through:
+All Sentinel UI components talk to /api/sentinel/....
 
-cloudbedsAdapter.js (authentication + heavy lifting)
+Market Pulse domain UIs talk to /api/metrics, /api/hotels, /api/market, /api/admin, /api/auth, /api/users, /api/webhooks.
 
-sentinel.adapter.js (pricing, overrides, batch rate pushes)
+Backend ↔ PMS
 
-Facts vs Rules stored in sentinel_configurations (single source of truth).
+All PMS read/write operations go through adapters:
 
-Async Queue isolates user actions from PMS rate push latency.
+cloudbedsAdapter.js for tokens + general operations.
 
-Notification System alerts users of failed background jobs.
+sentinel.adapter.js for Sentinel-specific rate reads/writes.
 
-Property Hub integrates Rate Replicator logic (OTA discount stack).
+Data Ownership
+
+Facts & rules for Sentinel live in sentinel_configurations.
+
+Rate history & overrides live in sentinel_rates_calendar.
+
+Queue state is in sentinel_job_queue.
+
+User-facing issues are surfaced via sentinel_notifications.
+
+Core hotel & metrics tables remain part of Market Pulse.
+
+Async Isolation
+
+User actions (overrides) never block on PMS writes.
+
+Producer enqueues jobs; worker processes them and reports via notifications.
+
+DGX / Shadowfax
+
+DGX Spark and “Shadowfax 2.0” are future compute/scraper layers.
+
+Current system references them conceptually; runtime pricing logic is fully handled by Node + adapters + existing SQL.
 
 2.0 ARCHITECTURE
 2.1 Backend Architecture
-Backend Stack
 
-Node.js + Express
+Stack & Entry
 
-Serverless model deployed on Vercel
+Node.js + Express.
 
-Single server entrypoint: server.js
+Deployed in a serverless-friendly way (Vercel).
 
-Feature-based routers under /api/routes
+Single entrypoint: server.js
 
-Centralized utilities under /api/utils
+Mounts domain routers:
 
-PMS-agnostic adapter pattern
+/api/metrics
 
-Sentinel Backend Modules
+/api/hotels
 
-sentinel.router.js
+/api/market
 
-Routes for Control Panel + Rate Manager
+/api/admin
 
-Write operations (e.g., POST /overrides)
+/api/auth
 
-Triggering background queue (“Producer” pattern)
+/api/users
 
-sentinel.adapter.js
+/api/sentinel
 
-Intelligent pricing adapter
+/api/support
 
-Uses main Cloudbeds authentication via imported getAccessToken()
+/api/webhooks
 
-Implements:
+Domain Services (Logic Owners)
 
-postRate()
+api/services/metrics.service.js
 
-postRateBatch()
+Single owner of all KPI / performance / YoY / portfolio / pacing logic.
 
-Live rate lookups
+api/services/market.service.js
 
-Write-back to PMS
+Market data, pace, seasonality, Shadowfax-derived metrics.
 
-Async Queue Components
+api/services/hotel.service.js
 
-sentinel_job_queue table
+Hotels, budgets, compsets, Rockenue assets, safe deletion.
 
-Background worker:
+api/services/sentinel.service.js
 
-Route: POST /api/sentinel/process-queue
+Canonical Sentinel pricing orchestration:
 
-Processes pending jobs FIFO
+Builds override payloads using sentinel.pricing.engine.js.
 
-Writes success/failure to DB
+Drives preview calendars and DB writes.
 
-Notification insertion via sentinel_notifications
+api/services/... (future)
 
+Additional services should follow the same pattern: routers stay thin; services own SQL + business logic.
 
-Webhooks System (The "Pulse" Engine)
+Routers (Interfaces)
 
-webhooks.router.js receives PMS events (Created, Status Changed)
+api/routes/metrics.router.js
 
-Directly fetches reservation details via cloudbedsAdapter
+Read-only metrics domain: dashboard, reports, portfolio, pacing.
 
-Real-time SQL updates to `daily_metrics_snapshots` (Live Layer)
+api/routes/hotels.router.js
 
-File Services
+Hotels, budgets, Rockenue assets, management flags, compsets.
 
-PDF generation (Playwright)
+api/routes/market.router.js
 
-Email delivery (SendGrid)
+Market & pace views, Shadowfax helpers.
+
+api/routes/admin.router.js
+
+Internal operations: health, manual sync, maintenance.
+
+api/routes/webhooks.router.js
+
+Inbound events from PMS → metrics snapshots (Pulse).
+
+api/routes/auth.router.js / api/routes/users.router.js
+
+Authentication & user management; aligned with service architecture.
+
+api/routes/support.router.js
+
+Support endpoints surfaced to the UI.
+
+api/routes/sentinel.router.js
+
+Sentinel-only API (see §5.1).
+
+Rule for AI:
+Never re-introduce deleted routers (dashboard/planning/reports/portfolio/rockenue/budgets/property-hub/scraper). All new work builds on the domain routers above.
+
+Adapters
+
+api/adapters/cloudbedsAdapter.js
+
+Primary PMS adapter.
+
+Owns OAuth/token exchange & generic calls.
+
+Exposes functions like getAccessToken(hotelId) and Cloudbeds-specific helpers.
+
+api/adapters/sentinel.adapter.js
+
+Sentinel-focused bridge.
+
+Uses Cloudbeds tokens.
+
+Owns:
+
+postRateBatch(...) for bulk pushes.
+
+getRates(hotelId, pmsPropertyId, roomTypeId, startDate, endDate) for live rate fetches.
+
+api/adapters/mewsAdapter.js / api/adapters/operaAdapter.js
+
+Present for broader Market Pulse usage.
+
+Sentinel is currently Cloudbeds-only.
+
+Utils
+
+api/utils/db.js – shared PostgreSQL connection.
+
+api/utils/benchmark.utils.js – pacing & benchmarking helpers.
+
+api/utils/market-codex.utils.js – WAP/trend/demand logic hub.
+
+api/utils/pacing.utils.js – pacing-specific business helpers.
+
+api/utils/pdf.utils.js, api/utils/report-templates/... – reporting & PDFs.
+
+api/utils/email.utils.js, api/utils/emailTemplates.js – transactional emails.
+
+api/utils/middleware.js – auth, requireAdminApi, etc.
+
+Workers & Scripts
+
+scripts/import-daily-history.js / scripts/import-monthly-history.js
+
+Backfill & import helpers for metrics.
+
+Sentinel async worker logic now lives inside sentinel.router.js as an internal background runner, not a separate worker file.
 
 2.2 Frontend Architecture
-React SPA (Vite)
 
-Single entrypoint: App.tsx
+Stack & Entry
 
-Sentinel UI components:
+React SPA (Vite) with TypeScript.
 
-SentinelControlPanel.tsx
+Entry: web/src/main.tsx + web/src/App.tsx.
 
-SentinelRateManager.tsx
+Styling:
 
-NotificationBell.tsx
+Tailwind + shadcn/ui primitives (web/src/components/ui/...).
 
-Property Hub Rate Replicator (drawer architecture)
+Global styles in web/src/styles/globals.css.
 
-Shared State
+Top-Level Routing / Product IA
 
-App-level data fetched in App.tsx
+The UI reflects the domain split:
 
-Child components receive props only; no Redux/MobX
+Dashboard – primary KPIs landing page.
 
-Inline styles (not Tailwind scanning)
+Reports Hub – performance, YoY, budgets, portfolio; internal-only tiles for Rockenue as needed.
 
-2.3 Adapters
-cloudbedsAdapter.js
+Market Intelligence – external & pace views.
 
-Official PMS adapter
+Sentinel – full AI pricing engine area.
 
-Handles:
+Settings – configuration, budgets, advanced settings.
 
-OAuth flow
+Admin – internal tools for Rockenue only.
 
-Rate reads
+This IA is implemented with feature hubs under web/src/features/....
 
-Historical sync
+Core Feature Modules
 
-Room/tax details
+Under web/src/features:
 
-Exposes getAccessToken(hotelId)
+admin/
 
-sentinel.adapter.js
+AdminHub.tsx
 
-Specialized “intelligent” write adapter
+API: admin/api/admin.api.ts, admin/api/types.ts
 
-Depends on getAccessToken() from cloudbedsAdapter
+Hooks: useAdminData.ts, useHotelSync.ts
 
-Handles only:
+dashboard/
 
-Price injection (rate pushes)
+DashboardHub.tsx
 
-Batch updates (v1.3 API)
+Components: HotelDashboard.tsx, DynamicYTDTrend.tsx, MarketOutlookBanner.tsx
 
-Real-time override application
+API: dashboard/api/dashboard.api.ts
 
-Differential engine integration
+Hooks: useDashboardData.ts
 
-mewsAdapter.js / operaAdapter.js
+reports/
 
-Exists for broader MP functionality.
+ReportsHub.tsx
 
-Sentinel currently uses Cloudbeds only.
+Components: ReportSelector.tsx, ReportTable.tsx, ReportActions.tsx, ReportControls.tsx, BudgetReport.tsx, PortfolioOverview.tsx, YearOnYearReport.tsx, ShreejiReport.tsx
 
-2.4 Routers
-Sentinel Router (api/routes/sentinel.router.js)
+API: reports/api/reports.api.ts, reports/api/types.ts
 
-POST /overrides
+Hooks: useReportData.ts, useScheduledReports.ts
 
-POST /process-queue
+market-intel/
 
-GET /notifications
+MarketIntelHub.tsx
 
-POST /notifications/mark-read
+Uses metrics/market APIs to surface forward-demand & competitive insights.
 
-Webhooks Router (api/routes/webhooks.router.js)
+settings/
 
-Dedicated receiver for PMS events (Pulse)
+Settings UI aligned with Figma (tabs, inline forms).
 
-Fetches full reservation details to calculate net room/revenue change
+API: settings/api/settings.api.ts, settings/api/types.ts
 
-Updates `daily_metrics_snapshots` immediately
+Hooks: useSettings.ts
 
-Dedicated receiver for PMS events
+sentinel/
 
-Queues inbound data for reconciliation
+SentinelHub.tsx – main Sentinel entry in the UI.
 
-2.5 Async Queue
-Producer (POST /overrides)
+Sub-components (structured by sub-domain):
 
-Calculate Final Rate (Base + Differentials)
+components/ControlPanel/ControlPanelView.tsx
 
-Insert into sentinel_job_queue
+components/PropertyHub/PropertyHubView.tsx
 
-Trigger worker (Kick)
+components/RateManager/RateManagerView.tsx
 
-Return instantly to UI
+components/RateManager/OccupancyVisualizer.tsx
 
-Consumer (Worker)
+components/RiskOverview/PortfolioRiskOverview.tsx
 
-Fetch PENDING jobs
+components/Shadowfax/ShadowfaxView.tsx
 
-Lock → PROCESSING
+Hooks:
 
-Call postRateBatch
+hooks/usePropertyHub.ts
 
-Update status (COMPLETED or FAILED)
+hooks/useRateGrid.ts
 
-Insert notification if failed
+hooks/useSentinelConfig.ts
 
-2.6 Notification Bell
+hooks/useShadowfax.ts
 
-Polls /api/sentinel/notifications/unread
+API layer:
 
-Shows list of system alerts
+api/sentinel.api.ts
 
-Clears via /mark-read
+api/types.ts
 
-Uses shadcn/ui Popover
+Rule for AI:
+All Sentinel pricing math and data orchestration comes from the backend (sentinel.service.js + sentinel.pricing.engine.js + sentinel.adapter.js).
+React components and hooks must not re-implement or diverge from those formulas.
 
-2.7 Rate Push Engine
+Shared Components & Utilities
 
-Reads:
+web/src/components/TopNav.tsx, LandingPage.tsx, InitialSyncScreen.tsx, NotificationBell.tsx, SettingsPage.tsx, SupportPage.tsx, modal components, etc.
 
-Guardrails
+web/src/components/ui/\* – shadcn primitives (omitted from file tree to reduce noise).
 
-Differentials
+web/src/styles/globals.css – global layout & theme.
 
-Room mappings
-
-Freeze windows
-
-Last-minute floors
-
-Manual overrides
-
-Pushes:
-
-Base Room
-
-All Derived Rooms
-
-Uses Batch API (max 30 per batch)
-
-2.8 Control Panel
-
-Activation Card (Surgical Activation model)
-
-Loads/Stores:
-
-Facts (room types, rate plans)
-
-Rules (differentials, guardrails, floors, freeze)
-
-UI mirrors Figma prototype
-
-All config stored in sentinel_configurations
-
-2.9 Rate Manager
-
-Grid view of:
-
-PMS Live Rates
-
-AI Suggested Rates
-
-Guardrails
-
-Min/Max
-
-LMF
-
-Freeze days
-
-Supports:
-
-Manual override input
-
-Pending vs Saved overrides
-
-Optimistic UI updates
-
-Submit triggers /overrides (async)
-
-2.10 Adapter Isolation Firewall / Bridge
-
-Certification Phase (past)
-
-Sentinel ran isolated via dev credentials.
-
-Current Mode (Bridge)
-
-sentinel.adapter.js imports real PMS tokens
-
-Full read/write access for production hotels
-
-2.11 DGX Integration
-
-DGX Spark is used for:
-
-Model training
-
-Batch inference
-
-Future “Shadowfax 2.0” scraper engine
-
-Market Pulse acts as the Data Hub feeding DGX
+web/src/guidelines/Guidelines.md – internal UI rules.
 
 3.0 LOGIC HUBS & FORMULAS
 3.1 Rate Replicator (OTA Sell-Rate Calculator)
 
-Sequential discount stack (Daisy-Chain model):
+Used primarily inside Property Hub under Sentinel.
 
-Level 0: Base
+Sequential discount stack:
+
+Level 0 – Base
+
 RawBase = PMS_Rate × Multiplier
 
-Level 1: Rate Plan Modifier
+Level 1 – Rate Plan Modifier
+
+Non-refundable etc.
+
 AfterNonRef = RawBase × (1 − NonRef%)
 
-Level 2: Sequential Discounts
-
-Applied in order:
+Level 2 – Sequential Discounts (applied in order)
 
 Genius
 
 AfterGenius = AfterNonRef × (1 − Genius%)
 
-
 Campaigns (Late Escape, Early Booker, etc.)
 
 AfterCampaign = AfterGenius × (1 − Campaign%)
-
 
 Targeting Discounts (Mobile, Country Rate)
 
@@ -406,84 +474,96 @@ FinalSellRate = AfterCampaign × (1 − Targeting%)
 
 Exclusive Deep Deals
 
-If active, they override Level 2 entirely:
+If active, this fork overrides the Level 2 stack:
 
 FinalSellRate = AfterNonRef × (1 − DeepDeal%)
 
-3.2 Daisy-Chain Differential Engine
+3.2 Daisy-Chain Differential Engine (Room Type Hierarchy)
 
-For each derived room type:
+For derived room types:
 
 DerivedRate = BaseRate × (1 + Differential%)
 
+Base room type (base_room_type_id) is skipped to avoid double pushes.
 
-Skips the base_room_type_id to avoid double push.
+Differential configuration is stored in sentinel_configurations under “rules”.
 
 3.3 Guardrails
+
 Min Rate
+
 EffectiveRate = max(CalculatedRate, MinRate)
 
 Max Rate
+
 EffectiveRate = min(EffectiveRate, MaxRate)
+
+These guardrails apply after differential calculations.
 
 3.4 Freeze Windows
 
 If freeze_period = N:
 
-Freeze applies to days 0 through N (inclusive)
-
+Freeze applies to days 0…N (inclusive) relative to “today”.
 
 Frozen days preserve PMS live rate.
 
+Freeze has priority over most other adjustments.
+
 3.5 Last-Minute Floors (LMF)
 
-If LMF = K:
+If last_minute_floor = K:
 
-LMF applies to days 0 through K (inclusive)
+LMF applies to days 0…K (inclusive).
 
-
-Overrides calculated rate with guardrail floor unless freeze period overlaps (freeze takes priority).
+For those days, the calculated rate is overridden by a floor (guardrail) unless the freeze window covers that day (freeze wins).
 
 3.6 Mapping Logic (room_type → rate_id)
 
-Stored in Facts portion of sentinel_configurations:
+Stored in the facts portion of sentinel_configurations:
 
-Base Room Type
+Base Room Type.
 
-Derived Room Types
+Derived Room Types.
 
-Rate Plan → Room Type mapping for base plan selection
+Rate Plan → Room Type mapping for base plan selection.
 
-Used to attach correct PMS rate IDs to override payloads.
+Mapping is used to attach correct PMS rate IDs to override payloads (bridge between config and Cloudbeds).
 
-3.7 Padlock Logic
+3.7 Padlock / Priority Logic
 
-If a day is MANUAL in PMS or has manually entered override:
+Priority of sources for any given date:
 
-System respects manual value
+Manual values (locked / padlocked).
 
-AI pushes nothing for that day
+Pending (unsaved changes in the UI).
 
-Priority:
+Saved overrides.
 
-Manual
+AI calculated rates.
 
-Pending (unsaved changes)
+If a day is manual in PMS or has a manual override:
 
-Saved
+System respects the manual value.
 
-AI calculated
+AI pushes nothing (no override) for that day.
 
-4.0 DATABASE SCHEMA (FINAL STATE)
+4.0 DATABASE SCHEMA (SENTINEL + CONTEXT)
 4.1 sentinel_configurations
 
-Stores Facts + Rules.
+Single source of truth for Sentinel facts + rules per hotel.
 
-Fields include:
+Key fields (conceptual):
 
 hotel_id
 
-facts: room_types, rate_plans, mappings
+facts:
+
+room_types
+
+rate_plans
+
+mappings (room → rate plan, base/derived)
 
 rules:
 
@@ -503,39 +583,73 @@ base_room_type_id
 
 activation flags
 
-manual overrides persisted here
+Manual inline overrides necessary for UI representation are persisted here when appropriate.
 
 4.2 sentinel_rates_calendar
 
-(If present in source — Not explicitly defined → omitted)
+Stores day-by-day rates for each hotel & room type.
+
+Used as the internal layer for:
+
+Rate history.
+
+AI decisions vs PMS.
+
+UIs (Rate Manager, previews) via service/routers.
+
+Details:
+
+hotel_id
+
+room_type_id
+
+stay_date
+
+rate
+
+source (e.g., AI / MANUAL / IMPORT / SYNC)
+
+Timestamps
 
 4.3 sentinel_job_queue
 
+Queue of pending rate push jobs.
+
+Fields (conceptual):
+
 id (PK)
 
-payload (JSON list of rates)
+hotel_id
 
-status: PENDING | PROCESSING | COMPLETED | FAILED
+payload (JSON; usually { pmsPropertyId, rates: [...] })
 
-error_log (text)
+status – PENDING | PROCESSING | COMPLETED | FAILED
 
-timestamps
+last_error / error_log – text
+
+created_at, updated_at
 
 4.4 sentinel_notifications
 
+User-facing notification store.
+
+Fields (conceptual):
+
 id (PK)
 
-type: ERROR | SUCCESS
+type – ERROR | SUCCESS | INFO
 
-message (text)
+title
+
+message
 
 is_read (boolean)
 
-timestamps
+created_at, updated_at
 
-4.5 Other Market Pulse Tables
+4.5 Other Market Pulse Tables (Relevant to Sentinel)
 
-(These are part of main MP system but needed for Sentinel context)
+Sentinel reads from / relies on:
 
 hotels
 
@@ -549,210 +663,310 @@ market_availability_snapshots
 
 hotel_budgets
 
-rockenue_managed_assets
+rockenue_managed_assets (calculator settings, multipliers, Genius %, etc.)
 
-helpers: magic_login_tokens, user_sessions, etc.
+Helpers: magic_login_tokens, user_sessions, etc.
 
 5.0 API REFERENCE (ACTIVE ENDPOINTS ONLY)
-5.1 Sentinel Endpoints
-POST /api/sentinel/overrides
 
-Producer
+Important:
+Endpoint lists here are authoritative; do not invent new routes.
+For request/response shapes, follow existing implementations.
 
-Calculates base + differentials
+5.1 Sentinel Endpoints (/api/sentinel)
 
-Inserts into job queue
+All Sentinel routes are admin-only (protected by requireAdminApi) and interact only with Sentinel services/adapters.
 
-Returns instantly
+POST /preview-rate
 
-POST /api/sentinel/process-queue
+Body: { hotelId, baseRoomTypeId, startDate, days? }
 
-Worker
+Uses sentinel.service.previewCalendar(...) to generate a calendar of live vs AI vs guardrails.
 
-Protected by CRON_SECRET
+GET /pms-property-ids
 
-Processes PENDING jobs
+Returns map { [hotelId]: pms_property_id } for Rockenue-managed hotels.
 
-GET /api/sentinel/notifications
+GET /configs
 
-Fetch notification list
+Returns all rows from sentinel_configurations for control panel overview.
 
-POST /api/sentinel/notifications/mark-read
+GET /config/:hotelId
 
-Clears notifications
+Returns single config for the given hotelId.
 
-5.2 Webhooks
-POST /api/webhooks
+POST /config
 
-Receives PMS webhook events
+Creates or updates configuration (facts + rules) for a hotel.
 
-Triggers "Pulse" logic: Fetch -> Calculate -> Upsert to DB
+POST /overrides
 
-Handles `reservation/created` and `reservation/status_changed`
+Producer:
 
-5.3 Property Hub
-Rate Replicator
+Validates payload { hotelId, pmsPropertyId, roomTypeId, overrides: [...] }.
 
-Logic processed in frontend + API
+Delegates to sentinel.service.buildOverridePayload(...) which calls sentinel.pricing.engine.js.
 
-No scraping
+Splits into chunks; writes to sentinel_job_queue.
 
-Pure math engine
+Kicks background worker via internal call.
 
-5.4 Remaining MP Endpoints (Relevant to Sentinel)
+Returns immediately with success/failure.
 
+POST /process-queue
 
+Manual/cron worker trigger.
 
-/auth
+Calls internal runBackgroundWorker():
 
-/dashboard
+Locks PENDING jobs.
 
-/portfolio
+Calls sentinel.adapter.postRateBatch(...).
 
-/planning
+Updates job statuses.
 
-/market
+Inserts notifications on failures.
 
-/reports
+GET /rates/:hotelId/:roomTypeId
 
-/scraper (Shadowfax)
+Combines:
 
-/admin
+Local sentinel_rates_calendar.
 
-/users
+Live PMS rates from sentinel.adapter.getRates(...).
 
-Sentinel interacts mainly with /admin/sync-hotel-info, /dashboard/summary, and PMS-facing logic.
+Returns 365-day calendar including:
 
-6.0 ACTIVE FILE TREE (EXACT)
+date, rate, source, liveRate.
+
+GET /notifications
+
+Returns up to 20 most recent rows from sentinel_notifications.
+
+POST /notifications/mark-read
+
+Optionally accepts ids array.
+
+Marks relevant notifications as read (or entire set).
+
+Rule:
+If you need new Sentinel functionality, extend the service and then expose a minimal API route here, instead of embedding logic in the router.
+
+5.2 Webhooks (/api/webhooks)
+
+Receives external PMS events (e.g., reservation/created, reservation/status_changed).
+
+Uses cloudbedsAdapter to fetch details.
+
+Updates daily_metrics_snapshots and related tables in near real-time.
+
+5.3 Domain Routers (Conceptual Contracts)
+
+The exact endpoint list is defined in code; here we keep conceptual domains only:
+
+/api/metrics
+
+Dashboard KPIs.
+
+YoY comparisons.
+
+Portfolio aggregation.
+
+Dynamic report data.
+
+Pacing/pickup metrics.
+
+/api/hotels
+
+Hotel list & details.
+
+Budgets.
+
+Compsets.
+
+Rockenue-managed asset records.
+
+/api/market
+
+Market KPIs & forward view.
+
+Neighborhood & demand segments.
+
+Shadowfax helper calls (scraper-derived or computed market pricing).
+
+/api/admin
+
+Internal tools, health checks, manual triggers.
+
+/api/auth / /api/users / /api/support
+
+Login/session, user management, support functions.
+
+Rule for AI:
+When adding features, pick the correct domain router instead of adding ad-hoc routes elsewhere.
+
+6.0 ACTIVE FILE TREE (SIMPLIFIED, LOGIC-FOCUSED)
+
+Note:
+This tree is intentionally trimmed to remove noise (favicons, shadcn primitives, etc.).
+UI primitives under web/src/components/ui and small static assets are not listed.
 
 market-pulse/
-├── api/
-│   ├── adapters/
-│   │   ├── cloudbedsAdapter.js    # Main Adapter (Auth Provider)
-│   │   ├── mewsAdapter.js         # Mews Logic
-│   │   ├── operaAdapter.js
-│   │   └── sentinel.adapter.js    # Bridge: Uses cloudbedsAdapter tokens
-│   ├── workers/
-│   │   └── process-queue.js       # Sentinel Async Worker
-│   ├── routes/
-│   │   ├── admin.router.js
-│   │   ├── auth.router.js
-│   │   ├── budgets.router.js
-│   │   ├── dashboard.router.js
-│   │   ├── market.router.js
-│   │   ├── planning.router.js
-│   │   ├── portfolio.router.js
-│   │   ├── reports.router.js
-│   │   ├── rockenue.router.js
-│   │   ├── scraper.router.js      # Shadowfax
-│   │   ├── sentinel.router.js     # Sentinel API
-│   │   ├── support.router.js
-│   │   ├── users.router.js
-│   │   └── webhooks.router.js     # "Pulse" Engine
-│   ├── utils/
-│   │   ├── report-templates/      # HTML templates for PDF generation
-│   │   ├── benchmark.utils.js     # Pacing Benchmark Logic
-│   │   ├── db.js
-│   │   ├── email.utils.js
-│   │   ├── emailTemplates.js
-│   │   ├── market-codex.utils.js  # WAP/Trend Logic Hub
-│   │   ├── middleware.js
-│   │   ├── pacing.utils.js
-│   │   ├── pdf.utils.js
-│   │   ├── report.generators.js
-│   │   └── scraper.utils.js       # Playwright Logic
-│   ├── daily-refresh.js
-│   ├── initial-sync.js
-│   ├── ota-crawler.js
-│   ├── send-scheduled-reports.js
-│   └── sync-rockenue-assets.js
-├── web/
-│   ├── build/
-│   ├── node_modules/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ui/                # shadcn/ui components
-│   │   │   ├── App.tsx            # God Component
-│   │   │   ├── Budgeting.tsx
-│   │   │   ├── CloudbedsAPIExplorer.tsx
-│   │   │   ├── CreateBudgetModal.tsx
-│   │   │   ├── CreateScheduleModal.tsx
-│   │   │   ├── DashboardControls.tsx
-│   │   │   ├── DataTable.tsx
-│   │   │   ├── DemandPace.tsx     #
-│   │   │   ├── DynamicYTDTrend.tsx
-│   │   │   ├── HotelDashboard.tsx #
-│   │   │   ├── HotelManagementTable.tsx
-│   │   │   ├── InitialSyncScreen.tsx
-│   │   │   ├── InsightsCard.tsx
-│   │   │   ├── KPICard.tsx
-│   │   │   ├── LandingPage.tsx
-│   │   │   ├── ManageCompSetModal.tsx
-│   │   │   ├── ManageSchedulesModal.tsx
-│   │   │   ├── MarketCompositionCardAlt.tsx
-│   │   │   ├── MarketDemandPatterns.tsx
-│   │   │   ├── MarketOutlookBanner.tsx
-│   │   │   ├── MarketRankingCard.tsx
-│   │   │   ├── MewsOnboarding.tsx
-│   │   │   ├── MiniMetricCard.tsx
-│   │   │   ├── MyProfile.tsx
-│   │   │   ├── NotificationBell.tsx # Sentinel Async Bell
-│   │   │   ├── PerformanceChart.tsx
-│   │   │   ├── PortfolioOverview.tsx
-│   │   │   ├── PortfolioRiskOverview.tsx
-│   │   │   ├── PrivacyPolicy.tsx
-│   │   │   ├── PropertyHubPage.tsx # Rate Replicator Engine
-│   │   │   ├── ReportActions.tsx
-│   │   │   ├── ReportControls.tsx
-│   │   │   ├── ReportSelector.tsx
-│   │   │   ├── ReportTable.tsx
-│   │   │   ├── SentinelControlPanel.tsx
-│   │   │   ├── SentinelRateManager.tsx #
-│   │   │   ├── SettingsPage.tsx
-│   │   │   ├── ShadowfaxPage.tsx
-│   │   │   ├── ShreejiReport.tsx
-│   │   │   ├── SupportPage.tsx
-│   │   │   ├── SystemHealth.tsx
-│   │   │   ├── TermsOfService.tsx
-│   │   │   ├── TopNav.tsx
-│   │   │   ├── UserManagement.tsx
-│   │   │   └── YearOnYearReport.tsx
-│   │   ├── index.css
-│   │   └── main.tsx
-├── scripts/
-│   ├── import-monthly-history.js
-│   └── import-daily-history.js
+├── api
+│ ├── adapters
+│ │ ├── cloudbedsAdapter.js
+│ │ ├── mewsAdapter.js
+│ │ ├── operaAdapter.js
+│ │ └── sentinel.adapter.js
+│ ├── routes
+│ │ ├── admin.router.js
+│ │ ├── auth.router.js
+│ │ ├── hotels.router.js
+│ │ ├── market.router.js
+│ │ ├── metrics.router.js
+│ │ ├── sentinel.router.js
+│ │ ├── support.router.js
+│ │ ├── users.router.js
+│ │ └── webhooks.router.js
+│ ├── services
+│ │ ├── hotel.service.js
+│ │ ├── market.service.js
+│ │ ├── metrics.service.js
+│ │ ├── sentinel.pricing.engine.js
+│ │ └── sentinel.service.js
+│ ├── utils
+│ │ ├── benchmark.utils.js
+│ │ ├── db.js
+│ │ ├── email.utils.js
+│ │ ├── emailTemplates.js
+│ │ ├── market-codex.utils.js
+│ │ ├── middleware.js
+│ │ ├── pacing.utils.js
+│ │ ├── pdf.utils.js
+│ │ ├── report-templates
+│ │ │ └── shreeji.template.html
+│ │ └── scraper.utils.js
+│ ├── daily-refresh.js
+│ ├── initial-sync.js
+│ ├── migration_001_add_market_metrics.js
+│ ├── migration_002_fix_market_metrics.js
+│ ├── send-scheduled-reports.js
+│ └── sync-rockenue-assets.js
+├── scripts
+│ ├── import-daily-history.js
+│ └── import-monthly-history.js
 ├── server.js
-└── vercel.json
+├── package.json
+├── package-lock.json
+├── vercel.json
+└── web
+├── index.html
+├── package.json
+├── package-lock.json
+├── public
+│ └── ... (favicons and logo assets omitted)
+└── src
+├── App.tsx
+├── main.tsx
+├── index.css
+├── styles
+│ └── globals.css
+├── components
+│ ├── CreateScheduleModal.tsx
+│ ├── DemandPace.tsx
+│ ├── GrantAccessModal.tsx
+│ ├── InitialSyncScreen.tsx
+│ ├── InviteUserModal.tsx
+│ ├── LandingPage.tsx
+│ ├── ManageSchedulesModal.tsx
+│ ├── NotificationBell.tsx
+│ ├── PrivacyPolicy.tsx
+│ ├── PropertyClassificationModal.tsx
+│ ├── SettingsPage.tsx
+│ ├── SupportPage.tsx
+│ ├── TermsOfService.tsx
+│ ├── TopNav.tsx
+│ ├── figma
+│ │ └── ImageWithFallback.tsx
+│ ├── ui
+│ │ └── ... (shadcn primitives – omitted)
+│ └── sentinel-toast.tsx (and other small shared helpers)
+├── features
+│ ├── admin
+│ │ ├── AdminHub.tsx
+│ │ ├── api
+│ │ │ ├── admin.api.ts
+│ │ │ └── types.ts
+│ │ ├── components
+│ │ │ ├── CloudbedsAPIExplorer.tsx
+│ │ │ ├── HotelManagementTable.tsx
+│ │ │ ├── ManualReportTrigger.tsx
+│ │ │ ├── MewsOnboarding.tsx
+│ │ │ └── SystemHealth.tsx
+│ │ └── hooks
+│ │ ├── useAdminData.ts
+│ │ └── useHotelSync.ts
+│ ├── dashboard
+│ │ ├── DashboardHub.tsx
+│ │ ├── api
+│ │ │ └── dashboard.api.ts
+│ │ ├── components
+│ │ │ ├── DynamicYTDTrend.tsx
+│ │ │ ├── HotelDashboard.tsx
+│ │ │ └── MarketOutlookBanner.tsx
+│ │ └── hooks
+│ │ └── useDashboardData.ts
+│ ├── market-intel
+│ │ └── MarketIntelHub.tsx
+│ ├── reports
+│ │ ├── ReportsHub.tsx
+│ │ ├── api
+│ │ │ ├── reports.api.ts
+│ │ │ └── types.ts
+│ │ ├── components
+│ │ │ ├── BudgetReport.tsx
+│ │ │ ├── PortfolioOverview.tsx
+│ │ │ ├── ReportActions.tsx
+│ │ │ ├── ReportControls.tsx
+│ │ │ ├── ReportSelector.tsx
+│ │ │ ├── ReportTable.tsx
+│ │ │ ├── ShreejiReport.tsx
+│ │ │ └── YearOnYearReport.tsx
+│ │ └── hooks
+│ │ ├── useReportData.ts
+│ │ └── useScheduledReports.ts
+│ ├── sentinel
+│ │ ├── SentinelHub.tsx
+│ │ ├── api
+│ │ │ ├── sentinel.api.ts
+│ │ │ └── types.ts
+│ │ ├── components
+│ │ │ ├── ControlPanel
+│ │ │ │ └── ControlPanelView.tsx
+│ │ │ ├── PropertyHub
+│ │ │ │ └── PropertyHubView.tsx
+│ │ │ ├── RateManager
+│ │ │ │ ├── OccupancyVisualizer.tsx
+│ │ │ │ └── RateManagerView.tsx
+│ │ │ ├── RiskOverview
+│ │ │ │ └── PortfolioRiskOverview.tsx
+│ │ │ └── Shadowfax
+│ │ │ └── ShadowfaxView.tsx
+│ │ ├── hooks
+│ │ │ ├── usePropertyHub.ts
+│ │ │ ├── useRateGrid.ts
+│ │ │ ├── useSentinelConfig.ts
+│ │ │ └── useShadowfax.ts
+│ ├── settings
+│ │ ├── api
+│ │ │ ├── settings.api.ts
+│ │ │ └── types.ts
+│ │ ├── components
+│ │ └── hooks
+│ │ └── useSettings.ts
+├── guidelines
+│ └── Guidelines.md
+└── Attributions.md
 
-7.0 DEVELOPER TOOLING & CRONS
-Crons
-
-daily-refresh.js
-
-365-day forecast refresh
-
-send-scheduled-reports.js
-
-Generates + emails reports
-
-sync-rockenue-assets.js
-
-Syncs internal ledger
-
-Hybrid future model
-
-Receiver → Processor → Reconciliation scripts (planned)
-
-Jobs
-
-initial-sync.js
-
-5-year PMS history import
-
-Developer Tools
-
-import-monthly-history.js (monthly → daily engine)
-
-import-daily-history.js (CSV straight to DB)
+End of Blueprint.
+Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.

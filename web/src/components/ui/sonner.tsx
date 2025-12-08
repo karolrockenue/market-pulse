@@ -2,47 +2,30 @@
 
 import { Toaster as Sonner } from "sonner";
 
-interface ToasterProps {
-  theme?: "light" | "dark" | "system";
-  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top-center" | "bottom-center";
-  toastOptions?: {
-    className?: string;
-    style?: React.CSSProperties;
-    [key: string]: any;
-  };
-}
+type ToasterProps = React.ComponentProps<typeof Sonner>;
 
-const Toaster = ({ theme, toastOptions, ...props }: ToasterProps) => {
-  // Define the base Sentinel style to reuse
-  const sentinelStyle = "group toast group-[.toaster]:bg-[#0f151a] group-[.toaster]:text-[#e5e5e5] group-[.toaster]:border-[1px] group-[.toaster]:border-[rgba(57,189,248,0.3)] group-[.toaster]:shadow-lg font-sans";
-
+const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme={theme || 'dark'}
+      theme="dark"
       className="toaster group"
+      position="top-right"
+      expand={true}
       toastOptions={{
         classNames: {
-          // 1. Apply Sentinel Style to ALL types explicitly
-          toast: sentinelStyle,
-          error: sentinelStyle,
-          success: sentinelStyle,
-          warning: sentinelStyle,
-          info: sentinelStyle,
-
-          // 2. Style the text
-          description: "group-[.toast]:text-muted-foreground",
-          
-          // 3. Custom Close Button (Dark Grey Circle)
-          closeButton: "group-[.toast]:bg-[#1a1a1a] group-[.toast]:text-[#e5e5e5] group-[.toast]:border-[#333] group-[.toast]:hover:bg-[#2a2a2a] group-[.toast]:hover:text-white !left-0 !top-0",
-          
-          // 4. Action buttons
-          actionButton: "group-[.toast]:bg-[#39BDF8] group-[.toast]:text-[#1d1d1c]",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          toast:
+            "group toast group-[.toaster]:bg-[#1a1a1a] group-[.toaster]:text-[#e5e5e5] group-[.toaster]:border-[#2a2a2a] group-[.toaster]:shadow-lg font-sans",
+          description: "group-[.toast]:text-[#9ca3af]",
+          actionButton:
+            "group-[.toast]:bg-[#39BDF8] group-[.toast]:text-[#1d1d1c]",
+          cancelButton:
+            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          closeButton:
+            "group-[.toast]:bg-[#1a1a1a] group-[.toast]:text-[#9ca3af] group-[.toast]:border-[#333] group-[.toast]:hover:bg-[#2a2a2a] group-[.toast]:hover:text-white !left-0 !top-0",
         },
-        ...toastOptions, 
         style: {
-             ...toastOptions?.style,
-        }
+          zIndex: 9999,
+        },
       }}
       {...props}
     />

@@ -4,25 +4,56 @@
  * This router is "firewalled" and only interacts with sentinel.adapter.js.
  * All routes are protected by super_admin-only middleware.
  */
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { requireAdminApi } = require('../utils/middleware'); // [MODIFIED] Allow Admin access
-const sentinelAdapter = require('../adapters/sentinel.adapter.js');
-const db = require('../utils/db'); // <-- [NEW] Import database connection
+const { requireAdminApi } = require("../utils/middleware"); // [MODIFIED] Allow Admin access
+const sentinelAdapter = require("../adapters/sentinel.adapter.js");
+const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
+const db = require("../utils/db"); // <-- [NEW] Import database connection
 
-// Apply super_admin protection to all routes in this file
-// Apply super_admin protection to all routes in this file
-// Apply permissive Admin protection (Staff + Founders)
 router.use(requireAdminApi);
 
+/**
+ * [NEW] POST /api/sentinel/preview-rate
+ * Generates a 365-day preview using the Canonical Pricing Engine.
+ * Used by Rate Manager Grid to show "AI Suggested" vs "Live" vs "Guardrails".
+ */
+router.post("/preview-rate", async (req, res) => {
+  try {
+    const { hotelId, baseRoomTypeId, startDate, days } = req.body;
 
+    if (!hotelId || !baseRoomTypeId || !startDate) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
+    }
+
+    const numDays = parseInt(days) || 30;
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + numDays);
+    const endDateStr = end.toISOString().split("T")[0];
+
+    const calendar = await sentinelService.previewCalendar({
+      hotelId,
+      baseRoomTypeId,
+      startDate,
+      endDate: endDateStr,
+    });
+
+    res.status(200).json({ success: true, data: calendar });
+  } catch (error) {
+    console.error("[Sentinel Router] preview-rate failed:", error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 /**
  * [NEW] GET /api/sentinel/pms-property-ids
  * Fetches a simple map of all Rockenue-managed hotels and their
  * external PMS Property IDs. This is used to "enrich" the
  * incomplete `allHotels` prop from App.tsx.
  */
-router.get('/pms-property-ids', async (req, res) => {
+router.get("/pms-property-ids", async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT hotel_id, pms_property_id 
@@ -36,17 +67,17 @@ router.get('/pms-property-ids', async (req, res) => {
       acc[row.hotel_id] = row.pms_property_id;
       return acc;
     }, {});
-    
+
     res.status(200).json({
       success: true,
-      message: 'PMS ID map fetched successfully.',
+      message: "PMS ID map fetched successfully.",
       data: idMap,
     });
   } catch (error) {
     console.error(`[Sentinel Router] get-pms-ids failed:`, error.message);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch PMS property ID map.',
+      message: "Failed to fetch PMS property ID map.",
       error: error.message,
     });
   }
@@ -57,20 +88,20 @@ router.get('/pms-property-ids', async (req, res) => {
  * Fetches ALL Sentinel configurations for all hotels.
  * Used by the main control panel to build its initial list.
  */
-router.get('/configs', async (req, res) => {
+router.get("/configs", async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT * FROM sentinel_configurations');
-    
+    const { rows } = await db.query("SELECT * FROM sentinel_configurations");
+
     res.status(200).json({
       success: true,
-      message: 'All configurations fetched successfully.',
+      message: "All configurations fetched successfully.",
       data: rows, // Return the array of configs
     });
   } catch (error) {
     console.error(`[Sentinel Router] get-all-configs failed:`, error.message);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch all configurations.',
+      message: "Failed to fetch all configurations.",
       error: error.message,
     });
   }
@@ -87,15 +118,19 @@ router.get('/configs', async (req, res) => {
  * Fetches the list of rate plans for a property so the user can
  * find the 'rateId' needed for testing.
  */
-router.get('/get-rate-plans/:propertyId', async (req, res) => {
+router.get("/get-rate-plans/:propertyId", async (req, res) => {
   const { propertyId } = req.params; // This is the External PMS ID
 
   try {
     console.log(`[Sentinel Router] Received get-rate-plans for ${propertyId}`);
 
     // [BRIDGE UPDATE] Lookup Internal ID
-    const hotelRes = await db.query('SELECT hotel_id FROM hotels WHERE pms_property_id = $1', [propertyId]);
-    if (hotelRes.rows.length === 0) throw new Error('Hotel not found in database.');
+    const hotelRes = await db.query(
+      "SELECT hotel_id FROM hotels WHERE pms_property_id = $1",
+      [propertyId]
+    );
+    if (hotelRes.rows.length === 0)
+      throw new Error("Hotel not found in database.");
     const hotelId = hotelRes.rows[0].hotel_id;
 
     // Pass BOTH IDs
@@ -103,53 +138,59 @@ router.get('/get-rate-plans/:propertyId', async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Rate plans fetched successfully.',
+      message: "Rate plans fetched successfully.",
       data: result,
     });
   } catch (error) {
-    console.error('[Sentinel Router] get-rate-plans failed:', error.message);
+    console.error("[Sentinel Router] get-rate-plans failed:", error.message);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch rate plans.',
+      message: "Failed to fetch rate plans.",
       error: error.message,
     });
   }
 });
 
-router.post('/test-post-rate', async (req, res) => {
+router.post("/test-post-rate", async (req, res) => {
   try {
     const { propertyId, rateId, date, rate } = req.body; // propertyId is External
 
     if (!propertyId || !rateId || !date || !rate) {
-      return res.status(400).json({ success: false, message: 'Missing required fields.' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
     }
 
     // [BRIDGE UPDATE] Lookup Internal ID
-    const hotelRes = await db.query('SELECT hotel_id FROM hotels WHERE pms_property_id = $1', [propertyId]);
-    if (hotelRes.rows.length === 0) throw new Error('Hotel not found in database.');
+    const hotelRes = await db.query(
+      "SELECT hotel_id FROM hotels WHERE pms_property_id = $1",
+      [propertyId]
+    );
+    if (hotelRes.rows.length === 0)
+      throw new Error("Hotel not found in database.");
     const hotelId = hotelRes.rows[0].hotel_id;
 
     // Pass BOTH IDs
     const result = await sentinelAdapter.postRate(
-      hotelId, 
-      propertyId, 
-      rateId, 
-      date, 
+      hotelId,
+      propertyId,
+      rateId,
+      date,
       rate
     );
 
     res.status(200).json({
       success: true,
-      message: 'Sentinel postRate test queued successfully.',
+      message: "Sentinel postRate test queued successfully.",
       data: result, // This will be the { jobReferenceID: "..." } object
     });
   } catch (error) {
-    console.error('[Sentinel Router] test-post-rate failed:', error.message);
+    console.error("[Sentinel Router] test-post-rate failed:", error.message);
     // [New code block to replace with]
 
     res.status(500).json({
       success: false,
-      message: 'Sentinel postRate test failed.',
+      message: "Sentinel postRate test failed.",
       error: error.message,
     });
   }
@@ -160,28 +201,39 @@ router.post('/test-post-rate', async (req, res) => {
  * Fetches the status of an asynchronous job (e.g., postRate)
  * using the jobReferenceID.
  */
-router.get('/job-status/:propertyId/:jobId', async (req, res) => {
+router.get("/job-status/:propertyId/:jobId", async (req, res) => {
   const { propertyId, jobId } = req.params;
 
   try {
     // [BRIDGE UPDATE] Lookup Internal ID
-    const hotelRes = await db.query('SELECT hotel_id FROM hotels WHERE pms_property_id = $1', [propertyId]);
-    if (hotelRes.rows.length === 0) throw new Error('Hotel not found in database.');
+    const hotelRes = await db.query(
+      "SELECT hotel_id FROM hotels WHERE pms_property_id = $1",
+      [propertyId]
+    );
+    if (hotelRes.rows.length === 0)
+      throw new Error("Hotel not found in database.");
     const hotelId = hotelRes.rows[0].hotel_id;
 
     // Pass BOTH IDs
-    const result = await sentinelAdapter.getJobStatus(hotelId, propertyId, jobId);
+    const result = await sentinelAdapter.getJobStatus(
+      hotelId,
+      propertyId,
+      jobId
+    );
 
     res.status(200).json({
       success: true,
-      message: 'Job status fetched successfully.',
+      message: "Job status fetched successfully.",
       data: result,
     });
   } catch (error) {
-    console.error(`[Sentinel Router] get-job-status failed for ${jobId}:`, error.message);
+    console.error(
+      `[Sentinel Router] get-job-status failed for ${jobId}:`,
+      error.message
+    );
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch job status.',
+      message: "Failed to fetch job status.",
       error: error.message,
     });
   }
@@ -192,12 +244,12 @@ router.get('/job-status/:propertyId/:jobId', async (req, res) => {
  * Fetches the complete Sentinel configuration for a single hotel
  * from our local database.
  */
-router.get('/config/:hotelId', async (req, res) => {
+router.get("/config/:hotelId", async (req, res) => {
   const { hotelId } = req.params;
-  
+
   try {
     const { rows } = await db.query(
-      'SELECT * FROM sentinel_configurations WHERE hotel_id = $1',
+      "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
       [hotelId]
     );
 
@@ -206,21 +258,24 @@ router.get('/config/:hotelId', async (req, res) => {
       // The frontend will use this null to show the "Enable" button.
       return res.status(200).json({
         success: true,
-        message: 'No configuration found for this hotel.',
+        message: "No configuration found for this hotel.",
         data: null,
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Configuration fetched successfully.',
+      message: "Configuration fetched successfully.",
       data: rows[0], // Return the full config object
     });
   } catch (error) {
-    console.error(`[Sentinel Router] get-config failed for ${hotelId}:`, error.message);
+    console.error(
+      `[Sentinel Router] get-config failed for ${hotelId}:`,
+      error.message
+    );
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch configuration.',
+      message: "Failed to fetch configuration.",
       error: error.message,
     });
   }
@@ -234,13 +289,15 @@ router.get('/config/:hotelId', async (req, res) => {
  * This is non-destructive and will not overwrite user "Rules".
  */
 // [MODIFIED] Route now takes IDs from the body, no params
-router.post('/sync', async (req, res) => {
+router.post("/sync", async (req, res) => {
   const { hotelId, pmsPropertyId } = req.body; // <-- [NEW] Get both IDs
-try {
+  try {
     // [MODIFIED] Log both IDs
-    console.log(`[Sentinel Router] Starting Facts Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`);
-    
-// 1. Fetch all "Facts" from PMS in parallel
+    console.log(
+      `[Sentinel Router] Starting Facts Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`
+    );
+
+    // 1. Fetch all "Facts" from PMS in parallel
     // [BRIDGE UPDATE] Pass BOTH IDs
     const [roomTypesData, ratePlansData] = await Promise.all([
       sentinelAdapter.getRoomTypes(hotelId, pmsPropertyId),
@@ -279,27 +336,28 @@ try {
     console.log(`[Sentinel Router] Facts Sync complete for ${hotelId}`);
     res.status(200).json({
       success: true,
-      message: 'PMS Facts sync complete.',
+      message: "PMS Facts sync complete.",
       data: rows[0],
     });
   } catch (error) {
-    console.error(`[Sentinel Router] facts-sync failed for ${hotelId}:`, error.message);
+    console.error(
+      `[Sentinel Router] facts-sync failed for ${hotelId}:`,
+      error.message
+    );
     res.status(500).json({
       success: false,
-      message: 'Failed to sync with PMS.',
+      message: "Failed to sync with PMS.",
       error: error.message,
     });
   }
 });
-
-
 
 /**
  * [MODIFIED] POST /api/sentinel/config/:hotelId
  * Saves the user's "Rules" and also (re)builds the
  * `rate_id_map` (e.g., {"roomTypeId_A": "rateId_1", "roomTypeId_B": "rateId_2"})
  */
-router.post('/config/:hotelId', async (req, res) => {
+router.post("/config/:hotelId", async (req, res) => {
   const { hotelId } = req.params;
   const {
     sentinel_enabled,
@@ -310,10 +368,10 @@ router.post('/config/:hotelId', async (req, res) => {
     room_differentials,
     last_minute_floor,
     monthly_aggression,
-    monthly_min_rates
+    monthly_min_rates,
   } = req.body;
 
-try {
+  try {
     // 1. Fetch the "Facts"
     const factsRes = await db.query(
       `SELECT pms_room_types, pms_rate_plans FROM sentinel_configurations WHERE hotel_id = $1`,
@@ -324,14 +382,22 @@ try {
     console.log(`[DEBUG /config] Fetched facts for hotel ${hotelId}`);
     if (factsRes.rows.length === 0) {
       console.error(`[DEBUG /config] No config row found.`);
-      return res.status(404).json({ success: false, message: 'Config row not found.' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Config row not found." });
     }
-    
+
     const pmsRoomTypesRaw = factsRes.rows[0].pms_room_types;
     const pmsRatePlansRaw = factsRes.rows[0].pms_rate_plans;
 
-    console.log(`[DEBUG /config] pms_room_types (raw):`, JSON.stringify(pmsRoomTypesRaw, null, 2));
-    console.log(`[DEBUG /config] pms_rate_plans (raw):`, JSON.stringify(pmsRatePlansRaw, null, 2));
+    console.log(
+      `[DEBUG /config] pms_room_types (raw):`,
+      JSON.stringify(pmsRoomTypesRaw, null, 2)
+    );
+    console.log(
+      `[DEBUG /config] pms_rate_plans (raw):`,
+      JSON.stringify(pmsRatePlansRaw, null, 2)
+    );
     // --- [END DEBUGGING LOG] ---
 
     if (factsRes.rows.length === 0) {
@@ -361,15 +427,20 @@ try {
       if (foundRateId) {
         rateIdMap[roomTypeId] = foundRateId;
       } else {
-        console.warn(`[Sentinel Router] No base rate (isDerived: false) found for roomTypeID ${roomTypeId}.`);
-}
+        console.warn(
+          `[Sentinel Router] No base rate (isDerived: false) found for roomTypeID ${roomTypeId}.`
+        );
+      }
     }
 
     // --- [START DEBUGGING LOG] ---
-    console.log(`[DEBUG /config] Finished building rateIdMap:`, JSON.stringify(rateIdMap, null, 2));
+    console.log(
+      `[DEBUG /config] Finished building rateIdMap:`,
+      JSON.stringify(rateIdMap, null, 2)
+    );
     // --- [END DEBUGGING LOG] ---
 
-// 3. [MODIFIED] Update the database with all rules AND the new base_rate_id
+    // 3. [MODIFIED] Update the database with all rules AND the new base_rate_id
     // [FIX] Manually stringify all JSONB-bound parameters to prevent pg driver errors
     const { rows } = await db.query(
       `
@@ -399,37 +470,38 @@ try {
         JSON.stringify(monthly_aggression || {}),
         JSON.stringify(monthly_min_rates || {}),
         JSON.stringify(rateIdMap || {}),
-        hotelId
+        hotelId,
       ]
     );
 
     res.status(200).json({
       success: true,
-      message: 'Configuration saved successfully. Rate ID Map rebuilt.',
+      message: "Configuration saved successfully. Rate ID Map rebuilt.",
       data: rows[0],
     });
   } catch (error) {
-    console.error(`[Sentinel Router] save-config failed for ${hotelId}:`, error.message);
+    console.error(
+      `[Sentinel Router] save-config failed for ${hotelId}:`,
+      error.message
+    );
     res.status(500).json({
       success: false,
-      message: 'Failed to save configuration.',
+      message: "Failed to save configuration.",
       error: error.message,
     });
   }
 });
-
 /**
- * [SHARED WORKER FUNCTION]
- * This runs the queue logic. We extract it so we can call it 
- * directly from the Producer without needing a network request.
+ * [SHARED WORKER FUNCTION - ROBUST FIX]
+ * This processes the queue with isolation (SAVEPOINTS) per job.
+ * If one job fails, it does NOT rollback the successful ones.
  */
 async function runBackgroundWorker() {
-  // ... setup ...
   const client = await db.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
-    // [BRIDGE UPDATE] Select hotel_id column
+    // 1. Fetch Pending Jobs with Lock
     const { rows: jobs } = await client.query(
       `SELECT id, hotel_id, payload FROM sentinel_job_queue 
        WHERE status = 'PENDING' 
@@ -439,136 +511,148 @@ async function runBackgroundWorker() {
     );
 
     if (jobs.length === 0) {
-      await client.query('COMMIT');
-      // console.log('[Sentinel Worker] No pending jobs.'); 
+      await client.query("COMMIT");
       return;
     }
 
     console.log(`[Sentinel Worker] Processing ${jobs.length} jobs...`);
 
-// 2. Process Each Job
+    // 2. Process Each Job Safely
     for (const job of jobs) {
-      const { pmsPropertyId, rates } = job.payload;
+      // Generate a safe savepoint name (PG doesn't like hyphens in identifiers sometimes)
+      const savepointName = `sp_${job.id.replace(/-/g, "_")}`;
 
       try {
-        // [BRIDGE UPDATE] Pass hotel_id from the job row
-        await sentinelAdapter.postRateBatch(job.hotel_id, pmsPropertyId, rates);
+        // Create Savepoint: If this loop iteration fails, we rollback to HERE.
+        await client.query(`SAVEPOINT ${savepointName}`);
 
-        // Mark Complete
-        await client.query(
-          `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
-          [job.id]
+        const { pmsPropertyId, rates } = job.payload;
+
+        // --- ADAPTER CALL ---
+        const result = await sentinelAdapter.postRateBatch(
+          job.hotel_id,
+          pmsPropertyId,
+          rates
         );
 
+        // --- SUCCESS HANDLER ---
+        if (
+          result &&
+          result.message === "All rates filtered out by safety checks."
+        ) {
+          console.log(
+            `[Sentinel Worker] Job ${job.id} SKIPPED (All rates invalid/zero).`
+          );
+          await client.query(
+            `UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`,
+            [job.id]
+          );
+        } else {
+          await client.query(
+            `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+            [job.id]
+          );
+        }
+
+        // Release savepoint (optional, but clean)
+        await client.query(`RELEASE SAVEPOINT ${savepointName}`);
       } catch (err) {
-        console.error(`[Sentinel Worker] Job ${job.id} Failed:`, err.message);
-        
-        // Mark Failed
-        await client.query(
-          `UPDATE sentinel_job_queue 
-           SET status = 'FAILED', last_error = $2, updated_at = NOW() 
-           WHERE id = $1`,
-          [job.id, err.message]
-        );
+        // --- FAILURE HANDLER ---
+        // 1. Undo any partial writes for THIS job only (keeps previous jobs safe)
+        await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
 
-        // Create Notification for User
-        await client.query(
-          `INSERT INTO sentinel_notifications (type, title, message) VALUES ($1, $2, $3)`,
-          ['ERROR', 'Rate Update Failed', `Failed to push ${rates.length} rates: ${err.message}`]
-        );
+        console.error(`[Sentinel Worker] Job ${job.id} Failed:`, err.message);
+
+        // 2. Safe Logging (Prevent "Text too long" crash)
+        try {
+          // Truncate error message to 500 chars to fit in DB
+          const safeError = (err.message || "Unknown error").substring(0, 500);
+
+          await client.query(
+            `UPDATE sentinel_job_queue 
+                 SET status = 'FAILED', last_error = $2, updated_at = NOW() 
+                 WHERE id = $1`,
+            [job.id, safeError]
+          );
+
+          await client.query(
+            `INSERT INTO sentinel_notifications (type, title, message, is_read) VALUES ($1, $2, $3, $4)`,
+            [
+              "ERROR",
+              "Rate Update Failed",
+              `Failed to push rates: ${safeError}`,
+              false,
+            ]
+          );
+        } catch (secondaryErr) {
+          // 3. Absolute Fail-Safe
+          // If we can't even log the error, just mark it FAILED with a generic message
+          // so the queue doesn't get stuck processing this forever.
+          console.error(
+            "[Sentinel Worker] CRITICAL: Failed to log error.",
+            secondaryErr
+          );
+          await client.query(
+            `UPDATE sentinel_job_queue 
+                 SET status = 'FAILED', last_error = 'Critical: Logging failed', updated_at = NOW() 
+                 WHERE id = $1`,
+            [job.id]
+          );
+        }
       }
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     console.log(`[Sentinel Worker] Batch complete.`);
-
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('[Sentinel Worker] Critical Error:', error);
+    // Only happens if the FETCH itself fails or connection dies
+    await client.query("ROLLBACK");
+    console.error("[Sentinel Worker] Critical Batch Error:", error);
   } finally {
     client.release();
   }
 }
-
 /**
  * [PRODUCER] POST /api/sentinel/overrides
- * 1. Saves rates to Queue.
- * 2. "Kicks" the worker internally (Reliable).
- * 3. Returns OK instantly.
+ * 1. Uses Sentinel Service to build payload (DB + engine).
+ * 2. Saves rates to Queue.
+ * 3. "Kicks" the worker internally (Reliable).
+ * 4. Returns OK instantly.
  */
-router.post('/overrides', async (req, res) => {
+router.post("/overrides", async (req, res) => {
   const { hotelId, pmsPropertyId, roomTypeId, overrides } = req.body;
   console.log(`[Sentinel Producer] Received overrides for hotel ${hotelId}`);
 
-  if (!hotelId || !pmsPropertyId || !roomTypeId || !overrides || !Array.isArray(overrides)) {
-    return res.status(400).json({ success: false, message: 'Missing required fields.' });
+  if (
+    !hotelId ||
+    !pmsPropertyId ||
+    !roomTypeId ||
+    !overrides ||
+    !Array.isArray(overrides)
+  ) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing required fields." });
   }
 
   try {
-    // 1. Get Config
-    const configRes = await db.query(
-      `SELECT rate_id_map, room_differentials FROM sentinel_configurations WHERE hotel_id = $1`,
-      [hotelId]
+    // 1. Delegate all DB + pricing logic to Sentinel Service
+    const batchPayload = await sentinelService.buildOverridePayload(
+      hotelId,
+      pmsPropertyId,
+      roomTypeId,
+      overrides
     );
-    
-    if (configRes.rows.length === 0) throw new Error('No configuration found.');
-    const { rate_id_map: rateIdMap, room_differentials: roomDifferentials } = configRes.rows[0];
 
-    // 2. Prepare Payload
-    const batchPayload = [];
-
-    for (const override of overrides) {
-      const { date, rate } = override;
-      const baseRate = parseFloat(rate);
-
-      // A. Update Local DB (Rule Book)
-      const jsonPatch = { [date]: baseRate };
-      await db.query(
-        `UPDATE sentinel_configurations SET rate_overrides = rate_overrides || $1 WHERE hotel_id = $2`,
-        [JSON.stringify(jsonPatch), hotelId]
-      );
-
-      // B. Update Calendar (Live State)
-      await db.query(
-        `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
-         VALUES ($1, $2, $3, $4, 'Manual', NOW())
-         ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
-         SET rate = EXCLUDED.rate, source = EXCLUDED.source, last_updated_at = NOW()`,
-        [hotelId, date, roomTypeId, baseRate]
-      );
-
-      // C. Calculate Payload (Base)
-      const baseRateId = rateIdMap[roomTypeId];
-      if (baseRateId) {
-        batchPayload.push({ rateId: baseRateId, date, rate: baseRate });
-      }
-
-      // D. Calculate Payload (Differentials)
-      if (roomDifferentials && Array.isArray(roomDifferentials)) {
-        for (const rule of roomDifferentials) {
-          if (!rule || rule.value === undefined || rule.roomTypeId === roomTypeId) continue;
-          
-          const diffRoomId = rule.roomTypeId;
-          const diffRateId = rateIdMap[diffRoomId];
-          if (diffRateId) {
-            const value = parseFloat(rule.value);
-            let newRate = rule.operator === '+' 
-              ? baseRate * (1 + (value / 100))
-              : baseRate * (1 - (value / 100));
-            batchPayload.push({ rateId: diffRateId, date, rate: parseFloat(newRate.toFixed(2)) });
-          }
-        }
-      }
-    }
-// 3. Insert into Job Queue (Chunked)
+    // 2. Insert into Job Queue (Chunked)
     // Cloudbeds has a strict limit of 30 items per API call.
     // We split the payload into chunks to ensure success.
-    if (batchPayload.length > 0) {
-      const CHUNK_SIZE = 30; 
-      
+    if (batchPayload && batchPayload.length > 0) {
+      const CHUNK_SIZE = 30;
+
       for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
         const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
-        
+
         await db.query(
           `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
           [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
@@ -576,19 +660,21 @@ router.post('/overrides', async (req, res) => {
       }
 
       const jobCount = Math.ceil(batchPayload.length / CHUNK_SIZE);
-      console.log(`[Sentinel Producer] Queued ${batchPayload.length} rates across ${jobCount} jobs.`);
+      console.log(
+        `[Sentinel Producer] Queued ${batchPayload.length} rates across ${jobCount} jobs.`
+      );
     }
 
-    // 4. THE KICK (Internal Function Call)
-    // This replaces the failed 'fetch' logic. 
+    // 3. THE KICK (Internal Function Call)
     // setImmediate ensures it runs on the next tick, keeping the API response fast.
     setImmediate(() => {
-      runBackgroundWorker().catch(err => console.error('Worker Background Error:', err));
+      runBackgroundWorker().catch((err) =>
+        console.error("Worker Background Error:", err)
+      );
     });
 
-    // 5. Return Instantly
-    res.status(200).json({ success: true, message: 'Updates queued.' });
-
+    // 4. Return Instantly
+    res.status(200).json({ success: true, message: "Updates queued." });
   } catch (error) {
     console.error(`[Sentinel Producer] Failed:`, error.message);
     res.status(500).json({ success: false, error: error.message });
@@ -599,9 +685,9 @@ router.post('/overrides', async (req, res) => {
  * [MANUAL TRIGGER] POST /api/sentinel/process-queue
  * Useful for debugging or CRON jobs.
  */
-router.post('/process-queue', async (req, res) => {
-  await runBackgroundWorker(); 
-  res.status(200).json({ success: true, message: 'Worker cycle complete.' });
+router.post("/process-queue", async (req, res) => {
+  await runBackgroundWorker();
+  res.status(200).json({ success: true, message: "Worker cycle complete." });
 });
 
 /**
@@ -613,9 +699,11 @@ router.post('/process-queue', async (req, res) => {
  * [UPDATED] GET /api/sentinel/rates/:hotelId/:roomTypeId
  * Fetches 365-day calendar from DB + Live Cloudbeds Sync
  */
-router.get('/rates/:hotelId/:roomTypeId', async (req, res) => {
+router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
   const { hotelId, roomTypeId } = req.params;
-  console.log(`[Sentinel Router] Received get-rates for ${hotelId}/${roomTypeId}`);
+  console.log(
+    `[Sentinel Router] Received get-rates for ${hotelId}/${roomTypeId}`
+  );
 
   try {
     // 1. Define date range (Today to Today + 365 days)
@@ -623,17 +711,20 @@ router.get('/rates/:hotelId/:roomTypeId', async (req, res) => {
     const future = new Date();
     future.setDate(today.getDate() + 365);
 
-    const startDateStr = today.toISOString().split('T')[0];
-    const endDateStr = future.toISOString().split('T')[0];
+    const startDateStr = today.toISOString().split("T")[0];
+    const endDateStr = future.toISOString().split("T")[0];
 
     // 2. Get PMS Property ID for the external call
-    const hotelRes = await db.query('SELECT pms_property_id FROM hotels WHERE hotel_id = $1', [hotelId]);
-    if (hotelRes.rows.length === 0) throw new Error('Hotel not found');
+    const hotelRes = await db.query(
+      "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
+      [hotelId]
+    );
+    if (hotelRes.rows.length === 0) throw new Error("Hotel not found");
     const pmsPropertyId = hotelRes.rows[0].pms_property_id;
 
     // 3. Run Queries in Parallel (DB + Live Cloudbeds)
     const [dbRes, pmsRes] = await Promise.all([
-db.query(
+      db.query(
         `SELECT stay_date, rate, source 
          FROM sentinel_rates_calendar 
          WHERE hotel_id = $1 
@@ -643,72 +734,82 @@ db.query(
         [hotelId, roomTypeId, startDateStr]
       ),
       // [BRIDGE UPDATE] Pass BOTH IDs
-      sentinelAdapter.getRates(hotelId, pmsPropertyId, roomTypeId, startDateStr, endDateStr)
+      sentinelAdapter.getRates(
+        hotelId,
+        pmsPropertyId,
+        roomTypeId,
+        startDateStr,
+        endDateStr
+      ),
     ]);
 
     // 4. Create a Lookup Map for Live Rates
     // [FIXED] Target the 'roomRateDetailed' array found in the X-Ray logs
     let liveRatesList = [];
-    
+
     if (pmsRes && pmsRes.data && Array.isArray(pmsRes.data.roomRateDetailed)) {
       liveRatesList = pmsRes.data.roomRateDetailed;
     } else {
-      console.warn('[Sentinel Router] Warning: roomRateDetailed array not found in PMS response.');
+      console.warn(
+        "[Sentinel Router] Warning: roomRateDetailed array not found in PMS response."
+      );
     }
 
     const liveRateMap = {};
-    liveRatesList.forEach(item => {
+    liveRatesList.forEach((item) => {
       // The logs confirm keys are 'date' and 'rate'
       if (item.date && item.rate) {
         liveRateMap[item.date] = parseFloat(item.rate);
       }
     });
-// 5. [FIXED] Merge Data (Union of DB & Live)
-    // We must combine dates from DB AND Cloudbeds to catch rates 
+    // 5. [FIXED] Merge Data (Union of DB & Live)
+    // We must combine dates from DB AND Cloudbeds to catch rates
     // that exist in Cloudbeds but haven't been touched in Sentinel yet.
 
     // A. Create a Map for easy DB lookup
     const dbMap = {};
-    dbRes.rows.forEach(row => {
-      const dateStr = new Date(row.stay_date).toISOString().split('T')[0];
+    dbRes.rows.forEach((row) => {
+      const dateStr = new Date(row.stay_date).toISOString().split("T")[0];
       dbMap[dateStr] = row;
     });
 
     // B. Create a Set of ALL unique dates (DB keys + Live keys)
     const allDates = new Set([
       ...Object.keys(dbMap),
-      ...Object.keys(liveRateMap)
+      ...Object.keys(liveRateMap),
     ]);
 
     // C. Build the final array
     const savedRates = [];
-    allDates.forEach(dateStr => {
+    allDates.forEach((dateStr) => {
       const dbRow = dbMap[dateStr];
-      
+
       savedRates.push({
         date: dateStr,
         // If in DB, use DB rate. If not, 0 (Sentinel treats 0 as 'empty/default')
-        rate: dbRow ? parseFloat(dbRow.rate) : 0, 
+        rate: dbRow ? parseFloat(dbRow.rate) : 0,
         // If in DB, use DB source. If not, default to 'AI' (or 'External' logic in frontend)
-        source: dbRow ? dbRow.source : 'AI',
+        source: dbRow ? dbRow.source : "AI",
         // Always inject the live rate if we found one
-        liveRate: liveRateMap[dateStr] || 0, 
+        liveRate: liveRateMap[dateStr] || 0,
       });
     });
-    
+
     // 6. Send Response
     res.status(200).json({
       success: true,
-      message: 'Rate calendar fetched (DB + Live Sync).',
+      message: "Rate calendar fetched (DB + Live Sync).",
       data: savedRates,
     });
-
   } catch (error) {
     // ... (Error handling remains the same)
-    console.error(`[Sentinel Router] get-rates failed for ${hotelId}:`, error.message);
+    console.error(
+      `[Sentinel Router] get-rates failed for ${hotelId}:`,
+      error.message
+    );
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch rate calendar.',
+      message: "Failed to fetch rate calendar.",
       error: error.message,
     });
   }
@@ -720,7 +821,7 @@ db.query(
  * [FIXED] GET /api/sentinel/notifications
  * Fetches the 20 most recent notifications.
  */
-router.get('/notifications', async (req, res) => {
+router.get("/notifications", async (req, res) => {
   try {
     // [FIX] robust query with safety limit
     const { rows } = await db.query(
@@ -728,16 +829,19 @@ router.get('/notifications', async (req, res) => {
        ORDER BY created_at DESC 
        LIMIT 20`
     );
-    
+
     // [FIX] Return standard format strictly
     res.status(200).json({
       success: true,
-      data: rows
+      data: rows,
     });
   } catch (error) {
-    console.error('[Sentinel Router] Fetch notifications failed:', error.message);
+    console.error(
+      "[Sentinel Router] Fetch notifications failed:",
+      error.message
+    );
     // Return empty list on error so UI doesn't break
-    res.status(200).json({ success: false, data: [], error: error.message }); 
+    res.status(200).json({ success: false, data: [], error: error.message });
   }
 });
 
@@ -745,10 +849,10 @@ router.get('/notifications', async (req, res) => {
  * [FIXED] POST /api/sentinel/notifications/mark-read
  * Marks all notifications as read.
  */
-router.post('/notifications/mark-read', async (req, res) => {
+router.post("/notifications/mark-read", async (req, res) => {
   try {
     const { ids } = req.body;
-    
+
     if (ids && Array.isArray(ids) && ids.length > 0) {
       // Mark specific IDs
       await db.query(
@@ -757,12 +861,14 @@ router.post('/notifications/mark-read', async (req, res) => {
       );
     } else {
       // Mark ALL
-      await db.query(`UPDATE sentinel_notifications SET is_read = TRUE WHERE is_read = FALSE`);
+      await db.query(
+        `UPDATE sentinel_notifications SET is_read = TRUE WHERE is_read = FALSE`
+      );
     }
-    
+
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error('[Sentinel Router] Mark read failed:', error.message);
+    console.error("[Sentinel Router] Mark read failed:", error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -771,13 +877,16 @@ router.post('/notifications/mark-read', async (req, res) => {
  * [NEW] DELETE /api/sentinel/notifications/:id
  * Permanently deletes a notification.
  */
-router.delete('/notifications/:id', async (req, res) => {
+router.delete("/notifications/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await db.query('DELETE FROM sentinel_notifications WHERE id = $1', [id]);
+    await db.query("DELETE FROM sentinel_notifications WHERE id = $1", [id]);
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error('[Sentinel Router] Delete notification failed:', error.message);
+    console.error(
+      "[Sentinel Router] Delete notification failed:",
+      error.message
+    );
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -559,3 +559,195 @@ It is not used in current logic
 It pollutes the deterministic blueprint
 
 This archive functions as the master background that can be consulted only when needed for deep context.
+
+14.0 FULL SYSTEM RESTRUCTURE — ROUTERS, FRONTEND, AND DEBLOATING (2025)
+
+(Major internal refactor, structural cleanup, and system-wide reorganisation)
+
+14.1 Motivation Behind the Refactor
+
+The Sentinel + Market Pulse system accumulated several years of rapid evolution:
+
+UI logic mixed with pricing logic
+
+Legacy router patterns that pre-dated Sentinel
+
+Old endpoints, naming conventions, and multi-purpose routers
+
+Massive frontend files carrying historical logic
+
+Repeated bugs caused by having logic duplicated across UI + backend
+
+Accidental technical debt from multiple prototypes
+
+Growth in portfolio size requiring more predictable architecture
+
+This refactor was executed to enforce a clean separation of responsibilities, eliminate ambiguity, and align the system with the final Blueprint architecture.
+
+14.2 Router Architecture Rewrite
+
+The entire API routing layer was reorganised around feature boundaries, replacing years of organic growth.
+
+Key changes:
+
+sentinel.router.js rewritten to contain only pricing-related endpoints (overrides, queue, notifications).
+
+Removal of stray logic that previously lived inside dashboard/router, admin/router, and planning/router.
+
+Centralisation of real pricing logic under sentinel.adapter.js and sentinel.service.js.
+
+Full removal of deprecated endpoints that were remnants of early prototypes.
+
+Declarative flow:
+UI → sentinel.router → sentinel.service → pricing engine → async queue → PMS
+
+The worker endpoint now operates as the single canonical consumer, replacing older in-router job processors.
+
+This cleanup eliminated 6+ years of fragmented patterns and ensured the “Backend owns the truth” principle.
+
+14.3 Complete Frontend Rewrite (Control Panel, Rate Manager, Shadowfax, Property Hub)
+
+Every major Sentinel UI surface was rebuilt from scratch:
+
+ControlPanelView
+
+RateManagerView
+
+ShadowfaxView
+
+PropertyHubView
+
+OccupancyVisualizer / Risk Overview
+
+Major improvements:
+
+All legacy logic removed from React components.
+
+Components now perform only UI rendering, state handling, and API calls.
+
+No pricing formulas or guardrails remain anywhere in React.
+
+Massive God-components and spaghetti state replaced with clean, isolated hooks.
+
+Full alignment with the PROT\_ design file:
+
+unified color system
+
+new background grid
+
+border rules
+
+typography
+
+spacing
+
+section structure
+
+The result: the frontend is now a thin, predictable presentation layer.
+
+14.4 Removal of All Duplicate or Deprecated Logic
+
+Historically, logic existed in multiple places:
+
+early rate generation
+
+padlock interpretation
+
+min/max guardrails
+
+freeze window logic
+
+room differential applications
+
+pseudo-calculations inside UI components
+
+All of these were removed.
+
+The only source of pricing, guardrails, and waterfalls now lives in:
+
+sentinel.pricing.engine.js
+
+sentinel.service.js
+
+sentinel.adapter.js
+
+This is one of the largest reductions of cognitive load in the project’s history.
+
+14.5 Creation of SentinelHub.tsx (Mother Navigation Component)
+
+To unify all Sentinel tools into one coherent module, a new SentinelHub feature was created:
+
+Manages sub-navigation for Rates / Control Panel / Shadowfax / Property Hub / Risk
+
+Replaces multiple scattered entrypoints
+
+Cleans up App.tsx from Sentinel-specific imports
+
+Provides a consistent onboarding and workflow path
+
+This was the single most important UI consolidation step.
+
+14.6 Debloating & File Purging
+
+The refactor removed:
+
+legacy Control Panel versions
+
+unused rate manager prototypes
+
+abandoned UI fragments
+
+scripts referencing old rate push logic
+
+deprecated constants and engine attempts
+
+dangling endpoints
+
+confusing intermediate schemas
+
+unused shadcn components
+
+all dead code in hooks and services
+
+commented code from early experiments
+
+The codebase size decreased significantly and is now aligned with the final architecture.
+
+14.7 Stability Gains After Refactor
+
+Post-refactor benefits:
+
+Zero logic duplication between UI and backend
+
+No more “split-brain” pricing inconsistencies
+
+Dramatically reduced bug surface
+
+Predictable data flow
+
+Router-level clarity
+
+Faster onboarding for future developers
+
+Lower cognitive overhead for any future Blueprint changes
+
+Easier performance profiling and debugging
+
+Architecture now matches documentation 1:1
+
+This refactor closed all architectural debt and consolidated 4+ years of divergent code paths into one deterministic system.
+
+14.8 Historical Significance
+
+This was the largest structural change since Sentinel was first extracted from Market Pulse.
+It represents:
+
+The final convergence of architecture + implementation
+
+Removal of legacy concepts inherited from early prototypes
+
+Transition from “evolving system” → “defined product”
+
+A clean foundation for Sentinel automation, DGX model integration, and Phase 4 Async expansion
+
+This refactor is now part of the permanent project history and is preserved here for context.

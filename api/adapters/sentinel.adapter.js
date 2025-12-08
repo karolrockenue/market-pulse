@@ -10,26 +10,32 @@
  * - Configuration Fact Syncing
  */
 
-const axios = require('axios');
-const { getAccessToken } = require('./cloudbedsAdapter'); // <-- The Bridge
+const axios = require("axios");
+const { getAccessToken } = require("./cloudbedsAdapter"); // <-- The Bridge
 
 // Cloudbeds API constants
-const CLOUDBEDS_API_URL = 'https://api.cloudbeds.com/api/v1.1';
+const CLOUDBEDS_API_URL = "https://api.cloudbeds.com/api/v1.1";
 
 /**
  * Private Helper: Generates authenticated headers for Cloudbeds API.
  * Uses the Internal Hotel ID to get the Token from DB, and External ID for the Header.
  */
 async function getHeaders(hotelId, pmsPropertyId) {
-  if (!hotelId) throw new Error('Sentinel Adapter: hotelId (Internal) is required for authentication.');
-  if (!pmsPropertyId) throw new Error('Sentinel Adapter: pmsPropertyId (External) is required for API routing.');
+  if (!hotelId)
+    throw new Error(
+      "Sentinel Adapter: hotelId (Internal) is required for authentication."
+    );
+  if (!pmsPropertyId)
+    throw new Error(
+      "Sentinel Adapter: pmsPropertyId (External) is required for API routing."
+    );
 
   // Borrow the token using the main adapter's logic
   const token = await getAccessToken(hotelId);
 
   return {
-    'Authorization': `Bearer ${token}`,
-    'X-PROPERTY-ID': pmsPropertyId,
+    Authorization: `Bearer ${token}`,
+    "X-PROPERTY-ID": pmsPropertyId,
     // Axios adds Content-Type automatically for objects/params
   };
 }
@@ -43,24 +49,35 @@ async function getHeaders(hotelId, pmsPropertyId) {
  * @param {number} rate - The new rate to set.
  */
 async function postRate(hotelId, pmsPropertyId, rateId, date, rate) {
-  console.log(`[Sentinel] Posting rate for ${hotelId} (PMS: ${pmsPropertyId}): ${rate} on ${date}`);
+  // [SAFETY] Strictly validate rate before attempting push
+  if (rate === undefined || rate === null || isNaN(rate) || Number(rate) <= 0) {
+    console.warn(
+      `[Sentinel] ABORTING postRate: Invalid rate value (${rate}) for ${date}`
+    );
+    throw new Error(
+      `Sentinel Safety: Attempted to push invalid rate (${rate}) to PMS.`
+    );
+  }
+
+  console.log(
+    `[Sentinel] Posting rate for ${hotelId} (PMS: ${pmsPropertyId}): ${rate} on ${date}`
+  );
 
   try {
     const headers = await getHeaders(hotelId, pmsPropertyId);
     const endpoint = `${CLOUDBEDS_API_URL}/putRate`; // v1.3
 
     const params = new URLSearchParams();
-    params.append('rates[0][rateID]', rateId);
-    params.append('rates[0][interval][0][startDate]', date);
-    params.append('rates[0][interval][0][endDate]', date);
-    params.append('rates[0][interval][0][rate]', rate);
+    params.append("rates[0][rateID]", rateId);
+    params.append("rates[0][interval][0][startDate]", date);
+    params.append("rates[0][interval][0][endDate]", date);
+    params.append("rates[0][interval][0][rate]", rate);
 
     const response = await axios.post(endpoint, params, { headers });
-    
-    return response.data;
 
+    return response.data;
   } catch (error) {
-    handleAxiosError(error, 'postRate');
+    handleAxiosError(error, "postRate");
   }
 }
 
@@ -71,10 +88,12 @@ async function postRate(hotelId, pmsPropertyId, rateId, date, rate) {
  * @param {Array} ratesArray - Array of { rateId, date, rate }
  */
 async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
-  console.log(`[Sentinel] Batch posting ${ratesArray.length} rates for ${hotelId} (PMS: ${pmsPropertyId})`);
+  console.log(
+    `[Sentinel] Batch posting ${ratesArray.length} rates for ${hotelId} (PMS: ${pmsPropertyId})`
+  );
 
   if (!ratesArray || ratesArray.length === 0) {
-    return { success: true, message: 'No rates to post.' };
+    return { success: true, message: "No rates to post." };
   }
 
   try {
@@ -82,20 +101,48 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
     const endpoint = `${CLOUDBEDS_API_URL}/putRate`; // v1.3
 
     const params = new URLSearchParams();
+    let validCount = 0;
+
     ratesArray.forEach((item, index) => {
-      params.append(`rates[${index}][rateID]`, item.rateId);
-      params.append(`rates[${index}][interval][0][startDate]`, item.date);
-      params.append(`rates[${index}][interval][0][endDate]`, item.date);
-      params.append(`rates[${index}][interval][0][rate]`, item.rate);
+      // [SAFETY] Skip invalid rates to prevent zero-out
+      if (
+        item.rate === undefined ||
+        item.rate === null ||
+        isNaN(item.rate) ||
+        Number(item.rate) <= 0
+      ) {
+        console.warn(
+          `[Sentinel] SKIPPING invalid batch item: Date ${item.date}, Rate ${item.rate}`
+        );
+        return;
+      }
+
+      // We use validCount for the index to ensure continuous array keys (rates[0], rates[1]...)
+      // even if we skipped some items in the original array.
+      params.append(`rates[${validCount}][rateID]`, item.rateId);
+      params.append(`rates[${validCount}][interval][0][startDate]`, item.date);
+      params.append(`rates[${validCount}][interval][0][endDate]`, item.date);
+      params.append(`rates[${validCount}][interval][0][rate]`, item.rate);
+
+      validCount++;
     });
+
+    if (validCount === 0) {
+      console.warn(
+        "[Sentinel] Batch empty after safety filtering. Nothing to send."
+      );
+      return {
+        success: true,
+        message: "All rates filtered out by safety checks.",
+      };
+    }
 
     const response = await axios.post(endpoint, params, { headers });
 
     console.log(`[Sentinel] Batch Job ID: ${response.data.jobReferenceID}`);
     return response.data;
-
   } catch (error) {
-    handleAxiosError(error, 'postRateBatch');
+    handleAxiosError(error, "postRateBatch");
   }
 }
 
@@ -109,10 +156,10 @@ async function getRatePlans(hotelId, pmsPropertyId) {
     const endpoint = `${CLOUDBEDS_API_URL}/getRatePlans`;
 
     // Use 90 day window to ensure we capture active plans
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     const future = new Date();
     future.setDate(new Date().getDate() + 90);
-    const endDate = future.toISOString().split('T')[0];
+    const endDate = future.toISOString().split("T")[0];
 
     const params = new URLSearchParams({
       propertyIDs: pmsPropertyId,
@@ -120,11 +167,12 @@ async function getRatePlans(hotelId, pmsPropertyId) {
       endDate: endDate,
     });
 
-    const response = await axios.get(`${endpoint}?${params.toString()}`, { headers });
+    const response = await axios.get(`${endpoint}?${params.toString()}`, {
+      headers,
+    });
     return response.data;
-
   } catch (error) {
-    handleAxiosError(error, 'getRatePlans');
+    handleAxiosError(error, "getRatePlans");
   }
 }
 
@@ -136,36 +184,44 @@ async function getRoomTypes(hotelId, pmsPropertyId) {
   try {
     const headers = await getHeaders(hotelId, pmsPropertyId);
     const endpoint = `${CLOUDBEDS_API_URL}/getRoomTypes`;
-    
+
     const response = await axios.get(endpoint, { headers });
     return response.data;
-
   } catch (error) {
-    handleAxiosError(error, 'getRoomTypes');
+    handleAxiosError(error, "getRoomTypes");
   }
 }
 
 /**
  * Fetches live rates for a specific room (Rate Manager).
  */
-async function getRates(hotelId, pmsPropertyId, roomTypeId, startDate, endDate) {
-  console.log(`[Sentinel] Fetching Live Rates for ${hotelId} (Room: ${roomTypeId})`);
+async function getRates(
+  hotelId,
+  pmsPropertyId,
+  roomTypeId,
+  startDate,
+  endDate
+) {
+  console.log(
+    `[Sentinel] Fetching Live Rates for ${hotelId} (Room: ${roomTypeId})`
+  );
   try {
     const headers = await getHeaders(hotelId, pmsPropertyId);
-    const endpoint = 'https://api.cloudbeds.com/api/v1.3/getRate';
+    const endpoint = "https://api.cloudbeds.com/api/v1.3/getRate";
 
     const params = new URLSearchParams({
       roomTypeID: roomTypeId,
       startDate: startDate,
       endDate: endDate,
-      detailedRates: 'false'
+      detailedRates: "false",
     });
 
-    const response = await axios.get(`${endpoint}?${params.toString()}`, { headers });
+    const response = await axios.get(`${endpoint}?${params.toString()}`, {
+      headers,
+    });
     return response.data;
-
   } catch (error) {
-    handleAxiosError(error, 'getRates');
+    handleAxiosError(error, "getRates");
   }
 }
 
@@ -178,11 +234,12 @@ async function getJobStatus(hotelId, pmsPropertyId, jobId) {
     const endpoint = `${CLOUDBEDS_API_URL}/getRateJobs`;
     const params = new URLSearchParams({ jobReferenceID: jobId });
 
-    const response = await axios.get(`${endpoint}?${params.toString()}`, { headers });
+    const response = await axios.get(`${endpoint}?${params.toString()}`, {
+      headers,
+    });
     return response.data;
-
   } catch (error) {
-    handleAxiosError(error, 'getJobStatus');
+    handleAxiosError(error, "getJobStatus");
   }
 }
 
@@ -192,7 +249,7 @@ async function getJobStatus(hotelId, pmsPropertyId, jobId) {
 function handleAxiosError(error, context) {
   if (error.response) {
     const data = error.response.data;
-    const errorStr = typeof data === 'object' ? JSON.stringify(data) : data;
+    const errorStr = typeof data === "object" ? JSON.stringify(data) : data;
     console.error(`[Sentinel] ${context} API Error:`, errorStr);
     throw new Error(`Cloudbeds API (${context}): ${errorStr}`);
   } else if (error.request) {
@@ -210,5 +267,5 @@ module.exports = {
   getRatePlans,
   getRoomTypes,
   getRates,
-  getJobStatus
+  getJobStatus,
 };

@@ -1,326 +1,157 @@
-// api/routes/market.router.js
 const express = require("express");
 const router = express.Router();
+const MarketService = require("../services/market.service");
+const { requireUserApi, requireAdminApi } = require("../utils/middleware");
 
-// Import shared utilities
-const pgPool = require("../utils/db");
-const { requireUserApi } = require("../utils/middleware");
+// --- 1. MARKET DATA (Trends, KPIs, Neighborhoods) ---
 
-// --- NEW TRENDS ENDPOINT ---
-// --- NEW TRENDS ENDPOINT ---
 router.get("/trends", requireUserApi, async (req, res) => {
   try {
-    // DEBUG: Log the exact query parameters received from the frontend.
-    console.log("--- Received query parameters for /trends: ---", req.query);
-
-    // --- 1. Get and Validate Filters from Frontend ---
     const { city, years } = req.query;
+    if (!city || !years) return res.status(400).json({ error: "City and years required." });
+    
+    // Parse tiers
     const tierArray = req.query.tiers
-      ? Array.isArray(req.query.tiers)
-        ? req.query.tiers
-        : [req.query.tiers]
+      ? Array.isArray(req.query.tiers) ? req.query.tiers : [req.query.tiers]
       : null;
 
-    if (!city || !years) {
-      return res.status(400).json({ error: "City and years are required." });
-    }
-
-    // --- 2. Calculate Date Range from Years ---
-    const yearArray = Array.isArray(years) ? years : [years];
-    const minYear = Math.min(...yearArray.map((y) => parseInt(y)));
-    const maxYear = Math.max(...yearArray.map((y) => parseInt(y)));
-    const startDate = new Date(Date.UTC(minYear, 0, 1));
-    const endDate = new Date(Date.UTC(maxYear, 11, 31));
-    const totalDaysInPeriod =
-      (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24) + 1;
-
-    // --- 3. Build the "Smart" SQL Query ---
-    let queryParams = [city, startDate, endDate, totalDaysInPeriod];
-    let tierFilterSql = "";
-
-    if (tierArray && tierArray.length > 0) {
-      queryParams.push(tierArray);
-      tierFilterSql = `AND category = ANY($${queryParams.length}::text[])`;
-    }
-
-    const query = `
-            WITH HotelsWithCompleteHistory AS (
-                SELECT h.hotel_id
-                FROM hotels h
-                JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
-                WHERE h.city = $1
-                  -- NEW: Only include hotels that were live before the start of 2024.
-                  AND h.go_live_date < '2024-01-01'
-                  ${tierFilterSql}
-                  AND dms.stay_date >= $2 AND dms.stay_date <= $3
-                GROUP BY h.hotel_id
-                HAVING COUNT(DISTINCT dms.stay_date::date) >= $4
-            )
-       SELECT
-                date_trunc('month', dms.stay_date) as period,
-                h.category,
-                -- [FIX] Correctly calculate occupancy from source columns
-                (SUM(dms.rooms_sold)::numeric / NULLIF(SUM(dms.capacity_count), 0)) as occupancy,
-                -- THE FIX: Use the new gross columns for consistency
-                AVG(dms.gross_adr) as adr,
-                AVG(dms.gross_revpar) as revpar
-            FROM daily_metrics_snapshots dms
-            JOIN hotels h ON dms.hotel_id = h.hotel_id
-            WHERE dms.hotel_id IN (SELECT hotel_id FROM HotelsWithCompleteHistory)
-              AND dms.stay_date >= $2 AND dms.stay_date <= $3
-            GROUP BY period, h.category
-            ORDER BY period, h.category ASC;
-        `;
-
-    // --- 4. Execute the Query and Return Data ---
-    const result = await pgPool.query(query, queryParams);
-    res.json(result.rows);
+    const data = await MarketService.getMarketTrends(city, years, tierArray);
+    res.json(data);
   } catch (error) {
     console.error("Error in /api/market/trends:", error);
     res.status(500).json({ error: "Failed to fetch market trends." });
   }
 });
-// --- NEW KPI ENDPOINT ---
+
 router.get("/kpis", requireUserApi, async (req, res) => {
-  const { city } = req.query;
-  if (!city) {
-    return res.status(400).json({ error: "City is a required parameter." });
-  }
-
-  // Define the date ranges for the query
-  const today = new Date();
-  const endDateCurrent = new Date(today);
-  const startDateCurrent = new Date(new Date().setDate(today.getDate() - 364));
-  const endDatePrior = new Date(new Date().setDate(today.getDate() - 365));
-  const startDatePrior = new Date(new Date().setDate(today.getDate() - 729));
-
-  // This new query implements the "Average of Changes" logic.
-  const query = `
-    -- CTE 1: Define the date ranges to be used throughout the query.
-    WITH DateRanges AS (
-        SELECT $2::date AS current_start, $3::date AS current_end,
-               $4::date AS prior_start, $5::date AS prior_end
-    ),
-    -- CTE 2: Find all hotels that are eligible for this YoY comparison.
-    ValidatedHotels AS (
-        SELECT hotel_id
-        FROM hotels, DateRanges
-        WHERE city = $1
-          AND go_live_date IS NOT NULL
-          -- THIS IS THE NEW RULE: Only include hotels with a go_live_date at least 2 months
-          -- before the start of the comparison period, ensuring they are mature properties.
-          AND go_live_date <= (DateRanges.prior_start - INTERVAL '2 months')
-    ),
-    -- CTE 3: Calculate the average metrics for each hotel for both the current and prior periods.
-    HotelYoY AS (
-        SELECT
-            h.hotel_id,
-            AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_revpar END) as current_revpar,
-            AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.gross_revpar END) as prior_revpar,
-           AVG(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.gross_adr END) as current_adr,
-            AVG(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.gross_adr END) as prior_adr,
-            -- [FIX] Correctly calculate occupancy from source columns
-            (SUM(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.rooms_sold END)::numeric /
-             NULLIF(SUM(CASE WHEN dms.stay_date BETWEEN dr.current_start AND dr.current_end THEN dms.capacity_count END), 0)) as current_occupancy,
-            (SUM(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.rooms_sold END)::numeric /
-             NULLIF(SUM(CASE WHEN dms.stay_date BETWEEN dr.prior_start AND dr.prior_end THEN dms.capacity_count END), 0)) as prior_occupancy
-        FROM hotels h
-        JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
-        CROSS JOIN DateRanges dr
-        WHERE h.hotel_id IN (SELECT hotel_id FROM ValidatedHotels)
-        GROUP BY h.hotel_id
-    )
-    -- Final SELECT: Calculate the final market values.
-    SELECT
-        -- THIS IS THE NEW LOGIC: Average the individual percentage changes of each hotel.
-        AVG( (current_revpar - prior_revpar) / NULLIF(prior_revpar, 0) ) AS revpar_change,
-        AVG( (current_adr - prior_adr) / NULLIF(prior_adr, 0) ) AS adr_change,
-        AVG( current_occupancy - prior_occupancy ) AS occupancy_change,
-        
-        -- Also calculate the simple market-wide averages for display on the KPI cards.
-        AVG(current_revpar) as current_revpar,
-        AVG(prior_revpar) as prior_revpar,
-        AVG(current_adr) as current_adr,
-        AVG(prior_adr) as prior_adr,
-        AVG(current_occupancy) as current_occupancy,
-        AVG(prior_occupancy) as prior_occupancy
-    FROM HotelYoY;
-  `;
-
   try {
-    const result = await pgPool.query(query, [
-      city,
-      startDateCurrent,
-      endDateCurrent,
-      startDatePrior,
-      endDatePrior,
-    ]);
-    // Send back the single row of aggregated data, or a default object if no hotels qualified.
-    res.json(result.rows[0] || {});
+    const { city } = req.query;
+    if (!city) return res.status(400).json({ error: "City required." });
+    
+    const data = await MarketService.getMarketKPIs(city);
+    res.json(data);
   } catch (error) {
     console.error("Error in /api/market/kpis:", error);
     res.status(500).json({ error: "Failed to fetch market KPIs." });
   }
 });
 
-// --- NEW NEIGHBORHOODS ENDPOINT ---
-// This endpoint aggregates key metrics for all neighborhoods within a given city.
-// --- NEW NEIGHBORHOODS ENDPOINT ---
 router.get("/neighborhoods", requireUserApi, async (req, res) => {
-  const { city } = req.query;
-  if (!city) {
-    return res.status(400).json({ error: "City is a required parameter." });
-  }
-
-  const endDateCurrent = new Date();
-  const startDateCurrent = new Date(
-    new Date().setDate(endDateCurrent.getDate() - 364)
-  );
-  const endDatePrior = new Date(
-    new Date().setDate(endDateCurrent.getDate() - 365)
-  );
-  const startDatePrior = new Date(
-    new Date().setDate(endDateCurrent.getDate() - 729)
-  );
-
-  const query = `
-    WITH DateRanges AS (
-        SELECT $2::date AS current_start, $3::date AS current_end,
-               $4::date AS prior_start, $5::date AS prior_end
-    ),
-    NeighborhoodMetricsCurrent AS (
-        SELECT
-            h.neighborhood,
-           COUNT(DISTINCT h.hotel_id) as hotel_count,
-            -- THE FIX: Use the new gross columns
-            AVG(dms.gross_revpar) AS revpar,
-            AVG(dms.gross_adr) AS adr,
-            -- [FIX] Correctly calculate occupancy from source columns
-            (SUM(dms.rooms_sold)::numeric / NULLIF(SUM(dms.capacity_count), 0)) AS occupancy
-        FROM hotels h
-        JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
-        CROSS JOIN DateRanges
-        WHERE h.city = $1 AND h.go_live_date IS NOT NULL
-          AND h.go_live_date <= DateRanges.current_start
-          AND dms.stay_date BETWEEN DateRanges.current_start AND DateRanges.current_end
-        GROUP BY h.neighborhood
-    ),
-    NeighborhoodMetricsPrior AS (
-        SELECT
-            h.neighborhood,
-            -- THE FIX: Use the new gross_revpar column
-            AVG(dms.gross_revpar) AS prior_revpar
-        FROM hotels h
-        JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id
-        CROSS JOIN DateRanges
-        WHERE h.city = $1 AND h.go_live_date IS NOT NULL
-          AND h.go_live_date <= DateRanges.prior_start
-          AND dms.stay_date BETWEEN DateRanges.prior_start AND DateRanges.prior_end
-        GROUP BY h.neighborhood
-    )
-    SELECT
-        nmc.neighborhood AS name, nmc.revpar, nmc.adr, nmc.occupancy, nmc.hotel_count,
-        CASE
-            WHEN nmp.prior_revpar > 0 THEN (nmc.revpar - nmp.prior_revpar) / nmp.prior_revpar * 100
-            ELSE NULL
-        END AS yoy
-    FROM NeighborhoodMetricsCurrent nmc
-    LEFT JOIN NeighborhoodMetricsPrior nmp ON nmc.neighborhood = nmp.neighborhood
-    WHERE nmc.neighborhood IS NOT NULL
-    ORDER BY nmc.revpar DESC;
-  `;
-
   try {
-    const result = await pgPool.query(query, [
-      city,
-      startDateCurrent,
-      endDateCurrent,
-      startDatePrior,
-      endDatePrior,
-    ]);
-    res.json(result.rows);
+    const { city } = req.query;
+    if (!city) return res.status(400).json({ error: "City required." });
+
+    const data = await MarketService.getNeighborhoods(city);
+    res.json(data);
   } catch (error) {
     console.error("Error in /api/market/neighborhoods:", error);
-    res.status(500).json({ error: "Failed to fetch neighborhood data." });
+    res.status(500).json({ error: "Failed to fetch neighborhoods." });
   }
 });
 
-// --- NEW AVAILABLE YEARS ENDPOINT ---
-// This endpoint finds which years have complete data for a seasonality analysis.
 router.get("/available-seasonality-years", requireUserApi, async (req, res) => {
-  const { city } = req.query;
-  if (!city) {
-    return res.status(400).json({ error: "City is a required parameter." });
-  }
-
-  const query = `
-    -- For each year, check if there is at least one hotel that was live
-    -- for the entirety of that year.
-    SELECT DISTINCT EXTRACT(YEAR FROM s.yr)::integer AS year
-    FROM generate_series(
-      '2022-01-01'::date,
-      (CURRENT_DATE - INTERVAL '1 year'),
-      '1 year'
-    ) AS s(yr)
-    WHERE EXISTS (
-      SELECT 1
-      FROM hotels h
-      WHERE h.city = $1
-        AND h.go_live_date IS NOT NULL
-        -- The hotel must have been live on or before the first day of the year.
-        AND h.go_live_date <= s.yr
-    )
-    ORDER BY year DESC;
-  `;
-
   try {
-    const result = await pgPool.query(query, [city]);
-    // Return a simple array of years, e.g., [2024, 2023]
-    res.json(result.rows.map((row) => row.year));
+    const { city } = req.query;
+    if (!city) return res.status(400).json({ error: "City required." });
+
+    const data = await MarketService.getAvailableSeasonalityYears(city);
+    res.json(data);
   } catch (error) {
     console.error("Error in /api/market/available-seasonality-years:", error);
-    res.status(500).json({ error: "Failed to fetch available years." });
+    res.status(500).json({ error: "Failed to fetch years." });
   }
 });
 
-// --- NEW SEASONALITY DATA ENDPOINT ---
-// This endpoint provides the daily RevPAR data for the heatmap chart.
-// --- NEW SEASONALITY DATA ENDPOINT ---
 router.get("/seasonality", requireUserApi, async (req, res) => {
-  const { city, year } = req.query;
-  if (!city || !year) {
-    return res.status(400).json({ error: "City and year are required." });
-  }
-
-  const startDate = `${year}-01-01`;
-  const endDate = `${year}-12-31`;
-
-  const query = `
-     WITH ValidatedHotels AS (
-            SELECT hotel_id
-            FROM hotels
-            WHERE city = $1
-              AND go_live_date IS NOT NULL
-              -- NEW: Only include hotels that were live before the start of 2024.
-              AND go_live_date < '2024-01-01'
-        )
-        SELECT
-            stay_date::date AS date,
-            -- THE FIX: Use the new gross_revpar column
-            AVG(gross_revpar) AS value
-        FROM daily_metrics_snapshots
-        WHERE hotel_id IN (SELECT hotel_id FROM ValidatedHotels)
-          AND stay_date BETWEEN $2 AND $3
-        GROUP BY stay_date
-        ORDER BY stay_date ASC;
-    `;
-
   try {
-    const result = await pgPool.query(query, [city, startDate, endDate]);
-    res.json(result.rows);
+    const { city, year } = req.query;
+    if (!city || !year) return res.status(400).json({ error: "City and year required." });
+
+    const data = await MarketService.getSeasonalityData(city, year);
+    res.json(data);
   } catch (error) {
     console.error("Error in /api/market/seasonality:", error);
-    res.status(500).json({ error: "Failed to fetch seasonality data." });
+    res.status(500).json({ error: "Failed to fetch seasonality." });
   }
 });
+
+// --- 2. PLANNING DATA (Forward View, Pace, Outlook) ---
+// Migrated from planning.router.js
+
+router.get('/forward-view', requireUserApi, async (req, res) => {
+  try {
+    const city = req.query.city || 'london';
+    const data = await MarketService.getForwardView(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/market/forward-view:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/outlook', requireUserApi, async (req, res) => {
+  // Previously /market-trend
+  try {
+    const city = req.query.city || 'london';
+    const data = await MarketService.getMarketOutlook(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/market/outlook:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.get('/pace', requireUserApi, async (req, res) => {
+  try {
+    const city = req.query.city || 'london';
+    const period = parseInt(req.query.period, 10) || 7;
+    
+    const data = await MarketService.getPaceData(city, period);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/market/pace:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/history', requireUserApi, async (req, res) => {
+  try {
+    const city = 'london'; // Hardcoded in original
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ error: 'Date required.' });
+
+    const data = await MarketService.getScrapeHistory(city, date);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/market/history:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- 3. SHADOWFAX (Scraper Tools) ---
+// Migrated from scraper.router.js
+
+router.get('/shadowfax/properties', requireAdminApi, async (req, res) => {
+  try {
+    const data = await MarketService.getSentinelProperties();
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/market/shadowfax/properties', err);
+    res.status(500).json({ error: 'Failed to fetch properties' });
+  }
+});
+
+router.post('/shadowfax/price', requireAdminApi, async (req, res) => {
+  try {
+    const { hotelId, checkinDate } = req.body;
+    if (!hotelId || !checkinDate) return res.status(400).json({ error: 'Missing parameters.' });
+
+    const data = await MarketService.checkAssetPrice(hotelId, checkinDate);
+    res.json(data);
+  } catch (error) {
+    console.error(`Shadowfax Error: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
