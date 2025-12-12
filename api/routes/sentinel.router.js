@@ -1043,7 +1043,6 @@ async function runBackgroundWorker() {
   try {
     // LOOP: Keep fetching batches until time runs out or queue is empty
     while (Date.now() - startTime < MAX_RUNTIME_MS) {
-      
       // A. Start Transaction for this BATCH
       await client.query("BEGIN");
 
@@ -1060,10 +1059,14 @@ async function runBackgroundWorker() {
       if (jobs.length === 0) {
         await client.query("COMMIT");
         console.log("[Sentinel Worker] Queue Empty. Stopping.");
-        break; 
+        break;
       }
 
-      console.log(`[Sentinel Worker] Batch ${batchesProcessed + 1}: Processing ${jobs.length} jobs...`);
+      console.log(
+        `[Sentinel Worker] Batch ${batchesProcessed + 1}: Processing ${
+          jobs.length
+        } jobs...`
+      );
 
       // D. Process Each Job
       for (const job of jobs) {
@@ -1073,22 +1076,34 @@ async function runBackgroundWorker() {
           const { pmsPropertyId, rates } = job.payload;
 
           // Adapter Call
-          const result = await sentinelAdapter.postRateBatch(job.hotel_id, pmsPropertyId, rates);
+          const result = await sentinelAdapter.postRateBatch(
+            job.hotel_id,
+            pmsPropertyId,
+            rates
+          );
 
           // Success Update
-          if (result && result.message === "All rates filtered out by safety checks.") {
-             await client.query(`UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`, [job.id]);
+          if (
+            result &&
+            result.message === "All rates filtered out by safety checks."
+          ) {
+            await client.query(
+              `UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`,
+              [job.id]
+            );
           } else {
-             await client.query(`UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`, [job.id]);
+            await client.query(
+              `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+              [job.id]
+            );
           }
           await client.query(`RELEASE SAVEPOINT ${savepointName}`);
-
         } catch (err) {
           // Failure Update
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           console.error(`[Sentinel Worker] Job ${job.id} Failed:`, err.message);
           const safeError = (err.message || "Unknown error").substring(0, 500);
-          
+
           await client.query(
             `UPDATE sentinel_job_queue SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1`,
             [job.id, safeError]
@@ -1099,13 +1114,16 @@ async function runBackgroundWorker() {
       // E. Commit this batch (Saves progress immediately)
       await client.query("COMMIT");
       batchesProcessed++;
-      
-      // Small breather to let Event Loop breathe
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    console.log(`[Sentinel Worker] Cycle finished. Batches: ${batchesProcessed}. Time: ${Date.now() - startTime}ms`);
 
+      // Small breather to let Event Loop breathe
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    console.log(
+      `[Sentinel Worker] Cycle finished. Batches: ${batchesProcessed}. Time: ${
+        Date.now() - startTime
+      }ms`
+    );
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("[Sentinel Worker] Critical Error:", error);
@@ -1113,112 +1131,7 @@ async function runBackgroundWorker() {
     client.release();
   }
 }
-    if (jobs.length === 0) {
-      await client.query("COMMIT");
-      return;
-    }
 
-    console.log(`[Sentinel Worker] Processing ${jobs.length} jobs...`);
-
-    // 2. Process Each Job Safely
-    for (const job of jobs) {
-      // Generate a safe savepoint name (PG doesn't like hyphens in identifiers sometimes)
-      const savepointName = `sp_${job.id.replace(/-/g, "_")}`;
-
-      try {
-        // Create Savepoint: If this loop iteration fails, we rollback to HERE.
-        await client.query(`SAVEPOINT ${savepointName}`);
-
-        const { pmsPropertyId, rates } = job.payload;
-
-        // --- ADAPTER CALL ---
-        const result = await sentinelAdapter.postRateBatch(
-          job.hotel_id,
-          pmsPropertyId,
-          rates
-        );
-
-        // --- SUCCESS HANDLER ---
-        if (
-          result &&
-          result.message === "All rates filtered out by safety checks."
-        ) {
-          console.log(
-            `[Sentinel Worker] Job ${job.id} SKIPPED (All rates invalid/zero).`
-          );
-          await client.query(
-            `UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`,
-            [job.id]
-          );
-        } else {
-          await client.query(
-            `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
-            [job.id]
-          );
-        }
-
-        // Release savepoint (optional, but clean)
-        await client.query(`RELEASE SAVEPOINT ${savepointName}`);
-      } catch (err) {
-        // --- FAILURE HANDLER ---
-        // 1. Undo any partial writes for THIS job only (keeps previous jobs safe)
-        await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-
-        console.error(`[Sentinel Worker] Job ${job.id} Failed:`, err.message);
-
-        // 2. Safe Logging (Prevent "Text too long" crash)
-        try {
-          // Truncate error message to 500 chars to fit in DB
-          const safeError = (err.message || "Unknown error").substring(0, 500);
-
-          await client.query(
-            `UPDATE sentinel_job_queue 
-                 SET status = 'FAILED', last_error = $2, updated_at = NOW() 
-                 WHERE id = $1`,
-            [job.id, safeError]
-          );
-
-          await client.query(
-            `INSERT INTO sentinel_notifications (type, title, message, is_read) VALUES ($1, $2, $3, $4)`,
-            [
-              "ERROR",
-              "Rate Update Failed",
-              `Failed to push rates: ${safeError}`,
-              false,
-            ]
-          );
-        } catch (secondaryErr) {
-          // 3. Absolute Fail-Safe
-          // If we can't even log the error, just mark it FAILED with a generic message
-          // so the queue doesn't get stuck processing this forever.
-          console.error(
-            "[Sentinel Worker] CRITICAL: Failed to log error.",
-            secondaryErr
-          );
-          await client.query(
-            `UPDATE sentinel_job_queue 
-                 SET status = 'FAILED', last_error = 'Critical: Logging failed', updated_at = NOW() 
-                 WHERE id = $1`,
-            [job.id]
-          );
-        }
-      }
-    }
-    await client.query("COMMIT");
-    console.log(`[Sentinel Worker] Batch complete. Checking for more jobs...`);
-
-    // [AUTO-DRAIN FIX] If we processed jobs, check for more immediately
-    if (jobs.length > 0) {
-      setImmediate(runBackgroundWorker);
-    }
-  } catch (error) {
-    // Only happens if the FETCH itself fails or connection dies
-    await client.query("ROLLBACK");
-    console.error("[Sentinel Worker] Critical Batch Error:", error);
-  } finally {
-    client.release();
-  }
-}
 /**
  * [PRODUCER] POST /api/sentinel/overrides
  * 1. Uses Sentinel Service to build payload (DB + engine).
