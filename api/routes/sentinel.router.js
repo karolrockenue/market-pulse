@@ -1136,9 +1136,13 @@ async function runBackgroundWorker() {
         }
       }
     }
-
     await client.query("COMMIT");
-    console.log(`[Sentinel Worker] Batch complete.`);
+    console.log(`[Sentinel Worker] Batch complete. Checking for more jobs...`);
+
+    // [AUTO-DRAIN FIX] If we processed jobs, check for more immediately
+    if (jobs.length > 0) {
+      setImmediate(runBackgroundWorker);
+    }
   } catch (error) {
     // Only happens if the FETCH itself fails or connection dies
     await client.query("ROLLBACK");
