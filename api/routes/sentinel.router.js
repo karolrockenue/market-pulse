@@ -8,10 +8,524 @@ const express = require("express");
 const router = express.Router();
 const { requireAdminApi } = require("../utils/middleware"); // [MODIFIED] Allow Admin access
 const sentinelAdapter = require("../adapters/sentinel.adapter.js");
+const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js"); // [Added for Export Feature]
 const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
 const db = require("../utils/db"); // <-- [NEW] Import database connection
 
 router.use(requireAdminApi);
+// ... existing imports ...
+// [REPLACEMENT] Full "Export Reservations" Route
+// Helper to prevent API Bans (Rate Limiter)
+
+// Helper to prevent API Bans (Rate Limiter)
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * [NEW] POST /api/sentinel/recalculate
+ * Triggers a full re-calculation of rates for ALL rooms based on:
+ * 1. The Base Rate (AI Engine)
+ * 2. The Configured Differentials
+ * Pushes the result to the Job Queue.
+ */
+router.post("/recalculate", async (req, res) => {
+  const { hotelId } = req.body;
+
+  if (!hotelId) {
+    return res.status(400).json({ success: false, message: "Missing hotelId" });
+  }
+
+  try {
+    console.log(`[Sentinel] Manual Re-Push triggered for Hotel ${hotelId}`);
+
+    // 1. Fetch Configuration (Facts + Rules)
+    const configRes = await db.query(
+      "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
+      [hotelId]
+    );
+
+    if (configRes.rows.length === 0) {
+      throw new Error("Configuration not found. Please Sync with PMS first.");
+    }
+
+    const config = configRes.rows[0];
+    const baseRoomTypeId = config.base_room_type_id;
+    const differentials = config.room_differentials || []; // Array of { roomTypeId, operator, value }
+    const pmsRoomTypes = config.pms_room_types?.data || [];
+
+    if (!baseRoomTypeId) {
+      throw new Error("Base Room Type not defined in configuration.");
+    }
+
+    // 2. Get 365-Day Base Rates from AI Engine
+    // We use today as start date
+    const today = new Date().toISOString().split("T")[0];
+    const previewCalendar = await sentinelService.previewCalendar({
+      hotelId,
+      baseRoomTypeId,
+      startDate: today,
+      endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+    });
+
+    // 3. Build The Master Override Payload
+    const allOverrides = [];
+
+    // Loop through EVERY room type in the PMS list
+    for (const room of pmsRoomTypes) {
+      const roomTypeId = room.roomTypeID;
+
+      // Determine Math
+      let isBase = String(roomTypeId) === String(baseRoomTypeId);
+      let diffRule = differentials.find(
+        (r) => String(r.roomTypeId) === String(roomTypeId)
+      );
+
+      // For each day in the calendar...
+      previewCalendar.forEach((day) => {
+        if (!day.rate || day.rate <= 0) return; // Skip invalid rates
+
+        let finalRate = parseFloat(day.rate);
+
+        // Apply Differential if not base
+        if (!isBase && diffRule) {
+          const val = parseFloat(diffRule.value);
+          if (diffRule.operator === "+") {
+            finalRate = finalRate * (1 + val / 100);
+          } else if (diffRule.operator === "-") {
+            finalRate = finalRate * (1 - val / 100);
+          }
+        }
+
+        // Round to 2 decimals
+        finalRate = Math.round(finalRate * 100) / 100;
+
+        allOverrides.push({
+          date: day.date,
+          room_type_id: roomTypeId,
+          rate: finalRate,
+        });
+      });
+    }
+
+    // 4. Send to Queue (using existing Producer logic)
+    // We reuse the service to format it for Cloudbeds (map to RateIDs)
+    // We need the PMS Property ID
+    const hotelRes = await db.query(
+      "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
+      [hotelId]
+    );
+    const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
+
+    // Use Service to build PMS-ready payload (maps room_type_id -> rate_id)
+    // Note: buildOverridePayload expects standard format. We might need to batch this ourselves
+    // if the array is huge (365 days * 10 rooms = 3650 items).
+    // Ideally, we chunk this BEFORE calling buildOverridePayload if it does DB checks,
+    // but here we will let the service handle the mapping.
+
+    // NOTE: sentinelService.buildOverridePayload usually takes { date, rate }
+    // for a SINGLE room. Here we have MANY rooms.
+    // We will group by Room Type to be safe and efficient.
+
+    const overridesByRoom = {};
+    allOverrides.forEach((o) => {
+      if (!overridesByRoom[o.room_type_id])
+        overridesByRoom[o.room_type_id] = [];
+      overridesByRoom[o.room_type_id].push({ date: o.date, rate: o.rate });
+    });
+
+    let totalQueued = 0;
+
+    for (const [rId, rates] of Object.entries(overridesByRoom)) {
+      const batchPayload = await sentinelService.buildOverridePayload(
+        hotelId,
+        pmsPropertyId,
+        rId,
+        rates
+      );
+
+      // Insert into Queue
+      if (batchPayload && batchPayload.length > 0) {
+        const CHUNK_SIZE = 30; // Cloudbeds Limit
+        for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
+          const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
+          await db.query(
+            `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
+            [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
+          );
+        }
+        totalQueued += batchPayload.length;
+      }
+    }
+
+    // 5. Kick Worker
+    setImmediate(() => {
+      runBackgroundWorker().catch((err) =>
+        console.error("Worker Background Error:", err)
+      );
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Recalculation complete. Queued ${totalQueued} rate updates.`,
+    });
+  } catch (error) {
+    console.error("[Sentinel] Re-Push Failed:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post("/export-reservations", async (req, res) => {
+  // If hotelId is sent, do that one. If NOT, do ALL managed hotels.
+  const { hotelId, hotelIds } = req.body;
+
+  const client = await db.connect();
+
+  try {
+    // 1. Determine which hotels to process
+    let hotelsToProcess = [];
+
+    if (Array.isArray(hotelIds) && hotelIds.length > 0) {
+      // Explicit list of hotel IDs (sequential)
+      const result = await client.query(
+        `SELECT hotel_id, pms_property_id 
+         FROM hotels 
+         WHERE hotel_id = ANY($1::int[])
+         ORDER BY hotel_id ASC`,
+        [hotelIds.map((id) => parseInt(id, 10))]
+      );
+      hotelsToProcess = result.rows;
+    } else {
+      // All managed hotels
+      const result = await client.query(
+        "SELECT hotel_id, pms_property_id FROM hotels WHERE is_rockenue_managed = true ORDER BY hotel_id ASC"
+      );
+      hotelsToProcess = result.rows;
+    }
+
+    if (hotelsToProcess.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No hotels found to process." });
+    }
+
+    console.log(
+      `[Export] Starting Batch Export for ${hotelsToProcess.length} hotels...`
+    );
+
+    let totalInserted = 0;
+
+    // 2. Loop through Hotels (One by One)
+    for (const hotel of hotelsToProcess) {
+      const currentHotelId = hotel.hotel_id;
+      const pmsPropertyId = hotel.pms_property_id;
+
+      console.log(
+        `\n[Export] === Processing Hotel: ${currentHotelId} (PMS: ${pmsPropertyId}) ===`
+      );
+
+      try {
+        const accessToken = await cloudbedsAdapter.getAccessToken(
+          currentHotelId
+        );
+
+        // Fetch reservations, then cap for verification
+        const reservations = await cloudbedsAdapter.getReservations(
+          accessToken,
+          pmsPropertyId,
+          { status: "confirmed,canceled,checked_in,checked_out" }
+        );
+
+        const limitedReservations = reservations; // use full list
+
+        console.log(
+          `[Export] Found ${reservations.length} reservations. Processing all of them...`
+        );
+
+        // 3. Process Reservations with Smart Retries
+        for (const summary of limitedReservations) {
+          let attempts = 0;
+          let success = false;
+
+          while (attempts < 3 && !success) {
+            try {
+              attempts++;
+
+              // Fetch Detail (Rate-limited to ~8/sec)
+              const detailRes = await cloudbedsAdapter.getReservation(
+                accessToken,
+                pmsPropertyId,
+                summary.reservationID
+              );
+
+              // RATE LIMIT: wait 125ms → 8 requests/sec
+              await sleep(125);
+
+              // ================= DEBUG: ADULTS / CHILDREN RAW PAYLOAD =================
+              if (
+                detailRes.status === "confirmed" ||
+                detailRes.status === "checked_in" ||
+                detailRes.status === "canceled"
+              ) {
+                console.log("[DEBUG][ADULTS PAYLOAD]", {
+                  reservationID: detailRes.reservationID,
+                  status: detailRes.status,
+                  adults_field: detailRes.adults,
+                  children_field: detailRes.children,
+                  assigned_units: detailRes.assigned?.map((u) => ({
+                    adults: u.adults,
+                    children: u.children,
+                    roomTotal: u.roomTotal,
+                  })),
+                  unassigned_units: detailRes.unassigned?.map((u) => ({
+                    adults: u.adults,
+                    children: u.children,
+                    roomTotal: u.roomTotal,
+                  })),
+                  legacy_rooms: detailRes.rooms?.map((u) => ({
+                    adults: u.adults,
+                    children: u.children,
+                    roomTotal: u.roomTotal,
+                  })),
+                });
+              }
+              // =======================================================================
+
+              // If we get here, the API call worked!
+              success = true;
+
+              if (!detailRes || !detailRes.reservationID) continue;
+
+              // [DATA PROCESSING LOGIC]
+              // 1. Universal Unit Fix
+              // [DATA PROCESSING LOGIC]
+              // DEBUG: dump cancellation-related fields for canceled reservations
+              if (detailRes.status === "canceled") {
+                console.log(
+                  "[Export][DEBUG] Raw canceled reservation payload:",
+                  {
+                    reservationID: detailRes.reservationID,
+                    status: detailRes.status,
+                    dateCreated: detailRes.dateCreated,
+                    dateCancelled: detailRes.dateCancelled,
+                    dateCancelledUTC: detailRes.dateCancelledUTC,
+                    dateCanceled: detailRes.dateCanceled,
+                    date_canceled: detailRes.date_canceled,
+                    cancellation_date: detailRes.cancellation_date,
+                  }
+                );
+              }
+
+              // 1. Universal Unit Fix
+              const assigned = Array.isArray(detailRes.assigned)
+                ? detailRes.assigned
+                : [];
+              const unassigned = Array.isArray(detailRes.unassigned)
+                ? detailRes.unassigned
+                : [];
+              const legacyRooms = Array.isArray(detailRes.rooms)
+                ? detailRes.rooms
+                : [];
+              const primaryUnit =
+                assigned[0] || unassigned[0] || legacyRooms[0] || null;
+
+              // 2. Calc Revenue
+              let rawRevenue = detailRes.total;
+              if (!rawRevenue || parseFloat(rawRevenue) === 0) {
+                let sum = 0;
+                [...assigned, ...unassigned, ...legacyRooms].forEach((r) => {
+                  sum += parseFloat(r.roomTotal) || 0;
+                });
+                rawRevenue = sum;
+              }
+              const revenue =
+                parseFloat(String(rawRevenue).replace(/[^0-9.-]+/g, "")) || 0;
+
+              const occSource =
+                assigned[0] || unassigned[0] || legacyRooms[0] || null;
+
+              let finalAdults = 0;
+              let childrenCount = 0;
+
+              if (occSource) {
+                finalAdults = parseInt(occSource.adults || 0, 10) || 0;
+                childrenCount = parseInt(occSource.children || 0, 10) || 0;
+              }
+
+              // 4. Extract & normalize daily rates to { "YYYY-MM-DD": number }
+              let dailyRatesJson = "{}";
+              let roomTypeId = null;
+              let ratePlanId = null;
+
+              if (primaryUnit) {
+                roomTypeId = primaryUnit.roomTypeID || null;
+                ratePlanId =
+                  primaryUnit.rateID || primaryUnit.ratePlanID || null;
+                const ratesRaw =
+                  primaryUnit.detailedRates || primaryUnit.dailyRates;
+
+                if (Array.isArray(ratesRaw)) {
+                  const map = {};
+                  for (const r of ratesRaw) {
+                    if (r.date && r.rate != null) {
+                      map[r.date] =
+                        parseFloat(String(r.rate).replace(/[^0-9.-]+/g, "")) ||
+                        0;
+                    }
+                  }
+                  dailyRatesJson = JSON.stringify(map);
+                } else if (ratesRaw && typeof ratesRaw === "object") {
+                  const map = {};
+                  for (const [k, v] of Object.entries(ratesRaw)) {
+                    map[k] =
+                      parseFloat(String(v).replace(/[^0-9.-]+/g, "")) || 0;
+                  }
+                  dailyRatesJson = JSON.stringify(map);
+                }
+              }
+
+              // 5. Cancellation + booking dates
+              // Prefer explicit cancellation fields; fallback to dateModified/dateModifiedUTC
+              const isCanceled =
+                String(detailRes.status).toLowerCase() === "canceled";
+
+              const cancelDate = isCanceled
+                ? detailRes.dateCancelled ||
+                  detailRes.dateCancelledUTC ||
+                  detailRes.dateCanceled ||
+                  detailRes.date_canceled ||
+                  detailRes.cancellation_date ||
+                  detailRes.dateModified || // fallback: modification timestamp
+                  detailRes.dateModifiedUTC || // fallback: modification timestamp (UTC)
+                  null
+                : null;
+
+              // DEBUG: log decision for canceled reservations
+              if (isCanceled) {
+                console.log("[Export][DEBUG] cancelDate decision:", {
+                  reservationID: detailRes.reservationID,
+                  status: detailRes.status,
+                  cancelDate,
+                  dateCancelled: detailRes.dateCancelled,
+                  dateCancelledUTC: detailRes.dateCancelledUTC,
+                  dateCanceled: detailRes.dateCanceled,
+                  date_canceled: detailRes.date_canceled,
+                  cancellation_date: detailRes.cancellation_date,
+                  dateModified: detailRes.dateModified,
+                  dateModifiedUTC: detailRes.dateModifiedUTC,
+                });
+              }
+
+              const bookingDate = detailRes.dateCreated
+                ? new Date(detailRes.dateCreated)
+                : new Date();
+
+              await client.query(
+                `INSERT INTO reservations_export_staging (
+      id,
+      "hotelId",
+      third_party_identifier,
+      "reservationDateCreated",
+      "checkInDate",
+      "checkOutDate",
+      "cancellationDate",
+      status,
+      "totalRate",
+      currency_code,
+      adults,
+      children,
+      rate_plan_id,
+      "roomTypeId",
+      "sourceName",
+      "guestCountry",
+      "detailedRoomRates",
+      last_updated_at
+    )
+    VALUES (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8, $9, $10,
+      $11, $12, $13, $14, $15,
+      $16, $17, NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      status               = EXCLUDED.status,
+      "totalRate"          = EXCLUDED."totalRate",
+      currency_code        = EXCLUDED.currency_code,
+      adults               = EXCLUDED.adults,
+      children             = EXCLUDED.children,
+      "checkInDate"        = EXCLUDED."checkInDate",
+      "checkOutDate"       = EXCLUDED."checkOutDate",
+      "cancellationDate"   = EXCLUDED."cancellationDate",
+      "detailedRoomRates"  = EXCLUDED."detailedRoomRates",
+      "roomTypeId"         = EXCLUDED."roomTypeId",
+      rate_plan_id         = EXCLUDED.rate_plan_id,
+      "sourceName"         = EXCLUDED."sourceName",
+      "guestCountry"       = EXCLUDED."guestCountry",
+      last_updated_at      = NOW()`,
+                [
+                  detailRes.reservationID, // id
+                  String(currentHotelId), // hotelId
+                  detailRes.thirdPartyIdentifier || null, // third_party_identifier
+                  bookingDate, // reservationDateCreated
+                  detailRes.startDate, // checkInDate
+                  detailRes.endDate, // checkOutDate
+                  cancelDate, // cancellationDate
+                  detailRes.status, // status
+                  revenue, // totalRate
+                  "USD", // currency_code
+                  finalAdults, // adults
+                  childrenCount, // children
+                  ratePlanId, // rate_plan_id
+                  roomTypeId, // roomTypeId
+                  detailRes.sourceName || detailRes.source || "Direct", // sourceName
+                  detailRes.guestCountry || null, // guestCountry
+                  dailyRatesJson, // detailedRoomRates
+                ]
+              );
+
+              totalInserted++;
+              // [DATA PROCESSING ENDS]
+            } catch (err) {
+              // ERROR HANDLER FOR RESERVATION
+              const isTransient =
+                err.message.includes("502") ||
+                err.message.includes("503") ||
+                err.message.includes("504") ||
+                err.message.includes("429");
+
+              if (isTransient) {
+                console.warn(
+                  `[Export] Transient Error (Limit/Hiccup) on Res ${summary.reservationID}. Retrying (${attempts}/3)...`
+                );
+                await sleep(5000);
+              } else {
+                console.error(
+                  `[Export] Failed Res ${summary.reservationID}: ${err.message}`
+                );
+                break; // Don't retry logic errors
+              }
+            }
+          }
+        }
+      } catch (hotelErr) {
+        console.error(
+          `[Export] CRITICAL ERROR processing Hotel ${currentHotelId}:`,
+          hotelErr.message
+        );
+        // Continue to next hotel
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Batch Export Complete. Processed/Updated ${totalInserted} reservations across ${hotelsToProcess.length} hotels.`,
+    });
+  } catch (err) {
+    console.error("[Export] Fatal Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
+  }
+});
 
 /**
  * [NEW] POST /api/sentinel/preview-rate

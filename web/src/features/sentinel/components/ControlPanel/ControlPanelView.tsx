@@ -172,6 +172,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
   const [activeMarket, setActiveMarket] = useState("london");
   const [roomDifferentialsExpanded, setRoomDifferentialsExpanded] =
     useState(false);
+  // [NEW] Repush Loading State
+  const [isRepushing, setIsRepushing] = useState("");
 
   // Manual Events State (Local UI Mock)
   const [londonEvents, setLondonEvents] = useState([
@@ -258,6 +260,59 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
       newDiffs = [...currentDiffs, newRule];
     }
     updateRule(hotelId, "room_differentials", newDiffs);
+  };
+
+  // [NEW] Handle Re-Push (Force Recalculate & Sync)
+  const handleRepushRates = async (hotelId: string) => {
+    if (isRepushing) return;
+    setIsRepushing(hotelId);
+
+    toast.promise(
+      async () => {
+        const res = await fetch("/api/sentinel/recalculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hotelId }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        return data.message;
+      },
+      {
+        loading: "Recalculating and pushing all rates...",
+        success: (msg) => {
+          setIsRepushing("");
+          return msg;
+        },
+        error: (err) => {
+          setIsRepushing("");
+          return `Failed: ${err.message}`;
+        },
+      }
+    );
+  };
+
+  const handleExportReservations = async (hotelId: string) => {
+    toast.promise(
+      async () => {
+        const res = await fetch("/api/sentinel/export-reservations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hotelId }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        return data.message;
+      },
+      {
+        loading: "Exporting reservations to SQL...",
+        success: (msg) => `${msg}`,
+        error: (err) => {
+          console.error("Export Error:", err);
+          return `Export failed: ${err.message}`;
+        },
+      }
+    );
   };
 
   const handleAddEvent = () => {
@@ -2165,12 +2220,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             </Button>
                             <Button
                               variant="outline"
+                              onClick={() =>
+                                handleRepushRates(String(hotel.hotel_id))
+                              }
+                              disabled={isRepushing === String(hotel.hotel_id)}
                               style={{
                                 backgroundColor: "rgba(250, 255, 106, 0.1)",
                                 borderColor: "rgba(250, 255, 106, 0.5)",
                                 color: "#faff6a",
                               }}
                             >
+                              {isRepushing === String(hotel.hotel_id) && (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              )}
                               Re-Push Rates
                             </Button>
                             <Button
@@ -2182,6 +2244,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               }}
                             >
                               Force Sync
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                handleExportReservations(String(hotel.hotel_id))
+                              }
+                              style={{
+                                backgroundColor: "rgba(147, 51, 234, 0.1)",
+                                borderColor: "rgba(147, 51, 234, 0.5)",
+                                color: "#a855f7",
+                              }}
+                            >
+                              Export Res (SQL)
                             </Button>
                           </div>
                         </div>
