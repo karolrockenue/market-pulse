@@ -18,13 +18,51 @@ router.use(requireAdminApi);
 // Helper to prevent API Bans (Rate Limiter)
 
 // Helper to prevent API Bans (Rate Limiter)
+// Helper to prevent API Bans (Rate Limiter)
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * [HELPER] Rebuild Rate ID Map
+ * Scans PMS Room Types & Rate Plans to find the correct "Base" Rate ID for each room.
+ * Returns the map object { [roomTypeId]: rateId }.
+ */
+function buildRateIdMap(pmsRoomTypes, pmsRatePlans) {
+  const rateIdMap = {};
+  const roomTypes = pmsRoomTypes || [];
+  const ratePlans = pmsRatePlans || [];
+
+  for (const room of roomTypes) {
+    const roomTypeId = room.roomTypeID;
+    let foundRateId = null;
+    // Find the first non-derived rate for this room
+    for (const rate of ratePlans) {
+      // Loose equality (==) handles string vs number ID mismatches
+      // Check falsey for isDerived to handle "false", false, 0, or null
+      if (rate.roomTypeID == roomTypeId && rate.isDerived == false) {
+        foundRateId = rate.rateID;
+        break;
+      }
+    }
+    if (foundRateId) {
+      rateIdMap[roomTypeId] = foundRateId;
+    }
+  }
+  return rateIdMap;
+}
 /**
  * [NEW] POST /api/sentinel/recalculate
  * Triggers a full re-calculation of rates for ALL rooms based on:
  * 1. The Base Rate (AI Engine)
  * 2. The Configured Differentials
  * Pushes the result to the Job Queue.
+ */
+/**
+ * [NEW] POST /api/sentinel/recalculate
+ * Triggers a full re-calculation of rates for ALL rooms based on:
+ * 1. The Base Rate (AI Engine)
+ * 2. The Configured Differentials
+ * Pushes the result to the Job Queue.
+ * [UPDATED] With Deep Tracing to debug "0 updates" issue.
  */
 router.post("/recalculate", async (req, res) => {
   const { hotelId } = req.body;
@@ -48,15 +86,40 @@ router.post("/recalculate", async (req, res) => {
 
     const config = configRes.rows[0];
     const baseRoomTypeId = config.base_room_type_id;
-    const differentials = config.room_differentials || []; // Array of { roomTypeId, operator, value }
+    const differentials = config.room_differentials || [];
     const pmsRoomTypes = config.pms_room_types?.data || [];
+    const pmsRatePlans = config.pms_rate_plans?.data || [];
 
     if (!baseRoomTypeId) {
       throw new Error("Base Room Type not defined in configuration.");
     }
 
-    // 2. Get 365-Day Base Rates from AI Engine
-    // We use today as start date
+    // --- SELF-HEALING MAP LOGIC ---
+    const currentMap = config.rate_id_map || {};
+    const freshMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+
+    let needsUpdate = false;
+    if (Object.keys(freshMap).length > Object.keys(currentMap).length) {
+      needsUpdate = true;
+    } else {
+      for (const [k, v] of Object.entries(freshMap)) {
+        if (currentMap[k] !== v) {
+          needsUpdate = true;
+          break;
+        }
+      }
+    }
+
+    if (needsUpdate) {
+      console.log(`[Sentinel] Healing Rate ID Map for Hotel ${hotelId}...`);
+      await db.query(
+        `UPDATE sentinel_configurations SET rate_id_map = $1, updated_at = NOW() WHERE hotel_id = $2`,
+        [JSON.stringify(freshMap), hotelId]
+      );
+    }
+    // ----------------------------
+
+    // 2. Get 365-Day Base Rates
     const today = new Date().toISOString().split("T")[0];
     const previewCalendar = await sentinelService.previewCalendar({
       hotelId,
@@ -67,14 +130,12 @@ router.post("/recalculate", async (req, res) => {
         .split("T")[0],
     });
 
-    // 3. Build The Master Override Payload
+    // 3. Build Master Payload
     const allOverrides = [];
 
-    // Loop through EVERY room type in the PMS list
+    // Loop through EVERY room type
     for (const room of pmsRoomTypes) {
       const roomTypeId = room.roomTypeID;
-
-      // Determine Math
       let isBase = String(roomTypeId) === String(baseRoomTypeId);
       let diffRule = differentials.find(
         (r) => String(r.roomTypeId) === String(roomTypeId)
@@ -82,11 +143,12 @@ router.post("/recalculate", async (req, res) => {
 
       // For each day in the calendar...
       previewCalendar.forEach((day) => {
-        if (!day.rate || day.rate <= 0) return; // Skip invalid rates
+        // [FIX] Use 'finalRate' instead of 'rate'
+        if (!day.finalRate || day.finalRate <= 0) return;
 
-        let finalRate = parseFloat(day.rate);
+        let finalRate = parseFloat(day.finalRate);
 
-        // Apply Differential if not base
+        // Apply Differential
         if (!isBase && diffRule) {
           const val = parseFloat(diffRule.value);
           if (diffRule.operator === "+") {
@@ -96,8 +158,9 @@ router.post("/recalculate", async (req, res) => {
           }
         }
 
-        // Round to 2 decimals
         finalRate = Math.round(finalRate * 100) / 100;
+
+        if (isNaN(finalRate) || finalRate <= 0) return;
 
         allOverrides.push({
           date: day.date,
@@ -107,24 +170,19 @@ router.post("/recalculate", async (req, res) => {
       });
     }
 
-    // 4. Send to Queue (using existing Producer logic)
-    // We reuse the service to format it for Cloudbeds (map to RateIDs)
-    // We need the PMS Property ID
+    // --- DEBUG TRACE 1 ---
+    console.log(
+      `[Trace] Generated ${allOverrides.length} total overrides across ${pmsRoomTypes.length} rooms.`
+    );
+    // ---------------------
+
+    // 4. Send to Queue
     const hotelRes = await db.query(
       "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
       [hotelId]
     );
     const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
-
-    // Use Service to build PMS-ready payload (maps room_type_id -> rate_id)
-    // Note: buildOverridePayload expects standard format. We might need to batch this ourselves
-    // if the array is huge (365 days * 10 rooms = 3650 items).
-    // Ideally, we chunk this BEFORE calling buildOverridePayload if it does DB checks,
-    // but here we will let the service handle the mapping.
-
-    // NOTE: sentinelService.buildOverridePayload usually takes { date, rate }
-    // for a SINGLE room. Here we have MANY rooms.
-    // We will group by Room Type to be safe and efficient.
+    console.log(`[Trace] Using PMS Property ID: ${pmsPropertyId}`);
 
     const overridesByRoom = {};
     allOverrides.forEach((o) => {
@@ -134,8 +192,15 @@ router.post("/recalculate", async (req, res) => {
     });
 
     let totalQueued = 0;
+    let roomsProcessed = 0;
 
     for (const [rId, rates] of Object.entries(overridesByRoom)) {
+      // --- DEBUG TRACE 2 ---
+      console.log(
+        `[Trace] Processing Room ${rId} with ${rates.length} rates...`
+      );
+      // ---------------------
+
       const batchPayload = await sentinelService.buildOverridePayload(
         hotelId,
         pmsPropertyId,
@@ -143,9 +208,16 @@ router.post("/recalculate", async (req, res) => {
         rates
       );
 
-      // Insert into Queue
+      // --- DEBUG TRACE 3 ---
+      console.log(
+        `[Trace] Service returned payload size: ${
+          batchPayload ? batchPayload.length : "NULL/0"
+        }`
+      );
+      // ---------------------
+
       if (batchPayload && batchPayload.length > 0) {
-        const CHUNK_SIZE = 30; // Cloudbeds Limit
+        const CHUNK_SIZE = 30;
         for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
           const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
           await db.query(
@@ -154,6 +226,7 @@ router.post("/recalculate", async (req, res) => {
           );
         }
         totalQueued += batchPayload.length;
+        roomsProcessed++;
       }
     }
 
@@ -166,14 +239,13 @@ router.post("/recalculate", async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Recalculation complete. Queued ${totalQueued} rate updates.`,
+      message: `Recalculation complete. Processed ${roomsProcessed} rooms, queued ${totalQueued} rate updates.`,
     });
   } catch (error) {
     console.error("[Sentinel] Re-Push Failed:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 router.post("/export-reservations", async (req, res) => {
   // If hotelId is sent, do that one. If NOT, do ALL managed hotels.
   const { hotelId, hotelIds } = req.body;
@@ -802,55 +874,55 @@ router.get("/config/:hotelId", async (req, res) => {
  * It is called by the "Enable" toggle and the "Sync with PMS" button.
  * This is non-destructive and will not overwrite user "Rules".
  */
-// [MODIFIED] Route now takes IDs from the body, no params
 router.post("/sync", async (req, res) => {
-  const { hotelId, pmsPropertyId } = req.body; // <-- [NEW] Get both IDs
+  const { hotelId, pmsPropertyId } = req.body;
   try {
-    // [MODIFIED] Log both IDs
     console.log(
       `[Sentinel Router] Starting Facts Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`
     );
 
     // 1. Fetch all "Facts" from PMS in parallel
-    // [BRIDGE UPDATE] Pass BOTH IDs
     const [roomTypesData, ratePlansData] = await Promise.all([
       sentinelAdapter.getRoomTypes(hotelId, pmsPropertyId),
       sentinelAdapter.getRatePlans(hotelId, pmsPropertyId),
     ]);
 
-    // 2. Save "Facts" to our database
-    // We use INSERT...ON CONFLICT to create or update the row.
-    // This is the core of the "Sync" logic:
-    // - It creates the row if it doesn't exist (and enables Sentinel).
-    // - It UPDATES the "Facts" if it does exist.
-    // - It critically DOES NOT touch the "Rules" (guardrail_min, etc.).
+    const pmsRoomTypes = roomTypesData.data || [];
+    const pmsRatePlans = ratePlansData.data || [];
+
+    // 2. Build Rate Map (Self-Healing)
+    const rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+
+    // 3. Save "Facts" + "Map" to our database
     const { rows } = await db.query(
       `
       INSERT INTO sentinel_configurations (
         hotel_id, 
         pms_room_types, 
         pms_rate_plans, 
+        rate_id_map,
         sentinel_enabled, 
         last_pms_sync_at,
         config_drift
       )
-      VALUES ($1, $2, $3, true, NOW(), false)
+      VALUES ($1, $2, $3, $4, true, NOW(), false)
       ON CONFLICT (hotel_id) DO UPDATE 
       SET
         pms_room_types = EXCLUDED.pms_room_types,
         pms_rate_plans = EXCLUDED.pms_rate_plans,
+        rate_id_map = EXCLUDED.rate_id_map,
         last_pms_sync_at = NOW(),
         config_drift = false,
         updated_at = NOW()
       RETURNING *;
       `,
-      [hotelId, roomTypesData, ratePlansData]
+      [hotelId, roomTypesData, ratePlansData, JSON.stringify(rateIdMap)]
     );
 
     console.log(`[Sentinel Router] Facts Sync complete for ${hotelId}`);
     res.status(200).json({
       success: true,
-      message: "PMS Facts sync complete.",
+      message: "PMS Facts sync complete. Rate Map updated.",
       data: rows[0],
     });
   } catch (error) {
@@ -875,7 +947,6 @@ router.post("/config/:hotelId", async (req, res) => {
   const { hotelId } = req.params;
   const {
     sentinel_enabled,
-    // guardrail_min, <-- REMOVED
     guardrail_max,
     rate_freeze_period,
     base_room_type_id,
@@ -892,28 +963,6 @@ router.post("/config/:hotelId", async (req, res) => {
       [hotelId]
     );
 
-    // --- [START DEBUGGING LOG] ---
-    console.log(`[DEBUG /config] Fetched facts for hotel ${hotelId}`);
-    if (factsRes.rows.length === 0) {
-      console.error(`[DEBUG /config] No config row found.`);
-      return res
-        .status(404)
-        .json({ success: false, message: "Config row not found." });
-    }
-
-    const pmsRoomTypesRaw = factsRes.rows[0].pms_room_types;
-    const pmsRatePlansRaw = factsRes.rows[0].pms_rate_plans;
-
-    console.log(
-      `[DEBUG /config] pms_room_types (raw):`,
-      JSON.stringify(pmsRoomTypesRaw, null, 2)
-    );
-    console.log(
-      `[DEBUG /config] pms_rate_plans (raw):`,
-      JSON.stringify(pmsRatePlansRaw, null, 2)
-    );
-    // --- [END DEBUGGING LOG] ---
-
     if (factsRes.rows.length === 0) {
       return res.status(404).json({
         success: false,
@@ -924,38 +973,11 @@ router.post("/config/:hotelId", async (req, res) => {
     const pmsRoomTypes = factsRes.rows[0].pms_room_types?.data || [];
     const pmsRatePlans = factsRes.rows[0].pms_rate_plans?.data || [];
 
-    // 2. [NEW LOGIC] Build the full rate_id_map
-    const rateIdMap = {};
-    for (const room of pmsRoomTypes) {
-      const roomTypeId = room.roomTypeID;
-      let foundRateId = null;
+    // 2. [NEW LOGIC] Build the full rate_id_map using helper
+    // Uses loose check for isDerived
+    const rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
 
-      // Find the first non-derived rate for this room
-      for (const rate of pmsRatePlans) {
-        if (rate.roomTypeID == roomTypeId && rate.isDerived === false) {
-          foundRateId = rate.rateID;
-          break;
-        }
-      }
-
-      if (foundRateId) {
-        rateIdMap[roomTypeId] = foundRateId;
-      } else {
-        console.warn(
-          `[Sentinel Router] No base rate (isDerived: false) found for roomTypeID ${roomTypeId}.`
-        );
-      }
-    }
-
-    // --- [START DEBUGGING LOG] ---
-    console.log(
-      `[DEBUG /config] Finished building rateIdMap:`,
-      JSON.stringify(rateIdMap, null, 2)
-    );
-    // --- [END DEBUGGING LOG] ---
-
-    // 3. [MODIFIED] Update the database with all rules AND the new base_rate_id
-    // [FIX] Manually stringify all JSONB-bound parameters to prevent pg driver errors
+    // 3. Update the database
     const { rows } = await db.query(
       `
       UPDATE sentinel_configurations
@@ -975,7 +997,6 @@ router.post("/config/:hotelId", async (req, res) => {
       `,
       [
         sentinel_enabled,
-        // guardrail_min, <-- REMOVED
         guardrail_max,
         rate_freeze_period,
         base_room_type_id,

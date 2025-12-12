@@ -137,6 +137,50 @@ router.post("/", async (req, res) => {
       return finish();
     }
 
+    // --- [NEW] Update Daily Bookings Record (Sales Ledger) ---
+    // We do this BEFORE the metrics logic so the ledger is always accurate.
+    try {
+      const r = resData.data;
+      // Safety: Cloudbeds usually sends "2024-01-01T12:00:00" or just "2024-01-01"
+      const bookingDate = r.dateCreated
+        ? r.dateCreated.split("T")[0]
+        : new Date().toISOString().split("T")[0];
+
+      const checkInDate = r.startDate;
+      // Sanitize revenue
+      const totalRev =
+        parseFloat(String(r.total || 0).replace(/[^0-9.-]+/g, "")) || 0;
+      const rStatus = r.status;
+      const rSource = r.sourceName || r.source || "Direct";
+
+      await pgPool.query(
+        `INSERT INTO daily_bookings_record 
+         (id, hotel_id, booking_date, check_in_date, revenue, status, source)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO UPDATE SET
+           status = EXCLUDED.status,
+           revenue = EXCLUDED.revenue,
+           check_in_date = EXCLUDED.check_in_date,
+           updated_at = NOW()`,
+        [
+          reservationId,
+          hotel_id,
+          bookingDate,
+          checkInDate,
+          totalRev,
+          rStatus,
+          rSource,
+        ]
+      );
+      console.log(
+        `[Webhook] Ledger updated for Res ${reservationId} (${rStatus})`
+      );
+    } catch (ledgerErr) {
+      console.error("[Webhook] Ledger Update Failed:", ledgerErr.message);
+      // We do NOT stop execution; metrics might still need updating.
+    }
+    // ---------------------------------------------------------
+
     // 6. Determine Direction (Add or Subtract)
     let multiplier = 0;
 
