@@ -1027,24 +1027,92 @@ router.post("/config/:hotelId", async (req, res) => {
   }
 });
 /**
- * [SHARED WORKER FUNCTION - ROBUST FIX]
- * This processes the queue with isolation (SAVEPOINTS) per job.
- * If one job fails, it does NOT rollback the successful ones.
+ * [SHARED WORKER FUNCTION - SERVERLESS OPTIMIZED]
+ * loops for up to 50 seconds processing small batches.
+ * Commits progress frequently so timeouts don't rollback work.
  */
 async function runBackgroundWorker() {
+  const MAX_RUNTIME_MS = 50000; // Run for max 50 seconds per trigger
+  const startTime = Date.now();
+  let batchesProcessed = 0;
+
+  console.log("[Sentinel Worker] Starting Smart Drain Cycle...");
+
   const client = await db.connect();
+
   try {
-    await client.query("BEGIN");
+    // LOOP: Keep fetching batches until time runs out or queue is empty
+    while (Date.now() - startTime < MAX_RUNTIME_MS) {
+      
+      // A. Start Transaction for this BATCH
+      await client.query("BEGIN");
 
-    // 1. Fetch Pending Jobs with Lock
-    const { rows: jobs } = await client.query(
-      `SELECT id, hotel_id, payload FROM sentinel_job_queue 
-       WHERE status = 'PENDING' 
-       ORDER BY created_at ASC 
-       LIMIT 5 
-       FOR UPDATE SKIP LOCKED`
-    );
+      // B. Fetch 5 Jobs
+      const { rows: jobs } = await client.query(
+        `SELECT id, hotel_id, payload FROM sentinel_job_queue 
+         WHERE status = 'PENDING' 
+         ORDER BY created_at ASC 
+         LIMIT 5 
+         FOR UPDATE SKIP LOCKED`
+      );
 
+      // C. Stop if empty
+      if (jobs.length === 0) {
+        await client.query("COMMIT");
+        console.log("[Sentinel Worker] Queue Empty. Stopping.");
+        break; 
+      }
+
+      console.log(`[Sentinel Worker] Batch ${batchesProcessed + 1}: Processing ${jobs.length} jobs...`);
+
+      // D. Process Each Job
+      for (const job of jobs) {
+        const savepointName = `sp_${job.id.replace(/-/g, "_")}`;
+        try {
+          await client.query(`SAVEPOINT ${savepointName}`);
+          const { pmsPropertyId, rates } = job.payload;
+
+          // Adapter Call
+          const result = await sentinelAdapter.postRateBatch(job.hotel_id, pmsPropertyId, rates);
+
+          // Success Update
+          if (result && result.message === "All rates filtered out by safety checks.") {
+             await client.query(`UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`, [job.id]);
+          } else {
+             await client.query(`UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`, [job.id]);
+          }
+          await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+
+        } catch (err) {
+          // Failure Update
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          console.error(`[Sentinel Worker] Job ${job.id} Failed:`, err.message);
+          const safeError = (err.message || "Unknown error").substring(0, 500);
+          
+          await client.query(
+            `UPDATE sentinel_job_queue SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1`,
+            [job.id, safeError]
+          );
+        }
+      }
+
+      // E. Commit this batch (Saves progress immediately)
+      await client.query("COMMIT");
+      batchesProcessed++;
+      
+      // Small breather to let Event Loop breathe
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.log(`[Sentinel Worker] Cycle finished. Batches: ${batchesProcessed}. Time: ${Date.now() - startTime}ms`);
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("[Sentinel Worker] Critical Error:", error);
+  } finally {
+    client.release();
+  }
+}
     if (jobs.length === 0) {
       await client.query("COMMIT");
       return;
