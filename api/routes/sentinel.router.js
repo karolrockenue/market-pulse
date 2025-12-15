@@ -12,6 +12,46 @@ const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js"); // [Added f
 const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
 const db = require("../utils/db"); // <-- [NEW] Import database connection
 
+// =============================================================================
+// 1. PUBLIC / CRON ROUTE (MUST be defined BEFORE requireAdminApi)
+// =============================================================================
+
+/**
+ * [CRON WORKER] POST /api/sentinel/process-queue
+ * Triggered by Vercel Cron every minute.
+ * Bypasses Admin Auth but requires CRON_SECRET.
+ */
+router.all("/process-queue", async (req, res) => {
+  // [SECURITY] Verify Vercel Cron Secret
+  // Vercel automatically injects CRON_SECRET as an env var and sends it in the header.
+  const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+
+  // Allow localhost for debugging, otherwise enforce Secret
+  const isLocal =
+    process.env.NODE_ENV === "development" ||
+    req.hostname === "localhost" ||
+    req.hostname === "127.0.0.1";
+
+  if (!isLocal) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      console.warn("[Sentinel] Unauthorized Cron Attempt blocked.");
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized Cron Trigger" });
+    }
+  }
+
+  // Run the worker logic (waits up to 50s to drain queue)
+  await runBackgroundWorker();
+
+  // Respond only after work is done
+  res.status(200).json({ success: true, message: "Worker cycle complete." });
+});
+
+// =============================================================================
+// 2. ADMIN MIDDLEWARE (Protects all routes below this line)
+// =============================================================================
 router.use(requireAdminApi);
 // ... existing imports ...
 // [REPLACEMENT] Full "Export Reservations" Route
@@ -230,16 +270,11 @@ router.post("/recalculate", async (req, res) => {
       }
     }
 
-    // 5. Kick Worker
-    setImmediate(() => {
-      runBackgroundWorker().catch((err) =>
-        console.error("Worker Background Error:", err)
-      );
-    });
-
+    // 5. [VERCEL OPTIMIZATION] Do not kick worker manually.
+    // The Cron job will pick up the PENDING jobs within 60 seconds.
     res.status(200).json({
       success: true,
-      message: `Recalculation complete. Processed ${roomsProcessed} rooms, queued ${totalQueued} rate updates.`,
+      message: `Recalculation queued. The background worker will process ${totalQueued} updates shortly.`,
     });
   } catch (error) {
     console.error("[Sentinel] Re-Push Failed:", error);
@@ -1185,30 +1220,19 @@ router.post("/overrides", async (req, res) => {
       );
     }
 
-    // 3. THE KICK (Internal Function Call)
-    // setImmediate ensures it runs on the next tick, keeping the API response fast.
-    setImmediate(() => {
-      runBackgroundWorker().catch((err) =>
-        console.error("Worker Background Error:", err)
-      );
+    // 3. [VERCEL OPTIMIZATION] Return Instantly
+    // The Cron job will pick up the PENDING jobs within 60 seconds.
+    res.status(200).json({
+      success: true,
+      message: "Updates queued for background processing.",
     });
-
-    // 4. Return Instantly
-    res.status(200).json({ success: true, message: "Updates queued." });
   } catch (error) {
     console.error(`[Sentinel Producer] Failed:`, error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-/**
- * [MANUAL TRIGGER] POST /api/sentinel/process-queue
- * Useful for debugging or CRON jobs.
- */
-router.post("/process-queue", async (req, res) => {
-  await runBackgroundWorker();
-  res.status(200).json({ success: true, message: "Worker cycle complete." });
-});
+// [REMOVED] process-queue moved to top of file (Public Cron)
 
 /**
  * [NEW & SIMPLIFIED] GET /api/sentinel/rates/:hotelId/:roomTypeId
