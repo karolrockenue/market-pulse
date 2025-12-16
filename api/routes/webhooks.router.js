@@ -147,6 +147,14 @@ router.post("/", async (req, res) => {
         : new Date().toISOString().split("T")[0];
 
       const checkInDate = r.startDate;
+      const checkOutDate = r.endDate; // Get End Date
+
+      // Calculate Room Nights (Sales View)
+      const start = new Date(checkInDate);
+      const end = new Date(checkOutDate);
+      const diffTime = Math.abs(end - start);
+      const calculatedNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+
       // Sanitize revenue
       const totalRev =
         parseFloat(String(r.total || 0).replace(/[^0-9.-]+/g, "")) || 0;
@@ -155,12 +163,13 @@ router.post("/", async (req, res) => {
 
       await pgPool.query(
         `INSERT INTO daily_bookings_record 
-         (id, hotel_id, booking_date, check_in_date, revenue, status, source)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (id, hotel_id, booking_date, check_in_date, revenue, status, source, room_nights)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO UPDATE SET
            status = EXCLUDED.status,
            revenue = EXCLUDED.revenue,
            check_in_date = EXCLUDED.check_in_date,
+           room_nights = EXCLUDED.room_nights,
            updated_at = NOW()`,
         [
           reservationId,
@@ -170,6 +179,7 @@ router.post("/", async (req, res) => {
           totalRev,
           rStatus,
           rSource,
+          calculatedNights,
         ]
       );
       console.log(
