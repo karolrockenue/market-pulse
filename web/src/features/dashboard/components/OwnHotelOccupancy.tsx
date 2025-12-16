@@ -183,7 +183,7 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
     <div style={styles.container}>
       <div style={styles.header}>
         <div style={styles.titleRow}>
-          <div style={styles.title}>Own Hotel Performance</div>
+          <div style={styles.title}>90 day occupancy and pickup</div>
           <div style={styles.buttonGroup}>
             <button
               style={{
