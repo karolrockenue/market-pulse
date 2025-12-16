@@ -749,6 +749,65 @@ const MetricsService = {
   },
 
   /**
+   * Dashboard: Flowcast (90-day forward view with pickup)
+   */
+  async getDashboardFlowcast(propertyId) {
+    const query = `
+      SELECT
+        d.stay_date,
+        d.rooms_sold,
+        d.capacity_count,
+        COALESCE(p1.rooms_sold, 0) as rooms_sold_1d_ago,
+        COALESCE(p3.rooms_sold, 0) as rooms_sold_3d_ago,
+        COALESCE(p7.rooms_sold, 0) as rooms_sold_7d_ago
+      FROM daily_metrics_snapshots d
+      LEFT JOIN pacing_snapshots p1 ON d.hotel_id = p1.hotel_id 
+           AND d.stay_date = p1.stay_date 
+           AND p1.snapshot_date = CURRENT_DATE - INTERVAL '1 day'
+      LEFT JOIN pacing_snapshots p3 ON d.hotel_id = p3.hotel_id 
+           AND d.stay_date = p3.stay_date 
+           AND p3.snapshot_date = CURRENT_DATE - INTERVAL '3 days'
+      LEFT JOIN pacing_snapshots p7 ON d.hotel_id = p7.hotel_id 
+           AND d.stay_date = p7.stay_date 
+           AND p7.snapshot_date = CURRENT_DATE - INTERVAL '7 days'
+      WHERE d.hotel_id = $1
+        AND d.stay_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+      ORDER BY d.stay_date ASC;
+    `;
+    const result = await pgPool.query(query, [propertyId]);
+    return result.rows;
+  },
+
+  /**
+   * Dashboard: Recent Activity (Sales Ledger)
+   */
+  async getRecentActivity(propertyId) {
+    // Aggregates sales ledger (bookings made) for the last 7 days
+    const query = `
+      WITH dates AS (
+        SELECT generate_series(
+          CURRENT_DATE - INTERVAL '6 days', 
+          CURRENT_DATE, 
+          '1 day'::interval
+        )::date AS date
+      )
+      SELECT
+        dates.date,
+        COALESCE(COUNT(dbr.id), 0) as bookings,
+        COALESCE(SUM(dbr.room_nights), 0) as room_nights,
+        COALESCE(SUM(dbr.revenue), 0) as revenue
+FROM dates
+      LEFT JOIN daily_bookings_record dbr 
+        ON dates.date = dbr.booking_date 
+        AND dbr.hotel_id = $1
+      GROUP BY dates.date
+      ORDER BY dates.date ASC;
+    `;
+    const result = await pgPool.query(query, [propertyId]);
+    return result.rows;
+  },
+
+  /**
    * Portfolio: Flowcast (90-day forward view with pickup)
    */
   async getPortfolioFlowcast(group, hotelId) {

@@ -1,8 +1,33 @@
 import { type SnapshotPeriod, type PatternDay, type Rank } from "../types";
-// Note: We will create a types.ts next, but for now I will define the main structure here
-// to keep this file self-contained until the full split is done.
+
+// --- NEW INTERFACES ---
+export interface FlowcastDay {
+  date: string;
+  fullDate: string;
+  occupancy: number;
+  pickup24h: number;
+  pickup3d: number;
+  pickup7d: number;
+  baseOccupancy24h: number;
+  baseOccupancy3d: number;
+  baseOccupancy7d: number;
+  isWeekend: boolean;
+}
+
+export interface RecentActivityDay {
+  date: string;
+  dateStr: string;
+  bookings: number;
+  roomNights: number;
+  adr: number;
+  revenue: number;
+  isToday: boolean;
+}
 
 export interface DashboardData {
+  // --- NEW FIELDS ---
+  flowcast: FlowcastDay[];
+  recentActivity: RecentActivityDay[];
   snapshot: {
     lastMonth: SnapshotPeriod;
     currentMonth: SnapshotPeriod;
@@ -52,6 +77,7 @@ interface Rank {
   rank: number | string;
   total: number | string;
 }
+// --- HELPER GENERATORS REMOVED (Data now comes from Backend) ---
 
 export const fetchDashboardSummary = async (
   propertyId: number,
@@ -164,5 +190,8 @@ export const fetchDashboardSummary = async (
   return {
     ...dashboardData,
     ytdTrend: filteredTrend.length > 0 ? filteredTrend : dashboardData.ytdTrend,
+    // Real data from API
+    flowcast: dashboardData.flowcast || [],
+    recentActivity: dashboardData.recentActivity || [],
   };
 };

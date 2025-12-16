@@ -1,6 +1,8 @@
 import { useMemo, CSSProperties } from "react";
 import { MarketOutlookBanner } from "./MarketOutlookBanner";
 import { DynamicYTDTrend } from "./DynamicYTDTrend";
+import { OwnHotelOccupancy } from "./OwnHotelOccupancy";
+import { RecentBookings } from "./RecentBookings";
 import { DataPendingBlur } from "../../../components/ui/DataPendingBlur";
 import {
   LineChart,
@@ -902,7 +904,23 @@ export function HotelDashboard({
             </div>
           </div>
         </div>
-
+        {/* [NEW] Flowcast & Recent Activity Row */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "16px",
+            // height removed: lets the grid grow to fit the tallest child
+            marginBottom: "24px",
+          }}
+        >
+          <div style={{ gridColumn: "span 2" }}>
+            <OwnHotelOccupancy data={data?.flowcast || []} />
+          </div>
+          <div style={{ gridColumn: "span 1" }}>
+            <RecentBookings data={data?.recentActivity || []} />
+          </div>
+        </div>
         {/* Market Outlook Banner + Chart (Merged Container) */}
         <div
           style={styles.marketOutlookContainer}

@@ -360,6 +360,8 @@ router.get("/summary", requireUserApi, async (req, res) => {
       ytdTrendRows,
       physicalUnsoldRemaining,
       pickupRows,
+      flowcastRows,
+      recentActivityRows,
     ] = await Promise.all([
       MetricsService.getDashboardSnapshot(propertyId),
       MarketService.getMarketOutlook(citySlug), // [FIX] Use MarketService
@@ -385,6 +387,8 @@ router.get("/summary", requireUserApi, async (req, res) => {
       MetricsService.getYearOnYearMetrics(propertyId, lastYear, currentYear), // Reuse YTD Logic
       MetricsService.getPhysicalUnsold(propertyId),
       MetricsService.getPickupHistory(propertyId),
+      MetricsService.getDashboardFlowcast(propertyId),
+      MetricsService.getRecentActivity(propertyId),
     ]);
 
     // --- Processing Logic (Copied from dashboard.router.js) ---
@@ -593,6 +597,59 @@ router.get("/summary", requireUserApi, async (req, res) => {
       });
     }
 
+    // Process Flowcast (similar to Sentinel logic but adapted for Dashboard view)
+    const flowcast = flowcastRows.map((row) => {
+      const stayDate = new Date(row.stay_date);
+      const isWeekend = stayDate.getDay() === 0 || stayDate.getDay() === 6; // Sun=0, Sat=6
+      const monthLabel = format(stayDate, "MMM");
+      const dayLabel = stayDate.getDate();
+
+      const capacity = parseInt(row.capacity_count || 0, 10);
+      const sold = parseInt(row.rooms_sold || 0, 10);
+      const sold1d = parseInt(row.rooms_sold_1d_ago || 0, 10);
+      const sold3d = parseInt(row.rooms_sold_3d_ago || 0, 10);
+      const sold7d = parseInt(row.rooms_sold_7d_ago || 0, 10);
+
+      const occupancy = capacity > 0 ? (sold / capacity) * 100 : 0;
+
+      // Calculate pickup relative to capacity (percentage points)
+      const pickup24h = capacity > 0 ? ((sold - sold1d) / capacity) * 100 : 0;
+      const pickup3d = capacity > 0 ? ((sold - sold3d) / capacity) * 100 : 0;
+      const pickup7d = capacity > 0 ? ((sold - sold7d) / capacity) * 100 : 0;
+
+      return {
+        date: `${monthLabel} ${dayLabel}`, // Always send date for chart axis
+        fullDate: format(stayDate, "MMM d, yyyy"),
+        occupancy,
+        pickup24h,
+        pickup3d,
+        pickup7d,
+        baseOccupancy24h: Math.max(0, occupancy - pickup24h),
+        baseOccupancy3d: Math.max(0, occupancy - pickup3d),
+        baseOccupancy7d: Math.max(0, occupancy - pickup7d),
+        isWeekend,
+      };
+    });
+
+    // Process Recent Activity (Sales Ledger)
+    const recentActivity = recentActivityRows.map((row) => {
+      const d = new Date(row.date);
+      const isToday =
+        format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+
+      const revenue = parseFloat(row.revenue || 0);
+      const roomNights = parseInt(row.room_nights || 0, 10);
+
+      return {
+        date: row.date, // ISO string
+        dateStr: format(d, "d MMM"),
+        bookings: parseInt(row.bookings || 0, 10),
+        roomNights,
+        revenue,
+        adr: roomNights > 0 ? revenue / roomNights : 0,
+        isToday,
+      };
+    });
     res.json({
       snapshot,
       marketOutlook,
@@ -601,6 +658,8 @@ router.get("/summary", requireUserApi, async (req, res) => {
       rankings,
       ytdTrend,
       budgetBenchmark: benchmarkCurrent,
+      flowcast,
+      recentActivity,
     });
   } catch (err) {
     console.error(`[API /summary] FAILED: propertyId=${propertyId}`, err);

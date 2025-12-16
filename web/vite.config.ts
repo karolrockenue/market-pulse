@@ -60,7 +60,7 @@ export default defineConfig({
     // Proxy API requests to the local backend server to avoid CORS issues during development.
     proxy: {
       "/api": {
-        target: "http://localhost:4001", // Point to the local backend.
+        target: "http://localhost:3001", // Point to the local backend.
         changeOrigin: true,
       },
     },
