@@ -13,9 +13,8 @@ export function useDashboardData(
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    // If essential params are missing, don't fetch, but stop loading
+    // If essential params are missing, wait for them to populate (keep loading)
     if (!propertyId || !city) {
-      setIsLoading(false);
       return;
     }
 
