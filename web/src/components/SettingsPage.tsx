@@ -1360,13 +1360,29 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
       .then((data) => {
         console.log("Budget Data Received:", data);
         if (Array.isArray(data) && data.length > 0) {
-          const merged = months.map((m) => {
-            const found = data.find((d: any) => d.month === m);
+          const merged = months.map((m, index) => {
+            // Match month name ("Jan") or number (1)
+            const found = data.find(
+              (d: any) =>
+                d.month === m ||
+                d.month === index + 1 ||
+                d.month == (index + 1).toString()
+            );
             return {
               month: m,
-              occupancy: found?.targetOccupancy ?? "",
-              adr: found?.targetADR ?? "",
-              revenue: found?.targetRevenue ?? "",
+              // Map DB columns (target_occupancy, target_adr_gross, target_revenue_gross)
+              occupancy:
+                found?.targetOccupancy ?? found?.target_occupancy ?? "",
+              adr:
+                found?.targetADR ??
+                found?.target_adr_gross ??
+                found?.target_adr ??
+                "",
+              revenue:
+                found?.targetRevenue ??
+                found?.target_revenue_gross ??
+                found?.target_revenue ??
+                "",
             };
           });
           setBudgetTargets(merged);
