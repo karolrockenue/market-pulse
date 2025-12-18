@@ -160,9 +160,7 @@ export function RecentBookings({ data }: RecentBookingsProps) {
             </div>
 
             <div style={styles.valueCell}>
-              <div style={styles.mainValue}>
-                {day.isToday ? day.roomNights : "-"}
-              </div>
+              <div style={styles.mainValue}>{day.roomNights}</div>
             </div>
 
             <div style={styles.valueCell}>
