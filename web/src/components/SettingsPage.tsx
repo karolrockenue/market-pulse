@@ -1454,7 +1454,7 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
           // Map the previous year's data to the current state structure
           // [FIX] Check both camelCase (API) and snake_case (DB) keys
           return {
-            month: m,g
+            month: m,
             occupancy: found?.targetOccupancy ?? found?.target_occupancy ?? "",
             adr: found?.targetADR ?? found?.target_adr ?? "",
             revenue:
