@@ -1426,8 +1426,41 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
     }
   };
 
-  const handleCopyFromPrevious = () => {
-    toast.info("Copy from previous year feature coming soon");
+  const handleCopyFromPrevious = async () => {
+    const prevYear = (parseInt(selectedYear) - 1).toString();
+    const loadingToast = toast.loading(`Checking data for ${prevYear}...`);
+
+    try {
+      const res = await fetch(`/api/hotels/${hotelId}/budgets/${prevYear}`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch previous year data");
+      const data = await res.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        const merged = months.map((m) => {
+          const found = data.find((d: any) => d.month === m);
+          // Map the previous year's data to the current state structure
+          return {
+            month: m,
+            occupancy: found?.targetOccupancy ?? "",
+            adr: found?.targetADR ?? "",
+            revenue: found?.targetRevenue ?? "",
+          };
+        });
+        setBudgetTargets(merged);
+        toast.dismiss(loadingToast);
+        toast.success(`Successfully copied data from ${prevYear}`);
+      } else {
+        toast.dismiss(loadingToast);
+        toast.warning(`No budget data found for ${prevYear} to copy.`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.dismiss(loadingToast);
+      toast.error("Failed to copy data from previous year");
+    }
   };
 
   const totals = useMemo(() => {
