@@ -631,23 +631,15 @@ router.get("/summary", requireUserApi, async (req, res) => {
       };
     });
 
-    // Process Recent Activity (Sales Ledger)
     const recentActivity = recentActivityRows.map((row) => {
-      const d = new Date(row.date);
-      const isToday =
-        format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-
-      const revenue = parseFloat(row.revenue || 0);
-      const roomNights = parseInt(row.room_nights || 0, 10);
-
       return {
-        date: row.date, // ISO string
-        dateStr: format(d, "d MMM"),
+        date: row.date,
+        dateStr: row.dateStr,
         bookings: parseInt(row.bookings || 0, 10),
-        roomNights,
-        revenue,
-        adr: roomNights > 0 ? revenue / roomNights : 0,
-        isToday,
+        roomNights: parseInt(row.roomNights || 0, 10),
+        revenue: parseFloat(row.revenue || 0),
+        adr: parseFloat(row.adr || 0),
+        isToday: row.isToday,
       };
     });
     res.json({
