@@ -1472,11 +1472,16 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
           return {
             month: m,
             occupancy: found?.targetOccupancy ?? found?.target_occupancy ?? "",
-            adr: found?.targetADR ?? found?.target_adr ?? "",
+            // Added target_adr_gross below
+            adr:
+              found?.targetADR ??
+              found?.target_adr_gross ??
+              found?.target_adr ??
+              "",
             revenue:
               found?.targetRevenue ??
-              found?.target_revenue ??
               found?.target_revenue_gross ??
+              found?.target_revenue ??
               "",
           };
         });
