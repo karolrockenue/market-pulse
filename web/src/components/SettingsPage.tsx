@@ -1438,6 +1438,9 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
       if (!res.ok) throw new Error("Failed to fetch previous year data");
       const data = await res.json();
 
+      // [DEBUG] Log the exact data structure to the console
+      console.log("Budget Copy Data (Previous Year):", data);
+
       if (Array.isArray(data) && data.length > 0) {
         const merged = months.map((m) => {
           const found = data.find((d: any) => d.month === m);
