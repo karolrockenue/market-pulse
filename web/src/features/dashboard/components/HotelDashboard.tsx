@@ -556,7 +556,7 @@ export function HotelDashboard({
                 })()
               ) : (
                 <button
-                  onClick={() => onNavigate("budget")}
+                  onClick={() => onNavigate("settings")}
                   style={{
                     width: "100%",
                     textAlign: "center",
@@ -713,7 +713,7 @@ export function HotelDashboard({
                 })()
               ) : (
                 <button
-                  onClick={() => onNavigate("budget")}
+                  onClick={() => onNavigate("settings")}
                   style={{
                     width: "100%",
                     textAlign: "center",
@@ -866,7 +866,7 @@ export function HotelDashboard({
                 })()
               ) : (
                 <button
-                  onClick={() => onNavigate("budget")}
+                  onClick={() => onNavigate("settings")}
                   style={{
                     width: "100%",
                     textAlign: "center",

@@ -16,7 +16,7 @@ Plan Before Code
 
 Before any code change, output a short bullet-point plan.
 
-STRICT Find & Replace Strategy is critical. Give user one snippet with 'FIND' - has to contain EXACT code to locate, just like in the file and another snippet with REPLACE. Do not provide entire files ,only code sections that need changing.h
+STRICT Find & Replace Strategy is critical. Give user one snippet with 'FIND' - has to contain EXACT code to locate, just like in the file and another snippet with REPLACE. Do not provide entire files ,only code sections that need changing. ALWAYS separate snippets for FIND and REPLACE.
 
 Wait for explicit user approval before writing code.
 
