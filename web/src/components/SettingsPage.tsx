@@ -1417,6 +1417,9 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
   const handleSaveBudget = async () => {
     setSaving(true);
     try {
+      // [FIX] ALIGNMENT WITH hotel.service.js
+      // The backend expects CamelCase keys (targetOccupancy, targetADR, targetRevenue)
+      // It handles the mapping to SQL columns (target_adr_gross) internally.
       const payload = budgetTargets.map((t) => ({
         month: t.month,
         targetOccupancy: t.occupancy || null,
