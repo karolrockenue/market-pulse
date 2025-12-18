@@ -792,13 +792,19 @@ const MetricsService = {
         )::date AS date
       )
       SELECT
-        dates.date,
+        TO_CHAR(dates.date, 'Dy DD Mon') as "dateStr",
+        CASE WHEN dates.date = CURRENT_DATE THEN true ELSE false END as "isToday",
         COALESCE(COUNT(dbr.id), 0) as bookings,
-        COALESCE(SUM(dbr.room_nights), 0) as room_nights,
-        COALESCE(SUM(dbr.revenue), 0) as revenue
-FROM dates
+        COALESCE(SUM(dbr.room_nights), 0) as "roomNights",
+        COALESCE(SUM(dbr.revenue), 0) as revenue,
+        CASE 
+          WHEN COALESCE(SUM(dbr.room_nights), 0) > 0 
+          THEN COALESCE(SUM(dbr.revenue), 0) / SUM(dbr.room_nights) 
+          ELSE 0 
+        END as adr
+      FROM dates
       LEFT JOIN daily_bookings_record dbr 
-        ON dates.date = dbr.booking_date 
+        ON dates.date = dbr.booking_date::date 
         AND dbr.hotel_id = $1
       GROUP BY dates.date
       ORDER BY dates.date ASC;

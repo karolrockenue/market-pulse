@@ -16,6 +16,8 @@ Plan Before Code
 
 Before any code change, output a short bullet-point plan.
 
+STRICT Find & Replace Strategy is critical. Give user one snippet with 'FIND' - has to contain EXACT code to locate, just like in the file and another snippet with REPLACE. Do not provide entire files ,only code sections that need changing.h
+
 Wait for explicit user approval before writing code.
 
 If user explicitly asks for “full file replacement”, you may skip incremental patches for that request only.
@@ -647,7 +649,29 @@ is_read (boolean)
 
 created_at, updated_at
 
-4.5 Other Market Pulse Tables (Relevant to Sentinel)
+4.6 daily_bookings_record (Sales Ledger)
+
+Stores individual booking transactions for "Recent Bookings" and granular revenue tracking.
+
+Key fields:
+
+id (PK) - usually Reservation ID
+
+hotel_id
+
+booking_date
+
+check_in_date
+
+room_nights
+
+revenue
+
+status
+
+source
+
+4.7 Other Market Pulse Tables (Relevant to Sentinel)
 
 Sentinel reads from / relies on:
 
@@ -913,7 +937,9 @@ market-pulse/
 │ │ ├── components
 │ │ │ ├── DynamicYTDTrend.tsx
 │ │ │ ├── HotelDashboard.tsx
-│ │ │ └── MarketOutlookBanner.tsx
+│ │ │ ├── MarketOutlookBanner.tsx
+│ │ │ ├── OwnHotelOccupancy.tsx
+│ │ │ └── RecentBookings.tsx
 │ │ └── hooks
 │ │ └── useDashboardData.ts
 │ ├── market-intel
