@@ -1,5 +1,56 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  Component,
+  type ReactNode,
+} from "react";
 
+// [NEW] Error Boundary to auto-fix "Gray Screen" / ChunkLoadErrors
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any) {
+    // If the error is a "ChunkLoadError" (version mismatch), reload immediately
+    if (
+      error?.message?.includes("Loading chunk") ||
+      error?.message?.includes("Importing a module script failed")
+    ) {
+      window.location.reload();
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#1a1a18] flex flex-col items-center justify-center p-4">
+          <h2 className="text-[#e5e5e5] text-xl mb-4">Something went wrong</h2>
+          <p className="text-[#9ca3af] mb-6">
+            We just updated the system. Please reload.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-[#faff6a] text-black font-medium rounded hover:bg-[#e8ef5a] transition-colors"
+          >
+            Reload Application
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { TopNav } from "./components/TopNav";
 
 import { DemandPace } from "./components/DemandPace";
@@ -559,189 +610,191 @@ export default function App() {
 
   return (
     activeView && (
-      // [MODIFIED] Wrap the entire app content with the ActionListProvider
-      <ActionListProvider>
-        <div
-          className="min-h-screen"
-          style={
-            activeView === "reports"
-              ? {
-                  backgroundImage:
-                    "linear-gradient(180deg, #111111 0%, #050507 60%, #000000 100%), radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
-                  backgroundSize: "100% 100%, 4px 4px",
-                  backgroundAttachment: "fixed",
-                  backgroundColor: "#050507",
-                }
-              : { backgroundColor: "#232320" }
-          }
-        >
-          {/* [NEW] Conditionally render the InitialSyncScreen as a full-screen overlay
+      // [MODIFIED] Wrap the entire app content with ErrorBoundary and ActionListProvider
+      <ErrorBoundary>
+        <ActionListProvider>
+          <div
+            className="min-h-screen"
+            style={
+              activeView === "reports"
+                ? {
+                    backgroundImage:
+                      "linear-gradient(180deg, #111111 0%, #050507 60%, #000000 100%), radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
+                    backgroundSize: "100% 100%, 4px 4px",
+                    backgroundAttachment: "fixed",
+                    backgroundColor: "#050507",
+                  }
+                : { backgroundColor: "#232320" }
+            }
+          >
+            {/* [NEW] Conditionally render the InitialSyncScreen as a full-screen overlay
         based on the new `isSyncing` state, which mimics the original app. 
         */}
-          {isSyncing && <InitialSyncScreen />}
+            {isSyncing && <InitialSyncScreen />}
 
-          <TopNav
-            activeView={activeView}
-            // [MODIFIED] Pass our new, smarter handler to the TopNav
-            onViewChange={handleViewChange}
-            property={property}
-            onPropertyChange={setProperty}
-            properties={properties}
-            // Pass the new state variable down to the TopNav component
-            lastUpdatedAt={lastUpdatedAt}
-            // [NEW] Pass the user info down to the TopNav
-            userInfo={userInfo}
-          />
-          {/* Landing View block is now removed and handled above */}
-
-          {activeView === "dashboard" && (
-            <DashboardHub
-              propertyId={selectedPropertyDetails?.hotel_id || null}
-              city={selectedPropertyDetails?.city}
-              onNavigate={handleViewChange}
-            />
-          )}
-          {activeView === "reports" && (
-            <ReportsHub
-              hotelId={property}
-              currencySymbol={
-                currencyCode === "GBP"
-                  ? "£"
-                  : currencyCode === "EUR"
-                  ? "€"
-                  : "$"
-              }
-              currencyCode={currencyCode}
-              userRole={userInfo?.role}
-            />
-          )}
-          {activeView === "admin" && <AdminHub />}
-          {activeView === "settings" && (
-            <SettingsPage
-              hotelId={property}
-              userRole={userInfo?.role}
-              onInviteUser={() => setShowInviteUser(true)} // <--- Re-connected
-              onGrantAccess={() => setShowGrantAccess(true)} // <--- Re-connected
-            />
-          )}
-
-          {/* [NEW] Added the Support Page to the main app layout */}
-          {activeView === "support" && (
-            <SupportPage
-              // Use the state-driven 'onBack' logic to return to the previous view
-              onBack={() => setActiveView(previousView || "dashboard")}
-            />
-          )}
-
-          {activeView === "setup" && (
-            <div className="p-6">
-              <div className="mb-6 text-center">
-                <h1 className="text-white text-2xl mb-2">
-                  Property Setup Demo
-                </h1>
-                <p className="text-[#9ca3af] text-sm">
-                  Click the button below to open the setup modal
-                </p>
-              </div>
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setShowPropertySetup(true)}
-                  className="bg-[#faff6a] text-[#1f1f1c] px-6 py-3 rounded hover:bg-[#e8ef5a]"
-                >
-                  Open Property Setup Modal
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* [NEW] Render the Demand & Pace page */}
-          {activeView === "demand-pace" &&
-            // [FIX] Add a conditional check.
-            // We must wait until 'selectedPropertyDetails' (which includes city and total_rooms)
-            // has been fetched before we can render the component that depends on it.
-            (selectedPropertyDetails ? (
-              <DemandPace
-                // We can now safely use 'selectedPropertyDetails' for ALL props,
-                // as we know it's not null.
-                propertyId={selectedPropertyDetails.hotel_id}
-                // Pass the currencyCode we already have in state
-                currencyCode={currencyCode}
-                // Pass the 'city' string from our details object
-                citySlug={selectedPropertyDetails.city}
-              />
-            ) : (
-              // [NEW] Render a simple loader while we wait for the property details to load.
-              // This covers the brief moment between selecting a property and the API returning its details.
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "80vh",
-                  background: "#1d1d1c", // [UPDATED] Matches main background color
-                  color: "#e5e5e5",
-                  padding: "24px",
-                }}
-              >
-                <div className="w-8 h-8 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
-                <h2 className="text-xl font-light text-[#e5e5e5]">
-                  Loading Market Context...
-                </h2>
-                <p className="text-[#6b7280] text-sm mt-2">
-                  Syncing city demand and room inventory...
-                </p>
-              </div>
-            ))}
-
-          {/* Sentinel Domain Hub */}
-          {(activeView === "sentinel" ||
-            activeView === "rateManager" ||
-            activeView === "shadowfax" ||
-            activeView === "propertyHub" ||
-            activeView === "riskOverview") && (
-            <SentinelHub
+            <TopNav
               activeView={activeView}
-              onNavigate={handleViewChange}
+              // [MODIFIED] Pass our new, smarter handler to the TopNav
+              onViewChange={handleViewChange}
+              property={property}
+              onPropertyChange={setProperty}
+              properties={properties}
+              // Pass the new state variable down to the TopNav component
+              lastUpdatedAt={lastUpdatedAt}
+              // [NEW] Pass the user info down to the TopNav
+              userInfo={userInfo}
             />
-          )}
+            {/* Landing View block is now removed and handled above */}
 
-          {/* ManageCompSetModal moved to AdminHub */}
-          <InviteUserModal
-            open={showInviteUser}
-            onClose={() => setShowInviteUser(false)}
-            properties={properties}
-            onSendInvite={handleSendInvite}
-            isLoading={isInviting}
-          />
-          <GrantAccessModal
-            open={showGrantAccess}
-            onClose={() => setShowGrantAccess(false)}
-            properties={properties}
-            onGrantAccess={handleGrantAccess} // <--- Wired logic
-            isLoading={isGranting} // <--- Wired loading state
-          />
-          <PropertyClassificationModal
-            isOpen={showPropertySetup} // [MODIFIED] Prop renamed
-            onClose={() => setShowPropertySetup(false)} // [NEW] Wire up onClose
-            onComplete={handlePropertySetupComplete} // [NEW] Use the new handler
-          />
+            {activeView === "dashboard" && (
+              <DashboardHub
+                propertyId={selectedPropertyDetails?.hotel_id || null}
+                city={selectedPropertyDetails?.city}
+                onNavigate={handleViewChange}
+              />
+            )}
+            {activeView === "reports" && (
+              <ReportsHub
+                hotelId={property}
+                currencySymbol={
+                  currencyCode === "GBP"
+                    ? "£"
+                    : currencyCode === "EUR"
+                    ? "€"
+                    : "$"
+                }
+                currencyCode={currencyCode}
+                userRole={userInfo?.role}
+              />
+            )}
+            {activeView === "admin" && <AdminHub />}
+            {activeView === "settings" && (
+              <SettingsPage
+                hotelId={property}
+                userRole={userInfo?.role}
+                onInviteUser={() => setShowInviteUser(true)} // <--- Re-connected
+                onGrantAccess={() => setShowGrantAccess(true)} // <--- Re-connected
+              />
+            )}
 
-          {/* Add the Toaster component here. It's invisible but necessary for toasts to appear. */}
-          {/* We add theme="dark" to match the application's style. */}
-          {/* [MODIFIED] Removed the 'richColors' prop to use the neutral styles from components/ui/sonner.tsx */}
+            {/* [NEW] Added the Support Page to the main app layout */}
+            {activeView === "support" && (
+              <SupportPage
+                // Use the state-driven 'onBack' logic to return to the previous view
+                onBack={() => setActiveView(previousView || "dashboard")}
+              />
+            )}
 
-          <Toaster
-            theme="dark"
-            expand={true} // <--- THIS FIXES THE OVERLAP (stacks them vertically)
-            position="top-right" // Right side is usually better for vertical stacking
-            closeButton
-            toastOptions={{
-              style: { zIndex: 9999 },
-            }}
-          />
-        </div>
-      </ActionListProvider>
+            {activeView === "setup" && (
+              <div className="p-6">
+                <div className="mb-6 text-center">
+                  <h1 className="text-white text-2xl mb-2">
+                    Property Setup Demo
+                  </h1>
+                  <p className="text-[#9ca3af] text-sm">
+                    Click the button below to open the setup modal
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setShowPropertySetup(true)}
+                    className="bg-[#faff6a] text-[#1f1f1c] px-6 py-3 rounded hover:bg-[#e8ef5a]"
+                  >
+                    Open Property Setup Modal
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* [NEW] Render the Demand & Pace page */}
+            {activeView === "demand-pace" &&
+              // [FIX] Add a conditional check.
+              // We must wait until 'selectedPropertyDetails' (which includes city and total_rooms)
+              // has been fetched before we can render the component that depends on it.
+              (selectedPropertyDetails ? (
+                <DemandPace
+                  // We can now safely use 'selectedPropertyDetails' for ALL props,
+                  // as we know it's not null.
+                  propertyId={selectedPropertyDetails.hotel_id}
+                  // Pass the currencyCode we already have in state
+                  currencyCode={currencyCode}
+                  // Pass the 'city' string from our details object
+                  citySlug={selectedPropertyDetails.city}
+                />
+              ) : (
+                // [NEW] Render a simple loader while we wait for the property details to load.
+                // This covers the brief moment between selecting a property and the API returning its details.
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: "80vh",
+                    background: "#1d1d1c", // [UPDATED] Matches main background color
+                    color: "#e5e5e5",
+                    padding: "24px",
+                  }}
+                >
+                  <div className="w-8 h-8 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
+                  <h2 className="text-xl font-light text-[#e5e5e5]">
+                    Loading Market Context...
+                  </h2>
+                  <p className="text-[#6b7280] text-sm mt-2">
+                    Syncing city demand and room inventory...
+                  </p>
+                </div>
+              ))}
+
+            {/* Sentinel Domain Hub */}
+            {(activeView === "sentinel" ||
+              activeView === "rateManager" ||
+              activeView === "shadowfax" ||
+              activeView === "propertyHub" ||
+              activeView === "riskOverview") && (
+              <SentinelHub
+                activeView={activeView}
+                onNavigate={handleViewChange}
+              />
+            )}
+
+            {/* ManageCompSetModal moved to AdminHub */}
+            <InviteUserModal
+              open={showInviteUser}
+              onClose={() => setShowInviteUser(false)}
+              properties={properties}
+              onSendInvite={handleSendInvite}
+              isLoading={isInviting}
+            />
+            <GrantAccessModal
+              open={showGrantAccess}
+              onClose={() => setShowGrantAccess(false)}
+              properties={properties}
+              onGrantAccess={handleGrantAccess} // <--- Wired logic
+              isLoading={isGranting} // <--- Wired loading state
+            />
+            <PropertyClassificationModal
+              isOpen={showPropertySetup} // [MODIFIED] Prop renamed
+              onClose={() => setShowPropertySetup(false)} // [NEW] Wire up onClose
+              onComplete={handlePropertySetupComplete} // [NEW] Use the new handler
+            />
+
+            {/* Add the Toaster component here. It's invisible but necessary for toasts to appear. */}
+            {/* We add theme="dark" to match the application's style. */}
+            {/* [MODIFIED] Removed the 'richColors' prop to use the neutral styles from components/ui/sonner.tsx */}
+
+            <Toaster
+              theme="dark"
+              expand={true} // <--- THIS FIXES THE OVERLAP (stacks them vertically)
+              position="top-right" // Right side is usually better for vertical stacking
+              closeButton
+              toastOptions={{
+                style: { zIndex: 9999 },
+              }}
+            />
+          </div>
+        </ActionListProvider>
+      </ErrorBoundary>
     ) // [NEW] This closes the conditional render from `activeView && (`
   );
 }
