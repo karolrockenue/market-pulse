@@ -1442,12 +1442,19 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
       console.log("Budget Copy Data (Previous Year):", data);
 
       if (Array.isArray(data) && data.length > 0) {
-        const merged = months.map((m) => {
-          const found = data.find((d: any) => d.month === m);
+        const merged = months.map((m, index) => {
+          // [FIX] Match month name ("Jan") OR month number (1 or "1")
+          const found = data.find(
+            (d: any) =>
+              d.month === m ||
+              d.month === index + 1 ||
+              d.month == (index + 1).toString()
+          );
+
           // Map the previous year's data to the current state structure
           // [FIX] Check both camelCase (API) and snake_case (DB) keys
           return {
-            month: m,
+            month: m,g
             occupancy: found?.targetOccupancy ?? found?.target_occupancy ?? "",
             adr: found?.targetADR ?? found?.target_adr ?? "",
             revenue:
