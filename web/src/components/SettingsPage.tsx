@@ -1442,11 +1442,16 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
         const merged = months.map((m) => {
           const found = data.find((d: any) => d.month === m);
           // Map the previous year's data to the current state structure
+          // [FIX] Check both camelCase (API) and snake_case (DB) keys
           return {
             month: m,
-            occupancy: found?.targetOccupancy ?? "",
-            adr: found?.targetADR ?? "",
-            revenue: found?.targetRevenue ?? "",
+            occupancy: found?.targetOccupancy ?? found?.target_occupancy ?? "",
+            adr: found?.targetADR ?? found?.target_adr ?? "",
+            revenue:
+              found?.targetRevenue ??
+              found?.target_revenue ??
+              found?.target_revenue_gross ??
+              "",
           };
         });
         setBudgetTargets(merged);
