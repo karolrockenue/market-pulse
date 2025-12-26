@@ -77,7 +77,7 @@ async function getCredentialsForHotel(hotelId) {
   const { pms_credentials, pms_type, pms_property_id } = result.rows[0];
 
   // For Mews, we must decrypt the access token before returning
-  if (pms_type === 'mews') {
+  if (pms_type === "mews") {
     const storedCredentials = pms_credentials;
     // Re-use the existing getMewsCredentials logic
     const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
@@ -98,23 +98,28 @@ async function getCredentialsForHotel(hotelId) {
     return {
       credentials: {
         clientToken: storedCredentials.clientToken,
-        accessToken: decryptedToken
+        accessToken: decryptedToken,
       },
-      pms_type: 'mews',
-      pms_property_id: pms_property_id
+      pms_type: "mews",
+      pms_property_id: pms_property_id,
     };
   }
 
   // For Cloudbeds, just return the stored credentials object
   return {
     credentials: pms_credentials, // This contains the refresh_token
-    pms_type: 'cloudbeds',
-    pms_property_id: pms_property_id
+    pms_type: "cloudbeds",
+    pms_property_id: pms_property_id,
   };
 }
 
-async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_id) {
-  if (pms_type === 'cloudbeds') {
+async function getRoomTypesFromPMS(
+  hotelId,
+  pms_type,
+  credentials,
+  pms_property_id
+) {
+  if (pms_type === "cloudbeds") {
     // --- Cloudbeds Logic ---
     // 1. Get a fresh Access Token using the stored refresh_token
     // We use the internal hotelId to find the right refresh token
@@ -136,8 +141,7 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
       throw new Error(`Cloudbeds API error: ${response.statusText}`);
     }
     return response.json(); // Returns { success: true, data: [...] }
-
-  } else if (pms_type === 'mews') {
+  } else if (pms_type === "mews") {
     // --- Mews Logic ---
     // Credentials are pre-decrypted by getCredentialsForHotel
     const targetUrl = "https://api.mews.com/api/connector/v1/roomTypes/getAll";
@@ -145,7 +149,7 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${credentials.accessToken}`,
+        Authorization: `Bearer ${credentials.accessToken}`,
       },
       body: JSON.stringify({
         ClientToken: credentials.clientToken,
@@ -205,17 +209,17 @@ router.post("/login", async (req, res) => {
       [token, user.user_id, expires_at]
     );
 
-  // --- DYNAMIC URL LOGIC ---
+    // --- DYNAMIC URL LOGIC ---
     // Create the correct baseUrl based on the environment.
     // This ensures magic links work on production, Vercel previews, and local development.
     let baseUrl;
-// --- DYNAMIC URL LOGIC (v2) ---
+    // --- DYNAMIC URL LOGIC (v2) ---
     // Create the correct baseUrl based on the environment.
 
-    if (process.env.VERCEL_ENV === 'production') {
+    if (process.env.VERCEL_ENV === "production") {
       // Production environment
-      baseUrl = 'https://www.market-pulse.io';
-    } else if (process.env.VERCEL_BRANCH_URL) { 
+      baseUrl = "https://www.market-pulse.io";
+    } else if (process.env.VERCEL_BRANCH_URL) {
       // Vercel "branch" preview environment (e.g., "feature-branch.vercel.app")
       // This is the URL the user is actually visiting.
       baseUrl = `https://${process.env.VERCEL_BRANCH_URL}`;
@@ -224,21 +228,21 @@ router.post("/login", async (req, res) => {
       baseUrl = `https://${process.env.VERCEL_URL}`;
     } else {
       // Local development environment
-      baseUrl = 'http://localhost:3000'; // Frontend runs on 3000
+      baseUrl = "http://localhost:3000"; // Frontend runs on 3000
     }
     // --- END DYNAMIC URL LOGIC (v2) ---
 
     // Construct the final link using the dynamic base URL
     const loginLink = `${baseUrl}/api/auth/magic-link-callback?token=${token}`;
     // --- END DYNAMIC URL LOGIC ---
-const msg = {
-  to: user.email,
-  // [FIX] Use your verified SendGrid sending domain to avoid spam filters
-  from: { name: "Market Pulse", email: "login@em4689.market-pulse.io" }, 
-  subject: "Your Market Pulse Login Link",
-  // [NEW] Call the imported function to get the robust HTML
-  html: getMagicLinkEmailHTML(user.first_name || "there", loginLink),
-};
+    const msg = {
+      to: user.email,
+      // [FIX] Use your verified SendGrid sending domain to avoid spam filters
+      from: { name: "Market Pulse", email: "login@em4689.market-pulse.io" },
+      subject: "Your Market Pulse Login Link",
+      // [NEW] Call the imported function to get the robust HTML
+      html: getMagicLinkEmailHTML(user.first_name || "there", loginLink),
+    };
     await sgMail.send(msg);
     res.status(200).json({ success: true, message: "Login link sent." });
   } catch (error) {
@@ -405,9 +409,7 @@ router.get("/accept-invitation", async (req, res) => {
       if (err) {
         console.error("Error regenerating session for new user:", err);
         // Even if session fails, the user was created. Redirect them to login.
-        return res.redirect(
-          "/login.html?message=Account created! Please log in."
-        );
+        return res.redirect("/signin?message=Account created! Please log in.");
       }
       req.session.userId = newDbUser.cloudbeds_user_id;
       req.session.role = "user";
@@ -416,7 +418,7 @@ router.get("/accept-invitation", async (req, res) => {
         if (saveErr) {
           console.error("Error saving session for new user:", saveErr);
           return res.redirect(
-            "/login.html?message=Account created! Please log in."
+            "/signin?message=Account created! Please log in."
           );
         }
         // Redirect to the dashboard on successful login
@@ -451,7 +453,10 @@ router.get("/session-info", async (req, res) => {
       const responsePayload = {
         isLoggedIn: true,
         role: user.role,
- isAdmin: user.role === "super_admin" || user.role === "owner" || user.role === "admin",
+        isAdmin:
+          user.role === "super_admin" ||
+          user.role === "owner" ||
+          user.role === "admin",
         firstName: user.first_name,
         lastName: user.last_name,
       };
@@ -909,7 +914,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       // Sync hotel details and link properties to the user
       for (const property of userProperties) {
-     const internalHotelId = await cloudbedsAdapter.syncHotelDetailsToDb(
+        const internalHotelId = await cloudbedsAdapter.syncHotelDetailsToDb(
           access_token,
           property.property_id,
           client
@@ -923,34 +928,36 @@ router.get("/cloudbeds/callback", async (req, res) => {
         );
 
         // [NEW] Add Total Rooms Sync Logic (copied from admin.router.js)
-        console.log(`[AUTH CALLBACK] Syncing total_rooms for new hotel: ${internalHotelId}`);
+        console.log(
+          `[AUTH CALLBACK] Syncing total_rooms for new hotel: ${internalHotelId}`
+        );
         let totalRooms = 0;
         try {
-          const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
-            internalHotelId
-          );
+          const { credentials, pms_type, pms_property_id } =
+            await getCredentialsForHotel(internalHotelId);
 
           const apiResponse = await getRoomTypesFromPMS(
-            internalHotelId, 
-            pms_type, 
-            credentials, 
+            internalHotelId,
+            pms_type,
+            credentials,
             pms_property_id
           );
 
           if (apiResponse && Array.isArray(apiResponse.data)) {
-            totalRooms = apiResponse.data.reduce(
-              (sum, roomType) => {
-                const roomName = roomType.roomTypeName || roomType.Name || "";
-                if (roomName.toLowerCase().includes('virtual')) {
-                  console.log(` -- Skipping room: "${roomName}" (virtual)`);
-                  return sum;
-                }
-                return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
-              },
-              0
-            );
+            totalRooms = apiResponse.data.reduce((sum, roomType) => {
+              const roomName = roomType.roomTypeName || roomType.Name || "";
+              if (roomName.toLowerCase().includes("virtual")) {
+                console.log(` -- Skipping room: "${roomName}" (virtual)`);
+                return sum;
+              }
+              return (
+                sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0)
+              );
+            }, 0);
           } else {
-            throw new Error("Invalid API response structure. Expected { data: [...] }");
+            throw new Error(
+              "Invalid API response structure. Expected { data: [...] }"
+            );
           }
 
           if (totalRooms > 0) {
@@ -958,13 +965,19 @@ router.get("/cloudbeds/callback", async (req, res) => {
               "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
               [totalRooms, internalHotelId]
             );
-            console.log(`[AUTH CALLBACK] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${internalHotelId}.`);
+            console.log(
+              `[AUTH CALLBACK] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${internalHotelId}.`
+            );
           } else {
-            console.warn(`[AUTH CALLBACK] Calculated total rooms was 0 for hotel ${internalHotelId}. Skipping update.`);
+            console.warn(
+              `[AUTH CALLBACK] Calculated total rooms was 0 for hotel ${internalHotelId}. Skipping update.`
+            );
           }
         } catch (roomError) {
           // Log the error but do not fail the whole transaction
-          console.error(`[AUTH CALLBACK] FAILED to update total_rooms for hotel ${internalHotelId}: ${roomError.message}`);
+          console.error(
+            `[AUTH CALLBACK] FAILED to update total_rooms for hotel ${internalHotelId}: ${roomError.message}`
+          );
         }
         // --- [END NEW] ---
 
@@ -999,7 +1012,7 @@ router.get("/cloudbeds/callback", async (req, res) => {
       req.session.userId = cloudbedsUser.user_id;
       req.session.role = userRole;
 
-// This is the new, corrected code
+      // This is the new, corrected code
       req.session.save((err) => {
         if (err) {
           console.error(
@@ -1012,14 +1025,14 @@ router.get("/cloudbeds/callback", async (req, res) => {
         }
 
         // --- [NEW] START INITIAL SYNC TRIGGER ---
-        
- // This is the new, enhanced-logging code
-        
+
+        // This is the new, enhanced-logging code
+
         // 1. Determine the correct base URL
         let baseUrl;
-        if (process.env.VERCEL_ENV === 'production') {
-          baseUrl = 'https://www.market-pulse.io';
-        } else if (process.env.VERCEL_BRANCH_URL) { 
+        if (process.env.VERCEL_ENV === "production") {
+          baseUrl = "https://www.market-pulse.io";
+        } else if (process.env.VERCEL_BRANCH_URL) {
           baseUrl = `https://${process.env.VERCEL_BRANCH_URL}`;
         } else if (process.env.VERCEL_URL) {
           baseUrl = `https://{process.env.VERCEL_URL}`;
@@ -1029,22 +1042,30 @@ router.get("/cloudbeds/callback", async (req, res) => {
           // We must call the server's *own* port, not the React dev server port.
           // Or, better yet, use an internal path relative to the server root.
           // Let's try the absolute URL first as it's more robust.
-          baseUrl = `http://localhost:${process.env.PORT || 3000}`; 
-          console.log(`[AUTH CALLBACK] DEBUG: Using localhost baseUrl: ${baseUrl}`);
+          baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+          console.log(
+            `[AUTH CALLBACK] DEBUG: Using localhost baseUrl: ${baseUrl}`
+          );
         }
 
         // 2. Loop through all new hotels and trigger the sync
-        console.log(`[AUTH CALLBACK] DEBUG: Found ${newlySyncedInternalIds.length} new hotels to sync.`);
-        
+        console.log(
+          `[AUTH CALLBACK] DEBUG: Found ${newlySyncedInternalIds.length} new hotels to sync.`
+        );
+
         for (const hotelId of newlySyncedInternalIds) {
           const syncUrl = `${baseUrl}/api/admin/initial-sync`;
           const bodyPayload = JSON.stringify({ propertyId: hotelId });
           const internalSecret = process.env.INTERNAL_API_SECRET;
 
-          console.log(`[AUTH CALLBACK] DEBUG: Preparing to trigger sync for hotel ${hotelId} via POST to ${syncUrl}`);
-          
+          console.log(
+            `[AUTH CALLBACK] DEBUG: Preparing to trigger sync for hotel ${hotelId} via POST to ${syncUrl}`
+          );
+
           if (!internalSecret) {
-            console.error(`[AUTH CALLBACK] CRITICAL FAILURE: INTERNAL_API_SECRET is not set. Cannot trigger sync.`);
+            console.error(
+              `[AUTH CALLBACK] CRITICAL FAILURE: INTERNAL_API_SECRET is not set. Cannot trigger sync.`
+            );
             continue; // Skip to next hotel
           }
 
@@ -1053,31 +1074,35 @@ router.get("/cloudbeds/callback", async (req, res) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${internalSecret}`,
+              Authorization: `Bearer ${internalSecret}`,
             },
             body: bodyPayload,
           })
-          .then(async (res) => {
-            // Check if the response was OK (status 200-299)
-            if (res.ok) {
-              const responseData = await res.json();
-              console.log(`[AUTH CALLBACK] SUCCESS: Triggered sync for hotel ${hotelId}. Server responded:`, responseData.message);
-            } else {
-              // If the response was not OK, log the error
-              const errorData = await res.text(); // Get text in case JSON parse fails
-              console.error(`[AUTH CALLBACK] FAILURE: Trigger for hotel ${hotelId} failed. Status: ${res.status}. Response: ${errorData}`);
-            }
-          })
-          .catch((syncErr) => {
-            // This catches network errors (e.g., fetch itself failed)
-            console.error(
-              `[AUTH CALLBACK] CRITICAL FETCH ERROR: Failed to trigger initial sync for hotel ${hotelId}:`,
-              syncErr.message
-            );
-          });
+            .then(async (res) => {
+              // Check if the response was OK (status 200-299)
+              if (res.ok) {
+                const responseData = await res.json();
+                console.log(
+                  `[AUTH CALLBACK] SUCCESS: Triggered sync for hotel ${hotelId}. Server responded:`,
+                  responseData.message
+                );
+              } else {
+                // If the response was not OK, log the error
+                const errorData = await res.text(); // Get text in case JSON parse fails
+                console.error(
+                  `[AUTH CALLBACK] FAILURE: Trigger for hotel ${hotelId} failed. Status: ${res.status}. Response: ${errorData}`
+                );
+              }
+            })
+            .catch((syncErr) => {
+              // This catches network errors (e.g., fetch itself failed)
+              console.error(
+                `[AUTH CALLBACK] CRITICAL FETCH ERROR: Failed to trigger initial sync for hotel ${hotelId}:`,
+                syncErr.message
+              );
+            });
         }
         // --- [END] INITIAL SYNC TRIGGER (WITH LOGGING) ---
-
 
         // 3. Redirect the user (this logic is unchanged)
         const primaryNewPropertyId = newlySyncedInternalIds[0];
@@ -1093,8 +1118,6 @@ router.get("/cloudbeds/callback", async (req, res) => {
           res.redirect("/app/");
         }
       });
-
-
     } catch (dbError) {
       await client.query("ROLLBACK");
       console.error(
