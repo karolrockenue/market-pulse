@@ -624,11 +624,52 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
             </p>
           </div>
 
-          {/* Actual Market Calendar */}
+          {/* Actual Market Calendar (Static Preview) */}
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-r from-[#faff6a]/20 via-[#10b981]/20 to-[#faff6a]/20 blur-3xl opacity-50" />
-            <div className="relative">
-              <MarketCalendarPreview />
+            <div className="relative bg-[#1a1a18] border border-[#3a3a35] rounded-xl overflow-hidden shadow-2xl">
+              {/* Fake Calendar Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#3a3a35] bg-[#232320]">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
+                  <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
+                  <div className="w-3 h-3 rounded-full bg-[#10b981]" />
+                </div>
+                <div className="text-xs text-[#9ca3af] font-mono">
+                  market_demand_forecast.pdf
+                </div>
+              </div>
+
+              {/* Fake Calendar Grid */}
+              <div className="p-6 grid grid-cols-7 gap-1 opacity-75">
+                {Array.from({ length: 28 }).map((_, i) => {
+                  // Generate random "heat map" colors for the preview
+                  const intensity = [
+                    "bg-[#3b82f6]/20 border-[#3b82f6]/30", // Low
+                    "bg-[#faff6a]/20 border-[#faff6a]/30", // Med
+                    "bg-[#f97316]/20 border-[#f97316]/30", // High
+                    "bg-[#ef4444]/20 border-[#ef4444]/30", // Critical
+                  ][i % 4];
+
+                  return (
+                    <div
+                      key={i}
+                      className={`h-12 rounded border ${intensity} flex items-center justify-center`}
+                    >
+                      <span className="text-[10px] text-[#e5e5e5] opacity-50">
+                        {i + 1}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Overlay Label */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-[#1a1a18]/90 backdrop-blur border border-[#faff6a]/30 px-6 py-3 rounded-full text-[#faff6a] text-sm font-medium">
+                  Live Interactive Calendar
+                </div>
+              </div>
             </div>
           </div>
         </div>
