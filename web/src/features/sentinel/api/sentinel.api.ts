@@ -68,6 +68,28 @@ export const syncFacts = async (
   return json.data;
 };
 
+// [NEW] Max Rates API
+export const getDailyMaxRates = async (hotelId: string) => {
+  const res = await fetch(`/api/sentinel/max-rates/${hotelId}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to fetch max rates");
+  return json.data || {};
+};
+
+export const saveDailyMaxRates = async (
+  hotelId: string,
+  rates: Record<string, string>
+) => {
+  const res = await fetch(`/api/sentinel/max-rates/${hotelId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rates }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to save max rates");
+  return json;
+};
+
 // --- RATE MANAGER (PRICING) ---
 
 export const getRateCalendar = async (
@@ -203,4 +225,38 @@ export const markNotificationsRead = async (ids?: string[]) => {
 
 export const deleteNotification = async (id: string) => {
   await fetch(`/api/sentinel/notifications/${id}`, { method: "DELETE" });
+};
+
+export const getAiPredictions = async (
+  hotelId: string
+): Promise<
+  {
+    room_type_id: number;
+    stay_date: string;
+    suggested_rate: string | number;
+    confidence_score: number;
+  }[]
+> => {
+  const res = await fetch(`/api/sentinel/predictions/${hotelId}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error("Failed to fetch AI predictions");
+  return json.data || [];
+};
+
+export const getSentinelStatus = async (hotelId: string) => {
+  const res = await fetch(`/api/sentinel/status/${hotelId}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to fetch status");
+  return json.data;
+};
+
+export const triggerSentinelRun = async (hotelId: string) => {
+  const res = await fetch("/api/sentinel/recalculate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hotelId }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to trigger run");
+  return json;
 };

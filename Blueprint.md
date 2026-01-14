@@ -16,7 +16,24 @@ Plan Before Code
 
 Before any code change, output a short bullet-point plan.
 
-STRICT Find & Replace Strategy is critical. Give user one snippet with 'FIND' - has to contain EXACT code to locate, just like in the file and another snippet with REPLACE. Do not provide entire files ,only code sections that need changing. ALWAYS separate snippets for FIND and REPLACE.
+STRUCTURAL ENFORCEMENT (CRITICAL)
+
+- FIND and REPLACE MUST be in two separate fenced code blocks
+- Each fenced block MUST contain only one of:
+
+  - the FIND snippet
+  - the REPLACE snippet
+
+- It is STRICTLY FORBIDDEN to:
+  - place FIND and REPLACE in the same code block
+  - label FIND and REPLACE inside a single snippet
+  - combine them under comments, headers, or separators
+
+If FIND and REPLACE appear in the same code block:
+→ Output is INVALID
+→ STOP
+→ Apologize
+→ Ask to re-output correctly
 
 Wait for explicit user approval before writing code.
 
@@ -224,6 +241,14 @@ Builds override payloads using sentinel.pricing.engine.js.
 
 Drives preview calendars and DB writes.
 
+api/services/sentinel.bridge.service.js
+
+Logic owner for Machine-to-Machine interactions (AI Bridge).
+
+Aggregates context (Inventory, Pace, Config) for the AI.
+
+Upserts AI predictions into sentinel_ai_predictions.
+
 api/services/... (future)
 
 Additional services should follow the same pattern: routers stay thin; services own SQL + business logic.
@@ -261,6 +286,10 @@ Support endpoints surfaced to the UI.
 api/routes/sentinel.router.js
 
 Sentinel-only API (see §5.1).
+
+api/routes/bridge.router.js
+
+Machine-to-machine AI Bridge (Node <-> DGX). Protected by x-api-key.
 
 Rule for AI:
 Never re-introduce deleted routers (dashboard/planning/reports/portfolio/rockenue/budgets/property-hub/scraper). All new work builds on the domain routers above.
@@ -308,6 +337,8 @@ api/utils/pdf.utils.js, api/utils/report-templates/... – reporting & PDFs.
 api/utils/email.utils.js, api/utils/emailTemplates.js – transactional emails.
 
 api/utils/middleware.js – auth, requireAdminApi, etc.
+
+api/utils/bridgeAuth.js – Security middleware for AI Bridge (x-api-key).
 
 Workers & Scripts
 
@@ -649,6 +680,24 @@ is_read (boolean)
 
 created_at, updated_at
 
+4.5 sentinel_daily_max_rates
+
+Stores granular daily price ceilings (Dynamic Rate Caps).
+
+Source of truth for "The Ceiling" in the Sentinel pricing logic.
+
+Fields:
+
+hotel_id (PK, Integer)
+
+stay_date (PK, Date)
+
+max_price (Numeric)
+
+is_manual_override (Boolean)
+
+updated_at
+
 4.6 daily_bookings_record (Sales Ledger)
 
 Stores individual booking transactions for "Recent Bookings" and granular revenue tracking.
@@ -671,7 +720,23 @@ status
 
 source
 
-4.7 Other Market Pulse Tables (Relevant to Sentinel)
+4.7 sentinel_pace_curves
+
+Stores the 365-day booking pace targets for different seasonality tiers.
+
+Key fields:
+
+id (PK)
+
+hotel_id
+
+season_tier (low | mid | high)
+
+curve_data (JSON/Array of numbers 0-100)
+
+created_at
+
+4.8 Other Market Pulse Tables (Relevant to Sentinel)
 
 Sentinel reads from / relies on:
 
@@ -690,6 +755,20 @@ hotel_budgets
 rockenue_managed_assets (calculator settings, multipliers, Genius %, etc.)
 
 Helpers: magic_login_tokens, user_sessions, etc.
+
+4.9 sentinel_ai_predictions
+
+Stores "Shadow Mode" rate suggestions from the External AI.
+
+Fields:
+
+hotel_id, room_type_id, stay_date (Composite Unique Key)
+
+suggested_rate (Numeric)
+
+confidence_score, reasoning, model_version
+
+is_applied (Boolean) – True if user accepted the suggestion.
 
 5.0 API REFERENCE (ACTIVE ENDPOINTS ONLY)
 
@@ -773,9 +852,18 @@ Optionally accepts ids array.
 
 Marks relevant notifications as read (or entire set).
 
+GET /pace-curves/:hotelId
+
+Returns the Low/Mid/High pace curves for the given hotel.
+
+POST /pace-curves/copy
+
+Body: { sourceHotelId, targetHotelId }
+
+Copies all pace curves from the source hotel to the target hotel (overwriting existing ones).
+
 Rule:
 If you need new Sentinel functionality, extend the service and then expose a minimal API route here, instead of embedding logic in the router.
-
 5.2 Webhooks (/api/webhooks)
 
 Receives external PMS events (e.g., reservation/created, reservation/status_changed).
@@ -829,6 +917,28 @@ Login/session, user management, support functions.
 Rule for AI:
 When adding features, pick the correct domain router instead of adding ad-hoc routes elsewhere.
 
+5.4 Bridge Endpoints (/api/bridge)
+
+Protected by bridgeAuth (requires x-api-key header).
+
+GET /context/:hotelId
+
+Returns full context for AI decision making:
+
+Inventory (sentinel_rates_calendar).
+
+Config (Min/Max rates, Seasonality).
+
+Pace Curves (Targets).
+
+Pickup Velocity (Calculated 24h delta).
+
+POST /decisions
+
+Accepts JSON array of rate predictions.
+
+Upserts into sentinel_ai_predictions.
+
 6.0 ACTIVE FILE TREE (SIMPLIFIED, LOGIC-FOCUSED)
 
 Note:
@@ -845,6 +955,7 @@ market-pulse/
 │ ├── routes
 │ │ ├── admin.router.js
 │ │ ├── auth.router.js
+│ │ ├── bridge.router.js
 │ │ ├── hotels.router.js
 │ │ ├── market.router.js
 │ │ ├── metrics.router.js
@@ -856,10 +967,12 @@ market-pulse/
 │ │ ├── hotel.service.js
 │ │ ├── market.service.js
 │ │ ├── metrics.service.js
+│ │ ├── sentinel.bridge.service.js
 │ │ ├── sentinel.pricing.engine.js
 │ │ └── sentinel.service.js
 │ ├── utils
 │ │ ├── benchmark.utils.js
+│ │ ├── bridgeAuth.js
 │ │ ├── db.js
 │ │ ├── email.utils.js
 │ │ ├── emailTemplates.js
@@ -968,7 +1081,9 @@ market-pulse/
 │ │ │ └── types.ts
 │ │ ├── components
 │ │ │ ├── ControlPanel
-│ │ │ │ └── ControlPanelView.tsx
+│ │ │ │ ├── ControlPanelView.tsx
+│ │ │ │ ├── DailyMaxRatesDialog.tsx
+│ │ │ │ └── YearlyRatesVisualization.tsx
 │ │ │ ├── PropertyHub
 │ │ │ │ └── PropertyHubView.tsx
 │ │ │ ├── RateManager

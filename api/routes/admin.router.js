@@ -447,10 +447,13 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
       if (apiResponse && Array.isArray(apiResponse.data)) {
         totalRooms = apiResponse.data.reduce((sum, roomType) => {
           const roomName = roomType.roomTypeName || roomType.Name || "";
-          // UPDATED: Now ignores both 'virtual' and 'day' (for Day Use) rooms
+          const lowerName = roomName.toLowerCase();
+
+          // [FIX] Exclude Virtual, "Day Use", and "DayUse" (case-insensitive)
           if (
-            roomName.toLowerCase().includes("virtual") ||
-            roomName.toLowerCase().includes("day")
+            lowerName.includes("virtual") ||
+            lowerName.includes("day use") ||
+            lowerName.includes("dayuse")
           ) {
             console.log(` -- Skipping room: "${roomName}" (Virtual/Day Use)`);
             return sum;
@@ -1234,15 +1237,16 @@ router.get(
               (sum, roomType) => {
                 // Get the room name. Cloudbeds uses 'roomTypeName', Mews uses 'Name'.
                 const roomName = roomType.roomTypeName || roomType.Name || ""; // Default to empty string
+                const lowerName = roomName.toLowerCase();
 
-                // Check if the name includes 'virtual'
-                // Check if the name includes 'virtual' or 'day'
+                // [FIX] Exclude Virtual, "Day Use", and "DayUse" (case-insensitive)
                 if (
-                  roomName.toLowerCase().includes("virtual") ||
-                  roomName.toLowerCase().includes("day")
+                  lowerName.includes("virtual") ||
+                  lowerName.includes("day use") ||
+                  lowerName.includes("dayuse")
                 ) {
                   logs.push(
-                    ` -- Skipping room: "${roomName}" (contains 'virtual' or 'day')`
+                    ` -- Skipping room: "${roomName}" (Virtual/Day Use)`
                   );
                   return sum; // Return the current sum without adding
                 }

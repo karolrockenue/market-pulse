@@ -6,7 +6,8 @@ import {
   getAssets,
   getPreviewRates,
   submitOverrides,
-  getDailyPickup, // [Correctly Imported]
+  getDailyPickup,
+  getAiPredictions, // [NEW]
 } from "../api/sentinel.api";
 import { RateCalendarDay, AssetConfig, RateOverride } from "../api/types";
 
@@ -155,6 +156,14 @@ export const useRateGrid = () => {
   const [savedOverrides, setSavedOverrides] = useState<Record<string, number>>(
     {}
   );
+  // [NEW] Shadow Mode: Store AI predictions separately from live data
+  const [aiPredictions, setAiPredictions] = useState<
+    Record<string, { rate: number; confidence: number }>
+  >({});
+  // [NEW] Track which pending overrides came from AI
+  const [aiApprovedPending, setAiApprovedPending] = useState<Set<string>>(
+    new Set()
+  );
 
   const [calcState, setCalcState] = useState<CalculatorState | null>(null);
   const [geniusPct, setGeniusPct] = useState(0);
@@ -181,25 +190,26 @@ export const useRateGrid = () => {
         const startStr = utcToday.toISOString().split("T")[0];
         const endStr = endOfWindow.toISOString().split("T")[0];
 
-        // [MODIFIED] Fetch Preview, Metrics, Assets AND Pickup in parallel
-        const [previewData, metricsRes, assets, pickupRes] = await Promise.all([
-          getPreviewRates(hotelId, baseRoomTypeId, startStr, 365),
-          fetch("/api/metrics/reports/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              propertyId: parseInt(hotelId),
-              startDate: startStr,
-              endDate: endStr,
-              granularity: "daily",
-              metrics: { hotel: ["rooms-sold", "rooms-unsold", "adr"] },
-              includeTaxes: true,
-            }),
-          }).then((r) => r.json()),
-          getAssets(),
-          // [NEW] Pass variable pickupWindow
-          getDailyPickup(hotelId, startStr, endStr, pickupWindow),
-        ]);
+        // [MODIFIED] Fetch Preview, Metrics, Assets, Pickup AND AI Predictions
+        const [previewData, metricsRes, assets, pickupRes, aiRes] =
+          await Promise.all([
+            getPreviewRates(hotelId, baseRoomTypeId, startStr, 365),
+            fetch("/api/metrics/reports/run", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                propertyId: parseInt(hotelId),
+                startDate: startStr,
+                endDate: endStr,
+                granularity: "daily",
+                metrics: { hotel: ["rooms-sold", "rooms-unsold", "adr"] },
+                includeTaxes: true,
+              }),
+            }).then((r) => r.json()),
+            getAssets(),
+            getDailyPickup(hotelId, startStr, endStr, pickupWindow),
+            getAiPredictions(hotelId),
+          ]);
 
         // A. Process Assets (for Context/UI flags)
         const asset = assets.find(
@@ -289,7 +299,8 @@ export const useRateGrid = () => {
 
             // Logic Flags (From Backend)
             isFrozen: day.isFrozen,
-            floorRateLMF: day.isFloorActive ? day.finalRate : null, // Backend handles floor application
+            // [FIX] Display the Floor Limit (£90), not the Final Price (£148)
+            floorRateLMF: day.isFloorActive ? day.guardrailMin || 0 : null,
             guardrailMin: day.guardrailMin || 0,
             // Metrics (From Merged Data)
             occupancy: stats.occupancy,
@@ -300,13 +311,36 @@ export const useRateGrid = () => {
 
         // [FIX] Populate savedOverrides from backend data where source is 'Manual'
         const initialSavedOverrides: Record<string, number> = {};
+
         fullCalendar.forEach((day: any) => {
+          // 1. Restore Manual Overrides
           if (day.source === "Manual" && day.rate > 0) {
             initialSavedOverrides[day.date] = parseFloat(day.rate);
           }
         });
-        setSavedOverrides(initialSavedOverrides);
 
+        // 2. Process Real AI Predictions
+        // We must map the SQL rows (snake_case) to the UI Map (date key)
+        // AND strictly filter for the current Base Room Type
+        const realAiData: Record<string, { rate: number; confidence: number }> =
+          {};
+
+        if (Array.isArray(aiRes)) {
+          aiRes.forEach((p: any) => {
+            // Strict Type Check: Ensure we only show predictions for the loaded room type
+            if (String(p.room_type_id) === String(baseRoomTypeId)) {
+              // Fix Date: SQL returns full ISO string, we need YYYY-MM-DD
+              const dateKey = new Date(p.stay_date).toISOString().split("T")[0];
+              realAiData[dateKey] = {
+                rate: Math.round(parseFloat(p.suggested_rate)), // Force Integer
+                confidence: parseFloat(p.confidence_score) || 0.0,
+              };
+            }
+          });
+        }
+
+        setSavedOverrides(initialSavedOverrides);
+        setAiPredictions(realAiData); // [CONNECTED]
         setCalendarData(fullCalendar);
       } catch (err: any) {
         console.error("Load Rates Error:", err);
@@ -331,6 +365,22 @@ export const useRateGrid = () => {
       delete next[date];
       return next;
     });
+    // Also clear AI tag if cleared
+    setAiApprovedPending((prev) => {
+      const next = new Set(prev);
+      next.delete(date);
+      return next;
+    });
+  };
+
+  // [NEW] Specific handler for AI approvals
+  const applyAiPrediction = (date: string, rate: number) => {
+    setPendingOverrides((prev) => ({ ...prev, [date]: rate }));
+    setAiApprovedPending((prev) => {
+      const next = new Set(prev);
+      next.add(date);
+      return next;
+    });
   };
 
   const submitChanges = async (
@@ -342,14 +392,33 @@ export const useRateGrid = () => {
 
     setIsSubmitting(true);
     const snapshot = { ...pendingOverrides };
+    // [MODIFIED] Attach source based on origin
     const payload = Object.keys(snapshot).map((date) => ({
       date,
       rate: snapshot[date],
+      source: aiApprovedPending.has(date) ? "AI_SUGGESTED" : "MANUAL",
     }));
 
     // Optimistic Update
     setSavedOverrides((prev) => ({ ...prev, ...snapshot }));
+
+    // [FIX] Immediate UI update for Source Column to persist "AI SUGGESTED" status
+    setCalendarData((prev) =>
+      prev.map((d) => {
+        if (snapshot[d.date] !== undefined) {
+          return {
+            ...d,
+            rate: snapshot[d.date],
+            liveRate: snapshot[d.date],
+            source: aiApprovedPending.has(d.date) ? "AI_SUGGESTED" : "Manual",
+          };
+        }
+        return d;
+      })
+    );
+
     setPendingOverrides({});
+    setAiApprovedPending(new Set()); // Cleanup
 
     toast.message("Syncing...", {
       description: `Queuing ${payload.length} updates...`,
@@ -386,6 +455,8 @@ export const useRateGrid = () => {
   };
 
   return {
+    aiPredictions, // [NEW]
+    aiApprovedPending, // [NEW]
     calendarData,
     pickupWindow, // [NEW]
     setPickupWindow, // [NEW]
@@ -399,6 +470,7 @@ export const useRateGrid = () => {
     loadRates,
     setOverride,
     clearOverride,
+    applyAiPrediction, // [NEW]
     submitChanges,
   };
 };

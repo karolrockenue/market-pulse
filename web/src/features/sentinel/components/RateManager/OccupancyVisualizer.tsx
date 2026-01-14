@@ -43,7 +43,8 @@ export function OccupancyVisualizer({
         occupancy: d.occupancy || 0,
         available: 0,
         isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-        sentinelRate: d.rate || 0,
+        // [FIX] Use the Shadow Rate for the Blue Dot. Fallback to 0 (hide dot) if no prediction.
+        sentinelRate: d.aiShadowRate || 0,
         minRate: d.guardrailMin || 0,
         pmsRate: d.liveRate || 0,
         isFrozen: d.isFrozen,
@@ -483,6 +484,12 @@ export function OccupancyVisualizer({
                               <div style={{ color: "white" }}>
                                 PMS Rate: £{day.pmsRate}
                               </div>
+                              {/* [NEW] AI Rate Tooltip */}
+                              {day.sentinelRate > 0 && (
+                                <div style={{ color: "#39BDF8" }}>
+                                  Sentinel Rate: £{day.sentinelRate}
+                                </div>
+                              )}
                               <div style={{ color: "#ef4444" }}>
                                 Min: £{day.minRate}
                               </div>
@@ -523,13 +530,22 @@ export function OccupancyVisualizer({
                 >
                   {chartData.map((day, idx) => {
                     const range = stats.maxRate - stats.minRate || 1;
-                    const rateHeight = Math.max(
+
+                    const pmsHeight = Math.max(
                       0,
                       Math.min(
                         100,
                         ((day.pmsRate - stats.minRate) / range) * 100
                       )
                     );
+                    const sentinelHeight = Math.max(
+                      0,
+                      Math.min(
+                        100,
+                        ((day.sentinelRate - stats.minRate) / range) * 100
+                      )
+                    );
+
                     return (
                       <div
                         key={idx}
@@ -539,6 +555,25 @@ export function OccupancyVisualizer({
                           height: "100%",
                         }}
                       >
+                        {/* Sentinel AI Rate (Blue Dot) */}
+                        {day.sentinelRate > 0 && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              borderRadius: "9999px",
+                              backgroundColor: "#39BDF8",
+                              border: "1px solid #141410",
+                              width: "0.375rem",
+                              height: "0.375rem",
+                              bottom: `${sentinelHeight}%`,
+                              zIndex: 5,
+                            }}
+                          />
+                        )}
+
+                        {/* PMS Rate (White Dot) - Rendered second to appear on top if equal */}
                         {day.pmsRate > 0 && (
                           <div
                             style={{
@@ -550,9 +585,10 @@ export function OccupancyVisualizer({
                               border: "1px solid #141410",
                               width: "0.375rem",
                               height: "0.375rem",
-                              bottom: `${rateHeight}%`,
+                              bottom: `${pmsHeight}%`,
+                              zIndex: 10,
                             }}
-                          ></div>
+                          />
                         )}
                       </div>
                     );
@@ -677,6 +713,7 @@ export function OccupancyVisualizer({
                       border: "1px solid #2a2a2a",
                     }}
                   ></div>
+
                   <span
                     style={{
                       fontSize: "11px",
@@ -685,6 +722,32 @@ export function OccupancyVisualizer({
                     }}
                   >
                     PMS Rate
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "0.5rem",
+                      height: "0.5rem",
+                      backgroundColor: "#39BDF8",
+                      borderRadius: "50%",
+                      border: "1px solid #2a2a2a",
+                    }}
+                  ></div>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      color: "#9ca3af",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Sentinel AI Rate
                   </span>
                 </div>
                 <div

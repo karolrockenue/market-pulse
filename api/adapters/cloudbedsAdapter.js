@@ -79,70 +79,94 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
 
   return aggregatedData;
 }
-
 /**
  * A private helper function to process raw API data for daily forecast syncs.
  * @param {Array} allData - An array of raw data pages from the API response.
  * @param {number} taxRate - The hotel's tax rate (e.g., 0.20 for 20%).
  * @param {string} pricingModel - The hotel's pricing model ('inclusive' or 'exclusive').
+ * @param {string} startDateStr - The start date of the range (YYYY-MM-DD).
+ * @param {string} endDateStr - The end date of the range (YYYY-MM-DD).
  * @returns {Object} - An object with dates as keys and calculated metrics as values.
  */
-function processUpcomingApiData(allData, taxRate, pricingModel) {
+function processUpcomingApiData(
+  allData,
+  taxRate,
+  pricingModel,
+  startDateStr,
+  endDateStr
+) {
   const aggregated = {};
-  if (!allData || allData.length === 0) return aggregated;
+
+  // --- FIX: Pre-fill the date range to ensure no gaps ---
+  // If Cloudbeds returns NO data for a day (zero bookings), we must still return a record
+  // so the database knows to zero out that day instead of leaving a "hole".
+  if (startDateStr && endDateStr) {
+    // We use UTC methods strictly to avoid "25-hour day" bugs (DST transitions).
+    // Specifically, Oct 25 2026 is a DST change in Europe, which breaks local .setDate() loops.
+    let curr = new Date(startDateStr);
+    const end = new Date(endDateStr);
+
+    while (curr <= end) {
+      const dateKey = curr.toISOString().split("T")[0];
+      aggregated[dateKey] = {
+        rooms_sold: 0,
+        capacity_count: 0,
+        room_revenue: 0,
+      };
+      // FORCE UTC ADDITION: This guarantees we move forward exactly 24h on the calendar
+      // regardless of the server's local timezone or daylight savings.
+      curr.setUTCDate(curr.getUTCDate() + 1);
+    }
+  }
 
   const sanitizeMetric = (metric) => {
     const num = parseFloat(metric);
     return isNaN(num) ? 0 : num;
   };
 
-  // Step 1: Aggregate base numbers from the API.
-  for (const page of allData) {
-    if (!page.index || !page.records) continue;
-    for (let i = 0; i < page.index.length; i++) {
-      const date = page.index[i][0].split("T")[0];
-      if (!aggregated[date]) {
-        aggregated[date] = {
-          rooms_sold: 0,
-          capacity_count: 0,
-          room_revenue: 0, // This will hold the primary revenue figure.
-        };
+  // Step 1: Aggregate base numbers from the API onto our pre-filled skeleton.
+  if (allData && allData.length > 0) {
+    for (const page of allData) {
+      if (!page.index || !page.records) continue;
+      for (let i = 0; i < page.index.length; i++) {
+        const date = page.index[i][0].split("T")[0];
+
+        // Safety check: ensure the date exists in our object (it should if within range).
+        if (!aggregated[date]) {
+          aggregated[date] = {
+            rooms_sold: 0,
+            capacity_count: 0,
+            room_revenue: 0,
+          };
+        }
+
+        aggregated[date].rooms_sold += sanitizeMetric(
+          page.records.rooms_sold?.[i]
+        );
+        aggregated[date].capacity_count += sanitizeMetric(
+          page.records.capacity_count?.[i]
+        );
+        aggregated[date].room_revenue += sanitizeMetric(
+          page.records.room_revenue?.[i]
+        );
       }
-      aggregated[date].rooms_sold += sanitizeMetric(
-        page.records.rooms_sold?.[i]
-      );
-      aggregated[date].capacity_count += sanitizeMetric(
-        page.records.capacity_count?.[i]
-      );
-      aggregated[date].room_revenue += sanitizeMetric(
-        page.records.room_revenue?.[i]
-      );
     }
   }
 
   // Step 2: Perform all financial calculations for each day.
   for (const date in aggregated) {
     const metrics = aggregated[date];
-    const rawRevenue = metrics.room_revenue;
-    const roomsSold = metrics.rooms_sold;
-    const capacityCount = metrics.capacity_count;
+    const rawRevenue = metrics.room_revenue || 0;
+    const roomsSold = metrics.rooms_sold || 0;
+    const capacityCount = metrics.capacity_count || 0;
 
     // Determine Net and Gross Revenue based on the hotel's pricing model.
-    // Convert taxRate to a number to ensure correct math.
-    const numericTaxRate = parseFloat(taxRate);
+    const numericTaxRate = parseFloat(taxRate) || 0;
 
-    // Convert taxRate to a number to ensure correct math.
-
-    // Determine Net and Gross Revenue based on the hotel's pricing model.
     if (pricingModel === "exclusive") {
-      // For 'exclusive' pricing, the API provides the net revenue.
-      // We calculate gross by adding the tax. This logic remains correct.
       metrics.net_revenue = rawRevenue;
       metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     } else {
-      // THE FIX: For 'inclusive' pricing, the Cloudbeds API still sends net revenue.
-      // The old logic incorrectly assumed this value was gross.
-      // We now correctly assign the raw value to net_revenue and calculate gross by adding tax.
       metrics.net_revenue = rawRevenue;
       metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     }
@@ -251,6 +275,12 @@ async function getHistoricalMetrics(
           operator: "less_than_or_equal",
           value: `${endDate}T00:00:00.000Z`,
         },
+        // FILTER: Exclude non-room revenue (House Accounts, etc)
+        {
+          cdf: { column: "room_type_id" },
+          operator: "is_not_null",
+          value: "",
+        },
       ],
     },
     columns: columnsToRequest,
@@ -344,9 +374,11 @@ async function getUpcomingMetrics(
   const startDateObj = new Date();
   startDateObj.setDate(startDateObj.getDate() - 14);
 
-  // NEW: The end date is set 365 days from today for the future forecast.
+  // NEW: The end date is set 367 days from today.
+  // We use 367 instead of 365 to provide a safety buffer for leap years and
+  // ensure we fully cover the "365th" day regardless of time-of-day execution.
   const endDateObj = new Date();
-  endDateObj.setDate(endDateObj.getDate() + 365);
+  endDateObj.setDate(endDateObj.getDate() + 367);
 
   // Format the dates for the API request payload.
   const startDate = startDateObj.toISOString().split("T")[0];
@@ -376,6 +408,12 @@ async function getUpcomingMetrics(
           cdf: { column: "stay_date" },
           operator: "less_than_or_equal",
           value: `${endDate}T00:00:00.000Z`,
+        },
+        // FILTER: Exclude non-room revenue (House Accounts, etc)
+        {
+          cdf: { column: "room_type_id" },
+          operator: "is_not_null",
+          value: "",
         },
       ],
     },
@@ -437,7 +475,14 @@ async function getUpcomingMetrics(
 
   console.log("--- FORECAST SYNC COMPLETE ---");
   // Use the new helper function to process all the pages of raw forecast data.
-  return processUpcomingApiData(allApiData, taxRate, pricingModel);
+  // FIX: Pass startDate and endDate to ensure missing dates are filled with zeros.
+  return processUpcomingApiData(
+    allApiData,
+    taxRate,
+    pricingModel,
+    startDate,
+    endDate
+  );
 }
 // Export all public functions.
 /**
@@ -616,7 +661,8 @@ async function getUserInfo(accessToken) {
 // /api/adapters/cloudbedsAdapter.js
 
 async function getHotelDetails(accessToken, propertyId) {
-  const url = `https://api.cloudbeds.com/api/v1.1/getHotelDetails?propertyID=${propertyId}`;
+  // UPDATED: v1.1 -> v1.2 (Compliance update)
+  const url = `https://api.cloudbeds.com/api/v1.2/getHotelDetails?propertyID=${propertyId}`;
   const response = await fetch(url, {
     headers: {
       // Add the Authorization header with the Bearer token for authentication.
@@ -860,7 +906,8 @@ async function setAppDisabled(accessToken, internalPropertyId) {
   // Use the correct, original Cloudbeds ID for the API call.
   const cloudbedsPropertyId = hotel.pms_property_id;
 
-  const url = "https://api.cloudbeds.com/api/v1.1/postAppState";
+  // UPDATED: v1.1 -> v1.2 (Compliance update)
+  const url = "https://api.cloudbeds.com/api/v1.2/postAppState";
   const params = new URLSearchParams();
   params.append("propertyID", cloudbedsPropertyId);
   params.append("app_state", "disabled");
@@ -920,8 +967,8 @@ async function getRooms(accessToken, propertyId) {
   let hasMore = true;
 
   while (hasMore) {
-    // FINAL FIX: The correct endpoint is /getRooms. This replaces the incorrect /getRoomList.
-    const url = `https://api.cloudbeds.com/api/v1.1/getRooms?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    // UPDATED: v1.1 -> v1.2 (Compliance update)
+    const url = `https://api.cloudbeds.com/api/v1.2/getRooms?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
 
     const response = await fetch(url, {
       headers: {
@@ -979,7 +1026,8 @@ async function getReservations(accessToken, propertyId, filters = {}) {
   const filterParams = new URLSearchParams(filters).toString();
 
   while (hasMore) {
-    const url = `https://api.cloudbeds.com/api/v1.1/getReservations?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}&${filterParams}`;
+    // UPDATED: v1.1 -> v1.2 (Compliance update)
+    const url = `https://api.cloudbeds.com/api/v1.2/getReservations?propertyID=${propertyId}&pageNumber=${pageNumber}&pageSize=${pageSize}&${filterParams}`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -1089,7 +1137,8 @@ async function getReservationsWithDetails(
  * @returns {Promise<Object>} - The single reservation object.
  */
 async function getReservation(accessToken, propertyId, reservationId) {
-  const url = `https://api.cloudbeds.com/api/v1.1/getReservation?propertyID=${propertyId}&reservationID=${reservationId}`;
+  // UPDATED: v1.1 -> v1.2 (Compliance update)
+  const url = `https://api.cloudbeds.com/api/v1.2/getReservation?propertyID=${propertyId}&reservationID=${reservationId}`;
 
   const response = await fetch(url, {
     headers: {

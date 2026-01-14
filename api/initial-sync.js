@@ -23,7 +23,7 @@ async function runSync(propertyId) {
   // Use a single database client for the entire operation
   const client = await pgPool.connect();
   try {
-// [NEW] First, determine the PMS type AND locked_years for this property
+    // [NEW] First, determine the PMS type AND locked_years for this property
     const hotelResult = await client.query(
       "SELECT pms_type, locked_years FROM hotels WHERE hotel_id = $1",
       [propertyId]
@@ -38,7 +38,7 @@ async function runSync(propertyId) {
     // Start a transaction for the entire sync operation
     await client.query("BEGIN");
 
-// [NEW] Clear existing metric snapshots, RESPECTING LOCKED YEARS
+    // [NEW] Clear existing metric snapshots, RESPECTING LOCKED YEARS
     console.log(`Clearing existing metric data for property ${propertyId}...`);
 
     // Get the hotel's locked_years from the result we fetched earlier
@@ -59,7 +59,7 @@ async function runSync(propertyId) {
         )}`
       );
     }
-    
+
     // Execute the safe, dynamic delete query
     await client.query(deleteQuery, [propertyId]);
     console.log("✅ Existing data cleared (respecting locks).");
@@ -72,7 +72,7 @@ async function runSync(propertyId) {
     if (pmsType === "cloudbeds") {
       console.log("--- Running Cloudbeds Sync ---");
 
-// THE FIX: Get the pms_property_id from the hotels table first.
+      // THE FIX: Get the pms_property_id from the hotels table first.
       const hotelDetailsResult = await client.query(
         "SELECT pms_property_id, tax_rate, tax_type, total_rooms FROM hotels WHERE hotel_id = $1",
         [propertyId]
@@ -115,60 +115,76 @@ async function runSync(propertyId) {
       console.log("✅ Hotel metadata sync complete.");
 
       // --- [NEW] Calculate and save Total Rooms (copied from admin.router.js) ---
-console.log(`[Initial Sync] Now calculating total rooms for hotel: ${propertyId}`);
-let totalRooms = 0;
-try {
-  // 1. Get credentials and PMS info
-  const { credentials, pms_type, pms_property_id } = await getCredentialsForHotel(
-    propertyId
-  );
+      console.log(
+        `[Initial Sync] Now calculating total rooms for hotel: ${propertyId}`
+      );
+      let totalRooms = 0;
+      try {
+        // 1. Get credentials and PMS info
+        const { credentials, pms_type, pms_property_id } =
+          await getCredentialsForHotel(propertyId);
 
-  // 2. Call the PMS API function
-  const apiResponse = await getRoomTypesFromPMS(
-    propertyId, 
-    pms_type, 
-    credentials, 
-    pms_property_id
-  );
+        // 2. Call the PMS API function
+        const apiResponse = await getRoomTypesFromPMS(
+          propertyId,
+          pms_type,
+          credentials,
+          pms_property_id
+        );
 
-  // 3. Sum the 'roomTypeUnits', skipping "virtual" rooms
-  if (apiResponse && Array.isArray(apiResponse.data)) {
-    totalRooms = apiResponse.data.reduce(
-      (sum, roomType) => {
-        const roomName = roomType.roomTypeName || roomType.Name || "";
-        if (roomName.toLowerCase().includes('virtual')) {
-          console.log(` -- Skipping room: "${roomName}" (virtual)`);
-          return sum;
+        // 3. Sum the 'roomTypeUnits', skipping "virtual" rooms
+        if (apiResponse && Array.isArray(apiResponse.data)) {
+          totalRooms = apiResponse.data.reduce((sum, roomType) => {
+            const roomName = roomType.roomTypeName || roomType.Name || "";
+            const lowerName = roomName.toLowerCase();
+
+            // [FIX] Exclude Virtual, "Day Use", and "DayUse" (case-insensitive)
+            if (
+              lowerName.includes("virtual") ||
+              lowerName.includes("day use") ||
+              lowerName.includes("dayuse")
+            ) {
+              console.log(
+                ` -- Skipping room: "${roomName}" (Virtual / Day Use)`
+              );
+              return sum;
+            }
+            return (
+              sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0)
+            );
+          }, 0);
+        } else {
+          throw new Error(
+            "Invalid API response structure. Expected { data: [...] }"
+          );
         }
-        return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
-      },
-      0
-    );
-  } else {
-    throw new Error("Invalid API response structure. Expected { data: [...] }");
-  }
 
-  // 4. Save to the database
-  if (totalRooms > 0) {
-    await client.query(
-      "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
-      [totalRooms, propertyId]
-    );
-    console.log(`[Initial Sync] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${propertyId}.`);
-  } else {
-    console.warn(`[Initial Sync] Calculated total rooms was 0 for hotel ${propertyId}. Skipping update.`);
-  }
-
-} catch (roomError) {
-  // Log the error but do not fail the whole transaction
-  console.error(`[Initial Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`);
-}
-// --- [END NEW] ---
+        // 4. Save to the database
+        if (totalRooms > 0) {
+          await client.query(
+            "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+            [totalRooms, propertyId]
+          );
+          console.log(
+            `[Initial Sync] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${propertyId}.`
+          );
+        } else {
+          console.warn(
+            `[Initial Sync] Calculated total rooms was 0 for hotel ${propertyId}. Skipping update.`
+          );
+        }
+      } catch (roomError) {
+        // Log the error but do not fail the whole transaction
+        console.error(
+          `[Initial Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`
+        );
+      }
+      // --- [END NEW] ---
 
       // Fetch historical metrics
       const taxRate = hotelDetailsResult.rows[0]?.tax_rate || 0;
       const pricingModel = hotelDetailsResult.rows[0]?.tax_type || "inclusive";
-const staticTotalRooms = hotelDetailsResult.rows[0]?.total_rooms;
+      const staticTotalRooms = hotelDetailsResult.rows[0]?.total_rooms;
 
       let allProcessedData = {};
       const startYear = new Date().getFullYear() - 5;
@@ -263,7 +279,7 @@ const staticTotalRooms = hotelDetailsResult.rows[0]?.total_rooms;
         );
       }
 
- const datesToUpdate = Object.keys(allProcessedData);
+      const datesToUpdate = Object.keys(allProcessedData);
 
       // [NEW] Filter out any records from a locked year before insertion
       // We already have 'lockedYears' array defined from the delete step
@@ -291,7 +307,7 @@ const staticTotalRooms = hotelDetailsResult.rows[0]?.total_rooms;
             date,
             propertyId,
             metrics.rooms_sold || 0,
-staticTotalRooms || metrics.capacity_count || 0, // <-- REPLACED: Uses non-conflicting variable
+            staticTotalRooms || metrics.capacity_count || 0, // <-- REPLACED: Uses non-conflicting variable
             metrics.occupancy || 0,
             user.cloudbeds_user_id,
             metrics.net_revenue || 0,
@@ -495,7 +511,7 @@ staticTotalRooms || metrics.capacity_count || 0, // <-- REPLACED: Uses non-confl
       }
       // --- END NEW LOGIC ---
 
-  // --- END NEW LOGIC ---
+      // --- END NEW LOGIC ---
 
       const datesToUpdate = Object.keys(allProcessedData);
 
@@ -650,7 +666,7 @@ async function getCredentialsForHotel(hotelId) {
   const { pms_credentials, pms_type, pms_property_id } = result.rows[0];
 
   // For Mews, we must decrypt the access token before returning
-  if (pms_type === 'mews') {
+  if (pms_type === "mews") {
     const storedCredentials = pms_credentials;
     // Re-use the existing getMewsCredentials logic
     const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
@@ -671,18 +687,18 @@ async function getCredentialsForHotel(hotelId) {
     return {
       credentials: {
         clientToken: storedCredentials.clientToken,
-        accessToken: decryptedToken
+        accessToken: decryptedToken,
       },
-      pms_type: 'mews',
-      pms_property_id: pms_property_id
+      pms_type: "mews",
+      pms_property_id: pms_property_id,
     };
   }
 
   // For Cloudbeds, just return the stored credentials object
   return {
     credentials: pms_credentials, // This contains the refresh_token
-    pms_type: 'cloudbeds',
-    pms_property_id: pms_property_id
+    pms_type: "cloudbeds",
+    pms_property_id: pms_property_id,
   };
 }
 
@@ -695,8 +711,13 @@ async function getCredentialsForHotel(hotelId) {
  * @param {string} pms_property_id The external PMS property ID (Cloudbeds needs this)
  * @returns {Promise<object>} The raw API response (expected to have a .data property)
  */
-async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_id) {
-  if (pms_type === 'cloudbeds') {
+async function getRoomTypesFromPMS(
+  hotelId,
+  pms_type,
+  credentials,
+  pms_property_id
+) {
+  if (pms_type === "cloudbeds") {
     // --- Cloudbeds Logic ---
     // 1. Get a fresh Access Token using the stored refresh_token
     // We use the internal hotelId to find the right refresh token
@@ -718,8 +739,7 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
       throw new Error(`Cloudbeds API error: ${response.statusText}`);
     }
     return response.json(); // Returns { success: true, data: [...] }
-
-  } else if (pms_type === 'mews') {
+  } else if (pms_type === "mews") {
     // --- Mews Logic ---
     // Credentials are pre-decrypted by getCredentialsForHotel
     const targetUrl = "https://api.mews.com/api/connector/v1/roomTypes/getAll";
@@ -727,7 +747,7 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${credentials.accessToken}`,
+        Authorization: `Bearer ${credentials.accessToken}`,
       },
       body: JSON.stringify({
         ClientToken: credentials.clientToken,
@@ -747,9 +767,6 @@ async function getRoomTypesFromPMS(hotelId, pms_type, credentials, pms_property_
 }
 
 // --- END OF COPIED FUNCTIONS ---
-
-
-
 
 // Wrapper and command-line execution logic remains unchanged...
 const serverlessWrapper = async (request, response) => {

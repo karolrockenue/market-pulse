@@ -181,16 +181,19 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
   const targetDate = new Date(date);
   const today = new Date();
 
-  // Normalize dates to midnight UTC to match frontend logic
+  // [FIX] Normalize dates using UTC components explicitly.
+  // Using .getFullYear()/.getDate() is unsafe as it uses Local Server Time.
   const utcTarget = new Date(
     Date.UTC(
-      targetDate.getFullYear(),
-      targetDate.getMonth(),
-      targetDate.getDate()
+      targetDate.getUTCFullYear(),
+      targetDate.getUTCMonth(),
+      targetDate.getUTCDate()
     )
   );
+
+  // Normalize Today to UTC Midnight as well for accurate "Days Out" calculation
   const utcToday = new Date(
-    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
   );
 
   // Calculate days from now (0 = today)
@@ -255,36 +258,47 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
 
   let effectiveRate = suggestedRate;
   let activeFloor = false;
+  let activeMinToEnforce = monthlyMin; // Default to standard min
 
   if (lmfEnabled && daysFromNow <= lmfDays && lmfDow.has(dowStr)) {
-    // Floor logic: "Overrides calculated rate with guardrail floor"
-    // Usually floor implies minimum, but LMF is often a "Selling Floor" (don't go below X)
-    // Blueprint says: "Overrides calculated rate with guardrail floor"
-    // useRateGrid.ts logic implies it highlights it.
-    // Standard logic: effective = max(suggested, lmf)
-    if (effectiveRate < lmfRate) {
-      effectiveRate = lmfRate;
-      activeFloor = true;
+    // [FIX] Priority Logic:
+    // If LMF is active, it REPLACES the Monthly Minimum for this specific day.
+    // This allows the rate to DROP below the standard min (e.g. 100) to the floor (e.g. 60).
+    activeMinToEnforce = lmfRate;
+    activeFloor = true;
+  }
+
+  // Apply the Determined Minimum (Either Standard Min OR LMF)
+  if (effectiveRate < activeMinToEnforce) {
+    effectiveRate = activeMinToEnforce;
+  }
+
+  // D. MAX RATE LOGIC (Daily Override > Global Max)
+  const { daily_max_rates = {} } = config;
+
+  let activeMax = parseFloat(guardrail_max); // Default to global
+  // Normalize dateStr for lookup
+  const dateStr = utcTarget.toISOString().split("T")[0];
+
+  // Check for specific daily max
+  if (daily_max_rates && daily_max_rates[dateStr]) {
+    const dailyVal = parseFloat(daily_max_rates[dateStr]);
+    if (!isNaN(dailyVal) && dailyVal > 0) {
+      activeMax = dailyVal;
     }
   }
 
-  // C. MONTHLY MIN RATE (Applied to effective rate)
-  // (Variable 'monthlyMin' was declared above in Freeze Logic)
-  if (effectiveRate < monthlyMin) {
-    effectiveRate = monthlyMin;
-  }
-
-  // D. GLOBAL MAX
-  const globalMax = parseFloat(guardrail_max);
-  if (globalMax > 0 && effectiveRate > globalMax) {
-    effectiveRate = globalMax;
+  // Apply Max
+  if (activeMax > 0 && effectiveRate > activeMax) {
+    effectiveRate = activeMax;
   }
 
   return {
     finalRate: parseFloat(effectiveRate.toFixed(2)),
     isFrozen: false,
     isFloorActive: activeFloor,
-    minApplied: monthlyMin,
+    minApplied: activeMinToEnforce, // [DEBUG] Shows which floor won
+    maxApplied: activeMax,
     reason: "CALCULATED",
   };
 }

@@ -28,14 +28,15 @@ const adminRoutes = require("./api/routes/admin.router.js");
 // This path is relative to the Vercel serverless function root (process.cwd())
 const publicPath = path.join(process.cwd(), "web", "build");
 const userRoutes = require("./api/routes/users.router.js");
-const supportRoutes = require("./api/routes/support.router.js"); 
+const supportRoutes = require("./api/routes/support.router.js");
 const sentinelRoutes = require("./api/routes/sentinel.router.js"); // Sentinel module
 const webhooksRoutes = require("./api/routes/webhooks.router.js"); // Webhooks module
+const bridgeRoutes = require("./api/routes/bridge.router.js"); // Sentinel AI Bridge
 
 // --- NEW DOMAIN ROUTERS (SESSION 1) ---
 const metricsRoutes = require("./api/routes/metrics.router.js"); // Unified Metrics Engine
-const hotelsRoutes = require("./api/routes/hotels.router.js");   // Unified Hotel/Config Engine
-const marketRoutes = require("./api/routes/market.router.js");   // Unified Market/Planning Engine
+const hotelsRoutes = require("./api/routes/hotels.router.js"); // Unified Hotel/Config Engine
+const marketRoutes = require("./api/routes/market.router.js"); // Unified Market/Planning Engine
 // --- EXPRESS APP INITIALIZATION ---
 
 // --- EXPRESS APP INITIALIZATION ---
@@ -49,7 +50,6 @@ app.set("trust proxy", 1);
 // don't need authentication and should be served immediately.
 app.use(express.static(publicPath));
 
-
 // --- MIDDLEWARE SETUP (CORS, Session) ---
 const allowedOrigins = [
   "https://market-pulse.io",
@@ -62,23 +62,24 @@ if (process.env.VERCEL_ENV !== "production") {
 // This is the new, more robust block to add
 const corsOptions = {
   origin: function (origin, callback) {
-    
     // 1. Allow local dev, Postman, mobile apps (no origin)
-    if (!origin || origin.startsWith('http://localhost')) {
+    if (!origin || origin.startsWith("http://localhost")) {
       callback(null, true);
       return;
     }
-    
+
     // 2. Allow any Vercel preview deployment
-    if (origin.endsWith('.vercel.app')) {
+    if (origin.endsWith(".vercel.app")) {
       callback(null, true);
       return;
     }
 
     // 3. Check if the origin starts with one of our allowed production domains
     // This handles cases like 'https://www.market-pulse.io'
-    const isAllowedProduction = allowedOrigins.some(allowed => origin.startsWith(allowed));
-    
+    const isAllowedProduction = allowedOrigins.some((allowed) =>
+      origin.startsWith(allowed)
+    );
+
     if (isAllowedProduction) {
       callback(null, true);
       return;
@@ -104,7 +105,7 @@ const cookieConfig = {
   maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
   // [MODIFIED] Set to undefined so the cookie works on ANY domain (production OR Vercel preview)
   domain: undefined,
-  
+
   // --- NEW: Add a custom serializer function ---
   serialize: (name, val) => {
     const parts = [`${name}=${val}`];
@@ -162,13 +163,15 @@ app.get("/api/cron/daily-refresh", (req, res) => {
   const { secret } = req.query;
 
   if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-    console.warn("CRON JOB FAILED: Unauthorized attempt at /api/cron/daily-refresh");
+    console.warn(
+      "CRON JOB FAILED: Unauthorized attempt at /api/cron/daily-refresh"
+    );
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   // If secret is valid, run the handler.
   // We pass the 'req' and 'res' objects directly to it.
-// [WITH THIS]
+  // [WITH THIS]
 
   console.log("CRON JOB ACCEPTED: Running daily-refresh...");
   return dailyRefreshHandler(req, res);
@@ -188,7 +191,6 @@ app.get("/api/sync-rockenue-assets", (req, res) => {
   console.log("CRON JOB ACCEPTED: Running sync-rockenue-assets...");
   return syncRockenueAssetsHandler(req, res);
 });
-
 
 // --- DEVELOPMENT ONLY LOGIN ---
 if (process.env.VERCEL_ENV !== "production") {
@@ -233,10 +235,6 @@ if (process.env.VERCEL_ENV !== "production") {
   });
 }
 
-
-
-
-
 // --- API ROUTERS ---
 // Mount all the dedicated routers to their respective paths.
 
@@ -248,12 +246,13 @@ app.use("/api/support", supportRoutes);
 
 // 2. Domain Engines (New Architecture)
 app.use("/api/metrics", metricsRoutes); // KPI, Dashboard, Reports, Portfolio
-app.use("/api/hotels", hotelsRoutes);   // Config, Budgets, Assets, CompSets
-app.use("/api/market", marketRoutes);   // Trends, Pace, Scraper, Shadowfax
+app.use("/api/hotels", hotelsRoutes); // Config, Budgets, Assets, CompSets
+app.use("/api/market", marketRoutes); // Trends, Pace, Scraper, Shadowfax
 
 // 3. Operational Engines
 app.use("/api/sentinel", sentinelRoutes); // AI Pricing
 app.use("/api/webhooks", webhooksRoutes); // PMS Events
+app.use("/api/bridge", bridgeRoutes); // Python AI Bridge
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
@@ -264,7 +263,11 @@ app.get("*", (req, res) => {
   // [FIX] Prevent "Soft 404" for missing assets.
   // If the request is looking for a file (e.g., .js, .css) but reached here,
   // it means express.static didn't find it. We must return 404, not HTML.
-  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/)) {
+  if (
+    req.path.match(
+      /\.(js|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/
+    )
+  ) {
     return res.status(404).send("Asset not found");
   }
 
@@ -279,12 +282,9 @@ app.get("*", (req, res) => {
   });
 });
 
-
 // --- SERVER START ---
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
-
-
 
 // --- SERVER START ---
 const PORT = process.env.PORT || 3000;

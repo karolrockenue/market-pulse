@@ -11,6 +11,9 @@ import {
   TrendingUp,
   Activity,
   Info,
+  Target,
+  ArrowDown,
+  Check,
 } from "lucide-react";
 import {
   Select,
@@ -34,7 +37,12 @@ import {
   calculateSellRate,
   calculateRequiredOverride,
 } from "../../hooks/useRateGrid";
-import { getConfigs, getPmsPropertyIds } from "../../api/sentinel.api";
+import {
+  getConfigs,
+  getPmsPropertyIds,
+  getSentinelStatus,
+  triggerSentinelRun,
+} from "../../api/sentinel.api";
 
 // --- STYLES ---
 const styles: { [key: string]: React.CSSProperties } = {
@@ -203,12 +211,22 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     string | null
   >(null);
   const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
+  // appliedPredictions removed (now in hook)
+  const [hoveredAiCell, setHoveredAiCell] = useState<string | null>(null);
+  const [paceCurves, setPaceCurves] = useState<any[]>([]);
+  const [sentinelStatus, setSentinelStatus] = useState<{
+    lastRun: string | null;
+    changesLast24h: number;
+  } | null>(null);
+  const [isRunningSentinel, setIsRunningSentinel] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
+    aiPredictions,
+    aiApprovedPending, // [NEW]
     calendarData,
-    pickupWindow, // [NEW]
-    setPickupWindow, // [NEW]
+    pickupWindow,
+    setPickupWindow,
     pendingOverrides,
     savedOverrides,
     calcState,
@@ -219,6 +237,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     loadRates,
     setOverride,
     clearOverride,
+    applyAiPrediction, // [NEW]
     submitChanges,
   } = useRateGrid();
 
@@ -238,6 +257,47 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     };
     init();
   }, []);
+
+  // [NEW] Load Pace Curves & Status
+  useEffect(() => {
+    if (!selectedHotelId) return;
+    const loadData = async () => {
+      try {
+        const [paceRes, statusData] = await Promise.all([
+          fetch(`/api/sentinel/pace-curves/${selectedHotelId}`),
+          getSentinelStatus(selectedHotelId),
+        ]);
+
+        if (paceRes.ok) {
+          const json = await paceRes.json();
+          setPaceCurves(Array.isArray(json.data) ? json.data : []);
+        }
+        setSentinelStatus(statusData);
+      } catch (err) {
+        console.error("Failed to load auxiliary data", err);
+      }
+    };
+    loadData();
+  }, [selectedHotelId]);
+
+  const handleRunSentinel = async () => {
+    if (!selectedHotelId) return;
+    setIsRunningSentinel(true);
+    try {
+      await triggerSentinelRun(selectedHotelId);
+      toast.success("Sentinel Run Queued. Updates will appear shortly.");
+      // Refresh status after a short delay
+      setTimeout(async () => {
+        const s = await getSentinelStatus(selectedHotelId);
+        setSentinelStatus(s);
+        handleLoad(); // Reload grid
+      }, 5000);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to run Sentinel");
+    } finally {
+      setIsRunningSentinel(false);
+    }
+  };
 
   // --- MEMOIZED HELPERS ---
   const selectedHotel = useMemo(() => {
@@ -268,6 +328,53 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
     return calendarData.slice(safeStart, safeStart + parseInt(nightsToView));
   }, [calendarData, startDate, nightsToView]);
+
+  // [NEW] Helper to get Pace Value
+  const getPaceValue = (dateStr: string) => {
+    if (!paceCurves.length || !sentinelConfigs.length) return null;
+
+    const config = sentinelConfigs.find(
+      (c) => String(c.hotel_id) === selectedHotelId
+    );
+    if (!config?.seasonality_profile) return null;
+
+    const targetDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize
+
+    const diffTime = targetDate.getTime() - today.getTime();
+    const daysOut = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (daysOut < 0) return null;
+
+    const monthKey = String(targetDate.getMonth() + 1);
+    let tier = config.seasonality_profile[monthKey];
+    if (tier === "medium") tier = "mid";
+    if (!tier) return null;
+
+    const curve = paceCurves.find((c) => c.season_tier === tier);
+    if (!curve || !curve.curve_data) return null;
+
+    const val = curve.curve_data[daysOut];
+    return val !== undefined ? val : null;
+  };
+
+  // [NEW] Helper for Seasonality Tier Display
+  const getSeasonalityTier = (dateStr: string) => {
+    if (!sentinelConfigs.length) return "-";
+    const config = sentinelConfigs.find(
+      (c) => String(c.hotel_id) === selectedHotelId
+    );
+    if (!config?.seasonality_profile) return "-";
+
+    const targetDate = new Date(dateStr);
+    const monthKey = String(targetDate.getMonth() + 1);
+    const tier = config.seasonality_profile[monthKey];
+
+    if (!tier) return "-";
+    if (tier === "mid" || tier === "medium") return "MED";
+    return tier.toUpperCase();
+  };
 
   // --- HANDLERS ---
   const handleLoad = () => {
@@ -479,19 +586,81 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
               </div>
             </div>
 
-            <Button
-              onClick={handleLoad}
-              disabled={isLoading || !selectedHotelId}
-              style={{ backgroundColor: "#39BDF8", color: "#1d1d1c" }}
-              className="h-9 text-sm font-semibold"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <Zap className="w-4 h-4 mr-2" />
-              )}{" "}
-              Load Rates
-            </Button>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              {/* Status Block */}
+              {sentinelStatus && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    marginRight: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: "#9ca3af",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Last AI Run
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#e5e5e5" }}>
+                    {sentinelStatus.lastRun
+                      ? format(new Date(sentinelStatus.lastRun), "HH:mm dd/MM")
+                      : "Never"}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color:
+                        sentinelStatus.changesLast24h > 0
+                          ? "#39BDF8"
+                          : "#6b7280",
+                    }}
+                  >
+                    {sentinelStatus.changesLast24h} updates (24h)
+                  </div>
+                </div>
+              )}
+
+              {/* Run Button - Only visible if data is loaded */}
+              {calendarData.length > 0 && (
+                <Button
+                  onClick={handleRunSentinel}
+                  disabled={isRunningSentinel || !selectedHotelId}
+                  variant="outline"
+                  className="h-9 text-sm"
+                  style={{
+                    borderColor: "#39BDF8",
+                    color: "#39BDF8",
+                    backgroundColor: "rgba(57, 189, 248, 0.05)",
+                  }}
+                >
+                  {isRunningSentinel ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Zap className="w-4 h-4 mr-2" />
+                  )}
+                  Run Sentinel
+                </Button>
+              )}
+
+              <Button
+                onClick={handleLoad}
+                disabled={isLoading || !selectedHotelId}
+                style={{ backgroundColor: "#39BDF8", color: "#1d1d1c" }}
+                className="h-9 text-sm font-semibold"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                )}{" "}
+                Load Rates
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -506,7 +675,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   ? visibleData.findIndex((d) => d.date === hoveredColumn)
                   : null
               }
-              data={calendarData.map((d) => ({ ...d, pmsRate: d.liveRate }))}
+              data={calendarData.map((d) => ({
+                ...d,
+                pmsRate: d.liveRate,
+                aiShadowRate: aiPredictions[d.date]?.rate, // Inject the Shadow Rate
+              }))}
             />
 
             {/* [RESTORED] Grid Section (Unified Container) */}
@@ -553,6 +726,43 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           <span>Occupancy</span>
                         </button>
                         <button
+                          onClick={() => toggleRow("curveTier")}
+                          style={getToggleButtonStyle(
+                            hiddenRows.has("curveTier")
+                          )}
+                        >
+                          {hiddenRows.has("curveTier") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Curve</span>
+                        </button>
+                        <button
+                          onClick={() => toggleRow("curveTarget")}
+                          style={getToggleButtonStyle(
+                            hiddenRows.has("curveTarget")
+                          )}
+                        >
+                          {hiddenRows.has("curveTarget") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Curve Target</span>
+                        </button>
+                        <button
+                          onClick={() => toggleRow("delta")}
+                          style={getToggleButtonStyle(hiddenRows.has("delta"))}
+                        >
+                          {hiddenRows.has("delta") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Delta</span>
+                        </button>
+                        <button
                           onClick={() => toggleRow("minRate")}
                           style={getToggleButtonStyle(
                             hiddenRows.has("minRate")
@@ -590,6 +800,32 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <Eye size={14} />
                           )}{" "}
                           <span>PMS Rates</span>
+                        </button>
+                        <button
+                          onClick={() => toggleRow("sellRate")}
+                          style={getToggleButtonStyle(
+                            hiddenRows.has("sellRate")
+                          )}
+                        >
+                          {hiddenRows.has("sellRate") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Sell Rate</span>
+                        </button>
+                        <button
+                          onClick={() => toggleRow("effectiveRate")}
+                          style={getToggleButtonStyle(
+                            hiddenRows.has("effectiveRate")
+                          )}
+                        >
+                          {hiddenRows.has("effectiveRate") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Effective Rate</span>
                         </button>
                       </div>
                     </div>
@@ -713,7 +949,16 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             text = "FROZEN";
                             color = "#f59e0b";
                           } else if (pendingOverrides[day.date]) {
-                            text = "PENDING";
+                            // [UPDATED] Check if this pending override was an AI Approval
+                            if (aiApprovedPending.has(day.date)) {
+                              text = "AI SUGGESTED";
+                            } else {
+                              text = "PENDING";
+                            }
+                            color = "#faff6a";
+                          } else if (day.source === "AI_SUGGESTED") {
+                            // [UPDATED] Check if the SAVED override was AI
+                            text = "AI SUGGESTED";
                             color = "#faff6a";
                           } else if (
                             savedOverrides[day.date] ||
@@ -862,6 +1107,168 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       )}
 
+                      {!hiddenRows.has("curveTier") && (
+                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                          <td style={styles.tdSticky}>
+                            <div
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <span style={{ color: "#e5e5e5" }}>Curve</span>
+                              <button
+                                onClick={() => toggleRow("curveTier")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color="#6b7280" />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => (
+                            <td
+                              key={day.date}
+                              style={{
+                                borderRight: "1px solid #2a2a2a",
+                                textAlign: "center",
+                                fontSize: "11px",
+                                padding: "12px 8px",
+                                color: "#e5e5e5",
+                                backgroundColor:
+                                  hoveredColumn === day.date
+                                    ? "rgba(57,189,248,0.05)"
+                                    : "transparent",
+                              }}
+                            >
+                              {getSeasonalityTier(day.date)}
+                            </td>
+                          ))}
+                        </tr>
+                      )}
+
+                      {/* Curve Target Row */}
+                      {!hiddenRows.has("curveTarget") && (
+                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                          <td style={styles.tdSticky}>
+                            <div
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <Target size={16} color="#3b82f6" /> Curve Target
+                              <button
+                                onClick={() => toggleRow("curveTarget")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color="#6b7280" />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            const target = getPaceValue(day.date);
+                            return (
+                              <td
+                                key={day.date}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  fontSize: "13px",
+                                  padding: "12px 8px",
+                                  fontFamily: "monospace",
+                                  color: "#e5e5e5",
+                                  backgroundColor:
+                                    hoveredColumn === day.date
+                                      ? "rgba(57,189,248,0.05)"
+                                      : "transparent",
+                                }}
+                              >
+                                {target !== null
+                                  ? `${Math.round(target)}%`
+                                  : "-"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
+
+                      {/* Delta Row */}
+                      {!hiddenRows.has("delta") && (
+                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                          <td style={styles.tdSticky}>
+                            <div
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <span style={{ color: "#e5e5e5" }}>Delta</span>
+                              <button
+                                onClick={() => toggleRow("delta")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color="#6b7280" />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            const target = getPaceValue(day.date);
+                            const delta =
+                              target !== null ? day.occupancy - target : null;
+                            const color =
+                              delta !== null
+                                ? delta >= 0
+                                  ? "#10b981"
+                                  : "#ef4444"
+                                : "#4a4a48";
+                            const sign = delta !== null && delta > 0 ? "+" : "";
+                            return (
+                              <td
+                                key={day.date}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  fontSize: "13px",
+                                  padding: "12px 8px",
+                                  fontFamily: "monospace",
+                                  fontWeight: "bold",
+                                  color: color,
+                                  backgroundColor:
+                                    hoveredColumn === day.date
+                                      ? "rgba(57,189,248,0.05)"
+                                      : "transparent",
+                                }}
+                              >
+                                {delta !== null
+                                  ? `${sign}${Math.round(delta)}%`
+                                  : "-"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
+
                       {/* Data 1 Placeholder */}
                       {!hiddenRows.has("data1") && (
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
@@ -997,7 +1404,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               }}
                             >
                               {day.guardrailMin > 0
-                                ? `£${day.guardrailMin}`
+                                ? `£${Math.round(day.guardrailMin)}`
                                 : "-"}
                             </td>
                           ))}
@@ -1044,7 +1451,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     : "transparent",
                               }}
                             >
-                              {day.floorRateLMF ? `£${day.floorRateLMF}` : "-"}
+                              {day.floorRateLMF
+                                ? `£${Math.round(day.floorRateLMF)}`
+                                : "-"}
                             </td>
                           ))}
                         </tr>
@@ -1102,67 +1511,81 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     : "transparent",
                               }}
                             >
-                              {day.liveRate > 0 ? `£${day.liveRate}` : "-"}
+                              {day.liveRate > 0
+                                ? `£${Math.round(day.liveRate)}`
+                                : "-"}
                             </td>
                           ))}
                         </tr>
                       )}
 
                       {/* 3. Calculations */}
-                      <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                        <td style={styles.tdSticky}>
-                          <div
-                            style={{
-                              width: "100%",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <span style={{ color: "#10b981" }}>
-                              Current Sell Rate
-                            </span>{" "}
-                            <Info size={12} color="#6b7280" />
-                          </div>
-                        </td>
-                        {visibleData.map((day) => {
-                          // [MODIFIED] Calculate on-the-fly from PMS Rate (Data 3)
-                          // Logic: PMS Rate * Multiplier * Discounts (Standard Stack)
-                          let c = 0;
-                          if (day.liveRate > 0 && calcState) {
-                            c = calculateSellRate(
-                              day.liveRate,
-                              geniusPct,
-                              calcState,
-                              day.date,
-                              { includeTargeting: false }
-                            );
-                          }
-                          return (
-                            <td
-                              key={day.date}
+                      {!hiddenRows.has("sellRate") && (
+                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                          <td style={styles.tdSticky}>
+                            <div
                               style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontWeight: "bold",
-                                fontFamily: "monospace",
-                                color: c > 0 ? "#10b981" : "#4a4a48",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                                opacity: day.isFrozen ? 0.4 : 1,
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
                               }}
                             >
-                              {c > 0 ? `£${Math.round(c)}` : "-"}
-                            </td>
-                          );
-                        })}
-                      </tr>
+                              <span style={{ color: "#10b981" }}>
+                                Current Sell Rate
+                              </span>{" "}
+                              <button
+                                onClick={() => toggleRow("sellRate")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color="#6b7280" />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            // [MODIFIED] Calculate on-the-fly from PMS Rate (Data 3)
+                            // Logic: PMS Rate * Multiplier * Discounts (Standard Stack)
+                            let c = 0;
+                            if (day.liveRate > 0 && calcState) {
+                              c = calculateSellRate(
+                                day.liveRate,
+                                geniusPct,
+                                calcState,
+                                day.date,
+                                { includeTargeting: false }
+                              );
+                            }
+                            return (
+                              <td
+                                key={day.date}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  fontSize: "12px",
+                                  padding: "12px 8px",
+                                  fontWeight: "bold",
+                                  fontFamily: "monospace",
+                                  color: c > 0 ? "#10b981" : "#4a4a48",
+                                  backgroundColor:
+                                    hoveredColumn === day.date
+                                      ? "rgba(57,189,248,0.05)"
+                                      : "transparent",
+                                  opacity: day.isFrozen ? 0.4 : 1,
+                                }}
+                              >
+                                {c > 0 ? `£${Math.round(c)}` : "-"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
 
-                      {/* Sentinel Row (Blue) */}
+                      {/* Sentinel Row (Blue) - Interactive Ghost Mode */}
                       <tr
                         style={{
                           borderBottom: "2px solid rgba(57, 189, 248, 0.4)",
@@ -1181,25 +1604,110 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             Sentinel AI Rate
                           </span>
                         </td>
-                        {visibleData.map((day) => (
-                          <td
-                            key={day.date}
-                            style={{
-                              borderRight: "1px solid #2a2a2a",
-                              textAlign: "center",
-                              padding: "16px 8px",
-                              color: "#4a4a48",
-                              fontSize: "14px",
-                              fontWeight: 600,
-                              backgroundColor:
-                                hoveredColumn === day.date
+                        {visibleData.map((day) => {
+                          const pred = aiPredictions[day.date];
+                          // [FIX] Use Hook State
+                          const isApplied =
+                            aiApprovedPending.has(day.date) ||
+                            day.source === "AI_SUGGESTED";
+
+                          const isHovered = hoveredAiCell === day.date;
+                          const showArrow =
+                            pred && !isApplied && !day.isFrozen && isHovered;
+
+                          return (
+                            <td
+                              key={day.date}
+                              onMouseEnter={() => setHoveredAiCell(day.date)}
+                              onMouseLeave={() => setHoveredAiCell(null)}
+                              style={{
+                                borderRight: "1px solid #2a2a2a",
+                                textAlign: "center",
+                                padding: "16px 8px",
+                                position: "relative",
+                                color: isApplied
+                                  ? "#10b981"
+                                  : pred
+                                  ? "#39BDF8"
+                                  : "#4a4a48",
+                                fontSize: "14px",
+                                fontWeight: 600,
+                                transition: "all 0.2s",
+                                cursor:
+                                  pred && !day.isFrozen ? "pointer" : "default",
+                                backgroundColor: isApplied
+                                  ? "rgba(16, 185, 129, 0.05)"
+                                  : hoveredColumn === day.date
                                   ? "rgba(57,189,248,0.1)"
                                   : "transparent",
-                            }}
-                          >
-                            -
-                          </td>
-                        ))}
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  height: "100%",
+                                  gap: "4px",
+                                }}
+                              >
+                                {isApplied ? (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                      opacity: 0.8,
+                                    }}
+                                  >
+                                    <Check size={12} /> Applied
+                                  </div>
+                                ) : (
+                                  <span>
+                                    {pred ? `£${Math.round(pred.rate)}` : "-"}
+                                  </span>
+                                )}
+
+                                {/* Hover Arrow Action */}
+                                {showArrow && (
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (pred) {
+                                        // [FIX] Use Hook Function
+                                        applyAiPrediction(day.date, pred.rate);
+                                        toast.success(
+                                          `AI Rate £${pred.rate} applied`
+                                        );
+                                      }
+                                    }}
+                                    style={{
+                                      position: "absolute",
+                                      bottom: "2px",
+                                      backgroundColor: "#39BDF8",
+                                      borderRadius: "50%",
+                                      width: "16px",
+                                      height: "16px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      cursor: "pointer",
+                                      boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+                                      zIndex: 10,
+                                    }}
+                                  >
+                                    <ArrowDown
+                                      size={10}
+                                      color="#1d1d1c"
+                                      strokeWidth={3}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
                       </tr>
 
                       {/* Separator */}
@@ -1209,141 +1717,160 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <td colSpan={visibleData.length + 1}></td>
                       </tr>
 
-                      <tr
-                        style={{
-                          borderBottom: "1px solid #2a2a2a",
-                          backgroundColor: "rgba(16, 185, 129, 0.05)",
-                        }}
-                      >
-                        <td
+                      {!hiddenRows.has("effectiveRate") && (
+                        <tr
                           style={{
-                            ...styles.tdSticky,
+                            borderBottom: "1px solid #2a2a2a",
                             backgroundColor: "rgba(16, 185, 129, 0.05)",
                           }}
                         >
-                          <div
+                          <td
                             style={{
-                              width: "100%",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
+                              ...styles.tdSticky,
+                              backgroundColor: "rgba(16, 185, 129, 0.05)",
                             }}
                           >
-                            <span style={{ color: "#10b981" }}>
-                              Effective Sell Rate
-                            </span>{" "}
-                            <Info size={12} color="#6b7280" />
-                          </div>
-                        </td>
-                        {visibleData.map((day) => {
-                          const overrideVal =
-                            pendingOverrides[day.date] ??
-                            savedOverrides[day.date];
-                          let effectiveVal = 0;
-
-                          if (overrideVal && calcState) {
-                            effectiveVal = calculateSellRate(
-                              overrideVal,
-                              geniusPct,
-                              calcState,
-                              day.date,
-                              { includeTargeting: false }
-                            );
-                          }
-
-                          return (
-                            <td
-                              key={day.date}
-                              onClick={() => {
-                                if (!day.isFrozen)
-                                  setEditingEffectiveCell(day.date);
-                              }}
+                            <div
                               style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontWeight: "bold",
-                                fontFamily: "monospace",
-                                color: effectiveVal > 0 ? "#10b981" : "#4a4a48",
-                                backgroundColor:
-                                  editingEffectiveCell === day.date
-                                    ? "transparent"
-                                    : hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                                opacity: day.isFrozen ? 0.4 : 1,
-                                cursor: day.isFrozen
-                                  ? "not-allowed"
-                                  : "pointer",
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
                               }}
                             >
-                              {editingEffectiveCell === day.date ? (
-                                <input
-                                  autoFocus
-                                  style={{
-                                    ...styles.input,
-                                    color: "#10b981",
-                                    fontWeight: "bold",
-                                    backgroundColor: "rgba(16, 185, 129, 0.1)",
-                                    border: "1px solid #10b981",
-                                  }}
-                                  defaultValue={
-                                    effectiveVal > 0
-                                      ? Math.round(effectiveVal)
-                                      : ""
-                                  }
-                                  onFocus={(e) => e.target.select()}
-                                  onBlur={(e) => {
-                                    const v = parseFloat(e.target.value);
-                                    if (!isNaN(v) && v > 0 && calcState) {
-                                      // Reverse Math
-                                      const reqOverride =
-                                        calculateRequiredOverride(
-                                          v,
-                                          geniusPct,
-                                          calcState,
-                                          day.date,
-                                          { includeTargeting: false }
-                                        );
+                              <span style={{ color: "#10b981" }}>
+                                Effective Sell Rate
+                              </span>{" "}
+                              <button
+                                onClick={() => toggleRow("effectiveRate")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color="#6b7280" />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            const overrideVal =
+                              pendingOverrides[day.date] ??
+                              savedOverrides[day.date];
+                            let effectiveVal = 0;
 
-                                      // Round to integer (no decimals) for the Override (Base)
-                                      const roundedOverride =
-                                        Math.round(reqOverride);
+                            if (overrideVal && calcState) {
+                              effectiveVal = calculateSellRate(
+                                overrideVal,
+                                geniusPct,
+                                calcState,
+                                day.date,
+                                { includeTargeting: false }
+                              );
+                            }
 
-                                      // Enforce Min Rate on the resulting Base
-                                      if (
-                                        day.guardrailMin > 0 &&
-                                        roundedOverride < day.guardrailMin
-                                      ) {
-                                        toast.warning(
-                                          `Required Base Rate (£${roundedOverride}) is below Min (£${day.guardrailMin}). Set to Min.`
-                                        );
-                                        setOverride(day.date, day.guardrailMin);
-                                      } else {
-                                        setOverride(day.date, roundedOverride);
+                            return (
+                              <td
+                                key={day.date}
+                                onClick={() => {
+                                  if (!day.isFrozen)
+                                    setEditingEffectiveCell(day.date);
+                                }}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  fontSize: "12px",
+                                  padding: "12px 8px",
+                                  fontWeight: "bold",
+                                  fontFamily: "monospace",
+                                  color:
+                                    effectiveVal > 0 ? "#10b981" : "#4a4a48",
+                                  backgroundColor:
+                                    editingEffectiveCell === day.date
+                                      ? "transparent"
+                                      : hoveredColumn === day.date
+                                      ? "rgba(57,189,248,0.05)"
+                                      : "transparent",
+                                  opacity: day.isFrozen ? 0.4 : 1,
+                                  cursor: day.isFrozen
+                                    ? "not-allowed"
+                                    : "pointer",
+                                }}
+                              >
+                                {editingEffectiveCell === day.date ? (
+                                  <input
+                                    autoFocus
+                                    style={{
+                                      ...styles.input,
+                                      color: "#10b981",
+                                      fontWeight: "bold",
+                                      backgroundColor:
+                                        "rgba(16, 185, 129, 0.1)",
+                                      border: "1px solid #10b981",
+                                    }}
+                                    defaultValue={
+                                      effectiveVal > 0
+                                        ? Math.round(effectiveVal)
+                                        : ""
+                                    }
+                                    onFocus={(e) => e.target.select()}
+                                    onBlur={(e) => {
+                                      const v = parseFloat(e.target.value);
+                                      if (!isNaN(v) && v > 0 && calcState) {
+                                        // Reverse Math
+                                        const reqOverride =
+                                          calculateRequiredOverride(
+                                            v,
+                                            geniusPct,
+                                            calcState,
+                                            day.date,
+                                            { includeTargeting: false }
+                                          );
+
+                                        // Round to integer (no decimals) for the Override (Base)
+                                        const roundedOverride =
+                                          Math.round(reqOverride);
+
+                                        // Enforce Min Rate on the resulting Base
+                                        if (
+                                          day.guardrailMin > 0 &&
+                                          roundedOverride < day.guardrailMin
+                                        ) {
+                                          toast.warning(
+                                            `Required Base Rate (£${roundedOverride}) is below Min (£${day.guardrailMin}). Set to Min.`
+                                          );
+                                          setOverride(
+                                            day.date,
+                                            day.guardrailMin
+                                          );
+                                        } else {
+                                          setOverride(
+                                            day.date,
+                                            roundedOverride
+                                          );
+                                        }
+                                      } else if (e.target.value === "") {
+                                        clearOverride(day.date);
                                       }
-                                    } else if (e.target.value === "") {
-                                      clearOverride(day.date);
-                                    }
-                                    setEditingEffectiveCell(null);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.currentTarget.blur();
-                                    }
-                                  }}
-                                />
-                              ) : effectiveVal > 0 ? (
-                                `£${Math.round(effectiveVal)}`
-                              ) : (
-                                "-"
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-
+                                      setEditingEffectiveCell(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                  />
+                                ) : effectiveVal > 0 ? (
+                                  `£${Math.round(effectiveVal)}`
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
                       {/* 4. Override Input */}
                       <tr
                         style={{
@@ -1387,7 +1914,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 <input
                                   autoFocus
                                   style={styles.input}
-                                  defaultValue={displayVal || ""}
+                                  defaultValue={
+                                    displayVal ? Math.round(displayVal) : ""
+                                  }
                                   onFocus={(e) => e.target.select()}
                                   onBlur={(e) => {
                                     const v = parseFloat(e.target.value);
@@ -1466,7 +1995,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     fontSize: "13px",
                                   }}
                                 >
-                                  {displayVal ? `£${displayVal}` : "-"}
+                                  {displayVal
+                                    ? `£${Math.round(displayVal)}`
+                                    : "-"}
                                 </span>
                               )}
                             </td>
