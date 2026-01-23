@@ -55,6 +55,50 @@ export interface DashboardData {
   } | null;
 }
 
+export interface PortfolioMetrics {
+  aggregates: {
+    totalRevenue: number;
+    occupancy: number;
+    adr: number;
+    revpar: number;
+  };
+  hotels: {
+    id: number;
+    name: string;
+    revenue: number;
+    occupancy: number;
+    adr: number;
+    revpar: number;
+  }[];
+}
+
+export interface MatrixDay {
+  day: number;
+  occupancy: number;
+  adr: number;
+  available: number;
+}
+
+export interface MonthlyMetric {
+  month_name: string;
+  month_num: number;
+  year: number;
+  revenue: number;
+  rooms_sold: number;
+  total_capacity: number;
+  adr: number;
+}
+
+export interface PortfolioDetailedHotel {
+  id: number;
+  name: string;
+  group: string;
+  city: string;
+  totalRooms: number;
+  matrixData: MatrixDay[];
+  monthlyData: MonthlyMetric[];
+}
+
 // Inline types to match HotelDashboard.tsx expectations
 interface SnapshotPeriod {
   label: string;
@@ -194,4 +238,18 @@ export const fetchDashboardSummary = async (
     flowcast: dashboardData.flowcast || [],
     recentActivity: dashboardData.recentActivity || [],
   };
+};
+
+export const fetchPortfolioMetrics = async (): Promise<PortfolioMetrics> => {
+  const res = await fetch("/api/metrics/portfolio");
+  if (!res.ok) throw new Error("Failed to fetch portfolio metrics");
+  return res.json();
+};
+
+export const fetchPortfolioDetailed = async (): Promise<
+  PortfolioDetailedHotel[]
+> => {
+  const res = await fetch("/api/metrics/portfolio/detailed");
+  if (!res.ok) throw new Error("Failed to fetch detailed portfolio metrics");
+  return res.json();
 };

@@ -1058,7 +1058,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
 
                 const hasSeasonality =
                   config.seasonality_profile &&
-                  Object.keys(config.seasonality_profile).length === 12;
+                  Object.keys(config.seasonality_profile).length > 0;
 
                 const hasMinRates =
                   config.monthly_min_rates &&
@@ -1294,7 +1294,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   ?.seasonality_profile ??
                                   hotel.config?.seasonality_profile ??
                                   {}
-                              ).length === 12
+                              ).length > 0
                                 ? {
                                     backgroundColor: "rgba(99, 102, 241, 0.1)", // Indigo
                                     color: "#818cf8",

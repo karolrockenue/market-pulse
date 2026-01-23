@@ -139,11 +139,7 @@ export default function App() {
   useEffect(() => {
     const fetchHotelDetails = async () => {
       // Don't run if the property ID (string) is empty
-      // [FIX] Also skip if property is 'ALL' (Portfolio View)
-      if (!property || property === "ALL") {
-        setSelectedPropertyDetails(null);
-        return;
-      }
+      if (!property) return;
 
       try {
         const response = await fetch(`/api/hotels/${property}/details`);
@@ -652,11 +648,7 @@ export default function App() {
 
             {activeView === "dashboard" && (
               <DashboardHub
-                propertyId={
-                  property === "ALL"
-                    ? "ALL"
-                    : selectedPropertyDetails?.hotel_id || null
-                }
+                propertyId={selectedPropertyDetails?.hotel_id || null}
                 city={selectedPropertyDetails?.city}
                 onNavigate={handleViewChange}
               />

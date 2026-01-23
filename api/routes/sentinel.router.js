@@ -62,8 +62,60 @@ router.use(requireAdminApi);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // [REMOVED] Local buildRateIdMap - logic moved to Sentinel Service
+
+/**
+ * [NEW] POST /api/sentinel/trigger-dgx
+ * Proxies a request to the External NVIDIA DGX Spark Server.
+ * Executes the Python Sentinel Logic for a specific hotel.
+ */
+router.post("/trigger-dgx", async (req, res) => {
+  const { hotelId } = req.body;
+
+  // Configuration: Set this in your Vercel/Node .env file
+  // Example: https://dgx-spark.rockenue.com or http://123.45.67.89:5000
+  const DGX_URL = process.env.DGX_API_URL || "http://localhost:5000";
+
+  if (!hotelId) {
+    return res.status(400).json({ success: false, message: "Missing hotelId" });
+  }
+
+  try {
+    console.log(`[Sentinel] Triggering DGX AI for Hotel ${hotelId}...`);
+
+    const response = await fetch(`${DGX_URL}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hotel_id: hotelId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `DGX responded with ${response.status}: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log(`[Sentinel] DGX Response:`, data);
+
+    res.status(200).json({
+      success: true,
+      message: "DGX Analysis Complete",
+      data: data,
+    });
+  } catch (error) {
+    console.error("[Sentinel] DGX Trigger Failed:", error.message);
+    res.status(502).json({
+      success: false,
+      message:
+        "Failed to contact DGX Server. Ensure the Python script is running.",
+      error: error.message,
+    });
+  }
+});
+
 /**
  * [NEW] POST /api/sentinel/recalculate
+--- END ---
  * Triggers a full re-calculation of rates for ALL rooms based on:
  * 1. The Base Rate (AI Engine)
  * 2. The Configured Differentials

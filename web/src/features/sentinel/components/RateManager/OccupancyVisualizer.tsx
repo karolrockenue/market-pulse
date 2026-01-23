@@ -27,13 +27,18 @@ export function OccupancyVisualizer({
   hoveredDay,
   data = [],
 }: OccupancyVisualizerProps) {
+  const [viewMode, setViewMode] = useState<"90" | "180" | "365">("90"); // [UPDATED]
+
   // Transform data
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     const startStr = startDate.toISOString().split("T")[0];
     const startIndex = data.findIndex((d) => d.date === startStr);
     const actualStart = startIndex === -1 ? 0 : startIndex;
-    const sliced = data.slice(actualStart, actualStart + 90);
+
+    // [UPDATED] Dynamic Slice
+    const daysToShow = parseInt(viewMode);
+    const sliced = data.slice(actualStart, actualStart + daysToShow);
 
     return sliced.map((d) => {
       const dateObj = new Date(d.date);
@@ -51,7 +56,7 @@ export function OccupancyVisualizer({
         pickup: d.pickup || 0,
       };
     });
-  }, [data, startDate]);
+  }, [data, startDate, viewMode]); // [FIX] Add viewMode dependency
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -183,7 +188,6 @@ export function OccupancyVisualizer({
                 Pickup: {stats.totalPickup > 0 ? "+" : ""}
                 {stats.totalPickup}
               </Badge>
-
               <Badge
                 variant="outline"
                 style={{
@@ -194,6 +198,7 @@ export function OccupancyVisualizer({
               >
                 30D AVG: {stats.avgOcc30}%
               </Badge>
+
               <Badge
                 variant="outline"
                 style={{
@@ -204,6 +209,74 @@ export function OccupancyVisualizer({
               >
                 Min Rate Days: {stats.minRateDays}
               </Badge>
+              {/* [NEW] View Toggle */}
+              <div
+                style={{
+                  display: "flex",
+                  backgroundColor: "#0f0f0f",
+                  borderRadius: "4px",
+                  padding: "2px",
+                  border: "1px solid #2a2a2a",
+                }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewMode("90");
+                  }}
+                  style={{
+                    fontSize: "10px",
+                    padding: "2px 8px",
+                    borderRadius: "2px",
+                    border: "none",
+                    cursor: "pointer",
+                    backgroundColor:
+                      viewMode === "90" ? "#2a2a2a" : "transparent",
+                    color: viewMode === "90" ? "#e5e5e5" : "#6b7280",
+                    fontWeight: viewMode === "90" ? "bold" : "normal",
+                  }}
+                >
+                  90D
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewMode("180");
+                  }}
+                  style={{
+                    fontSize: "10px",
+                    padding: "2px 8px",
+                    borderRadius: "2px",
+                    border: "none",
+                    cursor: "pointer",
+                    backgroundColor:
+                      viewMode === "180" ? "#2a2a2a" : "transparent",
+                    color: viewMode === "180" ? "#e5e5e5" : "#6b7280",
+                    fontWeight: viewMode === "180" ? "bold" : "normal",
+                  }}
+                >
+                  180D
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewMode("365");
+                  }}
+                  style={{
+                    fontSize: "10px",
+                    padding: "2px 8px",
+                    borderRadius: "2px",
+                    border: "none",
+                    cursor: "pointer",
+                    backgroundColor:
+                      viewMode === "365" ? "#2a2a2a" : "transparent",
+                    color: viewMode === "365" ? "#e5e5e5" : "#6b7280",
+                    fontWeight: viewMode === "365" ? "bold" : "normal",
+                  }}
+                >
+                  365D
+                </button>
+              </div>
             </div>
           </CollapsibleTrigger>
 

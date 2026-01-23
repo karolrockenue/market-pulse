@@ -291,6 +291,17 @@ export const useSentinelConfig = (allHotels: any[]) => {
       // 2. Sanitize numeric inputs (prevent empty strings causing 500s)
       if (rules.rate_freeze_period === "") rules.rate_freeze_period = "0";
       if (rules.guardrail_max === "") rules.guardrail_max = "0";
+
+      // [FIX] Ensure Seasonality Profile is complete (1-12)
+      // If user hasn't touched a month, default it to 'low' so DB is valid.
+      if (!rules.seasonality_profile) rules.seasonality_profile = {};
+      for (let i = 1; i <= 12; i++) {
+        const key = String(i);
+        if (!rules.seasonality_profile[key]) {
+          rules.seasonality_profile[key] = "low";
+        }
+      }
+
       if (rules.last_minute_floor) {
         rules.last_minute_floor = { ...rules.last_minute_floor };
         if (rules.last_minute_floor.rate === "")

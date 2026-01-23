@@ -35,6 +35,24 @@ If FIND and REPLACE appear in the same code block:
 → Apologize
 → Ask to re-output correctly
 
+When proposing code changes, you MUST output exactly two fenced code blocks.
+
+Rules:
+
+The first code block must contain only the exact code to FIND.
+
+The second code block must contain only the exact code to REPLACE it with.
+
+Do NOT include any labels, comments, explanations, or words such as “FIND”, “REPLACE”, “before”, “after”, or similar inside the code blocks.
+
+Do NOT include comments inside the snippets.
+
+Do NOT combine both snippets into one block.
+
+Each code block must be directly copy-pasteable into VS Code search/replace without modification.
+
+Any explanation must be written outside the code blocks.
+
 Wait for explicit user approval before writing code.
 
 If user explicitly asks for “full file replacement”, you may skip incremental patches for that request only.

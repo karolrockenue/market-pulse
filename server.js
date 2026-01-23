@@ -274,6 +274,14 @@ app.get("*", (req, res) => {
   // Otherwise, it's a navigation request -> serve index.html
   const indexPath = path.join(publicPath, "index.html");
 
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate"
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+
   res.sendFile(indexPath, (err) => {
     if (err) {
       console.error("Error sending index.html:", err);

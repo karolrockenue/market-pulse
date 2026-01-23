@@ -859,6 +859,263 @@ const MetricsService = {
     const result = await pgPool.query(query, params);
     return result.rows;
   },
+
+  /**
+   * Portfolio: User-Specific Aggregates (CEO View)
+   */
+  /**
+   * Portfolio: User-Specific Aggregates (CEO View)
+   */
+  async getPortfolioAggregates(userId) {
+    console.log(`[DEBUG] Portfolio: Fetching for UserID: ${userId}`);
+
+    // 1. Dual-Identity Lookup
+    const userQuery = `SELECT cloudbeds_user_id FROM users WHERE user_id = $1`;
+    const userResult = await pgPool.query(userQuery, [userId]);
+    const cloudbedsUserId = userResult.rows[0]?.cloudbeds_user_id;
+
+    // Fetch properties
+    const propQuery = `
+      SELECT DISTINCT property_id 
+      FROM user_properties 
+      WHERE user_id = $1 OR user_id = $2
+    `;
+
+    const propResult = await pgPool.query(propQuery, [
+      userId.toString(),
+      cloudbedsUserId || userId.toString(),
+    ]);
+
+    // FIX: Filter out Aviator Bali (318310) immediately so it doesn't pollute the math
+    const hotelIds = propResult.rows
+      .map((r) => parseInt(r.property_id, 10))
+      .filter((id) => id !== 318310);
+
+    console.log(
+      `[DEBUG] Portfolio: Found ${hotelIds.length} hotels (Excluded Bali).`
+    );
+
+    if (hotelIds.length === 0) {
+      return {
+        aggregates: { totalRevenue: 0, occupancy: 0, adr: 0, revpar: 0 },
+        hotels: [],
+      };
+    }
+
+    // 2. Calculate Global Aggregates (Weighted)
+    // ... rest of the function remains the same ...
+    // (The SQL below will naturally use the filtered hotelIds array)
+
+    const aggQuery = `
+      SELECT 
+        SUM(gross_revenue) as total_revenue,
+        SUM(rooms_sold) as total_sold,
+        SUM(capacity_count) as total_capacity
+      FROM daily_metrics_snapshots
+      WHERE hotel_id = ANY($1::int[])
+        AND stay_date >= (CURRENT_DATE - INTERVAL '1 year')
+    `;
+    const aggResult = await pgPool.query(aggQuery, [hotelIds]);
+    const aggRow = aggResult.rows[0] || {};
+
+    const totalRevenue = parseFloat(aggRow.total_revenue || 0);
+    const totalSold = parseFloat(aggRow.total_sold || 0);
+    const totalCapacity = parseFloat(aggRow.total_capacity || 0);
+
+    const globalOccupancy =
+      totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
+    const globalAdr = totalSold > 0 ? totalRevenue / totalSold : 0;
+    const globalRevpar = totalCapacity > 0 ? totalRevenue / totalCapacity : 0;
+
+    // 3. Get Per-Hotel Performance for Grid
+    const gridQuery = `
+      SELECT 
+        h.hotel_id as id,
+        h.property_name as name,
+        COALESCE(SUM(dms.gross_revenue), 0) as revenue,
+        COALESCE(SUM(dms.rooms_sold), 0) as rooms_sold,
+        COALESCE(SUM(dms.capacity_count), 0) as capacity_count
+      FROM hotels h
+      LEFT JOIN daily_metrics_snapshots dms ON h.hotel_id = dms.hotel_id 
+        AND dms.stay_date >= (CURRENT_DATE - INTERVAL '1 year')
+      WHERE h.hotel_id = ANY($1::int[])
+      GROUP BY h.hotel_id, h.property_name
+      ORDER BY revenue DESC
+    `;
+    const gridResult = await pgPool.query(gridQuery, [hotelIds]);
+
+    const hotels = gridResult.rows.map((row) => {
+      const rev = parseFloat(row.revenue);
+      const sold = parseFloat(row.rooms_sold);
+      const cap = parseFloat(row.capacity_count);
+      return {
+        id: row.id,
+        name: row.name,
+        revenue: rev,
+        occupancy: cap > 0 ? (sold / cap) * 100 : 0,
+        adr: sold > 0 ? rev / sold : 0,
+        revpar: cap > 0 ? rev / cap : 0,
+      };
+    });
+
+    return {
+      aggregates: {
+        totalRevenue,
+        occupancy: globalOccupancy,
+        adr: globalAdr,
+        revpar: globalRevpar,
+      },
+      hotels,
+    };
+  },
+
+  /**
+   * Fetches detailed portfolio data (Matrices, Monthly Tables, KPI Cards).
+   */
+  /**
+   * Fetches detailed portfolio data (Matrices, Monthly Tables, KPI Cards).
+   */
+  /**
+   * Fetches detailed portfolio data (Matrices, Monthly Tables, KPI Cards).
+   */
+  /**
+   * Fetches detailed portfolio data (Matrices, Monthly Tables, KPI Cards).
+   */
+  /**
+   * Fetches detailed portfolio data (Matrices, Monthly Tables, KPI Cards).
+   */
+  async getPortfolioDetailed(userId) {
+    console.log(`[DEBUG] PortfolioDetailed: Fetching for UserID: ${userId}`);
+
+    const userQuery = `SELECT cloudbeds_user_id FROM users WHERE user_id = $1`;
+    const userResult = await pgPool.query(userQuery, [userId]);
+    const cloudbedsUserId = userResult.rows[0]?.cloudbeds_user_id;
+
+    // Robust Join (Text vs Int)
+    const propQuery = `
+      SELECT DISTINCT h.hotel_id, h.property_name, h.management_group, h.total_rooms, h.city
+      FROM user_properties up
+      JOIN hotels h ON up.property_id::int = h.hotel_id
+      WHERE up.user_id::text = $1 OR up.user_id::text = $2
+    `;
+
+    const propResult = await pgPool.query(propQuery, [
+      userId.toString(),
+      cloudbedsUserId || userId.toString(),
+    ]);
+
+    // FIX: Filter out Aviator Bali (318310) immediately
+    const userHotels = propResult.rows
+      .map((h) => ({
+        id: parseInt(h.hotel_id, 10),
+        name: h.property_name,
+        group: h.management_group || "Independent",
+        city: h.city || "Unknown",
+        totalRooms: h.total_rooms || 0,
+      }))
+      .filter((h) => h.id !== 318310);
+
+    const hotelIds = userHotels.map((h) => h.id);
+    console.log(`[DEBUG] Found Hotels (Excluded Bali):`, hotelIds);
+
+    if (hotelIds.length === 0) return [];
+
+    // ... The rest of the function remains EXACTLY as I gave you in the previous step ...
+    // ... using the filtered hotelIds array for matrixSql and monthlySql ...
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const matrixEnd = new Date(today);
+    matrixEnd.setDate(today.getDate() + 45);
+
+    // 2. MATRIX DATA
+    const matrixSql = `
+        SELECT 
+            hotel_id, 
+            TO_CHAR(stay_date, 'YYYY-MM-DD') as date_str,
+            rooms_sold as occupancy, 
+            gross_adr as adr,
+            capacity_count as total_rooms,
+            (capacity_count - rooms_sold) as available
+        FROM daily_metrics_snapshots
+        WHERE hotel_id = ANY($1::int[])
+          AND stay_date >= $2 AND stay_date <= $3
+        ORDER BY stay_date ASC
+    `;
+
+    // 3. MONTHLY PERFORMANCE
+    const startOfLastYear = new Date(today.getFullYear() - 1, 0, 1);
+    const endOfNextYear = new Date(today.getFullYear() + 1, 11, 31);
+
+    const monthlySql = `
+        SELECT 
+            hotel_id,
+            EXTRACT(MONTH FROM stay_date)::int as month_num,
+            EXTRACT(YEAR FROM stay_date)::int as year,
+            SUM(gross_revenue) as revenue,
+            SUM(rooms_sold) as rooms_sold,
+            SUM(capacity_count) as total_capacity,
+            AVG(gross_adr) as adr
+        FROM daily_metrics_snapshots
+        WHERE hotel_id = ANY($1::int[])
+          AND stay_date >= $2 
+          AND stay_date <= $3
+        GROUP BY 1, 2, 3, hotel_id
+        ORDER BY year ASC, month_num ASC
+    `;
+
+    const [matrixRes, monthlyRes] = await Promise.all([
+      pgPool.query(matrixSql, [hotelIds, today, matrixEnd]),
+      pgPool.query(monthlySql, [hotelIds, startOfLastYear, endOfNextYear]),
+    ]);
+
+    // 4. DATA TRANSFORMATION
+    const result = userHotels.map((hotel) => {
+      const hMatrix = matrixRes.rows.filter((r) => r.hotel_id === hotel.id);
+      const hMonthly = monthlyRes.rows.filter((r) => r.hotel_id === hotel.id);
+
+      const matrixData = [];
+      for (let i = 0; i < 45; i++) {
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + i);
+        const dateStr = format(targetDate, "yyyy-MM-dd");
+
+        const match = hMatrix.find((r) => r.date_str === dateStr);
+
+        if (match) {
+          matrixData.push({
+            day: i,
+            occupancy:
+              match.total_rooms > 0
+                ? Math.round((match.occupancy / match.total_rooms) * 100)
+                : 0,
+            adr: Math.round(match.adr || 0),
+            available: match.available,
+          });
+        } else {
+          matrixData.push({
+            day: i,
+            occupancy: 0,
+            adr: 0,
+            available: hotel.totalRooms,
+          });
+        }
+      }
+
+      return {
+        id: hotel.id,
+        name: hotel.name,
+        group: hotel.group,
+        city: hotel.city,
+        totalRooms: hotel.totalRooms,
+        matrixData,
+        monthlyData: hMonthly,
+      };
+    });
+
+    return result;
+  },
 };
 
 module.exports = MetricsService;

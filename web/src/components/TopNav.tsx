@@ -312,6 +312,14 @@ export function TopNav({
                   color: WHITE,
                 }}
               >
+                {properties.length > 1 && (
+                  <SelectItem
+                    value="ALL"
+                    className="font-semibold border-b border-white/10 mb-1"
+                  >
+                    All Properties (Portfolio)
+                  </SelectItem>
+                )}
                 {properties.map((prop) => (
                   <SelectItem
                     key={prop.property_id}

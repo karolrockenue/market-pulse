@@ -1018,7 +1018,49 @@ router.delete("/reports/scheduled/:id", requireUserApi, async (req, res) => {
   }
 });
 
-// --- PORTFOLIO ANALYTICS (ADMIN) ---
+// --- PORTFOLIO ANALYTICS ---
+
+// 1. User Portfolio Aggregates (CEO View)
+router.get("/portfolio", requireUserApi, async (req, res) => {
+  try {
+    // Resolve internal user ID from session
+    const userResult = await pgPool.query(
+      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    const internalUserId = userResult.rows[0].user_id;
+
+    const data = await MetricsService.getPortfolioAggregates(internalUserId);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /portfolio:", error);
+    res.status(500).json({ error: "Failed to fetch portfolio aggregates" });
+  }
+});
+
+// 2. Detailed Portfolio View (Matrices + Monthly)
+router.get("/portfolio/detailed", requireUserApi, async (req, res) => {
+  try {
+    const userResult = await pgPool.query(
+      "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    const internalUserId = userResult.rows[0].user_id;
+
+    const data = await MetricsService.getPortfolioDetailed(internalUserId);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /portfolio/detailed:", error);
+    res.status(500).json({ error: "Failed to fetch detailed portfolio data" });
+  }
+});
+// --- ADMIN PORTFOLIO TOOLS ---
 
 router.get(
   "/portfolio/occupancy-problems",

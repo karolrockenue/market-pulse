@@ -250,13 +250,19 @@ export const getSentinelStatus = async (hotelId: string) => {
   return json.data;
 };
 
-export const triggerSentinelRun = async (hotelId: string) => {
-  const res = await fetch("/api/sentinel/recalculate", {
+export const triggerSentinelRun = async (
+  hotelId: string,
+  startDate?: string,
+  endDate?: string,
+  mode: "PREDICTION" | "LIVE" = "PREDICTION"
+) => {
+  // We use the new DGX Proxy endpoint
+  const res = await fetch("/api/sentinel/trigger-dgx", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hotelId }),
+    body: JSON.stringify({ hotelId, startDate, endDate, mode }),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.message || "Failed to trigger run");
+  if (!res.ok) throw new Error(json.message || "Failed to trigger Sentinel AI");
   return json;
 };

@@ -361,15 +361,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
     const monthKey = String(targetDate.getMonth() + 1);
     let tier = config.seasonality_profile[monthKey];
-
-    // [FIX] Robust Normalization
-    if (!tier) return null;
-    tier = String(tier).toLowerCase(); // Force lowercase string
     if (tier === "medium") tier = "mid";
+    if (!tier) return null;
 
-    const curve = paceCurves.find(
-      (c) => String(c.season_tier).toLowerCase() === tier
-    );
+    const curve = paceCurves.find((c) => c.season_tier === tier);
     if (!curve || !curve.curve_data) return null;
 
     const val = curve.curve_data[daysOut];

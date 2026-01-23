@@ -383,6 +383,34 @@ export const useRateGrid = () => {
     });
   };
 
+  // [NEW] Bulk Apply AI for a range of dates
+  const bulkApplyAi = useCallback(
+    (dates: string[]) => {
+      setPendingOverrides((prev) => {
+        const next = { ...prev };
+        dates.forEach((date) => {
+          const pred = aiPredictions[date]; // Access state directly from closure? No, need ref or dependency.
+          // Actually, aiPredictions is in scope.
+          if (pred && pred.rate > 0) {
+            next[date] = pred.rate;
+          }
+        });
+        return next;
+      });
+
+      setAiApprovedPending((prev) => {
+        const next = new Set(prev);
+        dates.forEach((date) => {
+          if (aiPredictions[date]) {
+            next.add(date);
+          }
+        });
+        return next;
+      });
+    },
+    [aiPredictions]
+  ); // Re-create if predictions change
+
   const submitChanges = async (
     hotelId: string,
     pmsPropertyId: string,
@@ -471,6 +499,7 @@ export const useRateGrid = () => {
     setOverride,
     clearOverride,
     applyAiPrediction, // [NEW]
+    bulkApplyAi, // [NEW]
     submitChanges,
   };
 };

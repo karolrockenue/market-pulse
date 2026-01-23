@@ -525,8 +525,11 @@ async function updateConfig(hotelId, updates) {
 
       for (const [key, price] of Object.entries(daily_max_rates)) {
         const [mIdx, d] = key.split("-").map(Number);
-        // Save for current and next year
-        const years = [2025, 2026];
+
+        // [FIX] Dynamic Year Calculation
+        // Always save for the current year AND the next year to ensure full 365+ day coverage.
+        const currentYear = new Date().getFullYear();
+        const years = [currentYear, currentYear + 1];
 
         for (const year of years) {
           const isoDate = `${year}-${String(mIdx + 1).padStart(
@@ -630,16 +633,33 @@ module.exports = {
 async function getSentinelStatus(hotelId) {
   const client = await db.connect();
   try {
-    // 1. Last AI Run Timestamp
-    const lastRunRes = await client.query(
-      `SELECT MAX(created_at) as last_run
-       FROM sentinel_price_history
-       WHERE hotel_id = $1 AND source IN ('AI', 'AI_APPROVED', 'SENTINEL', 'AUTO', 'AI_SUGGESTED')`,
-      [hotelId]
-    );
-    const lastRun = lastRunRes.rows[0]?.last_run || null;
+    // 1. Fetch timestamps from both History (Committed) and Predictions (Shadow/Thoughts)
+    const [historyRes, predRes] = await Promise.all([
+      client.query(
+        `SELECT MAX(created_at) as last_run
+         FROM sentinel_price_history
+         WHERE hotel_id = $1 AND source IN ('AI', 'AI_APPROVED', 'SENTINEL', 'AUTO', 'AI_SUGGESTED')`,
+        [hotelId]
+      ),
+      client.query(
+        `SELECT MAX(created_at) as last_run
+         FROM sentinel_ai_predictions
+         WHERE hotel_id = $1`,
+        [hotelId]
+      ),
+    ]);
 
-    // 2. Changes in last 24h
+    const historyDate = historyRes.rows[0]?.last_run
+      ? new Date(historyRes.rows[0].last_run)
+      : new Date(0);
+    const predDate = predRes.rows[0]?.last_run
+      ? new Date(predRes.rows[0].last_run)
+      : new Date(0);
+
+    // The "Last Run" is whichever is more recent
+    const lastRun = historyDate > predDate ? historyDate : predDate;
+
+    // 2. Changes in last 24h (Strictly Price Moves)
     const countRes = await client.query(
       `SELECT COUNT(*) as count
        FROM sentinel_price_history
@@ -650,7 +670,10 @@ async function getSentinelStatus(hotelId) {
     );
     const count = parseInt(countRes.rows[0]?.count || 0);
 
-    return { lastRun, changesLast24h: count };
+    return {
+      lastRun: lastRun.getTime() === 0 ? null : lastRun,
+      changesLast24h: count,
+    };
   } finally {
     client.release();
   }
