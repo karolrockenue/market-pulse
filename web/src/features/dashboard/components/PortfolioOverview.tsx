@@ -269,7 +269,7 @@ export function PortfolioOverview() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#1d1d1c]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1d1c]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-[#39BDF8]" />
           <p className="text-sm text-gray-400">Aggregating Portfolio Data...</p>
@@ -468,7 +468,7 @@ export function PortfolioOverview() {
                   }}
                 >
                   <div style={{ color: "#39BDF8", fontSize: "32px" }}>
-                    £{period.revenue.toLocaleString()}
+                    £{Math.round(period.revenue).toLocaleString()}
                   </div>
                   <div
                     style={{
@@ -479,7 +479,7 @@ export function PortfolioOverview() {
                       letterSpacing: "-0.025em",
                     }}
                   >
-                    {period.occupancy.toFixed(1)}% Occ
+                    {period.occupancy.toFixed(0)}% Occ
                   </div>
                 </div>
                 <div

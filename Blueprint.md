@@ -414,7 +414,7 @@ dashboard/
 
 DashboardHub.tsx
 
-Components: HotelDashboard.tsx, DynamicYTDTrend.tsx, MarketOutlookBanner.tsx
+Components: HotelDashboard.tsx, PortfolioOverview.tsx, DynamicYTDTrend.tsx, MarketOutlookBanner.tsx
 
 API: dashboard/api/dashboard.api.ts
 
@@ -424,7 +424,7 @@ reports/
 
 ReportsHub.tsx
 
-Components: ReportSelector.tsx, ReportTable.tsx, ReportActions.tsx, ReportControls.tsx, BudgetReport.tsx, PortfolioOverview.tsx, YearOnYearReport.tsx, ShreejiReport.tsx
+Components: ReportSelector.tsx, ReportTable.tsx, ReportActions.tsx, ReportControls.tsx, BudgetReport.tsx, YearOnYearReport.tsx, ShreejiReport.tsx
 
 API: reports/api/reports.api.ts, reports/api/types.ts
 
@@ -1070,6 +1070,7 @@ market-pulse/
 │ │ │ ├── HotelDashboard.tsx
 │ │ │ ├── MarketOutlookBanner.tsx
 │ │ │ ├── OwnHotelOccupancy.tsx
+│ │ │ ├── PortfolioOverview.tsx
 │ │ │ └── RecentBookings.tsx
 │ │ └── hooks
 │ │ └── useDashboardData.ts
@@ -1082,7 +1083,6 @@ market-pulse/
 │ │ │ └── types.ts
 │ │ ├── components
 │ │ │ ├── BudgetReport.tsx
-│ │ │ ├── PortfolioOverview.tsx
 │ │ │ ├── ReportActions.tsx
 │ │ │ ├── ReportControls.tsx
 │ │ │ ├── ReportSelector.tsx
