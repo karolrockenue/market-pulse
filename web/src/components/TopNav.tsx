@@ -81,6 +81,32 @@ export function TopNav({
     }
   };
 
+  const handleNavClick = (view: string) => {
+    const singlePropertyViews = [
+      "reports",
+      "demand-pace",
+      "settings",
+      "sentinel",
+      "sentinel-group",
+      "riskOverview",
+      "rateManager",
+      "propertyHub",
+      "shadowfax",
+    ];
+
+    if (property === "ALL" && singlePropertyViews.includes(view)) {
+      if (properties.length > 0) {
+        const firstPropId = properties[0].property_id.toString();
+        onPropertyChange(firstPropId);
+        onViewChange(view);
+      } else {
+        console.warn("Cannot switch view: No properties available.");
+      }
+    } else {
+      onViewChange(view);
+    }
+  };
+
   const allNavItems = [
     {
       label: "Dashboard",
@@ -240,7 +266,7 @@ export function TopNav({
                         return (
                           <DropdownMenuItem
                             key={child.value}
-                            onSelect={() => onViewChange(child.value)}
+                            onSelect={() => handleNavClick(child.value)}
                             style={{
                               backgroundColor: isChildActive
                                 ? "#2C2C2C"
@@ -268,7 +294,7 @@ export function TopNav({
             return (
               <button
                 key={item.value}
-                onClick={() => onViewChange(item.value)}
+                onClick={() => handleNavClick(item.value)}
                 style={buttonStyle}
               >
                 <span>{item.label}</span>
