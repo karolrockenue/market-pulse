@@ -24,15 +24,7 @@ class GlobalErrorBoundary extends Component<
       error?.message?.includes("Loading chunk") ||
       error?.message?.includes("Importing a module")
     ) {
-      // [FIX] Prevent infinite reload loops
-      const lastReload = sessionStorage.getItem("chunk_reload_ts");
-      const now = Date.now();
-
-      if (!lastReload || now - parseInt(lastReload) > 10000) {
-        // Only reload if we haven't done so in the last 10 seconds
-        sessionStorage.setItem("chunk_reload_ts", String(now));
-        window.location.reload();
-      }
+      window.location.reload();
     }
   }
 
