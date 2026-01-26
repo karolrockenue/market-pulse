@@ -3,6 +3,30 @@ import { Component, type ReactNode } from "react";
 import App from "./App.tsx";
 import "./index.css";
 
+// [FIX] Global Chunk Load Error Handler (Vite/Rollup specific)
+// This catches 404s on lazy-loaded chunks before React even sees them.
+window.addEventListener("error", (event) => {
+  // Check if the error is related to loading a script/module
+  if (
+    event.message &&
+    (event.message.includes("Loading chunk") ||
+      event.message.includes("Importing a module") ||
+      event.message.includes("Failed to fetch dynamically imported module"))
+  ) {
+    console.warn("Chunk load error detected. Forcing reload...");
+
+    // Prevent infinite loops: Only reload if we haven't done so recently
+    const lastReload = sessionStorage.getItem("chunk_reload_ts");
+    const now = Date.now();
+
+    if (!lastReload || now - parseInt(lastReload) > 5000) {
+      sessionStorage.setItem("chunk_reload_ts", String(now));
+      // Force reload from server (bypass cache)
+      window.location.reload();
+    }
+  }
+});
+
 // Global Error Boundary for Chunk Loading Failures
 class GlobalErrorBoundary extends Component<
   { children: ReactNode },
