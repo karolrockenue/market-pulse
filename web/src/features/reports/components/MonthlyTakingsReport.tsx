@@ -548,20 +548,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       borderRight: "1px solid #2a2a2a",
-                    }}
-                  >
-                    Total Revenue
-                  </th>
-                  <th
-                    style={{
-                      textAlign: "right",
-                      padding: "12px 16px",
-                      color: "#6b7280",
-                      fontSize: "10px",
-                      fontWeight: "500",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderLeft: "2px solid #444",
                     }}
                   >
                     Occ %
@@ -575,9 +562,37 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
                     }}
                   >
                     ADR
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Revpar
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#faff6a",
+                      fontSize: "10px",
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Total Revenue
                   </th>
                 </tr>
               </thead>

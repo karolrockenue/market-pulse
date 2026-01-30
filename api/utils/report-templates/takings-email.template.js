@@ -24,14 +24,37 @@ const formatPercent = (value) => {
 function generateTakingsEmailHTML(reportName, dateRange, data) {
   // Calculate Totals
   const totals = data.reduce(
-    (acc, hotel) => ({
-      cash: acc.cash + (hotel.takings?.cash || 0),
-      cards: acc.cards + (hotel.takings?.cards || 0),
-      bacs: acc.bacs + (hotel.takings?.bacs || 0),
-      extras: acc.extras + (hotel.revenue?.extras?.total || 0),
-      totalRevenue: acc.totalRevenue + (hotel.revenue?.totalRevenue || 0),
-    }),
-    { cash: 0, cards: 0, bacs: 0, extras: 0, totalRevenue: 0 }
+    (acc, hotel) => {
+      const revenue = acc.totalRevenue + (hotel.revenue?.totalRevenue || 0);
+      const roomsSold = acc.roomsSold + (hotel.revenue?.roomsSold || 0);
+      const capacity = acc.capacity + (hotel.revenue?.capacity || 0);
+
+      return {
+        cash: acc.cash + (hotel.takings?.cash || 0),
+        creditCards: acc.creditCards + (hotel.takings?.cards || 0),
+        bacs: acc.bacs + (hotel.takings?.bacs || 0),
+        extras: acc.extras + (hotel.revenue?.extras?.total || 0),
+        totalRevenue: revenue,
+        roomsSold: roomsSold,
+        capacity: capacity,
+        // Calculated totals
+        avgOcc: capacity > 0 ? (roomsSold / capacity) * 100 : 0,
+        avgAdr: roomsSold > 0 ? revenue / roomsSold : 0,
+        avgRevpar: capacity > 0 ? revenue / capacity : 0,
+      };
+    },
+    {
+      cash: 0,
+      creditCards: 0,
+      bacs: 0,
+      extras: 0,
+      totalRevenue: 0,
+      roomsSold: 0,
+      capacity: 0,
+      avgOcc: 0,
+      avgAdr: 0,
+      avgRevpar: 0,
+    }
   );
 
   // Styles
@@ -57,6 +80,11 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
   const rowsHtml = data
     .map((hotel, index) => {
       const bg = index % 2 === 0 ? "#ffffff" : "#fcfcfc";
+      const revpar =
+        hotel.revenue?.capacity > 0
+          ? (hotel.revenue.totalRevenue || 0) / hotel.revenue.capacity
+          : 0;
+
       return `
       <tr style="background-color: ${bg};">
         <td style="${style.tdLeft}">${hotel.name}</td>
@@ -68,13 +96,14 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
         <td style="${style.td}">${formatCurrency(
         hotel.revenue?.extras?.total || 0
       )}</td>
-        <td style="${style.td} font-weight: 600;">${formatCurrency(
-        hotel.revenue?.totalRevenue || 0
-      )}</td>
-        <td style="${style.td}">${formatPercent(
+        <td style="${style.td} border-left: 2px solid #e5e7eb;">${formatPercent(
         hotel.revenue?.occupancy || 0
       )}</td>
         <td style="${style.td}">${formatCurrency(hotel.revenue?.adr || 0)}</td>
+        <td style="${style.td}">${formatCurrency(revpar)}</td>
+        <td style="${style.td} font-weight: 600;">${formatCurrency(
+        hotel.revenue?.totalRevenue || 0
+      )}</td>
       </tr>
     `;
     })
@@ -95,7 +124,7 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
   }</p>
         </div>
 
-        <table style="${style.table}" cellpadding="0" cellspacing="0">
+<table style="${style.table}" cellpadding="0" cellspacing="0">
           <thead>
             <tr>
               <th style="${style.thLeft}">Hotel Name</th>
@@ -103,9 +132,10 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
               <th style="${style.th}">Cards</th>
               <th style="${style.th}">BACS</th>
               <th style="${style.th}">Extras</th>
-              <th style="${style.th}">Total Revenue</th>
-              <th style="${style.th}">Occ %</th>
+              <th style="${style.th} border-left: 2px solid #e5e7eb;">Occ %</th>
               <th style="${style.th}">ADR</th>
+              <th style="${style.th}">RevPAR</th>
+              <th style="${style.th} color: #111827;">Total Revenue</th>
             </tr>
           </thead>
           <tbody>
@@ -134,12 +164,24 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
               } border-top: 1px solid #d1d5db;">${formatCurrency(
     totals.extras
   )}</td>
+              <td style="${
+                style.td
+              } border-top: 1px solid #d1d5db; border-left: 2px solid #e5e7eb;">${formatPercent(
+    totals.avgOcc
+  )}</td>
+              <td style="${
+                style.td
+              } border-top: 1px solid #d1d5db;">${formatCurrency(
+    totals.avgAdr
+  )}</td>
+              <td style="${
+                style.td
+              } border-top: 1px solid #d1d5db;">${formatCurrency(
+    totals.avgRevpar
+  )}</td>
               <td style="${style.td} border-top: 1px solid #d1d5db; ${
     style.highlight
   }">${formatCurrency(totals.totalRevenue)}</td>
-              <td style="${
-                style.td
-              } border-top: 1px solid #d1d5db;" colspan="2"></td>
             </tr>
           </tbody>
         </table>

@@ -1531,31 +1531,50 @@ async function getMonthlyFinancials(
   for (const rec of takingsRecords) {
     if (rec.is_void === true || rec.is_void === "Yes") continue;
 
-    const amount = rec.amount; // Can be positive (Pay) or negative (Refund)
+    const amount = rec.amount;
     const method = (rec.method || "").toLowerCase();
     const description = (rec.description || "").toLowerCase();
 
-    // Normalize noise & Exclude problematic import types
+    // STRICT EXCLUSION: Ignore Reservation Imports and noise
     if (
       !method ||
       method === "-" ||
       method === "null" ||
       method === "-(none)-" ||
-      method.includes("reservations import") ||
-      description.includes("reservations import")
+      method.includes("reservation import") ||
+      description.includes("reservation import")
     ) {
+      if (method.includes("reservation import")) {
+        console.log(
+          `[FILTER] Skipping Reservation Import: £${amount} (ID: ${rec.id})`
+        );
+      }
       continue;
     }
 
-    if (method.includes("cash")) {
+    if (
+      method.includes("cash") &&
+      !method.includes("reservation import") &&
+      !description.includes("reservation import")
+    ) {
       cash += amount;
     } else if (
-      method.includes("bacs") ||
-      method.includes("wire") ||
-      method.includes("bank transfer")
+      (method.includes("bacs") ||
+        method.includes("wire") ||
+        method.includes("bank transfer")) &&
+      !method.includes("reservation import") &&
+      !description.includes("reservation import")
     ) {
       bacs += amount;
     } else {
+      // Ignore imports explicitly
+      if (
+        method.includes("reservation import") ||
+        description.includes("reservation import")
+      ) {
+        continue;
+      }
+
       // EVERYTHING ELSE is treated as a "Card / Digital Payment"
       cards += amount;
 

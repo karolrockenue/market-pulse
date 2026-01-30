@@ -100,6 +100,9 @@ const MetricsService = {
               totalRevenue: revenue,
               occupancy: capacity > 0 ? (rooms / capacity) * 100 : 0,
               adr: rooms > 0 ? revenue / rooms : 0,
+              revpar: capacity > 0 ? revenue / capacity : 0,
+              roomsSold: rooms,
+              capacity: capacity,
             },
           };
         } catch (err) {
