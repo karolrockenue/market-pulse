@@ -668,23 +668,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       style={{
                         textAlign: "right",
                         padding: "16px",
-                        color: "#e5e5e5",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
-                      }}
-                    >
-                      {formatCurrency(hotel.revenue?.totalRevenue || 0)}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        padding: "16px",
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
                         borderRight: "1px solid #2a2a2a",
+                        borderLeft: "2px solid #444",
                       }}
                     >
                       {formatPercent(hotel.revenue?.occupancy || 0)}
@@ -696,9 +684,34 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
                       }}
                     >
                       {formatCurrency(hotel.revenue?.adr || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatCurrency(hotel.revenue?.revpar || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#e5e5e5",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        fontFamily: "ui-monospace, monospace",
+                      }}
+                    >
+                      {formatCurrency(hotel.revenue?.totalRevenue || 0)}
                     </td>
                   </tr>
                 ))}
@@ -778,26 +791,53 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#faff6a",
+                      color: "#e5e5e5",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
+                      borderLeft: "2px solid #444",
+                    }}
+                  >
+                    {formatPercent(totals.avgOcc || 0)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#e5e5e5",
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
                       borderRight: "1px solid #2a2a2a",
                     }}
                   >
-                    {formatCurrency(totals.totalRevenue)}
+                    {formatCurrency(totals.avgAdr || 0)}
                   </td>
                   <td
-                    colSpan={2}
                     style={{
-                      textAlign: "center",
+                      textAlign: "right",
                       padding: "16px",
-                      color: "#6b7280",
-                      fontSize: "11px",
-                      fontStyle: "italic",
+                      color: "#e5e5e5",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
                     }}
                   >
-                    —
+                    {formatCurrency(totals.avgRevpar || 0)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#faff6a",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                    }}
+                  >
+                    {formatCurrency(totals.totalRevenue)}
                   </td>
                 </tr>
               </tbody>
