@@ -14,6 +14,7 @@ import { BudgetReport } from "./components/BudgetReport";
 import { YearOnYearReport } from "./components/YearOnYearReport";
 import { ShreejiReport } from "./components/ShreejiReport";
 import { PortfolioOverview } from "./components/PortfolioOverview"; // <--- UPDATED: Now local
+import { MonthlyTakingsReport } from "./components/MonthlyTakingsReport";
 
 // --- GLOBAL COMPONENTS (../../components) ---
 // These are shared components that live in src/components
@@ -313,6 +314,10 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
         <PortfolioOverview />
       </div>
     );
+  }
+
+  if (activeReportType === "monthly-takings") {
+    return <MonthlyTakingsReport onBack={handleBack} hotelId={hotelId} />;
   }
 
   // 3. Generic/Core Reports (Performance Metrics) - Managed by Hub State

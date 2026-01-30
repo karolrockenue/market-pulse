@@ -12,6 +12,7 @@ import {
   PieChart,
   Target,
   Building2,
+  Wallet,
 } from "lucide-react";
 
 interface ReportType {
@@ -113,6 +114,15 @@ export function ReportSelector({
       description:
         "Detailed financial reporting including revenue streams, payment methods, and transaction analysis",
       icon: DollarSign,
+      category: "Financial",
+      available: true,
+    },
+    {
+      id: "monthly-takings",
+      title: "Monthly Takings",
+      description:
+        "Reconcile Cash (Takings) vs Accrual (Revenue) for end-of-month reporting",
+      icon: Wallet,
       category: "Financial",
       available: true,
     },

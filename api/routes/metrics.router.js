@@ -716,6 +716,98 @@ router.get("/pickup", requireUserApi, async (req, res) => {
 // --- REPORTING ENDPOINTS ---
 
 // [NEW] Shreeji Report Preview
+// [NEW] Monthly Takings Report (Hybrid: Cash + Accrual)
+router.get("/reports/takings", requireUserApi, async (req, res) => {
+  try {
+    const { startDate, endDate, propertyId } = req.query;
+
+    console.log(
+      `[Takings Report] Request received. Property: ${propertyId}, Range: ${startDate} to ${endDate}`
+    );
+
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ error: "startDate and endDate are required." });
+    }
+
+    // Resolve User's Portfolio with Dual-Identity Lookup
+    const userResult = await pgPool.query(
+      "SELECT user_id, cloudbeds_user_id FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (userResult.rows.length === 0)
+      return res.status(401).json({ error: "User not found" });
+
+    const internalUserId = userResult.rows[0].user_id;
+    const cloudbedsUserId = userResult.rows[0].cloudbeds_user_id;
+
+    // 1. Get ALL accessible properties for this user (checking both ID types)
+    const propQuery = `
+      SELECT DISTINCT property_id 
+      FROM user_properties 
+      WHERE user_id = $1 OR user_id = $2
+    `;
+    const propResult = await pgPool.query(propQuery, [
+      internalUserId.toString(),
+      (cloudbedsUserId || internalUserId).toString(),
+    ]);
+    const accessibleIds = propResult.rows.map((r) => parseInt(r.property_id));
+
+    console.log(
+      `[Takings Report] Accessible Hotel IDs: ${accessibleIds.join(", ")}`
+    );
+
+    // 2. Determine target hotels
+    let hotelIds = [];
+
+    // FIX: Handle "ALL" explicitly to allow portfolio view
+    if (propertyId && propertyId !== "ALL") {
+      const requestedId = parseInt(propertyId);
+
+      if (isNaN(requestedId)) {
+        console.warn(`[Takings Report] Invalid Property ID: ${propertyId}`);
+        return res.status(400).json({ error: "Invalid Property ID" });
+      }
+
+      if (!accessibleIds.includes(requestedId)) {
+        console.warn(
+          `[Takings Report] Access denied. User requested ${requestedId} but has ${accessibleIds}`
+        );
+        return res
+          .status(403)
+          .json({ error: "Access denied to this property" });
+      }
+      hotelIds = [requestedId];
+    } else {
+      // IF no specific hotel: Use all accessible (Portfolio view)
+      // Exclude Aviator Bali (318310) to maintain portfolio consistency
+      hotelIds = accessibleIds.filter((id) => id !== 318310);
+    }
+
+    if (hotelIds.length === 0) {
+      console.warn(
+        `[Takings Report] No hotels selected. Returning empty array.`
+      );
+      return res.json([]);
+    }
+
+    console.log(
+      `[Takings Report] Fetching data for hotels: ${hotelIds.join(", ")}`
+    );
+
+    const report = await MetricsService.getGroupTakingsReport(
+      hotelIds,
+      startDate,
+      endDate
+    );
+    res.json(report);
+  } catch (error) {
+    console.error("Error in /reports/takings:", error);
+    res.status(500).json({ error: "Failed to generate takings report" });
+  }
+});
+
 router.get("/reports/shreeji", requireUserApi, async (req, res) => {
   try {
     const { hotel_id, date } = req.query;
@@ -919,7 +1011,6 @@ router.get("/reports/scheduled", requireUserApi, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 router.post("/reports/scheduled", requireUserApi, async (req, res) => {
   try {
     const userResult = await pgPool.query(
@@ -949,6 +1040,19 @@ router.post("/reports/scheduled", requireUserApi, async (req, res) => {
       attachmentFormats,
     } = req.body;
 
+    // [FIX] Map string days to Integers for DB (ISO 8601: Mon=1 ... Sun=7)
+    const dayMap = {
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+      sunday: 7,
+    };
+    const safeDayOfWeek =
+      dayMap[dayOfWeek?.toLowerCase()] || parseInt(dayOfWeek) || null;
+
     const safeReportType = reportType || "standard";
     const isShreeji = safeReportType === "shreeji";
     const safeMetricsHotel = isShreeji ? [] : metricsHotel;
@@ -972,8 +1076,8 @@ router.post("/reports/scheduled", requireUserApi, async (req, res) => {
         reportName,
         Array.isArray(recipients) ? recipients.join(",") : recipients,
         frequency,
-        dayOfWeek,
-        dayOfMonth,
+        safeDayOfWeek, // [FIX] Use mapped Integer
+        dayOfMonth || 1, // [FIX] Default to 1st if monthly and missing
         timeOfDay,
         safeMetricsHotel,
         safeMetricsMarket,
@@ -988,6 +1092,7 @@ router.post("/reports/scheduled", requireUserApi, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (error) {
+    console.error("Failed to save schedule:", error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -19,13 +19,16 @@ class SentinelBridgeService {
     const client = await db.connect();
 
     try {
+      console.time("Step 1 Config");
       // Step 1: Config
       const configRes = await client.query(
         "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
         [hotelId]
       );
       const config = configRes.rows[0] || {};
+      console.timeEnd("Step 1 Config");
 
+      console.time("Step 2 Inventory");
       // Step 2: Calendar (Inventory)
       const calendarRes = await client.query(
         `SELECT hotel_id, room_type_id, stay_date, rate, source 
@@ -34,7 +37,9 @@ class SentinelBridgeService {
          ORDER BY stay_date ASC`,
         [hotelId]
       );
+      console.timeEnd("Step 2 Inventory");
 
+      console.time("Step 3 MaxRates");
       // Step 3: Max Rates
       const maxRatesRes = await client.query(
         `SELECT stay_date, max_price 
@@ -43,14 +48,18 @@ class SentinelBridgeService {
         [hotelId]
       );
 
+      console.timeEnd("Step 3 MaxRates");
+
+      console.time("Step 4 Curves");
       // Step 4: Pace Curves
       const curvesRes = await client.query(
         "SELECT season_tier, curve_data FROM sentinel_pace_curves WHERE hotel_id = $1",
         [hotelId]
       );
+      console.timeEnd("Step 4 Curves");
 
       // --- NEW: Step 4.5 Fetch Last Price Change History ---
-      // We only want the MOST RECENT change for each date
+      console.time("Step 4.5 History");
       console.log("[Bridge] Step 4.5: Fetching Price History...");
       const historyRes = await client.query(
         `SELECT DISTINCT ON (stay_date) stay_date, created_at, old_price, new_price
@@ -81,8 +90,10 @@ class SentinelBridgeService {
           last_change_val: hist ? hist.new_price : null,
         };
       });
+      console.timeEnd("Step 4.5 History");
       // -----------------------------------------------------
 
+      console.time("Step 5 Velocity");
       // Step 5: Velocity
       const velocityRes = await client.query(
         `
@@ -107,6 +118,7 @@ class SentinelBridgeService {
         `,
         [hotelId]
       );
+      console.timeEnd("Step 5 Velocity");
 
       console.log("[Bridge] Context assembly complete.");
 
@@ -138,57 +150,71 @@ class SentinelBridgeService {
   }
 
   /**
-   * [WRITE] Save AI Predictions to the Shadow Table.
+   * [WRITE] Save AI Predictions to the Shadow Table (Batch Optimized).
    */
   async saveDecisions(decisions) {
+    console.log(
+      `[Bridge] Saving ${decisions?.length} decisions (Batch Mode)...`
+    );
     if (!Array.isArray(decisions) || decisions.length === 0)
       return { saved: 0 };
 
     const client = await db.connect();
-    let savedCount = 0;
 
     try {
-      await client.query("BEGIN");
+      console.time("DB Batch Insert");
 
-      for (const d of decisions) {
-        if (
-          !d.hotel_id ||
-          !d.room_type_id ||
-          !d.stay_date ||
-          !d.suggested_rate
-        ) {
-          continue;
-        }
+      // Filter valid decisions
+      const validDecisions = decisions.filter(
+        (d) => d.hotel_id && d.room_type_id && d.stay_date && d.suggested_rate
+      );
 
-        await client.query(
-          `INSERT INTO sentinel_ai_predictions 
-           (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, NOW())
-           ON CONFLICT (hotel_id, room_type_id, stay_date) 
-           DO UPDATE SET 
-             suggested_rate = EXCLUDED.suggested_rate,
-             confidence_score = EXCLUDED.confidence_score,
-             reasoning = EXCLUDED.reasoning,
-             model_version = EXCLUDED.model_version,
-             created_at = NOW(),
-             is_applied = FALSE`,
-          [
-            d.hotel_id,
-            d.room_type_id,
-            d.stay_date,
-            d.suggested_rate,
-            d.confidence_score || 0.0,
-            d.reasoning || null,
-            d.model_version || "v1.0",
-          ]
-        );
-        savedCount++;
-      }
+      if (validDecisions.length === 0) return { saved: 0 };
 
-      await client.query("COMMIT");
-      return { saved: savedCount };
+      // Construct Batch Query using UNNEST for high performance
+      const query = `
+        INSERT INTO sentinel_ai_predictions 
+        (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
+        SELECT * FROM UNNEST(
+          $1::int[],       -- hotel_id
+          $2::int[],       -- room_type_id
+          $3::date[],      -- stay_date
+          $4::numeric[],   -- suggested_rate
+          $5::numeric[],   -- confidence_score
+          $6::text[],      -- reasoning
+          $7::text[],      -- model_version
+          $8::boolean[],   -- is_applied
+          $9::timestamptz[] -- created_at
+        )
+        ON CONFLICT (hotel_id, room_type_id, stay_date) 
+        DO UPDATE SET 
+          suggested_rate = EXCLUDED.suggested_rate,
+          confidence_score = EXCLUDED.confidence_score,
+          reasoning = EXCLUDED.reasoning,
+          model_version = EXCLUDED.model_version,
+          created_at = NOW(),
+          is_applied = FALSE
+      `;
+
+      const now = new Date();
+
+      await client.query(query, [
+        validDecisions.map((d) => d.hotel_id),
+        validDecisions.map((d) => d.room_type_id),
+        validDecisions.map((d) => d.stay_date),
+        validDecisions.map((d) => d.suggested_rate),
+        validDecisions.map((d) => d.confidence_score || 0.0),
+        validDecisions.map((d) => d.reasoning || null),
+        validDecisions.map((d) => d.model_version || "v1.0"),
+        validDecisions.map(() => false),
+        validDecisions.map(() => now),
+      ]);
+
+      console.timeEnd("DB Batch Insert");
+      console.log(`[Bridge] Saved ${validDecisions.length} decisions.`);
+      return { saved: validDecisions.length };
     } catch (error) {
-      await client.query("ROLLBACK");
+      console.error("[Bridge] Save Failed:", error);
       throw error;
     } finally {
       client.release();

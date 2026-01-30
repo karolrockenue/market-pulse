@@ -247,19 +247,25 @@ router.post(
 // NEW: Route to manually trigger the scheduled reports job
 // UPDATED: Route to manually trigger a *single* scheduled report.
 // It's now a POST request to accept a reportId in the body.
-router.post("/run-scheduled-report", requireAdminApi, async (req, res) => {
-  const { reportId } = req.body;
-  if (!reportId) {
-    return res.status(400).json({ error: "A reportId is required." });
+router.post(
+  "/run-scheduled-report",
+  (req, res, next) => {
+    const authHeader = req.headers["authorization"];
+    const internalSecret = process.env.INTERNAL_API_SECRET;
+    if (internalSecret && authHeader === `Bearer ${internalSecret}`) {
+      return next();
+    }
+    return requireAdminApi(req, res, next);
+  },
+  async (req, res) => {
+    const { reportId } = req.body;
+    if (!reportId) {
+      return res.status(400).json({ error: "A reportId is required." });
+    }
+    console.log(`Admin panel manually triggering report ID: ${reportId}`);
+    await scheduledReportsHandler(req, res);
   }
-
-  console.log(`Admin panel manually triggering report ID: ${reportId}`);
-
-  // We call the handler from send-scheduled-reports.js directly.
-  // The handler will see the reportId in the req.body and run the
-  // logic for a single report.
-  await scheduledReportsHandler(req, res);
-});
+);
 
 // [NEW] Route to manually trigger the Rockenue asset sync job
 router.get("/sync-rockenue-assets", requireAdminApi, async (req, res) => {

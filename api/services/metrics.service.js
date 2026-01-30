@@ -1,5 +1,6 @@
 const pgPool = require("../utils/db");
 const { format } = require("date-fns");
+const CloudbedsAdapter = require("../adapters/cloudbedsAdapter");
 
 /**
  * Returns a SQL string for DATE_TRUNC based on the granularity.
@@ -22,6 +23,104 @@ const MetricsService = {
   /**
    * Fetches available years for a property based on sales data.
    */
+
+  /**
+   * Generates the "Takings vs Revenue" hybrid report for a group of hotels.
+   * Merges local DB performance metrics with live financial data from Cloudbeds.
+   */
+  async getGroupTakingsReport(hotelIds, startDate, endDate) {
+    // 1. Fetch DB Performance Metrics (Accrual Basis: Revenue, Occ, ADR)
+    const dbQuery = `
+      SELECT 
+        dms.hotel_id,
+        h.property_name,
+        h.tax_rate,
+        SUM(dms.gross_revenue) as total_revenue,
+        SUM(dms.rooms_sold) as rooms_sold,
+        SUM(dms.capacity_count) as capacity_count
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON dms.hotel_id = h.hotel_id
+      WHERE dms.hotel_id = ANY($1::int[])
+        AND dms.stay_date >= $2 AND dms.stay_date <= $3
+      GROUP BY dms.hotel_id, h.property_name, h.tax_rate
+    `;
+
+    const dbResult = await pgPool.query(dbQuery, [
+      hotelIds,
+      startDate,
+      endDate,
+    ]);
+    const dbMetricsMap = {};
+    dbResult.rows.forEach((row) => {
+      dbMetricsMap[row.hotel_id] = row;
+    });
+
+    // 2. Fetch API Financials (Cash Basis: Takings + Extras)
+    // We fetch hotel details to get the pms_property_id needed for the API.
+    const hotelsQuery = `SELECT hotel_id, pms_property_id, tax_rate, property_name FROM hotels WHERE hotel_id = ANY($1::int[])`;
+    const hotelsResult = await pgPool.query(hotelsQuery, [hotelIds]);
+
+    const reportData = await Promise.all(
+      hotelsResult.rows.map(async (hotel) => {
+        const hotelId = hotel.hotel_id;
+        // Use the name from the hotels table as the source of truth
+        const hotelName = hotel.property_name || `Hotel ${hotelId}`;
+
+        const dbData = dbMetricsMap[hotelId] || {
+          total_revenue: 0,
+          rooms_sold: 0,
+          capacity_count: 0,
+        };
+
+        try {
+          // Get Token & Tax Rate
+          const accessToken = await CloudbedsAdapter.getAccessToken(hotelId);
+          const taxRate = parseFloat(hotel.tax_rate || 0);
+
+          // Call the new Adapter function
+          const financials = await CloudbedsAdapter.getMonthlyFinancials(
+            accessToken,
+            hotel.pms_property_id,
+            startDate,
+            endDate,
+            taxRate
+          );
+
+          // Calculate Derived Metrics
+          const revenue = parseFloat(dbData.total_revenue || 0);
+          const rooms = parseInt(dbData.rooms_sold || 0);
+          const capacity = parseInt(dbData.capacity_count || 0);
+
+          return {
+            hotelId: hotelId,
+            name: hotelName,
+            takings: financials.takings,
+            revenue: {
+              extras: financials.extras,
+              totalRevenue: revenue,
+              occupancy: capacity > 0 ? (rooms / capacity) * 100 : 0,
+              adr: rooms > 0 ? revenue / rooms : 0,
+            },
+          };
+        } catch (err) {
+          console.error(`Failed to fetch financials for hotel ${hotelId}`, err);
+          // Fallback: Return DB data with zeroed financial columns
+          return {
+            hotelId: hotelId,
+            name: hotelName,
+            takings: { cash: 0, cards: 0, bacs: 0 },
+            revenue: {
+              extras: 0,
+              totalRevenue: parseFloat(dbData.total_revenue || 0),
+              occupancy: 0,
+              adr: 0,
+            },
+          };
+        }
+      })
+    );
+    return reportData;
+  },
 
   async getAvailableYears(propertyId) {
     console.log(

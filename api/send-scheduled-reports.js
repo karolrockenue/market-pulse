@@ -3,8 +3,21 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 const exceljs = require("exceljs");
-const { subDays, format } = require("date-fns"); // For calculating "yesterday"
-const { formatInTimeZone } = require("date-fns-tz"); // For email date formatting
+// [MODIFIED] Added 'subMonths', 'startOfMonth', 'endOfMonth' for monthly audits
+const {
+  subDays,
+  format,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+} = require("date-fns");
+const { formatInTimeZone } = require("date-fns-tz");
+
+// [NEW] Import Takings Report Helpers
+const MetricsService = require("./services/metrics.service");
+const {
+  generateTakingsEmailHTML,
+} = require("./utils/report-templates/takings-email.template");
 
 // [NEW] Import all our new utility functions
 // [WITH THIS]
@@ -12,13 +25,10 @@ const { formatInTimeZone } = require("date-fns-tz"); // For email date formattin
 // [NEW] Import all our new utility functions
 const { sendEmail } = require("./utils/email.utils");
 const { generateShreejiReport } = require("./utils/report.generators");
-const { 
+const {
   getShreejiReportEmailHTML,
-  getStandardReportEmailHTML // [NEW] Import the standard report template
+  getStandardReportEmailHTML, // [NEW] Import the standard report template
 } = require("./utils/emailTemplates");
-
-
-
 
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -44,10 +54,16 @@ function calculateDateRange(period) {
 
   switch (period) {
     case "last-week":
+    case "previous-week": // Support both namings
       startDate = new Date(today);
       startDate.setUTCDate(today.getUTCDate() - dayOfWeek - 7);
       endDate = new Date(startDate);
       endDate.setUTCDate(startDate.getUTCDate() + 6);
+      break;
+    case "previous-month": // [NEW] Added for Monthly Audits
+      const lastMonth = subMonths(today, 1);
+      startDate = startOfMonth(lastMonth);
+      endDate = endOfMonth(lastMonth);
       break;
     case "current-month":
       startDate = new Date(
@@ -315,15 +331,32 @@ async function generateXLSX(data, report) {
 // --- MAIN HANDLER ---
 // --- MAIN HANDLER ---
 module.exports = async (req, res) => {
-  console.log("--- [CRON START] /api/send-scheduled-reports function executing ---");
+  console.log("--- [DEBUG START] ---");
   try {
-    
+    const allReports = await pgPool.query(
+      "SELECT id, report_name, frequency, time_of_day, report_type FROM scheduled_reports"
+    );
+    console.log("TOTAL REPORTS IN DB:", allReports.rows.length);
+    allReports.rows.forEach((r) => {
+      console.log(
+        `ID: ${r.id} | Name: ${r.report_name} | Freq: "${r.frequency}" | Time: "${r.time_of_day}" | Type: ${r.report_type}`
+      );
+    });
+  } catch (e) {
+    console.error("DIAGNOSTIC QUERY FAILED:", e.message);
+  }
+  console.log("--- [DEBUG END] ---");
+
+  console.log(
+    "--- [CRON START] /api/send-scheduled-reports function executing ---"
+  );
+  try {
     let dueReports;
     // THE FIX: Safely access reportId from req.body, which might be undefined in a cron job.
     // We check if req.body exists before trying to get reportId from it.
     const reportId = req.body?.reportId;
 
-// If a reportId is provided, this is a manual trigger for a single report.
+    // If a reportId is provided, this is a manual trigger for a single report.
     if (reportId) {
       console.log(`Manual trigger: Fetching report with ID: ${reportId}`);
       const result = await pgPool.query(
@@ -344,11 +377,11 @@ module.exports = async (req, res) => {
       // If no reportId is provided, this is a normal cron job run.
       console.log("Cron job: Checking for reports based on schedule.");
       const now = new Date();
-const currentTime = `${now
+      const currentTime = `${now
         .getUTCHours()
         .toString()
         .padStart(2, "0")}:${now.getUTCMinutes().toString().padStart(2, "0")}`;
-      
+
       // [FIX] Normalize Sunday from 0 (JS getUTCDay()) to 7 (ISO standard used in DB)
       let currentDayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday...
       if (currentDayOfWeek === 0) {
@@ -362,188 +395,261 @@ const currentTime = `${now
       console.log(`[CRON DEBUG] day_of_week = ${currentDayOfWeek}`);
       console.log(`[CRON DEBUG] day_of_month = ${currentDayOfMonth}`);
 
-const result = await pgPool.query(
+      const result = await pgPool.query(
         `SELECT sr.*, h.category, h.property_name
          FROM scheduled_reports sr
          LEFT JOIN hotels h
            ON (
              CASE
-               WHEN sr.property_id ~ '^[0-9]+$' THEN sr.property_id::int
+               WHEN TRIM(sr.property_id) ~ '^[0-9]+$' THEN TRIM(sr.property_id)::int
                ELSE NULL
              END
            ) = h.hotel_id
-         WHERE sr.time_of_day = $1 AND (
-           (sr.frequency = 'Daily') OR
-           (sr.frequency = 'Weekly' AND sr.day_of_week = $2) OR
-           (sr.frequency = 'Monthly' AND sr.day_of_month = $3)
+         WHERE TRIM(sr.time_of_day) = $1 AND (
+           (TRIM(sr.frequency) ILIKE 'Daily') OR
+           (TRIM(sr.frequency) ILIKE 'Weekly' AND sr.day_of_week::text = $2::text) OR
+           (TRIM(sr.frequency) ILIKE 'Monthly' AND sr.day_of_month::text = $3::text)
          )`,
         [currentTime, currentDayOfWeek, currentDayOfMonth]
       );
       dueReports = result.rows;
     }
 
-console.log(`[CRON DEBUG] Database query returned ${dueReports.length} report(s).`);
+    console.log(
+      `[CRON DEBUG] Database query returned ${dueReports.length} report(s).`
+    );
 
     if (dueReports.length === 0) {
       const message = reportId
         ? `Report with ID ${reportId} not found.`
         : `No reports due at this time.`;
-console.log(`[CRON EXIT] ${message} - Exiting cleanly.`);
+      console.log(`[CRON EXIT] ${message} - Exiting cleanly.`);
       return res.status(reportId ? 404 : 200).send(message);
     }
 
-   console.log(`Found ${dueReports.length} report(s) to process.`);
-let sentCount = 0;
+    console.log(`Found ${dueReports.length} report(s) to process.`);
+    let sentCount = 0;
 
-for (const report of dueReports) {
-  // [NEW] Check for the 'shreeji' report type (which the UI will save).
-  // We assume 'standard' or undefined is the default P&L report.
-  if (report.report_type === 'shreeji') {
-    try {
-      // --- 1. GENERATE SHREEJI REPORT ---
-      // This report is always for "yesterday".
-      const yesterday = subDays(new Date(), 1);
-      const reportDateStr = format(yesterday, "yyyy-MM-dd");
-      const hotelId = report.property_id; // Use the property_id from the scheduled report
+    for (const report of dueReports) {
+      // [NEW] Check for the 'shreeji' report type (which the UI will save).
+      // We assume 'standard' or undefined is the default P&L report.
+      if (report.report_type === "shreeji") {
+        try {
+          // --- 1. GENERATE SHREEJI REPORT ---
+          // This report is always for "yesterday".
+          const yesterday = subDays(new Date(), 1);
+          const reportDateStr = format(yesterday, "yyyy-MM-dd");
+          const hotelId = report.property_id; // Use the property_id from the scheduled report
 
-      console.log(`[Cron] Generating Shreeji Report for hotel ${hotelId} on ${reportDateStr}...`);
+          console.log(
+            `[Cron] Generating Shreeji Report for hotel ${hotelId} on ${reportDateStr}...`
+          );
 
-      const { pdfBuffer, fileName, hotelName, reportDate } =
-        await generateShreejiReport(hotelId, reportDateStr);
+          const { pdfBuffer, fileName, hotelName, reportDate } =
+            await generateShreejiReport(hotelId, reportDateStr);
 
-      // --- 2. PREPARE EMAIL ---
-      // Format the date nicely for the email body
-      const emailDate = formatInTimeZone(
-        yesterday,
-        "Europe/London", // Use UK timezone as requested
-        "MMMM d, yyyy"
-      );
+          // --- 2. PREPARE EMAIL ---
+          // Format the date nicely for the email body
+          const emailDate = formatInTimeZone(
+            yesterday,
+            "Europe/London", // Use UK timezone as requested
+            "MMMM d, yyyy"
+          );
 
-      const emailHtml = getShreejiReportEmailHTML(
-        report.report_name,
-        hotelName,
-        emailDate,
-        "Team"
-      );
+          const emailHtml = getShreejiReportEmailHTML(
+            report.report_name,
+            hotelName,
+            emailDate,
+            "Team"
+          );
 
-      const recipients = report.recipients.split(",").map((e) => e.trim());
+          const recipients = report.recipients.split(",").map((e) => e.trim());
 
-      // --- 3. SEND EMAIL WITH ATTACHMENT ---
- // [WITH THIS]
+          // --- 3. SEND EMAIL WITH ATTACHMENT ---
+          // [WITH THIS]
 
-      // --- 3. SEND EMAIL WITH ATTACHMENT ---
-      await sendEmail({
-        to: recipients,
-        subject: `Daily Chart - ${hotelName} - ${emailDate}`, // [NEW] Use dynamic subject
-        html: emailHtml,
-        attachments: [
-          {
-            content: pdfBuffer.toString("base64"),
-            filename: fileName,
-            type: "application/pdf",
-            disposition: "attachment",
-          },
-        ],
-      });
+          // --- 3. SEND EMAIL WITH ATTACHMENT ---
+          await sendEmail({
+            to: recipients,
+            subject: `Daily Chart - ${hotelName} - ${emailDate}`, // [NEW] Use dynamic subject
+            html: emailHtml,
+            attachments: [
+              {
+                content: pdfBuffer.toString("base64"),
+                filename: fileName,
+                type: "application/pdf",
+                disposition: "attachment",
+              },
+            ],
+          });
 
-      console.log(`[Cron] Successfully sent Shreeji Report "${report.report_name}"`);
-      sentCount++;
+          console.log(
+            `[Cron] Successfully sent Shreeji Report "${report.report_name}"`
+          );
+          sentCount++;
+        } catch (shreejiError) {
+          console.error(
+            `[Cron] Failed to process Shreeji Report "${report.report_name}":`,
+            shreejiError
+          );
+        }
+      } else if (report.report_type === "takings_audit") {
+        // --- 3. TAKINGS / GROUP AUDIT REPORT (HTML Body, No Attachment) ---
+        try {
+          console.log(
+            `[Cron] Generating Takings Audit Report: ${report.report_name}`
+          );
 
-    } catch (shreejiError) {
-      console.error(`[Cron] Failed to process Shreeji Report "${report.report_name}":`, shreejiError);
-      // We could optionally email an admin here, but for now we just log
-    }
+          const { startDate, endDate } = calculateDateRange(
+            report.report_period
+          );
 
-  } else {
-    // --- 4. ELSE, RUN EXISTING STANDARD REPORT LOGIC ---
-    try {
-      const { startDate, endDate } = calculateDateRange(report.report_period);
-      const hotelData = await getHotelMetrics(
-        report.property_id,
-        startDate,
-        endDate
-      );
-      const marketData = report.add_comparisons
-        ? await getMarketMetrics(
+          // Get Hotel IDs (Handle both JSON arrays and Postgres string arrays like "{1,2}")
+          let rawIds = report.metrics_hotel;
+          if (typeof rawIds === "string") {
+            rawIds = rawIds
+              .replace(/{|}/g, "")
+              .split(",")
+              .map((id) => id.trim());
+          }
+
+          const hotelIds = (rawIds || [])
+            .map((id) => parseInt(id))
+            .filter((id) => !isNaN(id));
+
+          if (hotelIds.length === 0) {
+            console.log(
+              `[Cron] No hotels selected for Takings Report. Raw value: ${report.metrics_hotel}`
+            );
+          } else {
+            const reportData = await MetricsService.getGroupTakingsReport(
+              hotelIds,
+              startDate,
+              endDate
+            );
+            const emailHtml = generateTakingsEmailHTML(
+              report.report_name,
+              {
+                startDate: startDate,
+                endDate: endDate,
+              },
+              reportData
+            );
+
+            await sendEmail({
+              to: report.recipients.split(",").map((e) => e.trim()),
+              subject: `${report.report_name} (${format(
+                new Date(startDate),
+                "MMM d"
+              )} - ${format(new Date(endDate), "MMM d")})`,
+              html: emailHtml,
+              attachments: [],
+            });
+
+            console.log(`[Cron] Sent Takings Report to ${report.recipients}`);
+            sentCount++;
+          }
+        } catch (err) {
+          console.error(`[Cron] Takings Report Failed:`, err);
+        }
+      } else {
+        // --- 4. ELSE, RUN EXISTING STANDARD REPORT LOGIC ---
+        try {
+          const { startDate, endDate } = calculateDateRange(
+            report.report_period
+          );
+          const hotelData = await getHotelMetrics(
             report.property_id,
-            report.category,
             startDate,
             endDate
-          )
-        : [];
-      const processedData = processData(hotelData, marketData);
+          );
+          const marketData = report.add_comparisons
+            ? await getMarketMetrics(
+                report.property_id,
+                report.category,
+                startDate,
+                endDate
+              )
+            : [];
+          const processedData = processData(hotelData, marketData);
 
-      if (processedData.length === 0) {
-        console.log(`[Cron] No data for standard report "${report.report_name}", skipping.`);
-        continue;
+          if (processedData.length === 0) {
+            console.log(
+              `[Cron] No data for standard report "${report.report_name}", skipping.`
+            );
+            continue;
+          }
+
+          const attachments = [];
+          const formats = report.attachment_formats || ["csv"];
+          const cleanHotelName = report.property_name.replace(/\s/g, "_");
+          const cleanReportName = report.report_name.replace(/\s/g, "_");
+
+          if (formats.includes("csv")) {
+            attachments.push({
+              content: generateCSV(processedData, report).toString("base64"),
+              filename: `${cleanHotelName}_${cleanReportName}.csv`,
+              type: "text/csv",
+              disposition: "attachment",
+            });
+          }
+          if (formats.includes("xlsx")) {
+            const xlsxBuffer = await generateXLSX(processedData, report);
+            attachments.push({
+              content: xlsxBuffer.toString("base64"),
+              filename: `${cleanHotelName}_${cleanReportName}.xlsx`,
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              disposition: "attachment",
+            });
+          }
+
+          if (attachments.length > 0) {
+            // [WITH THIS]
+
+            // [WITH THIS]
+
+            // [NEW] Generate the branded HTML for the standard report
+            const emailHtml = getStandardReportEmailHTML(
+              report.report_name,
+              report.report_period,
+              startDate,
+              endDate
+            );
+
+            const msg = {
+              to: report.recipients.split(",").map((e) => e.trim()),
+              // [MODIFIED] Use a "from" object matching our new email util
+              from: {
+                name: "Market Pulse Reports",
+                email:
+                  process.env.SENDGRID_FROM_EMAIL || "reports@market-pulse.io",
+              },
+              subject: report.report_name, // Subject is just the report name
+              html: emailHtml, // [NEW] Use the new HTML template
+              // [REMOVED] The plain-text 'text' property is gone
+              attachments: attachments,
+            };
+
+            // [MODIFIED] Use the new sendEmail utility
+            await sendEmail(msg);
+
+            console.log(
+              `[Cron] Successfully sent standard report "${report.report_name}" to ${report.recipients}`
+            );
+            sentCount++;
+          }
+        } catch (standardReportError) {
+          console.error(
+            `[Cron] Failed to process Standard Report "${report.report_name}":`,
+            standardReportError
+          );
+        }
       }
+    } // End for-loop
 
-      const attachments = [];
-      const formats = report.attachment_formats || ["csv"];
-      const cleanHotelName = report.property_name.replace(/\s/g, "_");
-      const cleanReportName = report.report_name.replace(/\s/g, "_");
-
-      if (formats.includes("csv")) {
-        attachments.push({
-          content: generateCSV(processedData, report).toString("base64"),
-          filename: `${cleanHotelName}_${cleanReportName}.csv`,
-          type: "text/csv",
-          disposition: "attachment",
-        });
-      }
-      if (formats.includes("xlsx")) {
-        const xlsxBuffer = await generateXLSX(processedData, report);
-        attachments.push({
-          content: xlsxBuffer.toString("base64"),
-          filename: `${cleanHotelName}_${cleanReportName}.xlsx`,
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          disposition: "attachment",
-        });
-      }
-
-      if (attachments.length > 0) {
-// [WITH THIS]
-
-// [WITH THIS]
-
-        // [NEW] Generate the branded HTML for the standard report
-        const emailHtml = getStandardReportEmailHTML(
-          report.report_name,
-          report.report_period,
-          startDate,
-          endDate
-        );
-
-        const msg = {
-          to: report.recipients.split(",").map((e) => e.trim()),
-          // [MODIFIED] Use a "from" object matching our new email util
-          from: {
-            name: "Market Pulse Reports",
-            email: process.env.SENDGRID_FROM_EMAIL || "reports@market-pulse.io",
-          },
-          subject: report.report_name, // Subject is just the report name
-          html: emailHtml, // [NEW] Use the new HTML template
-          // [REMOVED] The plain-text 'text' property is gone
-          attachments: attachments,
-        };
-
-        // [MODIFIED] Use the new sendEmail utility
-        await sendEmail(msg);
-
-        console.log(
-          `[Cron] Successfully sent standard report "${report.report_name}" to ${report.recipients}`
-        );
-        sentCount++;
-      }
-    } catch (standardReportError) {
-      console.error(`[Cron] Failed to process Standard Report "${report.report_name}":`, standardReportError);
-    }
-  }
-} // End for-loop
-
-res
-  .status(200)
-  .json({ message: `Successfully sent ${sentCount} report(s).` });
+    res
+      .status(200)
+      .json({ message: `Successfully sent ${sentCount} report(s).` });
   } catch (error) {
     console.error("Report job failed:", error);
     res.status(500).json({ error: "Failed to process scheduled reports." });

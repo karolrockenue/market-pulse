@@ -1406,4 +1406,341 @@ module.exports = {
   getDailyTakings,
   getRoomBlocks,
   ensureWebhookSubscriptions,
+  getMonthlyFinancials,
 };
+/**
+ * Fetches monthly financial data (Takings vs Revenue) for a specific property.
+ * Performs paginated calls for payments (Cash basis) and a summary call for non-room revenue.
+ * @param {string} accessToken
+ * @param {string} propertyId
+ * @param {string} startDate YYYY-MM-DD
+ * @param {string} endDate YYYY-MM-DD
+ * @param {number} taxRate
+ * @returns {Promise<Object>} { takings: { cash, cards, bacs, cardBreakdown }, extras: number }
+ */
+
+async function getMonthlyFinancials(
+  accessToken,
+  propertyId,
+  startDate,
+  endDate,
+  taxRate
+) {
+  // 1. Fetch Takings (Dataset 1: Financial Transactions)
+  const initialTakingsPayload = {
+    property_ids: [propertyId],
+    dataset_id: 1,
+    filters: {
+      and: [
+        {
+          cdf: { column: "transaction_datetime" },
+          operator: "greater_than_or_equal",
+          value: `${startDate}T00:00:00.000Z`,
+        },
+        {
+          cdf: { column: "transaction_datetime" },
+          operator: "less_than_or_equal",
+          value: `${endDate}T23:59:59.999Z`,
+        },
+        // STRICT FILTER: Only fetch actual "Payment" records.
+        {
+          cdf: { column: "transaction_type" },
+          operator: "equals",
+          value: "Payment",
+        },
+      ],
+    },
+    columns: [
+      { cdf: { column: "payment_method" } },
+      { cdf: { column: "credit_amount" } }, // Will include negatives (Refunds)
+      { cdf: { column: "transaction_description" } },
+      { cdf: { column: "transaction_type" } },
+      { cdf: { column: "id" } },
+      { cdf: { column: "is_void" } },
+      { cdf: { column: "service_date" } },
+      // Corrected Diagnostic Columns
+      { cdf: { column: "transaction_code" } },
+      { cdf: { column: "user" } },
+      { cdf: { column: "booking_id" } },
+    ],
+    settings: { details: true, totals: false },
+  };
+
+  let takingsRecords = [];
+  let nextToken = null;
+
+  // Pagination Loop
+  do {
+    const payload = { ...initialTakingsPayload };
+    if (nextToken) {
+      payload.nextToken = nextToken;
+    }
+
+    const res = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-PROPERTY-ID": propertyId,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Takings Debug] API Error Body:", errText);
+      throw new Error(`Takings API failed: ${res.status} - ${errText}`);
+    }
+    const data = await res.json();
+
+    if (data.records && data.records.credit_amount) {
+      for (let i = 0; i < data.records.credit_amount.length; i++) {
+        takingsRecords.push({
+          id: data.records.id ? data.records.id[i] : "unknown",
+          method: data.records.payment_method[i],
+          amount: parseFloat(data.records.credit_amount[i] || 0),
+          description: data.records.transaction_description[i],
+          transaction_type: data.records.transaction_type
+            ? data.records.transaction_type[i]
+            : "unknown",
+          service_date: data.records.service_date
+            ? data.records.service_date[i]
+            : "unknown",
+          is_void: data.records.is_void ? data.records.is_void[i] : false,
+          // Extra diagnostic fields
+          code: data.records.transaction_code
+            ? data.records.transaction_code[i]
+            : "N/A",
+          user: data.records.user ? data.records.user[i] : "N/A",
+          res_id: data.records.booking_id ? data.records.booking_id[i] : "N/A",
+        });
+      }
+    }
+    nextToken = data.nextToken;
+  } while (nextToken);
+
+  // --- Process Takings (Logic) ---
+  let cash = 0,
+    cards = 0,
+    bacs = 0;
+  const cardBreakdown = {};
+
+  for (const rec of takingsRecords) {
+    if (rec.is_void === true || rec.is_void === "Yes") continue;
+
+    const amount = rec.amount; // Can be positive (Pay) or negative (Refund)
+    const method = (rec.method || "").toLowerCase();
+
+    // Normalize noise
+    if (!method || method === "-" || method === "null" || method === "-(none)-")
+      continue;
+
+    if (method.includes("cash")) {
+      cash += amount;
+    } else if (
+      method.includes("bacs") ||
+      method.includes("wire") ||
+      method.includes("bank transfer")
+    ) {
+      bacs += amount;
+    } else {
+      // EVERYTHING ELSE is treated as a "Card / Digital Payment"
+      cards += amount;
+
+      // Add to frontend breakdown
+      let label = rec.method || "Unknown";
+
+      // [FIX] Refine "Credit Card" using Description
+      if (label.toLowerCase() === "credit card") {
+        const desc = (rec.description || "").toLowerCase();
+        if (desc.includes("visa")) label = "VISA";
+        else if (desc.includes("mastercard")) label = "Mastercard";
+        else if (desc.includes("american express") || desc.includes("amex"))
+          label = "American Express";
+        else if (desc.includes("diners")) label = "Diners";
+        else if (desc.includes("maestro")) label = "Maestro";
+        else label = "Card (Generic)";
+      }
+
+      // Hotelsminder is now a valid category, not excluded
+      if (method.includes("hotelsminder")) label = "Hotelsminder";
+
+      cardBreakdown[label] = (cardBreakdown[label] || 0) + amount;
+    }
+  }
+
+  // 2. Fetch Extras Breakdown (Dataset 1: Financial Transactions)
+  // We look for charges (Debits) that are NOT Room Revenue or Tax.
+  const extrasPayload = {
+    property_ids: [propertyId],
+    dataset_id: 1,
+    filters: {
+      and: [
+        {
+          cdf: { column: "transaction_datetime" },
+          operator: "greater_than_or_equal",
+          value: `${startDate}T00:00:00.000Z`,
+        },
+        {
+          cdf: { column: "transaction_datetime" },
+          operator: "less_than_or_equal",
+          value: `${endDate}T23:59:59.999Z`,
+        },
+        // Exclude Payments, Room Revenue, and Taxes (Using supported operators)
+        {
+          cdf: { column: "transaction_type" },
+          operator: "not_equals",
+          value: "Payment",
+        },
+        {
+          cdf: { column: "transaction_type" },
+          operator: "not_equals",
+          value: "Room Revenue",
+        },
+        {
+          cdf: { column: "transaction_type" },
+          operator: "not_equals",
+          value: "Tax",
+        },
+        {
+          cdf: { column: "transaction_type" },
+          operator: "not_equals",
+          value: "Reservation Payment",
+        },
+      ],
+    },
+    columns: [
+      { cdf: { column: "item_service_type" } },
+      { cdf: { column: "item_service_category" } },
+      { cdf: { column: "transaction_description" } },
+      { cdf: { column: "debit_amount" } },
+      { cdf: { column: "quantity_amount" } }, // [NEW]
+      { cdf: { column: "service_date" } },
+      { cdf: { column: "is_void" } },
+      { cdf: { column: "transaction_type" } }, // [NEW] For filtering
+    ],
+    settings: { details: true, totals: false },
+  };
+
+  let extrasRecords = [];
+  let nextExtrasToken = null;
+
+  do {
+    const payload = { ...extrasPayload };
+    if (nextExtrasToken) payload.nextToken = nextExtrasToken;
+
+    const res = await fetch(
+      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-PROPERTY-ID": propertyId,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Extras Debug] API Error Body:", errText);
+      throw new Error(`Extras API failed: ${res.status} - ${errText}`);
+    }
+    const data = await res.json();
+
+    if (data.records && data.records.debit_amount) {
+      for (let i = 0; i < data.records.debit_amount.length; i++) {
+        // [DEBUG] Capture Transaction Code
+        const txCode = data.records.transaction_code
+          ? data.records.transaction_code[i]
+          : "N/A";
+
+        extrasRecords.push({
+          name:
+            data.records.item_service_type[i] ||
+            data.records.transaction_description[i] ||
+            "Unknown",
+          category: data.records.item_service_category[i] || "Uncategorized",
+          amount: parseFloat(data.records.debit_amount[i] || 0),
+          quantity: parseFloat(data.records.quantity_amount?.[i] || 1),
+          type: data.records.transaction_type?.[i],
+          date: data.records.service_date[i],
+          is_void: data.records.is_void ? data.records.is_void[i] : false,
+          code: txCode, // [DEBUG]
+        });
+      }
+    }
+    nextExtrasToken = data.nextToken;
+  } while (nextExtrasToken);
+  // --- Process Extras Breakdown ---
+  const extrasBreakdown = {};
+  const unitPrices = {}; // [NEW] Track avg price to fix void quantities
+  let extrasGross = 0;
+
+  console.log("\n--- EXTRAS AUDIT ---");
+  extrasRecords.forEach((r) => {
+    console.log(
+      `${r.date} | ${r.name} | ${r.amount} | ${r.code} | Void:${r.is_void}`
+    );
+  });
+  console.log("--------------------\n");
+
+  extrasRecords.forEach((rec) => {
+    // [FIX] For Extras (Debits), we MUST include Voids because they appear as
+    // negative offsetting entries (e.g. -1.67) that cancel out the original charge.
+    // If we skip them, we overcount revenue.
+    // if (rec.is_void === true || rec.is_void === "Yes") return;
+
+    // [FIX] Filter out Room Revenue artifacts
+    if (rec.name === "Unknown" || rec.name === "-" || !rec.name) return;
+    if (rec.type === "Room Revenue") return;
+
+    // [FIX] Gross up the amount
+    const grossAmount = rec.amount * (1 + taxRate);
+    const label = rec.name;
+
+    // [FIX] Smart Quantity Logic
+    let qty = rec.quantity;
+
+    if (grossAmount > 0 && qty > 0) {
+      // Positive transaction: Update Unit Price
+      unitPrices[label] = grossAmount / qty;
+    } else if (grossAmount < 0) {
+      // Negative transaction: Infer Quantity from Unit Price
+      // If we know the price (e.g. 6.25), and amount is -50, then qty is -8.
+      // If we don't know the price, fall back to -rec.quantity (usually -1).
+      const price = unitPrices[label];
+      if (price && price > 0) {
+        qty = Math.round(grossAmount / price); // e.g. -50 / 6.25 = -8
+      } else {
+        qty = -Math.abs(qty); // Fallback: just flip the API quantity
+      }
+    }
+
+    if (!extrasBreakdown[label]) {
+      extrasBreakdown[label] = { amount: 0, quantity: 0 };
+    }
+    extrasBreakdown[label].amount += grossAmount;
+    extrasBreakdown[label].quantity += qty;
+
+    extrasGross += grossAmount;
+  });
+
+  return {
+    takings: {
+      cash,
+      cards,
+      bacs,
+      cardBreakdown,
+      rawTransactions: takingsRecords,
+    },
+    extras: {
+      total: extrasGross,
+      breakdown: extrasBreakdown, // [NEW] Pass breakdown to UI
+      raw: extrasRecords, // [NEW] Pass raw records for debugging
+    },
+  };
+}

@@ -1,0 +1,918 @@
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { fetchTakingsReport } from "../api/reports.api";
+
+interface MonthlyTakingsReportProps {
+  onBack: () => void;
+  hotelId: string;
+}
+
+export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
+  onBack,
+  hotelId,
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any[]>([]);
+
+  // Date State (Defaults to today)
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [endDate, setEndDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const result = await fetchTakingsReport(startDate, endDate, hotelId);
+      setData(result);
+    } catch (error) {
+      console.error("Failed to load takings report:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manual trigger only
+  // useEffect(() => { loadData(); }, []);
+
+  // Calculate totals
+  const totals = data.reduce(
+    (acc, hotel) => ({
+      cash: acc.cash + (hotel.takings?.cash || 0),
+      creditCards: acc.creditCards + (hotel.takings?.cards || 0), // Note: API returns 'cards'
+      bacs: acc.bacs + (hotel.takings?.bacs || 0),
+      extras: acc.extras + (hotel.revenue?.extras?.total || 0), // [FIX] Handle object structure
+      totalRevenue: acc.totalRevenue + (hotel.revenue?.totalRevenue || 0),
+    }),
+    {
+      cash: 0,
+      creditCards: 0,
+      bacs: 0,
+      extras: 0,
+      totalRevenue: 0,
+    }
+  );
+
+  const formatCurrency = (value: number) => {
+    return `£${value.toLocaleString("en-GB", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const formatPercent = (value: number) => {
+    return `${value.toFixed(1)}%`;
+  };
+
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#1D1D1C",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "1600px",
+          margin: "0 auto",
+        }}
+      >
+        {/* Header */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="text-[#9ca3af] hover:text-[#faff6a] pl-0 mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Reports
+          </Button>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <h1
+                style={{
+                  color: "#e5e5e5",
+                  fontSize: "24px",
+                  fontWeight: "600",
+                  marginBottom: "8px",
+                  letterSpacing: "-0.025em",
+                }}
+              >
+                Monthly Takings
+              </h1>
+              <p
+                style={{
+                  color: "#9ca3af",
+                  fontSize: "14px",
+                }}
+              >
+                Financial performance (Cash Basis) vs Revenue (Accrual Basis)
+              </p>
+            </div>
+            {/* Date Controls */}
+            <div className="flex items-center gap-4 bg-[#1A1A1A] p-2 rounded-lg border border-[#2a2a2a]">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{
+                  background: "transparent",
+                  color: "white",
+                  border: "none",
+                  outline: "none",
+                  fontSize: "13px",
+                }}
+              />
+              <span style={{ color: "#6b7280" }}>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{
+                  background: "transparent",
+                  color: "white",
+                  border: "none",
+                  outline: "none",
+                  fontSize: "13px",
+                }}
+              />
+              <Button
+                onClick={loadData}
+                size="sm"
+                style={{
+                  background: "#faff6a",
+                  color: "black",
+                  fontWeight: "bold",
+                  marginLeft: "8px",
+                }}
+              >
+                Run Report
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Table */}
+        {loading ? (
+          <div className="flex items-center justify-center h-64 border border-[#2a2a2a] rounded-lg bg-[#1A1A1A]">
+            <Loader2 className="w-8 h-8 text-[#faff6a] animate-spin" />
+          </div>
+        ) : (
+          <div
+            style={{
+              background: "#1A1A1A",
+              border: "1px solid #2a2a2a",
+              borderRadius: "8px",
+              overflow: "hidden",
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    background: "#0a0a0a",
+                    borderBottom: "1px solid #2a2a2a",
+                  }}
+                >
+                  <th
+                    style={{
+                      textAlign: "left",
+                      padding: "16px",
+                      color: "#9ca3af",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Hotel Name
+                  </th>
+                  <th
+                    colSpan={3}
+                    style={{
+                      textAlign: "center",
+                      padding: "16px",
+                      color: "#9ca3af",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Takings (Cash Basis)
+                  </th>
+                  <th
+                    colSpan={4}
+                    style={{
+                      textAlign: "center",
+                      padding: "16px",
+                      color: "#9ca3af",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Revenue (Accrual Basis)
+                  </th>
+                </tr>
+                <tr
+                  style={{
+                    background: "#0a0a0a",
+                    borderBottom: "1px solid #2a2a2a",
+                  }}
+                >
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  ></th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Cash
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Credit Cards
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    BACS
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Extras
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Total Revenue
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Occ %
+                  </th>
+                  <th
+                    style={{
+                      textAlign: "right",
+                      padding: "12px 16px",
+                      color: "#6b7280",
+                      fontSize: "10px",
+                      fontWeight: "500",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    ADR
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((hotel, index) => (
+                  <tr
+                    key={index}
+                    style={{
+                      borderBottom: "1px solid #2a2a2a",
+                      background: index % 2 === 0 ? "#1A1A1A" : "#151515",
+                    }}
+                  >
+                    <td
+                      style={{
+                        padding: "16px",
+                        color: "#e5e5e5",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {hotel.name}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatCurrency(hotel.takings?.cash || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatCurrency(hotel.takings?.cards || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatCurrency(hotel.takings?.bacs || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatCurrency(hotel.revenue?.extras?.total || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#e5e5e5",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatCurrency(hotel.revenue?.totalRevenue || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                        borderRight: "1px solid #2a2a2a",
+                      }}
+                    >
+                      {formatPercent(hotel.revenue?.occupancy || 0)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "16px",
+                        color: "#d1d5db",
+                        fontSize: "13px",
+                        fontFamily: "ui-monospace, monospace",
+                      }}
+                    >
+                      {formatCurrency(hotel.revenue?.adr || 0)}
+                    </td>
+                  </tr>
+                ))}
+                {/* Totals Row */}
+                <tr
+                  style={{
+                    background: "#0a0a0a",
+                    borderTop: "2px solid #3a3a3a",
+                  }}
+                >
+                  <td
+                    style={{
+                      padding: "16px",
+                      color: "#9ca3af",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    Total
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#e5e5e5",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    {formatCurrency(totals.cash)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#e5e5e5",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    {formatCurrency(totals.creditCards)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#e5e5e5",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    {formatCurrency(totals.bacs)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#e5e5e5",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    {formatCurrency(totals.extras)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "16px",
+                      color: "#faff6a",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      fontFamily: "ui-monospace, monospace",
+                      borderRight: "1px solid #2a2a2a",
+                    }}
+                  >
+                    {formatCurrency(totals.totalRevenue)}
+                  </td>
+                  <td
+                    colSpan={2}
+                    style={{
+                      textAlign: "center",
+                      padding: "16px",
+                      color: "#6b7280",
+                      fontSize: "11px",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    —
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* [NEW] Detailed Breakdown Section */}
+        {!loading &&
+          data.map((hotel) => (
+            <div key={hotel.id} style={{ marginTop: "48px" }}>
+              <h2
+                style={{
+                  color: "#e5e5e5",
+                  fontSize: "18px",
+                  marginBottom: "16px",
+                  borderBottom: "1px solid #333",
+                  paddingBottom: "8px",
+                }}
+              >
+                {hotel.name} - Detailed Audit
+              </h2>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 2fr",
+                  gap: "24px",
+                }}
+              >
+                {/* 1. Payment Method Summary */}
+                <div
+                  style={{
+                    background: "#1A1A1A",
+                    padding: "16px",
+                    borderRadius: "8px",
+                    border: "1px solid #2a2a2a",
+                    height: "fit-content",
+                  }}
+                >
+                  <h3
+                    style={{
+                      color: "#9ca3af",
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Payment Methods
+                  </h3>
+                  <table style={{ width: "100%" }}>
+                    <tbody>
+                      {Object.entries(hotel.takings?.cardBreakdown || {}).map(
+                        ([method, amount]: [string, any]) => (
+                          <tr
+                            key={method}
+                            style={{ borderBottom: "1px solid #2a2a2a" }}
+                          >
+                            <td
+                              style={{
+                                padding: "8px 0",
+                                color: "#e5e5e5",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {method}
+                            </td>
+                            <td
+                              style={{
+                                padding: "8px 0",
+                                textAlign: "right",
+                                color: "#e5e5e5",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              {formatCurrency(amount)}
+                            </td>
+                          </tr>
+                        )
+                      )}
+                      {/* Add Cash/BACS manually if not in breakdown */}
+                      {hotel.takings?.cash > 0 && (
+                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                          <td
+                            style={{
+                              padding: "8px 0",
+                              color: "#e5e5e5",
+                              fontSize: "13px",
+                            }}
+                          >
+                            Cash
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 0",
+                              textAlign: "right",
+                              color: "#e5e5e5",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {formatCurrency(hotel.takings.cash)}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 2. Extras Breakdown (NEW) */}
+                <div
+                  style={{
+                    background: "#1A1A1A",
+                    padding: "16px",
+                    borderRadius: "8px",
+                    border: "1px solid #2a2a2a",
+                    height: "fit-content",
+                  }}
+                >
+                  <h3
+                    style={{
+                      color: "#9ca3af",
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Extras Breakdown
+                  </h3>
+                  <table style={{ width: "100%" }}>
+                    <thead>
+                      <tr
+                        style={{
+                          borderBottom: "1px solid #333",
+                          textAlign: "left",
+                        }}
+                      >
+                        <th
+                          style={{
+                            padding: "8px 0",
+                            color: "#6b7280",
+                            fontSize: "10px",
+                          }}
+                        >
+                          Item
+                        </th>
+                        <th
+                          style={{
+                            padding: "8px 0",
+                            color: "#6b7280",
+                            fontSize: "10px",
+                            textAlign: "center",
+                          }}
+                        >
+                          Qty
+                        </th>
+                        <th
+                          style={{
+                            padding: "8px 0",
+                            color: "#6b7280",
+                            fontSize: "10px",
+                            textAlign: "right",
+                          }}
+                        >
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(
+                        hotel.revenue?.extras?.breakdown || {}
+                      ).map(([item, data]: [string, any]) => (
+                        <tr
+                          key={item}
+                          style={{ borderBottom: "1px solid #2a2a2a" }}
+                        >
+                          <td
+                            style={{
+                              padding: "8px 0",
+                              color: "#e5e5e5",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {item}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 0",
+                              textAlign: "center",
+                              color: "#9ca3af",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {data.quantity}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 0",
+                              textAlign: "right",
+                              color: "#e5e5e5",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {formatCurrency(data.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                      {Object.keys(hotel.revenue?.extras?.breakdown || {})
+                        .length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={2}
+                            style={{
+                              color: "#6b7280",
+                              fontSize: "12px",
+                              padding: "8px 0",
+                            }}
+                          >
+                            No extras found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+          
+                  <h3
+                    style={{
+                      color: "#9ca3af",
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Transaction Log
+                  </h3>
+                  <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                    <table
+                      style={{ width: "100%", borderCollapse: "collapse" }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            borderBottom: "1px solid #333",
+                            textAlign: "left",
+                          }}
+                        >
+                          <th
+                            style={{
+                              padding: "8px",
+                              color: "#6b7280",
+                              fontSize: "10px",
+                            }}
+                          >
+                            Date
+                          </th>
+                          <th
+                            style={{
+                              padding: "8px",
+                              color: "#6b7280",
+                              fontSize: "10px",
+                            }}
+                          >
+                            Method
+                          </th>
+                          <th
+                            style={{
+                              padding: "8px",
+                              color: "#6b7280",
+                              fontSize: "10px",
+                            }}
+                          >
+                            Res ID
+                          </th>
+                          <th
+                            style={{
+                              padding: "8px",
+                              color: "#6b7280",
+                              fontSize: "10px",
+                            }}
+                          >
+                            User
+                          </th>
+                          <th
+                            style={{
+                              padding: "8px",
+                              color: "#6b7280",
+                              fontSize: "10px",
+                              textAlign: "right",
+                            }}
+                          >
+                            Amount
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(hotel.takings?.rawTransactions || [])
+                          .filter(
+                            (t: any) =>
+                              t.is_void !== true && t.is_void !== "Yes"
+                          ) // Hide voids in UI
+                          .sort(
+                            (a: any, b: any) =>
+                              new Date(b.service_date).getTime() -
+                              new Date(a.service_date).getTime()
+                          )
+                          .map((t: any, idx: number) => (
+                            <tr
+                              key={idx}
+                              style={{ borderBottom: "1px solid #2a2a2a" }}
+                            >
+                              <td
+                                style={{
+                                  padding: "8px",
+                                  color: "#9ca3af",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                {t.service_date}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px",
+                                  color: "#e5e5e5",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                {t.method}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px",
+                                  color: "#9ca3af",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                {t.res_id}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px",
+                                  color: "#9ca3af",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                {t.user}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px",
+                                  color: "#e5e5e5",
+                                  fontSize: "11px",
+                                  textAlign: "right",
+                                  fontFamily: "monospace",
+                                }}
+                              >
+                                {formatCurrency(t.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
