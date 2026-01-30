@@ -36,27 +36,27 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
 
   // Styles
   const style = {
-    body: "background-color: #1D1D1C; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e5e5e5; padding: 20px;",
+    body: "background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #374151; padding: 20px; line-height: 1.5;",
     container:
-      "max-width: 1000px; margin: 0 auto; background-color: #1A1A1A; border: 1px solid #333333; border-radius: 8px; overflow: hidden;",
+      "max-width: 1000px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 4px; overflow: hidden;",
     header:
-      "background-color: #0a0a0a; padding: 20px; border-bottom: 1px solid #333333;",
-    title: "color: #faff6a; font-size: 24px; margin: 0; font-weight: 600;",
-    subtitle: "color: #9ca3af; font-size: 14px; margin-top: 5px;",
+      "background-color: #f9fafb; padding: 24px; border-bottom: 1px solid #e5e7eb;",
+    title: "color: #111827; font-size: 22px; margin: 0; font-weight: 700;",
+    subtitle: "color: #6b7280; font-size: 14px; margin-top: 4px;",
     table: "width: 100%; border-collapse: collapse; font-size: 13px;",
-    th: "text-align: right; padding: 12px; color: #9ca3af; font-weight: 600; border-bottom: 1px solid #333333; background-color: #151515; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;",
+    th: "text-align: right; padding: 12px; color: #4b5563; font-weight: 600; border-bottom: 1px solid #e5e7eb; background-color: #f3f4f6; text-transform: uppercase; font-size: 10px; letter-spacing: 0.025em;",
     thLeft:
-      "text-align: left; padding: 12px; color: #9ca3af; font-weight: 600; border-bottom: 1px solid #333333; background-color: #151515; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em;",
-    td: "padding: 12px; text-align: right; color: #d1d5db; border-bottom: 1px solid #2a2a2a; font-family: monospace;",
+      "text-align: left; padding: 12px; color: #4b5563; font-weight: 600; border-bottom: 1px solid #e5e7eb; background-color: #f3f4f6; text-transform: uppercase; font-size: 10px; letter-spacing: 0.025em;",
+    td: "padding: 12px; text-align: right; color: #374151; border-bottom: 1px solid #f3f4f6;",
     tdLeft:
-      "padding: 12px; text-align: left; color: #e5e5e5; border-bottom: 1px solid #2a2a2a; font-weight: 500;",
-    totalRow: "background-color: #252525; font-weight: bold; color: #ffffff;",
-    highlight: "color: #faff6a;",
+      "padding: 12px; text-align: left; color: #111827; border-bottom: 1px solid #f3f4f6; font-weight: 500;",
+    totalRow: "background-color: #f9fafb; font-weight: bold; color: #111827;",
+    highlight: "color: #111827; font-weight: 700;",
   };
 
   const rowsHtml = data
     .map((hotel, index) => {
-      const bg = index % 2 === 0 ? "#1A1A1A" : "#151515";
+      const bg = index % 2 === 0 ? "#ffffff" : "#fcfcfc";
       return `
       <tr style="background-color: ${bg};">
         <td style="${style.tdLeft}">${hotel.name}</td>
@@ -68,9 +68,7 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
         <td style="${style.td}">${formatCurrency(
         hotel.revenue?.extras?.total || 0
       )}</td>
-        <td style="${
-          style.td
-        } color: #ffffff; font-weight: 600;">${formatCurrency(
+        <td style="${style.td} font-weight: 600;">${formatCurrency(
         hotel.revenue?.totalRevenue || 0
       )}</td>
         <td style="${style.td}">${formatPercent(
@@ -105,7 +103,7 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
               <th style="${style.th}">Cards</th>
               <th style="${style.th}">BACS</th>
               <th style="${style.th}">Extras</th>
-              <th style="${style.th} color: #faff6a;">Total Revenue</th>
+              <th style="${style.th}">Total Revenue</th>
               <th style="${style.th}">Occ %</th>
               <th style="${style.th}">ADR</th>
             </tr>
@@ -115,34 +113,38 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
             <tr style="${style.totalRow}">
               <td style="${
                 style.tdLeft
-              } border-top: 2px solid #444;">TOTALS</td>
+              } border-top: 1px solid #d1d5db;">TOTALS</td>
               <td style="${
                 style.td
-              } border-top: 2px solid #444;">${formatCurrency(totals.cash)}</td>
+              } border-top: 1px solid #d1d5db;">${formatCurrency(
+    totals.cash
+  )}</td>
               <td style="${
                 style.td
-              } border-top: 2px solid #444;">${formatCurrency(
+              } border-top: 1px solid #d1d5db;">${formatCurrency(
     totals.cards
   )}</td>
               <td style="${
                 style.td
-              } border-top: 2px solid #444;">${formatCurrency(totals.bacs)}</td>
+              } border-top: 1px solid #d1d5db;">${formatCurrency(
+    totals.bacs
+  )}</td>
               <td style="${
                 style.td
-              } border-top: 2px solid #444;">${formatCurrency(
+              } border-top: 1px solid #d1d5db;">${formatCurrency(
     totals.extras
   )}</td>
-              <td style="${style.td} border-top: 2px solid #444; ${
+              <td style="${style.td} border-top: 1px solid #d1d5db; ${
     style.highlight
   }">${formatCurrency(totals.totalRevenue)}</td>
               <td style="${
                 style.td
-              } border-top: 2px solid #444;" colspan="2"></td>
+              } border-top: 1px solid #d1d5db;" colspan="2"></td>
             </tr>
           </tbody>
         </table>
 
-        <div style="padding: 20px; background-color: #151515; border-top: 1px solid #333; text-align: center; color: #666; font-size: 11px;">
+        <div style="padding: 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 11px;">
           Generated automatically by Market Pulse. <br/>
           Cash Basis (Takings) vs Accrual Basis (Revenue) Reconciliation.
         </div>

@@ -3,6 +3,9 @@ console.log("[SERVER STARTUP] Admin router file is being loaded."); // Add this 
 
 // /api/routes/admin.router.js
 const express = require("express");
+const {
+  generateTakingsEmailHTML,
+} = require("../utils/report-templates/takings-email.template.js");
 const router = express.Router();
 const fetch = require("node-fetch");
 const format = require("pg-format"); // <-- Add this line
@@ -1315,5 +1318,44 @@ router.get(
 // --- END OF NEW ENDPOINT ---
 
 // [MOVED] Hotel management, group listing, and deletion endpoints moved to hotels.router.js
+
+/**
+ * Visual Preview for the Light-Themed Takings Email
+ * URL: /api/admin/test-takings-preview
+ */
+router.get("/test-takings-preview", requireAdminApi, (req, res) => {
+  const mockData = [
+    {
+      name: "The Grand Plaza",
+      takings: { cash: 1250.5, cards: 8420.0, bacs: 500.0 },
+      revenue: {
+        totalRevenue: 10500.0,
+        occupancy: 85.5,
+        adr: 122.8,
+        extras: { total: 450.0 },
+      },
+    },
+    {
+      name: "Riverside Boutique",
+      takings: { cash: 420.0, cards: 5100.0, bacs: 0 },
+      revenue: {
+        totalRevenue: 5800.0,
+        occupancy: 72.1,
+        adr: 98.5,
+        extras: { total: 120.0 },
+      },
+    },
+  ];
+
+  const dateRange = { startDate: "2026-01-01", endDate: "2026-01-31" };
+  const html = generateTakingsEmailHTML(
+    "Monthly Takings Audit (Preview)",
+    dateRange,
+    mockData
+  );
+
+  res.setHeader("Content-Type", "text/html");
+  res.send(html);
+});
 
 module.exports = router;
