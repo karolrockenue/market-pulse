@@ -1533,10 +1533,19 @@ async function getMonthlyFinancials(
 
     const amount = rec.amount; // Can be positive (Pay) or negative (Refund)
     const method = (rec.method || "").toLowerCase();
+    const description = (rec.description || "").toLowerCase();
 
-    // Normalize noise
-    if (!method || method === "-" || method === "null" || method === "-(none)-")
+    // Normalize noise & Exclude problematic import types
+    if (
+      !method ||
+      method === "-" ||
+      method === "null" ||
+      method === "-(none)-" ||
+      method.includes("reservations import") ||
+      description.includes("reservations import")
+    ) {
       continue;
+    }
 
     if (method.includes("cash")) {
       cash += amount;
