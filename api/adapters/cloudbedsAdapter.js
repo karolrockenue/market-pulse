@@ -45,7 +45,7 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
     // --- START DEBUG LOGGING ---
     console.log(`\n--- Debugging START for Date: ${date} ---`);
     console.log(
-      `[DEBUG A] Inputs: rawRevenue=${rawRevenue}, taxRate=${taxRate} (type: ${typeof taxRate}), pricingModel=${pricingModel}`
+      `[DEBUG A] Inputs: rawRevenue=${rawRevenue}, taxRate=${taxRate} (type: ${typeof taxRate}), pricingModel=${pricingModel}`,
     );
 
     const numericTaxRate = parseFloat(taxRate);
@@ -65,7 +65,7 @@ function processApiDataForTable(allData, taxRate, pricingModel) {
       metrics.gross_revenue = rawRevenue * (1 + numericTaxRate);
     }
     console.log(
-      `[DEBUG E] Assigned Metrics: net_revenue=${metrics.net_revenue}, gross_revenue=${metrics.gross_revenue}`
+      `[DEBUG E] Assigned Metrics: net_revenue=${metrics.net_revenue}, gross_revenue=${metrics.gross_revenue}`,
     );
     console.log(`--- Debugging END for Date: ${date} ---\n`);
     // --- END DEBUG LOGGING ---
@@ -93,7 +93,7 @@ function processUpcomingApiData(
   taxRate,
   pricingModel,
   startDateStr,
-  endDateStr
+  endDateStr,
 ) {
   const aggregated = {};
 
@@ -141,13 +141,13 @@ function processUpcomingApiData(
         }
 
         aggregated[date].rooms_sold += sanitizeMetric(
-          page.records.rooms_sold?.[i]
+          page.records.rooms_sold?.[i],
         );
         aggregated[date].capacity_count += sanitizeMetric(
-          page.records.capacity_count?.[i]
+          page.records.capacity_count?.[i],
         );
         aggregated[date].room_revenue += sanitizeMetric(
-          page.records.room_revenue?.[i]
+          page.records.room_revenue?.[i],
         );
       }
     }
@@ -247,7 +247,7 @@ async function getHistoricalMetrics(
   startDate,
   endDate,
   taxRate,
-  pricingModel
+  pricingModel,
 ) {
   const columnsToRequest = [
     "adr",
@@ -295,7 +295,7 @@ async function getHistoricalMetrics(
   console.log("--- STARTING HISTORICAL SYNC ---");
   console.log(
     `[DEBUG] Initial Payload for property ${propertyId}:`,
-    JSON.stringify(initialInsightsPayload, null, 2)
+    JSON.stringify(initialInsightsPayload, null, 2),
   );
 
   do {
@@ -304,7 +304,7 @@ async function getHistoricalMetrics(
       // If we have a nextToken from a previous page, we use it for the next request.
       insightsPayload.nextToken = nextToken;
       console.log(
-        `[DEBUG] Fetching page ${pageNum} using nextToken: ${nextToken}`
+        `[DEBUG] Fetching page ${pageNum} using nextToken: ${nextToken}`,
       );
     } else {
       console.log(`[DEBUG] Fetching page ${pageNum} (first page).`);
@@ -320,13 +320,13 @@ async function getHistoricalMetrics(
           "X-PROPERTY-ID": propertyId,
         },
         body: JSON.stringify(insightsPayload),
-      }
+      },
     );
 
     const responseText = await apiResponse.text();
     if (!apiResponse.ok) {
       console.error(
-        `[DEBUG] API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`
+        `[DEBUG] API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`,
       );
       throw new Error(`API Error on page ${pageNum}: ${apiResponse.status}`);
     }
@@ -337,7 +337,7 @@ async function getHistoricalMetrics(
     console.log(
       `[DEBUG] Page ${pageNum} response received. Record count: ${
         pageData.records?.rooms_sold?.length || 0
-      }. Has nextToken: ${!!pageData.nextToken}`
+      }. Has nextToken: ${!!pageData.nextToken}`,
     );
 
     allApiData.push(pageData);
@@ -368,7 +368,7 @@ async function getUpcomingMetrics(
   accessToken,
   propertyId,
   taxRate,
-  pricingModel
+  pricingModel,
 ) {
   // NEW: The start date is now set to 14 days in the past to recapture recent changes.
   const startDateObj = new Date();
@@ -448,16 +448,16 @@ async function getUpcomingMetrics(
           "X-PROPERTY-ID": propertyId,
         },
         body: JSON.stringify(insightsPayload),
-      }
+      },
     );
 
     const responseText = await apiResponse.text();
     if (!apiResponse.ok) {
       console.error(
-        `[DEBUG] Forecast API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`
+        `[DEBUG] Forecast API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`,
       );
       throw new Error(
-        `Forecast API Error on page ${pageNum}: ${apiResponse.status}`
+        `Forecast API Error on page ${pageNum}: ${apiResponse.status}`,
       );
     }
 
@@ -465,7 +465,7 @@ async function getUpcomingMetrics(
     console.log(
       `[DEBUG] Forecast page ${pageNum} received. Record count: ${
         pageData.records?.rooms_sold?.length || 0
-      }. Has nextToken: ${!!pageData.nextToken}`
+      }. Has nextToken: ${!!pageData.nextToken}`,
     );
 
     allApiData.push(pageData);
@@ -481,7 +481,7 @@ async function getUpcomingMetrics(
     taxRate,
     pricingModel,
     startDate,
-    endDate
+    endDate,
   );
 }
 // Export all public functions.
@@ -534,7 +534,7 @@ async function exchangeCodeForToken(code) {
     {
       method: "POST",
       body: params,
-    }
+    },
   );
 
   const tokenData = await tokenRes.json();
@@ -543,7 +543,7 @@ async function exchangeCodeForToken(code) {
   if (!tokenData.access_token) {
     throw new Error(
       "Authorization code exchange failed. Response from Cloudbeds: " +
-        JSON.stringify(tokenData)
+        JSON.stringify(tokenData),
     );
   }
 
@@ -567,7 +567,7 @@ async function getCredentialsForProperty(propertyId) {
   // has a link to a property, but the credentials belong to the original owner.
   const credsResult = await pgPool.query(
     `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
-    [propertyId]
+    [propertyId],
   );
 
   const credentials = credsResult.rows[0]?.pms_credentials;
@@ -575,7 +575,7 @@ async function getCredentialsForProperty(propertyId) {
   // If no record is found, it means we have no way to authenticate for this property.
   if (!credentials || !credentials.refresh_token) {
     throw new Error(
-      `Could not find valid credentials with a refresh_token for property ${propertyId}.`
+      `Could not find valid credentials with a refresh_token for property ${propertyId}.`,
     );
   }
 
@@ -607,7 +607,7 @@ async function getAccessToken(propertyId) {
     {
       method: "POST",
       body: params,
-    }
+    },
   );
 
   const tokenData = await tokenRes.json();
@@ -615,7 +615,7 @@ async function getAccessToken(propertyId) {
   if (!tokenData.access_token) {
     throw new Error(
       "Token refresh failed. Response from Cloudbeds: " +
-        JSON.stringify(tokenData)
+        JSON.stringify(tokenData),
     );
   }
 
@@ -696,7 +696,7 @@ async function getHotelDetails(accessToken, propertyId) {
 
 async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   console.log(
-    `[Sync Function] Starting detail sync for Cloudbeds property ${propertyId}...`
+    `[Sync Function] Starting detail sync for Cloudbeds property ${propertyId}...`,
   );
   const hotelDetails = await getHotelDetails(accessToken, propertyId);
   if (!hotelDetails) {
@@ -717,14 +717,14 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
           AND hotel_id = ($1)::integer
         )
   `,
-    [String(propertyId)] // ensure we always bind a string, not a JS number
+    [String(propertyId)], // ensure we always bind a string, not a JS number
   );
 
   const existingHotel = existingHotelResult.rows[0];
 
   const neighborhood = await getNeighborhoodFromCoords(
     hotelDetails.propertyAddress.propertyLatitude,
-    hotelDetails.propertyAddress.propertyLongitude
+    hotelDetails.propertyAddress.propertyLongitude,
   );
 
   let internalHotelId;
@@ -734,7 +734,7 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     // If the hotel already exists, UPDATE its record with the latest details.
     internalHotelId = existingHotel.hotel_id;
     console.log(
-      `[Sync Function] Existing hotel found with internal ID ${internalHotelId}. Updating details...`
+      `[Sync Function] Existing hotel found with internal ID ${internalHotelId}. Updating details...`,
     );
     const updateQuery = `
       UPDATE hotels SET
@@ -761,7 +761,7 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     // --- INSERT PATH ---
     // If no hotel is found, INSERT a new record.
     console.log(
-      `[Sync Function] No existing hotel found. Creating new record...`
+      `[Sync Function] No existing hotel found. Creating new record...`,
     );
     const insertQuery = `
       INSERT INTO hotels (
@@ -788,7 +788,7 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
   }
 
   console.log(
-    `[Sync Function] Successfully synced details for property ${propertyId}. Internal hotel_id is ${internalHotelId}.`
+    `[Sync Function] Successfully synced details for property ${propertyId}. Internal hotel_id is ${internalHotelId}.`,
   );
 
   // --- NEW: Auto-Subscribe to Webhooks (The Pulse) ---
@@ -798,7 +798,7 @@ async function syncHotelDetailsToDb(accessToken, propertyId, dbClient) {
     await ensureWebhookSubscriptions(accessToken, propertyId);
   } catch (webhookError) {
     console.error(
-      `[Sync Function] WARNING: Webhook auto-subscribe failed: ${webhookError.message}`
+      `[Sync Function] WARNING: Webhook auto-subscribe failed: ${webhookError.message}`,
     );
   }
 
@@ -826,19 +826,19 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
     taxData.data.length === 0
   ) {
     console.warn(
-      `[Tax Sync] No tax data found for property ${propertyId}. Skipping.`
+      `[Tax Sync] No tax data found for property ${propertyId}. Skipping.`,
     );
     return; // Fail gracefully
   }
 
   // --- FIX: Prioritize finding the 'inclusive' tax ---
   const primaryTax = taxData.data.find(
-    (t) => t.inclusiveOrExclusive === "inclusive"
+    (t) => t.inclusiveOrExclusive === "inclusive",
   );
 
   if (!primaryTax) {
     console.warn(
-      `[Tax Sync] No INCLUSIVE tax found for property ${propertyId}.`
+      `[Tax Sync] No INCLUSIVE tax found for property ${propertyId}.`,
     );
     return; // Fail gracefully
   }
@@ -861,10 +861,10 @@ async function syncHotelTaxInfoToDb(accessToken, propertyId, dbClient) {
     `UPDATE hotels 
      SET tax_rate = $1, tax_type = $2, tax_name = $3 
      WHERE pms_property_id = $4 OR hotel_id::text = $4`,
-    [taxRate, taxType, taxName, propertyId]
+    [taxRate, taxType, taxName, propertyId],
   );
   console.log(
-    `[Tax Sync] Successfully synced tax info for property ${propertyId}.`
+    `[Tax Sync] Successfully synced tax info for property ${propertyId}.`,
   );
 }
 
@@ -886,7 +886,7 @@ async function setAppDisabled(accessToken, internalPropertyId) {
   // THE FIX: Look up the original PMS ID from our database using the internal ID.
   const hotelResult = await pgPool.query(
     "SELECT pms_property_id, pms_type FROM hotels WHERE hotel_id = $1",
-    [internalPropertyId]
+    [internalPropertyId],
   );
 
   if (hotelResult.rows.length === 0) {
@@ -898,7 +898,7 @@ async function setAppDisabled(accessToken, internalPropertyId) {
   // This function is Cloudbeds-specific, so we ensure we're not accidentally running it for another PMS.
   if (hotel.pms_type !== "cloudbeds") {
     console.log(
-      `[Adapter] Skipping app disable for non-Cloudbeds property ${internalPropertyId}.`
+      `[Adapter] Skipping app disable for non-Cloudbeds property ${internalPropertyId}.`,
     );
     return;
   }
@@ -913,7 +913,7 @@ async function setAppDisabled(accessToken, internalPropertyId) {
   params.append("app_state", "disabled");
 
   console.log(
-    `[Adapter] Setting app_state to 'disabled' for Cloudbeds property ${cloudbedsPropertyId} (Internal ID: ${internalPropertyId}).`
+    `[Adapter] Setting app_state to 'disabled' for Cloudbeds property ${cloudbedsPropertyId} (Internal ID: ${internalPropertyId}).`,
   );
 
   const response = await fetch(url, {
@@ -931,18 +931,18 @@ async function setAppDisabled(accessToken, internalPropertyId) {
   if (!response.ok || !data.success) {
     console.error(
       `[Adapter] Failed to disable app for property ${cloudbedsPropertyId}. Response: ${JSON.stringify(
-        data
-      )}`
+        data,
+      )}`,
     );
     throw new Error(
       `Cloudbeds API Error: Failed to set app state to disabled. ${
         data.message || ""
-      }`
+      }`,
     );
   }
 
   console.log(
-    `[Adapter] Successfully disabled app for property ${cloudbedsPropertyId} in Cloudbeds.`
+    `[Adapter] Successfully disabled app for property ${cloudbedsPropertyId} in Cloudbeds.`,
   );
 }
 
@@ -986,7 +986,7 @@ async function getRooms(accessToken, propertyId) {
       throw new Error(
         `Cloudbeds API returned a non-JSON response (likely an auth error page). Status: ${
           response.status
-        }. Body: ${errorText.substring(0, 500)}...`
+        }. Body: ${errorText.substring(0, 500)}...`,
       );
     }
 
@@ -994,8 +994,8 @@ async function getRooms(accessToken, propertyId) {
     if (!response.ok || !data.success) {
       throw new Error(
         `Failed to fetch rooms page ${pageNumber}. API Response: ${JSON.stringify(
-          data
-        )}`
+          data,
+        )}`,
       );
     }
 
@@ -1042,7 +1042,7 @@ async function getReservations(accessToken, propertyId, filters = {}) {
       throw new Error(
         `Cloudbeds API returned a non-JSON response on reservations call. Status: ${
           response.status
-        }. Body: ${errorText.substring(0, 500)}...`
+        }. Body: ${errorText.substring(0, 500)}...`,
       );
     }
 
@@ -1051,8 +1051,8 @@ async function getReservations(accessToken, propertyId, filters = {}) {
     if (!response.ok || !data.success) {
       throw new Error(
         `Failed to fetch reservations page ${pageNumber}. API Response: ${JSON.stringify(
-          data
-        )}`
+          data,
+        )}`,
       );
     }
 
@@ -1077,7 +1077,7 @@ async function getReservations(accessToken, propertyId, filters = {}) {
 async function getReservationsWithDetails(
   accessToken,
   propertyId,
-  filters = {}
+  filters = {},
 ) {
   let allReservations = [];
   let pageNumber = 1;
@@ -1104,7 +1104,7 @@ async function getReservationsWithDetails(
       throw new Error(
         `Cloudbeds API returned a non-JSON response. Status: ${
           response.status
-        }. Body: ${errorText.substring(0, 500)}...`
+        }. Body: ${errorText.substring(0, 500)}...`,
       );
     }
 
@@ -1113,8 +1113,8 @@ async function getReservationsWithDetails(
       // Some endpoints use `success: false`
       throw new Error(
         `Failed to fetch detailed reservations page ${pageNumber}. API Response: ${JSON.stringify(
-          data
-        )}`
+          data,
+        )}`,
       );
     }
 
@@ -1154,7 +1154,7 @@ async function getReservation(accessToken, propertyId, reservationId) {
     throw new Error(
       `Cloudbeds API returned non-JSON for getReservation. Status: ${
         response.status
-      }. Body: ${errorText.substring(0, 500)}...`
+      }. Body: ${errorText.substring(0, 500)}...`,
     );
   }
 
@@ -1163,8 +1163,8 @@ async function getReservation(accessToken, propertyId, reservationId) {
   if (!response.ok || !data.success) {
     throw new Error(
       `Failed to fetch reservation ${reservationId}. API Response: ${JSON.stringify(
-        data
-      )}`
+        data,
+      )}`,
     );
   }
 
@@ -1223,7 +1223,7 @@ async function getDailyTakings(accessToken, propertyId, date) {
         "X-PROPERTY-ID": propertyId,
       },
       body: JSON.stringify(insightsPayload),
-    }
+    },
   );
 
   const data = await apiResponse.json();
@@ -1276,15 +1276,15 @@ async function getRoomBlocks(accessToken, propertyId, date) {
       throw new Error(
         `Cloudbeds API returned a non-JSON response for getRoomBlocks. Status: ${
           response.status
-        }. Body: ${errorText.substring(0, 500)}...`
+        }. Body: ${errorText.substring(0, 500)}...`,
       );
     }
     const data = await response.json();
     if (!response.ok || data.success === false) {
       throw new Error(
         `Failed to fetch room blocks page ${pageNumber}. API Response: ${JSON.stringify(
-          data
-        )}`
+          data,
+        )}`,
       );
     }
     // THE FIX: The API returns an object at 'data', not an array.
@@ -1320,7 +1320,7 @@ async function ensureWebhookSubscriptions(accessToken, propertyId) {
   ];
 
   console.log(
-    `[Webhooks] Ensuring subscriptions for property ${propertyId}...`
+    `[Webhooks] Ensuring subscriptions for property ${propertyId}...`,
   );
 
   // 1. Fetch existing subscriptions
@@ -1345,7 +1345,7 @@ async function ensureWebhookSubscriptions(accessToken, propertyId) {
       (w) =>
         w.event.entity === req.object &&
         w.event.action === req.action &&
-        w.subscriptionData?.url === TARGET_URL
+        w.subscriptionData?.url === TARGET_URL,
     );
 
     if (exists) {
@@ -1355,7 +1355,7 @@ async function ensureWebhookSubscriptions(accessToken, propertyId) {
 
     // If not, register it
     console.log(
-      `[Webhooks] Missing subscription for '${req.action}'. Registering now...`
+      `[Webhooks] Missing subscription for '${req.action}'. Registering now...`,
     );
 
     const params = new URLSearchParams({
@@ -1374,7 +1374,7 @@ async function ensureWebhookSubscriptions(accessToken, propertyId) {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: params,
-      }
+      },
     );
 
     const postJson = await postResponse.json();
@@ -1382,7 +1382,7 @@ async function ensureWebhookSubscriptions(accessToken, propertyId) {
       console.error(`[Webhooks] Failed to register ${req.action}:`, postJson);
     } else {
       console.log(
-        `[Webhooks] Successfully registered ${req.action}. ID: ${postJson.data?.subscriptionID}`
+        `[Webhooks] Successfully registered ${req.action}. ID: ${postJson.data?.subscriptionID}`,
       );
     }
   }
@@ -1419,108 +1419,182 @@ module.exports = {
  * @returns {Promise<Object>} { takings: { cash, cards, bacs, cardBreakdown }, extras: number }
  */
 
+/**
+ * Fetches monthly financial data (Takings vs Revenue) for a specific property.
+ * Performs paginated calls for payments (Cash basis) and a summary call for non-room revenue.
+ * @param {string} accessToken
+ * @param {string} propertyId
+ * @param {string} startDate YYYY-MM-DD
+ * @param {string} endDate YYYY-MM-DD
+ * @param {number} taxRate
+ * @returns {Promise<Object>} { takings: { cash, cards, bacs, cardBreakdown }, extras: number }
+ */
 async function getMonthlyFinancials(
   accessToken,
   propertyId,
   startDate,
   endDate,
-  taxRate
+  taxRate,
 ) {
-  // 1. Fetch Takings (Dataset 1: Financial Transactions)
-  const initialTakingsPayload = {
-    property_ids: [propertyId],
-    dataset_id: 1,
-    filters: {
-      and: [
-        {
-          cdf: { column: "transaction_datetime" },
-          operator: "greater_than_or_equal",
-          value: `${startDate}T00:00:00.000Z`,
-        },
-        {
-          cdf: { column: "transaction_datetime" },
-          operator: "less_than_or_equal",
-          value: `${endDate}T23:59:59.999Z`,
-        },
-        // STRICT FILTER: Only fetch actual "Payment" records.
-        {
-          cdf: { column: "transaction_type" },
-          operator: "equals",
-          value: "Payment",
-        },
-      ],
-    },
-    columns: [
-      { cdf: { column: "payment_method" } },
-      { cdf: { column: "credit_amount" } }, // Will include negatives (Refunds)
-      { cdf: { column: "transaction_description" } },
-      { cdf: { column: "transaction_type" } },
-      { cdf: { column: "id" } },
-      { cdf: { column: "is_void" } },
-      { cdf: { column: "service_date" } },
-      // Corrected Diagnostic Columns
-      { cdf: { column: "transaction_code" } },
-      { cdf: { column: "user" } },
-      { cdf: { column: "booking_id" } },
-    ],
-    settings: { details: true, totals: false },
-  };
-
   let takingsRecords = [];
-  let nextToken = null;
 
-  // Pagination Loop
-  do {
-    const payload = { ...initialTakingsPayload };
-    if (nextToken) {
-      payload.nextToken = nextToken;
-    }
+  // [FIX] Chunking Logic to bypass 12k row limit
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const chunks = [];
 
-    const res = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          "X-PROPERTY-ID": propertyId,
+  // [FIX] Daily Chunking to bypass 12k row limit
+  let curr = new Date(start);
+  while (curr <= end) {
+    const dayStr = curr.toISOString().split("T")[0];
+    chunks.push({ start: dayStr, end: dayStr }); // Single Day Chunk
+    curr.setDate(curr.getDate() + 1);
+  }
+
+  console.log(`[Takings] Split request into ${chunks.length} chunks.`);
+
+  for (const chunk of chunks) {
+    console.log(`[Takings] Fetching Chunk: ${chunk.start} to ${chunk.end}`);
+
+    const initialTakingsPayload = {
+      property_ids: [propertyId],
+      dataset_id: 1,
+      filters: {
+        and: [
+          {
+            cdf: { column: "transaction_datetime" },
+            operator: "greater_than_or_equal",
+            value: `${chunk.start}T00:00:00.000Z`,
+          },
+          {
+            cdf: { column: "transaction_datetime" },
+            operator: "less_than_or_equal",
+            value: `${chunk.end}T23:59:59.999Z`,
+          },
+          // [FIX] Restore strict Payment filter
+          {
+            cdf: { column: "transaction_type" },
+            operator: "equals",
+            value: "Payment",
+          },
+          // [FIX] Exclude Imports at API level to save bandwidth
+          {
+            cdf: { column: "payment_method" },
+            operator: "not_equals",
+            value: "Reservation Import",
+          },
+        ],
+      },
+      columns: [
+        { cdf: { column: "payment_method" } },
+        { cdf: { column: "credit_amount" } },
+        { cdf: { column: "transaction_description" } },
+        { cdf: { column: "transaction_type" } },
+        { cdf: { column: "id" } },
+        { cdf: { column: "is_void" } },
+        { cdf: { column: "service_date" } },
+        { cdf: { column: "transaction_code" } },
+        { cdf: { column: "user" } },
+        { cdf: { column: "booking_id" } },
+      ],
+      settings: { details: true, totals: false },
+    };
+
+    let nextToken = null;
+    let pageNum = 1;
+
+    do {
+      const payload = { ...initialTakingsPayload };
+      if (nextToken) payload.nextToken = nextToken;
+
+      const res = await fetch(
+        "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "X-PROPERTY-ID": propertyId,
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
+      );
+
+      if (!res.ok) throw new Error(`Takings API failed: ${res.status}`);
+      const data = await res.json();
+
+      if (data.records && data.records.credit_amount) {
+        for (let i = 0; i < data.records.credit_amount.length; i++) {
+          takingsRecords.push({
+            id: data.records.id ? data.records.id[i] : "unknown",
+            method: data.records.payment_method[i],
+            amount: parseFloat(data.records.credit_amount[i] || 0),
+            description: data.records.transaction_description[i],
+            transaction_type: data.records.transaction_type
+              ? data.records.transaction_type[i]
+              : "unknown",
+            service_date: data.records.service_date
+              ? data.records.service_date[i]
+              : "unknown",
+            is_void: data.records.is_void ? data.records.is_void[i] : false,
+            code: data.records.transaction_code
+              ? data.records.transaction_code[i]
+              : "N/A",
+            user: data.records.user ? data.records.user[i] : "N/A",
+            res_id: data.records.booking_id
+              ? data.records.booking_id[i]
+              : "N/A",
+          });
+        }
       }
+      nextToken = data.nextToken;
+      pageNum++;
+    } while (nextToken);
+  }
+
+  console.log(`[Takings] Total Fetched (All Chunks): ${takingsRecords.length}`);
+
+  // --- FULL AUDIT LOG (ALL TRANSACTIONS) ---
+  console.log("\n--- FULL TRANSACTION AUDIT ---");
+  console.log(
+    "Date       | Amount   | Method             | Res ID      | Type      | User         | Void | TxID",
+  );
+  console.log(
+    "-----------|----------|--------------------|-------------|-----------|--------------|------|------",
+  );
+
+  // Sort by Amount for easier matching
+  takingsRecords.sort((a, b) => b.amount - a.amount);
+
+  let dailyTotal = 0;
+
+  takingsRecords.forEach((r) => {
+    // [FIX] Exclude "Reservation Import" from Audit Log
+    if ((r.method || "").toLowerCase().includes("import")) return;
+
+    if (r.is_void !== true && r.is_void !== "Yes") {
+      dailyTotal += r.amount;
+    }
+
+    const date = r.service_date || "Unknown";
+    const isVoid = r.is_void === true || r.is_void === "Yes" ? "VOID" : "    ";
+    const amt = r.amount.toFixed(2).padStart(8);
+    const method = (r.method || "Unknown").substring(0, 18).padEnd(18);
+    const resId = (r.res_id || "").toString().padEnd(11);
+    const type = (r.transaction_type || "").substring(0, 9).padEnd(9);
+    const user = (r.user || "").substring(0, 12);
+    const txId = r.id || "N/A";
+
+    console.log(
+      `${date} | ${amt} | ${method} | ${resId} | ${type} | ${user} | ${isVoid} | ${txId}`,
     );
+  });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[Takings Debug] API Error Body:", errText);
-      throw new Error(`Takings API failed: ${res.status} - ${errText}`);
-    }
-    const data = await res.json();
-
-    if (data.records && data.records.credit_amount) {
-      for (let i = 0; i < data.records.credit_amount.length; i++) {
-        takingsRecords.push({
-          id: data.records.id ? data.records.id[i] : "unknown",
-          method: data.records.payment_method[i],
-          amount: parseFloat(data.records.credit_amount[i] || 0),
-          description: data.records.transaction_description[i],
-          transaction_type: data.records.transaction_type
-            ? data.records.transaction_type[i]
-            : "unknown",
-          service_date: data.records.service_date
-            ? data.records.service_date[i]
-            : "unknown",
-          is_void: data.records.is_void ? data.records.is_void[i] : false,
-          // Extra diagnostic fields
-          code: data.records.transaction_code
-            ? data.records.transaction_code[i]
-            : "N/A",
-          user: data.records.user ? data.records.user[i] : "N/A",
-          res_id: data.records.booking_id ? data.records.booking_id[i] : "N/A",
-        });
-      }
-    }
-    nextToken = data.nextToken;
-  } while (nextToken);
+  console.log(
+    "-----------|----------|--------------------|-------------|-----------|--------------|------|------",
+  );
+  console.log(`GRAND TOTAL: ${dailyTotal.toFixed(2)}`);
+  console.log("--- END AUDIT ---\n");
 
   // --- Process Takings (Logic) ---
   let cash = 0,
@@ -1534,47 +1608,28 @@ async function getMonthlyFinancials(
     const amount = rec.amount;
     const method = (rec.method || "").toLowerCase();
     const description = (rec.description || "").toLowerCase();
-
-    // STRICT EXCLUSION: Ignore Reservation Imports and noise
+    // Normalize noise only
     if (
       !method ||
       method === "-" ||
       method === "null" ||
-      method === "-(none)-" ||
-      method.includes("reservation import") ||
-      description.includes("reservation import")
+      method === "-(none)-"
     ) {
-      if (method.includes("reservation import")) {
-        console.log(
-          `[FILTER] Skipping Reservation Import: £${amount} (ID: ${rec.id})`
-        );
-      }
       continue;
     }
 
-    if (
-      method.includes("cash") &&
-      !method.includes("reservation import") &&
-      !description.includes("reservation import")
-    ) {
+    // [FIX] Exclude "Reservation Import" (Historical Migration Data)
+    if (method.toLowerCase().includes("import")) continue;
+
+    if (method.includes("cash")) {
       cash += amount;
     } else if (
-      (method.includes("bacs") ||
-        method.includes("wire") ||
-        method.includes("bank transfer")) &&
-      !method.includes("reservation import") &&
-      !description.includes("reservation import")
+      method.includes("bacs") ||
+      method.includes("wire") ||
+      method.includes("bank transfer")
     ) {
       bacs += amount;
     } else {
-      // Ignore imports explicitly
-      if (
-        method.includes("reservation import") ||
-        description.includes("reservation import")
-      ) {
-        continue;
-      }
-
       // EVERYTHING ELSE is treated as a "Card / Digital Payment"
       cards += amount;
 
@@ -1608,14 +1663,14 @@ async function getMonthlyFinancials(
     filters: {
       and: [
         {
-          cdf: { column: "transaction_datetime" },
+          cdf: { column: "service_date" }, // [FIX] Use Service Date for Extras to ensure filter is respected
           operator: "greater_than_or_equal",
-          value: `${startDate}T00:00:00.000Z`,
+          value: startDate,
         },
         {
-          cdf: { column: "transaction_datetime" },
+          cdf: { column: "service_date" },
           operator: "less_than_or_equal",
-          value: `${endDate}T23:59:59.999Z`,
+          value: endDate,
         },
         // Exclude Payments, Room Revenue, and Taxes (Using supported operators)
         {
@@ -1627,6 +1682,18 @@ async function getMonthlyFinancials(
           cdf: { column: "transaction_type" },
           operator: "not_equals",
           value: "Room Revenue",
+        },
+        // [FIX] Exclude Daily Room Rates (Accommodation)
+        {
+          cdf: { column: "transaction_type" },
+          operator: "not_equals",
+          value: "Room Rate",
+        },
+        // [FIX] Exclude Cancellations (Room Revenue)
+        {
+          cdf: { column: "transaction_type" },
+          operator: "not_equals",
+          value: "Cancellation",
         },
         {
           cdf: { column: "transaction_type" },
@@ -1670,7 +1737,7 @@ async function getMonthlyFinancials(
           "X-PROPERTY-ID": propertyId,
         },
         body: JSON.stringify(payload),
-      }
+      },
     );
     if (!res.ok) {
       const errText = await res.text();
@@ -1691,6 +1758,7 @@ async function getMonthlyFinancials(
             data.records.item_service_type[i] ||
             data.records.transaction_description[i] ||
             "Unknown",
+          description: data.records.transaction_description[i] || "", // [DEBUG]
           category: data.records.item_service_category[i] || "Uncategorized",
           amount: parseFloat(data.records.debit_amount[i] || 0),
           quantity: parseFloat(data.records.quantity_amount?.[i] || 1),
@@ -1709,9 +1777,25 @@ async function getMonthlyFinancials(
   let extrasGross = 0;
 
   console.log("\n--- EXTRAS AUDIT ---");
+  console.log(
+    "Date       | Type       | Category        | Name                 | Description          | Amount   | Qty | Void",
+  );
+  console.log(
+    "-----------|------------|-----------------|----------------------|----------------------|----------|-----|-----",
+  );
   extrasRecords.forEach((r) => {
+    const d = r.date || "N/A";
+    const tp = (r.type || "").substring(0, 10).padEnd(10);
+    const cat = (r.category || "").substring(0, 15).padEnd(15);
+    const nm = (r.name || "").substring(0, 20).padEnd(20);
+    const desc = (r.description || "").substring(0, 20).padEnd(20);
+    const amt = r.amount.toFixed(2).padStart(8);
+    const qty = r.quantity.toString().padStart(3);
+    // [FIX] Correctly interpret Cloudbeds "Yes"/"No" string or boolean
+    const isVoid = r.is_void === true || r.is_void === "Yes";
+    const v = isVoid ? "YES" : "   ";
     console.log(
-      `${r.date} | ${r.name} | ${r.amount} | ${r.code} | Void:${r.is_void}`
+      `${d} | ${tp} | ${cat} | ${nm} | ${desc} | ${amt} | ${qty} | ${v}`,
     );
   });
   console.log("--------------------\n");
@@ -1725,6 +1809,8 @@ async function getMonthlyFinancials(
     // [FIX] Filter out Room Revenue artifacts
     if (rec.name === "Unknown" || rec.name === "-" || !rec.name) return;
     if (rec.type === "Room Revenue") return;
+    if (rec.type === "Room Rate") return; // [FIX] Double check filter
+    if (rec.type === "Cancellation") return; // [FIX] Double check filter
 
     // [FIX] Gross up the amount
     const grossAmount = rec.amount * (1 + taxRate);
