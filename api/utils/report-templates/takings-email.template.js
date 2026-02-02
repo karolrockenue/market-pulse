@@ -54,7 +54,7 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
       avgOcc: 0,
       avgAdr: 0,
       avgRevpar: 0,
-    }
+    },
   );
 
   // Styles
@@ -90,20 +90,20 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
         <td style="${style.tdLeft}">${hotel.name}</td>
         <td style="${style.td}">${formatCurrency(hotel.takings?.cash || 0)}</td>
         <td style="${style.td}">${formatCurrency(
-        hotel.takings?.cards || 0
-      )}</td>
+          hotel.takings?.cards || 0,
+        )}</td>
         <td style="${style.td}">${formatCurrency(hotel.takings?.bacs || 0)}</td>
         <td style="${style.td}">${formatCurrency(
-        hotel.revenue?.extras?.total || 0
-      )}</td>
+          hotel.revenue?.extras?.total || 0,
+        )}</td>
         <td style="${style.td} border-left: 2px solid #e5e7eb;">${formatPercent(
-        hotel.revenue?.occupancy || 0
-      )}</td>
+          hotel.revenue?.occupancy || 0,
+        )}</td>
         <td style="${style.td}">${formatCurrency(hotel.revenue?.adr || 0)}</td>
         <td style="${style.td}">${formatCurrency(revpar)}</td>
         <td style="${style.td} font-weight: 600;">${formatCurrency(
-        hotel.revenue?.totalRevenue || 0
-      )}</td>
+          hotel.revenue?.totalRevenue || 0,
+        )}</td>
       </tr>
     `;
     })
@@ -120,8 +120,8 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
         <div style="${style.header}">
           <h1 style="${style.title}">${reportName}</h1>
           <p style="${style.subtitle}">Period: ${dateRange.startDate} to ${
-    dateRange.endDate
-  }</p>
+            dateRange.endDate
+          }</p>
         </div>
 
 <table style="${style.table}" cellpadding="0" cellspacing="0">
@@ -147,41 +147,39 @@ function generateTakingsEmailHTML(reportName, dateRange, data) {
               <td style="${
                 style.td
               } border-top: 1px solid #d1d5db;">${formatCurrency(
-    totals.cash
-  )}</td>
+                totals.cash,
+              )}</td>
+    <td style="${style.td} border-top: 1px solid #d1d5db;">${formatCurrency(
+      totals.creditCards,
+    )}</td>
               <td style="${
                 style.td
               } border-top: 1px solid #d1d5db;">${formatCurrency(
-    totals.cards
-  )}</td>
+                totals.bacs,
+              )}</td>
               <td style="${
                 style.td
               } border-top: 1px solid #d1d5db;">${formatCurrency(
-    totals.bacs
-  )}</td>
-              <td style="${
-                style.td
-              } border-top: 1px solid #d1d5db;">${formatCurrency(
-    totals.extras
-  )}</td>
+                totals.extras,
+              )}</td>
               <td style="${
                 style.td
               } border-top: 1px solid #d1d5db; border-left: 2px solid #e5e7eb;">${formatPercent(
-    totals.avgOcc
-  )}</td>
+                totals.avgOcc,
+              )}</td>
               <td style="${
                 style.td
               } border-top: 1px solid #d1d5db;">${formatCurrency(
-    totals.avgAdr
-  )}</td>
+                totals.avgAdr,
+              )}</td>
               <td style="${
                 style.td
               } border-top: 1px solid #d1d5db;">${formatCurrency(
-    totals.avgRevpar
-  )}</td>
+                totals.avgRevpar,
+              )}</td>
               <td style="${style.td} border-top: 1px solid #d1d5db; ${
-    style.highlight
-  }">${formatCurrency(totals.totalRevenue)}</td>
+                style.highlight
+              }">${formatCurrency(totals.totalRevenue)}</td>
             </tr>
           </tbody>
         </table>
