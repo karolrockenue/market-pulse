@@ -7,9 +7,29 @@ const express = require("express");
 const router = express.Router();
 const bridgeAuth = require("../utils/bridgeAuth");
 const bridgeService = require("../services/sentinel.bridge.service");
+const db = require("../utils/db"); // [NEW] Direct DB access for Fleet fetching
 
 // 1. Apply Security Layer (All routes require x-api-key)
 router.use(bridgeAuth);
+
+/**
+ * GET /api/bridge/fleet
+ * The "Roll Call": Returns list of Sentinel-enabled hotels for the DGX loop.
+ */
+router.get("/fleet", async (req, res) => {
+  try {
+    // Fetch only hotels that have Sentinel explicitly enabled in config
+    const { rows } = await db.query(
+      `SELECT hotel_id as id, sentinel_enabled 
+       FROM sentinel_configurations 
+       WHERE sentinel_enabled = true`,
+    );
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error("[Bridge] Fleet fetch failed:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 /**
  * GET /api/bridge/context/:hotelId
@@ -27,7 +47,7 @@ router.get("/context/:hotelId", async (req, res) => {
   } catch (error) {
     console.error(
       `[Bridge] Context fetch failed for ${req.params.hotelId}:`,
-      error
+      error,
     );
     res.status(500).json({ success: false, message: error.message });
   }
