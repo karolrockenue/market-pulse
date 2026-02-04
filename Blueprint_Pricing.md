@@ -128,3 +128,67 @@ web/src/features/sentinel/
  └── useShadowfax.ts
 
 Note: This document is a focused pricing specification; a wider master blueprint exists covering full system architecture, override execution semantics, job queue behavior, notifications, OTA discount stack math, competitive ingestion (Shadowfax), and cross-module data flows—any AI agent must explicitly request that documentation if additional context or certainty is required.
+
+## **5.0 REMOTE COMPUTING & HYBRID INFRASTRUCTURE**
+
+### **5.1 The "Hawaii Protocol" (Concept)**
+
+The system is designed for **Hybrid Execution**:
+
+1.  **Lightweight Frontend (Vercel):** Runs the UI and triggers on the public web.
+2.  **Heavyweight Compute (DGX Home Server):** Runs the Python pricing engine (`sentinel_live.py`) on bare metal.
+3.  **The Tunnel (Tailscale):** Bridges the two worlds securely without port forwarding.
+
+### **5.2 Connectivity Flows**
+
+#### **Flow A: The Application (Vercel → DGX)**
+
+- **Trigger:** User clicks "Run Sentinel" on the web.
+- **Route:** Vercel (`POST /trigger`) → `DGX_API_URL` (Env Var) → **Tailscale Funnel** (Public HTTPS) → **DGX Localhost:5000**.
+- **Requirement:** The `dgx-funnel` service must be active on the DGX.
+
+#### **Flow B: The Developer (Cursor → DGX)**
+
+- **Access:** Direct SSH via Tailscale private mesh network.
+- **Magic IP:** Uses the `100.x.x.x` CGNAT IP, accessible from any WiFi in the world (Hotel/Cafe).
+- **Config:** Requires `sentinel-hawaii` Host block in local `.ssh/config`.
+
+### **5.3 Infrastructure Configuration**
+
+#### **1. Vercel Environment Variables**
+
+- `DGX_API_URL`: Must point to the **Funnel URL** (e.g., `https://spark-828c.tailxxxx.ts.net`), NOT the numeric IP.
+
+#### **2. Local Developer SSH Config (`~/.ssh/config`)**
+
+```text
+Host sentinel-hawaii
+    HostName 100.66.138.7
+    User sentinel
+```
+
+3. DGX System Services (Daemonized)
+   We run two critical background services on the Linux host:
+
+Service A: The Pricing Engine (sentinel.service)
+
+Command: Runs python3 sentinel_live.py.
+
+Logs: journalctl -u sentinel.service -f
+
+Service B: The Public Tunnel (dgx-funnel.service)
+
+Command: /usr/bin/tailscale funnel 5000
+
+Definition Path: /etc/systemd/system/dgx-funnel.service
+
+Behavior: Auto-restarts on crash; ensures Vercel can always reach the server.
+
+5.4 Operational Commands (Cheat Sheet)
+
+Goal Command (on DGX Terminal)
+Watch Pricing Live journalctl -u sentinel.service -f
+Check Tunnel Status systemctl status dgx-funnel.service
+Restart Tunnel sudo systemctl restart dgx-funnel.service
+Get Tailscale IP tailscale ip -4
+Check Public URL tailscale funnel status

@@ -1,16 +1,33 @@
-
-
 // /api/utils/middleware.js (with extensive debugging)
 const pgPool = require("./db");
 
-
+/**
+ * [HELPER] Checks if the request is from a verified internal robot.
+ * Used to bypass session checks for Cron jobs and Python scripts.
+ */
+function isInternalRobot(req) {
+  const secret = process.env.INTERNAL_API_SECRET;
+  const header = req.headers["x-internal-secret"];
+  // Only allow bypass if the secret is set on the server AND matches the header
+  if (secret && header === secret) {
+    console.log(`[Auth Bypass] Robot Access Granted for ${req.path}`);
+    return true;
+  }
+  return false;
+}
 
 async function requireUserApi(req, res, next) {
+  // 1. Robot Bypass
+  if (isInternalRobot(req)) return next();
 
   console.log(`[AUTH DEBUG] Path: ${req.path}`);
   console.log(`[AUTH DEBUG] Session ID: ${req.sessionID}`);
-  console.log(`[AUTH DEBUG] User ID in Session: ${req.session ? req.session.userId : 'No Session Object'}`);
-  console.log(`[AUTH DEBUG] Cookie Header: ${req.headers.cookie ? 'Present' : 'MISSING'}`);
+  console.log(
+    `[AUTH DEBUG] User ID in Session: ${req.session ? req.session.userId : "No Session Object"}`,
+  );
+  console.log(
+    `[AUTH DEBUG] Cookie Header: ${req.headers.cookie ? "Present" : "MISSING"}`,
+  );
   // --- DEBUG END ---
   // --- NEW DIAGNOSTIC LOG ---
   // We are logging the session content at the very start of the middleware.
@@ -20,7 +37,7 @@ async function requireUserApi(req, res, next) {
   if (!req.session || !req.session.userId) {
     // We are adding a log here to know exactly why the 401 is being sent.
     console.error(
-      `[API AUTH FAILURE] Session or session.userId is missing. Denying access to ${req.path}.`
+      `[API AUTH FAILURE] Session or session.userId is missing. Denying access to ${req.path}.`,
     );
     return res.status(401).json({ error: "Authentication required." });
   }
@@ -30,7 +47,7 @@ async function requireUserApi(req, res, next) {
     // All references to 'auth_mode' and 'needs_property_sync' are removed.
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
 
     // If no user is found for the session ID, deny access.
@@ -50,7 +67,7 @@ async function requireUserApi(req, res, next) {
     // Generic error handling for any unexpected database issues.
     console.error(
       `[CRITICAL ERROR] Middleware failed for path ${req.path}:`,
-      error
+      error,
     );
     return res
       .status(500)
@@ -60,12 +77,15 @@ async function requireUserApi(req, res, next) {
 
 // --- [NEW] Permissive middleware for Staff ('admin' + 'super_admin') ---
 const requireAdminApi = (req, res, next) => {
+  // 1. Robot Bypass
+  if (isInternalRobot(req)) return next();
+
   if (!req.session.userId) {
     return res
       .status(401)
       .json({ error: "Unauthorized: User session required." });
   }
-  
+
   // Allows access for 'admin' (staff) AND 'super_admin' (you).
   const allowedRoles = ["admin", "super_admin"];
   if (!allowedRoles.includes(req.session.role)) {
@@ -78,6 +98,9 @@ const requireAdminApi = (req, res, next) => {
 
 // --- [RENAMED] Strict "Karol-only" middleware ---
 const requireSuperAdminOnly = (req, res, next) => {
+  // 1. Robot Bypass
+  if (isInternalRobot(req)) return next();
+
   if (!req.session.userId) {
     return res
       .status(401)
@@ -135,7 +158,7 @@ async function requireAccountOwner(req, res, next) {
     // Query the user_properties table to check the user's link to the specified property.
     const ownerCheck = await pgPool.query(
       "SELECT pms_credentials FROM user_properties WHERE user_id = $1 AND property_id = $2",
-      [requesterCloudbedsId, propertyId]
+      [requesterCloudbedsId, propertyId],
     );
 
     // Case 1: The user has no link to this property at all.
@@ -174,7 +197,7 @@ const requireManagePermission = (req, res, next) => {
     return next();
   }
   // --- END MODIFICATION ---
-  
+
   res.status(403).json({
     error: "Forbidden: You do not have permission to perform this action.",
   });
