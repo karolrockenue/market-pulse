@@ -192,3 +192,31 @@ Check Tunnel Status systemctl status dgx-funnel.service
 Restart Tunnel sudo systemctl restart dgx-funnel.service
 Get Tailscale IP tailscale ip -4
 Check Public URL tailscale funnel status
+
+### [2026-02-04] - Shadow Mode Verification & Infrastructure Automation
+
+- **Shadow Mode Integrity Confirmed:** Verified that AI decisions are correctly saving to `sentinel_ai_predictions` (Shadow) without leaking into `sentinel_price_history` (Live) or `sentinel_rates_calendar` (Production). Confirmed timestamp alignment between DGX logs (CET) and Database (UTC).
+- **Middleware "Service Entrance":** Implemented `isInternalRobot` bypass in `middleware.js`. Allows Python scripts (`sync_fleet.py`) to authenticate using `x-internal-secret` header, resolving "401 Unauthorized" errors for automated jobs.
+- **Fleet Sync Automation:** deployed `sync_fleet.py` on DGX.
+  - **Function:** Triggers `/api/sentinel/sync` for all 33 managed hotels.
+  - **Schedule:** Runs daily at **05:00 AM** via Cron.
+  - **Goal:** Prevents "Inventory Empty" / "20 dates checked" errors by ensuring the calendar is hydrated before the AI runs.
+- **Cron Job Architecture:**
+  - `0 5 * * *`: **Fleet Sync** (Refreshes Facts & Calendar).
+  - `0 */2 * * *`: **Sentinel Run** (Generates & Uploads Decisions).
+
+### **Next Session: Codebase Synchronization (Anti-Drift)**
+
+- **Context:** The DGX server currently runs a static version of the codebase (`/home/sentinel/sentinel-training-hub`). If we push logic updates to GitHub, the DGX continues running old code until manually updated.
+- **Objective:** Automate `git pull` to ensure the AI logic is always strictly verified against the latest `main` branch.
+- **Implementation Plan:**
+  1.  Create `daily_update.sh` on DGX:
+      ```bash
+      #!/bin/bash
+      cd /home/sentinel/sentinel-training-hub
+      git pull origin main
+      # Optional: update dependencies if requirements.txt changed
+      /home/sentinel/sentinel-training-hub/venv/bin/pip install -r requirements.txt
+      ```
+  2.  Add to Crontab (Schedule: **04:55 AM**, strictly _before_ the 5:00 AM Sync).
+  3.  Verify SSH Keys on DGX allow password-less pulling from GitHub.

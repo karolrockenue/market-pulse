@@ -23,7 +23,7 @@ class SentinelBridgeService {
       // Step 1: Config
       const configRes = await client.query(
         "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
-        [hotelId]
+        [hotelId],
       );
       const config = configRes.rows[0] || {};
       console.timeEnd("Step 1 Config");
@@ -35,7 +35,7 @@ class SentinelBridgeService {
          FROM sentinel_rates_calendar
          WHERE hotel_id = $1 AND stay_date >= CURRENT_DATE
          ORDER BY stay_date ASC`,
-        [hotelId]
+        [hotelId],
       );
       console.timeEnd("Step 2 Inventory");
 
@@ -45,7 +45,7 @@ class SentinelBridgeService {
         `SELECT stay_date, max_price 
          FROM sentinel_daily_max_rates 
          WHERE hotel_id = $1 AND stay_date >= CURRENT_DATE`,
-        [hotelId]
+        [hotelId],
       );
 
       console.timeEnd("Step 3 MaxRates");
@@ -54,7 +54,7 @@ class SentinelBridgeService {
       // Step 4: Pace Curves
       const curvesRes = await client.query(
         "SELECT season_tier, curve_data FROM sentinel_pace_curves WHERE hotel_id = $1",
-        [hotelId]
+        [hotelId],
       );
       console.timeEnd("Step 4 Curves");
 
@@ -66,7 +66,7 @@ class SentinelBridgeService {
          FROM sentinel_price_history
          WHERE hotel_id = $1 AND stay_date >= CURRENT_DATE
          ORDER BY stay_date, created_at DESC`,
-        [hotelId]
+        [hotelId],
       );
 
       // Map history to a lookup object { "YYYY-MM-DD": { ts, price } }
@@ -116,7 +116,7 @@ class SentinelBridgeService {
           AND live.stay_date::date >= CURRENT_DATE
         ORDER BY live.stay_date::date ASC, live.snapshot_id DESC
         `,
-        [hotelId]
+        [hotelId],
       );
       console.timeEnd("Step 5 Velocity");
 
@@ -131,6 +131,8 @@ class SentinelBridgeService {
           seasonality: config.seasonality_profile || {},
           capacity: config.total_capacity || 0,
           base_room_type_id: config.base_room_type_id,
+          rules: config.rules || {}, // [NEW] Pass full rules blob (contains strategy_mode)
+          strategy_mode: config.rules?.strategy_mode || "maintain", // [NEW] Lift for easy access
         },
         inventory: inventoryWithHistory, // [UPDATED]
         constraints: {
@@ -154,7 +156,7 @@ class SentinelBridgeService {
    */
   async saveDecisions(decisions) {
     console.log(
-      `[Bridge] Saving ${decisions?.length} decisions (Batch Mode)...`
+      `[Bridge] Saving ${decisions?.length} decisions (Batch Mode)...`,
     );
     if (!Array.isArray(decisions) || decisions.length === 0)
       return { saved: 0 };
@@ -166,7 +168,7 @@ class SentinelBridgeService {
 
       // Filter valid decisions
       const validDecisions = decisions.filter(
-        (d) => d.hotel_id && d.room_type_id && d.stay_date && d.suggested_rate
+        (d) => d.hotel_id && d.room_type_id && d.stay_date && d.suggested_rate,
       );
 
       if (validDecisions.length === 0) return { saved: 0 };

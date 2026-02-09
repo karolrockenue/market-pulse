@@ -53,6 +53,7 @@ const DEFAULT_RULES: Partial<SentinelConfig> = {
     dec: "medium",
   },
   seasonality_profile: {}, // <--- ADD THIS
+  rules: { strategy_mode: "maintain" }, // [NEW] Yield Strategy Defaults
   daily_max_rates: {},
   pms_room_types: { data: [] },
 };
@@ -147,7 +148,7 @@ export const useSentinelConfig = (allHotels: any[]) => {
     return {
       availableHotels: available,
       activeHotels: active.sort((a, b) =>
-        a.property_name.localeCompare(b.property_name)
+        a.property_name.localeCompare(b.property_name),
       ),
     };
   }, [allHotels, serverConfigs, pmsIdMap, formState]);
@@ -171,21 +172,21 @@ export const useSentinelConfig = (allHotels: any[]) => {
         rulesToSet = {
           sentinel_enabled: data.sentinel_enabled,
           guardrail_max: String(
-            data.guardrail_max ?? DEFAULT_RULES.guardrail_max
+            data.guardrail_max ?? DEFAULT_RULES.guardrail_max,
           ),
           rate_freeze_period: String(
-            data.rate_freeze_period ?? DEFAULT_RULES.rate_freeze_period
+            data.rate_freeze_period ?? DEFAULT_RULES.rate_freeze_period,
           ),
           base_room_type_id: data.base_room_type_id || "",
           last_minute_floor: {
             enabled: data.last_minute_floor?.enabled || false,
             rate: String(
               data.last_minute_floor?.rate ??
-                DEFAULT_RULES.last_minute_floor?.rate
+                DEFAULT_RULES.last_minute_floor?.rate,
             ),
             days: String(
               data.last_minute_floor?.days ??
-                DEFAULT_RULES.last_minute_floor?.days
+                DEFAULT_RULES.last_minute_floor?.days,
             ),
             dow:
               data.last_minute_floor?.dow ||
@@ -203,6 +204,9 @@ export const useSentinelConfig = (allHotels: any[]) => {
           },
           // 🟢 FIX: Capture the new profile from the server
           seasonality_profile: data.seasonality_profile || {},
+
+          // [NEW] Capture Yield Strategy Rules
+          rules: data.rules || DEFAULT_RULES.rules,
 
           daily_max_rates: maxRates || {},
           pms_room_types: data.pms_room_types || { data: [] },
@@ -224,7 +228,7 @@ export const useSentinelConfig = (allHotels: any[]) => {
   const updateRule = (hotelId: string, path: string, value: any) => {
     setFormState((prev) => {
       const newConfig = JSON.parse(
-        JSON.stringify(prev[hotelId] || DEFAULT_RULES)
+        JSON.stringify(prev[hotelId] || DEFAULT_RULES),
       );
 
       // Update nested property using path string (e.g. "last_minute_floor.rate")
@@ -323,7 +327,7 @@ export const useSentinelConfig = (allHotels: any[]) => {
 
         // Check if base room is already explicitly defined
         const baseRoomExists = currentDiffs.some(
-          (d) => d.roomTypeId === rules.base_room_type_id
+          (d) => d.roomTypeId === rules.base_room_type_id,
         );
 
         // If missing, inject it with a 0% offset

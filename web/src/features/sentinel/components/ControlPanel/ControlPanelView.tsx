@@ -340,14 +340,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     hotelId: string,
     roomTypeId: string,
     field: "operator" | "value",
-    newValue: string
+    newValue: string,
   ) => {
     const currentDiffs = formState[hotelId]?.room_differentials || [];
     const exists = currentDiffs.find((r: any) => r.roomTypeId === roomTypeId);
     let newDiffs;
     if (exists) {
       newDiffs = currentDiffs.map((r: any) =>
-        r.roomTypeId === roomTypeId ? { ...r, [field]: newValue } : r
+        r.roomTypeId === roomTypeId ? { ...r, [field]: newValue } : r,
       );
     } else {
       const newRule = {
@@ -387,7 +387,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
           setIsRepushing("");
           return `Failed: ${err.message}`;
         },
-      }
+      },
     );
   };
 
@@ -410,14 +410,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
           console.error("Export Error:", err);
           return `Export failed: ${err.message}`;
         },
-      }
+      },
     );
   };
 
   // [FIX] Missing helper function to save daily max rates
   const saveDailyMaxRates = async (
     hotelId: string,
-    rates: Record<string, string>
+    rates: Record<string, string>,
   ) => {
     const res = await fetch(`/api/sentinel/max-rates/${hotelId}`, {
       method: "POST",
@@ -593,7 +593,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           >
                             {hotelToActivate
                               ? availableHotels.find(
-                                  (h) => String(h.hotel_id) === hotelToActivate
+                                  (h) => String(h.hotel_id) === hotelToActivate,
                                 )?.property_name
                               : "Search hotel to activate..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -636,7 +636,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   value={String(hotel.hotel_id)}
                                   onSelect={(val) => {
                                     setHotelToActivate(
-                                      val === hotelToActivate ? "" : val
+                                      val === hotelToActivate ? "" : val,
                                     );
                                     setIsComboOpen(false);
                                   }}
@@ -680,7 +680,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       }}
                       onClick={() => {
                         const h = availableHotels.find(
-                          (h) => String(h.hotel_id) === hotelToActivate
+                          (h) => String(h.hotel_id) === hotelToActivate,
                         );
                         if (h) {
                           activateHotel(String(h.hotel_id), h.pms_property_id);
@@ -892,7 +892,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     style={{ color: "#ef4444" }}
                                     onClick={() =>
                                       setLondonEvents((prev) =>
-                                        prev.filter((e) => e.id !== event.id)
+                                        prev.filter((e) => e.id !== event.id),
                                       )
                                     }
                                   >
@@ -1293,7 +1293,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 formState[hotel.hotel_id]
                                   ?.seasonality_profile ??
                                   hotel.config?.seasonality_profile ??
-                                  {}
+                                  {},
                               ).length === 12
                                 ? {
                                     backgroundColor: "rgba(99, 102, 241, 0.1)", // Indigo
@@ -1355,7 +1355,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           <div
                             style={{
                               display: "grid",
-                              gridTemplateColumns: "repeat(3, 1fr)",
+                              gridTemplateColumns: "repeat(2, 1fr)",
                               gap: "1rem",
                             }}
                           >
@@ -1391,13 +1391,130 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   updateRule(
                                     String(hotel.hotel_id),
                                     "sentinel_enabled",
-                                    c
+                                    c,
                                   )
                                 }
                               />
                             </div>
 
-                            {/* 2. Max Rates */}
+                            {/* 2. Yield Strategy (NEW) */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "0 1rem",
+                                height: "60px",
+                                background: "#0f0f0f",
+                                border: "1px solid #2a2a2a",
+                                borderRadius: "0.5rem",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <Label
+                                  style={{
+                                    color: "#e5e5e5",
+                                    fontSize: "0.875rem",
+                                  }}
+                                >
+                                  Yield Strategy
+                                </Label>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <HelpCircle
+                                        style={{
+                                          width: "14px",
+                                          height: "14px",
+                                          color: "#6b7280",
+                                        }}
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      style={{
+                                        backgroundColor: "#1a1a1a",
+                                        borderColor: "#2a2a2a",
+                                      }}
+                                    >
+                                      <p
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#e5e5e5",
+                                        }}
+                                      >
+                                        Maintain: Optimize for ADR.
+                                        <br />
+                                        Sell Every Room: Aggressive occupancy
+                                        push in last 7 days.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <Select
+                                value={
+                                  formState[hotel.hotel_id]?.rules
+                                    ?.strategy_mode || "maintain"
+                                }
+                                onValueChange={(val) =>
+                                  updateRule(
+                                    String(hotel.hotel_id),
+                                    "rules.strategy_mode",
+                                    val,
+                                  )
+                                }
+                              >
+                                <SelectTrigger
+                                  style={{
+                                    width: "180px",
+                                    height: "32px",
+                                    fontSize: "0.75rem",
+                                    backgroundColor: "#1a1a1a",
+                                    borderColor: "#2a2a2a",
+                                    color: "#e5e5e5",
+                                  }}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent
+                                  style={{
+                                    backgroundColor: "#1a1a1a",
+                                    borderColor: "#2a2a2a",
+                                  }}
+                                >
+                                  <SelectItem
+                                    value="maintain"
+                                    className="focus:bg-[#39BDF8]/20 focus:text-[#39BDF8]"
+                                    style={{
+                                      color: "#e5e5e5",
+                                      fontSize: "0.8rem",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    🔶 Maintain (Profit)
+                                  </SelectItem>
+                                  <SelectItem
+                                    value="sell_every_room"
+                                    className="focus:bg-[#39BDF8]/20 focus:text-[#39BDF8]"
+                                    style={{
+                                      color: "#e5e5e5",
+                                      fontSize: "0.8rem",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    🔹 Sell Every Room
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* 3. Max Rates */}
                             <div
                               style={{
                                 display: "flex",
@@ -1422,7 +1539,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 propertyName={hotel.property_name}
                                 propertyId={String(hotel.hotel_id)}
                                 initialRates={getDailyMaxRates(
-                                  String(hotel.hotel_id)
+                                  String(hotel.hotel_id),
                                 )}
                                 // [NEW] Pass Active Hotels for Import
                                 sourceHotels={activeHotels.map((h) => ({
@@ -1431,9 +1548,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 }))}
                                 // [NEW] Fetcher function
                                 onFetchRates={async (sourceId) => {
-                                  const res = await fetchDailyMaxRates(
-                                    sourceId
-                                  );
+                                  const res =
+                                    await fetchDailyMaxRates(sourceId);
                                   return res || {};
                                 }}
                                 onSave={async (rates) => {
@@ -1441,18 +1557,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   try {
                                     await saveDailyMaxRates(
                                       String(hotel.hotel_id),
-                                      rates
+                                      rates,
                                     );
                                     toast.success("Max rates saved.");
                                     // Update local state to reflect changes instantly in the UI
                                     updateRule(
                                       String(hotel.hotel_id),
                                       "daily_max_rates",
-                                      rates
+                                      rates,
                                     );
                                   } catch (err: any) {
                                     toast.error(
-                                      "Failed to save max rates: " + err.message
+                                      "Failed to save max rates: " +
+                                        err.message,
                                     );
                                   }
                                 }}
@@ -1554,7 +1671,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     updateRule(
                                       String(hotel.hotel_id),
                                       "rate_freeze_period",
-                                      e.target.value
+                                      e.target.value,
                                     )
                                   }
                                   style={{
@@ -1653,7 +1770,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           {
                                             ...profile,
                                             [monthKey]: next,
-                                          }
+                                          },
                                         );
                                       }}
                                     >
@@ -1823,7 +1940,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   updateRule(
                                     String(hotel.hotel_id),
                                     "last_minute_floor.enabled",
-                                    c
+                                    c,
                                   )
                                 }
                               />
@@ -1889,7 +2006,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           updateRule(
                                             String(hotel.hotel_id),
                                             "last_minute_floor.rate",
-                                            e.target.value
+                                            e.target.value,
                                           )
                                         }
                                         style={{ backgroundColor: "#1a1a1a" }}
@@ -1925,7 +2042,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           updateRule(
                                             String(hotel.hotel_id),
                                             "last_minute_floor.days",
-                                            e.target.value
+                                            e.target.value,
                                           )
                                         }
                                         style={{ backgroundColor: "#1a1a1a" }}
@@ -1980,7 +2097,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         formState[
                                           hotel.hotel_id
                                         ]?.last_minute_floor?.dow.includes(
-                                          day.k
+                                          day.k,
                                         ) || false;
                                       return (
                                         <button
@@ -1988,7 +2105,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           onClick={() =>
                                             toggleDayOfWeek(
                                               String(hotel.hotel_id),
-                                              day.k
+                                              day.k,
                                             )
                                           }
                                           style={{
@@ -2030,7 +2147,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             <button
                               onClick={() =>
                                 setRoomDifferentialsExpanded(
-                                  !roomDifferentialsExpanded
+                                  !roomDifferentialsExpanded,
                                 )
                               }
                               style={{
@@ -2109,7 +2226,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         hotel.hotel_id
                                       ]?.room_differentials?.find(
                                         (r: any) =>
-                                          r.roomTypeId === room.roomTypeID
+                                          r.roomTypeId === room.roomTypeID,
                                       ) || {};
 
                                     return (
@@ -2145,7 +2262,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                               updateRule(
                                                 String(hotel.hotel_id),
                                                 "base_room_type_id",
-                                                val
+                                                val,
                                               )
                                             }
                                           >
@@ -2208,7 +2325,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                                   String(hotel.hotel_id),
                                                   room.roomTypeID,
                                                   "operator",
-                                                  v
+                                                  v,
                                                 )
                                               }
                                             >
@@ -2255,7 +2372,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                                     String(hotel.hotel_id),
                                                     room.roomTypeID,
                                                     "value",
-                                                    e.target.value
+                                                    e.target.value,
                                                   )
                                                 }
                                                 style={{
@@ -2427,7 +2544,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         updateRule(
                                           String(hotel.hotel_id),
                                           `monthly_min_rates.${month}`,
-                                          e.target.value
+                                          e.target.value,
                                         )
                                       }
                                       style={{
@@ -2461,10 +2578,10 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     formState[hotel.hotel_id]?.guardrail_max ||
                                     "500",
                                 }),
-                                {}
+                                {},
                               )}
                               dailyMaxRates={getDailyMaxRates(
-                                String(hotel.hotel_id)
+                                String(hotel.hotel_id),
                               )}
                               currency={
                                 hotel.currency ||
@@ -2504,7 +2621,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 onClick={() =>
                                   activateHotel(
                                     String(hotel.hotel_id),
-                                    hotel.pms_property_id
+                                    hotel.pms_property_id,
                                   )
                                 }
                                 disabled={isSyncing === String(hotel.hotel_id)}
@@ -2547,7 +2664,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 variant="outline"
                                 onClick={() =>
                                   handleExportReservations(
-                                    String(hotel.hotel_id)
+                                    String(hotel.hotel_id),
                                   )
                                 }
                                 style={{
@@ -2584,11 +2701,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 console.log("1. Hotel ID:", hotel.hotel_id);
                                 console.log(
                                   "2. Form State Object:",
-                                  currentData
+                                  currentData,
                                 );
                                 console.log(
                                   "3. Seasonality to Save:",
-                                  currentData?.seasonality_profile
+                                  currentData?.seasonality_profile,
                                 );
                                 console.groupEnd();
 

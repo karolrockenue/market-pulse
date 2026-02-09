@@ -35,6 +35,11 @@ export interface SentinelConfig {
   monthly_min_rates: Record<string, string>;
   monthly_aggression: Record<string, string>;
 
+  // [NEW] Flexible Rules Engine
+  rules?: {
+    strategy_mode?: "maintain" | "sell_every_room";
+  };
+
   // Stored Facts for UI rendering
   pms_room_types?: { data: PMSRoomType[] };
   pms_rate_plans?: { data: PMSRatePlan[] };

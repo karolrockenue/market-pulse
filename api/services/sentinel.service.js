@@ -60,7 +60,7 @@ async function saveDailyMaxRates(hotelId, ratesMap) {
         // Use 2025 as the base year to match the UI's day-of-week logic
         const year = 2025;
         dateStr = `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(
-          day
+          day,
         ).padStart(2, "0")}`;
       }
 
@@ -93,7 +93,7 @@ async function saveDailyMaxRates(hotelId, ratesMap) {
 async function getHotelConfig(hotelId) {
   const res = await db.query(
     "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
-    [hotelId]
+    [hotelId],
   );
 
   if (res.rows.length === 0) return null;
@@ -102,7 +102,7 @@ async function getHotelConfig(hotelId) {
   // [FIX] Read Daily Max Rates from SQL Table and format for UI (MonthIdx-Day)
   const maxRatesRes = await db.query(
     "SELECT to_char(stay_date, 'YYYY-MM-DD') as date, max_price FROM sentinel_daily_max_rates WHERE hotel_id = $1",
-    [hotelId]
+    [hotelId],
   );
 
   const maxRatesMap = {};
@@ -131,7 +131,7 @@ async function buildOverridePayload(
   pmsPropertyId,
   roomTypeId,
   overrides,
-  source = "MANUAL"
+  source = "MANUAL",
 ) {
   // 1. Load Configuration (Facts & Rules)
   const config = await getHotelConfig(hotelId);
@@ -153,7 +153,7 @@ async function buildOverridePayload(
   const currentRatesRes = await db.query(
     `SELECT stay_date, rate FROM sentinel_rates_calendar 
      WHERE hotel_id = $1 AND room_type_id = $2 AND stay_date = ANY($3::date[])`,
-    [hotelId, roomTypeId, datesToQuery]
+    [hotelId, roomTypeId, datesToQuery],
   );
 
   const currentRateMap = {};
@@ -173,7 +173,7 @@ async function buildOverridePayload(
     // Never allow 0, negative, or NaN to enter DB or Queue.
     if (isNaN(baseRate) || baseRate <= 0) {
       console.warn(
-        `[Sentinel Service] Dropping invalid override: ${rate} for ${date}`
+        `[Sentinel Service] Dropping invalid override: ${rate} for ${date}`,
       );
       continue;
     }
@@ -187,8 +187,8 @@ async function buildOverridePayload(
         db.query(
           `INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
                  VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-          [hotelId, roomTypeId, date, oldRate, baseRate, source]
-        )
+          [hotelId, roomTypeId, date, oldRate, baseRate, source],
+        ),
       );
     }
     // ----------------------------------
@@ -201,8 +201,8 @@ async function buildOverridePayload(
          VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
          SET rate = EXCLUDED.rate, source = EXCLUDED.source, last_updated_at = NOW()`,
-        [hotelId, date, roomTypeId, baseRate, source]
-      )
+        [hotelId, date, roomTypeId, baseRate, source],
+      ),
     );
 
     // B. Update sentinel_configurations (Legacy JSON Patch - Optional but kept for compatibility)
@@ -211,8 +211,8 @@ async function buildOverridePayload(
     dbUpdates.push(
       db.query(
         `UPDATE sentinel_configurations SET rate_overrides = rate_overrides || $1 WHERE hotel_id = $2`,
-        [JSON.stringify(jsonPatch), hotelId]
-      )
+        [JSON.stringify(jsonPatch), hotelId],
+      ),
     );
 
     // C. Calculate Base Payload (Engine not needed for base, it's direct input)
@@ -236,7 +236,7 @@ async function buildOverridePayload(
           const derivedRate = pricingEngine.calculateDifferential(
             baseRate,
             derivedRoomId,
-            roomDifferentials
+            roomDifferentials,
           );
 
           batchPayload.push({ rateId: derivedRateId, date, rate: derivedRate });
@@ -271,7 +271,7 @@ async function previewCalendar({
     getHotelConfig(hotelId),
     db.query(
       `SELECT * FROM rockenue_managed_assets WHERE market_pulse_hotel_id = $1`,
-      [hotelId]
+      [hotelId],
     ),
     getDailyMaxRates(hotelId, startDate, endDate),
   ]);
@@ -287,7 +287,7 @@ async function previewCalendar({
   // We need PMS Property ID for live lookup
   const hotelRes = await db.query(
     "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
-    [hotelId]
+    [hotelId],
   );
   const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
 
@@ -296,14 +296,14 @@ async function previewCalendar({
       `SELECT stay_date, rate, source 
        FROM sentinel_rates_calendar 
        WHERE hotel_id = $1 AND room_type_id = $2 AND stay_date >= $3 AND stay_date <= $4`,
-      [hotelId, baseRoomTypeId, startDate, endDate]
+      [hotelId, baseRoomTypeId, startDate, endDate],
     ),
     sentinelAdapter.getRates(
       hotelId,
       pmsPropertyId,
       baseRoomTypeId,
       startDate,
-      endDate
+      endDate,
     ),
   ]);
 
@@ -399,7 +399,7 @@ async function previewCalendar({
       suggestedRate,
       liveRate,
       config,
-      dateStr
+      dateStr,
     );
 
     // Step C: Determine Final Display Data
@@ -453,7 +453,8 @@ function buildRateIdMap(pmsRoomTypes, pmsRatePlans) {
 
     // Find ALL candidates for this room
     const candidates = ratePlans.filter(
-      (r) => String(r.roomTypeID) === String(roomTypeId) && r.isDerived == false
+      (r) =>
+        String(r.roomTypeID) === String(roomTypeId) && r.isDerived == false,
     );
 
     if (candidates.length === 0) continue;
@@ -508,7 +509,8 @@ async function updateConfig(hotelId, updates) {
     monthly_aggression,
     monthly_min_rates,
     daily_max_rates,
-    seasonality_profile, // <--- 1. NEW FIELD EXTRACTED
+    seasonality_profile,
+    rules, // <--- 1. NEW FIELD EXTRACTED (Yield Strategy)
   } = updates;
 
   // 1. Fetch current config to ensure we have the Facts (for rebuilding map)
@@ -534,12 +536,12 @@ async function updateConfig(hotelId, updates) {
         for (const year of years) {
           const isoDate = `${year}-${String(mIdx + 1).padStart(
             2,
-            "0"
+            "0",
           )}-${String(d).padStart(2, "0")}`;
 
           // Construct ($1, $2, $3, NOW()), ($4, $5, $6, NOW()), ...
           values.push(
-            `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, NOW())`
+            `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, NOW())`,
           );
           params.push(hotelId, isoDate, price);
           paramIdx += 3;
@@ -567,7 +569,7 @@ async function updateConfig(hotelId, updates) {
   const pmsRatePlans = currentConfig.pms_rate_plans?.data || [];
   const rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
 
-  // 3. Update Database (With Seasonality Profile)
+  // 3. Update Database (With Seasonality Profile & Rules)
   const { rows } = await db.query(
     `
     UPDATE sentinel_configurations
@@ -583,6 +585,7 @@ async function updateConfig(hotelId, updates) {
       rate_id_map = COALESCE($9, rate_id_map),
       daily_max_rates = COALESCE($10, daily_max_rates),
       seasonality_profile = COALESCE($12, seasonality_profile),
+      rules = COALESCE($13, rules),
       updated_at = NOW()
     WHERE hotel_id = $11
     RETURNING *;
@@ -600,7 +603,8 @@ async function updateConfig(hotelId, updates) {
       updates.daily_max_rates ? JSON.stringify(daily_max_rates) : null,
       hotelId,
       updates.seasonality_profile ? JSON.stringify(seasonality_profile) : null,
-    ]
+      updates.rules ? JSON.stringify(rules) : null,
+    ],
   );
 
   return rows[0];
@@ -639,13 +643,13 @@ async function getSentinelStatus(hotelId) {
         `SELECT MAX(created_at) as last_run
          FROM sentinel_price_history
          WHERE hotel_id = $1 AND source IN ('AI', 'AI_APPROVED', 'SENTINEL', 'AUTO', 'AI_SUGGESTED')`,
-        [hotelId]
+        [hotelId],
       ),
       client.query(
         `SELECT MAX(created_at) as last_run
          FROM sentinel_ai_predictions
          WHERE hotel_id = $1`,
-        [hotelId]
+        [hotelId],
       ),
     ]);
 
@@ -666,7 +670,7 @@ async function getSentinelStatus(hotelId) {
        WHERE hotel_id = $1 
          AND source IN ('AI', 'AI_APPROVED', 'SENTINEL', 'AUTO', 'AI_SUGGESTED')
          AND created_at >= NOW() - INTERVAL '24 hours'`,
-      [hotelId]
+      [hotelId],
     );
     const count = parseInt(countRes.rows[0]?.count || 0);
 
@@ -691,7 +695,7 @@ async function copyPaceCurves(sourceHotelId, targetHotelId) {
     // 1. Verify source has curves
     const checkRes = await client.query(
       `SELECT count(*) as count FROM sentinel_pace_curves WHERE hotel_id = $1`,
-      [sourceHotelId]
+      [sourceHotelId],
     );
     if (parseInt(checkRes.rows[0].count) === 0) {
       throw new Error("Source hotel has no pace curves to copy.");
@@ -710,7 +714,7 @@ async function copyPaceCurves(sourceHotelId, targetHotelId) {
       FROM sentinel_pace_curves
       WHERE hotel_id = $2
     `,
-      [targetHotelId, sourceHotelId]
+      [targetHotelId, sourceHotelId],
     );
 
     await client.query("COMMIT");
