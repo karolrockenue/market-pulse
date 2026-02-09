@@ -131,8 +131,9 @@ class SentinelBridgeService {
           seasonality: config.seasonality_profile || {},
           capacity: config.total_capacity || 0,
           base_room_type_id: config.base_room_type_id,
-          rules: config.rules || {}, // [NEW] Pass full rules blob (contains strategy_mode)
-          strategy_mode: config.rules?.strategy_mode || "maintain", // [NEW] Lift for easy access
+          last_minute_floor: config.last_minute_floor || {}, // [FIX] Pass LMF settings to AI
+          rules: config.rules || {},
+          strategy_mode: config.rules?.strategy_mode || "maintain",
         },
         inventory: inventoryWithHistory, // [UPDATED]
         constraints: {
