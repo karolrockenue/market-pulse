@@ -160,6 +160,15 @@ class SentinelBridgeService {
     console.log(
       `[Bridge] Processing ${decisions?.length} decisions (Shadow + Autonomy)...`,
     );
+
+    // [DEBUG] Log the Hotel ID type to confirm UUID vs Integer
+    if (decisions && decisions.length > 0) {
+      const sample = decisions[0];
+      console.log(
+        `[Bridge] Debug Sample: HotelID=${sample.hotel_id} (Type: ${typeof sample.hotel_id}), Rate=${sample.suggested_rate}`,
+      );
+    }
+
     if (!Array.isArray(decisions) || decisions.length === 0)
       return { saved: 0 };
 
@@ -342,6 +351,15 @@ class SentinelBridgeService {
       return { saved: validDecisions.length, queued: totalQueued };
     } catch (error) {
       console.error("[Bridge] Process Failed:", error);
+      // [DEBUG] Check for common UUID/Int mismatch
+      if (
+        error.message &&
+        error.message.includes("invalid input syntax for type integer")
+      ) {
+        console.error(
+          "[Bridge] CRITICAL: Attempted to insert a non-integer Hotel ID into an Integer array. This confirms the UUID bug.",
+        );
+      }
       throw error;
     } finally {
       client.release();

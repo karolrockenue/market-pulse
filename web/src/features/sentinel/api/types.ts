@@ -15,6 +15,7 @@ export interface PMSRatePlan {
 export interface SentinelConfig {
   hotel_id: number;
   sentinel_enabled: boolean;
+  is_autopilot_enabled?: boolean; // [FIX] Added missing field
   guardrail_max: string;
   rate_freeze_period: string;
   base_room_type_id: string;
@@ -34,6 +35,10 @@ export interface SentinelConfig {
 
   monthly_min_rates: Record<string, string>;
   monthly_aggression: Record<string, string>;
+
+  // [FIX] Added missing fields used in ControlPanelView
+  daily_max_rates?: Record<string, string>;
+  seasonality_profile?: Record<string, string>;
 
   // [NEW] Flexible Rules Engine
   rules?: {

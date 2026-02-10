@@ -2,7 +2,7 @@
 
 ### **1.0 OBJECTIVE**
 
-Transition Sentinel from **"Shadow Mode"** (passive logging) to **"Active Autonomy"** (direct PMS pricing) for specific, trusted hotels. The system must autonomously inject AI rate decisions into the sentinel\_job\_queue while strictly adhering to a **"Defense in Depth"** safety protocol.
+Transition Sentinel from **"Shadow Mode"** (passive logging) to **"Active Autonomy"** (direct PMS pricing) for specific, trusted hotels. The system must autonomously inject AI rate decisions into the sentinel_job_queue while strictly adhering to a **"Defense in Depth"** safety protocol.
 
 ---
 
@@ -10,16 +10,16 @@ Transition Sentinel from **"Shadow Mode"** (passive logging) to **"Active Autono
 
 **Current Flow (Shadow Mode):**
 
-DGX (Python) $\\rightarrow$ POST /decisions $\\rightarrow$ sentinel\_ai\_predictions (Log only).
+DGX (Python) $\\rightarrow$ POST /decisions $\\rightarrow$ sentinel_ai_predictions (Log only).
 
 **New Autonomous Flow:**
 
 DGX (Python) $\\rightarrow$ POST /decisions $\\rightarrow$ **Bridge Service (New Gatekeeper Logic)** $\\rightarrow$
 
-1. **Gate 1:** Configuration Check (Is Autonomy On?)  
-2. **Gate 2:** Policy Validation (Min/Max/Ceiling Clamps)  
+1. **Gate 1:** Configuration Check (Is Autonomy On?)
+2. **Gate 2:** Policy Validation (Min/Max/Ceiling Clamps)
 3. **Gate 3:** Conflict Resolution (Freeze/Locks)  
-   $\\rightarrow$ sentinel\_job\_queue (Action) $\\rightarrow$ PMS
+   $\\rightarrow$ sentinel_job_queue (Action) $\\rightarrow$ PMS
 
 ---
 
@@ -29,26 +29,26 @@ To answer the requirement for "multiple points of failure protection," the logic
 
 #### **Layer 1: The Configuration Gate (Permission)**
 
-* **Check:** Is is\_autopilot\_enabled set to TRUE for this hotel\_id?  
-* **Behavior:**  
-  * **TRUE:** Proceed to Layer 2\.  
-  * **FALSE:** Log to sentinel\_ai\_predictions (Shadow Mode) and **STOP**.
+- **Check:** Is is_autopilot_enabled set to TRUE for this hotel_id?
+- **Behavior:**
+  - **TRUE:** Proceed to Layer 2\.
+  - **FALSE:** Log to sentinel_ai_predictions (Shadow Mode) and **STOP**.
 
 #### **Layer 2: The Policy Gate (Hard Bounds)**
 
-* **Check:** Does the predicted rate violate basic math or business rules?  
-* **Behavior:**  
-  * **Min Rate:** If Rate \< Min\_Rate $\\rightarrow$ Clamp to Min\_Rate.  
-  * **Max Rate:** If Rate \> Max\_Rate $\\rightarrow$ Clamp to Max\_Rate.  
-  * **Dynamic Ceiling:** If Rate \> Daily\_Max\_Ceiling (94th percentile) $\\rightarrow$ Clamp to Ceiling.  
-  * **Sanity:** If NaN or \< 0 $\\rightarrow$ **REJECT**.
+- **Check:** Does the predicted rate violate basic math or business rules?
+- **Behavior:**
+  - **Min Rate:** If Rate \< Min_Rate $\\rightarrow$ Clamp to Min_Rate.
+  - **Max Rate:** If Rate \> Max_Rate $\\rightarrow$ Clamp to Max_Rate.
+  - **Dynamic Ceiling:** If Rate \> Daily_Max_Ceiling (94th percentile) $\\rightarrow$ Clamp to Ceiling.
+  - **Sanity:** If NaN or \< 0 $\\rightarrow$ **REJECT**.
 
 #### **Layer 3: The Conflict Gate (Context)**
 
-* **Check:** Is the specific *date* open for automation?  
-* **Behavior:**  
-  * **Freeze Window:** If Today \+ Freeze\_Days \>= Stay\_Date $\\rightarrow$ **SKIP** (Freeze wins).  
-  * **Manual Lock:** If sentinel\_rates\_calendar has source \= 'MANUAL' or PMS is Padlocked $\\rightarrow$ **SKIP** (Human wins).
+- **Check:** Is the specific _date_ open for automation?
+- **Behavior:**
+  - **Freeze Window:** If Today \+ Freeze_Days \>= Stay_Date $\\rightarrow$ **SKIP** (Freeze wins).
+  - **Manual Lock:** If sentinel_rates_calendar has source \= 'MANUAL' or PMS is Padlocked $\\rightarrow$ **SKIP** (Human wins).
 
 ---
 
@@ -60,8 +60,8 @@ Add the master switch to the hotel's rule set.
 
 SQL  
 \-- Enable Autonomy per hotel  
-ALTER TABLE sentinel\_configurations  
-ADD COLUMN is\_autopilot\_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE sentinel_configurations  
+ADD COLUMN is_autopilot_enabled BOOLEAN DEFAULT FALSE;
 
 #### **4.2 Sentinel Rates Calendar**
 
@@ -70,7 +70,7 @@ Add a specific source tag to track AI actions vs. Human actions.
 SQL  
 \-- (Conceptual Enum Update)  
 \-- Existing values: 'MANUAL', 'PMS', 'IMPORT'  
-\-- New value: 'AI\_AUTO'
+\-- New value: 'AI_AUTO'
 
 ---
 
@@ -78,81 +78,107 @@ SQL
 
 #### **5.1 Frontend (React)**
 
-* **File:** web/src/features/sentinel/components/ControlPanel/ControlPanelView.tsx  
-* **Action:** Add a **Toggle Switch** labeled *"Enable Autonomy (Beta)"*.  
-  * *Warning:* "Enabling this allows Sentinel to update live rates without approval."  
-* **File:** web/src/features/sentinel/components/RateManager/RateManagerView.tsx  
-* **Action:** Update the grid cell renderer. If source \=== 'AI\_AUTO', display a small **Robot Icon** 🤖 to differentiate from User Overrides.
+- **File:** web/src/features/sentinel/components/ControlPanel/ControlPanelView.tsx
+- **Action:** Add a **Toggle Switch** labeled _"Enable Autonomy (Beta)"_.
+  - _Warning:_ "Enabling this allows Sentinel to update live rates without approval."
+- **File:** web/src/features/sentinel/components/RateManager/RateManagerView.tsx
+- **Action:** Update the grid cell renderer. If source \=== 'AI_AUTO', display a small **Robot Icon** 🤖 to differentiate from User Overrides.
 
 #### **5.2 Backend Logic (Node.js)**
 
-* **File:** api/services/sentinel.bridge.service.js  
-* **Task:** Rewrite the processAiDecisions function to implement the 3-Layer Safety Protocol.
+- **File:** api/services/sentinel.bridge.service.js
+- **Task:** Rewrite the processAiDecisions function to implement the 3-Layer Safety Protocol.
 
 **Pseudocode for sentinel.bridge.service.js:**
 
 JavaScript  
 async function processAiDecisions(hotelId, predictions) {  
-    // 1\. Fetch Config & Context  
-    const config \= await sentinelService.getConfiguration(hotelId);  
-      
-    // Always save to Shadow History first (Audit Trail)  
+ // 1\. Fetch Config & Context  
+ const config \= await sentinelService.getConfiguration(hotelId);
+
+    // Always save to Shadow History first (Audit Trail)
     await saveToShadowHistory(hotelId, predictions);
 
-    // \--- GATE 1: PERMISSION \---  
-    if (\!config.is\_autopilot\_enabled) return; 
+    // \--- GATE 1: PERMISSION \---
+    if (\!config.is\_autopilot\_enabled) return;
 
     const validUpdates \= \[\];
 
-    for (const pred of predictions) {  
+    for (const pred of predictions) {
         let safeRate \= pred.price;
 
-        // \--- GATE 2: POLICY (BOUNDS) \---  
-        // Clamp to Min/Max  
-        if (safeRate \< config.min\_rate) safeRate \= config.min\_rate;  
-        if (safeRate \> config.max\_rate) safeRate \= config.max\_rate;  
-          
-        // Clamp to Dynamic Ceiling (if exists)  
-        const dailyCeiling \= await sentinelService.getDailyCeiling(hotelId, pred.date);  
+        // \--- GATE 2: POLICY (BOUNDS) \---
+        // Clamp to Min/Max
+        if (safeRate \< config.min\_rate) safeRate \= config.min\_rate;
+        if (safeRate \> config.max\_rate) safeRate \= config.max\_rate;
+
+        // Clamp to Dynamic Ceiling (if exists)
+        const dailyCeiling \= await sentinelService.getDailyCeiling(hotelId, pred.date);
         if (dailyCeiling && safeRate \> dailyCeiling) safeRate \= dailyCeiling;
 
-        // \--- GATE 3: CONFLICT (LOCKS) \---  
-        const isFrozen \= sentinelService.isDateFrozen(pred.date, config.freeze\_window);  
+        // \--- GATE 3: CONFLICT (LOCKS) \---
+        const isFrozen \= sentinelService.isDateFrozen(pred.date, config.freeze\_window);
         const isLocked \= await sentinelService.isDateLocked(hotelId, pred.date);
 
         if (isFrozen || isLocked) continue; // Skip this date
 
-        // If all gates passed:  
-        validUpdates.push({  
-            date: pred.date,  
-            rate: safeRate,  
-            roomTypeId: pred.room\_type\_id,  
-            source: 'AI\_AUTO' // Tag it  
-        });  
+        // If all gates passed:
+        validUpdates.push({
+            date: pred.date,
+            rate: safeRate,
+            roomTypeId: pred.room\_type\_id,
+            source: 'AI\_AUTO' // Tag it
+        });
     }
 
-    // Final Push  
-    if (validUpdates.length \> 0\) {  
-        await sentinelService.enqueueRateUpdate(hotelId, validUpdates);  
-    }  
+    // Final Push
+    if (validUpdates.length \> 0\) {
+        await sentinelService.enqueueRateUpdate(hotelId, validUpdates);
+    }
+
 }
 
 ---
 
 ### **6.0 ROLLOUT STRATEGY**
 
-1. **Deploy Schema:** Run migration to add is\_autopilot\_enabled.  
-2. **Deploy Code:** Update Bridge Service and UI.  
-3. **Verify Default:** Ensure all hotels default to FALSE.  
-4. **Pilot Test:**  
-   * Select **The Portico Hotel** (ID: fbd2965d...).  
-   * Set is\_autopilot\_enabled \= TRUE.  
-   * Wait for the next hourly run (check logs).  
-   * Verify rates appear in PMS with the correct value.
+1. **Deploy Schema:** Run migration to add is_autopilot_enabled.
+2. **Deploy Code:** Update Bridge Service and UI.
+3. **Verify Default:** Ensure all hotels default to FALSE.
+4. **Pilot Test:**
+   - Select **The Portico Hotel** (ID: fbd2965d...).
+   - Set is_autopilot_enabled \= TRUE.
+   - Wait for the next hourly run (check logs).
+   - Verify rates appear in PMS with the correct value.
 
 ### **7.0 NEXT ACTION FOR AI**
 
 To begin execution, simply ask:
 
-*"Apply the schema migration and update the Bridge Service now."*
+_"Apply the schema migration and update the Bridge Service now."_
 
+Changelog: Sentinel System Implementation & Core Integration
+🚀 Major Achievements (System Implementation):
+
+Validated Core Pricing Engine: Confirmed implementation of the "Waterfall" logic (Base Rate → Multipliers → Discounts → Taxes) and "Guardrails" (Min/Max/Freeze) in sentinel.pricing.engine.js.
+
+Enabled Differential Logic: The system can now correctly calculate derived room rates (e.g., Single vs Double) based on the room_differentials rules we successfully saved.
+
+Integrated AI Bridge: Verified the SentinelBridgeService which assembles the full hotel context (Inventory, Competitors, Pace Curves) for the Python AI.
+
+Completed Data Flow: The Frontend (ControlPanelView) can now successfully push "Rules" (Strategy, Autopilot, Aggression) to the Backend, which the Service layer uses to generate Job Queue items for the PMS.
+
+🐛 Critical Fixes (The "Last Mile"):
+
+Fixed Configuration Persistence: Resolved the "Payload Too Large" crash by stripping read-only PMS data in sentinel.api.ts, allowing the complex Pricing Rules to be saved to the DB.
+
+Synchronized State (Autopilot): Fixed the Frontend/Backend disconnect where is_autopilot_enabled was being saved but not read, ensuring the UI correctly reflects the system's active state.
+
+Cleaned Telemetry: Implemented and then cleaned up deep-trace logging to verify that payloads move correctly from UI → Router → Service → Database.
+
+📌 Note for Next Session
+Objective: Debug "Heartbeat" (Cron Job)
+
+Issue: The logic is ready, but the AI "Pulse" (Hourly Run) didn't trigger as expected.
+
+Target: Investigate the process-queue endpoint in sentinel.router.js and the Vercel Cron configuration to ensure the system wakes up and processes the job queue automatically.

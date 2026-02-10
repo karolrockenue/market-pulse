@@ -1405,14 +1405,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 justifyContent: "space-between",
                                 padding: "0 1rem",
                                 height: "60px",
-                                background: formState[hotel.hotel_id]
-                                  ?.is_autopilot_enabled
-                                  ? "rgba(16, 185, 129, 0.1)"
-                                  : "#0f0f0f",
-                                border: formState[hotel.hotel_id]
-                                  ?.is_autopilot_enabled
-                                  ? "1px solid rgba(16, 185, 129, 0.3)"
-                                  : "1px solid #2a2a2a",
+                                // [FIX] Fallback to hotel.config to ensure UI shows DB state
+                                background:
+                                  (formState[hotel.hotel_id]
+                                    ?.is_autopilot_enabled ??
+                                  hotel.config?.is_autopilot_enabled)
+                                    ? "rgba(16, 185, 129, 0.1)"
+                                    : "#0f0f0f",
+                                border:
+                                  (formState[hotel.hotel_id]
+                                    ?.is_autopilot_enabled ??
+                                  hotel.config?.is_autopilot_enabled)
+                                    ? "1px solid rgba(16, 185, 129, 0.3)"
+                                    : "1px solid #2a2a2a",
                                 borderRadius: "0.5rem",
                                 transition: "all 0.3s ease",
                               }}
@@ -1466,9 +1471,12 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               </div>
                               <Switch
                                 id={`autopilot-status-${hotel.hotel_id}`}
+                                // [FIX] Robust check: Look at Form State -> Then Config -> Then False
                                 checked={
                                   formState[hotel.hotel_id]
-                                    ?.is_autopilot_enabled || false
+                                    ?.is_autopilot_enabled ??
+                                  hotel.config?.is_autopilot_enabled ??
+                                  false
                                 }
                                 onCheckedChange={(c) =>
                                   updateRule(

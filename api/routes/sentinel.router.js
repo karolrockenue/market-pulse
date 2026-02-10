@@ -90,7 +90,7 @@ router.post("/trigger-dgx", async (req, res) => {
 
     if (!response.ok) {
       throw new Error(
-        `DGX responded with ${response.status}: ${response.statusText}`
+        `DGX responded with ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -140,7 +140,7 @@ router.post("/recalculate", async (req, res) => {
   // This prevents accidental "Mass Wipes" or full-year overwrites.
   if (!startDate || !endDate) {
     console.warn(
-      `[Sentinel] Blocked Unsafe Recalculation Attempt for Hotel ${hotelId} (Missing Dates)`
+      `[Sentinel] Blocked Unsafe Recalculation Attempt for Hotel ${hotelId} (Missing Dates)`,
     );
     return res.status(400).json({
       success: false,
@@ -151,13 +151,13 @@ router.post("/recalculate", async (req, res) => {
 
   try {
     console.log(
-      `[Sentinel] Recalculate Triggered: Hotel ${hotelId} | Range: ${startDate} to ${endDate}`
+      `[Sentinel] Recalculate Triggered: Hotel ${hotelId} | Range: ${startDate} to ${endDate}`,
     );
 
     // 1. Fetch Configuration (Facts + Rules)
     const configRes = await db.query(
       "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
-      [hotelId]
+      [hotelId],
     );
 
     if (configRes.rows.length === 0) {
@@ -182,7 +182,7 @@ router.post("/recalculate", async (req, res) => {
     // If the map is empty, we cannot proceed safely.
     if (Object.keys(freshMap).length === 0) {
       throw new Error(
-        "Critical: Unable to build a valid Rate ID Map. Check PMS Rate Plans."
+        "Critical: Unable to build a valid Rate ID Map. Check PMS Rate Plans.",
       );
     }
 
@@ -193,11 +193,11 @@ router.post("/recalculate", async (req, res) => {
 
     if (needsUpdate) {
       console.log(
-        `[Sentinel] Healing Rate ID Map for Hotel ${hotelId} (Correcting Target Plans)...`
+        `[Sentinel] Healing Rate ID Map for Hotel ${hotelId} (Correcting Target Plans)...`,
       );
       await db.query(
         `UPDATE sentinel_configurations SET rate_id_map = $1, updated_at = NOW() WHERE hotel_id = $2`,
-        [JSON.stringify(freshMap), hotelId]
+        [JSON.stringify(freshMap), hotelId],
       );
       // Update local config object so the rest of the function uses the new map
       config.rate_id_map = freshMap;
@@ -221,7 +221,7 @@ router.post("/recalculate", async (req, res) => {
       const roomTypeId = room.roomTypeID;
       let isBase = String(roomTypeId) === String(baseRoomTypeId);
       let diffRule = differentials.find(
-        (r) => String(r.roomTypeId) === String(roomTypeId)
+        (r) => String(r.roomTypeId) === String(roomTypeId),
       );
 
       // For each day in the calendar...
@@ -255,14 +255,14 @@ router.post("/recalculate", async (req, res) => {
 
     // --- DEBUG TRACE 1 ---
     console.log(
-      `[Trace] Generated ${allOverrides.length} total overrides across ${pmsRoomTypes.length} rooms.`
+      `[Trace] Generated ${allOverrides.length} total overrides across ${pmsRoomTypes.length} rooms.`,
     );
     // ---------------------
 
     // 4. Send to Queue
     const hotelRes = await db.query(
       "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
-      [hotelId]
+      [hotelId],
     );
     const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
     console.log(`[Trace] Using PMS Property ID: ${pmsPropertyId}`);
@@ -280,7 +280,7 @@ router.post("/recalculate", async (req, res) => {
     for (const [rId, rates] of Object.entries(overridesByRoom)) {
       // --- DEBUG TRACE 2 ---
       console.log(
-        `[Trace] Processing Room ${rId} with ${rates.length} rates...`
+        `[Trace] Processing Room ${rId} with ${rates.length} rates...`,
       );
       // ---------------------
 
@@ -290,14 +290,14 @@ router.post("/recalculate", async (req, res) => {
         pmsPropertyId,
         rId,
         rates,
-        "SENTINEL"
+        "SENTINEL",
       );
 
       // --- DEBUG TRACE 3 ---
       console.log(
         `[Trace] Service returned payload size: ${
           batchPayload ? batchPayload.length : "NULL/0"
-        }`
+        }`,
       );
       // ---------------------
 
@@ -307,7 +307,7 @@ router.post("/recalculate", async (req, res) => {
           const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
           await db.query(
             `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
-            [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
+            [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
           );
         }
         totalQueued += batchPayload.length;
@@ -343,13 +343,13 @@ router.post("/export-reservations", async (req, res) => {
          FROM hotels 
          WHERE hotel_id = ANY($1::int[])
          ORDER BY hotel_id ASC`,
-        [hotelIds.map((id) => parseInt(id, 10))]
+        [hotelIds.map((id) => parseInt(id, 10))],
       );
       hotelsToProcess = result.rows;
     } else {
       // All managed hotels
       const result = await client.query(
-        "SELECT hotel_id, pms_property_id FROM hotels WHERE is_rockenue_managed = true ORDER BY hotel_id ASC"
+        "SELECT hotel_id, pms_property_id FROM hotels WHERE is_rockenue_managed = true ORDER BY hotel_id ASC",
       );
       hotelsToProcess = result.rows;
     }
@@ -361,7 +361,7 @@ router.post("/export-reservations", async (req, res) => {
     }
 
     console.log(
-      `[Export] Starting Batch Export for ${hotelsToProcess.length} hotels...`
+      `[Export] Starting Batch Export for ${hotelsToProcess.length} hotels...`,
     );
 
     let totalInserted = 0;
@@ -372,25 +372,24 @@ router.post("/export-reservations", async (req, res) => {
       const pmsPropertyId = hotel.pms_property_id;
 
       console.log(
-        `\n[Export] === Processing Hotel: ${currentHotelId} (PMS: ${pmsPropertyId}) ===`
+        `\n[Export] === Processing Hotel: ${currentHotelId} (PMS: ${pmsPropertyId}) ===`,
       );
 
       try {
-        const accessToken = await cloudbedsAdapter.getAccessToken(
-          currentHotelId
-        );
+        const accessToken =
+          await cloudbedsAdapter.getAccessToken(currentHotelId);
 
         // Fetch reservations, then cap for verification
         const reservations = await cloudbedsAdapter.getReservations(
           accessToken,
           pmsPropertyId,
-          { status: "confirmed,canceled,checked_in,checked_out" }
+          { status: "confirmed,canceled,checked_in,checked_out" },
         );
 
         const limitedReservations = reservations; // use full list
 
         console.log(
-          `[Export] Found ${reservations.length} reservations. Processing all of them...`
+          `[Export] Found ${reservations.length} reservations. Processing all of them...`,
         );
 
         // 3. Process Reservations with Smart Retries
@@ -406,7 +405,7 @@ router.post("/export-reservations", async (req, res) => {
               const detailRes = await cloudbedsAdapter.getReservation(
                 accessToken,
                 pmsPropertyId,
-                summary.reservationID
+                summary.reservationID,
               );
 
               // RATE LIMIT: wait 125ms → 8 requests/sec
@@ -463,7 +462,7 @@ router.post("/export-reservations", async (req, res) => {
                     dateCanceled: detailRes.dateCanceled,
                     date_canceled: detailRes.date_canceled,
                     cancellation_date: detailRes.cancellation_date,
-                  }
+                  },
                 );
               }
 
@@ -631,7 +630,7 @@ router.post("/export-reservations", async (req, res) => {
                   detailRes.sourceName || detailRes.source || "Direct", // sourceName
                   detailRes.guestCountry || null, // guestCountry
                   dailyRatesJson, // detailedRoomRates
-                ]
+                ],
               );
 
               totalInserted++;
@@ -646,12 +645,12 @@ router.post("/export-reservations", async (req, res) => {
 
               if (isTransient) {
                 console.warn(
-                  `[Export] Transient Error (Limit/Hiccup) on Res ${summary.reservationID}. Retrying (${attempts}/3)...`
+                  `[Export] Transient Error (Limit/Hiccup) on Res ${summary.reservationID}. Retrying (${attempts}/3)...`,
                 );
                 await sleep(5000);
               } else {
                 console.error(
-                  `[Export] Failed Res ${summary.reservationID}: ${err.message}`
+                  `[Export] Failed Res ${summary.reservationID}: ${err.message}`,
                 );
                 break; // Don't retry logic errors
               }
@@ -661,7 +660,7 @@ router.post("/export-reservations", async (req, res) => {
       } catch (hotelErr) {
         console.error(
           `[Export] CRITICAL ERROR processing Hotel ${currentHotelId}:`,
-          hotelErr.message
+          hotelErr.message,
         );
         // Continue to next hotel
       }
@@ -724,7 +723,7 @@ router.get("/pms-property-ids", async (req, res) => {
     const { rows } = await db.query(
       `SELECT hotel_id, pms_property_id 
        FROM hotels 
-       WHERE is_rockenue_managed = true`
+       WHERE is_rockenue_managed = true`,
     );
 
     // Convert the array [ {hotel_id: 1, pms_id: 100} ]
@@ -793,7 +792,7 @@ router.get("/get-rate-plans/:propertyId", async (req, res) => {
     // [BRIDGE UPDATE] Lookup Internal ID
     const hotelRes = await db.query(
       "SELECT hotel_id FROM hotels WHERE pms_property_id = $1",
-      [propertyId]
+      [propertyId],
     );
     if (hotelRes.rows.length === 0)
       throw new Error("Hotel not found in database.");
@@ -830,7 +829,7 @@ router.post("/test-post-rate", async (req, res) => {
     // [BRIDGE UPDATE] Lookup Internal ID
     const hotelRes = await db.query(
       "SELECT hotel_id FROM hotels WHERE pms_property_id = $1",
-      [propertyId]
+      [propertyId],
     );
     if (hotelRes.rows.length === 0)
       throw new Error("Hotel not found in database.");
@@ -842,7 +841,7 @@ router.post("/test-post-rate", async (req, res) => {
       propertyId,
       rateId,
       date,
-      rate
+      rate,
     );
 
     res.status(200).json({
@@ -874,7 +873,7 @@ router.get("/job-status/:propertyId/:jobId", async (req, res) => {
     // [BRIDGE UPDATE] Lookup Internal ID
     const hotelRes = await db.query(
       "SELECT hotel_id FROM hotels WHERE pms_property_id = $1",
-      [propertyId]
+      [propertyId],
     );
     if (hotelRes.rows.length === 0)
       throw new Error("Hotel not found in database.");
@@ -884,7 +883,7 @@ router.get("/job-status/:propertyId/:jobId", async (req, res) => {
     const result = await sentinelAdapter.getJobStatus(
       hotelId,
       propertyId,
-      jobId
+      jobId,
     );
 
     res.status(200).json({
@@ -895,7 +894,7 @@ router.get("/job-status/:propertyId/:jobId", async (req, res) => {
   } catch (error) {
     console.error(
       `[Sentinel Router] get-job-status failed for ${jobId}:`,
-      error.message
+      error.message,
     );
     res.status(500).json({
       success: false,
@@ -916,7 +915,7 @@ router.get("/config/:hotelId", async (req, res) => {
   try {
     const { rows } = await db.query(
       "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
-      [hotelId]
+      [hotelId],
     );
 
     if (rows.length === 0) {
@@ -937,7 +936,7 @@ router.get("/config/:hotelId", async (req, res) => {
   } catch (error) {
     console.error(
       `[Sentinel Router] get-config failed for ${hotelId}:`,
-      error.message
+      error.message,
     );
     res.status(500).json({
       success: false,
@@ -958,7 +957,7 @@ router.post("/sync", async (req, res) => {
   const { hotelId, pmsPropertyId } = req.body;
   try {
     console.log(
-      `[Sentinel Router] Starting Full Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`
+      `[Sentinel Router] Starting Full Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`,
     );
 
     // 1. Fetch Metadata ("Facts") from PMS
@@ -974,7 +973,7 @@ router.post("/sync", async (req, res) => {
     // 2. Build Rate Map (Use Service Logic)
     const rateIdMap = sentinelService.buildRateIdMap(
       pmsRoomTypes,
-      pmsRatePlans
+      pmsRatePlans,
     );
 
     // 3. Save Configuration to DB
@@ -1000,7 +999,7 @@ router.post("/sync", async (req, res) => {
         updated_at = NOW()
       RETURNING *;
       `,
-      [hotelId, roomTypesData, ratePlansData, JSON.stringify(rateIdMap)]
+      [hotelId, roomTypesData, ratePlansData, JSON.stringify(rateIdMap)],
     );
 
     const config = rows[0];
@@ -1013,7 +1012,7 @@ router.post("/sync", async (req, res) => {
 
     if (baseRoomId) {
       console.log(
-        `[Sentinel Router] Hydrating Calendar for Base Room: ${baseRoomId}`
+        `[Sentinel Router] Hydrating Calendar for Base Room: ${baseRoomId}`,
       );
       const startDate = new Date().toISOString().split("T")[0];
       const endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
@@ -1026,7 +1025,7 @@ router.post("/sync", async (req, res) => {
           pmsPropertyId,
           baseRoomId,
           startDate,
-          endDate
+          endDate,
         );
 
         let ratesList = [];
@@ -1054,7 +1053,7 @@ router.post("/sync", async (req, res) => {
               rateValues.push(
                 `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${
                   pIdx + 3
-                }, 'SYNC', NOW())`
+                }, 'SYNC', NOW())`,
               );
               rateParams.push(hotelId, baseRoomId, row.date, row.rate);
               pIdx += 4;
@@ -1070,14 +1069,14 @@ router.post("/sync", async (req, res) => {
             `;
             await db.query(queryText, rateParams);
             console.log(
-              `[Sentinel Router] Successfully hydrated ${rateValues.length} days.`
+              `[Sentinel Router] Successfully hydrated ${rateValues.length} days.`,
             );
           }
         }
       } catch (hydrationError) {
         console.error(
           `[Sentinel Router] Hydration Warning (Sync continued):`,
-          hydrationError.message
+          hydrationError.message,
         );
       }
     } else {
@@ -1092,7 +1091,7 @@ router.post("/sync", async (req, res) => {
   } catch (error) {
     console.error(
       `[Sentinel Router] Sync failed for ${hotelId}:`,
-      error.message
+      error.message,
     );
     res.status(500).json({
       success: false,
@@ -1122,7 +1121,7 @@ router.post("/config/:hotelId", async (req, res) => {
   } catch (error) {
     console.error(
       `[Sentinel Router] save-config failed for ${hotelId}:`,
-      error.message
+      error.message,
     );
     res.status(500).json({
       success: false,
@@ -1226,7 +1225,7 @@ async function runBackgroundWorker() {
          WHERE status = 'PENDING' 
          ORDER BY created_at ASC 
          LIMIT 5 
-         FOR UPDATE SKIP LOCKED`
+         FOR UPDATE SKIP LOCKED`,
       );
 
       // C. Stop if empty
@@ -1239,7 +1238,7 @@ async function runBackgroundWorker() {
       console.log(
         `[Sentinel Worker] Batch ${batchesProcessed + 1}: Processing ${
           jobs.length
-        } jobs...`
+        } jobs...`,
       );
 
       // D. Process Each Job
@@ -1253,7 +1252,7 @@ async function runBackgroundWorker() {
           const result = await sentinelAdapter.postRateBatch(
             job.hotel_id,
             pmsPropertyId,
-            rates
+            rates,
           );
 
           // Success Update
@@ -1263,12 +1262,12 @@ async function runBackgroundWorker() {
           ) {
             await client.query(
               `UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`,
-              [job.id]
+              [job.id],
             );
           } else {
             await client.query(
               `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
-              [job.id]
+              [job.id],
             );
           }
           await client.query(`RELEASE SAVEPOINT ${savepointName}`);
@@ -1280,7 +1279,7 @@ async function runBackgroundWorker() {
 
           await client.query(
             `UPDATE sentinel_job_queue SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1`,
-            [job.id, safeError]
+            [job.id, safeError],
           );
         }
       }
@@ -1296,7 +1295,7 @@ async function runBackgroundWorker() {
     console.log(
       `[Sentinel Worker] Cycle finished. Batches: ${batchesProcessed}. Time: ${
         Date.now() - startTime
-      }ms`
+      }ms`,
     );
   } catch (error) {
     await client.query("ROLLBACK");
@@ -1321,7 +1320,7 @@ router.post("/overrides", async (req, res) => {
   const changeSource = source || "MANUAL";
 
   console.log(
-    `[Sentinel Producer] Received overrides for hotel ${hotelId} (Source: ${changeSource})`
+    `[Sentinel Producer] Received overrides for hotel ${hotelId} (Source: ${changeSource})`,
   );
 
   if (
@@ -1344,7 +1343,7 @@ router.post("/overrides", async (req, res) => {
       pmsPropertyId,
       roomTypeId,
       overrides,
-      changeSource
+      changeSource,
     );
 
     // 2. Insert into Job Queue (Chunked)
@@ -1358,13 +1357,13 @@ router.post("/overrides", async (req, res) => {
 
         await db.query(
           `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
-          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
+          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
         );
       }
 
       const jobCount = Math.ceil(batchPayload.length / CHUNK_SIZE);
       console.log(
-        `[Sentinel Producer] Queued ${batchPayload.length} rates across ${jobCount} jobs.`
+        `[Sentinel Producer] Queued ${batchPayload.length} rates across ${jobCount} jobs.`,
       );
     }
 
@@ -1394,7 +1393,7 @@ router.post("/overrides", async (req, res) => {
 router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
   const { hotelId, roomTypeId } = req.params;
   console.log(
-    `[Sentinel Router] Received get-rates for ${hotelId}/${roomTypeId}`
+    `[Sentinel Router] Received get-rates for ${hotelId}/${roomTypeId}`,
   );
 
   try {
@@ -1409,7 +1408,7 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
     // 2. Get PMS Property ID for the external call
     const hotelRes = await db.query(
       "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
-      [hotelId]
+      [hotelId],
     );
     if (hotelRes.rows.length === 0) throw new Error("Hotel not found");
     const pmsPropertyId = hotelRes.rows[0].pms_property_id;
@@ -1423,7 +1422,7 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
            AND room_type_id = $2 
            AND stay_date >= $3
          ORDER BY stay_date ASC`,
-        [hotelId, roomTypeId, startDateStr]
+        [hotelId, roomTypeId, startDateStr],
       ),
       // [BRIDGE UPDATE] Pass BOTH IDs
       sentinelAdapter.getRates(
@@ -1431,7 +1430,7 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
         pmsPropertyId,
         roomTypeId,
         startDateStr,
-        endDateStr
+        endDateStr,
       ),
     ]);
 
@@ -1443,7 +1442,7 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
       liveRatesList = pmsRes.data.roomRateDetailed;
     } else {
       console.warn(
-        "[Sentinel Router] Warning: roomRateDetailed array not found in PMS response."
+        "[Sentinel Router] Warning: roomRateDetailed array not found in PMS response.",
       );
     }
 
@@ -1497,7 +1496,7 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
     // ... (Error handling remains the same)
     console.error(
       `[Sentinel Router] get-rates failed for ${hotelId}:`,
-      error.message
+      error.message,
     );
     res.status(500).json({
       success: false,
@@ -1519,7 +1518,7 @@ router.get("/notifications", async (req, res) => {
     const { rows } = await db.query(
       `SELECT * FROM sentinel_notifications 
        ORDER BY created_at DESC 
-       LIMIT 20`
+       LIMIT 20`,
     );
 
     // [FIX] Return standard format strictly
@@ -1530,7 +1529,7 @@ router.get("/notifications", async (req, res) => {
   } catch (error) {
     console.error(
       "[Sentinel Router] Fetch notifications failed:",
-      error.message
+      error.message,
     );
     // Return empty list on error so UI doesn't break
     res.status(200).json({ success: false, data: [], error: error.message });
@@ -1549,12 +1548,12 @@ router.post("/notifications/mark-read", async (req, res) => {
       // Mark specific IDs
       await db.query(
         `UPDATE sentinel_notifications SET is_read = TRUE WHERE id = ANY($1::uuid[])`,
-        [ids]
+        [ids],
       );
     } else {
       // Mark ALL
       await db.query(
-        `UPDATE sentinel_notifications SET is_read = TRUE WHERE is_read = FALSE`
+        `UPDATE sentinel_notifications SET is_read = TRUE WHERE is_read = FALSE`,
       );
     }
 
@@ -1578,7 +1577,7 @@ router.delete("/notifications/:id", async (req, res) => {
   } catch (error) {
     console.error(
       "[Sentinel Router] Delete notification failed:",
-      error.message
+      error.message,
     );
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1596,7 +1595,7 @@ router.get("/predictions/:hotelId", async (req, res) => {
        FROM sentinel_ai_predictions 
        WHERE hotel_id = $1 AND is_applied = FALSE
        ORDER BY stay_date ASC`,
-      [hotelId]
+      [hotelId],
     );
 
     res.status(200).json({ success: true, data: rows });

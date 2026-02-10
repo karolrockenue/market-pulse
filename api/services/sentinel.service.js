@@ -499,6 +499,11 @@ function buildRateIdMap(pmsRoomTypes, pmsRatePlans) {
  * Handles Daily Max Rates and rebuilding the Rate ID Map.
  */
 async function updateConfig(hotelId, updates) {
+  // --- DEBUG PROBE START ---
+  console.log(`[DEBUG SERVICE] updateConfig called for ${hotelId}`);
+  console.log(`[DEBUG SERVICE] Raw Updates:`, JSON.stringify(updates, null, 2));
+  // --- DEBUG PROBE END ---
+
   const {
     sentinel_enabled,
     is_autopilot_enabled, // [NEW] Autonomy Switch
