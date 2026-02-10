@@ -1397,6 +1397,88 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               />
                             </div>
 
+                            {/* 1.5 Sentinel Mode (Autonomy) */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "0 1rem",
+                                height: "60px",
+                                background: formState[hotel.hotel_id]
+                                  ?.is_autopilot_enabled
+                                  ? "rgba(16, 185, 129, 0.1)"
+                                  : "#0f0f0f",
+                                border: formState[hotel.hotel_id]
+                                  ?.is_autopilot_enabled
+                                  ? "1px solid rgba(16, 185, 129, 0.3)"
+                                  : "1px solid #2a2a2a",
+                                borderRadius: "0.5rem",
+                                transition: "all 0.3s ease",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <Label
+                                  htmlFor={`autopilot-status-${hotel.hotel_id}`}
+                                  style={{
+                                    color: "#e5e5e5",
+                                    fontSize: "0.875rem",
+                                  }}
+                                >
+                                  Sentinel Mode
+                                </Label>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <HelpCircle
+                                        style={{
+                                          width: "14px",
+                                          height: "14px",
+                                          color: "#ef4444",
+                                        }}
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      style={{
+                                        backgroundColor: "#1a1a1a",
+                                        borderColor: "#ef4444",
+                                      }}
+                                    >
+                                      <p
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#ef4444",
+                                        }}
+                                      >
+                                        WARNING: Enabling this allows Sentinel
+                                        to update live rates in the PMS without
+                                        manual approval.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <Switch
+                                id={`autopilot-status-${hotel.hotel_id}`}
+                                checked={
+                                  formState[hotel.hotel_id]
+                                    ?.is_autopilot_enabled || false
+                                }
+                                onCheckedChange={(c) =>
+                                  updateRule(
+                                    String(hotel.hotel_id),
+                                    "is_autopilot_enabled",
+                                    c,
+                                  )
+                                }
+                              />
+                            </div>
                             {/* 2. Yield Strategy (NEW) */}
                             <div
                               style={{

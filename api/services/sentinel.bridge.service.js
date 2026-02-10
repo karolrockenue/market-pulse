@@ -153,11 +153,12 @@ class SentinelBridgeService {
   }
 
   /**
-   * [WRITE] Save AI Predictions to the Shadow Table (Batch Optimized).
+   * [WRITE] Save AI Predictions AND Execute Autonomy (if enabled).
+   * Implements the 3-Layer Safety Protocol.
    */
   async saveDecisions(decisions) {
     console.log(
-      `[Bridge] Saving ${decisions?.length} decisions (Batch Mode)...`,
+      `[Bridge] Processing ${decisions?.length} decisions (Shadow + Autonomy)...`,
     );
     if (!Array.isArray(decisions) || decisions.length === 0)
       return { saved: 0 };
@@ -165,59 +166,182 @@ class SentinelBridgeService {
     const client = await db.connect();
 
     try {
-      console.time("DB Batch Insert");
-
-      // Filter valid decisions
+      // ---------------------------------------------------------
+      // PHASE 1: SHADOW SAVE (Always Log to History)
+      // ---------------------------------------------------------
+      console.time("Phase 1: Shadow Log");
       const validDecisions = decisions.filter(
         (d) => d.hotel_id && d.room_type_id && d.stay_date && d.suggested_rate,
       );
 
-      if (validDecisions.length === 0) return { saved: 0 };
+      if (validDecisions.length > 0) {
+        const shadowQuery = `
+          INSERT INTO sentinel_ai_predictions 
+          (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
+          SELECT * FROM UNNEST(
+            $1::int[], $2::int[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
+          )
+          ON CONFLICT (hotel_id, room_type_id, stay_date) 
+          DO UPDATE SET 
+            suggested_rate = EXCLUDED.suggested_rate,
+            confidence_score = EXCLUDED.confidence_score,
+            reasoning = EXCLUDED.reasoning,
+            model_version = EXCLUDED.model_version,
+            created_at = NOW(),
+            is_applied = FALSE
+        `;
+        const now = new Date();
+        await client.query(shadowQuery, [
+          validDecisions.map((d) => d.hotel_id),
+          validDecisions.map((d) => d.room_type_id),
+          validDecisions.map((d) => d.stay_date),
+          validDecisions.map((d) => d.suggested_rate),
+          validDecisions.map((d) => d.confidence_score || 0.0),
+          validDecisions.map((d) => d.reasoning || null),
+          validDecisions.map((d) => d.model_version || "v1.0"),
+          validDecisions.map(() => false),
+          validDecisions.map(() => now),
+        ]);
+      }
+      console.timeEnd("Phase 1: Shadow Log");
 
-      // Construct Batch Query using UNNEST for high performance
-      const query = `
-        INSERT INTO sentinel_ai_predictions 
-        (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
-        SELECT * FROM UNNEST(
-          $1::int[],       -- hotel_id
-          $2::int[],       -- room_type_id
-          $3::date[],      -- stay_date
-          $4::numeric[],   -- suggested_rate
-          $5::numeric[],   -- confidence_score
-          $6::text[],      -- reasoning
-          $7::text[],      -- model_version
-          $8::boolean[],   -- is_applied
-          $9::timestamptz[] -- created_at
-        )
-        ON CONFLICT (hotel_id, room_type_id, stay_date) 
-        DO UPDATE SET 
-          suggested_rate = EXCLUDED.suggested_rate,
-          confidence_score = EXCLUDED.confidence_score,
-          reasoning = EXCLUDED.reasoning,
-          model_version = EXCLUDED.model_version,
-          created_at = NOW(),
-          is_applied = FALSE
-      `;
+      // ---------------------------------------------------------
+      // PHASE 2: ACTIVE AUTONOMY (The 3-Layer Safety Protocol)
+      // ---------------------------------------------------------
+      console.time("Phase 2: Autonomy Gates");
 
-      const now = new Date();
+      // Group decisions by Hotel ID to fetch context efficiently
+      const decisionsByHotel = validDecisions.reduce((acc, d) => {
+        if (!acc[d.hotel_id]) acc[d.hotel_id] = [];
+        acc[d.hotel_id].push(d);
+        return acc;
+      }, {});
 
-      await client.query(query, [
-        validDecisions.map((d) => d.hotel_id),
-        validDecisions.map((d) => d.room_type_id),
-        validDecisions.map((d) => d.stay_date),
-        validDecisions.map((d) => d.suggested_rate),
-        validDecisions.map((d) => d.confidence_score || 0.0),
-        validDecisions.map((d) => d.reasoning || null),
-        validDecisions.map((d) => d.model_version || "v1.0"),
-        validDecisions.map(() => false),
-        validDecisions.map(() => now),
-      ]);
+      let totalQueued = 0;
 
-      console.timeEnd("DB Batch Insert");
-      console.log(`[Bridge] Saved ${validDecisions.length} decisions.`);
-      return { saved: validDecisions.length };
+      for (const hotelId of Object.keys(decisionsByHotel)) {
+        const hotelDecisions = decisionsByHotel[hotelId];
+
+        // --- GATE 1: PERMISSION (Is Autopilot ON?) ---
+        const configRes = await client.query(
+          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period 
+           FROM sentinel_configurations WHERE hotel_id = $1`,
+          [hotelId],
+        );
+        const config = configRes.rows[0];
+
+        if (!config || !config.is_autopilot_enabled) {
+          console.log(
+            `[Autonomy] Hotel ${hotelId}: Autopilot OFF. Skipping execution.`,
+          );
+          continue;
+        }
+
+        // Prepare Gate Data
+        const stayDates = hotelDecisions.map((d) => d.stay_date);
+        const minRates = config.monthly_min_rates || {};
+        const freezeDays = parseInt(config.rate_freeze_period || 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Fetch Dynamic Ceilings (Gate 2 Data)
+        const ceilingsRes = await client.query(
+          `SELECT stay_date::text, max_price FROM sentinel_daily_max_rates 
+           WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
+          [hotelId, stayDates],
+        );
+        const ceilingsMap = {};
+        ceilingsRes.rows.forEach((r) => {
+          ceilingsMap[r.stay_date.split("T")[0]] = parseFloat(r.max_price);
+        });
+
+        // Fetch Conflict Locks (Gate 3 Data)
+        const locksRes = await client.query(
+          `SELECT stay_date::text, source FROM sentinel_rates_calendar
+           WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
+          [hotelId, stayDates],
+        );
+        const locksMap = {};
+        locksRes.rows.forEach((r) => {
+          locksMap[r.stay_date.split("T")[0]] = r.source;
+        });
+
+        const validUpdates = [];
+
+        for (const pred of hotelDecisions) {
+          const dateStr = new Date(pred.stay_date).toISOString().split("T")[0];
+          const stayDateObj = new Date(pred.stay_date);
+          let safeRate = parseFloat(pred.suggested_rate);
+
+          // --- GATE 3: CONFLICTS (Freeze & Locks) ---
+
+          // 3a. Freeze Window (Today + X days)
+          const daysUntilStay = (stayDateObj - today) / (1000 * 60 * 60 * 24);
+          if (daysUntilStay < freezeDays) {
+            continue; // Frozen period
+          }
+
+          // 3b. Manual Lock (Human Override)
+          const currentSource = locksMap[dateStr];
+          if (currentSource === "MANUAL" || currentSource === "PMS_LOCKED") {
+            continue; // Human wins
+          }
+
+          // --- GATE 2: POLICY (Hard Bounds) ---
+
+          // 2a. Min Rate Check
+          const monthKey = String(stayDateObj.getMonth() + 1); // 1-12
+          const minRate = parseFloat(minRates[monthKey] || 0);
+          if (safeRate < minRate) safeRate = minRate;
+
+          // 2b. Dynamic Ceiling Check (94th Percentile Cap)
+          const ceiling = ceilingsMap[dateStr];
+          if (ceiling && safeRate > ceiling) safeRate = ceiling;
+
+          // 2c. Sanity Check
+          if (isNaN(safeRate) || safeRate <= 0) continue;
+
+          // ALL GATES PASSED -> Queue for PMS
+          validUpdates.push({
+            hotel_id: hotelId,
+            room_type_id: pred.room_type_id,
+            start_date: pred.stay_date,
+            end_date: pred.stay_date,
+            price: safeRate,
+            source: "AI_AUTO",
+          });
+        }
+
+        // --- EXECUTION ---
+        if (validUpdates.length > 0) {
+          const qQuery = `
+            INSERT INTO sentinel_job_queue 
+            (hotel_id, room_type_id, start_date, end_date, price, source, status, created_at)
+            SELECT * FROM UNNEST(
+              $1::int[], $2::int[], $3::date[], $4::date[], $5::numeric[], $6::text[], $7::text[], $8::timestamptz[]
+            )
+          `;
+          await client.query(qQuery, [
+            validUpdates.map((u) => u.hotel_id),
+            validUpdates.map((u) => u.room_type_id),
+            validUpdates.map((u) => u.start_date),
+            validUpdates.map((u) => u.end_date),
+            validUpdates.map((u) => u.price),
+            validUpdates.map((u) => u.source),
+            validUpdates.map(() => "PENDING"),
+            validUpdates.map(() => new Date()),
+          ]);
+          totalQueued += validUpdates.length;
+          console.log(
+            `[Autonomy] Hotel ${hotelId}: Queued ${validUpdates.length} rate updates.`,
+          );
+        }
+      }
+
+      console.timeEnd("Phase 2: Autonomy Gates");
+      return { saved: validDecisions.length, queued: totalQueued };
     } catch (error) {
-      console.error("[Bridge] Save Failed:", error);
+      console.error("[Bridge] Process Failed:", error);
       throw error;
     } finally {
       client.release();

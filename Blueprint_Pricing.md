@@ -202,21 +202,16 @@ Check Public URL tailscale funnel status
   - **Schedule:** Runs daily at **05:00 AM** via Cron.
   - **Goal:** Prevents "Inventory Empty" / "20 dates checked" errors by ensuring the calendar is hydrated before the AI runs.
 - **Cron Job Architecture:**
-  - `0 5 * * *`: **Fleet Sync** (Refreshes Facts & Calendar).
-  - `0 */2 * * *`: **Sentinel Run** (Generates & Uploads Decisions).
+- `0 5 * * *`: **Fleet Sync** (Refreshes Facts & Calendar).
+  - `0 * * * *`: **Sentinel Run** (Generates & Uploads Decisions - **Hourly**).
 
-### **Next Session: Codebase Synchronization (Anti-Drift)**
+### [2026-02-09] - Logic Hardening & Infrastructure Adjustment
 
-- **Context:** The DGX server currently runs a static version of the codebase (`/home/sentinel/sentinel-training-hub`). If we push logic updates to GitHub, the DGX continues running old code until manually updated.
-- **Objective:** Automate `git pull` to ensure the AI logic is always strictly verified against the latest `main` branch.
-- **Implementation Plan:**
-  1.  Create `daily_update.sh` on DGX:
-      ```bash
-      #!/bin/bash
-      cd /home/sentinel/sentinel-training-hub
-      git pull origin main
-      # Optional: update dependencies if requirements.txt changed
-      /home/sentinel/sentinel-training-hub/venv/bin/pip install -r requirements.txt
-      ```
-  2.  Add to Crontab (Schedule: **04:55 AM**, strictly _before_ the 5:00 AM Sync).
-  3.  Verify SSH Keys on DGX allow password-less pulling from GitHub.
+- **"Sell Every Room" Fix:**
+  - **Issue:** Rates were hitting the standard Min Rate (£90) instead of the lower Last-Minute Floor (£80).
+  - **Fix 1 (Bridge):** Updated `sentinel.bridge.service.js` to pass `last_minute_floor` configuration to the Python Engine.
+  - **Fix 2 (Engine):** Updated `sentinel_live.py` Desperation Logic to force-drop rates to the _effective_ floor (Standard or LMF) when lead time is < 48h.
+- **Infrastructure Decision (No Git on DGX):**
+  - **Decision:** We explicitly chose **NOT** to use Git on the DGX server for now. The code is managed via direct editing (Cursor SSH).
+  - **Action:** Removed `daily_update.sh` and the corresponding cron job to prevent errors.
+- **Schedule Update:** Increased Sentinel Run frequency to **Hourly** (`0 * * * *`) to capture rapid market changes.
