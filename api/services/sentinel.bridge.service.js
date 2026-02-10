@@ -232,12 +232,27 @@ class SentinelBridgeService {
         const hotelDecisions = decisionsByHotel[hotelId];
 
         // --- GATE 1: PERMISSION (Is Autopilot ON?) ---
+        // [FIX] Also fetch rate_id_map to build the PMS payload later
         const configRes = await client.query(
-          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period 
+          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map 
            FROM sentinel_configurations WHERE hotel_id = $1`,
           [hotelId],
         );
         const config = configRes.rows[0];
+
+        // [FIX] Fetch PMS Property ID for the payload
+        const hotelRes = await client.query(
+          `SELECT pms_property_id FROM hotels WHERE hotel_id = $1`,
+          [hotelId],
+        );
+        const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
+
+        if (!pmsPropertyId) {
+          console.error(
+            `[Autonomy] Hotel ${hotelId}: Missing PMS Property ID. Skipping.`,
+          );
+          continue;
+        }
 
         if (!config || !config.is_autopilot_enabled) {
           console.log(
@@ -323,27 +338,56 @@ class SentinelBridgeService {
 
         // --- EXECUTION ---
         if (validUpdates.length > 0) {
-          const qQuery = `
-            INSERT INTO sentinel_job_queue 
-            (hotel_id, room_type_id, start_date, end_date, price, source, status, created_at)
-            SELECT * FROM UNNEST(
-              $1::int[], $2::int[], $3::date[], $4::date[], $5::numeric[], $6::text[], $7::text[], $8::timestamptz[]
-            )
-          `;
-          await client.query(qQuery, [
-            validUpdates.map((u) => u.hotel_id),
-            validUpdates.map((u) => u.room_type_id),
-            validUpdates.map((u) => u.start_date),
-            validUpdates.map((u) => u.end_date),
-            validUpdates.map((u) => u.price),
-            validUpdates.map((u) => u.source),
-            validUpdates.map(() => "PENDING"),
-            validUpdates.map(() => new Date()),
-          ]);
-          totalQueued += validUpdates.length;
-          console.log(
-            `[Autonomy] Hotel ${hotelId}: Queued ${validUpdates.length} rate updates.`,
-          );
+          // [FIX] Construct the Cloudbeds JSON Payload
+          // Structure: { pmsPropertyId, rates: [{ rate_id, date, amount }] }
+
+          const ratesPayload = [];
+          const rateIdMap = config.rate_id_map || {};
+
+          for (const update of validUpdates) {
+            const pmsRateId = rateIdMap[update.room_type_id];
+            if (!pmsRateId) {
+              console.warn(
+                `[Autonomy] Missing Rate ID mapping for Room ${update.room_type_id} (Hotel ${hotelId}). Skipping.`,
+              );
+              continue;
+            }
+
+            // Format date as YYYY-MM-DD
+            const dStr = new Date(update.start_date)
+              .toISOString()
+              .split("T")[0];
+
+            ratesPayload.push({
+              rate_id: pmsRateId,
+              date: dStr,
+              amount: update.price,
+            });
+          }
+
+          if (ratesPayload.length > 0) {
+            const finalPayload = {
+              pmsPropertyId: pmsPropertyId,
+              rates: ratesPayload,
+            };
+
+            // Insert into the JSON 'payload' column
+            // Note: We insert ONE job per batch to be efficient, or we could split them.
+            // For now, let's insert one job containing all updates for this hotel.
+            const qQuery = `
+                INSERT INTO sentinel_job_queue 
+                (hotel_id, payload, status, created_at)
+                VALUES ($1, $2, 'PENDING', NOW())
+            `;
+
+            // [FIX] Handle UUID vs Integer Hotel ID by not casting to ::int[]
+            await client.query(qQuery, [hotelId, JSON.stringify(finalPayload)]);
+
+            totalQueued += ratesPayload.length;
+            console.log(
+              `[Autonomy] Hotel ${hotelId}: Queued ${ratesPayload.length} rate updates (JSON Payload).`,
+            );
+          }
         }
       }
 
