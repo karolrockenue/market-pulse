@@ -280,10 +280,17 @@ class SentinelBridgeService {
         });
 
         // Fetch Conflict Locks & Current Rates (Gate 3 & Delta Check)
+        // [FIX] Must include room_type_id in query and map key to avoid collisions
+        const roomTypeIds = [
+          ...new Set(hotelDecisions.map((d) => d.room_type_id)),
+        ];
+
         const calendarRes = await client.query(
-          `SELECT stay_date::text, source, rate FROM sentinel_rates_calendar
-           WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
-          [hotelId, stayDates],
+          `SELECT room_type_id, stay_date::text, source, rate FROM sentinel_rates_calendar
+           WHERE hotel_id = $1 
+             AND room_type_id = ANY($2::int[])
+             AND stay_date = ANY($3::date[])`,
+          [hotelId, roomTypeIds, stayDates],
         );
 
         const calendarMap = {};
@@ -296,7 +303,10 @@ class SentinelBridgeService {
             dStr = String(r.stay_date).split("T")[0];
           }
 
-          calendarMap[dStr] = {
+          // Key by Room + Date
+          const key = `${r.room_type_id}_${dStr}`;
+
+          calendarMap[key] = {
             source: r.source,
             rate: parseFloat(r.rate || 0),
           };
@@ -318,7 +328,9 @@ class SentinelBridgeService {
           }
 
           // 3b. Manual Lock (Human Override)
-          const currentData = calendarMap[dateStr] || {};
+          // [FIX] Lookup using composite key
+          const key = `${pred.room_type_id}_${dateStr}`;
+          const currentData = calendarMap[key] || {};
           const currentSource = currentData.source;
 
           if (currentSource === "MANUAL" || currentSource === "PMS_LOCKED") {
