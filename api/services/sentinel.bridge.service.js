@@ -366,26 +366,34 @@ class SentinelBridgeService {
           }
 
           if (ratesPayload.length > 0) {
-            const finalPayload = {
-              pmsPropertyId: pmsPropertyId,
-              rates: ratesPayload,
-            };
+            // [FIX] Chunking Logic for Cloudbeds API Limit (Max 30 items)
+            // We use a safe batch size of 25 to avoid edge cases.
+            const BATCH_SIZE = 25;
 
-            // Insert into the JSON 'payload' column
-            // Note: We insert ONE job per batch to be efficient, or we could split them.
-            // For now, let's insert one job containing all updates for this hotel.
-            const qQuery = `
-                INSERT INTO sentinel_job_queue 
-                (hotel_id, payload, status, created_at)
-                VALUES ($1, $2, 'PENDING', NOW())
-            `;
+            for (let i = 0; i < ratesPayload.length; i += BATCH_SIZE) {
+              const chunk = ratesPayload.slice(i, i + BATCH_SIZE);
 
-            // [FIX] Handle UUID vs Integer Hotel ID by not casting to ::int[]
-            await client.query(qQuery, [hotelId, JSON.stringify(finalPayload)]);
+              const chunkPayload = {
+                pmsPropertyId: pmsPropertyId,
+                rates: chunk,
+              };
+
+              const qQuery = `
+                    INSERT INTO sentinel_job_queue 
+                    (hotel_id, payload, status, created_at)
+                    VALUES ($1, $2, 'PENDING', NOW())
+                `;
+
+              // [FIX] Handle UUID vs Integer Hotel ID by not casting to ::int[]
+              await client.query(qQuery, [
+                hotelId,
+                JSON.stringify(chunkPayload),
+              ]);
+            }
 
             totalQueued += ratesPayload.length;
             console.log(
-              `[Autonomy] Hotel ${hotelId}: Queued ${ratesPayload.length} rate updates (JSON Payload).`,
+              `[Autonomy] Hotel ${hotelId}: Queued ${ratesPayload.length} rate updates (Split into ${Math.ceil(ratesPayload.length / BATCH_SIZE)} jobs).`,
             );
           }
         }
