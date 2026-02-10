@@ -501,6 +501,7 @@ function buildRateIdMap(pmsRoomTypes, pmsRatePlans) {
 async function updateConfig(hotelId, updates) {
   const {
     sentinel_enabled,
+    is_autopilot_enabled, // [NEW] Autonomy Switch
     guardrail_max,
     rate_freeze_period,
     base_room_type_id,
@@ -586,6 +587,7 @@ async function updateConfig(hotelId, updates) {
       daily_max_rates = COALESCE($10, daily_max_rates),
       seasonality_profile = COALESCE($12, seasonality_profile),
       rules = COALESCE($13, rules),
+      is_autopilot_enabled = COALESCE($14, is_autopilot_enabled),
       updated_at = NOW()
     WHERE hotel_id = $11
     RETURNING *;
@@ -604,6 +606,7 @@ async function updateConfig(hotelId, updates) {
       hotelId,
       updates.seasonality_profile ? JSON.stringify(seasonality_profile) : null,
       updates.rules ? JSON.stringify(rules) : null,
+      is_autopilot_enabled, // [NEW] $14
     ],
   );
 
