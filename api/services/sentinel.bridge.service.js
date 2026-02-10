@@ -288,7 +288,15 @@ class SentinelBridgeService {
 
         const calendarMap = {};
         calendarRes.rows.forEach((r) => {
-          calendarMap[r.stay_date.split("T")[0]] = {
+          // [FIX] Robust Date Normalization (Handle Date obj or String)
+          let dStr;
+          if (r.stay_date instanceof Date) {
+            dStr = r.stay_date.toISOString().split("T")[0];
+          } else {
+            dStr = String(r.stay_date).split("T")[0];
+          }
+
+          calendarMap[dStr] = {
             source: r.source,
             rate: parseFloat(r.rate || 0),
           };
@@ -332,10 +340,16 @@ class SentinelBridgeService {
           if (isNaN(safeRate) || safeRate <= 0) continue;
 
           // --- DELTA CHECK (Surgical Strike) ---
-          // Only push if the price is actually different
+          // Only push if the price is actually different.
+          // We check !== undefined to ensure we have a valid DB baseline.
+          // If DB has 0 (or null converted to 0), and AI has a real price, we MUST push.
           const currentRate = currentData.rate;
-          if (currentRate && Math.abs(safeRate - currentRate) < 0.01) {
-            continue; // No change needed
+
+          if (
+            currentRate !== undefined &&
+            Math.abs(safeRate - currentRate) < 0.01
+          ) {
+            continue; // No change needed (Price is identical)
           }
 
           // ALL GATES PASSED -> Queue for PMS
