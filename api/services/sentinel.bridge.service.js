@@ -279,15 +279,19 @@ class SentinelBridgeService {
           ceilingsMap[r.stay_date.split("T")[0]] = parseFloat(r.max_price);
         });
 
-        // Fetch Conflict Locks (Gate 3 Data)
-        const locksRes = await client.query(
-          `SELECT stay_date::text, source FROM sentinel_rates_calendar
+        // Fetch Conflict Locks & Current Rates (Gate 3 & Delta Check)
+        const calendarRes = await client.query(
+          `SELECT stay_date::text, source, rate FROM sentinel_rates_calendar
            WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
           [hotelId, stayDates],
         );
-        const locksMap = {};
-        locksRes.rows.forEach((r) => {
-          locksMap[r.stay_date.split("T")[0]] = r.source;
+
+        const calendarMap = {};
+        calendarRes.rows.forEach((r) => {
+          calendarMap[r.stay_date.split("T")[0]] = {
+            source: r.source,
+            rate: parseFloat(r.rate || 0),
+          };
         });
 
         const validUpdates = [];
@@ -306,7 +310,9 @@ class SentinelBridgeService {
           }
 
           // 3b. Manual Lock (Human Override)
-          const currentSource = locksMap[dateStr];
+          const currentData = calendarMap[dateStr] || {};
+          const currentSource = currentData.source;
+
           if (currentSource === "MANUAL" || currentSource === "PMS_LOCKED") {
             continue; // Human wins
           }
@@ -324,6 +330,13 @@ class SentinelBridgeService {
 
           // 2c. Sanity Check
           if (isNaN(safeRate) || safeRate <= 0) continue;
+
+          // --- DELTA CHECK (Surgical Strike) ---
+          // Only push if the price is actually different
+          const currentRate = currentData.rate;
+          if (currentRate && Math.abs(safeRate - currentRate) < 0.01) {
+            continue; // No change needed
+          }
 
           // ALL GATES PASSED -> Queue for PMS
           validUpdates.push({
