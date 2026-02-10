@@ -359,9 +359,9 @@ class SentinelBridgeService {
               .split("T")[0];
 
             ratesPayload.push({
-              rate_id: pmsRateId,
+              rateId: pmsRateId, // [CRITICAL] Must match Cloudbeds Adapter (camelCase)
               date: dStr,
-              amount: update.price,
+              rate: update.price, // [CRITICAL] Must match Cloudbeds Adapter ('rate', not 'amount')
             });
           }
 
