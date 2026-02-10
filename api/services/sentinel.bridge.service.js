@@ -281,14 +281,15 @@ class SentinelBridgeService {
 
         // Fetch Conflict Locks & Current Rates (Gate 3 & Delta Check)
         // [FIX] Must include room_type_id in query and map key to avoid collisions
+        // [FIX] Cast room_type_id to String for robust Set creation
         const roomTypeIds = [
-          ...new Set(hotelDecisions.map((d) => d.room_type_id)),
+          ...new Set(hotelDecisions.map((d) => String(d.room_type_id))),
         ];
 
         const calendarRes = await client.query(
           `SELECT room_type_id, stay_date::text, source, rate FROM sentinel_rates_calendar
            WHERE hotel_id = $1 
-             AND room_type_id = ANY($2::int[])
+             AND room_type_id = ANY($2::text[])  -- [FIX] Cast to text[] to match DB column type
              AND stay_date = ANY($3::date[])`,
           [hotelId, roomTypeIds, stayDates],
         );
