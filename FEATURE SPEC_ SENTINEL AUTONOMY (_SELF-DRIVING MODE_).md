@@ -182,3 +182,37 @@ Objective: Debug "Heartbeat" (Cron Job)
 Issue: The logic is ready, but the AI "Pulse" (Hourly Run) didn't trigger as expected.
 
 Target: Investigate the process-queue endpoint in sentinel.router.js and the Vercel Cron configuration to ensure the system wakes up and processes the job queue automatically.
+[2026-02-10] - Sentinel Autonomy Activation & Stabilization
+🚀 Major Milestone: Sentinel Autonomy ("Self-Driving Mode") is LIVE
+Today marks the successful transition of Sentinel from a passive "Shadow Mode" advisor to an active, autonomous pricing engine. The system is now capable of calculating, validating, and pushing rate updates directly to the PMS without human intervention, protected by a robust "Defense in Depth" safety protocol.
+🔧 Key Technical Achievements:
+Activated the "Bridge" (Node.js <-> Python):
+Established a secure, automated pipeline where the Python AI (on DGX) fetches context from the Node.js backend, calculates optimal rates, and sends decisions back for execution.
+Implemented the 3-Layer Safety Protocol in sentinel.bridge.service.js:
+Permission Gate: Checks is_autopilot_enabled per hotel.
+Policy Gate: Enforces Min/Max rates and Dynamic Ceilings (94th percentile cap).
+Conflict Gate: Respects Freeze Windows and Manual Locks (Human Overrides).
+Solved the "Cloudbeds Limit" (Chunking):
+Diagnosed a critical failure where pushing 365 days of rates caused a 400 Bad Request due to Cloudbeds' 30-item limit.
+Implemented intelligent Batch Chunking in the Bridge Service, splitting massive updates into safe batches of 25 rates per job.
+Implemented "Surgical Strike" (Delta Check):
+Added logic to compare the AI's new rate against the existing rate in the database before pushing.
+Result: Drastically reduced API spam by only queuing updates where the price actually changes by a meaningful amount (> £5.00).
+Fix: Resolved a complex text = integer type mismatch in the PostgreSQL query that was causing the Delta Check to crash silently.
+Stabilized the AI Logic (Anti-Jitter):
+Identified that the AI was "flickering" prices by small amounts (e.g., £100 -> £101 -> £100) due to sensitive math.
+Enforced a £5.00 Deadband in the Node.js layer: The system now ignores any AI suggestion that differs from the live rate by less than £5, ensuring stability.
+Updated the Python Engine (on DGX) to use a 5-day window (down from 7) for the "Sell Every Room" strategy, making the desperation logic more targeted.
+🐛 Critical Fixes:
+Schema Alignment: Fixed a crash caused by the AI trying to insert into non-existent columns (room_type_id) in the sentinel_job_queue. We now correctly pack the data into the JSON payload column expected by the worker.
+UUID vs Integer Crash: Resolved a type casting error where UUID hotel IDs were being forced into Integer arrays, crashing the Bridge for specific hotels.
+Map Lookup Failure: Fixed a bug where the "Delta Check" was failing to find the current rate because of date format mismatches (Date Object vs String) and missing Room Type keys.
+📊 Current System Status:
+Autonomy: ACTIVE for pilot hotels (Lancaster Court, Studio 169).
+Efficiency: The system now pushes ~10-20 targeted updates per run instead of 400+ redundant ones.
+Safety: Rates are clamped, frozen periods are respected, and manual overrides always take precedence.
+Known Issue (Operational): "The Tudor Inn Hotel" has an invalid/expired Cloudbeds token, causing webhook errors. This requires a manual reconnect in the admin panel but does not affect the code logic.
+📌 Next Steps:
+Monitor: Watch the hourly runs for 24 hours to confirm stability.
+Reconnect Tudor Inn: Fix the expired token to stop the webhook error noise.
+Expand: Once stable, enable Autonomy for more hotels in the fleet.

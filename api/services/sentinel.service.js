@@ -638,7 +638,31 @@ module.exports = {
   copyPaceCurves,
   getSentinelStatus,
   buildRateIdMap,
+  getRecentJobBatches,
 };
+/**
+ * [NEW] Get Sentinel Status (Last Run & Activity)
+ */
+/**
+ * [NEW] Get Recent Job Batches
+ * Groups queue items by minute to show "Push Events"
+ */
+async function getRecentJobBatches(hotelId) {
+  const sql = `
+      SELECT
+          to_char(created_at, 'YYYY-MM-DD HH24:MI') as batch_key,
+          COUNT(*) as days_count,
+          MAX(created_at) as latest_timestamp
+      FROM sentinel_job_queue
+      WHERE hotel_id = $1
+      GROUP BY batch_key
+      ORDER BY latest_timestamp DESC
+      LIMIT 3
+  `;
+  const { rows } = await db.query(sql, [hotelId]);
+  return rows;
+}
+
 /**
  * [NEW] Get Sentinel Status (Last Run & Activity)
  */

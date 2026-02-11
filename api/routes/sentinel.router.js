@@ -1620,4 +1620,19 @@ router.get("/status/:hotelId", async (req, res) => {
   }
 });
 
+/**
+ * [NEW] GET /api/sentinel/recent-jobs/:hotelId
+ * Fetches the last 3 batched job pushes.
+ */
+router.get("/recent-jobs/:hotelId", async (req, res) => {
+  const { hotelId } = req.params;
+  try {
+    const data = await sentinelService.getRecentJobBatches(hotelId);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error(`[Sentinel Router] get-recent-jobs failed:`, error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

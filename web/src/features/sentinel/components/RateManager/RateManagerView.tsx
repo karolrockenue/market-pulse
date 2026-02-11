@@ -198,7 +198,7 @@ interface RateManagerViewProps {
 export function RateManagerView({ allHotels }: RateManagerViewProps) {
   // --- STATE ---
   const [selectedHotelId, setSelectedHotelId] = useState<string>(
-    () => localStorage.getItem("sentinel_last_hotel_id") || ""
+    () => localStorage.getItem("sentinel_last_hotel_id") || "",
   );
   const [sentinelConfigs, setSentinelConfigs] = useState<any[]>([]);
   const [pmsIdMap, setPmsIdMap] = useState<Record<string, string>>({});
@@ -218,6 +218,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     lastRun: string | null;
     changesLast24h: number;
   } | null>(null);
+  const [recentJobs, setRecentJobs] = useState<any[]>([]);
   const [isRunningSentinel, setIsRunningSentinel] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -259,20 +260,27 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     init();
   }, []);
 
-  // [NEW] Load Pace Curves & Status
+  // [NEW] Load Pace Curves, Status & Recent Jobs
   useEffect(() => {
     if (!selectedHotelId) return;
     const loadData = async () => {
       try {
-        const [paceRes, statusData] = await Promise.all([
+        const [paceRes, statusData, jobsRes] = await Promise.all([
           fetch(`/api/sentinel/pace-curves/${selectedHotelId}`),
           getSentinelStatus(selectedHotelId),
+          fetch(`/api/sentinel/recent-jobs/${selectedHotelId}`),
         ]);
 
         if (paceRes.ok) {
           const json = await paceRes.json();
           setPaceCurves(Array.isArray(json.data) ? json.data : []);
         }
+
+        if (jobsRes.ok) {
+          const jobs = await jobsRes.json();
+          setRecentJobs(Array.isArray(jobs) ? jobs : []);
+        }
+
         setSentinelStatus(statusData);
       } catch (err) {
         console.error("Failed to load auxiliary data", err);
@@ -314,10 +322,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
   // --- MEMOIZED HELPERS ---
   const selectedHotel = useMemo(() => {
     const cfg = sentinelConfigs.find(
-      (c) => String(c.hotel_id) === selectedHotelId
+      (c) => String(c.hotel_id) === selectedHotelId,
     );
     const details = allHotels.find(
-      (h) => String(h.hotel_id) === selectedHotelId
+      (h) => String(h.hotel_id) === selectedHotelId,
     );
     return {
       id: selectedHotelId,
@@ -346,7 +354,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     if (!paceCurves.length || !sentinelConfigs.length) return null;
 
     const config = sentinelConfigs.find(
-      (c) => String(c.hotel_id) === selectedHotelId
+      (c) => String(c.hotel_id) === selectedHotelId,
     );
     if (!config?.seasonality_profile) return null;
 
@@ -368,7 +376,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     if (tier === "medium") tier = "mid";
 
     const curve = paceCurves.find(
-      (c) => String(c.season_tier).toLowerCase() === tier
+      (c) => String(c.season_tier).toLowerCase() === tier,
     );
     if (!curve || !curve.curve_data) return null;
 
@@ -380,7 +388,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
   const getSeasonalityTier = (dateStr: string) => {
     if (!sentinelConfigs.length) return "-";
     const config = sentinelConfigs.find(
-      (c) => String(c.hotel_id) === selectedHotelId
+      (c) => String(c.hotel_id) === selectedHotelId,
     );
     if (!config?.seasonality_profile) return "-";
 
@@ -496,7 +504,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   >
                     {sentinelConfigs.map((c) => {
                       const h = allHotels.find(
-                        (ah) => ah.hotel_id === c.hotel_id
+                        (ah) => ah.hotel_id === c.hotel_id,
                       );
                       return (
                         <SelectItem key={c.hotel_id} value={String(c.hotel_id)}>
@@ -606,43 +614,91 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
             </div>
 
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              {/* Status Block */}
-              {sentinelStatus && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    marginRight: "8px",
-                  }}
-                >
+              {/* Status Block Container */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  alignItems: "center",
+                  marginRight: "8px",
+                }}
+              >
+                {/* Recent Jobs (Last 3 Pushes) */}
+                {recentJobs.length > 0 && (
                   <div
                     style={{
-                      fontSize: "10px",
-                      color: "#9ca3af",
-                      textTransform: "uppercase",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
                     }}
                   >
-                    Last AI Run
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#9ca3af",
+                        textTransform: "uppercase",
+                        marginBottom: "2px",
+                      }}
+                    >
+                      Last 3 Pushes
+                    </div>
+                    {recentJobs.map((job, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          fontSize: "11px",
+                          color: idx === 0 ? "#e5e5e5" : "#6b7280",
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        {format(new Date(job.latest_timestamp), "HH:mm dd/MM")}{" "}
+                        • {job.days_count} days
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ fontSize: "12px", color: "#e5e5e5" }}>
-                    {sentinelStatus.lastRun
-                      ? format(new Date(sentinelStatus.lastRun), "HH:mm dd/MM")
-                      : "Never"}
-                  </div>
+                )}
+
+                {/* AI Status */}
+                {sentinelStatus && (
                   <div
                     style={{
-                      fontSize: "10px",
-                      color:
-                        sentinelStatus.changesLast24h > 0
-                          ? "#39BDF8"
-                          : "#6b7280",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
                     }}
                   >
-                    {sentinelStatus.changesLast24h} updates (24h)
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#9ca3af",
+                        textTransform: "uppercase",
+                        marginBottom: "2px",
+                      }}
+                    >
+                      Last AI Run
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#e5e5e5" }}>
+                      {sentinelStatus.lastRun
+                        ? format(
+                            new Date(sentinelStatus.lastRun),
+                            "HH:mm dd/MM",
+                          )
+                        : "Never"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color:
+                          sentinelStatus.changesLast24h > 0
+                            ? "#39BDF8"
+                            : "#6b7280",
+                      }}
+                    >
+                      {sentinelStatus.changesLast24h} updates (24h)
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Run Button - Only visible if data is loaded */}
               {calendarData.length > 0 && (
@@ -734,7 +790,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("occupancy")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("occupancy")
+                            hiddenRows.has("occupancy"),
                           )}
                         >
                           {hiddenRows.has("occupancy") ? (
@@ -747,7 +803,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("curveTier")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("curveTier")
+                            hiddenRows.has("curveTier"),
                           )}
                         >
                           {hiddenRows.has("curveTier") ? (
@@ -760,7 +816,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("curveTarget")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("curveTarget")
+                            hiddenRows.has("curveTarget"),
                           )}
                         >
                           {hiddenRows.has("curveTarget") ? (
@@ -784,7 +840,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("minRate")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("minRate")
+                            hiddenRows.has("minRate"),
                           )}
                         >
                           {hiddenRows.has("minRate") ? (
@@ -797,7 +853,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("floorRate")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("floorRate")
+                            hiddenRows.has("floorRate"),
                           )}
                         >
                           {hiddenRows.has("floorRate") ? (
@@ -810,7 +866,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("pmsRates")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("pmsRates")
+                            hiddenRows.has("pmsRates"),
                           )}
                         >
                           {hiddenRows.has("pmsRates") ? (
@@ -823,7 +879,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("sellRate")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("sellRate")
+                            hiddenRows.has("sellRate"),
                           )}
                         >
                           {hiddenRows.has("sellRate") ? (
@@ -836,7 +892,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <button
                           onClick={() => toggleRow("effectiveRate")}
                           style={getToggleButtonStyle(
-                            hiddenRows.has("effectiveRate")
+                            hiddenRows.has("effectiveRate"),
                           )}
                         >
                           {hiddenRows.has("effectiveRate") ? (
@@ -866,7 +922,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                     bulkApplyAi(validDates);
                     toast.success(
-                      `Applied AI rates for ${validDates.length} days.`
+                      `Applied AI rates for ${validDates.length} days.`,
                     );
                   }}
                   variant="outline"
@@ -882,7 +938,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   Apply AI (
                   {
                     visibleData.filter(
-                      (d) => !d.isFrozen && aiPredictions[d.date]
+                      (d) => !d.isFrozen && aiPredictions[d.date],
                     ).length
                   }
                   )
@@ -894,7 +950,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                     submitChanges(
                       selectedHotelId,
                       selectedHotel.pmsPropertyId || "",
-                      selectedHotel.baseRoomTypeId || ""
+                      selectedHotel.baseRoomTypeId || "",
                     )
                   }
                   disabled={
@@ -1153,8 +1209,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   day.occupancy > 80
                                     ? "#10b981"
                                     : day.occupancy > 60
-                                    ? "#facc15"
-                                    : "#ef4444",
+                                      ? "#facc15"
+                                      : "#ef4444",
                               }}
                             >
                               {Math.round(day.occupancy)}%
@@ -1613,7 +1669,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 geniusPct,
                                 calcState,
                                 day.date,
-                                { includeTargeting: false }
+                                { includeTargeting: false },
                               );
                             }
                             return (
@@ -1684,8 +1740,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 color: isApplied
                                   ? "#10b981"
                                   : pred
-                                  ? "#39BDF8"
-                                  : "#4a4a48",
+                                    ? "#39BDF8"
+                                    : "#4a4a48",
                                 fontSize: "14px",
                                 fontWeight: 600,
                                 transition: "all 0.2s",
@@ -1694,8 +1750,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 backgroundColor: isApplied
                                   ? "rgba(16, 185, 129, 0.05)"
                                   : hoveredColumn === day.date
-                                  ? "rgba(57,189,248,0.1)"
-                                  : "transparent",
+                                    ? "rgba(57,189,248,0.1)"
+                                    : "transparent",
                               }}
                             >
                               <div
@@ -1734,7 +1790,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         // [FIX] Use Hook Function
                                         applyAiPrediction(day.date, pred.rate);
                                         toast.success(
-                                          `AI Rate £${pred.rate} applied`
+                                          `AI Rate £${pred.rate} applied`,
                                         );
                                       }
                                     }}
@@ -1822,7 +1878,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 geniusPct,
                                 calcState,
                                 day.date,
-                                { includeTargeting: false }
+                                { includeTargeting: false },
                               );
                             }
 
@@ -1846,8 +1902,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     editingEffectiveCell === day.date
                                       ? "transparent"
                                       : hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
+                                        ? "rgba(57,189,248,0.05)"
+                                        : "transparent",
                                   opacity: day.isFrozen ? 0.4 : 1,
                                   cursor: day.isFrozen
                                     ? "not-allowed"
@@ -1881,7 +1937,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                             geniusPct,
                                             calcState,
                                             day.date,
-                                            { includeTargeting: false }
+                                            { includeTargeting: false },
                                           );
 
                                         // Round to integer (no decimals) for the Override (Base)
@@ -1894,16 +1950,16 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                           roundedOverride < day.guardrailMin
                                         ) {
                                           toast.warning(
-                                            `Required Base Rate (£${roundedOverride}) is below Min (£${day.guardrailMin}). Set to Min.`
+                                            `Required Base Rate (£${roundedOverride}) is below Min (£${day.guardrailMin}). Set to Min.`,
                                           );
                                           setOverride(
                                             day.date,
-                                            day.guardrailMin
+                                            day.guardrailMin,
                                           );
                                         } else {
                                           setOverride(
                                             day.date,
-                                            roundedOverride
+                                            roundedOverride,
                                           );
                                         }
                                       } else if (e.target.value === "") {
@@ -1959,10 +2015,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   editingCell === day.date
                                     ? "transparent"
                                     : isPending
-                                    ? "rgba(250, 255, 106, 0.06)"
-                                    : hasAny
-                                    ? "rgba(229, 229, 229, 0.03)"
-                                    : "transparent",
+                                      ? "rgba(250, 255, 106, 0.06)"
+                                      : hasAny
+                                        ? "rgba(229, 229, 229, 0.03)"
+                                        : "transparent",
                                 opacity: day.isFrozen ? 0.5 : 1,
                               }}
                             >
@@ -1983,7 +2039,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         v < day.guardrailMin
                                       ) {
                                         toast.warning(
-                                          `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`
+                                          `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`,
                                         );
                                         setOverride(day.date, day.guardrailMin);
                                       } else {
@@ -2003,7 +2059,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                                       // 1. Save current value manually before switching
                                       const v = parseFloat(
-                                        e.currentTarget.value
+                                        e.currentTarget.value,
                                       );
                                       if (!isNaN(v) && v > 0) {
                                         // [NEW] Enforce Min Rate Guardrail (Tab)
@@ -2012,11 +2068,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                           v < day.guardrailMin
                                         ) {
                                           toast.warning(
-                                            `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`
+                                            `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`,
                                           );
                                           setOverride(
                                             day.date,
-                                            day.guardrailMin
+                                            day.guardrailMin,
                                           );
                                         } else {
                                           setOverride(day.date, v);
@@ -2027,7 +2083,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                                       // 2. Find and activate next cell
                                       const currIdx = visibleData.findIndex(
-                                        (d) => d.date === day.date
+                                        (d) => d.date === day.date,
                                       );
                                       if (
                                         currIdx !== -1 &&

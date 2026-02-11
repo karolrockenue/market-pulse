@@ -1071,6 +1071,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                   hasSeasonality &&
                   hasMinRates;
 
+                const isAutopilot =
+                  formState[hotel.hotel_id]?.is_autopilot_enabled ??
+                  hotel.config?.is_autopilot_enabled ??
+                  false;
+
+                const strategyMode =
+                  formState[hotel.hotel_id]?.rules?.strategy_mode ??
+                  hotel.config?.rules?.strategy_mode ??
+                  "maintain";
+
                 return (
                   <AccordionItem
                     key={hotel.hotel_id}
@@ -1111,51 +1121,82 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       <div
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "1fr auto auto auto", // [FIXED] Added 4th column
+                          gridTemplateColumns: "1fr 190px 140px 120px auto",
                           gap: "1.5rem",
                           width: "100%",
                           paddingRight: "1rem",
                           alignItems: "center",
                         }}
                       >
-                        {/* Name */}
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "1rem",
+                            gap: "1.5rem",
                           }}
                         >
-                          <span style={{ color: "#e5e5e5" }}>
+                          <span style={{ color: "#e5e5e5", fontWeight: 500 }}>
                             {hotel.property_name} ({hotel.hotel_id})
                           </span>
                         </div>
 
-                        {/* [MOVED] AI Ready Badge (Now First) */}
+                        <div style={{ marginRight: "50px" }}>
+                          <Badge
+                            variant="outline"
+                            style={
+                              isAutopilot
+                                ? {
+                                    backgroundColor: "rgba(239, 68, 68, 0.15)",
+                                    color: "#ef4444",
+                                    borderColor: "#ef4444",
+                                    whiteSpace: "nowrap",
+                                    fontWeight: "bold",
+                                    boxShadow:
+                                      "0 0 12px rgba(239, 68, 68, 0.4)",
+                                    width: "100%",
+                                    justifyContent: "center",
+                                  }
+                                : {
+                                    backgroundColor: "rgba(74, 74, 72, 0.1)",
+                                    color: "#6b7280",
+                                    borderColor: "rgba(74, 74, 72, 0.3)",
+                                    whiteSpace: "nowrap",
+                                    width: "100%",
+                                    justifyContent: "center",
+                                  }
+                            }
+                          >
+                            {isAutopilot ? "AUTOPILOT ON" : "Autopilot Off"}
+                          </Badge>
+                        </div>
+
                         <Badge
                           variant="outline"
                           style={
-                            isAiReady
+                            strategyMode === "sell_every_room"
                               ? {
-                                  backgroundColor: "rgba(250, 255, 106, 0.1)",
-                                  color: "#faff6a",
-                                  borderColor: "rgba(250, 255, 106, 0.5)",
+                                  backgroundColor: "rgba(147, 51, 234, 0.1)",
+                                  color: "#c084fc",
+                                  borderColor: "rgba(147, 51, 234, 0.5)",
                                   whiteSpace: "nowrap",
-                                  boxShadow:
-                                    "0 0 10px rgba(250, 255, 106, 0.2)",
+                                  width: "100%",
+                                  justifyContent: "center",
                                 }
                               : {
-                                  backgroundColor: "#2a2a2a",
-                                  color: "#6b7280",
-                                  borderColor: "#404040",
+                                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                  color: "#fbbf24",
+                                  borderColor: "rgba(245, 158, 11, 0.5)",
                                   whiteSpace: "nowrap",
+                                  width: "100%",
+                                  justifyContent: "center",
                                 }
                           }
                         >
-                          {isAiReady ? "AI READY" : "AI READY"}
+                          {strategyMode === "sell_every_room"
+                            ? "Sell Every Room"
+                            : "Maintain"}
                         </Badge>
 
-                        {/* Status Badge */}
                         <Badge
                           variant="outline"
                           style={
@@ -1165,12 +1206,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   color: "#10b981",
                                   borderColor: "rgba(16, 185, 129, 0.3)",
                                   whiteSpace: "nowrap",
+                                  width: "100%",
+                                  justifyContent: "center",
                                 }
                               : {
                                   backgroundColor: "rgba(250, 255, 106, 0.1)",
                                   color: "#faff6a",
                                   borderColor: "rgba(250, 255, 106, 0.3)",
                                   whiteSpace: "nowrap",
+                                  width: "100%",
+                                  justifyContent: "center",
                                 }
                           }
                         >
@@ -1178,137 +1223,167 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           {hotel.config?.sentinel_enabled ? "Active" : "Paused"}
                         </Badge>
 
-                        {/* Icon Badges */}
-
-                        {/* Icon Badges */}
-
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "0.5rem",
+                            gap: "1.5rem",
+                            borderLeft: "1px solid #2a2a2a",
+                            paddingLeft: "1.5rem",
                           }}
                         >
-                          <Badge
-                            variant="outline"
-                            style={
-                              hotel.status?.hasFloorRate
-                                ? {
-                                    backgroundColor: "rgba(57, 189, 248, 0.1)",
-                                    color: "#39BDF8",
-                                    borderColor: "rgba(57, 189, 248, 0.3)",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                    color: "#ef4444",
-                                    borderColor: "rgba(239, 68, 68, 0.3)",
-                                  }
-                            }
-                          >
-                            Floor Rate
-                          </Badge>
+                          {/* OPTIONALS */}
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <Badge
+                              variant="outline"
+                              style={
+                                hotel.status?.hasFloorRate
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(57, 189, 248, 0.1)",
+                                      color: "#39BDF8",
+                                      borderColor: "rgba(57, 189, 248, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(74, 74, 72, 0.1)",
+                                      color: "#6b7280",
+                                      borderColor: "rgba(74, 74, 72, 0.3)",
+                                    }
+                              }
+                            >
+                              Last-Min Floor
+                            </Badge>
 
-                          <Badge
-                            variant="outline"
-                            style={
-                              hotel.status?.hasRateFreeze
-                                ? {
-                                    backgroundColor: "rgba(245, 158, 11, 0.1)",
-                                    color: "#f59e0b",
-                                    borderColor: "rgba(245, 158, 11, 0.3)",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                    color: "#6b7280",
-                                    borderColor: "rgba(74, 74, 72, 0.3)",
-                                  }
-                            }
-                          >
-                            Freeze
-                          </Badge>
+                            <Badge
+                              variant="outline"
+                              style={
+                                hotel.status?.hasRateFreeze
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(245, 158, 11, 0.1)",
+                                      color: "#f59e0b",
+                                      borderColor: "rgba(245, 158, 11, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(74, 74, 72, 0.1)",
+                                      color: "#6b7280",
+                                      borderColor: "rgba(74, 74, 72, 0.3)",
+                                    }
+                              }
+                            >
+                              Freeze
+                            </Badge>
+                          </div>
 
-                          <Badge
-                            variant="outline"
-                            style={
-                              hasMaxRatesByHotelId[String(hotel.hotel_id)]
-                                ? {
-                                    backgroundColor: "rgba(57, 189, 248, 0.1)",
-                                    color: "#39BDF8",
-                                    borderColor: "rgba(57, 189, 248, 0.3)",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                    color: "#ef4444",
-                                    borderColor: "rgba(239, 68, 68, 0.3)",
-                                  }
-                            }
+                          {/* MUSTS */}
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "0.5rem",
+                              borderLeft: "1px solid #2a2a2a",
+                              paddingLeft: "1.5rem",
+                            }}
                           >
-                            Max Rates
-                          </Badge>
+                            <Badge
+                              variant="outline"
+                              style={
+                                hasMinRates
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(57, 189, 248, 0.1)",
+                                      color: "#39BDF8",
+                                      borderColor: "rgba(57, 189, 248, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      color: "#ef4444",
+                                      borderColor: "rgba(239, 68, 68, 0.3)",
+                                    }
+                              }
+                            >
+                              MIN
+                            </Badge>
 
-                          <Badge
-                            variant="outline"
-                            style={
-                              hasCurvesByHotelId[String(hotel.hotel_id)]
-                                ? {
-                                    backgroundColor: "rgba(57, 189, 248, 0.1)",
-                                    color: "#39BDF8",
-                                    borderColor: "rgba(57, 189, 248, 0.3)",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                    color: "#6b7280",
-                                    borderColor: "rgba(74, 74, 72, 0.3)",
-                                  }
-                            }
-                          >
-                            Curves
-                          </Badge>
+                            <Badge
+                              variant="outline"
+                              style={
+                                hasMaxRates
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(57, 189, 248, 0.1)",
+                                      color: "#39BDF8",
+                                      borderColor: "rgba(57, 189, 248, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      color: "#ef4444",
+                                      borderColor: "rgba(239, 68, 68, 0.3)",
+                                    }
+                              }
+                            >
+                              MAX
+                            </Badge>
 
-                          <Badge
-                            variant="outline"
-                            style={
-                              hotel.status?.hasDifferentials
-                                ? {
-                                    backgroundColor: "rgba(57, 189, 248, 0.1)",
-                                    color: "#39BDF8",
-                                    borderColor: "rgba(57, 189, 248, 0.3)",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                    color: "#6b7280",
-                                    borderColor: "rgba(74, 74, 72, 0.3)",
-                                  }
-                            }
-                          >
-                            Differentials
-                          </Badge>
+                            <Badge
+                              variant="outline"
+                              style={
+                                hasCurves
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(57, 189, 248, 0.1)",
+                                      color: "#39BDF8",
+                                      borderColor: "rgba(57, 189, 248, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      color: "#ef4444",
+                                      borderColor: "rgba(239, 68, 68, 0.3)",
+                                    }
+                              }
+                            >
+                              Curves
+                            </Badge>
 
-                          <Badge
-                            variant="outline"
-                            style={
-                              (formState[hotel.hotel_id]?.seasonality_profile ??
-                                hotel.config?.seasonality_profile) &&
-                              Object.keys(
-                                formState[hotel.hotel_id]
-                                  ?.seasonality_profile ??
-                                  hotel.config?.seasonality_profile ??
-                                  {},
-                              ).length === 12
-                                ? {
-                                    backgroundColor: "rgba(99, 102, 241, 0.1)", // Indigo
-                                    color: "#818cf8",
-                                    borderColor: "rgba(99, 102, 241, 0.3)",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                    color: "#6b7280",
-                                    borderColor: "rgba(74, 74, 72, 0.3)",
-                                  }
-                            }
-                          >
-                            Seasonality
-                          </Badge>
+                            <Badge
+                              variant="outline"
+                              style={
+                                hasSeasonality
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(57, 189, 248, 0.1)",
+                                      color: "#39BDF8",
+                                      borderColor: "rgba(57, 189, 248, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      color: "#ef4444",
+                                      borderColor: "rgba(239, 68, 68, 0.3)",
+                                    }
+                              }
+                            >
+                              Seasonality
+                            </Badge>
+
+                            <Badge
+                              variant="outline"
+                              style={
+                                hasDifferentials
+                                  ? {
+                                      backgroundColor:
+                                        "rgba(57, 189, 248, 0.1)",
+                                      color: "#39BDF8",
+                                      borderColor: "rgba(57, 189, 248, 0.3)",
+                                    }
+                                  : {
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      color: "#ef4444",
+                                      borderColor: "rgba(239, 68, 68, 0.3)",
+                                    }
+                              }
+                            >
+                              Differentials
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                     </AccordionTrigger>
@@ -1445,32 +1520,75 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         style={{
                                           width: "14px",
                                           height: "14px",
-                                          color: "#ef4444",
+                                          color: isAiReady
+                                            ? "#ef4444"
+                                            : "#f59e0b",
                                         }}
                                       />
                                     </TooltipTrigger>
                                     <TooltipContent
                                       style={{
                                         backgroundColor: "#1a1a1a",
-                                        borderColor: "#ef4444",
+                                        borderColor: isAiReady
+                                          ? "#ef4444"
+                                          : "#f59e0b",
                                       }}
                                     >
-                                      <p
-                                        style={{
-                                          fontSize: "11px",
-                                          color: "#ef4444",
-                                        }}
-                                      >
-                                        WARNING: Enabling this allows Sentinel
-                                        to update live rates in the PMS without
-                                        manual approval.
-                                      </p>
+                                      {isAiReady ? (
+                                        <p
+                                          style={{
+                                            fontSize: "11px",
+                                            color: "#ef4444",
+                                          }}
+                                        >
+                                          WARNING: Enabling this allows Sentinel
+                                          to update live rates in the PMS
+                                          without manual approval.
+                                        </p>
+                                      ) : (
+                                        <div
+                                          style={{
+                                            fontSize: "11px",
+                                            color: "#f59e0b",
+                                          }}
+                                        >
+                                          <p
+                                            style={{
+                                              fontWeight: 600,
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            Autopilot Locked. Missing:
+                                          </p>
+                                          <ul
+                                            style={{
+                                              paddingLeft: "12px",
+                                              margin: 0,
+                                            }}
+                                          >
+                                            {!hasSeasonality && (
+                                              <li>Seasonality Profile</li>
+                                            )}
+                                            {!hasMinRates && (
+                                              <li>Monthly Min Rates</li>
+                                            )}
+                                            {!hasMaxRates && (
+                                              <li>Daily Max Rates</li>
+                                            )}
+                                            {!hasCurves && <li>Pace Curves</li>}
+                                            {!hasDifferentials && (
+                                              <li>Room Differentials</li>
+                                            )}
+                                          </ul>
+                                        </div>
+                                      )}
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               </div>
                               <Switch
                                 id={`autopilot-status-${hotel.hotel_id}`}
+                                disabled={!isAiReady}
                                 // [FIX] Robust check: Look at Form State -> Then Config -> Then False
                                 checked={
                                   formState[hotel.hotel_id]
