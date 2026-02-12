@@ -94,34 +94,24 @@ class SentinelBridgeService {
       // -----------------------------------------------------
 
       console.time("Step 5 Velocity");
-      // Step 5: Velocity (24h and 48h for Momentum Validation)
+      // Step 5: Velocity
       const velocityRes = await client.query(
         `
         WITH latest_snapshot AS (
             SELECT MAX(snapshot_date) as s_date 
             FROM pacing_snapshots 
             WHERE hotel_id = $1 AND snapshot_date < CURRENT_DATE
-        ),
-        snapshot_48h AS (
-            SELECT MAX(snapshot_date) as s_date 
-            FROM pacing_snapshots 
-            WHERE hotel_id = $1 AND snapshot_date < (CURRENT_DATE - INTERVAL '1 day')
         )
         SELECT DISTINCT ON (live.stay_date::date)
             live.stay_date::date as stay_date,
             live.rooms_sold,
             live.capacity_count as capacity,
-            (live.rooms_sold - COALESCE(hist.rooms_sold, 0)) as pickup_24h,
-            (live.rooms_sold - COALESCE(hist48.rooms_sold, 0)) as pickup_48h
+            (live.rooms_sold - COALESCE(hist.rooms_sold, 0)) as pickup_24h
         FROM daily_metrics_snapshots live
         LEFT JOIN pacing_snapshots hist 
             ON live.hotel_id = hist.hotel_id 
             AND live.stay_date::date = hist.stay_date::date
             AND hist.snapshot_date = (SELECT s_date FROM latest_snapshot)
-        LEFT JOIN pacing_snapshots hist48
-            ON live.hotel_id = hist48.hotel_id 
-            AND live.stay_date::date = hist48.stay_date::date
-            AND hist48.snapshot_date = (SELECT s_date FROM snapshot_48h)
         WHERE live.hotel_id = $1 
           AND live.stay_date::date >= CURRENT_DATE
         ORDER BY live.stay_date::date ASC, live.snapshot_id DESC
