@@ -431,7 +431,7 @@ class SentinelBridgeService {
                 JSON.stringify(chunkPayload),
               ]);
             }
-            // --- NEW: Mark Decisions as Applied, Log to History, AND Update Calendar Source ---
+            // --- Mark Decisions as Applied, Log to History, AND Update Calendar Source ---
             for (const update of validUpdates) {
               // 1. Mark as Applied in Predictions
               await client.query(
@@ -441,17 +441,17 @@ class SentinelBridgeService {
                 [hotelId, update.start_date],
               );
 
-              // 2. Log to Price History (so Stopwatch/Velocity work)
+              // 2. Log to Price History (Unify as SENTINEL)
               await client.query(
                 `INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
-                 VALUES ($1, $2, $3, (SELECT rate FROM sentinel_rates_calendar WHERE hotel_id = $1 AND stay_date = $3 LIMIT 1), $4, 'AI_AUTO', NOW())`,
+                 VALUES ($1, $2, $3, (SELECT rate FROM sentinel_rates_calendar WHERE hotel_id = $1 AND stay_date = $3 LIMIT 1), $4, 'SENTINEL', NOW())`,
                 [hotelId, update.room_type_id, update.start_date, update.price],
               );
 
-              // 3. Update the Live Calendar Source so the UI shows "Sentinel AI"
+              // 3. Update the Live Calendar Source (Unify as SENTINEL)
               await client.query(
                 `UPDATE sentinel_rates_calendar 
-                 SET source = 'AI_AUTO', last_updated_at = NOW()
+                 SET source = 'SENTINEL', last_updated_at = NOW()
                  WHERE hotel_id = $1 AND stay_date = $2 AND room_type_id = $3`,
                 [hotelId, update.start_date, String(update.room_type_id)],
               );

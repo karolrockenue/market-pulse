@@ -1055,26 +1055,33 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       >
                         <td style={styles.tdSticky}>AI Status</td>
                         {visibleData.map((day) => {
-                          let text = "AI",
+                          let text = "SENTINEL",
                             color = "#39BDF8";
+
+                          const currentSource = (
+                            day.source || ""
+                          ).toUpperCase();
+
                           if (day.isFrozen) {
                             text = "FROZEN";
                             color = "#f59e0b";
                           } else if (pendingOverrides[day.date]) {
-                            // [UPDATED] Check if this pending override was an AI Approval
-                            if (aiApprovedPending.has(day.date)) {
-                              text = "AI SUGGESTED";
-                            } else {
-                              text = "PENDING";
-                            }
-                            color = "#faff6a";
-                          } else if (day.source === "AI_SUGGESTED") {
-                            // [UPDATED] Check if the SAVED override was AI
-                            text = "AI SUGGESTED";
-                            color = "#faff6a";
+                            text = aiApprovedPending.has(day.date)
+                              ? "SENTINEL"
+                              : "PENDING";
+                            color = aiApprovedPending.has(day.date)
+                              ? "#39BDF8"
+                              : "#faff6a";
+                          } else if (
+                            currentSource === "SENTINEL" ||
+                            currentSource === "AI_AUTO" ||
+                            currentSource === "AI_SUGGESTED"
+                          ) {
+                            text = "SENTINEL";
+                            color = "#39BDF8";
                           } else if (
                             savedOverrides[day.date] ||
-                            day.source === "Manual"
+                            currentSource === "MANUAL"
                           ) {
                             text = "MANUAL";
                             color = "#9ca3af";

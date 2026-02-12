@@ -417,7 +417,11 @@ async function previewCalendar({
       isFrozen: guardrailResult.isFrozen,
       isFloorActive: guardrailResult.isFloorActive,
       guardrailMin: guardrailResult.minApplied,
-      source: isManual ? "Manual" : guardrailResult.isFrozen ? "Frozen" : "AI",
+      source: isManual
+        ? "MANUAL"
+        : guardrailResult.isFrozen
+          ? "Frozen"
+          : dbEntry?.source || "SENTINEL",
     });
 
     // [CRITICAL FIX] Use UTC setters to avoid DST "Spring Forward" loops (23h days)
