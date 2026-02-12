@@ -412,8 +412,8 @@ async function previewCalendar({
     days.push({
       date: dateStr,
       liveRate: liveRate,
-      suggestedRate: suggestedRate, // Raw AI calculation
-      finalRate: finalRate, // Effective Rate (after guardrails/manual)
+      suggestedRate: suggestedRate,
+      finalRate: finalRate,
       isFrozen: guardrailResult.isFrozen,
       isFloorActive: guardrailResult.isFloorActive,
       guardrailMin: guardrailResult.minApplied,

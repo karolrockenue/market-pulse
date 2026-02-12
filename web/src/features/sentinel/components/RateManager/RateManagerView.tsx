@@ -1079,6 +1079,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           ) {
                             text = "SENTINEL";
                             color = "#39BDF8";
+                          } else if (currentSource === "SYNC") {
+                            text = "SYNC";
+                            color = "#6b7280";
                           } else if (
                             savedOverrides[day.date] ||
                             currentSource === "MANUAL"

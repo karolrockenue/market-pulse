@@ -215,3 +215,76 @@ Check Public URL tailscale funnel status
   - **Decision:** We explicitly chose **NOT** to use Git on the DGX server for now. The code is managed via direct editing (Cursor SSH).
   - **Action:** Removed `daily_update.sh` and the corresponding cron job to prevent errors.
 - **Schedule Update:** Increased Sentinel Run frequency to **Hourly** (`0 * * * *`) to capture rapid market changes.
+
+### [2026-02-12] - Navigator v5 Deployment (The "Bible" Update)
+
+- **Navigator v5 (Projection Logic):** Transitioned from "Snapshot" to "Horizon" view. Logic now uses `Current_Occupancy + (Velocity * Days_Remaining)` to predict sell-outs.
+- **Saturday Strength:** Implemented 50% Anchor (Mid-Season) for all Fridays/Saturdays, even in Low Season, to prevent "Panic Drops" on weekends.
+- **Asymmetric Aggression:**
+  - **Low Season:** Decisive Down (1.5x) / Gentle Up (0.5x).
+  - **High Season:** Stubborn Down (0.5x) / Aggressive Up (1.5x).
+- **LMF Sequence Fix:** Moved Last-Minute Floor check to the top of the engine so the "Slider" math recognizes the lower floor.
+- **Source Hierarchy & Locks:**
+  - **MANUAL:** Set via Market Pulse UI. **AI is forbidden from touching this.**
+  - **SYNC:** Set when price changes in Cloudbeds. **AI is allowed to override this.**
+  - **SENTINEL:** Set when AI moves a price. **AI is allowed to override this.**
+- **Memory Restoration:** Fixed a "Paperwork Bug" where the Bridge was pushing rates but failing to log them to `sentinel_price_history`.
+
+## **6.0 DEBUGGING & DATA INTEGRITY**
+
+### **6.1 Self-Healing Authentication**
+
+- **Issue:** Occasional `invalid_request` errors during Cloudbeds token refresh.
+- **Cause:** High concurrency. When 33 hotels are processed hourly, multiple processes may attempt to refresh the same token simultaneously, causing Cloudbeds to invalidate the session.
+- **Protocol:** These errors are usually transient. If a run fails, the system typically self-heals in the next hourly cycle. Manual re-authentication is only required if failures persist for > 3 consecutive hours.
+
+## **7.0 SCHEMA SOURCE OF TRUTH**
+
+_AI Agents must use these exact column names for all SQL queries._
+
+### **7.1 sentinel_configurations (The Rules)**
+
+- `hotel_id` (int), `monthly_min_rates` (jsonb), `last_minute_floor` (jsonb), `seasonality_profile` (jsonb), `rules` (jsonb), `is_autopilot_enabled` (bool), `rate_id_map` (jsonb).
+
+### **7.2 sentinel_ai_predictions (The Brain)**
+
+- `hotel_id` (int), `stay_date` (date), `suggested_rate` (numeric), `reasoning` (text), `is_applied` (bool), `created_at` (timestamp).
+
+### **7.3 sentinel_rates_calendar (The Production Grid)**
+
+- `hotel_id` (int), `stay_date` (date), `rate` (numeric), `source` (text), `last_updated_at` (timestamptz).
+- **Valid Sources:** `MANUAL`, `SYNC`, `SENTINEL`.
+
+### **7.4 sentinel_price_history (The Memory)**
+
+- `hotel_id` (int), `stay_date` (date), `old_price` (numeric), `new_price` (numeric), `source` (varchar), `created_at` (timestamp).
+
+### **7.5 sentinel_job_queue (The Hand)**
+
+- `hotel_id` (int), `payload` (jsonb), `status` (text), `last_error` (text), `created_at` (timestamptz).
+
+## **8.0 STANDARD DEBUG PROTOCOL**
+
+### **8.1 "Why did the AI pick this price?"**
+
+```sql
+SELECT stay_date, suggested_rate, reasoning, is_applied, created_at
+FROM sentinel_ai_predictions
+WHERE hotel_id = {{ID}} AND stay_date = '{{DATE}}'
+ORDER BY created_at DESC LIMIT 5;
+```
+
+8.2 "Show me the last 5 updates sent to the PMS"
+code
+SQL
+SELECT created_at, status, last_error,
+(SELECT x.rate FROM jsonb_to_recordset(payload->'rates') AS x(date text, rate float) WHERE x.date = '{{DATE}}' LIMIT 1) as rate_sent
+FROM sentinel_job_queue
+WHERE hotel_id = {{ID}} AND payload->'rates' @> '[{"date": "{{DATE}}"}]'
+ORDER BY created_at DESC LIMIT 5;
+8.3 "Who owns this date right now?"
+code
+SQL
+SELECT stay_date, rate, source, last_updated_at
+FROM sentinel_rates_calendar
+WHERE hotel_id = {{ID}} AND stay_date = '{{DATE}}';

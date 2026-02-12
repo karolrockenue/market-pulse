@@ -1068,7 +1068,7 @@ router.post("/sync", async (req, res) => {
                DO UPDATE SET 
                  source = CASE 
                    WHEN sentinel_rates_calendar.rate = EXCLUDED.rate THEN sentinel_rates_calendar.source 
-                   ELSE 'MANUAL' 
+                   ELSE 'SYNC' 
                  END,
                  rate = EXCLUDED.rate, 
                  last_updated_at = NOW()
