@@ -1065,7 +1065,13 @@ router.post("/sync", async (req, res) => {
                INSERT INTO sentinel_rates_calendar (hotel_id, room_type_id, stay_date, rate, source, last_updated_at)
                VALUES ${rateValues.join(", ")}
                ON CONFLICT (hotel_id, room_type_id, stay_date) 
-               DO UPDATE SET rate = EXCLUDED.rate, source = 'SYNC', last_updated_at = NOW()
+               DO UPDATE SET 
+                 source = CASE 
+                   WHEN sentinel_rates_calendar.rate = EXCLUDED.rate THEN sentinel_rates_calendar.source 
+                   ELSE 'MANUAL' 
+                 END,
+                 rate = EXCLUDED.rate, 
+                 last_updated_at = NOW()
             `;
             await db.query(queryText, rateParams);
             console.log(
