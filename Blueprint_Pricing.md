@@ -288,3 +288,29 @@ SQL
 SELECT stay_date, rate, source, last_updated_at
 FROM sentinel_rates_calendar
 WHERE hotel_id = {{ID}} AND stay_date = '{{DATE}}';
+
+Changelog Entry: Navigator v5 - Base Loading & Hard Floor Enforcement
+Date: 2026-02-12
+Status: Logic Specification (Pending Competent Implementation)
+Module: sentinel_live.py (Pricing Engine) & sentinel.bridge.service.js (Context Layer)
+
+1. The Problem: Velocity Hallucination in Low Season
+   The existing logic (v4) was too "mathematically optimistic." In Low Season, a single booking far in advance caused the Projection Engine to hallucinate a 100%+ sell-out. This triggered aggressive price hikes (Yielding Up) while the hotel was still in a Deep Deficit (e.g., -53% behind the target Delta). The system was attempting to yield profit before it had secured the "Base Load" (minimum occupancy).
+2. The Solution: The 3-Zone Safety Protocol
+   To prevent premature yielding, the engine must transition to a Zone-Based Navigator that prioritizes volume until the target path is secured.
+   Zone A: Deep Deficit (The Anchor)
+   Condition: Current_Occupancy is >20% behind Target_Occupancy.
+   Logic: Hard-Lock to Floor. The AI is strictly forbidden from raising rates. Priority is 100% volume recovery.
+   Zone B: Momentum Zone (The Probe)
+   Condition: Current_Occupancy is behind but within 10% of Target_Occupancy AND 48h_Velocity is strong (>5% of capacity).
+   Logic: The Nudge. Allow a conservative "probe" increase (e.g., 20% of the suggested hike) to test market elasticity without killing momentum.
+   Zone C: On-Target (The Navigator)
+   Condition: Current_Occupancy >= Target_Occupancy.
+   Logic: Standard Yielding. Full Navigator logic applies to maximize ADR now that the base is loaded.
+3. Critical Constraints (The "Holy Lines")
+   Hard Floor Enforcement: The effective_min (Floor) is an absolute wall. No "Fire Sale," "Desperation," or "Sell Every Room" logic is permitted to calculate a rate below this value. Any logic resulting in Rate < Floor must be discarded and replaced with Rate = Floor.
+   Momentum Validation: Velocity checks must use a 48-hour window (requires Bridge SQL update) to ensure "Momentum" is a consistent trend and not a single-booking fluke.
+   Noise Filter: Maintain the £5.00 minimum change threshold to prevent micro-jitter in the PMS.
+4. Required Infrastructure Changes
+   Bridge Service: Update getHotelContext to join pacing_snapshots twice to calculate pickup_48h.
+   Engine: Implement occ_deficit as the primary gatekeeper for the calculate_optimal_rate decision fork.

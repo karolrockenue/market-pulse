@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Copy, Zap, Download, Loader2, Percent } from "lucide-react";
-
+import { Calendar, Copy, Zap, Download, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -117,24 +116,6 @@ export function DailyMaxRatesDialog({
     setRates((prev) => ({ ...prev, ...newRates }));
   };
 
-  const handleApplyModifier = (monthId: number, percentage: number) => {
-    const days = getDaysInMonth(monthId);
-    setRates((prev) => {
-      const next = { ...prev };
-      let hasChanges = false;
-      days.forEach((day) => {
-        const key = `${monthId}-${day}`;
-        const currentVal = parseFloat(next[key]);
-        if (!isNaN(currentVal)) {
-          const newVal = Math.round(currentVal * (1 + percentage / 100));
-          next[key] = newVal.toString();
-          hasChanges = true;
-        }
-      });
-      return hasChanges ? next : prev;
-    });
-  };
-
   const handleAdvancedBulkUpdate = () => {
     if (!bulkRate || selectedDays.length === 0 || selectedMonths.length === 0) {
       return;
@@ -164,7 +145,7 @@ export function DailyMaxRatesDialog({
 
   const toggleDay = (dayId: number) => {
     setSelectedDays((prev) =>
-      prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId],
+      prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId]
     );
   };
 
@@ -172,7 +153,7 @@ export function DailyMaxRatesDialog({
     setSelectedMonths((prev) =>
       prev.includes(monthId)
         ? prev.filter((m) => m !== monthId)
-        : [...prev, monthId],
+        : [...prev, monthId]
     );
   };
 
@@ -765,8 +746,6 @@ export function DailyMaxRatesDialog({
                   >
                     {month.name}
                   </div>
-
-                  {/* Fill All Section */}
                   <div
                     style={{
                       display: "flex",
@@ -781,7 +760,7 @@ export function DailyMaxRatesDialog({
                         fontWeight: "500",
                       }}
                     >
-                      Set:
+                      Fill All:
                     </span>
                     <input
                       type="number"
@@ -792,8 +771,8 @@ export function DailyMaxRatesDialog({
                         border: "1px solid #2a2a2a",
                         color: "#e5e5e5",
                         fontSize: "12px",
-                        height: "28px",
-                        width: "70px",
+                        height: "32px",
+                        width: "96px",
                         padding: "0 8px",
                         borderRadius: "6px",
                         outline: "none",
@@ -808,22 +787,23 @@ export function DailyMaxRatesDialog({
                     />
                     <button
                       onClick={(e) => {
+                        // [FIX] Prevent form submission bubbles and safe element lookup
                         e.preventDefault();
                         const input = document.getElementById(
-                          `bulk-${monthIdx}`,
+                          `bulk-${monthIdx}`
                         ) as HTMLInputElement;
                         if (input && input.value) {
                           handleBulkSet(monthIdx, input.value);
                         }
                       }}
                       style={{
-                        height: "28px",
-                        padding: "0 10px",
+                        height: "32px",
+                        padding: "0 12px",
                         color: "#9ca3af",
                         fontSize: "12px",
                         fontWeight: "500",
-                        backgroundColor: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        backgroundColor: "transparent",
+                        border: "none",
                         cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
@@ -833,108 +813,16 @@ export function DailyMaxRatesDialog({
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.color = "#39BDF8";
-                        e.currentTarget.style.borderColor =
-                          "rgba(57, 189, 248, 0.3)";
+                        e.currentTarget.style.backgroundColor =
+                          "rgba(57, 189, 248, 0.1)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.color = "#9ca3af";
-                        e.currentTarget.style.borderColor =
-                          "rgba(255, 255, 255, 0.1)";
+                        e.currentTarget.style.backgroundColor = "transparent";
                       }}
                     >
                       <Copy style={{ width: "12px", height: "12px" }} />
-                    </button>
-                  </div>
-
-                  {/* Divider */}
-                  <div
-                    style={{
-                      width: "1px",
-                      height: "20px",
-                      backgroundColor: "#2a2a2a",
-                    }}
-                  />
-
-                  {/* Modifier Section */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "#9ca3af",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                      }}
-                    >
-                      Mod %:
-                    </span>
-                    <input
-                      type="number"
-                      placeholder="+10"
-                      id={`mod-${monthIdx}`}
-                      style={{
-                        backgroundColor: "#141414",
-                        border: "1px solid #2a2a2a",
-                        color: "#e5e5e5",
-                        fontSize: "12px",
-                        height: "28px",
-                        width: "60px",
-                        padding: "0 8px",
-                        borderRadius: "6px",
-                        outline: "none",
-                      }}
-                      onFocus={(e) =>
-                        (e.currentTarget.style.borderColor =
-                          "rgba(16, 185, 129, 0.5)")
-                      }
-                      onBlur={(e) =>
-                        (e.currentTarget.style.borderColor = "#2a2a2a")
-                      }
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        const input = document.getElementById(
-                          `mod-${monthIdx}`,
-                        ) as HTMLInputElement;
-                        if (input && input.value) {
-                          handleApplyModifier(
-                            monthIdx,
-                            parseFloat(input.value),
-                          );
-                        }
-                      }}
-                      style={{
-                        height: "28px",
-                        padding: "0 10px",
-                        color: "#9ca3af",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        backgroundColor: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        borderRadius: "6px",
-                        transition: "all 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "#10b981";
-                        e.currentTarget.style.borderColor =
-                          "rgba(16, 185, 129, 0.3)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "#9ca3af";
-                        e.currentTarget.style.borderColor =
-                          "rgba(255, 255, 255, 0.1)";
-                      }}
-                    >
-                      <Percent style={{ width: "12px", height: "12px" }} />
+                      Apply
                     </button>
                   </div>
                 </div>
@@ -945,7 +833,7 @@ export function DailyMaxRatesDialog({
                     {getDaysInMonth(monthIdx).map((day) => {
                       const dayOfWeek = getDayOfWeek(2025, monthIdx, day);
                       const dayName = daysOfWeek.find(
-                        (d) => d.id === dayOfWeek,
+                        (d) => d.id === dayOfWeek
                       )?.short;
                       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
