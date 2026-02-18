@@ -483,6 +483,7 @@ class SentinelBridgeService {
                 [hIds, rIds, dates, prices],
               );
             }
+            c;
 
             totalQueued += ratesPayload.length;
             console.log(

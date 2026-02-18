@@ -1591,16 +1591,23 @@ router.delete("/notifications/:id", async (req, res) => {
 
 /**
  * [NEW] GET /api/sentinel/predictions/:hotelId
- * Fetches "Shadow Mode" AI predictions (not yet applied) for the grid.
+ * Fetches the LATEST AI predictions for the grid (Applied OR Pending).
+ * Uses DISTINCT ON to ensure we only see the most recent thought for each day.
  */
 router.get("/predictions/:hotelId", async (req, res) => {
   const { hotelId } = req.params;
   try {
     const { rows } = await db.query(
-      `SELECT room_type_id, stay_date, suggested_rate, confidence_score 
+      `SELECT DISTINCT ON (stay_date) 
+          room_type_id, 
+          stay_date, 
+          suggested_rate, 
+          confidence_score,
+          is_applied
        FROM sentinel_ai_predictions 
-       WHERE hotel_id = $1 AND is_applied = FALSE
-       ORDER BY stay_date ASC`,
+       WHERE hotel_id = $1 
+         AND stay_date >= CURRENT_DATE
+       ORDER BY stay_date ASC, created_at DESC`,
       [hotelId],
     );
 
@@ -1610,7 +1617,6 @@ router.get("/predictions/:hotelId", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
 /**
  * [NEW] GET /api/sentinel/status/:hotelId
  * Fetches the last run timestamp and activity stats.
