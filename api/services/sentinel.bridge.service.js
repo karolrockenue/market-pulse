@@ -433,28 +433,54 @@ class SentinelBridgeService {
               ]);
             }
             // --- Mark Decisions as Applied, Log to History, AND Update Calendar Source ---
-            for (const update of validUpdates) {
-              // 1. Mark as Applied in Predictions
+            // [OPTIMIZED] Bulk Execution: Replaces N loop queries with 3 set-based operations
+            const hIds = validUpdates.map((u) => String(u.hotel_id));
+            const rIds = validUpdates.map((u) => String(u.room_type_id));
+            const dates = validUpdates.map((u) => u.start_date);
+            const prices = validUpdates.map((u) => u.price);
+
+            if (hIds.length > 0) {
+              // 1. Bulk Mark Applied
               await client.query(
-                `UPDATE sentinel_ai_predictions 
-                 SET is_applied = TRUE 
-                 WHERE hotel_id = $1 AND stay_date = $2`,
-                [hotelId, update.start_date],
+                `
+                UPDATE sentinel_ai_predictions AS p
+                SET is_applied = TRUE
+                FROM UNNEST($1::text[], $2::text[], $3::date[]) AS t(hid, rid, sdate)
+                WHERE p.hotel_id::text = t.hid 
+                  AND p.room_type_id::text = t.rid 
+                  AND p.stay_date = t.sdate
+              `,
+                [hIds, rIds, dates],
               );
 
-              // 2. Log to Price History (Unify as SENTINEL)
+              // 2. Bulk Log History (Uses efficient JOIN instead of row-by-row SELECT)
+              // Note: We use t.hid without casting to allow Postgres to handle both Int/UUID columns implicitly if possible,
+              // or rely on the table schema. If strict Int is required, use t.hid::integer.
               await client.query(
-                `INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
-                 VALUES ($1, $2, $3, (SELECT rate FROM sentinel_rates_calendar WHERE hotel_id = $1 AND stay_date = $3 LIMIT 1), $4, 'SENTINEL', NOW())`,
-                [hotelId, update.room_type_id, update.start_date, update.price],
+                `
+                INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
+                SELECT 
+                    t.hid::integer, t.rid, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
+                FROM UNNEST($1::text[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                JOIN sentinel_rates_calendar c 
+                    ON c.hotel_id::text = t.hid 
+                    AND c.room_type_id::text = t.rid 
+                    AND c.stay_date = t.sdate
+              `,
+                [hIds, rIds, dates, prices],
               );
 
-              // 3. Update the Live Calendar Source (Unify as SENTINEL)
+              // 3. Bulk Update Calendar (CRITICAL FIX: Now updates 'rate' too)
               await client.query(
-                `UPDATE sentinel_rates_calendar 
-                 SET source = 'SENTINEL', last_updated_at = NOW()
-                 WHERE hotel_id = $1 AND stay_date = $2 AND room_type_id = $3`,
-                [hotelId, update.start_date, String(update.room_type_id)],
+                `
+                UPDATE sentinel_rates_calendar AS c
+                SET source = 'SENTINEL', last_updated_at = NOW(), rate = t.new_price
+                FROM UNNEST($1::text[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                WHERE c.hotel_id::text = t.hid 
+                  AND c.room_type_id::text = t.rid 
+                  AND c.stay_date = t.sdate
+              `,
+                [hIds, rIds, dates, prices],
               );
             }
 
