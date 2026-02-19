@@ -1,4 +1,5 @@
 const db = require("../utils/db");
+const pricingEngine = require("./sentinel.pricing.engine");
 
 /**
  * @file sentinel.bridge.service.js
@@ -234,7 +235,7 @@ class SentinelBridgeService {
         // --- GATE 1: PERMISSION (Is Autopilot ON?) ---
         // [FIX] Also fetch rate_id_map to build the PMS payload later
         const configRes = await client.query(
-          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map 
+          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map, room_differentials 
            FROM sentinel_configurations WHERE hotel_id = $1`,
           [hotelId],
         );
@@ -377,6 +378,47 @@ class SentinelBridgeService {
             source: "SENTINEL",
           });
         }
+
+        // --- APPLY DIFFERENTIALS TO DERIVED ROOMS ---
+        // The AI only predicts the Base Room. We must calculate and inject the derived rooms (Single, etc.) here.
+        const expandedUpdates = [];
+        const differentials = config.room_differentials || [];
+
+        for (const update of validUpdates) {
+          expandedUpdates.push(update); // Add the Base Room
+
+          if (differentials.length > 0) {
+            for (const rule of differentials) {
+              if (
+                !rule ||
+                rule.value === undefined ||
+                String(rule.roomTypeId) === String(update.room_type_id)
+              )
+                continue;
+
+              const derivedRate = pricingEngine.calculateDifferential(
+                update.price,
+                rule.roomTypeId,
+                differentials,
+              );
+
+              if (derivedRate) {
+                expandedUpdates.push({
+                  hotel_id: update.hotel_id,
+                  room_type_id: rule.roomTypeId,
+                  start_date: update.start_date,
+                  end_date: update.end_date,
+                  price: derivedRate,
+                  source: "SENTINEL",
+                });
+              }
+            }
+          }
+        }
+
+        // Overwrite the original array with the expanded list
+        validUpdates.length = 0;
+        validUpdates.push(...expandedUpdates);
 
         // --- EXECUTION ---
         if (validUpdates.length > 0) {
