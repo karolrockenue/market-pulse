@@ -239,7 +239,18 @@ async function buildOverridePayload(
             roomDifferentials,
           );
 
-          batchPayload.push({ rateId: derivedRateId, date, rate: derivedRate });
+          // [SAFETY FIX] Block null, undefined, or <= 0 rates from entering the queue
+          if (derivedRate !== null && derivedRate > 0) {
+            batchPayload.push({
+              rateId: derivedRateId,
+              date,
+              rate: derivedRate,
+            });
+          } else {
+            console.warn(
+              `[Sentinel Service] Blocked invalid differential rate for room ${derivedRoomId} on ${date}`,
+            );
+          }
         }
       }
     }

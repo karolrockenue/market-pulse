@@ -23,11 +23,11 @@ const CLOUDBEDS_API_URL = "https://api.cloudbeds.com/api/v1.1";
 async function getHeaders(hotelId, pmsPropertyId) {
   if (!hotelId)
     throw new Error(
-      "Sentinel Adapter: hotelId (Internal) is required for authentication."
+      "Sentinel Adapter: hotelId (Internal) is required for authentication.",
     );
   if (!pmsPropertyId)
     throw new Error(
-      "Sentinel Adapter: pmsPropertyId (External) is required for API routing."
+      "Sentinel Adapter: pmsPropertyId (External) is required for API routing.",
     );
 
   // Borrow the token using the main adapter's logic
@@ -52,15 +52,15 @@ async function postRate(hotelId, pmsPropertyId, rateId, date, rate) {
   // [SAFETY] Strictly validate rate before attempting push
   if (rate === undefined || rate === null || isNaN(rate) || Number(rate) <= 0) {
     console.warn(
-      `[Sentinel] ABORTING postRate: Invalid rate value (${rate}) for ${date}`
+      `[Sentinel] ABORTING postRate: Invalid rate value (${rate}) for ${date}`,
     );
     throw new Error(
-      `Sentinel Safety: Attempted to push invalid rate (${rate}) to PMS.`
+      `Sentinel Safety: Attempted to push invalid rate (${rate}) to PMS.`,
     );
   }
 
   console.log(
-    `[Sentinel] Posting rate for ${hotelId} (PMS: ${pmsPropertyId}): ${rate} on ${date}`
+    `[Sentinel] Posting rate for ${hotelId} (PMS: ${pmsPropertyId}): ${rate} on ${date}`,
   );
 
   try {
@@ -89,7 +89,7 @@ async function postRate(hotelId, pmsPropertyId, rateId, date, rate) {
  */
 async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
   console.log(
-    `[Sentinel] Batch posting ${ratesArray.length} rates for ${hotelId} (PMS: ${pmsPropertyId})`
+    `[Sentinel] Batch posting ${ratesArray.length} rates for ${hotelId} (PMS: ${pmsPropertyId})`,
   );
 
   if (!ratesArray || ratesArray.length === 0) {
@@ -101,41 +101,41 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
     const endpoint = `${CLOUDBEDS_API_URL}/putRate`; // v1.3
 
     const params = new URLSearchParams();
-    let validCount = 0;
 
-    ratesArray.forEach((item, index) => {
-      // [SAFETY] Skip invalid rates to prevent zero-out
+    // [SAFETY FIX] 1. Strictly filter out garbage first to prevent any £0 or null leaks
+    const safeRates = ratesArray.filter((item) => {
+      const numRate = Number(item.rate);
       if (
         item.rate === undefined ||
         item.rate === null ||
-        isNaN(item.rate) ||
-        Number(item.rate) <= 0
+        isNaN(numRate) ||
+        numRate <= 0
       ) {
         console.warn(
-          `[Sentinel] SKIPPING invalid batch item: Date ${item.date}, Rate ${item.rate}`
+          `[Sentinel] SKIPPING invalid batch item: Date ${item.date}, Rate ${item.rate}`,
         );
-        return;
+        return false;
       }
-
-      // We use validCount for the index to ensure continuous array keys (rates[0], rates[1]...)
-      // even if we skipped some items in the original array.
-      params.append(`rates[${validCount}][rateID]`, item.rateId);
-      params.append(`rates[${validCount}][interval][0][startDate]`, item.date);
-      params.append(`rates[${validCount}][interval][0][endDate]`, item.date);
-      params.append(`rates[${validCount}][interval][0][rate]`, item.rate);
-
-      validCount++;
+      return true;
     });
 
-    if (validCount === 0) {
+    if (safeRates.length === 0) {
       console.warn(
-        "[Sentinel] Batch empty after safety filtering. Nothing to send."
+        "[Sentinel] Batch empty after safety filtering. Nothing to send.",
       );
       return {
         success: true,
         message: "All rates filtered out by safety checks.",
       };
     }
+
+    // 2. Append only the safely verified rates using a clean native index
+    safeRates.forEach((item, index) => {
+      params.append(`rates[${index}][rateID]`, item.rateId);
+      params.append(`rates[${index}][interval][0][startDate]`, item.date);
+      params.append(`rates[${index}][interval][0][endDate]`, item.date);
+      params.append(`rates[${index}][interval][0][rate]`, item.rate);
+    });
 
     const response = await axios.post(endpoint, params, { headers });
 
@@ -200,10 +200,10 @@ async function getRates(
   pmsPropertyId,
   roomTypeId,
   startDate,
-  endDate
+  endDate,
 ) {
   console.log(
-    `[Sentinel] Fetching Live Rates for ${hotelId} (Room: ${roomTypeId})`
+    `[Sentinel] Fetching Live Rates for ${hotelId} (Room: ${roomTypeId})`,
   );
   try {
     const headers = await getHeaders(hotelId, pmsPropertyId);
