@@ -91,9 +91,13 @@ export function HotelDashboard({
     });
   };
 
+  // Dynamically determine currency from data (fallback to £)
+  const currencySymbol =
+    (data as any)?.currencySymbol || (data as any)?.currency || "£";
+
   // Helper for Currency
   const formatCurrency = (value: number) => {
-    return `£${(value || 0).toLocaleString(undefined, {
+    return `${currencySymbol}${(value || 0).toLocaleString(undefined, {
       maximumFractionDigits: 0,
     })}`;
   };
@@ -105,10 +109,9 @@ export function HotelDashboard({
     return {
       value: diff,
       onTarget: diff >= 0, // Simplified rule: positive variance is "on target" for revenue
-      label: `${diff >= 0 ? "+" : ""}£${Math.abs(diff).toLocaleString(
-        undefined,
-        { maximumFractionDigits: 0 }
-      )}`,
+      label: `${diff >= 0 ? "+" : ""}${currencySymbol}${Math.abs(
+        diff,
+      ).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
     };
   };
 
@@ -918,7 +921,10 @@ export function HotelDashboard({
             <OwnHotelOccupancy data={data?.flowcast || []} />
           </div>
           <div style={{ gridColumn: "span 1" }}>
-            <RecentBookings data={data?.recentActivity || []} />
+            <RecentBookings
+              data={data?.recentActivity || []}
+              currencySymbol={currencySymbol}
+            />
           </div>
         </div>
         {/* Market Outlook Banner + Chart (Merged Container) */}

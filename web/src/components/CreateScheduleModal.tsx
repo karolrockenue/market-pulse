@@ -1,23 +1,4 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "./ui/dialog";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { Checkbox } from "./ui/checkbox";
-import { Badge } from "./ui/badge";
-import { Separator } from "./ui/separator";
-import { useState } from "react";
+import { useState, CSSProperties } from "react";
 import {
   Calendar,
   Clock,
@@ -28,44 +9,138 @@ import {
   Info,
   Zap,
   ArrowRight,
+  Radio,
+  X,
 } from "lucide-react";
-import { format } from "date-fns";
-// [DEBUG] Import the entire module as a namespace to fix the ESM/CJS interop error
-import * as fnsTz from "date-fns-tz";
-// [FIX] Removed the invalid '@2.0.3' version from the import path
 import { toast } from "sonner";
 
 interface CreateScheduleModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (schedule: any) => void;
-  variant?: "default" | "takings"; // [NEW] Support specialized modes
 }
+
+const font = "system-ui, -apple-system, sans-serif";
+
+const overlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 9998,
+  backgroundColor: "rgba(0,0,0,0.6)",
+  backdropFilter: "blur(4px)",
+};
+
+const modalStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 9999,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "24px",
+};
+
+const contentStyle: CSSProperties = {
+  position: "relative",
+  backgroundColor: "#1a1a1a",
+  border: "1px solid #2a2a2a",
+  borderRadius: "8px",
+  maxWidth: "1200px",
+  width: "95vw",
+  maxHeight: "90vh",
+  overflowY: "auto",
+  padding: "24px",
+  fontFamily: font,
+  color: "#e5e5e5",
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  backgroundColor: "#141414",
+  border: "1px solid #2a2a2a",
+  borderRadius: "4px",
+  padding: "10px 12px",
+  color: "#e5e5e5",
+  fontSize: "13px",
+  fontFamily: font,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
+const selectWrapperStyle: CSSProperties = {
+  position: "relative",
+  width: "100%",
+};
+
+const selectStyle: CSSProperties = {
+  ...inputStyle,
+  appearance: "none" as const,
+  cursor: "pointer",
+  paddingRight: "32px",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 12px center",
+};
+
+const labelStyle: CSSProperties = {
+  color: "#9ca3af",
+  fontSize: "11px",
+  textTransform: "uppercase",
+  letterSpacing: "-0.025em",
+  marginBottom: "8px",
+  display: "block",
+  fontFamily: font,
+};
+
+const sectionBoxStyle: CSSProperties = {
+  background: "#0a0a0a",
+  borderRadius: "4px",
+  border: "1px solid #2a2a2a",
+};
+
+const sectionHeaderStyle: CSSProperties = {
+  borderBottom: "1px solid #2a2a2a",
+  padding: "12px 16px",
+};
+
+const sectionTitleStyle: CSSProperties = {
+  color: "#39BDF8",
+  fontSize: "11px",
+  letterSpacing: "-0.025em",
+  textTransform: "uppercase",
+  fontFamily: font,
+};
+
+const buttonBase: CSSProperties = {
+  padding: "10px 20px",
+  fontSize: "13px",
+  borderRadius: "4px",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: font,
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  transition: "all 0.2s",
+};
 
 export function CreateScheduleModal({
   open,
   onClose,
   onSave,
-  variant = "default",
 }: CreateScheduleModalProps) {
-  const isTakings = variant === "takings";
-
-  // [MODIFIED] Default to 'previous-month' for takings, 'previous-week' otherwise
-  const [reportPeriod, setReportPeriod] = useState(
-    isTakings ? "previous-month" : "previous-week"
-  );
+  const [reportPeriod, setReportPeriod] = useState("previous-week");
   const [frequency, setFrequency] = useState("weekly");
   const [dayOfWeek, setDayOfWeek] = useState("monday");
   const [timeOfDay, setTimeOfDay] = useState("09:00");
   const [reportName, setReportName] = useState("");
   const [emailRecipients, setEmailRecipients] = useState("");
-
-  // [MODIFIED] For takings, formats are disabled (inline only). For default, CSV is checked.
-  const [csvFormat, setCsvFormat] = useState(!isTakings);
+  const [csvFormat, setCsvFormat] = useState(true);
   const [excelFormat, setExcelFormat] = useState(false);
 
+  if (!open) return null;
+
   const handleSave = () => {
-    // Validation
     if (!reportName.trim()) {
       toast.error("Please enter a report name");
       return;
@@ -74,58 +149,23 @@ export function CreateScheduleModal({
       toast.error("Please enter at least one email recipient");
       return;
     }
-    // [MODIFIED] Only validate format selection if not in 'takings' mode
-    if (!isTakings && !csvFormat && !excelFormat) {
+    if (!csvFormat && !excelFormat) {
       toast.error("Please select at least one file format");
       return;
     }
-
-    // --- [NEW] Timezone Conversion Logic ---
-    // 1. Get the user's local time string from state (e.g., "11:50")
-    const localTime = timeOfDay;
-    // 2. Get the user's browser timezone (e.g., "Europe/Warsaw")
-    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // 3. Get today's date as a string in YYYY-MM-DD format
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    const localDateString = `${year}-${month}-${day}`;
-
-    // 4. Create a full "wall time" string (e.g., "2025-10-21T11:50:00")
-    // This is explicitly what the user sees and intends.
-    const localDateTimeString = `${localDateString}T${localTime}:00`;
-
-    // 5. Use 'fromZonedTime' (the function fixed in the changelog)
-    // to parse that wall time *in its specific timezone* into a true Date object.
-    // This object (zonedDate) now correctly represents 2025-10-21T09:50:00.000Z
-    const zonedDate = fnsTz.fromZonedTime(localDateTimeString, localTz);
-
-    // 6. Format that correct Date object into a UTC time string.
-    // [FIX] Replace 'fnsTz.format' with 'fnsTz.formatInTimeZone'.
-    // The 'format' function was incorrectly ignoring the { timeZone: 'UTC' } option
-    // and formatting the date in local time.
-    // 'formatInTimeZone' is the explicit function for this exact task.
-    const utcTime = fnsTz.formatInTimeZone(zonedDate, "UTC", "HH:mm");
-    // --- End of Conversion Logic ---
-
     onSave({
       reportPeriod,
       frequency,
       dayOfWeek,
-      timeOfDay: utcTime, // [MODIFIED] Pass the converted UTC time string
+      timeOfDay,
       reportName,
       emailRecipients,
       formats: { csv: csvFormat, excel: excelFormat },
     });
-
-    // [FIX] Removed the toast.success() call from here.
-    // The toast is now handled in App.tsx *after* the API call succeeds.
+    toast.success("Schedule created successfully!");
     onClose();
   };
 
-  // Generate preview text
   const getFrequencyText = () => {
     if (frequency === "daily") return "Daily";
     if (frequency === "weekly") {
@@ -165,430 +205,743 @@ export function CreateScheduleModal({
     return formats.length > 0 ? formats.join(" + ") : "None";
   };
 
+  const checkboxStyle = (checked: boolean): CSSProperties => ({
+    width: "16px",
+    height: "16px",
+    borderRadius: "3px",
+    border: `1px solid ${checked ? "#39BDF8" : "#2a2a2a"}`,
+    backgroundColor: checked ? "#39BDF8" : "transparent",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    transition: "all 0.15s",
+  });
+
+  const summaryRowStyle: CSSProperties = {
+    borderBottom: "1px solid #2a2a2a",
+  };
+
+  const summaryLabelTd: CSSProperties = {
+    paddingTop: "8px",
+    paddingBottom: "8px",
+    color: "#9ca3af",
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "-0.025em",
+    fontFamily: font,
+  };
+
+  const summaryValueTd: CSSProperties = {
+    paddingTop: "8px",
+    paddingBottom: "8px",
+    color: "#e5e5e5",
+    textAlign: "right",
+    fontSize: "13px",
+    fontFamily: font,
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      {/* [FIX] Moved max-width, max-height, and overflow to inline styles.
-    - The Tailwind class 'max-h-[90vh]' is an arbitrary value and is not
-    - in the static CSS build, so it must be applied as an inline style.
-*/}
-      <DialogContent
-        className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
-        style={{
-          maxWidth: "1200px",
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
-      >
-        <DialogHeader className="pb-4">
-          <DialogTitle className="text-[#faff6a] text-2xl flex items-center gap-2">
-            <Zap className="w-6 h-6" />
-            Create Automated Report Schedule
-          </DialogTitle>
-          <DialogDescription className="text-[#9ca3af] text-base mt-1">
-            Set up automatic report delivery to your inbox—configure once,
-            receive forever
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <div style={overlayStyle} onClick={onClose} />
+      <div style={modalStyle}>
+        <div style={contentStyle}>
+          {/* Background effects */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              overflow: "hidden",
+              borderRadius: "8px",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: "384px",
+                height: "384px",
+                borderRadius: "9999px",
+                filter: "blur(96px)",
+                background: "rgba(57, 189, 248, 0.03)",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                width: "384px",
+                height: "384px",
+                borderRadius: "9999px",
+                filter: "blur(96px)",
+                background: "rgba(250, 255, 106, 0.02)",
+              }}
+            />
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage:
+                "linear-gradient(rgba(57,189,248,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.02) 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+              pointerEvents: "none",
+              borderRadius: "8px",
+            }}
+          />
 
-        <div className="grid grid-cols-5 gap-8">
-          {/* Left Side - Configuration */}
-          <div className="col-span-3 space-y-5">
-            {/* Step 1: Report Details */}
-            <div className="bg-[#1f1f1c] rounded-lg p-5 border border-[#3a3a35]">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-8 h-8 rounded-full bg-[#faff6a] text-[#1f1f1c] flex items-center justify-center">
-                  1
-                </div>
-                <h3 className="text-[#e5e5e5] text-lg">Report Details</h3>
-                <FileText className="w-5 h-5 text-[#faff6a] ml-auto" />
-              </div>
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            style={{
+              position: "absolute",
+              top: "16px",
+              right: "16px",
+              background: "none",
+              border: "none",
+              color: "#6b7280",
+              cursor: "pointer",
+              zIndex: 20,
+              padding: "4px",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#e5e5e5")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#6b7280")}
+          >
+            <X size={18} />
+          </button>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[#9ca3af] text-sm mb-2 block">
-                    Report Name
-                  </label>
-                  <Input
-                    value={reportName}
-                    onChange={(e) => setReportName(e.target.value)}
-                    placeholder="e.g., Weekly Performance Summary"
-                    className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
+          <div style={{ position: "relative", zIndex: 10 }}>
+            {/* Header */}
+            <div
+              style={{
+                paddingBottom: "16px",
+                borderBottom: "1px solid #2a2a2a",
+                marginBottom: "24px",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "12px" }}
+              >
+                <div
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    background: "#39BDF8",
+                    borderRadius: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Radio
+                    style={{ width: "20px", height: "20px", color: "#0a0a0a" }}
                   />
-                  {/* [FIX] Increased top margin from mt-1.5 to mt-2 */}
-                  <p className="text-[#6b7280] text-xs mt-2">
-                    This appears in email subject and filename
-                  </p>
                 </div>
-
                 <div>
-                  <label className="text-[#9ca3af] text-sm mb-2 block">
-                    Report Period
-                  </label>
-                  <Select value={reportPeriod} onValueChange={setReportPeriod}>
-                    <SelectTrigger className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                      {/* [MODIFIED] Conditional Options based on Variant */}
-                      {!isTakings && (
-                        <>
-                          <SelectItem value="previous-week">
+                  <div
+                    style={{
+                      color: "#e5e5e5",
+                      fontSize: "20px",
+                      letterSpacing: "-0.025em",
+                      textTransform: "uppercase",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Create Report Schedule
+                  </div>
+                  <div style={{ color: "#9ca3af", fontSize: "14px" }}>
+                    Automated report delivery configuration
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr",
+                gap: "24px",
+              }}
+            >
+              {/* Left Side */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "20px",
+                }}
+              >
+                {/* Report Configuration */}
+                <div style={sectionBoxStyle}>
+                  <div style={sectionHeaderStyle}>
+                    <h3 style={sectionTitleStyle}>Report Configuration</h3>
+                  </div>
+                  <div
+                    style={{
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                    }}
+                  >
+                    <div>
+                      <label style={labelStyle}>Report Name</label>
+                      <input
+                        value={reportName}
+                        onChange={(e) => setReportName(e.target.value)}
+                        placeholder="e.g., Weekly Performance Summary"
+                        style={inputStyle}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#39BDF8")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#2a2a2a")
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Report Period</label>
+                      <div style={selectWrapperStyle}>
+                        <select
+                          value={reportPeriod}
+                          onChange={(e) => setReportPeriod(e.target.value)}
+                          style={selectStyle}
+                        >
+                          <option value="previous-week">
                             Previous Week (Mon-Sun)
-                          </SelectItem>
-                          <SelectItem value="current-week">
+                          </option>
+                          <option value="current-week">
                             Current Week (Mon-Sun)
-                          </SelectItem>
-                        </>
-                      )}
-                      <SelectItem value="previous-month">
-                        Previous Month (Full)
-                      </SelectItem>
-                      <SelectItem value="current-month">
-                        Current Month (MTD)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {/* [FIX] Increased top margin from mt-1.5 to mt-2 */}
-                  <p className="text-[#6b7280] text-xs mt-2">
-                    Which time period to include
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2: Schedule */}
-            <div className="bg-[#1f1f1c] rounded-lg p-5 border border-[#3a3a35]">
-              {/* [FIX] Increased bottom margin for better spacing */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-full bg-[#faff6a] text-[#1f1f1c] flex items-center justify-center">
-                  2
-                </div>
-                <h3 className="text-[#e5e5e5] text-lg">Delivery Schedule</h3>
-                <Calendar className="w-5 h-5 text-[#faff6a] ml-auto" />
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[#9ca3af] text-sm mb-2 block">
-                      Frequency
-                    </label>
-                    <Select value={frequency} onValueChange={setFrequency}>
-                      <SelectTrigger className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-[#9ca3af] text-sm mb-2 block flex items-center gap-1.5">
-                      <Clock className="w-4 h-4" />
-                      Time
-                    </label>
-                    <Input
-                      type="time"
-                      value={timeOfDay}
-                      onChange={(e) => setTimeOfDay(e.target.value)}
-                      className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
-                      // [FIX] Add step="300" (300 seconds = 5 minutes)
-                      // This forces the time input to align with the 5-minute cron job in vercel.json.
-                      step="300"
-                    />
-                    {/* [NEW] Add helper text to explain the 5-minute intervals */}
-                    <p className="text-[#6b7280] text-xs mt-2">
-                      Time is in your local timezone and can be set in 5-minute
-                      intervals.
-                    </p>
+                          </option>
+                          <option value="previous-month">
+                            Previous Month (Full)
+                          </option>
+                          <option value="current-month">
+                            Current Month (MTD)
+                          </option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {frequency === "weekly" && (
-                  <div>
-                    <label className="text-[#9ca3af] text-sm mb-2 block">
-                      Day of Week
-                    </label>
-                    <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
-                      <SelectTrigger className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]">
-                        <SelectItem value="monday">Monday</SelectItem>
-                        <SelectItem value="tuesday">Tuesday</SelectItem>
-                        <SelectItem value="wednesday">Wednesday</SelectItem>
-                        <SelectItem value="thursday">Thursday</SelectItem>
-                        <SelectItem value="friday">Friday</SelectItem>
-                        <SelectItem value="saturday">Saturday</SelectItem>
-                        <SelectItem value="sunday">Sunday</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Delivery Schedule */}
+                <div style={sectionBoxStyle}>
+                  <div style={sectionHeaderStyle}>
+                    <h3 style={sectionTitleStyle}>Delivery Schedule</h3>
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Step 3: Recipients */}
-            <div className="bg-[#1f1f1c] rounded-lg p-5 border border-[#3a3a35]">
-              {/* [FIX] Increased bottom margin for better spacing */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-full bg-[#faff6a] text-[#1f1f1c] flex items-center justify-center">
-                  3
-                </div>
-                <h3 className="text-[#e5e5e5] text-lg">Recipients</h3>
-                <Mail className="w-5 h-5 text-[#faff6a] ml-auto" />
-              </div>
-
-              <div>
-                <label className="text-[#9ca3af] text-sm mb-2 block">
-                  Email Addresses
-                </label>
-                <Input
-                  value={emailRecipients}
-                  onChange={(e) => setEmailRecipients(e.target.value)}
-                  placeholder="manager@hotel.com, owner@hotel.com"
-                  className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]"
-                />
-                {/* [FIX] Increased top margin from mt-1.5 to mt-2 */}
-                <p className="text-[#6b7280] text-xs mt-2">
-                  Separate multiple emails with commas
-                </p>
-                {getRecipientCount() > 0 && (
-                  <div className="mt-2">
-                    <Badge
-                      variant="outline"
-                      className="text-xs border-[#faff6a] text-[#faff6a]"
+                  <div
+                    style={{
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "16px",
+                      }}
                     >
-                      {getRecipientCount()} recipient
-                      {getRecipientCount() > 1 ? "s" : ""}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Step 4: Format */}
-            <div className="bg-[#1f1f1c] rounded-lg p-5 border border-[#3a3a35]">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-full bg-[#faff6a] text-[#1f1f1c] flex items-center justify-center">
-                  4
-                </div>
-                <h3 className="text-[#e5e5e5] text-lg">File Format</h3>
-                <Package className="w-5 h-5 text-[#faff6a] ml-auto" />
-              </div>
-
-              <div className="space-y-3">
-                {isTakings ? (
-                  // [NEW] Read-only view for Takings Report
-                  <div className="p-4 rounded border border-[#3a3a35] bg-[#2C2C2C]/50">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded bg-[#3a3a35] flex items-center justify-center text-[#faff6a]">
-                        <Mail className="w-4 h-4" />
+                      <div>
+                        <label style={labelStyle}>Frequency</label>
+                        <div style={selectWrapperStyle}>
+                          <select
+                            value={frequency}
+                            onChange={(e) => setFrequency(e.target.value)}
+                            style={selectStyle}
+                          >
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </div>
                       </div>
                       <div>
-                        <p className="text-[#e5e5e5] font-medium text-sm">
-                          Inline Email Body
-                        </p>
-                        <p className="text-[#9ca3af] text-xs mt-0.5">
-                          Report renders directly in the email (HTML)
-                        </p>
+                        <label style={labelStyle}>Time</label>
+                        <input
+                          type="time"
+                          value={timeOfDay}
+                          onChange={(e) => setTimeOfDay(e.target.value)}
+                          style={inputStyle}
+                          onFocus={(e) =>
+                            (e.currentTarget.style.borderColor = "#39BDF8")
+                          }
+                          onBlur={(e) =>
+                            (e.currentTarget.style.borderColor = "#2a2a2a")
+                          }
+                        />
                       </div>
                     </div>
+                    {frequency === "weekly" && (
+                      <div>
+                        <label style={labelStyle}>Day of Week</label>
+                        <div style={selectWrapperStyle}>
+                          <select
+                            value={dayOfWeek}
+                            onChange={(e) => setDayOfWeek(e.target.value)}
+                            style={selectStyle}
+                          >
+                            <option value="monday">Monday</option>
+                            <option value="tuesday">Tuesday</option>
+                            <option value="wednesday">Wednesday</option>
+                            <option value="thursday">Thursday</option>
+                            <option value="friday">Friday</option>
+                            <option value="saturday">Saturday</option>
+                            <option value="sunday">Sunday</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  // Standard View
-                  <>
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-[#3a3a35] hover:border-[#faff6a]/50 transition-colors">
-                      <Checkbox
-                        checked={csvFormat}
-                        onCheckedChange={(checked) =>
-                          setCsvFormat(checked as boolean)
+                </div>
+
+                {/* Recipients & Format */}
+                <div style={sectionBoxStyle}>
+                  <div style={sectionHeaderStyle}>
+                    <h3 style={sectionTitleStyle}>Recipients & Format</h3>
+                  </div>
+                  <div
+                    style={{
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                    }}
+                  >
+                    <div>
+                      <label style={labelStyle}>Email Addresses</label>
+                      <input
+                        value={emailRecipients}
+                        onChange={(e) => setEmailRecipients(e.target.value)}
+                        placeholder="manager@hotel.com, owner@hotel.com"
+                        style={inputStyle}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#39BDF8")
                         }
-                        className="border-[#3a3a35] data-[state=checked]:bg-[#faff6a] data-[state=checked]:border-[#faff6a]"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[#e5e5e5]">CSV Format</span>
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-[#3a3a35] text-[#9ca3af]"
-                          >
-                            .csv
-                          </Badge>
-                        </div>
-                        <p className="text-[#6b7280] text-xs">
-                          Excel, Google Sheets compatible
-                        </p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded border border-[#3a3a35] hover:border-[#faff6a]/50 transition-colors">
-                      <Checkbox
-                        checked={excelFormat}
-                        onCheckedChange={(checked) =>
-                          setExcelFormat(checked as boolean)
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#2a2a2a")
                         }
-                        className="border-[#3a3a35] data-[state=checked]:bg-[#faff6a] data-[state=checked]:border-[#faff6a]"
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[#e5e5e5]">Excel Format</span>
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-[#3a3a35] text-[#9ca3af]"
+                      <p
+                        style={{
+                          color: "#6b7280",
+                          fontSize: "11px",
+                          marginTop: "6px",
+                          fontFamily: font,
+                        }}
+                      >
+                        Separate multiple emails with commas
+                      </p>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>File Formats</label>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            cursor: "pointer",
+                            padding: "12px",
+                            borderRadius: "4px",
+                            border: "1px solid #2a2a2a",
+                            transition: "border-color 0.2s",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.borderColor = "#39BDF8")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.borderColor = "#2a2a2a")
+                          }
+                        >
+                          <div
+                            style={checkboxStyle(csvFormat)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCsvFormat(!csvFormat);
+                            }}
                           >
-                            .xlsx
-                          </Badge>
-                        </div>
-                        <p className="text-[#6b7280] text-xs">
-                          Native Excel with formatting
-                        </p>
-                      </div>
-                    </label>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side - Live Preview */}
-          <div className="col-span-2">
-            <div className="bg-gradient-to-br from-[#faff6a]/10 to-[#faff6a]/5 rounded-lg p-6 border border-[#faff6a]/30 sticky top-0">
-              <div className="flex items-center gap-2 mb-6">
-                <CheckCircle2 className="w-5 h-5 text-[#faff6a]" />
-                <h3 className="text-[#faff6a] text-lg">Live Preview</h3>
-              </div>
-
-              <div className="space-y-5">
-                {/* Preview Card */}
-                <div className="bg-[#1f1f1c] rounded-lg p-4 border border-[#3a3a35]">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[#9ca3af] text-xs mb-1.5">
-                        Report Name
-                      </p>
-                      <p className="text-[#e5e5e5]">
-                        {reportName || (
-                          <span className="text-[#6b7280] italic">Not set</span>
-                        )}
-                      </p>
-                    </div>
-
-                    <Separator className="bg-[#3a3a35]" />
-
-                    <div>
-                      <p className="text-[#9ca3af] text-xs mb-2">Schedule</p>
-                      <div className="flex items-center gap-2 text-[#e5e5e5] mb-1.5">
-                        <Calendar className="w-4 h-4 text-[#faff6a]" />
-                        <span>{getFrequencyText()}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[#e5e5e5]">
-                        <Clock className="w-4 h-4 text-[#faff6a]" />
-                        <span>{timeOfDay}</span>
-                      </div>
-                    </div>
-
-                    <Separator className="bg-[#3a3a35]" />
-
-                    <div>
-                      <p className="text-[#9ca3af] text-xs mb-1.5">
-                        Report Data
-                      </p>
-                      <p className="text-[#e5e5e5]">{getPeriodLabel()}</p>
-                    </div>
-
-                    <Separator className="bg-[#3a3a35]" />
-
-                    <div>
-                      <p className="text-[#9ca3af] text-xs mb-1.5">
-                        Recipients
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-[#faff6a]" />
-                        <p className="text-[#e5e5e5]">
-                          {getRecipientCount() > 0 ? (
-                            `${getRecipientCount()} recipient${
-                              getRecipientCount() > 1 ? "s" : ""
-                            }`
-                          ) : (
-                            <span className="text-[#6b7280] italic">
-                              Not set
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Separator className="bg-[#3a3a35]" />
-
-                    <div>
-                      <p className="text-[#9ca3af] text-xs mb-1.5">
-                        File Formats
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-[#faff6a]" />
-                        <p className="text-[#e5e5e5]">
-                          {csvFormat || excelFormat ? (
-                            getFormats()
-                          ) : (
-                            <span className="text-[#6b7280] italic">
-                              Not set
-                            </span>
-                          )}
-                        </p>
+                            {csvFormat && (
+                              <span
+                                style={{
+                                  color: "#0a0a0a",
+                                  fontSize: "11px",
+                                  lineHeight: 1,
+                                }}
+                              >
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: "#e5e5e5",
+                                  fontSize: "14px",
+                                  fontFamily: font,
+                                }}
+                              >
+                                CSV Format
+                              </span>
+                              <span
+                                style={{
+                                  color: "#9ca3af",
+                                  fontSize: "11px",
+                                  fontFamily: font,
+                                }}
+                              >
+                                .csv
+                              </span>
+                            </div>
+                          </div>
+                        </label>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            cursor: "pointer",
+                            padding: "12px",
+                            borderRadius: "4px",
+                            border: "1px solid #2a2a2a",
+                            transition: "border-color 0.2s",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.borderColor = "#39BDF8")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.borderColor = "#2a2a2a")
+                          }
+                        >
+                          <div
+                            style={checkboxStyle(excelFormat)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setExcelFormat(!excelFormat);
+                            }}
+                          >
+                            {excelFormat && (
+                              <span
+                                style={{
+                                  color: "#0a0a0a",
+                                  fontSize: "11px",
+                                  lineHeight: 1,
+                                }}
+                              >
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: "#e5e5e5",
+                                  fontSize: "14px",
+                                  fontFamily: font,
+                                }}
+                              >
+                                Excel Format
+                              </span>
+                              <span
+                                style={{
+                                  color: "#9ca3af",
+                                  fontSize: "11px",
+                                  fontFamily: font,
+                                }}
+                              >
+                                .xlsx
+                              </span>
+                            </div>
+                          </div>
+                        </label>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* What Happens Next */}
-                <div className="bg-[#2C2C2C] rounded-lg p-4 border border-[#3a3a35]">
-                  <h4 className="text-[#e5e5e5] mb-3 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-[#faff6a]" />
-                    What happens next?
-                  </h4>
-                  <div className="space-y-2.5 text-sm text-[#9ca3af]">
-                    <div className="flex items-start gap-2">
-                      <ArrowRight className="w-4 h-4 text-[#faff6a] flex-shrink-0 mt-0.5" />
-                      <span>Reports automatically generated & sent</span>
+              {/* Right Side - Summary */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "16px",
+                }}
+              >
+                <div
+                  style={{
+                    background: "#0a0a0a",
+                    borderRadius: "4px",
+                    border: "1px solid #39BDF8",
+                    position: "sticky",
+                    top: 0,
+                  }}
+                >
+                  <div style={sectionHeaderStyle}>
+                    <h3
+                      style={{
+                        ...sectionTitleStyle,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <CheckCircle2 style={{ width: "14px", height: "14px" }} />{" "}
+                      Schedule Summary
+                    </h3>
+                  </div>
+                  <div style={{ padding: "16px" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        fontSize: "14px",
+                        borderCollapse: "collapse",
+                        fontFamily: font,
+                      }}
+                    >
+                      <tbody>
+                        <tr style={summaryRowStyle}>
+                          <td style={summaryLabelTd}>Report</td>
+                          <td style={summaryValueTd}>
+                            {reportName || (
+                              <span
+                                style={{
+                                  color: "#6b7280",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                Not set
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        <tr style={summaryRowStyle}>
+                          <td style={summaryLabelTd}>Period</td>
+                          <td style={summaryValueTd}>{getPeriodLabel()}</td>
+                        </tr>
+                        <tr style={summaryRowStyle}>
+                          <td style={summaryLabelTd}>Frequency</td>
+                          <td style={summaryValueTd}>{getFrequencyText()}</td>
+                        </tr>
+                        <tr style={summaryRowStyle}>
+                          <td style={summaryLabelTd}>Time</td>
+                          <td style={summaryValueTd}>{timeOfDay}</td>
+                        </tr>
+                        <tr style={summaryRowStyle}>
+                          <td style={summaryLabelTd}>Recipients</td>
+                          <td style={summaryValueTd}>
+                            {getRecipientCount() > 0 ? (
+                              `${getRecipientCount()} recipient${getRecipientCount() > 1 ? "s" : ""}`
+                            ) : (
+                              <span
+                                style={{
+                                  color: "#6b7280",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                Not set
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style={summaryLabelTd}>Format</td>
+                          <td style={summaryValueTd}>
+                            {csvFormat || excelFormat ? (
+                              getFormats()
+                            ) : (
+                              <span
+                                style={{
+                                  color: "#6b7280",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                Not set
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Info Panel */}
+                <div style={sectionBoxStyle}>
+                  <div style={{ padding: "16px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <Info
+                        style={{
+                          width: "14px",
+                          height: "14px",
+                          color: "#39BDF8",
+                        }}
+                      />
+                      <h4
+                        style={{
+                          color: "#e5e5e5",
+                          fontSize: "11px",
+                          textTransform: "uppercase",
+                          letterSpacing: "-0.025em",
+                          fontFamily: font,
+                        }}
+                      >
+                        Automation
+                      </h4>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <ArrowRight className="w-4 h-4 text-[#faff6a] flex-shrink-0 mt-0.5" />
-                      <span>Pause or edit schedule anytime</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <ArrowRight className="w-4 h-4 text-[#faff6a] flex-shrink-0 mt-0.5" />
-                      <span>All recipients get same report</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px",
+                        fontSize: "11px",
+                        color: "#9ca3af",
+                        fontFamily: font,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "8px",
+                        }}
+                      >
+                        <ArrowRight
+                          style={{
+                            width: "12px",
+                            height: "12px",
+                            color: "#39BDF8",
+                            flexShrink: 0,
+                            marginTop: "2px",
+                          }}
+                        />
+                        <span>Reports generated automatically</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "8px",
+                        }}
+                      >
+                        <ArrowRight
+                          style={{
+                            width: "12px",
+                            height: "12px",
+                            color: "#39BDF8",
+                            flexShrink: 0,
+                            marginTop: "2px",
+                          }}
+                        />
+                        <span>Edit or pause anytime</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "8px",
+                        }}
+                      >
+                        <ArrowRight
+                          style={{
+                            width: "12px",
+                            height: "12px",
+                            color: "#39BDF8",
+                            flexShrink: 0,
+                            marginTop: "2px",
+                          }}
+                        />
+                        <span>Delivery confirmation emails</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Footer Buttons */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "12px",
+                paddingTop: "24px",
+                marginTop: "24px",
+                borderTop: "1px solid #2a2a2a",
+              }}
+            >
+              <button
+                onClick={onClose}
+                style={{
+                  ...buttonBase,
+                  backgroundColor: "transparent",
+                  border: "1px solid #2a2a2a",
+                  color: "#e5e5e5",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#2a2a2a")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                style={{
+                  ...buttonBase,
+                  backgroundColor: "#39BDF8",
+                  color: "#0a0a0a",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#29ADEE")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#39BDF8")
+                }
+              >
+                <Zap style={{ width: "16px", height: "16px" }} />
+                Create Schedule
+              </button>
+            </div>
           </div>
         </div>
-
-        <Separator className="bg-[#3a3a35] mt-6" />
-
-        <div className="flex justify-end gap-3 pt-4">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35]"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            className="bg-[#faff6a] text-[#1f1f1c] hover:bg-[#e8ef5a]"
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            Create Schedule
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </>
   );
 }

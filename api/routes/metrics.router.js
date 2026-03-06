@@ -25,7 +25,7 @@ const { format, subMonths, addMonths, parseISO } = require("date-fns");
 router.get("/metadata/last-refresh", requireUserApi, async (req, res) => {
   try {
     const result = await pgPool.query(
-      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'"
+      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'",
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Not found" });
@@ -52,13 +52,13 @@ router.get(
       // Simple check: Does data exist for this hotel?
       const check = await pgPool.query(
         "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1::integer LIMIT 1",
-        [propertyId]
+        [propertyId],
       );
       res.json({ isSyncComplete: check.rows.length > 0 });
     } catch (error) {
       res.status(500).json({ error: "Failed to check sync status" });
     }
-  }
+  },
 );
 
 // 1. KPI Summary
@@ -82,20 +82,20 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     // Quick CompSet Fetch (Inline for now, move to HotelService later)
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
+      [propertyId],
     );
     let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id
+      (row) => row.competitor_hotel_id,
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+        [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
           "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId]
+          [catRes.rows[0].category, propertyId],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -105,7 +105,7 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       propertyId,
       startDate,
       endDate,
-      competitorIds
+      competitorIds,
     );
     res.json(data);
   } catch (error) {
@@ -130,7 +130,7 @@ router.get("/range", requireUserApi, async (req, res) => {
       propertyId,
       startDate,
       endDate,
-      granularity
+      granularity,
     );
     res.json({ metrics });
   } catch (error) {
@@ -149,20 +149,20 @@ router.get("/competitors", requireUserApi, async (req, res) => {
     // Fetch CompSet (Inline for now)
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
+      [propertyId],
     );
     let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id
+      (row) => row.competitor_hotel_id,
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+        [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
           "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId]
+          [catRes.rows[0].category, propertyId],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -172,7 +172,7 @@ router.get("/competitors", requireUserApi, async (req, res) => {
       competitorIds,
       startDate,
       endDate,
-      granularity
+      granularity,
     );
     // Add static source text as per original router
     data.source = "a comp set of local hotels in a similar quality class";
@@ -193,20 +193,20 @@ router.get("/ranking", requireUserApi, async (req, res) => {
     // Fetch CompSet (Inline)
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
+      [propertyId],
     );
     let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id
+      (row) => row.competitor_hotel_id,
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+        [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
           "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId]
+          [catRes.rows[0].category, propertyId],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -224,7 +224,7 @@ router.get("/ranking", requireUserApi, async (req, res) => {
       propertyId,
       competitorIds,
       startDate,
-      endDate
+      endDate,
     );
     const totalHotels = competitorIds.length + 1;
 
@@ -262,20 +262,20 @@ router.get("/chart", requireUserApi, async (req, res) => {
     // Fetch CompSet (Inline)
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
+      [propertyId],
     );
     let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id
+      (row) => row.competitor_hotel_id,
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+        [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
           "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId]
+          [catRes.rows[0].category, propertyId],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -286,7 +286,7 @@ router.get("/chart", requireUserApi, async (req, res) => {
       competitorIds,
       startDate,
       endDate,
-      granularity
+      granularity,
     );
     res.json(data);
   } catch (error) {
@@ -317,20 +317,20 @@ router.get("/summary", requireUserApi, async (req, res) => {
     // CompSet (Inline)
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
+      [propertyId],
     );
     let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id
+      (row) => row.competitor_hotel_id,
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+        [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
           "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId]
+          [catRes.rows[0].category, propertyId],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -362,6 +362,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
       pickupRows,
       flowcastRows,
       recentActivityRows,
+      hotelMetaResult,
     ] = await Promise.all([
       MetricsService.getDashboardSnapshot(propertyId),
       MarketService.getMarketOutlook(citySlug), // [FIX] Use MarketService
@@ -370,18 +371,18 @@ router.get("/summary", requireUserApi, async (req, res) => {
         propertyId,
         competitorIds,
         format(subMonths(today, 1), "yyyy-MM-dd"),
-        format(today, "yyyy-MM-dd")
+        format(today, "yyyy-MM-dd"),
       ), // Ranking is roughly last month/current
       getBenchmarks(
         propertyId,
         format(lastMonthDate, "MMM"),
-        format(lastMonthDate, "yyyy")
+        format(lastMonthDate, "yyyy"),
       ),
       getBenchmarks(propertyId, format(today, "MMM"), format(today, "yyyy")),
       getBenchmarks(
         propertyId,
         format(nextMonthDate, "MMM"),
-        format(nextMonthDate, "yyyy")
+        format(nextMonthDate, "yyyy"),
       ),
       pgPool.query(budgetSql, [propertyId]),
       MetricsService.getYearOnYearMetrics(propertyId, lastYear, currentYear), // Reuse YTD Logic
@@ -389,6 +390,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
       MetricsService.getPickupHistory(propertyId),
       MetricsService.getDashboardFlowcast(propertyId),
       MetricsService.getRecentActivity(propertyId),
+      pgPool.query("SELECT * FROM hotels WHERE hotel_id = $1", [propertyId]),
     ]);
 
     // --- Processing Logic (Copied from dashboard.router.js) ---
@@ -403,7 +405,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
     // Process Pickup
     const pickupMap = new Map();
     pickupRows.forEach((r) =>
-      pickupMap.set(r.period, parseInt(r.history_rooms_sold || 0, 10))
+      pickupMap.set(r.period, parseInt(r.history_rooms_sold || 0, 10)),
     );
     const calcPickup = (liveSold, periodKey) => {
       const historySold = pickupMap.get(periodKey);
@@ -482,7 +484,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
         pacingStatus: currentMonthPacing,
         pickup: calcPickup(
           parseFloat(currentMonth.total_sold_room_nights),
-          formatPeriodKey(today)
+          formatPeriodKey(today),
         ),
       },
       nextMonth: {
@@ -496,7 +498,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
         pacingStatus: nextMonthPacing,
         pickup: calcPickup(
           parseFloat(nextMonth.total_sold_room_nights),
-          formatPeriodKey(addMonths(today, 1))
+          formatPeriodKey(addMonths(today, 1)),
         ),
       },
     };
@@ -511,13 +513,13 @@ router.get("/summary", requireUserApi, async (req, res) => {
     }));
 
     const validPatterns = processedDemand.filter(
-      (r) => r.market_demand_score != null
+      (r) => r.market_demand_score != null,
     );
     const sortedByDemandDesc = [...validPatterns].sort(
-      (a, b) => b.market_demand_score - a.market_demand_score
+      (a, b) => b.market_demand_score - a.market_demand_score,
     );
     const sortedByDemandAsc = [...validPatterns].sort(
-      (a, b) => a.market_demand_score - b.market_demand_score
+      (a, b) => a.market_demand_score - b.market_demand_score,
     );
     const formatPatternRow = (row) => ({
       date: row.checkin_date,
@@ -570,7 +572,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
     const currentMonthIndex = today.getMonth();
     const ytdResultMap = new Map();
     ytdTrendRows.forEach((r) =>
-      ytdResultMap.set(parseInt(r.month_number, 10), r)
+      ytdResultMap.set(parseInt(r.month_number, 10), r),
     );
 
     for (let i = 0; i <= currentMonthIndex; i++) {
@@ -642,7 +644,20 @@ router.get("/summary", requireUserApi, async (req, res) => {
         isToday: row.isToday,
       };
     });
+    // Extract currency from hotel meta (fallback to £ if column doesn't exist or is empty)
+    // Extract currency code from database
+    const hotelData = hotelMetaResult.rows[0] || {};
+    const dbCurrencyCode = (hotelData.currency_code || "GBP").toUpperCase();
+
+    // Map code to symbol for the frontend
+    let currencySymbol = "£"; // Default to GBP
+    if (dbCurrencyCode === "USD") currencySymbol = "$";
+    else if (dbCurrencyCode === "EUR") currencySymbol = "€";
+    else if (dbCurrencyCode === "IDR") currencySymbol = "Rp ";
+    // Add other currencies here if your portfolio expands!
+
     res.json({
+      currencySymbol,
       snapshot,
       marketOutlook,
       forwardDemandChartData,
@@ -722,7 +737,7 @@ router.get("/reports/takings", requireUserApi, async (req, res) => {
     const { startDate, endDate, propertyId } = req.query;
 
     console.log(
-      `[Takings Report] Request received. Property: ${propertyId}, Range: ${startDate} to ${endDate}`
+      `[Takings Report] Request received. Property: ${propertyId}, Range: ${startDate} to ${endDate}`,
     );
 
     if (!startDate || !endDate) {
@@ -734,7 +749,7 @@ router.get("/reports/takings", requireUserApi, async (req, res) => {
     // Resolve User's Portfolio with Dual-Identity Lookup
     const userResult = await pgPool.query(
       "SELECT user_id, cloudbeds_user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
     if (userResult.rows.length === 0)
       return res.status(401).json({ error: "User not found" });
@@ -755,7 +770,7 @@ router.get("/reports/takings", requireUserApi, async (req, res) => {
     const accessibleIds = propResult.rows.map((r) => parseInt(r.property_id));
 
     console.log(
-      `[Takings Report] Accessible Hotel IDs: ${accessibleIds.join(", ")}`
+      `[Takings Report] Accessible Hotel IDs: ${accessibleIds.join(", ")}`,
     );
 
     // 2. Determine target hotels
@@ -772,7 +787,7 @@ router.get("/reports/takings", requireUserApi, async (req, res) => {
 
       if (!accessibleIds.includes(requestedId)) {
         console.warn(
-          `[Takings Report] Access denied. User requested ${requestedId} but has ${accessibleIds}`
+          `[Takings Report] Access denied. User requested ${requestedId} but has ${accessibleIds}`,
         );
         return res
           .status(403)
@@ -787,19 +802,19 @@ router.get("/reports/takings", requireUserApi, async (req, res) => {
 
     if (hotelIds.length === 0) {
       console.warn(
-        `[Takings Report] No hotels selected. Returning empty array.`
+        `[Takings Report] No hotels selected. Returning empty array.`,
       );
       return res.json([]);
     }
 
     console.log(
-      `[Takings Report] Fetching data for hotels: ${hotelIds.join(", ")}`
+      `[Takings Report] Fetching data for hotels: ${hotelIds.join(", ")}`,
     );
 
     const report = await MetricsService.getGroupTakingsReport(
       hotelIds,
       startDate,
-      endDate
+      endDate,
     );
     res.json(report);
   } catch (error) {
@@ -876,20 +891,20 @@ router.post("/reports/run", requireUserApi, async (req, res) => {
     // Fetch CompSet (Inline)
     const compSetResult = await pgPool.query(
       "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId]
+      [propertyId],
     );
     let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id
+      (row) => row.competitor_hotel_id,
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
         "SELECT category FROM hotels WHERE hotel_id = $1",
-        [propertyId]
+        [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
           "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId]
+          [catRes.rows[0].category, propertyId],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -902,7 +917,7 @@ router.post("/reports/run", requireUserApi, async (req, res) => {
       granularity,
       metrics,
       includeTaxes,
-      competitorIds
+      competitorIds,
     );
     res.json(data);
   } catch (error) {
@@ -921,7 +936,7 @@ router.post("/reports/year-on-year", requireUserApi, async (req, res) => {
     const rows = await MetricsService.getYearOnYearMetrics(
       propertyId,
       year1,
-      year2
+      year2,
     );
 
     const monthNames = [
@@ -983,7 +998,7 @@ router.post("/reports/year-on-year", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error(
       `[API ERROR] Year-on-Year report failed for property ${req.body?.propertyId}:`,
-      error
+      error,
     );
     res
       .status(500)
@@ -996,7 +1011,7 @@ router.get("/reports/scheduled", requireUserApi, async (req, res) => {
   try {
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
     if (userResult.rows.length === 0)
       return res.status(401).json({ error: "User not found" });
@@ -1004,7 +1019,7 @@ router.get("/reports/scheduled", requireUserApi, async (req, res) => {
 
     const { rows } = await pgPool.query(
       `SELECT sr.*, h.property_name FROM scheduled_reports sr LEFT JOIN hotels h ON (CASE WHEN sr.property_id ~ '^[0-9]+$' THEN sr.property_id::int ELSE NULL END) = h.hotel_id WHERE sr.user_id = $1 ORDER BY sr.created_at DESC`,
-      [internalUserId]
+      [internalUserId],
     );
     res.json(rows);
   } catch (error) {
@@ -1015,7 +1030,7 @@ router.post("/reports/scheduled", requireUserApi, async (req, res) => {
   try {
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
     if (userResult.rows.length === 0)
       return res.status(401).json({ error: "User not found" });
@@ -1059,14 +1074,14 @@ router.post("/reports/scheduled", requireUserApi, async (req, res) => {
     const safeMetricsMarket = isShreeji
       ? []
       : Array.isArray(metricsMarket)
-      ? metricsMarket
-      : [];
+        ? metricsMarket
+        : [];
     const safeAddComparisons = isShreeji ? false : !!addComparisons;
-    const safeDisplayOrder = isShreeji ? "metric" : displayOrder ?? "metric";
+    const safeDisplayOrder = isShreeji ? "metric" : (displayOrder ?? "metric");
     const safeDisplayTotals = isShreeji ? false : displayTotals;
-    const safeIncludeTaxes = isShreeji ? false : includeTaxes ?? true;
-    const safeReportPeriod = isShreeji ? "daily" : reportPeriod ?? "daily";
-    const safeAttachmentFormats = isShreeji ? [] : attachmentFormats ?? [];
+    const safeIncludeTaxes = isShreeji ? false : (includeTaxes ?? true);
+    const safeReportPeriod = isShreeji ? "daily" : (reportPeriod ?? "daily");
+    const safeAttachmentFormats = isShreeji ? [] : (attachmentFormats ?? []);
 
     const result = await pgPool.query(
       `INSERT INTO scheduled_reports (user_id, property_id, report_name, recipients, frequency, day_of_week, day_of_month, time_of_day, metrics_hotel, metrics_market, add_comparisons, display_order, display_totals, include_taxes, report_period, attachment_formats, report_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
@@ -1088,7 +1103,7 @@ router.post("/reports/scheduled", requireUserApi, async (req, res) => {
         safeReportPeriod,
         safeAttachmentFormats,
         safeReportType,
-      ]
+      ],
     );
     res.json(result.rows[0]);
   } catch (error) {
@@ -1102,7 +1117,7 @@ router.delete("/reports/scheduled/:id", requireUserApi, async (req, res) => {
     const { id } = req.params;
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
     if (userResult.rows.length === 0)
       return res.status(401).json({ error: "User not found" });
@@ -1110,7 +1125,7 @@ router.delete("/reports/scheduled/:id", requireUserApi, async (req, res) => {
 
     const deleteResult = await pgPool.query(
       `DELETE FROM scheduled_reports WHERE id = $1 AND user_id = $2 RETURNING id`,
-      [id, internalUserId]
+      [id, internalUserId],
     );
     if (deleteResult.rowCount === 0)
       return res.status(404).json({ error: "Scheduled report not found." });
@@ -1131,7 +1146,7 @@ router.get("/portfolio", requireUserApi, async (req, res) => {
     // Resolve internal user ID from session
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
     if (userResult.rows.length === 0) {
       return res.status(401).json({ error: "User not found" });
@@ -1151,7 +1166,7 @@ router.get("/portfolio/detailed", requireUserApi, async (req, res) => {
   try {
     const userResult = await pgPool.query(
       "SELECT user_id FROM users WHERE cloudbeds_user_id = $1",
-      [req.session.userId]
+      [req.session.userId],
     );
     if (userResult.rows.length === 0) {
       return res.status(401).json({ error: "User not found" });
@@ -1175,14 +1190,14 @@ router.get(
       const { group, hotelId } = req.query;
       const data = await MetricsService.getPortfolioOccupancyProblemList(
         group,
-        hotelId
+        hotelId,
       );
       res.json(data);
     } catch (error) {
       console.error("Error fetching portfolio occupancy problem list:", error);
       res.status(500).json({ error: "Internal server error" });
     }
-  }
+  },
 );
 
 router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
@@ -1201,7 +1216,7 @@ router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
         const benchmarkData = await getBenchmarks(
           row.hotel_id,
           currentMonthName,
-          currentYear
+          currentYear,
         );
         const benchmarkAdr = benchmarkData.benchmarkAdr;
         const benchmarkOcc = benchmarkData.benchmarkOcc / 100.0;
@@ -1237,8 +1252,8 @@ router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
           (benchmarkAdr > 0
             ? currentMonthRequiredADR / benchmarkAdr
             : currentMonthRequiredADR > 0
-            ? 999
-            : 1) * 100;
+              ? 999
+              : 1) * 100;
         let quadrant, currentMonthStatus;
         if (currentMonthRequiredADR === 99999) currentMonthStatus = "red";
         else if (pacingDifficultyPercent > 115) currentMonthStatus = "red";
@@ -1262,8 +1277,8 @@ router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
           (benchmarkAdr > 0
             ? nextMonthRequiredADR / benchmarkAdr
             : nextMonthRequiredADR > 0
-            ? 999
-            : 1) * 100;
+              ? 999
+              : 1) * 100;
         if (nextMonthRequiredADR === 99999) nextMonthStatus = "red";
         else if (nextPacingDifficulty > 115) nextMonthStatus = "red";
         else if (nextPacingDifficulty > 100) nextMonthStatus = "yellow";
@@ -1284,7 +1299,7 @@ router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
           nextMonthShortfall,
           nextMonthRequiredADR,
         };
-      })
+      }),
     );
 
     res.json(results);
@@ -1299,7 +1314,7 @@ router.get("/portfolio/matrix", requireAdminApi, async (req, res) => {
     const { group, hotelId } = req.query;
     const rows = await MetricsService.getPortfolioOccupancyMatrix(
       group,
-      hotelId
+      hotelId,
     );
 
     // Post-process nested structure

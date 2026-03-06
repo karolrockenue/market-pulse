@@ -8,7 +8,9 @@ import { toast } from "sonner";
 // --- LOCAL FEATURE COMPONENTS (./components) ---
 import { ReportSelector } from "./components/ReportSelector";
 import { ReportTable } from "./components/ReportTable";
-import { ReportControls } from "./components/ReportControls";
+import { RoundedGridReportControls } from "./components/RoundedGridReportControls";
+import { MetricSelectorChips } from "./components/MetricSelectorChips";
+import { FormattingOptions } from "./components/FormattingOptions";
 import { ReportActions } from "./components/ReportActions";
 import { BudgetReport } from "./components/BudgetReport";
 import { YearOnYearReport } from "./components/YearOnYearReport";
@@ -27,6 +29,7 @@ import { useScheduledReports } from "./hooks/useScheduledReports";
 
 interface ReportsHubProps {
   hotelId: string;
+  propertyName?: string; // Used for export filenames
   currencySymbol: string; // e.g. '$', '£'
   currencyCode: string; // e.g. 'USD', 'GBP'
   userRole?: string;
@@ -34,6 +37,7 @@ interface ReportsHubProps {
 
 export const ReportsHub: React.FC<ReportsHubProps> = ({
   hotelId,
+  propertyName,
   currencySymbol,
   currencyCode,
   userRole,
@@ -55,8 +59,11 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
     "total-revenue",
   ]);
   const [displayTotals, setDisplayTotals] = useState(true);
-  const [taxInclusive, setTaxInclusive] = useState(false);
+  const [taxInclusive, setTaxInclusive] = useState(true);
   const [showMarketComparisons, setShowMarketComparisons] = useState(false);
+
+  // --- STATE: Modals ---
+  const [tableLayout, setTableLayout] = useState("group-by-metric");
 
   // --- STATE: Modals ---
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
@@ -97,18 +104,30 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
     switch (datePreset) {
       case "last-week":
         newStart = new Date(
-          Date.UTC(currentYear, currentMonth, currentDay - currentDayOfWeek - 6)
+          Date.UTC(
+            currentYear,
+            currentMonth,
+            currentDay - currentDayOfWeek - 6,
+          ),
         );
         newEnd = new Date(
-          Date.UTC(currentYear, currentMonth, currentDay - currentDayOfWeek)
+          Date.UTC(currentYear, currentMonth, currentDay - currentDayOfWeek),
         );
         break;
       case "current-week":
         newStart = new Date(
-          Date.UTC(currentYear, currentMonth, currentDay - currentDayOfWeek + 1)
+          Date.UTC(
+            currentYear,
+            currentMonth,
+            currentDay - currentDayOfWeek + 1,
+          ),
         );
         newEnd = new Date(
-          Date.UTC(currentYear, currentMonth, currentDay - currentDayOfWeek + 7)
+          Date.UTC(
+            currentYear,
+            currentMonth,
+            currentDay - currentDayOfWeek + 7,
+          ),
         );
         break;
       case "current-month":
@@ -186,13 +205,101 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
     setSelectedMetrics((prev) =>
       prev.includes(metric)
         ? prev.filter((m) => m !== metric)
-        : [...prev, metric]
+        : [...prev, metric],
     );
+  };
+  const downloadCSV = (data: any[], fileName: string) => {
+    if (!data || data.length === 0) return;
+
+    const headers = Object.keys(data[0]);
+
+    // 1. Helper to format values consistently with the UI logic
+    const formatCsvValue = (fieldName: string, value: any) => {
+      const safeValue = Number(value) || 0;
+      if (fieldName.toLowerCase().includes("occupancy")) {
+        return `${(safeValue * 100).toFixed(1)}%`;
+      }
+      if (
+        fieldName.toLowerCase().includes("adr") ||
+        fieldName.toLowerCase().includes("revenue") ||
+        fieldName.toLowerCase().includes("revpar")
+      ) {
+        return safeValue.toFixed(2);
+      }
+      return value ?? "";
+    };
+
+    // 2. Build Data Rows (Standard CSV escaping)
+    const dataRows = data.map((row) =>
+      headers
+        .map((fieldName) => {
+          const formatted = formatCsvValue(fieldName, row[fieldName]);
+          return `"${("" + formatted).replace(/"/g, '""')}"`;
+        })
+        .join(","),
+    );
+
+    // 3. Calculate Totals Row (Mirroring calculateAggregate from ReportTable.tsx)
+    const totalsRow = headers
+      .map((fieldName) => {
+        if (fieldName === "period") return '"Total / Avg"';
+
+        const sum = data.reduce(
+          (acc, row) => acc + (Number(row[fieldName]) || 0),
+          0,
+        );
+        const isVolume =
+          fieldName.includes("revenue") ||
+          fieldName.includes("rooms-sold") ||
+          fieldName.includes("rooms-unsold");
+
+        const finalVal = isVolume ? sum : sum / data.length;
+        const formattedTotal = formatCsvValue(fieldName, finalVal);
+        return `"${("" + formattedTotal).replace(/"/g, '""')}"`;
+      })
+      .join(",");
+
+    // 4. Combine: Strictly [Headers] + [Data] + [Totals] with no leading text
+    const csvContent = [headers.join(","), ...dataRows, totalsRow].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${fileName}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleExport = (format: "csv" | "xlsx") => {
-    toast.info(`Export to ${format.toUpperCase()} coming soon.`);
-    // TODO: Connect to backend export endpoint
+    if (!data || !data.rows || data.rows.length === 0) {
+      toast.error("No data available to export. Please run the report first.");
+      return;
+    }
+
+    if (format === "csv") {
+      // 1. Format the report name (e.g., "performance-metrics" -> "Performance Metrics")
+      const reportName = activeReportType
+        ? activeReportType
+            .split("-")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ")
+        : "Report";
+
+      // 2. Property Name Lookup (Uses prop, falls back to hotelId)
+      const exportPropName = propertyName || hotelId || "Property";
+
+      // 3. Clean Filename with spaces
+      const fileName = `${reportName} ${exportPropName} ${startDate} to ${endDate}`;
+
+      // 4. Trigger Download
+      downloadCSV(data.rows, fileName);
+      toast.success("CSV Export successful");
+    } else {
+      toast.info("Excel (.xlsx) export coming soon. Please use CSV for now.");
+    }
   };
 
   // --- RENDER ---
@@ -322,55 +429,92 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
 
   // 3. Generic/Core Reports (Performance Metrics) - Managed by Hub State
   return (
-    <div style={{ minHeight: "100vh", position: "relative" }}>
-      {/* Fixed Full-Screen Background */}
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#1d1d1c",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Background gradient */}
       <div
         style={{
-          position: "fixed",
-          inset: 0,
-          backgroundColor: "#1d1d1c",
-          zIndex: 0,
-          pointerEvents: "none",
+          position: "absolute",
+          inset: "0",
+          background:
+            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(57, 189, 248, 0.01))",
         }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(250, 255, 106, 0.01))",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-            backgroundSize: "64px 64px",
-          }}
-        />
-      </div>
+      ></div>
+      {/* Grid overlay */}
+      <div
+        style={{
+          position: "absolute",
+          inset: "0",
+          backgroundImage:
+            "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+        }}
+      ></div>
+
       <div style={{ position: "relative", zIndex: 10, padding: "24px" }}>
-        {/* Header & Actions */}
-        {/* Header & Actions */}
-        <div className="mb-6 flex items-center justify-between">
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            marginBottom: "24px",
+          }}
+        >
           <div>
             <button
               onClick={handleBack}
-              className="text-[#9ca3af] hover:text-[#faff6a] text-sm mb-2 flex items-center gap-2 transition-colors"
+              style={{
+                background: "none",
+                border: "none",
+                color: "#6b7280",
+                fontSize: "12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "8px",
+                padding: "0",
+                textTransform: "uppercase",
+                letterSpacing: "-0.025em",
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#39BDF8")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#6b7280")}
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Report Selection</span>
             </button>
-            <h1 className="text-white text-2xl mb-1">
+            <div
+              style={{
+                color: "#e5e5e5",
+                fontSize: "18px",
+                textTransform: "uppercase",
+                letterSpacing: "-0.025em",
+                marginBottom: "6px",
+              }}
+            >
               Performance Metrics Report
-            </h1>
-            <p className="text-[#9ca3af] text-sm">
+            </div>
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "-0.025em",
+              }}
+            >
               Comprehensive analysis of occupancy, ADR, RevPAR, and market
               comparisons
-            </p>
+            </div>
           </div>
+
           <ReportActions
             onExportCSV={() => handleExport("csv")}
             onExportExcel={() => handleExport("xlsx")}
@@ -379,58 +523,108 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
           />
         </div>
 
-        {/* Controls */}
-        <div className="mb-6">
-          <ReportControls
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            datePreset={datePreset}
-            setDatePreset={setDatePreset}
-            granularity={granularity}
-            setGranularity={setGranularity}
-            onRunReport={handleRunReport}
-            isLoading={loading}
-          />
-        </div>
-
-        {/* Data View */}
-        <ReportTable
-          data={data?.rows || []} // The hook returns ReportData structure
-          isLoading={loading}
-          granularity={granularity}
-          startDate={startDate}
-          endDate={endDate}
-          currencyCode={currencyCode}
-          // State Props
-          selectedMetrics={selectedMetrics}
-          onToggleMetric={handleToggleMetric}
-          displayTotals={displayTotals}
-          setDisplayTotals={setDisplayTotals}
-          taxInclusive={taxInclusive}
-          setTaxInclusive={setTaxInclusive}
-          showMarketComparisons={showMarketComparisons}
-          setShowMarketComparisons={setShowMarketComparisons}
-        />
-
-        {/* Modals */}
-        <CreateScheduleModal
-          open={showCreateSchedule}
-          onClose={() => setShowCreateSchedule(false)}
-          onSave={async (payload) => {
-            // We might need to map the modal payload to the API payload here
-            await addSchedule({ ...payload, hotelId });
-            setShowCreateSchedule(false);
+        {/* Unified Canvas — single #1A1A1A card */}
+        <div
+          style={{
+            backgroundColor: "rgb(26, 26, 26)",
+            borderRadius: "8px",
+            border: "1px solid #2a2a2a",
+            overflow: "hidden",
+            minHeight: "calc(100vh - 160px)",
+            display: "flex",
+            flexDirection: "column",
           }}
-        />
-        <ManageSchedulesModal
-          open={showManageSchedules}
-          onClose={() => setShowManageSchedules(false)}
-          schedules={schedules}
-          onDelete={async (id) => await removeSchedule(id, hotelId)}
-        />
-      </div>{" "}
+        >
+          {/* Section 1: Report Controls */}
+          <div style={{ padding: "20px 24px" }}>
+            <RoundedGridReportControls
+              startDate={startDate}
+              endDate={endDate}
+              setStartDate={setStartDate}
+              setEndDate={setEndDate}
+              datePreset={datePreset}
+              setDatePreset={setDatePreset}
+              granularity={granularity}
+              setGranularity={setGranularity}
+              onRunReport={handleRunReport}
+              transparent
+            />
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a" }} />
+
+          {/* Section 2: Metrics + Formatting */}
+          <div style={{ padding: "20px 24px" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: "32px",
+              }}
+            >
+              <MetricSelectorChips
+                selectedMetrics={selectedMetrics}
+                onToggleMetric={handleToggleMetric}
+              />
+              <div
+                style={{
+                  width: "1px",
+                  backgroundColor: "#2a2a2a",
+                  alignSelf: "stretch",
+                }}
+              />
+              <FormattingOptions
+                displayTotals={displayTotals}
+                setDisplayTotals={setDisplayTotals}
+                taxInclusive={taxInclusive}
+                setTaxInclusive={setTaxInclusive}
+                showMarketComparisons={showMarketComparisons}
+                setShowMarketComparisons={setShowMarketComparisons}
+                tableLayout={tableLayout}
+                setTableLayout={setTableLayout}
+              />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a" }} />
+          {/* Report Table */}
+          <div style={{ flex: 1 }}>
+            <ReportTable
+              startDate={startDate}
+              endDate={endDate}
+              granularity={granularity}
+              selectedMetrics={selectedMetrics}
+              displayTotals={displayTotals}
+              showMarketComparisons={showMarketComparisons}
+              taxInclusive={taxInclusive}
+              tableLayout={tableLayout}
+              data={data?.rows || []}
+              currencySymbol={currencySymbol}
+              transparent
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <CreateScheduleModal
+        open={showCreateSchedule}
+        onClose={() => setShowCreateSchedule(false)}
+        onSave={async (payload) => {
+          await addSchedule({ ...payload, hotelId });
+          setShowCreateSchedule(false);
+        }}
+      />
+      <ManageSchedulesModal
+        open={showManageSchedules}
+        onClose={() => setShowManageSchedules(false)}
+        schedules={schedules}
+        onDelete={async (id) => await removeSchedule(id, hotelId)}
+      />
     </div>
   );
 };

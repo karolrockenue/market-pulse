@@ -4,9 +4,13 @@ import { type RecentActivityDay } from "../api/dashboard.api";
 
 interface RecentBookingsProps {
   data: RecentActivityDay[];
+  currencySymbol?: string;
 }
 
-export function RecentBookings({ data }: RecentBookingsProps) {
+export function RecentBookings({
+  data,
+  currencySymbol = "£",
+}: RecentBookingsProps) {
   // Use passed data
   const bookingData = data || [];
 
@@ -164,7 +168,10 @@ export function RecentBookings({ data }: RecentBookingsProps) {
             </div>
 
             <div style={styles.valueCell}>
-              <div style={styles.mainValue}>£{Math.round(day.adr)}</div>
+              <div style={styles.mainValue}>
+                {currencySymbol}
+                {Math.round(day.adr)}
+              </div>
             </div>
 
             <div style={styles.valueCell}>
@@ -175,7 +182,8 @@ export function RecentBookings({ data }: RecentBookingsProps) {
                   fontSize: "11px",
                 }}
               >
-                £{Math.round(day.revenue).toLocaleString()}
+                {currencySymbol}
+                {Math.round(day.revenue).toLocaleString()}
               </div>
             </div>
           </div>
