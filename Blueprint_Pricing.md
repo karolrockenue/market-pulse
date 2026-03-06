@@ -314,3 +314,56 @@ Module: sentinel_live.py (Pricing Engine) & sentinel.bridge.service.js (Context 
 4. Required Infrastructure Changes
    Bridge Service: Update getHotelContext to join pacing_snapshots twice to calculate pickup_48h.
    Engine: Implement occ_deficit as the primary gatekeeper for the calculate_optimal_rate decision fork.
+
+CHANGELOG Entry:
+[2026-03-06] - Navigator v6 Deployment ("Open Sky" & Proportional Ratchet)
+Status: Logic Specification & Implementation Deployed to DGX.
+
+Module: sentinel_live.py (Pricing Engine).
+
+1. The Problem: The "Interpolation Trap" & Binary States
+
+The Symptom: Properties were falling into a binary "Full or Empty" state. Fast-paced months (e.g., March for Portico) were massively pre-selling, while High Season dates (e.g., May) were under-pricing and selling out too early.
+
+The Root Cause: The v5 engine calculated a price_band by subtracting the min_rate from the dynamic_max. The AI then applied a slide_factor to this band. However, because manual dynamic_max rates were often set too low, the AI physically lacked the mathematical "runway" to apply the brakes during a booking surge. The Max Rate was acting as a heavy anchor pulling prices down, rather than a safety net.
+
+2. The Solution: The "Open Sky" Model
+   We completely ripped out the interpolation logic. The engine no longer slides between a Min and Max rate. Instead, it uses a Base + Step proportional ratchet. The Dynamic Max rate has been demoted to a simple "Bouncer at the Door"—it only steps in at the very end to cap the final calculated price, allowing the AI to organically push rates as high as the positive delta demands.
+
+3. The Exact New Logic Architecture (v6):
+
+Rule 1: The Base Anchor (Scalability)
+
+To ensure the math scales perfectly across both hostels (£20) and 5-star properties (£250), the core calculations now use percentage multipliers instead of flat cash steps.
+
+Low Season Base: Min Rate
+
+Mid/High Season Base: Min Rate \* 1.50 (Acts as a premium anchor to protect future inventory).
+
+Rule 2: The Hibernate Shield (Time-Based Blindness)
+
+If the system is behind its target curve (Negative Delta), it is forbidden from panicking and dropping the rate if the arrival date is outside the active booking window.
+
+Weekends (Fri/Sat): Shield drops at 30 days out.
+
+Weekdays (Sun-Thu): Shield drops at 40 days out.
+
+Action: If shielded, the AI holds the Base Rate and ignores the negative delta.
+
+Rule 3: The Proportional Ratchet (Yielding Up)
+
+If ahead of the target curve (Positive Delta), the AI applies a direct percentage premium to the Base Rate.
+
+High Season Example (1.5x Aggression): If Delta is +20%, the rate increases by 30% (Base _ 1.30). If Delta is +60%, the rate increases by 90% (Base _ 1.90).
+
+Rule 4: The Deep Deficit Override (Yielding Down)
+
+If inside the active booking window (<30 or <40 days) and struggling, the AI gently decays the rate.
+
+The Panic Button: If the property falls to -30% or worse behind the target curve, the AI abandons the gentle glide path and immediately drops to the absolute Min Rate to aggressively load base occupancy.
+
+Rule 5: Ruthless Decay ("Sell Every Room" Mode)
+
+If the UI is set to "Sell Every Room" and lead time is <= 3 days (72 hours), the AI ignores standard Control Theory.
+
+It applies a continuous exponential decay (roughly 1.9% per hour) to seamlessly glide the current rate down to the absolute Min Rate exactly 24 hours before arrival, ignoring recent velocity to guarantee the final rooms clear.
