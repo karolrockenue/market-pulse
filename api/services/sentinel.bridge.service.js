@@ -361,10 +361,10 @@ class SentinelBridgeService {
           // If DB has 0 (or null converted to 0), and AI has a real price, we MUST push.
           const currentRate = currentData.rate;
 
-          // [UPDATED] Widen deadband to £5.00 to prevent micro-jitter
+          // [UPDATED] Reduced deadband to £1.00 to allow Ruthless Decay micro-drops
           if (
             currentRate !== undefined &&
-            Math.abs(safeRate - currentRate) < 5.0
+            Math.abs(safeRate - currentRate) < 1.0
           ) {
             continue; // No change needed (Price change is insignificant)
           }
