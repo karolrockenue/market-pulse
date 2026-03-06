@@ -135,6 +135,7 @@ class SentinelBridgeService {
           last_minute_floor: config.last_minute_floor || {}, // [FIX] Pass LMF settings to AI
           rules: config.rules || {},
           strategy_mode: config.rules?.strategy_mode || "maintain",
+          pricing_mode: config.rules?.pricing_mode || "maintain_profit", // [FIX] Expose Pricing Mode for Ruthless Decay
         },
         inventory: inventoryWithHistory, // [UPDATED]
         constraints: {
