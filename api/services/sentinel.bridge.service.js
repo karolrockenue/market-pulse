@@ -121,12 +121,25 @@ class SentinelBridgeService {
       );
       console.timeEnd("Step 5 Velocity");
 
+      console.time("Step 6 Market Events");
+      // Step 6: Market Events (Currently defaulting to 'london' as primary market)
+      const eventsRes = await client.query(
+        "SELECT event_date, impact_multiplier FROM sentinel_market_events WHERE market_slug = 'london' AND event_date >= CURRENT_DATE",
+      );
+      const peakDatesMap = {};
+      eventsRes.rows.forEach((row) => {
+        const dStr = new Date(row.event_date).toISOString().split("T")[0];
+        peakDatesMap[dStr] = parseFloat(row.impact_multiplier);
+      });
+      console.timeEnd("Step 6 Market Events");
+
       console.log("[Bridge] Context assembly complete.");
 
       return {
         hotelId,
         generated_at: new Date().toISOString(),
         config: {
+          peak_dates: peakDatesMap, // [NEW] Event Anchors for the Python Engine
           min_rates: config.monthly_min_rates || {},
           currency: "USD",
           seasonality: config.seasonality_profile || {},

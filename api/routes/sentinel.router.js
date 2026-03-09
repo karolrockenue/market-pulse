@@ -1647,4 +1647,62 @@ router.get("/recent-jobs/:hotelId", async (req, res) => {
   }
 });
 
+/**
+ * [NEW] GET /api/sentinel/market-events/:marketSlug
+ * Fetches future market events for a specific city.
+ */
+router.get("/market-events/:marketSlug", async (req, res) => {
+  try {
+    const { marketSlug } = req.params;
+    const { rows } = await db.query(
+      "SELECT * FROM sentinel_market_events WHERE market_slug = $1 ORDER BY event_date ASC",
+      [marketSlug],
+    );
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error(
+      "[Sentinel Router] Fetch market events failed:",
+      error.message,
+    );
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * [NEW] POST /api/sentinel/market-events
+ * Adds a new market event.
+ */
+router.post("/market-events", async (req, res) => {
+  try {
+    const { marketSlug, eventDate, eventName, impactMultiplier } = req.body;
+    const { rows } = await db.query(
+      `INSERT INTO sentinel_market_events (market_slug, event_date, event_name, impact_multiplier) 
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [marketSlug, eventDate, eventName, impactMultiplier],
+    );
+    res.status(200).json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error("[Sentinel Router] Add market event failed:", error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * [NEW] DELETE /api/sentinel/market-events/:id
+ * Deletes a market event.
+ */
+router.delete("/market-events/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.query("DELETE FROM sentinel_market_events WHERE id = $1", [id]);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error(
+      "[Sentinel Router] Delete market event failed:",
+      error.message,
+    );
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

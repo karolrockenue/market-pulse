@@ -260,19 +260,21 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     };
   }, [activeHotels]);
 
-  // Manual Events State (Local UI Mock)
-  const [londonEvents, setLondonEvents] = useState([
-    {
-      id: "1",
-      date: "2024-07-15",
-      name: "Wimbledon Finals",
-      impact: "High Demand",
-    },
-  ]);
+  // Market Events State (DB Driven)
+  const [londonEvents, setLondonEvents] = useState<any[]>([]);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventName, setNewEventName] = useState("");
-  const [newEventImpact, setNewEventImpact] = useState("High Demand");
+  const [newEventImpact, setNewEventImpact] = useState("2.50"); // Default High Demand
+
+  useEffect(() => {
+    fetch("/api/sentinel/market-events/london")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setLondonEvents(data.data);
+      })
+      .catch(console.error);
+  }, []);
 
   // [RESTORED] Market Strategy Seasonality State
   const [londonAggression, setLondonAggression] = useState<
@@ -429,20 +431,46 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     return data;
   };
 
-  const handleAddEvent = () => {
+  const handleAddEvent = async () => {
     if (!newEventDate || !newEventName) return;
-    setLondonEvents((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        date: newEventDate,
-        name: newEventName,
-        impact: newEventImpact,
-      },
-    ]);
-    setIsAddEventOpen(false);
-    setNewEventDate("");
-    setNewEventName("");
+    try {
+      const res = await fetch("/api/sentinel/market-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marketSlug: "london",
+          eventDate: newEventDate,
+          eventName: newEventName,
+          impactMultiplier: parseFloat(newEventImpact),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLondonEvents([...londonEvents, data.data]);
+        setIsAddEventOpen(false);
+        setNewEventDate("");
+        setNewEventName("");
+        toast.success("Market event added successfully.");
+      } else {
+        toast.error(data.error || "Failed to add event");
+      }
+    } catch (err) {
+      toast.error("Network error adding event");
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      const res = await fetch(`/api/sentinel/market-events/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setLondonEvents(londonEvents.filter((e) => e.id !== id));
+        toast.success("Market event removed.");
+      }
+    } catch (err) {
+      toast.error("Failed to delete event");
+    }
   };
 
   return (
@@ -862,47 +890,72 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {londonEvents.map((event) => (
-                              <TableRow
-                                key={event.id}
-                                className="border-[#2a2a2a] hover:bg-[#161616]"
-                              >
-                                <TableCell style={{ color: "#e5e5e5" }}>
-                                  {event.date}
-                                </TableCell>
-                                <TableCell style={{ color: "#e5e5e5" }}>
-                                  {event.name}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant="outline"
-                                    style={{
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      color: "#ef4444",
-                                      borderColor: "rgba(239, 68, 68, 0.3)",
-                                    }}
-                                  >
-                                    {event.impact}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    style={{ color: "#ef4444" }}
-                                    onClick={() =>
-                                      setLondonEvents((prev) =>
-                                        prev.filter((e) => e.id !== event.id),
-                                      )
-                                    }
-                                  >
-                                    <Trash2
-                                      style={{ width: "1rem", height: "1rem" }}
-                                    />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {londonEvents.map((event) => {
+                              let impactLabel = "High Demand";
+                              let color = "#ef4444";
+                              let bg = "rgba(239, 68, 68, 0.1)";
+                              let border = "rgba(239, 68, 68, 0.3)";
+
+                              const mult = parseFloat(event.impact_multiplier);
+                              if (mult <= 1.5) {
+                                impactLabel = "Medium Demand";
+                                color = "#faff6a";
+                                bg = "rgba(250, 255, 106, 0.1)";
+                                border = "rgba(250, 255, 106, 0.3)";
+                              } else if (mult >= 3.0) {
+                                impactLabel = "Extreme Demand";
+                                color = "#c084fc";
+                                bg = "rgba(147, 51, 234, 0.1)";
+                                border = "rgba(147, 51, 234, 0.3)";
+                              }
+
+                              const formattedDate = new Date(event.event_date)
+                                .toISOString()
+                                .split("T")[0];
+
+                              return (
+                                <TableRow
+                                  key={event.id}
+                                  className="border-[#2a2a2a] hover:bg-[#161616]"
+                                >
+                                  <TableCell style={{ color: "#e5e5e5" }}>
+                                    {formattedDate}
+                                  </TableCell>
+                                  <TableCell style={{ color: "#e5e5e5" }}>
+                                    {event.event_name}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      style={{
+                                        backgroundColor: bg,
+                                        color: color,
+                                        borderColor: border,
+                                      }}
+                                    >
+                                      {impactLabel} ({mult}x)
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      style={{ color: "#ef4444" }}
+                                      onClick={() =>
+                                        handleDeleteEvent(event.id)
+                                      }
+                                    >
+                                      <Trash2
+                                        style={{
+                                          width: "1rem",
+                                          height: "1rem",
+                                        }}
+                                      />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -3069,6 +3122,30 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 color: "#e5e5e5",
               }}
             />
+            <Select value={newEventImpact} onValueChange={setNewEventImpact}>
+              <SelectTrigger
+                style={{
+                  backgroundColor: "#0f0f0f",
+                  borderColor: "#2a2a2a",
+                  color: "#e5e5e5",
+                }}
+              >
+                <SelectValue placeholder="Select Demand Impact" />
+              </SelectTrigger>
+              <SelectContent
+                style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}
+              >
+                <SelectItem value="1.50" style={{ color: "#faff6a" }}>
+                  Medium Demand (1.5x Base)
+                </SelectItem>
+                <SelectItem value="2.50" style={{ color: "#ef4444" }}>
+                  High Demand (2.5x Base)
+                </SelectItem>
+                <SelectItem value="3.00" style={{ color: "#c084fc" }}>
+                  Extreme Demand (3.0x Base)
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button
