@@ -1670,17 +1670,40 @@ router.get("/market-events/:marketSlug", async (req, res) => {
 
 /**
  * [NEW] POST /api/sentinel/market-events
- * Adds a new market event.
+ * Adds multiple market events (Bulk Support).
  */
 router.post("/market-events", async (req, res) => {
   try {
-    const { marketSlug, eventDate, eventName, impactMultiplier } = req.body;
-    const { rows } = await db.query(
-      `INSERT INTO sentinel_market_events (market_slug, event_date, event_name, impact_multiplier) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [marketSlug, eventDate, eventName, impactMultiplier],
-    );
-    res.status(200).json({ success: true, data: rows[0] });
+    const { marketSlug, events } = req.body;
+
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No events provided." });
+    }
+
+    const values = [];
+    const params = [];
+    let pIdx = 1;
+
+    events.forEach((ev) => {
+      values.push(`($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3})`);
+      params.push(marketSlug, ev.eventDate, ev.eventName, ev.impactMultiplier);
+      pIdx += 4;
+    });
+
+    // ON CONFLICT DO UPDATE allows you to overwrite existing events gracefully
+    const query = `
+      INSERT INTO sentinel_market_events (market_slug, event_date, event_name, impact_multiplier) 
+      VALUES ${values.join(", ")} 
+      ON CONFLICT (market_slug, event_date) 
+      DO UPDATE SET 
+        event_name = EXCLUDED.event_name, 
+        impact_multiplier = EXCLUDED.impact_multiplier
+      RETURNING *`;
+
+    const { rows } = await db.query(query, params);
+    res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("[Sentinel Router] Add market event failed:", error.message);
     res.status(500).json({ success: false, error: error.message });

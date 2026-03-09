@@ -263,9 +263,43 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
   // Market Events State (DB Driven)
   const [londonEvents, setLondonEvents] = useState<any[]>([]);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
-  const [newEventDate, setNewEventDate] = useState("");
+
+  // Bulk Builder State
+  const [newEventStartDate, setNewEventStartDate] = useState("");
+  const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventName, setNewEventName] = useState("");
-  const [newEventImpact, setNewEventImpact] = useState("2.50"); // Default High Demand
+  const [newEventImpact, setNewEventImpact] = useState("1.50"); // Default to Base
+  const [generatedEvents, setGeneratedEvents] = useState<any[]>([]);
+
+  // Magic List Generator: Rebuilds the preview list when dates change
+  useEffect(() => {
+    if (newEventStartDate && newEventEndDate && newEventName) {
+      const start = new Date(newEventStartDate);
+      const end = new Date(newEventEndDate);
+
+      // Max 60 days to prevent browser lockup from fat-fingered dates
+      if (start <= end && (end.getTime() - start.getTime()) / 86400000 <= 60) {
+        setGeneratedEvents((prev) => {
+          const events = [];
+          let current = new Date(start);
+          while (current <= end) {
+            const dateStr = current.toISOString().split("T")[0];
+            // Preserve user tweaks if they already modified this row
+            const existing = prev.find((e) => e.date === dateStr);
+            events.push({
+              date: dateStr,
+              name: newEventName,
+              impact: existing ? existing.impact : newEventImpact,
+            });
+            current.setDate(current.getDate() + 1);
+          }
+          return events;
+        });
+      }
+    } else {
+      setGeneratedEvents([]);
+    }
+  }, [newEventStartDate, newEventEndDate, newEventName, newEventImpact]);
 
   useEffect(() => {
     fetch("/api/sentinel/market-events/london")
@@ -432,30 +466,43 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
   };
 
   const handleAddEvent = async () => {
-    if (!newEventDate || !newEventName) return;
+    if (generatedEvents.length === 0) return;
     try {
+      const payloadEvents = generatedEvents.map((e) => ({
+        eventDate: e.date,
+        eventName: e.name,
+        impactMultiplier: parseFloat(e.impact),
+      }));
+
       const res = await fetch("/api/sentinel/market-events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           marketSlug: "london",
-          eventDate: newEventDate,
-          eventName: newEventName,
-          impactMultiplier: parseFloat(newEventImpact),
+          events: payloadEvents,
         }),
       });
+
       const data = await res.json();
       if (data.success) {
-        setLondonEvents([...londonEvents, data.data]);
+        // Refetch everything to guarantee the table is perfectly in sync
+        fetch("/api/sentinel/market-events/london")
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.success) setLondonEvents(d.data);
+          });
+
         setIsAddEventOpen(false);
-        setNewEventDate("");
+        setNewEventStartDate("");
+        setNewEventEndDate("");
         setNewEventName("");
-        toast.success("Market event added successfully.");
+        setGeneratedEvents([]);
+        toast.success(`Successfully added ${payloadEvents.length} event days.`);
       } else {
-        toast.error(data.error || "Failed to add event");
+        toast.error(data.error || "Failed to add events");
       }
     } catch (err) {
-      toast.error("Network error adding event");
+      toast.error("Network error adding events");
     }
   };
 
@@ -3091,68 +3138,257 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
         </Card>
       </div>
 
-      {/* Add Event Dialog */}
+      {/* Bulk Add Event Dialog */}
       <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
         <DialogContent
-          style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}
+          style={{
+            backgroundColor: "#1a1a1a",
+            borderColor: "#2a2a2a",
+            maxWidth: "600px",
+          }}
         >
           <DialogHeader>
-            <DialogTitle style={{ color: "#e5e5e5" }}>Add Event</DialogTitle>
+            <DialogTitle style={{ color: "#e5e5e5" }}>
+              Add Event Range
+            </DialogTitle>
+            <DialogDescription style={{ color: "#9ca3af" }}>
+              Define the dates, base impact, and tweak specific peak days below.
+            </DialogDescription>
           </DialogHeader>
           <div
             style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
           >
-            <Input
-              type="date"
-              value={newEventDate}
-              onChange={(e) => setNewEventDate(e.target.value)}
+            {/* Top Row: Dates */}
+            <div
               style={{
-                backgroundColor: "#0f0f0f",
-                borderColor: "#2a2a2a",
-                color: "#e5e5e5",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
               }}
-            />
-            <Input
-              placeholder="Event Name"
-              value={newEventName}
-              onChange={(e) => setNewEventName(e.target.value)}
+            >
+              <div>
+                <Label
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "0.75rem",
+                    marginBottom: "4px",
+                    display: "block",
+                  }}
+                >
+                  Start Date
+                </Label>
+                <Input
+                  type="date"
+                  value={newEventStartDate}
+                  onChange={(e) => setNewEventStartDate(e.target.value)}
+                  style={{
+                    backgroundColor: "#0f0f0f",
+                    borderColor: "#2a2a2a",
+                    color: "#e5e5e5",
+                  }}
+                />
+              </div>
+              <div>
+                <Label
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "0.75rem",
+                    marginBottom: "4px",
+                    display: "block",
+                  }}
+                >
+                  End Date
+                </Label>
+                <Input
+                  type="date"
+                  value={newEventEndDate}
+                  onChange={(e) => setNewEventEndDate(e.target.value)}
+                  style={{
+                    backgroundColor: "#0f0f0f",
+                    borderColor: "#2a2a2a",
+                    color: "#e5e5e5",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Middle Row: Name & Base Impact */}
+            <div
               style={{
-                backgroundColor: "#0f0f0f",
-                borderColor: "#2a2a2a",
-                color: "#e5e5e5",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
               }}
-            />
-            <Select value={newEventImpact} onValueChange={setNewEventImpact}>
-              <SelectTrigger
-                style={{
-                  backgroundColor: "#0f0f0f",
-                  borderColor: "#2a2a2a",
-                  color: "#e5e5e5",
-                }}
-              >
-                <SelectValue placeholder="Select Demand Impact" />
-              </SelectTrigger>
-              <SelectContent
-                style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}
-              >
-                <SelectItem value="1.50" style={{ color: "#faff6a" }}>
-                  Medium Demand (1.5x Base)
-                </SelectItem>
-                <SelectItem value="2.50" style={{ color: "#ef4444" }}>
-                  High Demand (2.5x Base)
-                </SelectItem>
-                <SelectItem value="3.00" style={{ color: "#c084fc" }}>
-                  Extreme Demand (3.0x Base)
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            >
+              <div>
+                <Label
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "0.75rem",
+                    marginBottom: "4px",
+                    display: "block",
+                  }}
+                >
+                  Event Name
+                </Label>
+                <Input
+                  placeholder="e.g., Wimbledon"
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                  style={{
+                    backgroundColor: "#0f0f0f",
+                    borderColor: "#2a2a2a",
+                    color: "#e5e5e5",
+                  }}
+                />
+              </div>
+              <div>
+                <Label
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: "0.75rem",
+                    marginBottom: "4px",
+                    display: "block",
+                  }}
+                >
+                  Base Impact
+                </Label>
+                <Select
+                  value={newEventImpact}
+                  onValueChange={setNewEventImpact}
+                >
+                  <SelectTrigger
+                    style={{
+                      backgroundColor: "#0f0f0f",
+                      borderColor: "#2a2a2a",
+                      color: "#e5e5e5",
+                    }}
+                  >
+                    <SelectValue placeholder="Select Impact" />
+                  </SelectTrigger>
+                  <SelectContent
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      borderColor: "#2a2a2a",
+                    }}
+                  >
+                    <SelectItem value="1.50" style={{ color: "#faff6a" }}>
+                      Medium (1.5x)
+                    </SelectItem>
+                    <SelectItem value="2.50" style={{ color: "#ef4444" }}>
+                      High (2.5x)
+                    </SelectItem>
+                    <SelectItem value="3.00" style={{ color: "#c084fc" }}>
+                      Extreme (3.0x)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Bottom Row: Magic Preview List */}
+            {generatedEvents.length > 0 && (
+              <div style={{ marginTop: "0.5rem" }}>
+                <Label
+                  style={{
+                    color: "#e5e5e5",
+                    fontSize: "0.75rem",
+                    marginBottom: "8px",
+                    display: "block",
+                  }}
+                >
+                  Day-by-Day Tuning ({generatedEvents.length} Days)
+                </Label>
+                <div
+                  style={{
+                    maxHeight: "220px",
+                    overflowY: "auto",
+                    border: "1px solid #2a2a2a",
+                    borderRadius: "0.5rem",
+                    background: "#0f0f0f",
+                  }}
+                >
+                  {generatedEvents.map((ev, index) => (
+                    <div
+                      key={ev.date}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.5rem 1rem",
+                        borderBottom:
+                          index < generatedEvents.length - 1
+                            ? "1px solid #2a2a2a"
+                            : "none",
+                      }}
+                    >
+                      <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
+                        {ev.date}
+                      </span>
+                      <Select
+                        value={ev.impact}
+                        onValueChange={(val) => {
+                          setGeneratedEvents((prev) =>
+                            prev.map((p) =>
+                              p.date === ev.date ? { ...p, impact: val } : p,
+                            ),
+                          );
+                        }}
+                      >
+                        <SelectTrigger
+                          style={{
+                            width: "140px",
+                            height: "28px",
+                            backgroundColor: "#1a1a1a",
+                            borderColor: "#2a2a2a",
+                            color: "#e5e5e5",
+                            fontSize: "0.75rem",
+                          }}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent
+                          style={{
+                            backgroundColor: "#1a1a1a",
+                            borderColor: "#2a2a2a",
+                          }}
+                        >
+                          <SelectItem
+                            value="1.50"
+                            style={{ color: "#faff6a", fontSize: "0.75rem" }}
+                          >
+                            Medium
+                          </SelectItem>
+                          <SelectItem
+                            value="2.50"
+                            style={{ color: "#ef4444", fontSize: "0.75rem" }}
+                          >
+                            High
+                          </SelectItem>
+                          <SelectItem
+                            value="3.00"
+                            style={{ color: "#c084fc", fontSize: "0.75rem" }}
+                          >
+                            Extreme
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
+          <DialogFooter style={{ marginTop: "1rem" }}>
             <Button
               onClick={handleAddEvent}
+              disabled={generatedEvents.length === 0}
               style={{ backgroundColor: "#39BDF8", color: "#0f0f0f" }}
             >
-              Add Event
+              Save{" "}
+              {generatedEvents.length > 0
+                ? `${generatedEvents.length} Days`
+                : "Event"}
             </Button>
           </DialogFooter>
         </DialogContent>
