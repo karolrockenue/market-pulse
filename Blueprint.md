@@ -20,7 +20,6 @@ STRUCTURAL ENFORCEMENT (CRITICAL)
 
 - FIND and REPLACE MUST be in two separate fenced code blocks
 - Each fenced block MUST contain only one of:
-
   - the FIND snippet
   - the REPLACE snippet
 
@@ -788,6 +787,19 @@ confidence_score, reasoning, model_version
 
 is_applied (Boolean) – True if user accepted the suggestion.
 
+4.10 sentinel_market_events
+
+Stores market-level event multipliers to preemptively inflate AI base rates.
+
+Fields:
+
+id (PK, UUID)
+market_slug (varchar)
+event_date (date)
+event_name (varchar)
+impact_multiplier (numeric)
+created_at (timestamptz)
+
 5.0 API REFERENCE (ACTIVE ENDPOINTS ONLY)
 
 Important:
@@ -879,6 +891,19 @@ POST /pace-curves/copy
 Body: { sourceHotelId, targetHotelId }
 
 Copies all pace curves from the source hotel to the target hotel (overwriting existing ones).
+
+GET /market-events/:marketSlug
+
+Fetches future market events for a specific city.
+
+POST /market-events
+
+Body: { marketSlug, events: [...] }
+Supports bulk inserts of events. Updates existing events on conflict.
+
+DELETE /market-events/:id
+
+Permanently deletes an event by its UUID.
 
 Rule:
 If you need new Sentinel functionality, extend the service and then expose a minimal API route here, instead of embedding logic in the router.

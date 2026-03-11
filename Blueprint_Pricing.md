@@ -70,6 +70,12 @@ When multiple rules apply to the same date, follow this hierarchy:
 - **High Season:** Hold rate if HoursSinceLastChange $\< 24$h.
 - **Velocity Guard:** If Pickup_24h $\> 0$, the system refuses to drop the rate.
 
+### **2.4 Event Anchors (Market-Level Peak Dates)**
+
+- **Concept:** Anticipatory multipliers for known high-demand dates (e.g., NYE, Wimbledon).
+- **Base Override:** If an event multiplier exists for a date, the standard base rate logic is bypassed. Base Rate = Min Rate \* Event Multiplier.
+- **Proportional Ratchet:** The AI still applies its positive Delta yield on top of this newly inflated Base Rate.
+
 ---
 
 ## **3.0 ARCHITECTURE & OWNERSHIP**
@@ -89,6 +95,7 @@ When multiple rules apply to the same date, follow this hierarchy:
 - **sentinel_price_history:** Immutable ledger of all rate changes.
 - **sentinel_daily_max_rates:** Granular daily price ceilings.
 - **sentinel_pace_curves:** 365-day booking pace targets.
+- **sentinel_market_events:** Market-wide event multipliers (e.g., London).
 
 ### **3.3 Active Endpoints**
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 
 import {
   Plus,
@@ -263,6 +263,52 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
   // Market Events State (DB Driven)
   const [londonEvents, setLondonEvents] = useState<any[]>([]);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  const toggleGroup = (name: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  const groupedEvents = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    londonEvents.forEach((ev) => {
+      if (!groups[ev.event_name]) groups[ev.event_name] = [];
+      groups[ev.event_name].push(ev);
+    });
+
+    return Object.entries(groups)
+      .map(([name, events]) => {
+        events.sort(
+          (a, b) =>
+            new Date(a.event_date).getTime() - new Date(b.event_date).getTime(),
+        );
+        const start = new Date(events[0].event_date)
+          .toISOString()
+          .split("T")[0];
+        const end = new Date(events[events.length - 1].event_date)
+          .toISOString()
+          .split("T")[0];
+
+        const maxMult = Math.max(
+          ...events.map((e) => parseFloat(e.impact_multiplier)),
+        );
+
+        return {
+          name,
+          start,
+          end,
+          events,
+          isSingleDay: start === end,
+          count: events.length,
+          maxMult,
+        };
+      })
+      .sort(
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      );
+  }, [londonEvents]);
 
   // Bulk Builder State
   const [newEventStartDate, setNewEventStartDate] = useState("");
@@ -937,70 +983,235 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {londonEvents.map((event) => {
+                            {groupedEvents.map((group) => {
+                              // Determine Summary Badge style based on maxMult
                               let impactLabel = "High Demand";
                               let color = "#ef4444";
                               let bg = "rgba(239, 68, 68, 0.1)";
                               let border = "rgba(239, 68, 68, 0.3)";
 
-                              const mult = parseFloat(event.impact_multiplier);
-                              if (mult <= 1.5) {
+                              if (group.maxMult <= 1.5) {
                                 impactLabel = "Medium Demand";
                                 color = "#faff6a";
                                 bg = "rgba(250, 255, 106, 0.1)";
                                 border = "rgba(250, 255, 106, 0.3)";
-                              } else if (mult >= 3.0) {
+                              } else if (group.maxMult >= 3.0) {
                                 impactLabel = "Extreme Demand";
                                 color = "#c084fc";
                                 bg = "rgba(147, 51, 234, 0.1)";
                                 border = "rgba(147, 51, 234, 0.3)";
                               }
 
-                              const formattedDate = new Date(event.event_date)
-                                .toISOString()
-                                .split("T")[0];
-
                               return (
-                                <TableRow
-                                  key={event.id}
-                                  className="border-[#2a2a2a] hover:bg-[#161616]"
-                                >
-                                  <TableCell style={{ color: "#e5e5e5" }}>
-                                    {formattedDate}
-                                  </TableCell>
-                                  <TableCell style={{ color: "#e5e5e5" }}>
-                                    {event.event_name}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      variant="outline"
+                                <React.Fragment key={group.name}>
+                                  {/* SUMMARY ROW */}
+                                  <TableRow
+                                    className="hover:bg-[#161616]"
+                                    style={{
+                                      borderBottom: expandedGroups[group.name]
+                                        ? "none"
+                                        : "1px solid #2a2a2a",
+                                      backgroundColor: expandedGroups[
+                                        group.name
+                                      ]
+                                        ? "rgba(255,255,255,0.02)"
+                                        : "transparent",
+                                    }}
+                                  >
+                                    <TableCell
                                       style={{
-                                        backgroundColor: bg,
-                                        color: color,
-                                        borderColor: border,
+                                        color: "#e5e5e5",
+                                        fontWeight: 500,
                                       }}
                                     >
-                                      {impactLabel} ({mult}x)
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      style={{ color: "#ef4444" }}
-                                      onClick={() =>
-                                        handleDeleteEvent(event.id)
-                                      }
+                                      {group.isSingleDay
+                                        ? group.start
+                                        : `${group.start} to ${group.end}`}
+                                    </TableCell>
+                                    <TableCell
+                                      style={{
+                                        color: "#e5e5e5",
+                                        fontWeight: 500,
+                                      }}
                                     >
-                                      <Trash2
+                                      {group.name}{" "}
+                                      {group.count > 1 && (
+                                        <span
+                                          style={{
+                                            color: "#9ca3af",
+                                            fontSize: "0.75rem",
+                                            marginLeft: "8px",
+                                          }}
+                                        >
+                                          ({group.count} days)
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        variant="outline"
                                         style={{
-                                          width: "1rem",
-                                          height: "1rem",
+                                          backgroundColor: bg,
+                                          color: color,
+                                          borderColor: border,
                                         }}
-                                      />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
+                                      >
+                                        {group.count > 1 ? "Peak: " : ""}
+                                        {impactLabel} ({group.maxMult}x)
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          justifyContent: "flex-end",
+                                          gap: "0.5rem",
+                                        }}
+                                      >
+                                        {group.count > 1 && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                              toggleGroup(group.name)
+                                            }
+                                            style={{ color: "#9ca3af" }}
+                                          >
+                                            {expandedGroups[group.name] ? (
+                                              <ChevronUp
+                                                style={{
+                                                  width: "1rem",
+                                                  height: "1rem",
+                                                }}
+                                              />
+                                            ) : (
+                                              <ChevronDown
+                                                style={{
+                                                  width: "1rem",
+                                                  height: "1rem",
+                                                }}
+                                              />
+                                            )}
+                                          </Button>
+                                        )}
+                                        {group.count === 1 && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            style={{ color: "#ef4444" }}
+                                            onClick={() =>
+                                              handleDeleteEvent(
+                                                group.events[0].id,
+                                              )
+                                            }
+                                          >
+                                            <Trash2
+                                              style={{
+                                                width: "1rem",
+                                                height: "1rem",
+                                              }}
+                                            />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+
+                                  {/* EXPANDED INDIVIDUAL DAYS */}
+                                  {expandedGroups[group.name] &&
+                                    group.count > 1 &&
+                                    group.events.map(
+                                      (event: any, idx: number) => {
+                                        let eLabel = "High Demand";
+                                        let eColor = "#ef4444";
+                                        let eBg = "rgba(239, 68, 68, 0.05)";
+                                        let eBorder = "rgba(239, 68, 68, 0.2)";
+                                        const eMult = parseFloat(
+                                          event.impact_multiplier,
+                                        );
+
+                                        if (eMult <= 1.5) {
+                                          eLabel = "Medium Demand";
+                                          eColor = "#faff6a";
+                                          eBg = "rgba(250, 255, 106, 0.05)";
+                                          eBorder = "rgba(250, 255, 106, 0.2)";
+                                        } else if (eMult >= 3.0) {
+                                          eLabel = "Extreme Demand";
+                                          eColor = "#c084fc";
+                                          eBg = "rgba(147, 51, 234, 0.05)";
+                                          eBorder = "rgba(147, 51, 234, 0.2)";
+                                        }
+
+                                        const formattedDate = new Date(
+                                          event.event_date,
+                                        )
+                                          .toISOString()
+                                          .split("T")[0];
+                                        const isLast =
+                                          idx === group.events.length - 1;
+
+                                        return (
+                                          <TableRow
+                                            key={event.id}
+                                            className="hover:bg-[#161616]"
+                                            style={{
+                                              backgroundColor:
+                                                "rgba(0,0,0,0.15)",
+                                              borderBottom: isLast
+                                                ? "1px solid #2a2a2a"
+                                                : "none",
+                                            }}
+                                          >
+                                            <TableCell
+                                              style={{
+                                                color: "#9ca3af",
+                                                paddingLeft: "2rem",
+                                              }}
+                                            >
+                                              └ {formattedDate}
+                                            </TableCell>
+                                            <TableCell
+                                              style={{ color: "#9ca3af" }}
+                                            ></TableCell>
+                                            <TableCell>
+                                              <Badge
+                                                variant="outline"
+                                                style={{
+                                                  backgroundColor: eBg,
+                                                  color: eColor,
+                                                  borderColor: eBorder,
+                                                  opacity: 0.8,
+                                                }}
+                                              >
+                                                {eMult}x
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                style={{
+                                                  color: "#ef4444",
+                                                  opacity: 0.7,
+                                                }}
+                                                className="hover:opacity-100"
+                                                onClick={() =>
+                                                  handleDeleteEvent(event.id)
+                                                }
+                                              >
+                                                <Trash2
+                                                  style={{
+                                                    width: "1rem",
+                                                    height: "1rem",
+                                                  }}
+                                                />
+                                              </Button>
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      },
+                                    )}
+                                </React.Fragment>
                               );
                             })}
                           </TableBody>

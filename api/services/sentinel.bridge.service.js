@@ -357,7 +357,21 @@ class SentinelBridgeService {
           // --- GATE 2: POLICY (Hard Bounds) ---
 
           // 2a. Min Rate Check
-          const monthKey = String(stayDateObj.getMonth() + 1); // 1-12
+          const monthNames = [
+            "jan",
+            "feb",
+            "mar",
+            "apr",
+            "may",
+            "jun",
+            "jul",
+            "aug",
+            "sep",
+            "oct",
+            "nov",
+            "dec",
+          ];
+          const monthKey = monthNames[stayDateObj.getMonth()];
           const minRate = parseFloat(minRates[monthKey] || 0);
           if (safeRate < minRate) safeRate = minRate;
 
