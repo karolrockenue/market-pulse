@@ -278,7 +278,17 @@ class SentinelBridgeService {
 
         // Prepare Gate Data
         const stayDates = hotelDecisions.map((d) => d.stay_date);
-        const minRates = config.monthly_min_rates || {};
+
+        // [FIX] Handle double-stringified JSON from the database
+        let minRates = config.monthly_min_rates || {};
+        if (typeof minRates === "string") {
+          try {
+            minRates = JSON.parse(minRates);
+          } catch (e) {
+            minRates = {};
+          }
+        }
+
         const freezeDays = parseInt(config.rate_freeze_period || 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
