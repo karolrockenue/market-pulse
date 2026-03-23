@@ -216,11 +216,11 @@ class SentinelBridgeService {
         `;
         const now = new Date();
         await client.query(shadowQuery, [
-          validDecisions.map((d) => d.hotel_id),
-          validDecisions.map((d) => d.room_type_id),
+          validDecisions.map((d) => Number(d.hotel_id)),
+          validDecisions.map((d) => Number(d.room_type_id)),
           validDecisions.map((d) => d.stay_date),
-          validDecisions.map((d) => d.suggested_rate),
-          validDecisions.map((d) => d.confidence_score || 0.0),
+          validDecisions.map((d) => Number(d.suggested_rate)),
+          validDecisions.map((d) => Number(d.confidence_score) || 0.0),
           validDecisions.map((d) => d.reasoning || null),
           validDecisions.map((d) => d.model_version || "v1.0"),
           validDecisions.map(() => false),
@@ -243,8 +243,9 @@ class SentinelBridgeService {
 
       let totalQueued = 0;
 
-      for (const hotelId of Object.keys(decisionsByHotel)) {
-        const hotelDecisions = decisionsByHotel[hotelId];
+      for (const hotelIdStr of Object.keys(decisionsByHotel)) {
+        const hotelId = Number(hotelIdStr);
+        const hotelDecisions = decisionsByHotel[hotelIdStr];
 
         // --- GATE 1: PERMISSION (Is Autopilot ON?) ---
         // [FIX] Also fetch rate_id_map to build the PMS payload later
@@ -503,10 +504,10 @@ class SentinelBridgeService {
               const qQuery = `
                     INSERT INTO sentinel_job_queue 
                     (hotel_id, payload, status, created_at)
-                    VALUES ($1, $2, 'PENDING', NOW())
+                    VALUES ($1::int, $2::jsonb, 'PENDING', NOW())
                 `;
 
-              // [FIX] Handle UUID vs Integer Hotel ID by not casting to ::int[]
+              // Ensure hotelId is strictly an integer for the DB write
               await client.query(qQuery, [
                 hotelId,
                 JSON.stringify(chunkPayload),
