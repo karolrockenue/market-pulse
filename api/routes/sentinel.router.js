@@ -88,13 +88,23 @@ router.post("/trigger-dgx", async (req, res) => {
       body: JSON.stringify({ hotel_id: hotelId }),
     });
 
-    if (!response.ok) {
+    // UNMASKING: Read raw text first in case Python throws a nasty HTML error page
+    const rawText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
       throw new Error(
-        `DGX responded with ${response.status}: ${response.statusText}`,
+        `DGX returned non-JSON response. Status: ${response.status}. Raw Output: ${rawText.substring(0, 200)}`,
       );
     }
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        `DGX responded with ${response.status}. Payload: ${JSON.stringify(data)}`,
+      );
+    }
+
     console.log(`[Sentinel] DGX Response:`, data);
 
     res.status(200).json({
@@ -103,12 +113,11 @@ router.post("/trigger-dgx", async (req, res) => {
       data: data,
     });
   } catch (error) {
-    console.error("[Sentinel] DGX Trigger Failed:", error.message);
+    console.error("[Sentinel] DGX Trigger Failed RAW:", error);
     res.status(502).json({
       success: false,
-      message:
-        "Failed to contact DGX Server. Ensure the Python script is running.",
-      error: error.message,
+      message: `SYSTEM FAULT: ${error.message}`,
+      error: error.stack,
     });
   }
 });
