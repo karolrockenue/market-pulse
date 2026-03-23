@@ -512,7 +512,7 @@ class SentinelBridgeService {
                 JSON.stringify(chunkPayload),
               ]);
             }
-            // --- BULK EXECUTION ---
+            // --- BULK EXECUTION f---
             const hIds = validUpdates.map((u) => Number(u.hotel_id));
             const rIds = validUpdates.map((u) => String(u.room_type_id));
             const dates = validUpdates.map((u) => u.start_date);
