@@ -203,7 +203,7 @@ class SentinelBridgeService {
      INSERT INTO sentinel_ai_predictions 
           (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
          SELECT * FROM UNNEST(
-            $1::int[], $2::text[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
+            $1::int[], $2::int[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
           )
           ON CONFLICT (hotel_id, room_type_id, stay_date)
           DO UPDATE SET 
@@ -215,17 +215,29 @@ class SentinelBridgeService {
             is_applied = FALSE
         `;
         const now = new Date();
-        await client.query(shadowQuery, [
-          validDecisions.map((d) => Number(d.hotel_id)),
-          validDecisions.map((d) => String(d.room_type_id)),
-          validDecisions.map((d) => d.stay_date),
-          validDecisions.map((d) => Number(d.suggested_rate)),
-          validDecisions.map((d) => Number(d.confidence_score) || 0.0),
-          validDecisions.map((d) => d.reasoning || null),
-          validDecisions.map((d) => d.model_version || "v1.0"),
-          validDecisions.map(() => false),
-          validDecisions.map(() => now),
-        ]);
+        try {
+          await client.query(shadowQuery, [
+            validDecisions.map((d) => Number(d.hotel_id)),
+            validDecisions.map((d) => Number(d.room_type_id)),
+            validDecisions.map((d) => d.stay_date),
+            validDecisions.map((d) => Number(d.suggested_rate)),
+            validDecisions.map((d) => Number(d.confidence_score) || 0.0),
+            validDecisions.map((d) => d.reasoning || null),
+            validDecisions.map((d) => d.model_version || "v1.0"),
+            validDecisions.map(() => false),
+            validDecisions.map(() => now),
+          ]);
+        } catch (err) {
+          console.error("\n[CRASH LOG] PHASE 1: SHADOW SAVE FAILED");
+          console.error(
+            `[CRASH LOG] hotel_id type/val: ${typeof validDecisions[0].hotel_id} / ${validDecisions[0].hotel_id}`,
+          );
+          console.error(
+            `[CRASH LOG] room_type_id type/val: ${typeof validDecisions[0].room_type_id} / ${validDecisions[0].room_type_id}`,
+          );
+          console.error(`[CRASH LOG] Postgres Error:`, err.message);
+          throw err;
+        }
       }
       console.timeEnd("Phase 1: Shadow Log");
 
@@ -309,16 +321,24 @@ class SentinelBridgeService {
         // [FIX] Must include room_type_id in query and map key to avoid collisions
         // [FIX] Cast room_type_id to String for robust Set creation
         const roomTypeIds = [
-          ...new Set(hotelDecisions.map((d) => String(d.room_type_id))),
+          ...new Set(hotelDecisions.map((d) => Number(d.room_type_id))),
         ];
 
-        const calendarRes = await client.query(
-          `SELECT room_type_id, stay_date::text, source, rate FROM sentinel_rates_calendar
-           WHERE hotel_id = $1::int 
-             AND room_type_id = ANY($2::text[])
-             AND stay_date = ANY($3::date[])`,
-          [hotelId, roomTypeIds, stayDates],
-        );
+        let calendarRes;
+        try {
+          calendarRes = await client.query(
+            `SELECT room_type_id, stay_date::text, source, rate FROM sentinel_rates_calendar
+             WHERE hotel_id = $1::int 
+               AND room_type_id = ANY($2::int[])
+               AND stay_date = ANY($3::date[])`,
+            [hotelId, roomTypeIds, stayDates],
+          );
+        } catch (err) {
+          console.error("\n[CRASH LOG] GATE 3: CONFLICT LOOKUP FAILED");
+          console.error(`[CRASH LOG] roomTypeIds:`, roomTypeIds);
+          console.error(`[CRASH LOG] Postgres Error:`, err.message);
+          throw err;
+        }
         const calendarMap = {};
         calendarRes.rows.forEach((r) => {
           // [FIX] Robust Date Normalization (Handle Date obj or String)
@@ -514,51 +534,70 @@ class SentinelBridgeService {
             }
             // --- BULK EXECUTION f---
             const hIds = validUpdates.map((u) => Number(u.hotel_id));
-            const rIds = validUpdates.map((u) => String(u.room_type_id));
+            const rIds = validUpdates.map((u) => Number(u.room_type_id));
             const dates = validUpdates.map((u) => u.start_date);
             const prices = validUpdates.map((u) => u.price);
 
             if (hIds.length > 0) {
-              // 1. Bulk Mark Applied
-              await client.query(
-                `
-                UPDATE sentinel_ai_predictions AS p
-                SET is_applied = TRUE
-                FROM UNNEST($1::int[], $2::text[], $3::date[]) AS t(hid, rid, sdate)
-                WHERE p.hotel_id = t.hid 
-                  AND p.room_type_id = t.rid 
-                  AND p.stay_date = t.sdate
-              `,
-                [hIds, rIds, dates],
-              );
+              try {
+                await client.query(
+                  `
+                  UPDATE sentinel_ai_predictions AS p
+                  SET is_applied = TRUE
+                  FROM UNNEST($1::int[], $2::int[], $3::date[]) AS t(hid, rid, sdate)
+                  WHERE p.hotel_id = t.hid 
+                    AND p.room_type_id = t.rid 
+                    AND p.stay_date = t.sdate
+                `,
+                  [hIds, rIds, dates],
+                );
+              } catch (err) {
+                console.error(
+                  "\n[CRASH LOG] PHASE 2: BULK MARK APPLIED FAILED",
+                );
+                console.error(`[CRASH LOG] Postgres Error:`, err.message);
+                throw err;
+              }
 
-              // 2. Bulk Log History (Uses efficient JOIN instead of row-by-row SELECT)
-              await client.query(
-                `
-                INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
-                SELECT 
-                    t.hid, t.rid, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
-                FROM UNNEST($1::int[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
-                JOIN sentinel_rates_calendar c 
-                    ON c.hotel_id = t.hid 
+              try {
+                await client.query(
+                  `
+                  INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
+                  SELECT 
+                      t.hid, t.rid, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
+                  FROM UNNEST($1::int[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                  JOIN sentinel_rates_calendar c 
+                      ON c.hotel_id = t.hid 
+                      AND c.room_type_id = t.rid 
+                      AND c.stay_date = t.sdate
+                `,
+                  [hIds, rIds, dates, prices],
+                );
+              } catch (err) {
+                console.error("\n[CRASH LOG] PHASE 2: BULK LOG HISTORY FAILED");
+                console.error(`[CRASH LOG] Postgres Error:`, err.message);
+                throw err;
+              }
+
+              try {
+                await client.query(
+                  `
+                  UPDATE sentinel_rates_calendar AS c
+                  SET source = 'SENTINEL', last_updated_at = NOW(), rate = t.new_price
+                  FROM UNNEST($1::int[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                  WHERE c.hotel_id = t.hid 
                     AND c.room_type_id = t.rid 
                     AND c.stay_date = t.sdate
-              `,
-                [hIds, rIds, dates, prices],
-              );
-
-              // 3. Bulk Update Calendar
-              await client.query(
-                `
-                UPDATE sentinel_rates_calendar AS c
-                SET source = 'SENTINEL', last_updated_at = NOW(), rate = t.new_price
-                FROM UNNEST($1::int[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
-                WHERE c.hotel_id = t.hid 
-                  AND c.room_type_id = t.rid 
-                  AND c.stay_date = t.sdate
-              `,
-                [hIds, rIds, dates, prices],
-              );
+                `,
+                  [hIds, rIds, dates, prices],
+                );
+              } catch (err) {
+                console.error(
+                  "\n[CRASH LOG] PHASE 2: BULK UPDATE CALENDAR FAILED",
+                );
+                console.error(`[CRASH LOG] Postgres Error:`, err.message);
+                throw err;
+              }
             }
 
             totalQueued += ratesPayload.length;
