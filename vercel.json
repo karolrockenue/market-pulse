@@ -15,6 +15,11 @@
       "destination": "/server.js"
     }
   ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/sentinel/process-queue",
