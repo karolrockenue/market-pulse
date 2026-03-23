@@ -315,9 +315,9 @@ class SentinelBridgeService {
         const calendarRes = await client.query(
           `SELECT room_type_id, stay_date::text, source, rate FROM sentinel_rates_calendar
            WHERE hotel_id = $1::int 
-             AND room_type_id = ANY($2::int[])
+             AND room_type_id = ANY($2::text[])
              AND stay_date = ANY($3::date[])`,
-          [hotelId, roomTypeIds, stayDates],
+          [hotelId, roomTypeIds.map(String), stayDates],
         );
         const calendarMap = {};
         calendarRes.rows.forEach((r) => {
@@ -513,8 +513,8 @@ class SentinelBridgeService {
               ]);
             }
             // --- BULK EXECUTION ---
-            const hIds = validUpdates.map((u) => String(u.hotel_id));
-            const rIds = validUpdates.map((u) => Number(u.room_type_id));
+            const hIds = validUpdates.map((u) => Number(u.hotel_id));
+            const rIds = validUpdates.map((u) => String(u.room_type_id));
             const dates = validUpdates.map((u) => u.start_date);
             const prices = validUpdates.map((u) => u.price);
 
@@ -524,10 +524,10 @@ class SentinelBridgeService {
                 `
                 UPDATE sentinel_ai_predictions AS p
                 SET is_applied = TRUE
-                FROM UNNEST($1::text[], $2::int[], $3::date[]) AS t(hid, rid, sdate)
-                WHERE p.hotel_id::text = t.hid::text 
-                  AND p.room_type_id::int = t.rid::int 
-                  AND p.stay_date::date = t.sdate::date
+                FROM UNNEST($1::int[], $2::text[], $3::date[]) AS t(hid, rid, sdate)
+                WHERE p.hotel_id = t.hid 
+                  AND p.room_type_id = t.rid::int 
+                  AND p.stay_date = t.sdate
               `,
                 [hIds, rIds, dates],
               );
@@ -537,12 +537,12 @@ class SentinelBridgeService {
                 `
                 INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
                 SELECT 
-                    t.hid::text, t.rid::int, t.sdate::date, c.rate, t.new_price, 'SENTINEL', NOW()
-                FROM UNNEST($1::text[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                    t.hid, t.rid::int, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
+                FROM UNNEST($1::int[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
                 JOIN sentinel_rates_calendar c 
-                    ON c.hotel_id::text = t.hid::text 
-                    AND c.room_type_id::int = t.rid::int 
-                    AND c.stay_date::date = t.sdate::date
+                    ON c.hotel_id = t.hid 
+                    AND c.room_type_id = t.rid 
+                    AND c.stay_date = t.sdate
               `,
                 [hIds, rIds, dates, prices],
               );
@@ -552,10 +552,10 @@ class SentinelBridgeService {
                 `
                 UPDATE sentinel_rates_calendar AS c
                 SET source = 'SENTINEL', last_updated_at = NOW(), rate = t.new_price
-                FROM UNNEST($1::text[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
-                WHERE c.hotel_id::text = t.hid::text 
-                  AND c.room_type_id::int = t.rid::int 
-                  AND c.stay_date::date = t.sdate::date
+                FROM UNNEST($1::int[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                WHERE c.hotel_id = t.hid 
+                  AND c.room_type_id = t.rid 
+                  AND c.stay_date = t.sdate
               `,
                 [hIds, rIds, dates, prices],
               );
