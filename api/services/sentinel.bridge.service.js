@@ -251,14 +251,14 @@ class SentinelBridgeService {
         // [FIX] Also fetch rate_id_map to build the PMS payload later
         const configRes = await client.query(
           `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map, room_differentials 
-           FROM sentinel_configurations WHERE hotel_id = $1`,
+           FROM sentinel_configurations WHERE hotel_id = $1::int`,
           [hotelId],
         );
         const config = configRes.rows[0];
 
         // [FIX] Fetch PMS Property ID for the payload
         const hotelRes = await client.query(
-          `SELECT pms_property_id FROM hotels WHERE hotel_id = $1`,
+          `SELECT pms_property_id FROM hotels WHERE hotel_id = $1::int`,
           [hotelId],
         );
         const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
@@ -297,7 +297,7 @@ class SentinelBridgeService {
         // Fetch Dynamic Ceilings (Gate 2 Data)
         const ceilingsRes = await client.query(
           `SELECT stay_date::text, max_price FROM sentinel_daily_max_rates 
-           WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
+           WHERE hotel_id = $1::int AND stay_date = ANY($2::date[])`,
           [hotelId, stayDates],
         );
         const ceilingsMap = {};
@@ -314,12 +314,11 @@ class SentinelBridgeService {
 
         const calendarRes = await client.query(
           `SELECT room_type_id, stay_date::text, source, rate FROM sentinel_rates_calendar
-           WHERE hotel_id = $1 
+           WHERE hotel_id = $1::int 
              AND room_type_id = ANY($2::int[])
              AND stay_date = ANY($3::date[])`,
           [hotelId, roomTypeIds, stayDates],
         );
-
         const calendarMap = {};
         calendarRes.rows.forEach((r) => {
           // [FIX] Robust Date Normalization (Handle Date obj or String)
