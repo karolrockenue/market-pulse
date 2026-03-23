@@ -191,7 +191,7 @@ export default function App() {
       try {
         // [NEW] Call the sync status endpoint
         const response = await fetch(
-          `/api/metrics/metadata/sync-status/${propertyId}`
+          `/api/metrics/metadata/sync-status/${propertyId}`,
         );
         if (!response.ok) {
           throw new Error("Sync check failed");
@@ -335,7 +335,7 @@ export default function App() {
 
         if (!response.ok) {
           throw new Error(
-            `No active session found. Status: ${response.status}`
+            `No active session found. Status: ${response.status}`,
           );
         }
 
@@ -368,7 +368,7 @@ export default function App() {
     if (!property) {
       sentinelToast.error(
         "No property selected",
-        "Cannot save classification."
+        "Cannot save classification.",
       );
       return;
     }
@@ -548,7 +548,7 @@ export default function App() {
         // Go back to 'dashboard' if logged in, or 'landing' if logged out
         onBack={() =>
           setActiveView(
-            previousView || (isSessionLoading ? "landing" : "dashboard")
+            previousView || (isSessionLoading ? "landing" : "dashboard"),
           )
         }
       />
@@ -561,7 +561,7 @@ export default function App() {
         // Go back to 'dashboard' if logged in, or 'landing' if logged out
         onBack={() =>
           setActiveView(
-            previousView || (isSessionLoading ? "landing" : "dashboard")
+            previousView || (isSessionLoading ? "landing" : "dashboard"),
           )
         }
       />
@@ -584,7 +584,7 @@ export default function App() {
                   backgroundAttachment: "fixed",
                   backgroundColor: "#050507",
                 }
-              : { backgroundColor: "#232320" }
+              : { backgroundColor: "#1a1a1a" }
           }
         >
           {/* [NEW] Conditionally render the InitialSyncScreen as a full-screen overlay
@@ -624,8 +624,8 @@ export default function App() {
                 currencyCode === "GBP"
                   ? "£"
                   : currencyCode === "EUR"
-                  ? "€"
-                  : "$"
+                    ? "€"
+                    : "$"
               }
               currencyCode={currencyCode}
               userRole={userInfo?.role}
@@ -662,7 +662,7 @@ export default function App() {
               <div className="flex justify-center">
                 <button
                   onClick={() => setShowPropertySetup(true)}
-                  className="bg-[#faff6a] text-[#1f1f1c] px-6 py-3 rounded hover:bg-[#e8ef5a]"
+                  className="bg-[#faff6a] text-[#1a1a1a] px-6 py-3 rounded hover:bg-[#e8ef5a]"
                 >
                   Open Property Setup Modal
                 </button>
@@ -695,7 +695,7 @@ export default function App() {
                   alignItems: "center",
                   justifyContent: "center",
                   minHeight: "80vh",
-                  background: "#1d1d1c", // [UPDATED] Matches main background color
+                  background: "#1a1a1a", // [UPDATED] Matches main background color
                   color: "#e5e5e5",
                   padding: "24px",
                 }}

@@ -56,7 +56,7 @@ function MarketDemandPatterns({ patterns }: { patterns: any }) {
   return (
     <div className="grid grid-cols-2 gap-6">
       {/* Busiest Days Card */}
-      <div className="bg-[#1f1f1c] border border-[#3a3a35] rounded-lg p-4">
+      <div className="bg-[#1A1A1A] border border-[#3a3a35] rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-full bg-[#ef4444]/20 flex items-center justify-center">
             <TrendingUp className="w-4 h-4 text-[#ef4444]" />
@@ -96,7 +96,7 @@ function MarketDemandPatterns({ patterns }: { patterns: any }) {
       </div>
 
       {/* Quietest Days Card */}
-      <div className="bg-[#1f1f1c] border border-[#3a3a35] rounded-lg p-4">
+      <div className="bg-[#1A1A1A] border border-[#3a3a35] rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-full bg-[#10b981]/20 flex items-center justify-center">
             <TrendingDown className="w-4 h-4 text-[#10b981]" />
@@ -222,7 +222,7 @@ export function DemandPace({
         //
         // Inside fetchPlanningData:
         const marketResponse = await fetch(
-          `/api/market/forward-view?city=${citySlug}`
+          `/api/market/forward-view?city=${citySlug}`,
         );
         if (!marketResponse.ok) {
           throw new Error(`Market API failed: ${marketResponse.statusText}`);
@@ -244,7 +244,7 @@ export function DemandPace({
         const endDateStr = endDate.toISOString().split("T")[0];
 
         const hotelResponse = await fetch(
-          `/api/metrics/range?propertyId=${propertyId}&granularity=daily&startDate=${startDateStr}&endDate=${endDateStr}`
+          `/api/metrics/range?propertyId=${propertyId}&granularity=daily&startDate=${startDateStr}&endDate=${endDateStr}`,
         );
         if (!hotelResponse.ok) {
           throw new Error(`Hotel API failed: ${hotelResponse.statusText}`);
@@ -257,11 +257,11 @@ export function DemandPace({
         // --- API Call 3: Static 7-Day Pace Data ---
         // Fetches 7-day pace data for the static grid row
         const staticPaceResponse = await fetch(
-          `/api/market/pace?city=${citySlug}&period=7`
+          `/api/market/pace?city=${citySlug}&period=7`,
         );
         if (!staticPaceResponse.ok) {
           throw new Error(
-            `Static Pace API failed: ${staticPaceResponse.statusText}`
+            `Static Pace API failed: ${staticPaceResponse.statusText}`,
           );
         }
         const staticPaceApiData = await staticPaceResponse.json();
@@ -296,7 +296,7 @@ export function DemandPace({
         // Fetches 90-day forward-looking pace deltas
         //
         const paceResponse = await fetch(
-          `/api/market/pace?city=${citySlug}&period=${paceAnalysisPeriod}`
+          `/api/market/pace?city=${citySlug}&period=${paceAnalysisPeriod}`,
         );
         if (!paceResponse.ok) {
           throw new Error(`Pace API failed: ${paceResponse.statusText}`);
@@ -313,7 +313,7 @@ export function DemandPace({
             paceData[0].wap_delta,
             "(Type:",
             typeof paceData[0].wap_delta,
-            ")"
+            ")",
           );
         }
         // --- [DEBUG 1: END] ---
@@ -345,7 +345,7 @@ export function DemandPace({
         if (!response.ok) {
           const data = await response.json();
           throw new Error(
-            data.error || `API failed with status ${response.status}`
+            data.error || `API failed with status ${response.status}`,
           );
         }
 
@@ -382,7 +382,7 @@ export function DemandPace({
     const processedData = mergeAndProcessData(
       marketData,
       hotelData,
-      staticPaceData
+      staticPaceData,
     );
 
     setStaticMergedData(processedData); // [MODIFIED] Set static state
@@ -398,7 +398,7 @@ export function DemandPace({
   const mergeAndProcessData = (
     market: any[],
     hotel: any[],
-    staticPace: any[]
+    staticPace: any[],
   ) => {
     // Helper to format date strings consistently
     // [FIX] Moved this function to the top of the scope
@@ -443,7 +443,7 @@ export function DemandPace({
 
         // --- [NEW] Static 7-Day Pace (Supply % Change) ---
         supplyChangePace: parseFloat(
-          (paceMap.get(dateKey)?.total_results_percent_delta || 0).toFixed(1)
+          (paceMap.get(dateKey)?.total_results_percent_delta || 0).toFixed(1),
         ),
 
         // --- [REMOVED] Pace data is no longer merged here ---
@@ -471,7 +471,7 @@ export function DemandPace({
         const roomsSold = parseInt(item.your_rooms_sold, 10) || 0;
         const adr = parseFloat(item.your_gross_adr || item.your_net_adr || 0);
         const revenue = parseFloat(
-          item.your_gross_revenue || item.your_net_revenue || 0
+          item.your_gross_revenue || item.your_net_revenue || 0,
         );
 
         existing.hotelOccupancy = Math.round(occupancy);
@@ -529,7 +529,7 @@ export function DemandPace({
         // Add the pace-driven values here
         priceChange: Math.round(paceItem?.wap_delta || 0),
         supplyChange: parseFloat(
-          (paceItem?.total_results_percent_delta || 0).toFixed(1)
+          (paceItem?.total_results_percent_delta || 0).toFixed(1),
         ),
       };
     });
@@ -755,7 +755,7 @@ export function DemandPace({
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#1d1d1c",
+        backgroundColor: "#1a1a1a",
         position: "relative",
         overflow: "hidden",
         padding: "24px",
@@ -1439,7 +1439,7 @@ export function DemandPace({
                 </div>
 
                 {/* Content Grid with Indentation */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-gradient-to-b from-[#1a1a18] to-[#1f1f1c]">
+                <div className="grid grid-cols-2 gap-4 p-4 bg-gradient-to-b from-[#1a1a18] to-[#1a1a1a]">
                   {/* Market Metrics */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-1.5 text-[#6b7280] text-[9px] uppercase tracking-wider mb-2.5">
@@ -1453,7 +1453,7 @@ export function DemandPace({
                           className="w-2 h-2 rounded-sm"
                           style={{
                             backgroundColor: getDemandColor(
-                              selectedDay.marketDemand
+                              selectedDay.marketDemand,
                             ),
                           }}
                         />
@@ -1519,28 +1519,11 @@ export function DemandPace({
             </div>
           )}
           {/* Combined 90-Day Market Analytics - 4 Synchronized Charts */}
-          <div
-            style={{
-              backgroundColor: "#1A1A1A",
-              borderRadius: "8px",
-              border: "1px solid #3a3a35",
-              padding: "20px",
-            }}
-          >
-            {/* [MODIFIED] Dropdown has been moved to Chart 4 */}
-            <div className="mb-5">
-              <div>
-                <h2 className="text-[#e5e5e5] text-lg mb-1">
-                  90-Day Market Analytics
-                </h2>
-                <p className="text-[#9ca3af] text-xs">
-                  Comprehensive market intelligence with synchronized data
-                  visualization
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-[#1f1f1c] rounded-lg border border-[#3a3a35]">
+          <div className="w-full">
+            <div
+              className="rounded-lg border border-[#3a3a35]"
+              style={{ backgroundColor: "#1a1a1a" }}
+            >
               {/* Chart 2: Market Supply Landscape */}
               <div className="p-5 border-b border-[#3a3a35]">
                 <div className="mb-3">
@@ -1752,10 +1735,10 @@ export function DemandPace({
                   value={paceAnalysisPeriod}
                   onValueChange={setPaceAnalysisPeriod}
                 >
-                  <SelectTrigger className="w-[120px] h-8 bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
+                  <SelectTrigger className="w-[120px] h-8 bg-[#1A1A1A] border-[#3a3a35] text-[#e5e5e5]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1f1f1c] border-[#3a3a35]">
+                  <SelectContent className="bg-[#1A1A1A] border-[#3a3a35]">
                     <SelectItem
                       value="1"
                       className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#faff6a]"
