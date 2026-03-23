@@ -200,10 +200,10 @@ class SentinelBridgeService {
 
       if (validDecisions.length > 0) {
         const shadowQuery = `
-          INSERT INTO sentinel_ai_predictions 
+     INSERT INTO sentinel_ai_predictions 
           (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
           SELECT * FROM UNNEST(
-            $1::int[], $2::int[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
+            $1::text[], $2::int[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
           )
           ON CONFLICT (hotel_id, room_type_id, stay_date)
           DO UPDATE SET 
@@ -216,7 +216,7 @@ class SentinelBridgeService {
         `;
         const now = new Date();
         await client.query(shadowQuery, [
-          validDecisions.map((d) => Number(d.hotel_id)),
+          validDecisions.map((d) => String(d.hotel_id)),
           validDecisions.map((d) => Number(d.room_type_id)),
           validDecisions.map((d) => d.stay_date),
           validDecisions.map((d) => Number(d.suggested_rate)),
@@ -513,7 +513,7 @@ class SentinelBridgeService {
               ]);
             }
             // --- BULK EXECUTION ---
-            const hIds = validUpdates.map((u) => Number(u.hotel_id));
+            const hIds = validUpdates.map((u) => String(u.hotel_id));
             const rIds = validUpdates.map((u) => Number(u.room_type_id));
             const dates = validUpdates.map((u) => u.start_date);
             const prices = validUpdates.map((u) => u.price);
@@ -524,8 +524,8 @@ class SentinelBridgeService {
                 `
                 UPDATE sentinel_ai_predictions AS p
                 SET is_applied = TRUE
-                FROM UNNEST($1::int[], $2::int[], $3::date[]) AS t(hid, rid, sdate)
-                WHERE p.hotel_id::int = t.hid::int 
+                FROM UNNEST($1::text[], $2::int[], $3::date[]) AS t(hid, rid, sdate)
+                WHERE p.hotel_id::text = t.hid::text 
                   AND p.room_type_id::int = t.rid::int 
                   AND p.stay_date::date = t.sdate::date
               `,
@@ -537,10 +537,10 @@ class SentinelBridgeService {
                 `
                 INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
                 SELECT 
-                    t.hid::int, t.rid::int, t.sdate::date, c.rate, t.new_price, 'SENTINEL', NOW()
-                FROM UNNEST($1::int[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                    t.hid::text, t.rid::int, t.sdate::date, c.rate, t.new_price, 'SENTINEL', NOW()
+                FROM UNNEST($1::text[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
                 JOIN sentinel_rates_calendar c 
-                    ON c.hotel_id::int = t.hid::int 
+                    ON c.hotel_id::text = t.hid::text 
                     AND c.room_type_id::int = t.rid::int 
                     AND c.stay_date::date = t.sdate::date
               `,
@@ -552,8 +552,8 @@ class SentinelBridgeService {
                 `
                 UPDATE sentinel_rates_calendar AS c
                 SET source = 'SENTINEL', last_updated_at = NOW(), rate = t.new_price
-                FROM UNNEST($1::int[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
-                WHERE c.hotel_id::int = t.hid::int 
+                FROM UNNEST($1::text[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
+                WHERE c.hotel_id::text = t.hid::text 
                   AND c.room_type_id::int = t.rid::int 
                   AND c.stay_date::date = t.sdate::date
               `,
