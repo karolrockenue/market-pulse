@@ -547,7 +547,7 @@ class SentinelBridgeService {
                 [hIds, rIds, dates, prices],
               );
 
-              // 3. Bulk Update Calendar (CRITICAL FIX: Now updates 'rate' too)
+              // 3. Bulk Update Calendar
               await client.query(
                 `
                 UPDATE sentinel_rates_calendar AS c
