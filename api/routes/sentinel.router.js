@@ -63,8 +63,6 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // [REMOVED] Local buildRateIdMap - logic moved to Sentinel Service
 
-const axios = require("axios");
-
 /**
  * [NEW] POST /api/sentinel/trigger-dgx
  * Proxies a request to the External NVIDIA DGX Spark Server.
@@ -74,6 +72,7 @@ router.post("/trigger-dgx", async (req, res) => {
   const { hotelId } = req.body;
 
   // Configuration: Set this in your Vercel/Node .env file
+  // Example: https://dgx-spark.rockenue.com or http://123.45.67.89:5000
   const DGX_URL = process.env.DGX_API_URL || "http://localhost:5000";
 
   if (!hotelId) {
@@ -81,37 +80,34 @@ router.post("/trigger-dgx", async (req, res) => {
   }
 
   try {
-    console.log(
-      `[Sentinel] Triggering DGX AI for Hotel ${hotelId} at ${DGX_URL}/run...`,
-    );
+    console.log(`[Sentinel] Triggering DGX AI for Hotel ${hotelId}...`);
 
-    // Use Axios for better stability with Tailscale and add an explicit timeout
-    const response = await axios.post(
-      `${DGX_URL}/run`,
-      { hotel_id: hotelId },
-      {
-        headers: { "Content-Type": "application/json" },
-        timeout: 20000, // 20 seconds explicit timeout
-      },
-    );
+    const response = await fetch(`${DGX_URL}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hotel_id: hotelId }),
+    });
 
-    console.log(`[Sentinel] DGX Response Status:`, response.status);
+    if (!response.ok) {
+      throw new Error(
+        `DGX responded with ${response.status}: ${response.statusText}`,
+      );
+    }
+
+    const data = await response.json();
+    console.log(`[Sentinel] DGX Response:`, data);
 
     res.status(200).json({
       success: true,
       message: "DGX Analysis Complete",
-      data: response.data,
+      data: data,
     });
   } catch (error) {
     console.error("[Sentinel] DGX Trigger Failed:", error.message);
-    if (error.response) {
-      console.error("[Sentinel] DGX Response Data:", error.response.data);
-    }
-
     res.status(502).json({
       success: false,
       message:
-        "Failed to contact DGX Server. Ensure the Python script is running and tunnel is open.",
+        "Failed to contact DGX Server. Ensure the Python script is running.",
       error: error.message,
     });
   }
