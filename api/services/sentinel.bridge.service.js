@@ -525,9 +525,9 @@ class SentinelBridgeService {
                 UPDATE sentinel_ai_predictions AS p
                 SET is_applied = TRUE
                 FROM UNNEST($1::int[], $2::int[], $3::date[]) AS t(hid, rid, sdate)
-                WHERE p.hotel_id = t.hid 
-                  AND p.room_type_id = t.rid 
-                  AND p.stay_date = t.sdate
+                WHERE p.hotel_id::int = t.hid::int 
+                  AND p.room_type_id::int = t.rid::int 
+                  AND p.stay_date::date = t.sdate::date
               `,
                 [hIds, rIds, dates],
               );
@@ -537,12 +537,12 @@ class SentinelBridgeService {
                 `
                 INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
                 SELECT 
-                    t.hid, t.rid, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
+                    t.hid::int, t.rid::int, t.sdate::date, c.rate, t.new_price, 'SENTINEL', NOW()
                 FROM UNNEST($1::int[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
                 JOIN sentinel_rates_calendar c 
-                    ON c.hotel_id = t.hid 
-                    AND c.room_type_id = t.rid 
-                    AND c.stay_date = t.sdate
+                    ON c.hotel_id::int = t.hid::int 
+                    AND c.room_type_id::int = t.rid::int 
+                    AND c.stay_date::date = t.sdate::date
               `,
                 [hIds, rIds, dates, prices],
               );
@@ -553,9 +553,9 @@ class SentinelBridgeService {
                 UPDATE sentinel_rates_calendar AS c
                 SET source = 'SENTINEL', last_updated_at = NOW(), rate = t.new_price
                 FROM UNNEST($1::int[], $2::int[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
-                WHERE c.hotel_id = t.hid 
-                  AND c.room_type_id = t.rid 
-                  AND c.stay_date = t.sdate
+                WHERE c.hotel_id::int = t.hid::int 
+                  AND c.room_type_id::int = t.rid::int 
+                  AND c.stay_date::date = t.sdate::date
               `,
                 [hIds, rIds, dates, prices],
               );
