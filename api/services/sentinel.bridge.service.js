@@ -203,9 +203,9 @@ class SentinelBridgeService {
           INSERT INTO sentinel_ai_predictions 
           (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
           SELECT * FROM UNNEST(
-            $1::int[], $2::int[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
+            $1::text[], $2::text[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
           )
-          ON CONFLICT (hotel_id, room_type_id, stay_date) 
+          ON CONFLICT (hotel_id, room_type_id, stay_date)
           DO UPDATE SET 
             suggested_rate = EXCLUDED.suggested_rate,
             confidence_score = EXCLUDED.confidence_score,
@@ -540,9 +540,9 @@ class SentinelBridgeService {
                 `
                 INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
                 SELECT 
-                    t.hid::integer, t.rid::integer, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
+                    t.hid, t.rid, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
                 FROM UNNEST($1::text[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
-                JOIN sentinel_rates_calendar c 
+                JOIN sentinel_rates_calendar c
                     ON c.hotel_id::text = t.hid 
                     AND c.room_type_id::text = t.rid 
                     AND c.stay_date = t.sdate
