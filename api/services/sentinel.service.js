@@ -7,6 +7,7 @@
 const db = require("../utils/db");
 const pricingEngine = require("./sentinel.pricing.engine");
 const sentinelAdapter = require("../adapters/sentinel.adapter"); // Needed for live rate lookup
+const pmsRegistry = require("../adapters/pmsRegistry"); // [MEWS] PMS-aware adapter routing
 /**
  * [FIXED] Fetch Daily Max Rates
  * Translates DB Date ('2025-01-01') -> Frontend Key ('0-1')
@@ -309,13 +310,27 @@ async function previewCalendar({
        WHERE hotel_id = $1 AND room_type_id = $2 AND stay_date >= $3 AND stay_date <= $4`,
       [hotelId, baseRoomTypeId, startDate, endDate],
     ),
-    sentinelAdapter.getRates(
-      hotelId,
-      pmsPropertyId,
-      baseRoomTypeId,
-      startDate,
-      endDate,
-    ),
+    pmsRegistry
+      .getPmsType(hotelId)
+      .then((pmsType) => {
+        const adapter = pmsRegistry.getSentinelAdapter(pmsType);
+        return adapter.getRates(
+          hotelId,
+          pmsPropertyId,
+          baseRoomTypeId,
+          startDate,
+          endDate,
+        );
+      })
+      .catch(() => {
+        return sentinelAdapter.getRates(
+          hotelId,
+          pmsPropertyId,
+          baseRoomTypeId,
+          startDate,
+          endDate,
+        );
+      }),
   ]);
 
   // 3. Map Data

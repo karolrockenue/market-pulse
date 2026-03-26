@@ -106,11 +106,9 @@ router.post("/", async (req, res) => {
     }`,
   );
 
-  // Always respond 200 immediately to prevent Mews retries
-  const finish = (msg) => {
-    if (msg) console.log(`[Mews Webhook] ${msg}`);
-    if (!res.headersSent) res.status(200).json({ success: true });
-  };
+  // Respond 200 immediately — Mews requires response within 5 seconds.
+  // All processing happens async after this.
+  res.status(200).json({ success: true });
 
   // 1. Validate basic structure
   if (
@@ -118,7 +116,8 @@ router.post("/", async (req, res) => {
     !payload.Events ||
     !Array.isArray(payload.Events)
   ) {
-    return finish("Invalid payload structure. Skipping.");
+    console.log("[Mews Webhook] Invalid payload structure. Skipping.");
+    return;
   }
 
   // 2. Find the hotel
@@ -127,7 +126,7 @@ router.post("/", async (req, res) => {
     console.warn(
       `[Mews Webhook] Orphan Event: Enterprise ${payload.EnterpriseId} not found in our system. Skipping.`,
     );
-    return finish();
+    return;
   }
 
   const { hotel_id, pms_credentials } = hotel;
@@ -141,7 +140,7 @@ router.post("/", async (req, res) => {
       `[Mews Webhook] Failed to get credentials for hotel ${hotel_id}:`,
       credErr.message,
     );
-    return finish();
+    return;
   }
 
   // 4. Filter for ServiceOrderUpdated events (= reservation changes)
@@ -150,9 +149,10 @@ router.post("/", async (req, res) => {
   );
 
   if (reservationEvents.length === 0) {
-    return finish(
-      `No ServiceOrderUpdated events. Received: ${payload.Events.map((e) => e.Discriminator).join(", ")}`,
+    console.log(
+      `[Mews Webhook] No ServiceOrderUpdated events. Received: ${payload.Events.map((e) => e.Discriminator).join(", ")}`,
     );
+    return;
   }
 
   console.log(
@@ -316,8 +316,8 @@ router.post("/", async (req, res) => {
     }
   }
 
-  return finish(
-    `Processed ${reservationEvents.length} reservation events for hotel ${hotel_id}`,
+  console.log(
+    `[Mews Webhook] Processed ${reservationEvents.length} reservation events for hotel ${hotel_id}`,
   );
 });
 

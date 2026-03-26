@@ -77,27 +77,47 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
     ...data,
   };
 
-  try {
-    const response = await axios.post(url, body);
-    return response.data;
-  } catch (error) {
-    // ── Detailed Error Logging ──
-    const errorMessage = error.response
-      ? JSON.stringify(error.response.data)
-      : error.message;
+  const MAX_RETRIES = 3;
 
-    const maskedAccess = credentials.accessToken
-      ? `${credentials.accessToken.substring(0, 4)}...${credentials.accessToken.slice(-4)}`
-      : "N/A";
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await axios.post(url, body);
+      return response.data;
+    } catch (error) {
+      const status = error.response?.status;
 
-    console.error("--- MEWS API CALL FAILED ---");
-    console.error(`Endpoint: ${endpoint}`);
-    console.error(`Access Token (Masked): ${maskedAccess}`);
-    console.error(`Status: ${error.response?.status || "No response"}`);
-    console.error(`Error: ${errorMessage}`);
-    console.error("----------------------------");
+      if ((status === 429 || status === 408) && attempt < MAX_RETRIES) {
+        const retryAfter =
+          status === 429
+            ? parseInt(error.response.headers["retry-after"] || "5", 10)
+            : Math.pow(2, attempt);
 
-    throw new Error(`Mews API (${endpoint}) failed: ${errorMessage}`);
+        console.warn(
+          `[Mews API] ${status} on ${endpoint} — retry ${attempt}/${MAX_RETRIES} after ${retryAfter}s`,
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+        continue;
+      }
+
+      const errorMessage = error.response
+        ? JSON.stringify(error.response.data)
+        : error.message;
+
+      const maskedAccess = credentials.accessToken
+        ? `${credentials.accessToken.substring(0, 4)}...${credentials.accessToken.slice(-4)}`
+        : "N/A";
+
+      console.error("--- MEWS API CALL FAILED ---");
+      console.error(`Endpoint: ${endpoint}`);
+      console.error(`Access Token (Masked): ${maskedAccess}`);
+      console.error(`Status: ${status || "No response"}`);
+      console.error(`Error: ${errorMessage}`);
+      console.error(`Attempt: ${attempt}/${MAX_RETRIES}`);
+      console.error("----------------------------");
+
+      throw new Error(`Mews API (${endpoint}) failed: ${errorMessage}`);
+    }
   }
 }
 
