@@ -159,11 +159,17 @@ Risk Overview – portfolio risk lens inside Sentinel.
 
 Shadowfax View – competitive pricing & scraped context for Sentinel usage.
 
-Connects to PMS via:
+Connects to PMS via adapters (PMS-siloed architecture):
 
-cloudbedsAdapter.js (auth + generic operations).
+Cloudbeds:
+cloudbedsAdapter.js (OAuth auth + generic operations).
+sentinel.adapter.js (Cloudbeds pricing-focused write/read bridge).
 
-sentinel.adapter.js (pricing-focused write/read bridge).
+Mews:
+mewsAdapter.js (static token auth + configuration, metrics, onboarding).
+mews.sentinel.adapter.js (Mews pricing-focused write/read bridge).
+
+pmsRegistry.js routes all PMS calls to the correct adapter based on hotels.pms_type.
 
 1.2 Key Boundaries
 
@@ -175,11 +181,13 @@ Market Pulse domain UIs talk to /api/metrics, /api/hotels, /api/market, /api/adm
 
 Backend ↔ PMS
 
-All PMS read/write operations go through adapters:
+All PMS read/write operations go through adapters, routed by pmsRegistry.js:
 
-cloudbedsAdapter.js for tokens + general operations.
+Cloudbeds: cloudbedsAdapter.js for OAuth tokens + general operations. sentinel.adapter.js for Sentinel rate reads/writes.
 
-sentinel.adapter.js for Sentinel-specific rate reads/writes.
+Mews: mewsAdapter.js for static token auth + configuration/metrics. mews.sentinel.adapter.js for Sentinel rate reads/writes (rates/getPricing, rates/updatePrice).
+
+The process-queue worker, Rate Manager, and PMS Sync routes all use pmsRegistry.\_getSentinelAdapterForHotel(hotelId) to resolve the correct adapter at runtime. Cloudbeds remains the default fallback.
 
 Data Ownership
 
@@ -201,9 +209,27 @@ Producer enqueues jobs; worker processes them and reports via notifications.
 
 DGX / Shadowfax
 
-DGX Spark and “Shadowfax 2.0” are future compute/scraper layers.
+DGX Spark and "Shadowfax 2.0" are future compute/scraper layers.
 
 Current system references them conceptually; runtime pricing logic is fully handled by Node + adapters + existing SQL.
+
+Mews Integration (Active — March 2026)
+
+Full Mews PMS integration across all 5 phases: onboarding, metrics sync, Sentinel rate reads, Sentinel rate writes, and real-time webhooks.
+
+Architecture: PMS-siloed. All Mews code lives in dedicated files. Zero changes to Sentinel core services or pricing engine.
+
+New files: mewsAdapter.js, mews.sentinel.adapter.js, pmsRegistry.js, mews.onboarding.router.js, mews.webhooks.router.js.
+
+Modified files (additive only): server.js (4 lines), sentinel.router.js (5 PMS routing patches), sentinel.service.js (1 PMS-aware rate_id_map patch), daily-refresh.js (Mews branch updated).
+
+Environment variables: MEWS_CLIENT_TOKEN, MEWS_API_URL (defaults to https://api.mews-demo.com, production: https://api.mews.com).
+
+Per-hotel credentials: hotels.pms_credentials stores { accessToken, serviceId, timezone }.
+
+Production webhook URL: https://www.market-pulse.io/api/mews-webhooks
+
+Certification: Mews certification form submitted. Pending production ClientToken.
 
 2.0 ARCHITECTURE
 2.1 Backend Architecture
@@ -290,7 +316,21 @@ Internal operations: health, manual sync, maintenance.
 
 api/routes/webhooks.router.js
 
-Inbound events from PMS → metrics snapshots (Pulse).
+Inbound events from Cloudbeds PMS → metrics snapshots (Pulse).
+
+api/routes/mews.onboarding.router.js
+
+Mews hotel onboarding (POST /api/mews/onboard, POST /api/mews/test-creds).
+
+Admin-only. Creates hotel + sentinel_configurations records from Mews API data.
+
+api/routes/mews.webhooks.router.js
+
+Inbound events from Mews PMS → metrics snapshots + bookings ledger.
+
+Mounted at /api/mews-webhooks. Handles ServiceOrderUpdated General Webhook events.
+
+Fetches reservation details + revenue (orderItems/getAll) per event.
 
 api/routes/auth.router.js / api/routes/users.router.js
 
@@ -333,11 +373,35 @@ postRateBatch(...) for bulk pushes.
 
 getRates(hotelId, pmsPropertyId, roomTypeId, startDate, endDate) for live rate fetches.
 
-api/adapters/mewsAdapter.js / api/adapters/operaAdapter.js
+api/adapters/mewsAdapter.js
 
-Present for broader Market Pulse usage.
+Full Mews PMS adapter (rewritten March 2026).
 
-Sentinel is currently Cloudbeds-only.
+Auth: MEWS_CLIENT_TOKEN from env (shared) + per-hotel AccessToken from hotels.pms_credentials.
+
+Owns: getHotelDetails, getAccommodationServiceId, getResourceCategories, getRatePlans, buildMewsRateIdMap, getOccupancyMetrics, getRevenueMetrics, getCombinedMetrics.
+
+API base URL controlled by MEWS_API_URL env var (defaults to demo, production is https://api.mews.com).
+
+api/adapters/mews.sentinel.adapter.js
+
+Sentinel-focused Mews bridge (mirrors sentinel.adapter.js interface).
+
+Owns: getRates (via rates/getPricing), getRoomTypes, getRatePlans, postRate, postRateBatch (via rates/updatePrice), getJobStatus.
+
+All functions take the same parameters as sentinel.adapter.js for interface compatibility.
+
+api/adapters/pmsRegistry.js
+
+PMS Adapter Router. Returns the correct adapter module based on hotels.pms_type.
+
+Exports: getAdapter(pmsType), getSentinelAdapter(pmsType), getPmsType(hotelId).
+
+Used by: sentinel.router.js (via \_getSentinelAdapterForHotel helper), daily-refresh.js, sentinel.service.js.
+
+api/adapters/operaAdapter.js
+
+Present for future Opera PMS integration. Not yet active.
 
 Utils
 
@@ -982,6 +1046,44 @@ Accepts JSON array of rate predictions.
 
 Upserts into sentinel_ai_predictions.
 
+5.5 Mews Onboarding Endpoints (/api/mews)
+
+All Mews onboarding routes are admin-only (protected by requireAdminApi).
+
+POST /test-creds
+
+Body: { accessToken }
+
+Tests Mews credentials by calling configuration/get, services/getAll, resourceCategories/getAll, rates/getAll.
+
+Returns property details, room types, and rate plans without creating any records.
+
+POST /onboard
+
+Body: { accessToken }
+
+Creates hotel + sentinel_configurations records from Mews API data.
+
+Checks for duplicates by Enterprise ID. Sets sentinel_enabled = false.
+
+Stores { accessToken, serviceId, timezone } in hotels.pms_credentials.
+
+5.6 Mews Webhooks (/api/mews-webhooks)
+
+POST /
+
+Receives Mews General Webhook payloads.
+
+Processes ServiceOrderUpdated events:
+
+1. Looks up hotel by EnterpriseId (= hotels.pms_property_id).
+2. Fetches reservation details via reservations/getAll/2023-06-06.
+3. Fetches revenue via orderItems/getAll with ServiceOrderIds.
+4. Updates daily_metrics_snapshots (rooms_sold + gross_revenue).
+5. Updates daily_bookings_record (sales ledger).
+
+Production webhook URL: https://www.market-pulse.io/api/mews-webhooks
+
 6.0 ACTIVE FILE TREE (SIMPLIFIED, LOGIC-FOCUSED)
 
 Note:
@@ -993,7 +1095,9 @@ market-pulse/
 │ ├── adapters
 │ │ ├── cloudbedsAdapter.js
 │ │ ├── mewsAdapter.js
+│ │ ├── mews.sentinel.adapter.js
 │ │ ├── operaAdapter.js
+│ │ ├── pmsRegistry.js
 │ │ └── sentinel.adapter.js
 │ ├── routes
 │ │ ├── admin.router.js
@@ -1002,6 +1106,8 @@ market-pulse/
 │ │ ├── hotels.router.js
 │ │ ├── market.router.js
 │ │ ├── metrics.router.js
+│ │ ├── mews.onboarding.router.js
+│ │ ├── mews.webhooks.router.js
 │ │ ├── sentinel.router.js
 │ │ ├── support.router.js
 │ │ ├── users.router.js

@@ -249,6 +249,14 @@ Check Public URL tailscale funnel status
 
 _AI Agents must use these exact column names for all SQL queries._
 
+> **🚨 CRITICAL INCIDENT: THE POSTGRES TYPE-CASTING TRAP 🚨**
+> Do **NOT** assume `hotel_id` and `room_type_id` share the same data type across the system.
+>
+> - `hotel_id` is STRICTLY an `INTEGER` across all tables.
+> - `room_type_id` is a **MIXED TYPE**. In `sentinel_ai_predictions` it is an `INTEGER`, but in `sentinel_rates_calendar` it is `TEXT` (VARCHAR).
+>
+> **The Hard Rule:** When writing Node.js `UNNEST` arrays or performing cross-table `JOIN`s, you MUST explicitly cast the room type ID to text (e.g., `room_type_id::text = ANY($2::text[])` or `c.room_type_id::text = t.rid`). Failing to do this will trigger a fatal `operator does not exist: text = integer` crash in Postgres. Never cast `room_type_id` to `$X::int[]` when interacting with the calendar table.
+
 ### **7.1 sentinel_configurations (The Rules)**
 
 - `hotel_id` (int), `monthly_min_rates` (jsonb), `last_minute_floor` (jsonb), `seasonality_profile` (jsonb), `rules` (jsonb), `is_autopilot_enabled` (bool), `rate_id_map` (jsonb).

@@ -11,6 +11,19 @@ const sentinelAdapter = require("../adapters/sentinel.adapter.js");
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js"); // [Added for Export Feature]
 const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
 const db = require("../utils/db"); // <-- [NEW] Import database connection
+const pmsRegistry = require("../adapters/pmsRegistry.js"); // [MEWS] PMS adapter router
+
+// [MEWS] Helper: Returns the correct sentinel adapter for a hotel's PMS type.
+// Falls back to Cloudbeds adapter if pms_type is null (legacy hotels).
+async function _getSentinelAdapterForHotel(hotelId) {
+  try {
+    const pmsType = await pmsRegistry.getPmsType(hotelId);
+    return pmsRegistry.getSentinelAdapter(pmsType);
+  } catch (e) {
+    // Fallback: legacy hotels without pms_type default to Cloudbeds
+    return sentinelAdapter;
+  }
+}
 
 // =============================================================================
 // 1. PUBLIC / CRON ROUTE (MUST be defined BEFORE requireAdminApi)
@@ -844,8 +857,9 @@ router.post("/test-post-rate", async (req, res) => {
       throw new Error("Hotel not found in database.");
     const hotelId = hotelRes.rows[0].hotel_id;
 
-    // Pass BOTH IDs
-    const result = await sentinelAdapter.postRate(
+    // Pass BOTH IDs — [MEWS] Route to correct PMS adapter
+    const rateAdapter = await _getSentinelAdapterForHotel(hotelId);
+    const result = await rateAdapter.postRate(
       hotelId,
       propertyId,
       rateId,
@@ -969,21 +983,28 @@ router.post("/sync", async (req, res) => {
       `[Sentinel Router] Starting Full Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`,
     );
 
-    // 1. Fetch Metadata ("Facts") from PMS
+    // 1. Fetch Metadata ("Facts") from PMS — [MEWS] Route to correct adapter
+    const syncAdapter = await _getSentinelAdapterForHotel(hotelId);
     const [roomTypesData, ratePlansData] = await Promise.all([
-      sentinelAdapter.getRoomTypes(hotelId, pmsPropertyId),
-      sentinelAdapter.getRatePlans(hotelId, pmsPropertyId),
+      syncAdapter.getRoomTypes(hotelId, pmsPropertyId),
+      syncAdapter.getRatePlans(hotelId, pmsPropertyId),
     ]);
 
     const pmsRoomTypes = roomTypesData.data || [];
     const pmsRatePlans = ratePlansData.data || [];
 
-    // 2. Build Rate Map (Use Service Logic)
-    // 2. Build Rate Map (Use Service Logic)
-    const rateIdMap = sentinelService.buildRateIdMap(
-      pmsRoomTypes,
-      pmsRatePlans,
-    );
+    // 2. Build Rate Map — [MEWS] Use PMS-specific map builder
+    const hotelPmsType = await pmsRegistry.getPmsType(hotelId);
+    let rateIdMap;
+    if (hotelPmsType === "mews") {
+      const mewsAdapterLocal = require("../adapters/mewsAdapter");
+      rateIdMap = mewsAdapterLocal.buildMewsRateIdMap(
+        pmsRatePlans,
+        pmsRoomTypes,
+      );
+    } else {
+      rateIdMap = sentinelService.buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+    }
 
     // 3. Save Configuration to DB
     const { rows } = await db.query(
@@ -1029,7 +1050,8 @@ router.post("/sync", async (req, res) => {
         .split("T")[0];
 
       try {
-        const liveRatesRes = await sentinelAdapter.getRates(
+        const hydrateAdapter = await _getSentinelAdapterForHotel(hotelId);
+        const liveRatesRes = await hydrateAdapter.getRates(
           hotelId,
           pmsPropertyId,
           baseRoomId,
@@ -1263,8 +1285,9 @@ async function runBackgroundWorker() {
           await client.query(`SAVEPOINT ${savepointName}`);
           const { pmsPropertyId, rates } = job.payload;
 
-          // Adapter Call
-          const result = await sentinelAdapter.postRateBatch(
+          // Adapter Call — [MEWS] Route to correct PMS adapter
+          const jobAdapter = await _getSentinelAdapterForHotel(job.hotel_id);
+          const result = await jobAdapter.postRateBatch(
             job.hotel_id,
             pmsPropertyId,
             rates,
@@ -1439,13 +1462,15 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
          ORDER BY stay_date ASC`,
         [hotelId, roomTypeId, startDateStr],
       ),
-      // [BRIDGE UPDATE] Pass BOTH IDs
-      sentinelAdapter.getRates(
-        hotelId,
-        pmsPropertyId,
-        roomTypeId,
-        startDateStr,
-        endDateStr,
+      // [BRIDGE UPDATE] Pass BOTH IDs — [MEWS] Route to correct PMS adapter
+      _getSentinelAdapterForHotel(hotelId).then((adapter) =>
+        adapter.getRates(
+          hotelId,
+          pmsPropertyId,
+          roomTypeId,
+          startDateStr,
+          endDateStr,
+        ),
       ),
     ]);
 

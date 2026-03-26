@@ -9,35 +9,36 @@ module.exports = async (request, response) => {
   // ** REFACTORED LOGIC **
   // The job now fetches all connected properties directly, making it property-centric
 
-
-
   try {
     // More descriptive logging for the job's purpose.
-console.log("Starting daily forecast refresh job for all properties...");
-let totalRecordsUpdated = 0;
-let allProperties = []; // Define here to ensure it's in scope
+    console.log("Starting daily forecast refresh job for all properties...");
+    let totalRecordsUpdated = 0;
+    let allProperties = []; // Define here to ensure it's in scope
 
-// Step 1: Get a list of all hotels and their essential info.
-// This is more efficient as it's one query for all properties.
-// It also fetches the pms_type and timezone needed for branching.
-const propertiesClient = await pgPool.connect();
-try {
-const propertiesResult = await propertiesClient.query(
-    "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels"
-  );
-  console.log("...Initial property fetch query complete.");
-  allProperties = propertiesResult.rows;
-} catch (e) {
-  console.error("CRITICAL: Failed to fetch initial property list.", e.message);
-  throw e; // Re-throw to be caught by main catch block
-} finally {
-  propertiesClient.release();
-}
+    // Step 1: Get a list of all hotels and their essential info.
+    // This is more efficient as it's one query for all properties.
+    // It also fetches the pms_type and timezone needed for branching.
+    const propertiesClient = await pgPool.connect();
+    try {
+      const propertiesResult = await propertiesClient.query(
+        "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels",
+      );
+      console.log("...Initial property fetch query complete.");
+      allProperties = propertiesResult.rows;
+    } catch (e) {
+      console.error(
+        "CRITICAL: Failed to fetch initial property list.",
+        e.message,
+      );
+      throw e; // Re-throw to be caught by main catch block
+    } finally {
+      propertiesClient.release();
+    }
     console.log(`Found ${allProperties.length} properties to process.`);
 
     // Step 2: Loop through each property.
     for (const hotel of allProperties) {
-  const {
+      const {
         hotel_id,
         property_name,
         pms_type,
@@ -47,7 +48,7 @@ const propertiesResult = await propertiesClient.query(
         total_rooms, // <-- ADDED
       } = hotel;
       console.log(
-        `--- Processing: ${property_name} (ID: ${hotel_id}, PMS: ${pms_type}) ---`
+        `--- Processing: ${property_name} (ID: ${hotel_id}, PMS: ${pms_type}) ---`,
       );
 
       let processedData; // This will hold the forecast data from the adapter.
@@ -71,38 +72,46 @@ const propertiesResult = await propertiesClient.query(
             accessToken,
             cloudbedsApiId,
             tax_rate,
-            pricingModel
+            pricingModel,
           );
         } catch (err) {
           console.error(
             `-- Failed to fetch Cloudbeds data for ${property_name}. Error: --`,
-            err.message
+            err.message,
           );
           continue; // Skip to the next hotel.
         }
       } else if (pms_type === "mews") {
         try {
-          // Get Mews credentials from the database.
+          // Get Mews credentials using the new adapter pattern
+          // (ClientToken from env, AccessToken from hotels.pms_credentials)
+          const credentials = await mewsAdapter.getCredentials(hotel_id);
+
+          // Get the serviceId from pms_credentials stored during onboarding
           const credsResult = await pgPool.query(
-            "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
-            [hotel_id]
+            "SELECT pms_credentials FROM hotels WHERE hotel_id = $1",
+            [hotel_id],
           );
-          const credentials = credsResult.rows[0]?.pms_credentials;
-          if (!credentials) {
+          const pmsCreds = credsResult.rows[0]?.pms_credentials;
+          const serviceId = pmsCreds?.serviceId;
+          const tz = pmsCreds?.timezone || timezone || "UTC";
+
+          if (!serviceId) {
             throw new Error(
-              `No Mews credentials found for property ${hotel_id}.`
+              `No serviceId in pms_credentials for Mews hotel ${hotel_id}. Re-onboard the property.`,
             );
           }
 
           const dataMap = {};
           let currentStartDate = new Date();
+          currentStartDate.setDate(currentStartDate.getDate() - 14); // 14 days back to recapture
           const finalEndDate = new Date();
-          finalEndDate.setDate(currentStartDate.getDate() + 365);
+          finalEndDate.setDate(finalEndDate.getDate() + 367);
 
-          // Loop through the next 365 days in 90-day chunks to respect API limits.
+          // Loop through in 90-day chunks to respect Mews API limits (max 3 months for reservations)
           while (currentStartDate < finalEndDate) {
             let currentEndDate = new Date(currentStartDate);
-            currentEndDate.setDate(currentEndDate.getDate() + 89); // Fetch in ~90 day chunks
+            currentEndDate.setDate(currentEndDate.getDate() + 89);
 
             if (currentEndDate > finalEndDate) {
               currentEndDate = finalEndDate;
@@ -112,80 +121,35 @@ const propertiesResult = await propertiesClient.query(
             const endDateStr = currentEndDate.toISOString().split("T")[0];
 
             console.log(
-              `-- Fetching Mews forecast chunk from ${startDateStr} to ${endDateStr}... --`
+              `-- Fetching Mews forecast chunk from ${startDateStr} to ${endDateStr}... --`,
             );
 
-            const [occupancyData, revenueData] = await Promise.all([
-              mewsAdapter.getOccupancyMetrics(
-                credentials,
-                startDateStr,
-                endDateStr,
-                timezone
-              ),
-              mewsAdapter.getRevenueMetrics(
-                credentials,
-                startDateStr,
-                endDateStr,
-                timezone
-              ),
-            ]);
+            // Use the new getCombinedMetrics which returns canonical format
+            const chunkData = await mewsAdapter.getCombinedMetrics(
+              credentials,
+              serviceId,
+              startDateStr,
+              endDateStr,
+              tz,
+            );
 
-            // Merge the data from this chunk into our main dataMap.
-            occupancyData.dailyMetrics.forEach((metric) => {
-              dataMap[metric.date] = {
-                ...dataMap[metric.date],
-                rooms_sold: metric.occupied,
-                capacity_count: metric.available,
-              };
-            });
-            revenueData.dailyMetrics.forEach((metric) => {
-              dataMap[metric.date] = {
-                ...dataMap[metric.date],
-                net_revenue: metric.netRevenue,
-                gross_revenue: metric.grossRevenue,
-              };
-            });
+            // Merge chunk into main map
+            Object.assign(dataMap, chunkData);
 
-            // Advance the start date for the next loop iteration.
             currentStartDate.setDate(currentStartDate.getDate() + 90);
-          }
-
-          // Calculate the final derived metrics for each day after all chunks are fetched.
-          for (const date in dataMap) {
-            const metrics = dataMap[date];
-            metrics.occupancy =
-              metrics.capacity_count > 0 && metrics.rooms_sold
-                ? metrics.rooms_sold / metrics.capacity_count
-                : 0;
-            metrics.net_adr =
-              metrics.rooms_sold > 0 && metrics.net_revenue
-                ? metrics.net_revenue / metrics.rooms_sold
-                : 0;
-            metrics.gross_adr =
-              metrics.rooms_sold > 0 && metrics.gross_revenue
-                ? metrics.gross_revenue / metrics.rooms_sold
-                : 0;
-            metrics.net_revpar =
-              metrics.capacity_count > 0 && metrics.net_revenue
-                ? metrics.net_revenue / metrics.capacity_count
-                : 0;
-            metrics.gross_revpar =
-              metrics.capacity_count > 0 && metrics.gross_revenue
-                ? metrics.gross_revenue / metrics.capacity_count
-                : 0;
           }
 
           processedData = dataMap;
         } catch (err) {
           console.error(
             `-- Failed to fetch Mews forecast for ${property_name}. Error: --`,
-            err.message
+            err.message,
           );
           continue;
         }
       } else {
         console.log(
-          `-- Unknown PMS type '${pms_type}' for hotel ${property_name}. Skipping. --`
+          `-- Unknown PMS type '${pms_type}' for hotel ${property_name}. Skipping. --`,
         );
         continue; // Skip unknown PMS types.
       }
@@ -201,7 +165,7 @@ const propertiesResult = await propertiesClient.query(
           // NOTE: This can be removed once cloudbeds_user_id is removed from the table.
           const userResult = await client.query(
             "SELECT user_id FROM user_properties WHERE property_id = $1 LIMIT 1",
-            [hotel_id]
+            [hotel_id],
           );
           const cloudbedsUserId =
             userResult.rows.length > 0 ? userResult.rows[0].user_id : null;
@@ -213,7 +177,7 @@ const propertiesResult = await propertiesClient.query(
               date,
               hotel_id,
               metrics.rooms_sold || 0,
-    total_rooms || metrics.capacity_count || 0, // <-- REPLACED: Prioritizes static total_rooms
+              total_rooms || metrics.capacity_count || 0, // <-- REPLACED: Prioritizes static total_rooms
               cloudbedsUserId, // Legacy column
               metrics.net_revenue || 0,
               metrics.gross_revenue || 0,
@@ -226,7 +190,7 @@ const propertiesResult = await propertiesClient.query(
 
           // This single query works for both Cloudbeds and Mews data.
           // Note: occupancy_direct is no longer populated as it was a calculated field.
- const query = format(
+          const query = format(
             `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, cloudbeds_user_id, net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
              VALUES %L
              ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
@@ -239,7 +203,7 @@ const propertiesResult = await propertiesClient.query(
                  gross_adr = EXCLUDED.gross_adr,
                  net_revpar = EXCLUDED.net_revpar,
                  gross_revpar = EXCLUDED.gross_revpar;`,
-            bulkInsertValues
+            bulkInsertValues,
           );
 
           await client.query(query);
@@ -262,49 +226,49 @@ const propertiesResult = await propertiesClient.query(
 
           totalRecordsUpdated += datesToUpdate.length;
           console.log(
-            `-- Successfully updated ${datesToUpdate.length} forecast records for ${property_name}. --`
+            `-- Successfully updated ${datesToUpdate.length} forecast records for ${property_name}. --`,
           );
         } catch (e) {
           await client.query("ROLLBACK");
           console.error(
             `-- DB update failed for ${property_name}. Error: --`,
-            e.message
+            e.message,
           );
         } finally {
           client.release();
         }
       } else {
         console.log(
-          `-- No new forecast records to update for ${property_name}. --`
+          `-- No new forecast records to update for ${property_name}. --`,
         );
       }
     }
 
-console.log(
-  "✅ Daily forecast refresh job complete. Attempting to update system_state table..."
-);
-const jobData = { timestamp: new Date().toISOString() };
-const stateClient = await pgPool.connect();
-try {
-  // --- GATELOG: About to update system_state ---
-  console.log("GATELOG: Writing new timestamp to system_state...");
+    console.log(
+      "✅ Daily forecast refresh job complete. Attempting to update system_state table...",
+    );
+    const jobData = { timestamp: new Date().toISOString() };
+    const stateClient = await pgPool.connect();
+    try {
+      // --- GATELOG: About to update system_state ---
+      console.log("GATELOG: Writing new timestamp to system_state...");
 
-  // THE FIX: Corrected the key to match what the dashboard API endpoint reads.
-  await stateClient.query(
-    "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
-    ["last_successful_refresh", jobData]
-  );
+      // THE FIX: Corrected the key to match what the dashboard API endpoint reads.
+      await stateClient.query(
+        "INSERT INTO system_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2;",
+        ["last_successful_refresh", jobData],
+      );
 
-  // --- GATELOG: Finished updating system_state ---
-  console.log("GATELOG: Write to system_state complete.");
-} catch (e) {
-  console.error("CRITICAL: Failed to update system_state.", e.message);
-  throw e; // Re-throw to be caught by main catch block
-} finally {
-  stateClient.release();
-}
+      // --- GATELOG: Finished updating system_state ---
+      console.log("GATELOG: Write to system_state complete.");
+    } catch (e) {
+      console.error("CRITICAL: Failed to update system_state.", e.message);
+      throw e; // Re-throw to be caught by main catch block
+    } finally {
+      stateClient.release();
+    }
 
-response.status(200).json({
+    response.status(200).json({
       status: "Success",
       processedProperties: allProperties.length,
       totalRecordsUpdated: totalRecordsUpdated,

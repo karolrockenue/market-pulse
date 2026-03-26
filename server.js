@@ -15,6 +15,7 @@ const pgPool = require("./api/utils/db");
 const { requirePageLogin } = require("./api/utils/middleware");
 // [NEW] Import the daily-refresh job handler
 // [WITH THIS]
+const mewsOnboardingRoutes = require("./api/routes/mews.onboarding.router.js");
 
 // [NEW] Import all cron job handlers
 const dailyRefreshHandler = require("./api/daily-refresh.js");
@@ -32,6 +33,8 @@ const supportRoutes = require("./api/routes/support.router.js");
 const sentinelRoutes = require("./api/routes/sentinel.router.js"); // Sentinel module
 const webhooksRoutes = require("./api/routes/webhooks.router.js"); // Webhooks module
 const bridgeRoutes = require("./api/routes/bridge.router.js"); // Sentinel AI Bridge
+
+const mewsWebhooksRoutes = require("./api/routes/mews.webhooks.router.js");
 
 // --- NEW DOMAIN ROUTERS (SESSION 1) ---
 const metricsRoutes = require("./api/routes/metrics.router.js"); // Unified Metrics Engine
@@ -77,7 +80,7 @@ const corsOptions = {
     // 3. Check if the origin starts with one of our allowed production domains
     // This handles cases like 'https://www.market-pulse.io'
     const isAllowedProduction = allowedOrigins.some((allowed) =>
-      origin.startsWith(allowed)
+      origin.startsWith(allowed),
     );
 
     if (isAllowedProduction) {
@@ -130,7 +133,7 @@ const cookieConfig = {
 // This log will run once when the server starts.
 console.log(
   "[BREADCRUMB 0 - server.js] Using session cookie configuration:",
-  cookieConfig
+  cookieConfig,
 );
 
 app.use(
@@ -154,7 +157,7 @@ app.use(
       domain: undefined,
       path: "/",
     },
-  })
+  }),
 );
 
 // --- [NEW] SECURE CRON JOB ENDPOINT ---
@@ -164,7 +167,7 @@ app.get("/api/cron/daily-refresh", (req, res) => {
 
   if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     console.warn(
-      "CRON JOB FAILED: Unauthorized attempt at /api/cron/daily-refresh"
+      "CRON JOB FAILED: Unauthorized attempt at /api/cron/daily-refresh",
     );
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -204,7 +207,7 @@ if (process.env.VERCEL_ENV !== "production") {
       // --- FIX: Look up the user's ID and their role from the database ---
       const userResult = await pgPool.query(
         "SELECT cloudbeds_user_id, role FROM users WHERE email = $1",
-        [email]
+        [email],
       );
 
       if (userResult.rows.length === 0) {
@@ -243,7 +246,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/support", supportRoutes);
-
+app.use("/api/mews", mewsOnboardingRoutes);
 // 2. Domain Engines (New Architecture)
 app.use("/api/metrics", metricsRoutes); // KPI, Dashboard, Reports, Portfolio
 app.use("/api/hotels", hotelsRoutes); // Config, Budgets, Assets, CompSets
@@ -253,6 +256,8 @@ app.use("/api/market", marketRoutes); // Trends, Pace, Scraper, Shadowfax
 app.use("/api/sentinel", sentinelRoutes); // AI Pricing
 app.use("/api/webhooks", webhooksRoutes); // PMS Events
 app.use("/api/bridge", bridgeRoutes); // Python AI Bridge
+
+app.use("/api/mews-webhooks", mewsWebhooksRoutes);
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
@@ -265,7 +270,7 @@ app.get("*", (req, res) => {
   // it means express.static didn't find it. We must return 404, not HTML.
   if (
     req.path.match(
-      /\.(js|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/
+      /\.(js|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/,
     )
   ) {
     return res.status(404).send("Asset not found");
@@ -276,7 +281,7 @@ app.get("*", (req, res) => {
 
   res.setHeader(
     "Cache-Control",
-    "no-store, no-cache, must-revalidate, proxy-revalidate"
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
   );
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");

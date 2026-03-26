@@ -585,10 +585,19 @@ async function updateConfig(hotelId, updates) {
     }
   }
 
-  // 2. Rebuild Rate ID Map
+  // 2. Rebuild Rate ID Map — PMS-aware
   const pmsRoomTypes = currentConfig.pms_room_types?.data || [];
   const pmsRatePlans = currentConfig.pms_rate_plans?.data || [];
-  const rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+  let rateIdMap;
+  // Check if this is a Mews hotel (Mews rate IDs are UUIDs with dashes)
+  const isMewsHotel =
+    pmsRatePlans.length > 0 && pmsRatePlans[0]?.rateID?.includes("-");
+  if (isMewsHotel) {
+    const mewsAdapter = require("../adapters/mewsAdapter");
+    rateIdMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
+  } else {
+    rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+  }
 
   // 3. Update Database (With Seasonality Profile & Rules)
   const { rows } = await db.query(

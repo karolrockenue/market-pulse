@@ -1,371 +1,566 @@
-// replace with this
+/**
+ * @file mewsAdapter.js
+ * @brief Core Mews PMS Adapter (Full Rewrite)
+ *
+ * ARCHITECTURE:
+ * - ClientToken: from env (MEWS_CLIENT_TOKEN) — shared across all Mews properties
+ * - AccessToken: from DB per hotel (hotels.pms_credentials.accessToken)
+ * - API URL: from env (MEWS_API_URL) — defaults to demo
+ *
+ * This file handles:
+ *   Phase 1: Configuration, services, resource categories, rates (onboarding)
+ *   Phase 2: Occupancy + revenue metrics (daily-refresh)
+ *
+ * Sentinel-specific rate reads/writes live in mews.sentinel.adapter.js (Phase 3-4).
+ */
+
 const axios = require("axios");
-const dateFnsTz = require("date-fns-tz");
-console.log("Inspecting date-fns-tz library:", dateFnsTz);
+const { fromZonedTime } = require("date-fns-tz");
+const pgPool = require("../utils/db");
 
-const MEWS_API_BASE_URL = "https://api.mews-demo.com";
-/**
- * A private helper to correctly format timestamps for the Mews API.
- * It takes a date string (e.g., "2025-08-13") and a timezone (e.g., "Europe/Budapest")
- * and converts it to the exact UTC timestamp for the beginning of that day in that zone.
- * @param {string} dateString - The date in YYYY-MM-DD format.
- * @param {string} timezone - The IANA timezone identifier.
- * @returns {string} An ISO 8601 formatted string in UTC.
- */
-// replace with this
-const _getUtcTimestampForMews = (dateString, timezone) => {
-  // Combine date with midnight time
-  const localTime = `${dateString}T00:00:00`;
-  // Use fromZonedTime, which correctly converts a wall-clock time
-  // in a specific timezone into a standard UTC Date object.
-  const utcDate = dateFnsTz.fromZonedTime(localTime, timezone);
-  // Return in ISO format (e.g., "2025-08-12T22:00:00.000Z")
-  return utcDate.toISOString();
-};
+// ─── Environment ───────────────────────────────────────────────────
+const MEWS_API_URL = process.env.MEWS_API_URL || "https://api.mews-demo.com";
+const MEWS_CLIENT_TOKEN = process.env.MEWS_CLIENT_TOKEN;
+const MEWS_CLIENT_NAME = "Rockenue MarketPulse 1.0.0";
+
+// ─── Credential Helpers ────────────────────────────────────────────
 
 /**
- * A private helper function to handle all API calls to the Mews Connector API.
- * @param {string} endpoint - The Mews API endpoint to call (e.g., 'configuration/get').
- * @param {object} credentials - The credentials for the property.
- * @param {string} credentials.clientToken - The client token for our application.
- * @param {string} credentials.accessToken - The access token for the specific property.
- * @param {object} [data={}] - Additional data for the request body.
- * @returns {Promise<object>} - The data from the API response.
+ * Fetches the per-hotel Mews credentials from the database.
+ * Returns { clientToken, accessToken, client } ready for API calls.
+ *
+ * @param {number|string} hotelId - Internal DB hotel ID
+ * @returns {Promise<{clientToken: string, accessToken: string, client: string}>}
  */
-const _callMewsApi = async (endpoint, credentials, data = {}) => {
-  try {
-    // Prepare the request body with authentication tokens, as required by Mews.
-    const requestBody = {
-      ClientToken: credentials.clientToken,
-      AccessToken: credentials.accessToken,
-      Client: "Rockenue 1.0.0", // Use a unique client name for certification
-      ...data,
-    };
+async function getCredentials(hotelId) {
+  const result = await pgPool.query(
+    `SELECT pms_credentials FROM hotels WHERE hotel_id = $1 AND pms_type = 'mews'`,
+    [hotelId],
+  );
 
-    // Make a POST request to the specified Mews endpoint
-    const response = await axios.post(
-      `${MEWS_API_BASE_URL}/api/connector/v1/${endpoint}`,
-      requestBody
+  if (result.rows.length === 0) {
+    throw new Error(`[Mews] No Mews hotel found with hotel_id ${hotelId}`);
+  }
+
+  const creds = result.rows[0].pms_credentials;
+  if (!creds || !creds.accessToken) {
+    throw new Error(
+      `[Mews] Missing accessToken in pms_credentials for hotel ${hotelId}`,
     );
+  }
 
-    // Return the data part of the response
+  return {
+    clientToken: MEWS_CLIENT_TOKEN,
+    accessToken: creds.accessToken,
+    client: MEWS_CLIENT_NAME,
+  };
+}
+
+// ─── Core API Caller ───────────────────────────────────────────────
+
+/**
+ * Makes authenticated POST requests to the Mews Connector API.
+ * All Mews endpoints are POST (even reads).
+ *
+ * @param {string} endpoint - e.g. 'configuration/get'
+ * @param {object} credentials - { clientToken, accessToken, client }
+ * @param {object} [data={}] - Additional request body fields
+ * @returns {Promise<object>} - Parsed response data
+ */
+async function _callMewsApi(endpoint, credentials, data = {}) {
+  const url = `${MEWS_API_URL}/api/connector/v1/${endpoint}`;
+
+  const body = {
+    ClientToken: credentials.clientToken,
+    AccessToken: credentials.accessToken,
+    Client: credentials.client,
+    ...data,
+  };
+
+  try {
+    const response = await axios.post(url, body);
     return response.data;
   } catch (error) {
-    // --- NEW DETAILED LOGGING FOR MEWS SUPPORT ---
+    // ── Detailed Error Logging ──
     const errorMessage = error.response
       ? JSON.stringify(error.response.data)
       : error.message;
 
-    // Create masked tokens for safe logging (shows first and last 4 chars)
-    const maskedClientToken = credentials.clientToken
-      ? `${credentials.clientToken.substring(
-          0,
-          4
-        )}...${credentials.clientToken.slice(-4)}`
-      : "N/A";
-    const maskedAccessToken = credentials.accessToken
-      ? `${credentials.accessToken.substring(
-          0,
-          4
-        )}...${credentials.accessToken.slice(-4)}`
+    const maskedAccess = credentials.accessToken
+      ? `${credentials.accessToken.substring(0, 4)}...${credentials.accessToken.slice(-4)}`
       : "N/A";
 
     console.error("--- MEWS API CALL FAILED ---");
     console.error(`Endpoint: ${endpoint}`);
-    console.error(`Client Token (Masked): ${maskedClientToken}`);
-    console.error(`Access Token (Masked): ${maskedAccessToken}`);
-    console.error(`Full Error Response: ${errorMessage}`);
-    console.error("-----------------------------");
-    // --- END DETAILED LOGGING ---
+    console.error(`Access Token (Masked): ${maskedAccess}`);
+    console.error(`Status: ${error.response?.status || "No response"}`);
+    console.error(`Error: ${errorMessage}`);
+    console.error("----------------------------");
 
-    // Rethrow the error with the specific API message for better debugging upstream.
-    throw new Error(`Mews API call to ${endpoint} failed: ${errorMessage}`);
+    throw new Error(`Mews API (${endpoint}) failed: ${errorMessage}`);
   }
-};
+}
+
+// ─── Timezone Helper ───────────────────────────────────────────────
 
 /**
- * Fetches property configuration details from Mews and maps them to our canonical data model.
- * @param {object} credentials - The credentials for the property.
- * @param {string} credentials.clientToken - The client token for our application.
- * @param {string} credentials.accessToken - The access token for the specific property.
- * @returns {Promise<object>} A standardized hotel details object.
+ * Converts a local date string (YYYY-MM-DD) to the UTC timestamp
+ * that represents midnight in the given timezone.
+ * Mews requires UTC timestamps for all date parameters.
+ *
+ * @param {string} dateString - e.g. '2026-01-15'
+ * @param {string} timezone - IANA timezone, e.g. 'Europe/Budapest'
+ * @returns {string} ISO 8601 UTC string, e.g. '2026-01-14T23:00:00.000Z'
  */
-// replace with this
-// replace with this
-// replace with this
-const getHotelDetails = async (credentials) => {
-  // Call the Mews configuration endpoint
+function toMewsUtc(dateString, timezone) {
+  const localMidnight = `${dateString}T00:00:00`;
+  const utcDate = fromZonedTime(localMidnight, timezone);
+  return utcDate.toISOString();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PHASE 1: CONFIGURATION & ONBOARDING
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Fetches property configuration from Mews and maps to our canonical format.
+ *
+ * @param {object} credentials - { clientToken, accessToken, client }
+ * @returns {Promise<object>} Standardized hotel details
+ */
+async function getHotelDetails(credentials) {
   const response = await _callMewsApi("configuration/get", credentials);
+  const e = response.Enterprise;
 
-  // Find the default currency
-  const defaultCurrency = response.Enterprise.Currencies.find(
-    (c) => c.IsDefault === true
-  );
+  // Find default currency
+  const defaultCurrency = e.Currencies
+    ? e.Currencies.find((c) => c.IsDefault === true)
+    : null;
 
-  // Transform the Mews response into our internal standard format
-  const hotelDetails = {
-    id: response.Enterprise.Id, // <-- ADD THIS LINE
-    propertyName: response.Enterprise.Name,
-    city: response.Enterprise.Address.City,
+  return {
+    id: e.Id,
+    propertyName: e.Name,
+    city: e.Address?.City || null,
     currencyCode: defaultCurrency ? defaultCurrency.Currency : null,
-    latitude: response.Enterprise.Address.Latitude,
-    longitude: response.Enterprise.Address.Longitude,
-    timezone: response.Enterprise.TimeZoneIdentifier,
-    // --- ADDING NEW FIELDS ---
-    address_1: response.Enterprise.Address.Line1,
-    zip_postal_code: response.Enterprise.Address.PostalCode,
-    country: response.Enterprise.Address.CountryCode,
-    // --- END NEW FIELDS ---
+    latitude: e.Address?.Latitude || null,
+    longitude: e.Address?.Longitude || null,
+    timezone: e.TimeZoneIdentifier,
+    address_1: e.Address?.Line1 || null,
+    zip_postal_code: e.Address?.PostalCode || null,
+    country: e.Address?.CountryCode || null,
     pmsType: "mews",
     rawResponse: response,
   };
+}
 
-  return hotelDetails;
-};
-
-// add this new function
 /**
- * Fetches all services for a property and finds the ID of the 'Accommodation' service.
- * @param {object} credentials - The credentials for the property.
- * @returns {Promise<string>} The ID of the accommodation service.
- * @throws Will throw an error if the accommodation service cannot be found.
+ * Finds the Accommodation (Reservable) service ID.
+ * This ID is required for availability, reservation, and rate queries.
+ *
+ * @param {object} credentials
+ * @returns {Promise<string>} The Service UUID
  */
-// replace with this
-// replace with this
-const getAccommodationServiceId = async (credentials) => {
-  // Call the Mews services/getAll endpoint.
+async function getAccommodationServiceId(credentials) {
   const response = await _callMewsApi("services/getAll", credentials);
 
-  // Find the service with the Type 'Reservable'. Based on the API response,
-  // this is the service type that provides room availability and occupancy data.
-  // replace with this
-  const accommodationService = response.Services.find(
-    (service) => service.Type === "Reservable" && service.IsActive === true
+  const service = response.Services.find(
+    (s) => s.Type === "Reservable" && s.IsActive === true,
   );
 
-  // If the service isn't found, we cannot proceed. Throw an error.
-  if (!accommodationService) {
-    // Corrected the error message to be more specific.
-    throw new Error("Could not find a 'Reservable' service for this property.");
+  if (!service) {
+    throw new Error(
+      "[Mews] Could not find an active Reservable service for this property.",
+    );
   }
 
-  // Return the unique identifier of the accommodation service.
-  return accommodationService.Id;
-};
+  return service.Id;
+}
+
 /**
- * Fetches daily occupancy metrics for a date range using the Mews 'getAvailability' endpoint.
- * This function includes a timezone correction for the 'Europe/Budapest' demo hotel.
- * @param {object} credentials - The credentials for the property.
- * @param {string} credentials.clientToken - The client token for our application.
- * @param {string} credentials.accessToken - The access token for the specific property.
- * @param {string} startDate - The start date of the range, in 'YYYY-MM-DD' format.
- * @param {string} endDate - The end date of the range, in 'YYYY-MM-DD' format.
- * @returns {Promise<object>} An object containing the daily metrics and the raw API response.
+ * Fetches resource categories (= room types) for the property.
+ * Uses the dedicated resourceCategories/getAll endpoint.
+ *
+ * @param {object} credentials
+ * @param {string} serviceId - The Reservable service UUID
+ * @returns {Promise<Array>} Array of { roomTypeID, roomTypeName, capacity }
  */
-// replace with this
-// replace with this
-// replace with this
-const getOccupancyMetrics = async (
-  credentials,
-  startDate,
-  endDate,
-  timezone = "Europe/Budapest"
-) => {
-  // --- PART 1: Get Total Room Capacity ---
-  // We still call getAvailability, but only to get the total number of ActiveResources.
-  const serviceId = await getAccommodationServiceId(credentials);
-  const availabilityPayload = {
-    ServiceId: serviceId,
-    FirstTimeUnitStartUtc: _getUtcTimestampForMews(startDate, timezone),
-    LastTimeUnitStartUtc: _getUtcTimestampForMews(endDate, timezone),
-    Metrics: ["ActiveResources"], // We only need the total capacity from this endpoint.
-  };
-  const availabilityData = await _callMewsApi(
-    "services/getAvailability/2024-01-22",
+async function getResourceCategories(credentials, serviceId) {
+  const response = await _callMewsApi(
+    "resourceCategories/getAll",
     credentials,
-    availabilityPayload
-  );
-
-  // --- PART 2: Get Confirmed Reservations ---
-  // We call reservations/getAll to get a list of confirmed bookings.
-  const reservationsPayload = {
-    CollidingUtc: {
-      StartUtc: _getUtcTimestampForMews(startDate, timezone),
-      EndUtc: _getUtcTimestampForMews(endDate, timezone),
+    {
+      ServiceIds: [serviceId],
+      ActivityStates: ["Active"],
+      Limitation: { Count: 1000 },
     },
-    States: ["Confirmed", "Started", "Processed"],
-    Limitation: { Count: 1000 }, // Assuming we handle pagination later if needed.
-  };
-  const reservationData = await _callMewsApi(
-    "reservations/getAll/2023-06-06",
-    credentials,
-    reservationsPayload
   );
 
-  // --- PART 3: Process and Combine the Data ---
-  const dailyMetrics = {};
-  const { Reservations } = reservationData;
+  const categories = response.ResourceCategories || [];
 
-  // Initialize our results object with dates and total capacity.
-  availabilityData.TimeUnitStartsUtc.forEach((utcDate) => {
-    const date = new Date(utcDate).toISOString().split("T")[0];
-    dailyMetrics[date] = {
-      occupied: 0,
-      available: 0,
+  if (categories.length === 0) {
+    console.warn(
+      "[Mews] No ResourceCategories returned from resourceCategories/getAll.",
+    );
+  }
+
+  return categories.map((cat) => {
+    // Names is a localized object like { "en-US": "Double Room" }
+    // Pick the first available name
+    const names = cat.Names || {};
+    const name =
+      names["en-US"] ||
+      names["en"] ||
+      Object.values(names)[0] ||
+      cat.ShortNames?.["en-US"] ||
+      "Unnamed";
+
+    return {
+      roomTypeID: cat.Id,
+      roomTypeName: name,
+      capacity: cat.Capacity || 0,
+      _mewsRaw: {
+        Id: cat.Id,
+        Names: cat.Names,
+        ShortNames: cat.ShortNames,
+        Type: cat.Type,
+        Capacity: cat.Capacity,
+        ExtraCapacity: cat.ExtraCapacity,
+        IsActive: cat.IsActive,
+        Ordering: cat.Ordering,
+      },
     };
-    // Sum the capacity from all resource categories for this date.
-    availabilityData.ResourceCategoryAvailabilities.forEach((category) => {
-      const index = availabilityData.TimeUnitStartsUtc.indexOf(utcDate);
-      dailyMetrics[date].available +=
-        category.Metrics.ActiveResources[index] || 0;
-    });
+  });
+}
+
+/**
+ * Fetches all rate plans for the accommodation service.
+ * Maps to a shape compatible with our sentinel_configurations.pms_rate_plans.
+ *
+ * @param {object} credentials
+ * @param {string} serviceId - The Reservable service UUID
+ * @returns {Promise<Array>} Array of { rateID, ratePlanName, isBase, baseRateId, ... }
+ */
+async function getRatePlans(credentials, serviceId) {
+  const response = await _callMewsApi("rates/getAll", credentials, {
+    ServiceIds: [serviceId],
+    Extent: {
+      Rates: true,
+      RateGroups: true,
+      RateRestrictions: false,
+    },
   });
 
-  // Loop through each reservation to count "occupied" rooms for each day.
-  if (Reservations && Reservations.length > 0) {
-    Reservations.forEach((res) => {
-      const resStart = new Date(res.ScheduledStartUtc);
-      const resEnd = new Date(res.ScheduledEndUtc);
+  const rates = response.Rates || [];
 
-      // Iterate through each day in our dailyMetrics object.
-      for (const dateStr in dailyMetrics) {
-        const currentDay = new Date(dateStr);
-        // A reservation occupies a room on a given day if the day is
-        // on or after the start date AND before the end date.
-        if (currentDay >= resStart && currentDay < resEnd) {
-          dailyMetrics[dateStr].occupied += 1;
-        }
-      }
-    });
+  return rates
+    .filter((r) => r.IsActive && r.IsEnabled)
+    .map((r) => ({
+      rateID: r.Id,
+      ratePlanName: r.Name || r.ShortName || "Unnamed Rate",
+      isDerived: r.BaseRateId !== null,
+      baseRateId: r.BaseRateId,
+      isActive: r.IsActive,
+      isEnabled: r.IsEnabled,
+      isPublic: r.IsPublic,
+      type: r.Type,
+      externalIdentifier: r.ExternalIdentifier || null,
+      // Preserve raw for debugging
+      _mewsRaw: {
+        Id: r.Id,
+        Name: r.Name,
+        BaseRateId: r.BaseRateId,
+        GroupId: r.GroupId,
+        ServiceId: r.ServiceId,
+      },
+    }));
+}
+
+/**
+ * Builds the Mews-specific Rate ID Map for Sentinel.
+ * In Mews, we need to find root rates (BaseRateId = null) for each resource category.
+ *
+ * For Cloudbeds: rate_id_map = { roomTypeID: rateID }
+ * For Mews:     rate_id_map = { resourceCategoryId: rootRateId }
+ *
+ * Since Mews rates are not inherently per-category (a rate applies to ALL categories
+ * unless category-specific pricing is set), the map stores the single root rate ID
+ * that Sentinel will use for price updates.
+ *
+ * @param {Array} ratePlans - Output of getRatePlans()
+ * @param {Array} resourceCategories - Output of getResourceCategories()
+ * @returns {object} { [resourceCategoryId]: rootRateId }
+ */
+function buildMewsRateIdMap(ratePlans, resourceCategories) {
+  // Find root rates (not derived from another rate)
+  const rootRates = ratePlans.filter((r) => !r.isDerived);
+
+  if (rootRates.length === 0) {
+    console.warn("[Mews] No root rate plans found. Rate ID map will be empty.");
+    return {};
   }
 
-  const results = Object.keys(dailyMetrics).map((date) => ({
+  // Prioritize: Public > Private, then by name keywords
+  const bestRoot =
+    rootRates.find((r) => {
+      const name = (r.ratePlanName || "").toLowerCase();
+      return (
+        name.includes("base") ||
+        name.includes("standard") ||
+        name.includes("rack") ||
+        name.includes("bar")
+      );
+    }) ||
+    rootRates.find((r) => r.isPublic) ||
+    rootRates[0];
+
+  console.log(
+    `[Mews] Selected root rate: "${bestRoot.ratePlanName}" (${bestRoot.rateID})`,
+  );
+
+  // Map every resource category to this root rate
+  const rateIdMap = {};
+  for (const cat of resourceCategories) {
+    rateIdMap[cat.roomTypeID] = bestRoot.rateID;
+  }
+
+  return rateIdMap;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PHASE 2: METRICS (Occupancy + Revenue)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Fetches daily occupancy metrics for a date range.
+ *
+ * @param {object} credentials
+ * @param {string} serviceId - Reservable service UUID
+ * @param {string} startDate - YYYY-MM-DD
+ * @param {string} endDate - YYYY-MM-DD
+ * @param {string} timezone - IANA timezone
+ * @returns {Promise<Array>} Array of { date, occupied, available }
+ */
+async function getOccupancyMetrics(
+  credentials,
+  serviceId,
+  startDate,
+  endDate,
+  timezone,
+) {
+  // 1. Get capacity via availability endpoint
+  const availabilityData = await _callMewsApi(
+    "services/getAvailability",
+    credentials,
+    {
+      ServiceId: serviceId,
+      FirstTimeUnitStartUtc: toMewsUtc(startDate, timezone),
+      LastTimeUnitStartUtc: toMewsUtc(endDate, timezone),
+    },
+  );
+
+  // 2. Get confirmed reservations
+  let allReservations = [];
+  let cursor = null;
+
+  do {
+    const payload = {
+      CollidingUtc: {
+        StartUtc: toMewsUtc(startDate, timezone),
+        EndUtc: toMewsUtc(endDate, timezone),
+      },
+      States: ["Confirmed", "Started", "Processed"],
+      Limitation: { Count: 1000, Cursor: cursor },
+    };
+
+    const resData = await _callMewsApi(
+      "reservations/getAll/2023-06-06",
+      credentials,
+      payload,
+    );
+
+    if (resData.Reservations) {
+      allReservations = allReservations.concat(resData.Reservations);
+    }
+    cursor = resData.Cursor || null;
+  } while (cursor);
+
+  // 3. Build daily metrics
+  const dailyMetrics = {};
+  const timeUnits = availabilityData.TimeUnitStartsUtc || [];
+
+  timeUnits.forEach((utcStr, index) => {
+    const date = new Date(utcStr).toISOString().split("T")[0];
+    let totalCapacity = 0;
+
+    // Sum capacity across all resource categories for this day
+    const categories = availabilityData.CategoryAvailabilities || [];
+    categories.forEach((cat) => {
+      // Availabilities array is parallel to TimeUnitStartsUtc
+      totalCapacity += cat.Availabilities?.[index] || 0;
+    });
+
+    dailyMetrics[date] = { occupied: 0, available: totalCapacity };
+  });
+
+  // 4. Count occupied rooms per day from reservations
+  allReservations.forEach((res) => {
+    const resStart = new Date(res.ScheduledStartUtc);
+    const resEnd = new Date(res.ScheduledEndUtc);
+
+    for (const dateStr in dailyMetrics) {
+      const dayStart = new Date(dateStr);
+      // Reservation occupies a room if day >= start AND day < end
+      if (dayStart >= resStart && dayStart < resEnd) {
+        dailyMetrics[dateStr].occupied += 1;
+      }
+    }
+  });
+
+  return Object.keys(dailyMetrics).map((date) => ({
     date,
     occupied: dailyMetrics[date].occupied,
     available: dailyMetrics[date].available,
   }));
+}
 
-  return { dailyMetrics: results }; // Return a cleaner response now.
-};
 /**
- * Fetches daily revenue metrics for a date range using the Mews 'orderItems/getAll' endpoint.
- * @param {object} credentials - The credentials for the property.
- * @param {string} startDate - The start date of the range, in 'YYYY-MM-DD' format.
- * @param {string} endDate - The end date of the range, in 'YYYY-MM-DD' format.
- * @returns {Promise<object>} An object containing the daily revenue metrics and the raw API response.
+ * Fetches daily revenue metrics for a date range.
+ *
+ * @param {object} credentials
+ * @param {string} startDate - YYYY-MM-DD
+ * @param {string} endDate - YYYY-MM-DD
+ * @param {string} timezone - IANA timezone
+ * @returns {Promise<Array>} Array of { date, netRevenue, grossRevenue }
  */
-// replace with this
-const getRevenueMetrics = async (
-  credentials,
-  startDate,
-  endDate,
-  timezone = "Europe/Budapest" // Add timezone parameter with a default for testing
-) => {
+async function getRevenueMetrics(credentials, startDate, endDate, timezone) {
   let allOrderItems = [];
   let cursor = null;
 
-  // Use a do-while loop to handle pagination and fetch all order items.
   do {
     const payload = {
-      // Filter by the consumption date range using the new robust helper.
       ConsumedUtc: {
-        StartUtc: _getUtcTimestampForMews(startDate, timezone),
-        EndUtc: _getUtcTimestampForMews(endDate, timezone),
+        StartUtc: toMewsUtc(startDate, timezone),
+        EndUtc: toMewsUtc(endDate, timezone),
       },
-      Types: ["SpaceOrder"], // Get only room revenue.
-      AccountingStates: ["Open", "Closed"], // Exclude canceled orders.
-      Limitation: {
-        Cursor: cursor,
-        Count: 1000,
-      },
+      Types: ["SpaceOrder"],
+      AccountingStates: ["Open", "Closed"],
+      Limitation: { Cursor: cursor, Count: 1000 },
     };
 
     const response = await _callMewsApi(
       "orderItems/getAll",
       credentials,
-      payload
+      payload,
     );
 
     if (response.OrderItems) {
       allOrderItems = allOrderItems.concat(response.OrderItems);
     }
-    cursor = response.Cursor;
+    cursor = response.Cursor || null;
   } while (cursor);
 
-  // Process all fetched items to sum revenue by day.
+  // Aggregate by day
   const dailyTotals = {};
 
   allOrderItems.forEach((item) => {
-    // The ConsumedUtc timestamp is the start of the day in the hotel's local time,
-    // but represented in UTC. We can safely convert this to an ISO string and
-    // take the date part.
     const date = new Date(item.ConsumedUtc).toISOString().split("T")[0];
 
     if (!dailyTotals[date]) {
-      dailyTotals[date] = { totalNetRevenue: 0, totalGrossRevenue: 0 };
+      dailyTotals[date] = { netRevenue: 0, grossRevenue: 0 };
     }
 
     if (item.Amount) {
       if (typeof item.Amount.NetValue === "number") {
-        dailyTotals[date].totalNetRevenue += item.Amount.NetValue;
+        dailyTotals[date].netRevenue += item.Amount.NetValue;
       }
       if (typeof item.Amount.GrossValue === "number") {
-        dailyTotals[date].totalGrossRevenue += item.Amount.GrossValue;
+        dailyTotals[date].grossRevenue += item.Amount.GrossValue;
       }
     }
   });
 
-  // Convert the dailyTotals object into a clean array.
-  const results = Object.keys(dailyTotals).map((date) => ({
+  return Object.keys(dailyTotals).map((date) => ({
     date,
-    netRevenue: dailyTotals[date].totalNetRevenue,
-    grossRevenue: dailyTotals[date].totalGrossRevenue,
+    netRevenue: dailyTotals[date].netRevenue,
+    grossRevenue: dailyTotals[date].grossRevenue,
   }));
-
-  return {
-    dailyMetrics: results,
-    rawItems: allOrderItems,
-  };
-};
-
-// add this new function before module.exports
-/**
- * [QUICK TEST] Fetches a raw list of reservations for a given date range.
- * @param {object} credentials The Mews API credentials.
- * @param {string} startDate The start date of the range in 'YYYY-MM-DD' format.
- * @param {string} endDate The end date of the range in 'YYYY-MM-DD' format.
- * @param {string} timezone The IANA timezone identifier.
- * @returns {Promise<object>} The raw response from the Mews API.
- */
+}
 
 /**
- * Fetches all enterprises (hotels) associated with a Portfolio Access Token.
- * @param {object} credentials - The credentials for the property.
- * @returns {Promise<Array<{id: string, name: string}>>} A list of enterprises.
+ * Combined metrics fetch for daily-refresh.
+ * Returns data in the same canonical format as cloudbedsAdapter.
+ *
+ * @param {object} credentials
+ * @param {string} serviceId
+ * @param {string} startDate - YYYY-MM-DD
+ * @param {string} endDate - YYYY-MM-DD
+ * @param {string} timezone
+ * @returns {Promise<object>} { [date]: { rooms_sold, capacity_count, net_revenue, gross_revenue, occupancy, ... } }
  */
-const getPortfolioEnterprises = async (credentials) => {
-  // Call the Mews enterprises/getAll endpoint.
-  // We omit any filters to get all enterprises within the token's scope.
-  const response = await _callMewsApi("enterprises/getAll", credentials, {
-    Limitation: { Count: 1000 }, // Get up to 1000 properties, assuming no portfolio has more.
+async function getCombinedMetrics(
+  credentials,
+  serviceId,
+  startDate,
+  endDate,
+  timezone,
+) {
+  const [occupancy, revenue] = await Promise.all([
+    getOccupancyMetrics(credentials, serviceId, startDate, endDate, timezone),
+    getRevenueMetrics(credentials, startDate, endDate, timezone),
+  ]);
+
+  // Build revenue lookup
+  const revMap = {};
+  revenue.forEach((r) => {
+    revMap[r.date] = r;
   });
 
-  // If the response is valid but contains no enterprises, return an empty array.
-  if (!response.Enterprises) {
-    return [];
-  }
+  // Combine into canonical format (matches cloudbedsAdapter output)
+  const result = {};
 
-  // Map the Mews response to the simple {id, name} format our frontend needs.
-  return response.Enterprises.map((enterprise) => ({
-    id: enterprise.Id,
-    name: enterprise.Name,
-  }));
-};
+  occupancy.forEach((day) => {
+    const rev = revMap[day.date] || { netRevenue: 0, grossRevenue: 0 };
+    const roomsSold = day.occupied;
+    const capacity = day.available;
+    const netRev = rev.netRevenue;
+    const grossRev = rev.grossRevenue;
+    const occ = capacity > 0 ? roomsSold / capacity : 0;
+
+    result[day.date] = {
+      rooms_sold: roomsSold,
+      capacity_count: capacity,
+      net_revenue: netRev,
+      gross_revenue: grossRev,
+      occupancy: occ,
+      gross_adr: roomsSold > 0 ? grossRev / roomsSold : 0,
+      net_adr: roomsSold > 0 ? netRev / roomsSold : 0,
+      gross_revpar: (roomsSold > 0 ? grossRev / roomsSold : 0) * occ,
+      net_revpar: (roomsSold > 0 ? netRev / roomsSold : 0) * occ,
+    };
+  });
+
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  EXPORTS
+// ═══════════════════════════════════════════════════════════════════
 
 module.exports = {
+  // Internal helpers (exposed for onboarding router + other adapters)
+  getCredentials,
+  _callMewsApi,
+  toMewsUtc,
+
+  // Phase 1: Configuration
   getHotelDetails,
   getAccommodationServiceId,
+  getResourceCategories,
+  getRatePlans,
+  buildMewsRateIdMap,
+
+  // Phase 2: Metrics
   getOccupancyMetrics,
   getRevenueMetrics,
-  getPortfolioEnterprises, // Export the new function
+  getCombinedMetrics,
 };
