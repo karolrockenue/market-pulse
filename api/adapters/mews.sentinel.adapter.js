@@ -30,12 +30,12 @@ const mewsAdapter = require("./mewsAdapter");
 async function getHotelContext(hotelId) {
   const result = await pgPool.query(
     `SELECT pms_property_id, pms_credentials FROM hotels WHERE hotel_id = $1 AND pms_type = 'mews'`,
-    [hotelId]
+    [hotelId],
   );
 
   if (result.rows.length === 0) {
     throw new Error(
-      `[Mews Sentinel] No Mews hotel found with hotel_id ${hotelId}`
+      `[Mews Sentinel] No Mews hotel found with hotel_id ${hotelId}`,
     );
   }
 
@@ -44,13 +44,13 @@ async function getHotelContext(hotelId) {
 
   if (!pmsCreds || !pmsCreds.accessToken) {
     throw new Error(
-      `[Mews Sentinel] Missing accessToken in pms_credentials for hotel ${hotelId}`
+      `[Mews Sentinel] Missing accessToken in pms_credentials for hotel ${hotelId}`,
     );
   }
 
   if (!pmsCreds.serviceId) {
     throw new Error(
-      `[Mews Sentinel] Missing serviceId in pms_credentials for hotel ${hotelId}. Re-onboard the property.`
+      `[Mews Sentinel] Missing serviceId in pms_credentials for hotel ${hotelId}. Re-onboard the property.`,
     );
   }
 
@@ -82,9 +82,15 @@ async function getHotelContext(hotelId) {
  * @param {string} endDate - YYYY-MM-DD
  * @returns {Promise<object>} Cloudbeds-compatible response: { success: true, data: { roomRateDetailed: [...] } }
  */
-async function getRates(hotelId, pmsPropertyId, roomTypeId, startDate, endDate) {
+async function getRates(
+  hotelId,
+  pmsPropertyId,
+  roomTypeId,
+  startDate,
+  endDate,
+) {
   console.log(
-    `[Mews Sentinel] Fetching Live Rates for hotel ${hotelId} (Room: ${roomTypeId})`
+    `[Mews Sentinel] Fetching Live Rates for hotel ${hotelId} (Room: ${roomTypeId})`,
   );
 
   const ctx = await getHotelContext(hotelId);
@@ -92,14 +98,14 @@ async function getRates(hotelId, pmsPropertyId, roomTypeId, startDate, endDate) 
   // Find the root rate ID from sentinel_configurations.rate_id_map
   const configResult = await pgPool.query(
     "SELECT rate_id_map FROM sentinel_configurations WHERE hotel_id = $1",
-    [hotelId]
+    [hotelId],
   );
   const rateIdMap = configResult.rows[0]?.rate_id_map || {};
   const rateId = rateIdMap[roomTypeId];
 
   if (!rateId) {
     console.warn(
-      `[Mews Sentinel] No rate mapping found for room ${roomTypeId} in hotel ${hotelId}`
+      `[Mews Sentinel] No rate mapping found for room ${roomTypeId} in hotel ${hotelId}`,
     );
     return { success: true, data: { roomRateDetailed: [] } };
   }
@@ -122,16 +128,19 @@ async function getRates(hotelId, pmsPropertyId, roomTypeId, startDate, endDate) 
       ctx.credentials,
       {
         RateId: rateId,
-        FirstTimeUnitStartUtc: mewsAdapter.toMewsUtc(chunkStartStr, ctx.timezone),
+        FirstTimeUnitStartUtc: mewsAdapter.toMewsUtc(
+          chunkStartStr,
+          ctx.timezone,
+        ),
         LastTimeUnitStartUtc: mewsAdapter.toMewsUtc(chunkEndStr, ctx.timezone),
-      }
+      },
     );
 
     const timeUnits = pricingData.TimeUnitStartsUtc || [];
 
     // Try to find category-specific pricing for this room type
     const categoryPricing = (pricingData.CategoryPrices || []).find(
-      (cp) => cp.CategoryId === roomTypeId
+      (cp) => cp.CategoryId === roomTypeId,
     );
 
     // Use category pricing if available, otherwise fall back to base prices
@@ -183,7 +192,7 @@ async function getRoomTypes(hotelId, pmsPropertyId) {
   const ctx = await getHotelContext(hotelId);
   const categories = await mewsAdapter.getResourceCategories(
     ctx.credentials,
-    ctx.serviceId
+    ctx.serviceId,
   );
 
   return {
@@ -245,7 +254,7 @@ async function getRatePlans(hotelId, pmsPropertyId) {
  */
 async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
   console.log(
-    `[Mews Sentinel] Batch posting ${ratesArray.length} rates for hotel ${hotelId}`
+    `[Mews Sentinel] Batch posting ${ratesArray.length} rates for hotel ${hotelId}`,
   );
 
   if (!ratesArray || ratesArray.length === 0) {
@@ -264,7 +273,7 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
       numRate <= 0
     ) {
       console.warn(
-        `[Mews Sentinel] SKIPPING invalid rate: Date ${item.date}, Rate ${item.rate}`
+        `[Mews Sentinel] SKIPPING invalid rate: Date ${item.date}, Rate ${item.rate}`,
       );
       return false;
     }
@@ -273,7 +282,7 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
 
   if (safeRates.length === 0) {
     console.warn(
-      "[Mews Sentinel] Batch empty after safety filtering. Nothing to send."
+      "[Mews Sentinel] Batch empty after safety filtering. Nothing to send.",
     );
     return {
       success: true,
@@ -313,9 +322,17 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
       const chunk = priceUpdates.slice(i, i + CHUNK_SIZE);
 
       console.log(
-        `[Mews Sentinel] Pushing ${chunk.length} price updates for Rate ${rateId}`
+        `[Mews Sentinel] Pushing ${chunk.length} price updates for Rate ${rateId}`,
       );
 
+      console.log(
+        `[Mews Debug] postRateBatch credentials:`,
+        JSON.stringify({
+          clientToken: ctx.credentials.clientToken?.substring(0, 8),
+          accessToken: ctx.credentials.accessToken?.substring(0, 8),
+          client: ctx.credentials.client,
+        }),
+      );
       await mewsAdapter._callMewsApi("rates/updatePrice", ctx.credentials, {
         RateId: rateId,
         PriceUpdates: chunk,
@@ -326,7 +343,7 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
   }
 
   console.log(
-    `[Mews Sentinel] Successfully pushed ${totalPushed} rate updates to Mews`
+    `[Mews Sentinel] Successfully pushed ${totalPushed} rate updates to Mews`,
   );
 
   return {
@@ -351,10 +368,10 @@ async function postRate(hotelId, pmsPropertyId, rateId, date, rate) {
   // [SAFETY] Validate
   if (rate === undefined || rate === null || isNaN(rate) || Number(rate) <= 0) {
     console.warn(
-      `[Mews Sentinel] ABORTING postRate: Invalid rate value (${rate}) for ${date}`
+      `[Mews Sentinel] ABORTING postRate: Invalid rate value (${rate}) for ${date}`,
     );
     throw new Error(
-      `Mews Sentinel Safety: Attempted to push invalid rate (${rate}) to PMS.`
+      `Mews Sentinel Safety: Attempted to push invalid rate (${rate}) to PMS.`,
     );
   }
 

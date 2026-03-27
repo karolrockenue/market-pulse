@@ -77,6 +77,10 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
     ...data,
   };
 
+  console.log(
+    `[Mews Debug] ClientToken starts: ${body.ClientToken?.substring(0, 8)} | Endpoint: ${endpoint}`,
+  );
+
   const MAX_RETRIES = 3;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {

@@ -606,7 +606,8 @@ async function updateConfig(hotelId, updates) {
   let rateIdMap;
   // Check if this is a Mews hotel (Mews rate IDs are UUIDs with dashes)
   const isMewsHotel =
-    pmsRatePlans.length > 0 && pmsRatePlans[0]?.rateID?.includes("-");
+    pmsRatePlans.length > 0 &&
+    String(pmsRatePlans[0]?.rateID || "").includes("-");
   if (isMewsHotel) {
     const mewsAdapter = require("../adapters/mewsAdapter");
     rateIdMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
