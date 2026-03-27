@@ -211,8 +211,8 @@ export function TopNav({
               color: item.isAdmin
                 ? BLUE // Admin items always Blue text
                 : isActive
-                ? WHITE // Active standard items White text
-                : GRAY, // Inactive standard items Gray text
+                  ? WHITE // Active standard items White text
+                  : GRAY, // Inactive standard items Gray text
             };
 
             const underlineStyle = {
@@ -322,26 +322,41 @@ export function TopNav({
             </div>
             <Select value={property} onValueChange={onPropertyChange}>
               <SelectTrigger
-                className="w-56 h-9"
                 style={{
+                  width: "268px",
+                  height: "36px",
                   backgroundColor: "#2C2C2C",
                   borderColor: BORDER_DARK,
                   color: WHITE,
+                  paddingLeft: "12px",
+                  paddingRight: "12px",
                 }}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent
                 style={{
+                  width: "268px",
+                  maxWidth: "268px",
+                  minWidth: "268px",
                   backgroundColor: "#1a1a18",
-                  borderColor: "#2C2C2C",
+                  borderColor: BORDER_DARK,
                   color: WHITE,
+                  padding: "4px",
                 }}
               >
                 {properties.length > 1 && (
                   <SelectItem
                     value="ALL"
                     className="font-semibold border-b border-white/10 mb-1"
+                    style={{
+                      color: WHITE,
+                      borderRadius: "4px",
+                      maxWidth: "260px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
                   >
                     All Properties (Portfolio)
                   </SelectItem>
@@ -350,8 +365,23 @@ export function TopNav({
                   <SelectItem
                     key={prop.property_id}
                     value={prop.property_id.toString()}
+                    style={{
+                      color: WHITE,
+                      borderRadius: "4px",
+                    }}
                   >
-                    {prop.property_name}
+                    <span
+                      style={{
+                        display: "block",
+                        maxWidth: "220px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        paddingRight: "8px",
+                      }}
+                    >
+                      {prop.property_name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

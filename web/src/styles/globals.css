@@ -1,16 +1,14 @@
 @import "tailwindcss";
 
-
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
   --font-size: 14px;
   --background: #252521;
   --foreground: #e5e5e5;
-  --card: #2C2C2C;
+  --card: #2c2c2c;
   --card-foreground: #e5e5e5;
-  --popover: #2C2C2C;
+  --popover: #2c2c2c;
   --popover-foreground: #e5e5e5;
   --primary: #faff6a;
   --primary-foreground: #252521;
@@ -18,13 +16,13 @@
   --secondary-foreground: #e5e5e5;
   --muted: #3a3a35;
   --muted-foreground: #9ca3af;
-  --accent: #faff6a;
-  --accent-foreground: #252521;
+  --accent: rgba(57, 189, 248, 0.15);
+  --accent-foreground: #39bdf8;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: #3a3a35;
   --input: #3a3a35;
-  --input-background: #2C2C2C;
+  --input-background: #2c2c2c;
   --switch-background: #3a3a35;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -39,7 +37,7 @@
   --sidebar-foreground: #e5e5e5;
   --sidebar-primary: #faff6a;
   --sidebar-primary-foreground: #252521;
-  --sidebar-accent: #2C2C2C;
+  --sidebar-accent: #2c2c2c;
   --sidebar-accent-foreground: #e5e5e5;
   --sidebar-border: #3a3a35;
   --sidebar-ring: #faff6a;
@@ -58,8 +56,8 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: rgba(57, 189, 248, 0.15);
+  --accent-foreground: #39bdf8;
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.269 0 0);
@@ -190,4 +188,19 @@
 
 html {
   font-size: var(--font-size);
+}
+/* Select dropdown hover state - blue highlight */
+[data-slot="select-item"][data-highlighted] {
+  background-color: rgba(57, 189, 248, 0.15) !important;
+  color: #39bdf8 !important;
+}
+/* Target Radix Select items in portal */
+[role="option"]:hover,
+[role="option"][data-highlighted] {
+  background-color: rgba(57, 189, 248, 0.15) !important;
+  color: #39bdf8 !important;
+}
+
+[role="option"][data-state="checked"] {
+  color: #39bdf8 !important;
 }

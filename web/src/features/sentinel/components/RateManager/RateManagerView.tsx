@@ -486,8 +486,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   }}
                 >
                   <SelectTrigger
-                    className="w-56 h-9 text-sm"
+                    className="h-9 text-sm"
                     style={{
+                      width: "268px",
+                      minWidth: "268px",
                       backgroundColor: "#0f0f0f",
                       borderColor: "#2a2a2a",
                       color: "#e5e5e5",
@@ -497,21 +499,46 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   </SelectTrigger>
                   <SelectContent
                     style={{
+                      width: "268px",
+                      maxWidth: "268px",
+                      minWidth: "268px",
                       backgroundColor: "#1a1a18",
                       borderColor: "#2C2C2C",
                       color: "#e5e5e5",
+                      padding: "4px",
                     }}
                   >
-                    {sentinelConfigs.map((c) => {
-                      const h = allHotels.find(
-                        (ah) => ah.hotel_id === c.hotel_id,
-                      );
-                      return (
-                        <SelectItem key={c.hotel_id} value={String(c.hotel_id)}>
-                          {h?.property_name || c.hotel_id}
-                        </SelectItem>
-                      );
-                    })}
+                    {[...sentinelConfigs]
+                      .sort((a, b) => {
+                        const nameA = allHotels.find((h) => h.hotel_id === a.hotel_id)?.property_name || "";
+                        const nameB = allHotels.find((h) => h.hotel_id === b.hotel_id)?.property_name || "";
+                        return nameA.localeCompare(nameB);
+                      })
+                      .map((c) => {
+                        const h = allHotels.find(
+                          (ah) => ah.hotel_id === c.hotel_id,
+                        );
+                        return (
+                          <SelectItem
+                            key={c.hotel_id}
+                            value={String(c.hotel_id)}
+                            style={{ color: "#e5e5e5", borderRadius: "4px" }}
+                          >
+                            <span
+                              style={{
+                                display: "block",
+                                maxWidth: "220px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                paddingRight: "8px",
+                              }}
+                            >
+                              {h?.property_name || c.hotel_id}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
               </div>
