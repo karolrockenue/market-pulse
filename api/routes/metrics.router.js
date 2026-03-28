@@ -1287,6 +1287,7 @@ router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
         return {
           hotelId: row.hotel_id,
           hotelName: row.property_name,
+          currencyCode: row.currency_code || "GBP",
           forwardOccupancy: fwdOcc,
           pacingDifficultyPercent: isNaN(pacingDifficultyPercent)
             ? 100
@@ -1325,6 +1326,7 @@ router.get("/portfolio/matrix", requireAdminApi, async (req, res) => {
           id: row.hotel_id,
           name: row.property_name,
           city: row.city,
+          currencyCode: row.currency_code || "GBP",
           group: row.group,
           totalRooms: row.total_rooms,
           occupancy: 0,

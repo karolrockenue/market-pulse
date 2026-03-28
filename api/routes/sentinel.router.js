@@ -289,53 +289,49 @@ router.post("/recalculate", async (req, res) => {
     const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
     console.log(`[Trace] Using PMS Property ID: ${pmsPropertyId}`);
 
-    const overridesByRoom = {};
-    allOverrides.forEach((o) => {
-      if (!overridesByRoom[o.room_type_id])
-        overridesByRoom[o.room_type_id] = [];
-      overridesByRoom[o.room_type_id].push({ date: o.date, rate: o.rate });
-    });
+    // Build PMS payload directly (differentials already applied above)
+    const rateIdMap = config.rate_id_map || {};
+    const batchPayload = [];
+    const dbWrites = [];
+
+    for (const o of allOverrides) {
+      const rateId = rateIdMap[o.room_type_id];
+      if (!rateId) continue;
+
+      batchPayload.push({ rateId, date: o.date, rate: o.rate });
+
+      // Write to sentinel_rates_calendar
+      dbWrites.push(
+        db.query(
+          `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
+           VALUES ($1, $2, $3, $4, 'SENTINEL', NOW())
+           ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
+           SET rate = EXCLUDED.rate, source = 'SENTINEL', last_updated_at = NOW()`,
+          [hotelId, o.date, o.room_type_id, o.rate],
+        ),
+      );
+    }
+
+    // Persist rate calendar updates
+    await Promise.all(dbWrites);
 
     let totalQueued = 0;
-    let roomsProcessed = 0;
 
-    for (const [rId, rates] of Object.entries(overridesByRoom)) {
-      // --- DEBUG TRACE 2 ---
-      console.log(
-        `[Trace] Processing Room ${rId} with ${rates.length} rates...`,
-      );
-      // ---------------------
-
-      // [FIX] Pass 'SENTINEL' as source so it shows up in Last Run stats
-      const batchPayload = await sentinelService.buildOverridePayload(
-        hotelId,
-        pmsPropertyId,
-        rId,
-        rates,
-        "SENTINEL",
-      );
-
-      // --- DEBUG TRACE 3 ---
-      console.log(
-        `[Trace] Service returned payload size: ${
-          batchPayload ? batchPayload.length : "NULL/0"
-        }`,
-      );
-      // ---------------------
-
-      if (batchPayload && batchPayload.length > 0) {
-        const CHUNK_SIZE = 30;
-        for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
-          const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
-          await db.query(
-            `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
-            [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
-          );
-        }
-        totalQueued += batchPayload.length;
-        roomsProcessed++;
+    if (batchPayload.length > 0) {
+      const CHUNK_SIZE = 30;
+      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
+        const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
+        await db.query(
+          `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
+          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
+        );
       }
+      totalQueued = batchPayload.length;
     }
+
+    console.log(
+      `[Sentinel] Recalculate complete: ${totalQueued} rates queued across ${Object.keys(rateIdMap).length} rooms.`,
+    );
 
     // 5. [VERCEL OPTIMIZATION] Do not kick worker manually.
     // The Cron job will pick up the PENDING jobs within 60 seconds.

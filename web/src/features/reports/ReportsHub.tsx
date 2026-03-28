@@ -15,7 +15,7 @@ import { ReportActions } from "./components/ReportActions";
 import { BudgetReport } from "./components/BudgetReport";
 import { YearOnYearReport } from "./components/YearOnYearReport";
 import { ShreejiReport } from "./components/ShreejiReport";
-import { PortfolioOverview } from "./components/PortfolioOverview"; // <--- UPDATED: Now local
+
 import { MonthlyTakingsReport } from "./components/MonthlyTakingsReport";
 
 // --- GLOBAL COMPONENTS (../../components) ---
@@ -46,8 +46,14 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
   const [activeReportType, setActiveReportType] = useState<string | null>(null);
 
   // --- STATE: Report Configuration (Lifted from Table/App) ---
-  const [startDate, setStartDate] = useState("2025-09-01");
-  const [endDate, setEndDate] = useState("2025-09-15");
+  const now = new Date();
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date(now.getFullYear(), now.getMonth(), 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    return now.toISOString().split('T')[0];
+  });
   const [datePreset, setDatePreset] = useState("current-month");
   const [granularity, setGranularity] = useState("daily");
 
@@ -404,24 +410,6 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
     );
   }
 
-  if (activeReportType === "portfolio-overview") {
-    // Wrapper to provide back button for Portfolio
-    return (
-      <div className="min-h-screen bg-[#252521]">
-        <div className="p-4 border-b border-[#3a3a35] bg-[#2C2C2C]">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            className="text-[#9ca3af] hover:text-[#faff6a]"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Reports
-          </Button>
-        </div>
-        <PortfolioOverview />
-      </div>
-    );
-  }
 
   if (activeReportType === "monthly-takings") {
     return <MonthlyTakingsReport onBack={handleBack} hotelId={hotelId} />;

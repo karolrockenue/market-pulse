@@ -140,6 +140,12 @@ export function DemandPace({
   currencyCode,
   citySlug,
 }: DemandPaceProps) {
+  const getCurrencySymbol = (code: string) => {
+    const map: Record<string, string> = { GBP: "£", USD: "$", EUR: "€" };
+    return map[code] || code || "£";
+  };
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   // Pace Analysis period selector
   const [paceAnalysisPeriod, setPaceAnalysisPeriod] = useState("7");
 
@@ -957,7 +963,7 @@ export function DemandPace({
                         axisLine={{ stroke: "#3a3a35" }}
                         width={45}
                         label={{
-                          value: "Price Change (£)",
+                          value: `Price Change (${currencySymbol})`,
                           angle: -90,
                           position: "insideLeft",
                           fill: "#6b7280",
@@ -983,7 +989,7 @@ export function DemandPace({
                       />
                       <Bar
                         dataKey="priceChange"
-                        name="Price Change (£)"
+                        name={`Price Change (${currencySymbol})`}
                         radius={[4, 4, 0, 0]}
                         maxBarSize={24}
                       >

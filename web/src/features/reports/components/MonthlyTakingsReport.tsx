@@ -65,12 +65,22 @@ interface ReportItem {
   errorMsg?: string;
 }
 
+const currencySymbolMap: Record<string, string> = {
+  USD: '$', GBP: '£', EUR: '€', JPY: '¥', CNY: '¥',
+  AUD: 'A$', CAD: 'C$', CHF: 'CHF', INR: '₹', KRW: '₩',
+  SEK: 'kr', NOK: 'kr', DKK: 'kr', ZAR: 'R', BRL: 'R$',
+  MXN: 'MX$', SGD: 'S$', HKD: 'HK$', NZD: 'NZ$', THB: '฿',
+  AED: 'د.إ', SAR: '﷼', PLN: 'zł', CZK: 'Kč', HUF: 'Ft',
+};
+
 interface MonthlyTakingsReportProps {
   onBack: () => void;
+  currencyCode?: string;
 }
 
 export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
   onBack,
+  currencyCode = 'GBP',
 }) => {
   // --- Selection State ---
   const [availableHotels, setAvailableHotels] = useState<Hotel[]>([]);
@@ -212,8 +222,10 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
     }
   );
 
+  const symbol = currencySymbolMap[currencyCode.toUpperCase()] || currencyCode;
+
   const formatCurrency = (value: number) => {
-    return `£${value.toLocaleString("en-GB", {
+    return `${symbol}${value.toLocaleString("en-GB", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;

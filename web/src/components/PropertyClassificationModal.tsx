@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
-import { Building2, Hotel, Sparkles, Star, Crown } from 'lucide-react';
+import { Building2, Hotel, Sparkles, Crown } from 'lucide-react';
 import { toast } from 'sonner'; // [FIX] Correct the import path
 
 interface PropertyClassificationModalProps {
@@ -10,7 +10,7 @@ interface PropertyClassificationModalProps {
   onComplete?: (tier: PropertyTier) => void;
 }
 
-export type PropertyTier = 'economy' | 'midscale' | 'upscale' | 'upper-upscale' | 'luxury';
+export type PropertyTier = 'Hostel' | 'Economy' | 'Midscale' | 'Upper Midscale' | 'Luxury';
 
 interface TierOption {
   id: PropertyTier;
@@ -21,31 +21,31 @@ interface TierOption {
 
 const tierOptions: TierOption[] = [
   {
-    id: 'economy',
+    id: 'Hostel',
+    name: 'Hostel',
+    description: 'Budget-friendly shared accommodation',
+    icon: Building2,
+  },
+  {
+    id: 'Economy',
     name: 'Economy',
     description: 'Essential comfort and value',
     icon: Building2,
   },
   {
-    id: 'midscale',
+    id: 'Midscale',
     name: 'Midscale',
     description: 'Balanced comfort and affordability',
     icon: Hotel,
   },
   {
-    id: 'upscale',
-    name: 'Upscale',
+    id: 'Upper Midscale',
+    name: 'Upper Midscale',
     description: 'Stylish and service-focused',
     icon: Sparkles,
   },
   {
-    id: 'upper-upscale',
-    name: 'Upper Upscale',
-    description: 'High-end service and sophistication',
-    icon: Star,
-  },
-  {
-    id: 'luxury',
+    id: 'Luxury',
     name: 'Luxury',
     description: 'Premium experience and amenities',
     icon: Crown,

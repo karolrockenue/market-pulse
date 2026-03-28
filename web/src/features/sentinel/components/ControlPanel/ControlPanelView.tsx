@@ -453,7 +453,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
         const res = await fetch("/api/sentinel/recalculate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hotelId }),
+          body: JSON.stringify({
+            hotelId,
+            startDate: new Date().toISOString().split("T")[0],
+            endDate: new Date(Date.now() + 365 * 86400000).toISOString().split("T")[0],
+          }),
         });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);

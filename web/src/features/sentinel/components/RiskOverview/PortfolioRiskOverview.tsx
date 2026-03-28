@@ -68,6 +68,19 @@ import {
 import { toast } from "sonner";
 import { PortfolioFlowcast } from "./PortfolioFlowcast";
 
+// --- Currency symbol helper ---
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  GBP: "£",
+  USD: "$",
+  EUR: "€",
+  IDR: "Rp",
+};
+
+function getCurrencySymbol(currencyCode?: string): string {
+  const code = (currencyCode || "GBP").toUpperCase();
+  return CURRENCY_SYMBOLS[code] || code + " ";
+}
+
 // --- Quadrant → Color map (canonical, do NOT recompute quadrant from x/y) ---
 const QUADRANT_COLORS: Record<string, string> = {
   "Critical Risk": "#ef4444", // red
@@ -757,33 +770,6 @@ export function PortfolioRiskOverview() {
         setPacingOverviewData(pacingData);
         setOccupancyMatrixData(matrixData);
 
-        // --- [NEW DEBUGGING LINE 1] ---
-        console.log("--- ENTIRE PACING ARRAY ---", pacingData);
-        // --- [END DEBUGGING LINE 1] ---
-
-        // --- [NEW] DEBUG LOG FOR ELYSEE HYDE PARK ---
-        // Find the specific hotel in the newly fetched data
-        const hotelToDebug = pacingData.find(
-          (h: any) => h.hotelName === "The Cleveland Hotel"
-        );
-
-        if (hotelToDebug) {
-          console.log(
-            "--- [DEBUG] The Cleveland Hotel FINAL QUADRANT LOGIC ---",
-            {
-              property_name: hotelToDebug.hotelName,
-              fwdOcc: hotelToDebug.forwardOccupancy,
-              currentMonthStatus: hotelToDebug.currentMonthStatus,
-              pacingDifficultyPercent: hotelToDebug.pacingDifficultyPercent,
-            }
-          );
-        } else {
-          console.warn(
-            "--- [DEBUG] The Cleveland ---",
-            "Hotel not found in pacing data array."
-          );
-        }
-        // --- [END NEW DEBUG LOG] ---
       } catch (error: any) {
         console.error("Error fetching portfolio data:", error);
         toast.error("Failed to load portfolio data", {
@@ -3049,7 +3035,7 @@ export function PortfolioRiskOverview() {
                                     {matrixMetric === "occupancy" &&
                                       `${value.toFixed(0)}%`}
                                     {matrixMetric === "adr" &&
-                                      `£${value.toFixed(0)}`}
+                                      `${getCurrencySymbol(hotel.currencyCode)}${value.toFixed(0)}`}
                                     {matrixMetric === "available" && value}
 
                                     {anomaly && (
@@ -3148,7 +3134,7 @@ export function PortfolioRiskOverview() {
                                             fontSize: "12px",
                                           }}
                                         >
-                                          £{dayData.adr.toFixed(0)}
+                                          {getCurrencySymbol(hotel.currencyCode)}{dayData.adr.toFixed(0)}
                                         </span>
                                       </div>
                                       <div
@@ -3286,7 +3272,7 @@ export function PortfolioRiskOverview() {
                               : styles.textGreen
                           }
                         >
-                          {hotel.currentMonthShortfall < 0 ? "-" : "+"}£
+                          {hotel.currentMonthShortfall < 0 ? "-" : "+"}{getCurrencySymbol(hotel.currencyCode)}
                           {Math.abs(hotel.currentMonthShortfall).toLocaleString(
                             undefined,
                             { maximumFractionDigits: 0 }
@@ -3305,7 +3291,7 @@ export function PortfolioRiskOverview() {
                           {/* [MODIFIED] Handle 'Infinity' case */}
                           {hotel.currentMonthRequiredADR > 90000
                             ? "N/A"
-                            : `£${hotel.currentMonthRequiredADR.toFixed(2)}`}
+                            : `${getCurrencySymbol(hotel.currencyCode)}${hotel.currentMonthRequiredADR.toFixed(2)}`}
                         </span>
                       </div>
 

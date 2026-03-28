@@ -138,6 +138,18 @@ const fetchReportData = async () => {
     fetchReportData();
   }, [propertyId, year1, year2]); // This hook re-runs if property or selected years change
 
+  // [NEW] Derive currency symbol from currencyCode for use in delta prefixes
+  const currencySymbol = useMemo(() => {
+    const symbolMap: Record<string, string> = {
+      USD: '$', GBP: '£', EUR: '€', JPY: '¥', CNY: '¥',
+      AUD: 'A$', CAD: 'C$', CHF: 'CHF', INR: '₹', KRW: '₩',
+      SEK: 'kr', NOK: 'kr', DKK: 'kr', ZAR: 'R', BRL: 'R$',
+      MXN: 'MX$', SGD: 'S$', HKD: 'HK$', NZD: 'NZ$', THB: '฿',
+      AED: 'د.إ', SAR: '﷼', PLN: 'zł', CZK: 'Kč', HUF: 'Ft',
+    };
+    return symbolMap[(currencyCode || 'USD').toUpperCase()] || currencyCode || '$';
+  }, [currencyCode]);
+
   // [NEW] Currency and Number formatting helpers
   const formatCurrency = (value: number, digits: number = 0) => {
     return new Intl.NumberFormat('en-US', {
@@ -320,12 +332,12 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
       case 'occupancy':
         return { value2: data.year2.occupancy, value1: data.year1.occupancy, suffix: '%' };
       case 'adr':
-        return { value2: data.year2.adr, value1: data.year1.adr, prefix: '$' };
+        return { value2: data.year2.adr, value1: data.year1.adr, prefix: currencySymbol };
       case 'revpar':
-        return { value2: data.year2.revpar, value1: data.year1.revpar, prefix: '$' };
+        return { value2: data.year2.revpar, value1: data.year1.revpar, prefix: currencySymbol };
       case 'revenue':
       default:
-        return { value2: data.year2.revenue, value1: data.year1.revenue, prefix: '$', decimals: 0 };
+        return { value2: data.year2.revenue, value1: data.year1.revenue, prefix: currencySymbol, decimals: 0 };
     }
   };
 
@@ -334,12 +346,12 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
       case 'occupancy':
         return { value2: summary.avg2.occupancy, value1: summary.avg1.occupancy, suffix: '%' };
       case 'adr':
-        return { value2: summary.avg2.adr, value1: summary.avg1.adr, prefix: '$' };
+        return { value2: summary.avg2.adr, value1: summary.avg1.adr, prefix: currencySymbol };
       case 'revpar':
-        return { value2: summary.avg2.revpar, value1: summary.avg1.revpar, prefix: '$' };
+        return { value2: summary.avg2.revpar, value1: summary.avg1.revpar, prefix: currencySymbol };
       case 'revenue':
       default:
-        return { value2: summary.total2.revenue, value1: summary.total1.revenue, prefix: '$', decimals: 0 };
+        return { value2: summary.total2.revenue, value1: summary.total1.revenue, prefix: currencySymbol, decimals: 0 };
     }
   };
 
@@ -351,12 +363,12 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
       case 'occupancy':
         return { value2: currentPeriodSummary.avg2.occupancy, value1: currentPeriodSummary.avg1.occupancy, suffix: '%' };
       case 'adr':
-        return { value2: currentPeriodSummary.avg2.adr, value1: currentPeriodSummary.avg1.adr, prefix: '$' };
+        return { value2: currentPeriodSummary.avg2.adr, value1: currentPeriodSummary.avg1.adr, prefix: currencySymbol };
       case 'revpar':
-        return { value2: currentPeriodSummary.avg2.revpar, value1: currentPeriodSummary.avg1.revpar, prefix: '$' };
+        return { value2: currentPeriodSummary.avg2.revpar, value1: currentPeriodSummary.avg1.revpar, prefix: currencySymbol };
       case 'revenue':
       default:
-        return { value2: currentPeriodSummary.total2.revenue, value1: currentPeriodSummary.total1.revenue, prefix: '$', decimals: 0 };
+        return { value2: currentPeriodSummary.total2.revenue, value1: currentPeriodSummary.total1.revenue, prefix: currencySymbol, decimals: 0 };
     }
   };
   

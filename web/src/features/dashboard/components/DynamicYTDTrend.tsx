@@ -19,11 +19,13 @@ interface MonthData {
 interface DynamicYTDTrendProps {
   onNavigate?: (view: string) => void;
   data?: any[]; // Map incoming API data
+  currencySymbol?: string;
 }
 
 export function DynamicYTDTrend({
   onNavigate,
   data: propData,
+  currencySymbol = "£",
 }: DynamicYTDTrendProps) {
   // [NEW] Map data safely from API format to internal structure
   const multiMetricData: MonthData[] = (
@@ -65,11 +67,11 @@ export function DynamicYTDTrend({
     if (type === "occupancy") {
       return `${value.toFixed(1)}%`;
     } else if (type === "adr") {
-      return `£${value.toFixed(0)}`;
+      return `${currencySymbol}${value.toFixed(0)}`;
     } else if (type === "revenue") {
       // [MODIFIED] Full number format with commas (e.g. £131,000)
       const absValue = Math.abs(value);
-      const formatted = `£${Math.round(absValue).toLocaleString()}`;
+      const formatted = `${currencySymbol}${Math.round(absValue).toLocaleString()}`;
       const sign = value < 0 ? "-" : showSign ? "+" : "";
       return `${sign}${formatted}`;
     }
@@ -134,7 +136,7 @@ export function DynamicYTDTrend({
           </div>
           <div>
             <div style={{ color: "#e5e5e5", marginBottom: "4px" }}>
-              YTD Performance - All Metrics
+              Annual Performance - All Metrics
             </div>
             <div style={{ color: "#6b7280", fontSize: "12px" }}>
               ADR, Occupancy & Revenue comparison ({multiMetricData.length}{" "}
@@ -230,7 +232,7 @@ export function DynamicYTDTrend({
               textAlign: "center",
             }}
           >
-            2024
+            {new Date().getFullYear() - 1}
           </div>
           <div
             style={{
@@ -244,7 +246,7 @@ export function DynamicYTDTrend({
               paddingLeft: "8px",
             }}
           >
-            2025
+            {new Date().getFullYear()}
           </div>
           <div
             style={{
@@ -451,7 +453,7 @@ export function DynamicYTDTrend({
                   )}
                 </div>
 
-                {/* 2024 Metrics */}
+                {/* Last Year Metrics */}
                 <div
                   style={{
                     textAlign: "center",
@@ -483,7 +485,7 @@ export function DynamicYTDTrend({
                   {formatValue(row.revenue.lastYear, "revenue")}
                 </div>
 
-                {/* 2025 Metrics */}
+                {/* This Year Metrics */}
                 <div
                   style={{
                     textAlign: "center",
@@ -598,11 +600,11 @@ export function DynamicYTDTrend({
               }}
             >
               <span style={{ color: "#39BDF8", fontSize: "12px" }}>
-                YTD Total
+                Annual Total
               </span>
             </div>
 
-            {/* 2024 Totals */}
+            {/* Last Year Totals */}
             <div
               style={{
                 textAlign: "center",
@@ -661,7 +663,7 @@ export function DynamicYTDTrend({
               )}
             </div>
 
-            {/* 2025 Totals */}
+            {/* This Year Totals */}
             <div
               style={{
                 textAlign: "center",

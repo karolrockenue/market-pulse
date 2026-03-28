@@ -1,9 +1,7 @@
 import { useState } from "react";
 import {
   BarChart3,
-  Globe,
   DollarSign,
-  Users,
   TrendingUp,
   Calendar,
   ArrowUpDown,
@@ -11,7 +9,6 @@ import {
   ChevronRight,
   PieChart,
   Target,
-  Building2,
   Wallet,
 } from "lucide-react";
 
@@ -63,7 +60,7 @@ export function ReportSelector({
         "Track performance against defined budget targets for ADR, Occupancy, and Revenue",
       icon: PieChart,
       category: "Core Analytics",
-      available: true,
+      available: false,
     },
 
     // --- Internal Reports (Restricted) ---
@@ -76,35 +73,6 @@ export function ReportSelector({
       category: "Core Analytics", // Kept in Core as per PROT, or move to 'Internal Reports' if you prefer separation
       available: true,
       requiredRole: "super_admin",
-    },
-    {
-      id: "portfolio-overview",
-      title: "Portfolio Overview",
-      description: "High-level aggregated view of all properties in the group.",
-      icon: Building2,
-      category: "Internal Reports",
-      available: true,
-      requiredRole: "super_admin",
-    },
-
-    // --- Guest Analytics ---
-    {
-      id: "guest-source-countries",
-      title: "Guest Source Countries",
-      description:
-        "Geographic breakdown of guest origins, booking patterns, and regional market insights",
-      icon: Globe,
-      category: "Guest Analytics",
-      available: true,
-    },
-    {
-      id: "guest-demographics",
-      title: "Guest Demographics",
-      description:
-        "Analyze guest profiles, booking behavior, length of stay, and customer segmentation",
-      icon: Users,
-      category: "Guest Analytics",
-      available: false,
     },
 
     // --- Financial ---
@@ -161,7 +129,6 @@ export function ReportSelector({
 
   const categories = [
     "Core Analytics",
-    "Guest Analytics",
     "Financial",
     "Forecasting",
     "Market Intelligence",

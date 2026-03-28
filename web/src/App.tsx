@@ -374,8 +374,12 @@ export default function App() {
     }
 
     try {
-      // TODO: when backend endpoint is ready, call it here
-      // await fetch('/api/admin/save-property-tier', { ... })
+      const res = await fetch('/api/hotels/category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hotelId: property, category: tier }),
+      });
+      if (!res.ok) throw new Error('Failed to save classification');
     } catch (error: any) {
       console.error("Error saving property classification:", error);
       sentinelToast.error("Error saving classification", error.message);

@@ -66,7 +66,7 @@ export const MarketIntelHub = ({
     return (
       <div className="p-4">
         <div className="mb-4">
-          <h1 className="text-white text-xl mb-1">London Market Overview</h1>
+          <h1 className="text-white text-xl mb-1">{citySlug ? citySlug.charAt(0).toUpperCase() + citySlug.slice(1) : "Market"} Market Overview</h1>
           <p className="text-[#9ca3af] text-xs">
             Macro-level market analytics, trends, and competitive insights
           </p>

@@ -162,21 +162,6 @@ export const fetchDashboardSummary = async (
     ytdReportPromise,
   ]);
 
-  // [DEBUG] Inspect the raw data returned from the YTD endpoint
-  console.group("🔍 Dashboard vs Report Data Debug");
-  console.log("Raw YTD Report API Response:", ytdReportData);
-
-  // Check a specific month (e.g., last month) to compare with what you see on screen
-  const lastMonthIndex = currentMonthIndex - 1;
-
-  if (ytdReportData[lastMonthIndex]) {
-    console.log(
-      `Data for Month Index ${lastMonthIndex} (Last Month):`,
-      ytdReportData[lastMonthIndex]
-    );
-  }
-  console.groupEnd();
-
   // 4. Transform the Report Data to match Dashboard Component expectations
   // Explicit month mapping to ensure data aligns even if API returns sparse arrays
   const monthNames = [
@@ -222,13 +207,8 @@ export const fetchDashboardSummary = async (
     };
   });
 
-  // Only keep months up to current month (matching original dashboard logic)
-  // Use filter instead of slice to handle potential unsorted data safely
   const filteredTrend = enrichedYtdTrend
-    .filter(
-      (item: any) =>
-        item.monthIndex !== -1 && item.monthIndex <= currentMonthIndex
-    )
+    .filter((item: any) => item.monthIndex !== -1)
     .sort((a: any, b: any) => a.monthIndex - b.monthIndex);
 
   return {
