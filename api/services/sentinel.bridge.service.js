@@ -218,7 +218,7 @@ class SentinelBridgeService {
         try {
           await client.query(shadowQuery, [
             validDecisions.map((d) => Number(d.hotel_id)),
-            validDecisions.map((d) => Number(d.room_type_id)),
+            validDecisions.map((d) => String(d.room_type_id)),
             validDecisions.map((d) => d.stay_date),
             validDecisions.map((d) => Number(d.suggested_rate)),
             validDecisions.map((d) => Number(d.confidence_score) || 0.0),
