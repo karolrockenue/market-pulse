@@ -360,6 +360,7 @@ class SentinelBridgeService {
         });
 
         const validUpdates = [];
+        let skFrozen = 0, skManual = 0, skSanity = 0, skDelta = 0, skRateMap = 0;
 
         for (const pred of hotelDecisions) {
           const dateStr = new Date(pred.stay_date).toISOString().split("T")[0];
@@ -371,6 +372,7 @@ class SentinelBridgeService {
           // 3a. Freeze Window (Today + X days)
           const daysUntilStay = (stayDateObj - today) / (1000 * 60 * 60 * 24);
           if (daysUntilStay < freezeDays) {
+            skFrozen++;
             continue; // Frozen period
           }
 
@@ -382,6 +384,7 @@ class SentinelBridgeService {
           // AI is FORBIDDEN from touching MANUAL (Market Pulse) or PMS_LOCKED.
           // AI IS ALLOWED to overwrite SYNC (Cloudbeds) and SENTINEL.
           if (currentSource === "MANUAL" || currentSource === "PMS_LOCKED") {
+            skManual++;
             continue;
           }
 
@@ -411,7 +414,10 @@ class SentinelBridgeService {
           if (ceiling && safeRate > ceiling) safeRate = ceiling;
 
           // 2c. Sanity Check
-          if (isNaN(safeRate) || safeRate <= 0) continue;
+          if (isNaN(safeRate) || safeRate <= 0) {
+            skSanity++;
+            continue;
+          }
 
           // --- DELTA CHECK (Surgical Strike) ---
           // Only push if the price is actually different.
@@ -424,6 +430,7 @@ class SentinelBridgeService {
             currentRate !== undefined &&
             Math.abs(safeRate - currentRate) < 1.0
           ) {
+            skDelta++;
             continue; // No change needed (Price change is insignificant)
           }
 
@@ -490,6 +497,7 @@ class SentinelBridgeService {
           for (const update of validUpdates) {
             const pmsRateId = rateIdMap[update.room_type_id];
             if (!pmsRateId) {
+              skRateMap++;
               console.warn(
                 `[Autonomy] Missing Rate ID mapping for Room ${update.room_type_id} (Hotel ${hotelId}). Skipping.`,
               );
@@ -507,6 +515,10 @@ class SentinelBridgeService {
               rate: update.price, // [CRITICAL] Must match Cloudbeds Adapter ('rate', not 'amount')
             });
           }
+
+          console.log(
+            `[Autonomy] Hotel ${hotelId}: ${hotelDecisions.length} predictions → ${validUpdates.length} passed gates, ${ratesPayload.length} mapped to PMS | Filtered: frozen=${skFrozen} manual=${skManual} delta=${skDelta} sanity=${skSanity} rateMap=${skRateMap}`
+          );
 
           if (ratesPayload.length > 0) {
             // [FIX] Chunking Logic for Cloudbeds API Limit (Max 30 items)
