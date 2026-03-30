@@ -199,6 +199,7 @@ class SentinelBridgeService {
       );
 
       if (validDecisions.length > 0) {
+        console.log(`[Bridge] Shadow save: room_type_id sample = "${validDecisions[0].room_type_id}" (type: ${typeof validDecisions[0].room_type_id})`);
         const shadowQuery = `
      INSERT INTO sentinel_ai_predictions 
           (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
