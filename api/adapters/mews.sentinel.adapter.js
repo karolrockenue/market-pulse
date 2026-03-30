@@ -169,11 +169,19 @@ async function getRates(
     chunkStart.setDate(chunkStart.getDate() + 1);
   }
 
+  // Deduplicate by date (chunk boundaries can overlap due to timezone conversion)
+  const seen = new Set();
+  const dedupedRates = allRates.filter((r) => {
+    if (seen.has(r.date)) return false;
+    seen.add(r.date);
+    return true;
+  });
+
   // Return in Cloudbeds-compatible format so sentinel.service.previewCalendar works
   return {
     success: true,
     data: {
-      roomRateDetailed: allRates,
+      roomRateDetailed: dedupedRates,
     },
   };
 }
