@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Building2, Hotel, Sparkles, Crown } from 'lucide-react';
-import { toast } from 'sonner'; // [FIX] Correct the import path
 
 interface PropertyClassificationModalProps {
   isOpen: boolean;
@@ -52,10 +51,10 @@ const tierOptions: TierOption[] = [
   },
 ];
 
-export function PropertyClassificationModal({ 
-  isOpen, 
-  onClose, 
-  onComplete 
+export function PropertyClassificationModal({
+  isOpen,
+  onClose,
+  onComplete
 }: PropertyClassificationModalProps) {
   const [selectedTier, setSelectedTier] = useState<PropertyTier | null>(null);
 
@@ -66,55 +65,78 @@ export function PropertyClassificationModal({
     onClose();
   };
 
-  const handleSkip = () => {
-    onClose();
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-<DialogContent 
-        className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5]" 
-        style={{ maxWidth: '960px' }} // [FIX] Use inline style to bypass static CSS build issue
+      <DialogContent
+        className="border-0"
+        style={{
+          maxWidth: '960px',
+          backgroundColor: '#1d1d1c',
+          border: '1px solid #2a2a2a',
+          color: '#e5e5e5',
+        }}
       >
         <DialogHeader>
-          <DialogTitle className="text-[#faff6a] text-2xl">Classify Your Property</DialogTitle>
-          <DialogDescription className="text-[#9ca3af] text-sm">
+          <DialogTitle style={{ color: '#e5e5e5', fontSize: '20px', fontWeight: 600, letterSpacing: '-0.025em' }}>
+            Classify Your Property
+          </DialogTitle>
+          <DialogDescription style={{ color: '#6b7280', fontSize: '13px' }}>
             Select the category that best represents your hotel's position in the market.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div style={{ padding: '20px 0' }}>
           {/* Property Category Selector */}
           <div>
-            <h3 className="text-[#e5e5e5] text-sm mb-3 uppercase tracking-wider">Property Category</h3>
-            <div className="grid grid-cols-5 gap-4">
+            <h3 style={{
+              color: '#6b7280',
+              fontSize: '10px',
+              marginBottom: '14px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}>
+              Property Category
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
               {tierOptions.map((tier) => {
                 const Icon = tier.icon;
                 const isSelected = selectedTier === tier.id;
-                
+
                 return (
                   <button
                     key={tier.id}
                     onClick={() => setSelectedTier(tier.id)}
-                    className={`p-5 rounded border-2 transition-all hover:border-[#faff6a]/50 ${
-                      isSelected
-                        ? 'border-[#faff6a] bg-[#faff6a]/10'
-                        : 'border-[#3a3a35] bg-[#1f1f1c]'
-                    }`}
+                    style={{
+                      padding: '20px 12px',
+                      borderRadius: '8px',
+                      border: isSelected ? '2px solid #39BDF8' : '1px solid #2a2a2a',
+                      backgroundColor: isSelected ? 'rgba(57, 189, 248, 0.08)' : '#1a1a1a',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.borderColor = 'rgba(57, 189, 248, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.borderColor = '#2a2a2a';
+                    }}
                   >
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <Icon 
-                        className={`w-10 h-10 ${
-                          isSelected ? 'text-[#faff6a]' : 'text-[#9ca3af]'
-                        }`}
-                      />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '10px' }}>
+                      <Icon style={{
+                        width: '32px',
+                        height: '32px',
+                        color: isSelected ? '#39BDF8' : '#6b7280',
+                      }} />
                       <div>
-                        <div className={`mb-1 ${
-                          isSelected ? 'text-[#faff6a]' : 'text-[#e5e5e5]'
-                        }`}>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: isSelected ? '#39BDF8' : '#e5e5e5',
+                          marginBottom: '4px',
+                        }}>
                           {tier.name}
                         </div>
-                        <div className="text-[#9ca3af] text-xs leading-tight">
+                        <div style={{ color: '#6b7280', fontSize: '11px', lineHeight: '1.4' }}>
                           {tier.description}
                         </div>
                       </div>
@@ -126,29 +148,56 @@ export function PropertyClassificationModal({
           </div>
 
           {/* Info Note */}
-          <div className="bg-[#1f1f1c] rounded p-4 border border-[#3a3a35]">
-            <p className="text-[#9ca3af] text-xs leading-relaxed">
-              This classification is used for more accurate competitive benchmarking and can be changed later in Settings → Property Details.
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '6px',
+            padding: '12px 16px',
+            border: '1px solid #2a2a2a',
+            marginTop: '20px',
+          }}>
+            <p style={{ color: '#6b7280', fontSize: '11px', lineHeight: '1.6', margin: 0 }}>
+              This classification is used for more accurate competitive benchmarking and can be changed later in Settings.
             </p>
           </div>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div className="flex justify-between items-center pt-4 border-t border-[#3a3a35]">
+        {/* Action Buttons */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingTop: '16px',
+          borderTop: '1px solid #2a2a2a',
+        }}>
           <button
-            onClick={handleSkip}
-            className="text-[#9ca3af] text-sm hover:text-[#e5e5e5] transition-colors"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#6b7280',
+              fontSize: '13px',
+              cursor: 'pointer',
+              padding: '8px 0',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#e5e5e5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#6b7280'; }}
           >
             Skip for now
           </button>
           <Button
             onClick={handleContinue}
             disabled={!selectedTier}
-            className={`px-8 h-11 text-base ${
-              selectedTier
-                ? 'bg-[#faff6a] text-[#1f1f1c] hover:bg-[#e8ef5a]'
-                : 'bg-[#3a3a35] text-[#6b7280] cursor-not-allowed'
-            }`}
+            style={{
+              padding: '0 28px',
+              height: '40px',
+              fontSize: '13px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: selectedTier ? 'pointer' : 'not-allowed',
+              backgroundColor: selectedTier ? '#39BDF8' : '#2a2a2a',
+              color: selectedTier ? '#0d0d0d' : '#6b7280',
+            }}
           >
             Continue
           </Button>

@@ -379,6 +379,8 @@ async function runSync(propertyId) {
       // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
+      const serviceId = await mewsAdapter.getAccommodationServiceId(credentials);
+      console.log(`Mews ServiceId: ${serviceId}`);
 
       const hotelTimezone = hotelDetails.timezone;
       if (!hotelTimezone) {
@@ -413,6 +415,11 @@ async function runSync(propertyId) {
           hotelDetails.zip_postal_code,
           hotelDetails.country,
         ]
+      );
+      // Store serviceId + timezone in hotels.pms_credentials for other features
+      await client.query(
+        `UPDATE hotels SET pms_credentials = $1 WHERE hotel_id = $2`,
+        [JSON.stringify({ accessToken: decryptedToken, serviceId, timezone: hotelTimezone }), propertyId]
       );
       console.log(`✅ Hotel metadata sync complete.`);
 
@@ -455,6 +462,7 @@ async function runSync(propertyId) {
         const [occupancyData, revenueData] = await Promise.all([
           mewsAdapter.getOccupancyMetrics(
             credentials,
+            serviceId,
             startDateStr,
             endDateStr,
             hotelTimezone
@@ -467,7 +475,7 @@ async function runSync(propertyId) {
           ),
         ]);
 
-        occupancyData.dailyMetrics.forEach((metric) => {
+        occupancyData.forEach((metric) => {
           allProcessedData[metric.date] = {
             ...allProcessedData[metric.date],
             rooms_sold: metric.occupied,
@@ -477,7 +485,7 @@ async function runSync(propertyId) {
           };
         });
 
-        revenueData.dailyMetrics.forEach((metric) => {
+        revenueData.forEach((metric) => {
           allProcessedData[metric.date] = {
             ...allProcessedData[metric.date],
             net_revenue: metric.netRevenue,

@@ -649,7 +649,19 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
         )}
 
         {/* Scorecard Row */}
-        {(() => {
+        {isLoading ? (
+          <div style={styles.scorecardGrid}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ ...styles.card, minHeight: '120px' }}>
+                <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ width: '60%', height: '10px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ width: '40%', height: '28px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ width: '50%', height: '10px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (() => {
           const myOcc = kpis.yourHotel?.occupancy != null ? Math.round(Number(kpis.yourHotel.occupancy) * 100) : '--';
           const compOcc = kpis.market?.occupancy != null ? Math.round(Number(kpis.market.occupancy) * 100) : '--';
           const myAdr = kpis.yourHotel?.adr != null ? Math.round(Number(kpis.yourHotel.adr)) : '--';
@@ -891,6 +903,25 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
         </div>
 
         {/* Daily Drill-Down Table */}
+        {isLoading ? (
+          <div style={{ ...styles.table, padding: '16px' }}>
+            <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ width: '200px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                <div style={{ width: '120px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+              </div>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ width: '80px', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div>
@@ -1010,6 +1041,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
             ))}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

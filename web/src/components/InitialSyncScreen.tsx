@@ -21,67 +21,128 @@ export function InitialSyncScreen() {
   const CurrentIcon = steps[currentStep].icon;
 
   return (
-    <div className="fixed inset-0 bg-[#252521] flex items-center justify-center z-50">
-      <div className="max-w-md w-full px-6 text-center">
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: '#1d1d1c',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 50,
+    }}>
+      {/* Subtle grid overlay */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: 'linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)',
+        backgroundSize: '64px 64px',
+      }} />
+
+      <div style={{ maxWidth: '420px', width: '100%', padding: '0 24px', textAlign: 'center', position: 'relative', zIndex: 10 }}>
         {/* Animated Icon */}
-        <div className="mb-8 flex justify-center">
-          <div className="relative">
-            {/* Outer spinning ring */}
-            <div className="w-24 h-24 border-4 border-[#3a3a35] rounded-full animate-spin border-t-[#faff6a]" />
-            
-            {/* Inner icon */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <CurrentIcon className="w-10 h-10 text-[#faff6a]" />
+        <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ position: 'relative', width: '96px', height: '96px' }}>
+            <div
+              className="animate-spin"
+              style={{
+                width: '96px',
+                height: '96px',
+                border: '3px solid #2a2a2a',
+                borderTopColor: '#39BDF8',
+                borderRadius: '50%',
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <CurrentIcon style={{ width: '36px', height: '36px', color: '#39BDF8' }} />
             </div>
           </div>
         </div>
 
         {/* Main Heading */}
-        <h1 className="text-white text-3xl mb-4">Connecting Your Property</h1>
+        <h1 style={{
+          color: '#e5e5e5',
+          fontSize: '22px',
+          fontWeight: 600,
+          marginBottom: '12px',
+          letterSpacing: '-0.025em',
+        }}>
+          Connecting Your Property
+        </h1>
 
-        {/* Informative Subtext */}
-        <p className="text-[#9ca3af] text-sm leading-relaxed mb-6">
-          We're pulling your historical performance data from your Property Management System 
-          to ensure your dashboard and reports are accurate from day one. This one-time process 
-          may take several minutes to complete.
+        {/* Subtext */}
+        <p style={{
+          color: '#6b7280',
+          fontSize: '13px',
+          lineHeight: '1.7',
+          marginBottom: '24px',
+        }}>
+          We're pulling your historical performance data from your Property Management System
+          to ensure your dashboard and reports are accurate from day one.
         </p>
 
-        <div className="bg-[#faff6a]/10 border border-[#faff6a]/30 rounded p-3 mb-6">
-          <p className="text-[#faff6a] text-xs">
+        {/* Info Banner */}
+        <div style={{
+          backgroundColor: 'rgba(57, 189, 248, 0.08)',
+          border: '1px solid rgba(57, 189, 248, 0.25)',
+          borderRadius: '6px',
+          padding: '10px 16px',
+          marginBottom: '24px',
+        }}>
+          <p style={{ color: '#39BDF8', fontSize: '12px', margin: 0 }}>
             Please keep this page open while we complete the sync.
           </p>
         </div>
 
-        {/* Dynamic Status Text */}
-        <div className="bg-[#2C2C2C] rounded border border-[#3a3a35] p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[#9ca3af] text-xs uppercase tracking-wider">Progress</span>
-            <span className="text-[#faff6a] text-xs">Step {currentStep + 1} of {steps.length}</span>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="w-full bg-[#1f1f1c] rounded-full h-2 mb-3">
-            <div 
-              className="bg-[#faff6a] h-2 rounded-full transition-all duration-500"
-              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-            />
+        {/* Progress Card */}
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          borderRadius: '8px',
+          border: '1px solid #2a2a2a',
+          padding: '16px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progress</span>
+            <span style={{ color: '#39BDF8', fontSize: '11px' }}>Step {currentStep + 1} of {steps.length}</span>
           </div>
 
-          {/* Current Step Text */}
-          <div className="flex items-center gap-2 justify-center">
-            <Loader2 className="w-4 h-4 text-[#faff6a] animate-spin" />
-            <span className="text-[#e5e5e5] text-sm">{steps[currentStep].text}</span>
+          {/* Progress Bar */}
+          <div style={{
+            width: '100%',
+            backgroundColor: '#0d0d0d',
+            borderRadius: '4px',
+            height: '6px',
+            marginBottom: '14px',
+          }}>
+            <div style={{
+              backgroundColor: '#39BDF8',
+              height: '6px',
+              borderRadius: '4px',
+              transition: 'width 0.5s ease',
+              width: `${((currentStep + 1) / steps.length) * 100}%`,
+            }} />
+          </div>
+
+          {/* Current Step */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+            <Loader2 className="animate-spin" style={{ width: '14px', height: '14px', color: '#39BDF8' }} />
+            <span style={{ color: '#e5e5e5', fontSize: '13px' }}>{steps[currentStep].text}</span>
           </div>
         </div>
 
-        {/* Additional Info */}
-        <div className="mt-8 space-y-2">
-          <div className="flex items-center justify-center gap-2 text-[#9ca3af] text-xs">
-            <div className="w-2 h-2 bg-[#10b981] rounded-full animate-pulse" />
-            <span>Secure connection established</span>
+        {/* Footer Info */}
+        <div style={{ marginTop: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div className="animate-pulse" style={{ width: '6px', height: '6px', backgroundColor: '#10b981', borderRadius: '50%' }} />
+            <span style={{ color: '#6b7280', fontSize: '11px' }}>Secure connection established</span>
           </div>
-          <div className="text-[#9ca3af] text-xs">
-            Expected completion: 2-5 minutes
+          <div style={{ color: '#6b7280', fontSize: '11px' }}>
+            Expected completion: 2–5 minutes
           </div>
         </div>
       </div>

@@ -89,13 +89,13 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
+        "SELECT category, city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId],
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -156,13 +156,13 @@ router.get("/competitors", requireUserApi, async (req, res) => {
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
+        "SELECT category, city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId],
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -200,13 +200,13 @@ router.get("/ranking", requireUserApi, async (req, res) => {
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
+        "SELECT category, city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId],
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -269,13 +269,13 @@ router.get("/chart", requireUserApi, async (req, res) => {
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
+        "SELECT category, city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId],
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -324,13 +324,13 @@ router.get("/summary", requireUserApi, async (req, res) => {
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
+        "SELECT category, city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId],
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
@@ -898,13 +898,13 @@ router.post("/reports/run", requireUserApi, async (req, res) => {
     );
     if (competitorIds.length === 0) {
       const catRes = await pgPool.query(
-        "SELECT category FROM hotels WHERE hotel_id = $1",
+        "SELECT category, city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
       if (catRes.rows[0]?.category) {
         const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2",
-          [catRes.rows[0].category, propertyId],
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
         );
         competitorIds = autoComp.rows.map((r) => r.hotel_id);
       }
