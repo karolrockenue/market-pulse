@@ -228,12 +228,11 @@ async function buildOverridePayload(
     // C. Calculate Base Payload (Engine not needed for base, it's direct input)
     const baseRateId = rateIdMap[roomTypeId];
     if (baseRateId) {
-      batchPayload.push({ rateId: baseRateId, date, rate: baseRate });
+      batchPayload.push({ rateId: baseRateId, date, rate: baseRate, categoryId: isMews ? roomTypeId : undefined });
     }
 
     // D. Calculate Differentials (Derived Rooms)
-    // Skip for Mews — all categories share one rate ID, differentials handled by Mews CategoryAdjustments
-    if (!isMews && roomDifferentials && Array.isArray(roomDifferentials)) {
+    if (roomDifferentials && Array.isArray(roomDifferentials)) {
       for (const rule of roomDifferentials) {
         // Skip invalid rules or rules targeting the base room itself
         if (!rule || rule.value === undefined || rule.roomTypeId === roomTypeId)
@@ -256,6 +255,7 @@ async function buildOverridePayload(
               rateId: derivedRateId,
               date,
               rate: derivedRate,
+              categoryId: isMews ? derivedRoomId : undefined,
             });
           } else {
             console.warn(

@@ -314,13 +314,16 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
     // Each item becomes a single-day price update
     const priceUpdates = items.map((item) => {
       const utcStart = mewsAdapter.toMewsUtc(item.date, ctx.timezone);
-      return {
+      const update = {
         FirstTimeUnitStartUtc: utcStart,
         LastTimeUnitStartUtc: utcStart, // Same day = single time unit
         Value: Number(item.rate),
-        // Note: We don't set CategoryId here, so this updates the BASE price.
-        // Category-specific pricing is handled by Mews adjustments automatically.
       };
+      // If categoryId is provided (Mews per-category pricing), include it
+      if (item.categoryId) {
+        update.CategoryId = item.categoryId;
+      }
+      return update;
     });
 
     // Mews allows max 1000 PriceUpdates per call — chunk if needed

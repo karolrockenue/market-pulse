@@ -374,12 +374,8 @@ router.post("/recalculate", async (req, res) => {
     // 3. Build Master Payload
     const allOverrides = [];
 
-    // Loop through room types — for Mews, only process base room (shared rate ID)
-    const roomsToProcess = isMewsHotel
-      ? pmsRoomTypes.filter((r) => String(r.roomTypeID) === String(baseRoomTypeId))
-      : pmsRoomTypes;
-
-    for (const room of roomsToProcess) {
+    // Loop through EVERY room type
+    for (const room of pmsRoomTypes) {
       const roomTypeId = room.roomTypeID;
       let isBase = String(roomTypeId) === String(baseRoomTypeId);
       let diffRule = differentials.find(
@@ -393,8 +389,8 @@ router.post("/recalculate", async (req, res) => {
 
         let finalRate = parseFloat(day.finalRate);
 
-        // Apply Differential (skip for Mews — handled by CategoryAdjustments)
-        if (!isMewsHotel && !isBase && diffRule) {
+        // Apply Differential
+        if (!isBase && diffRule) {
           const val = parseFloat(diffRule.value);
           if (diffRule.operator === "+") {
             finalRate = finalRate * (1 + val / 100);
@@ -411,6 +407,7 @@ router.post("/recalculate", async (req, res) => {
           date: day.date,
           room_type_id: roomTypeId,
           rate: finalRate,
+          categoryId: isMewsHotel ? roomTypeId : undefined,
         });
       });
     }
@@ -438,7 +435,7 @@ router.post("/recalculate", async (req, res) => {
       const rateId = rateIdMap[o.room_type_id];
       if (!rateId) continue;
 
-      batchPayload.push({ rateId, date: o.date, rate: o.rate });
+      batchPayload.push({ rateId, date: o.date, rate: o.rate, categoryId: o.categoryId });
 
       // Write to sentinel_rates_calendar
       dbWrites.push(
