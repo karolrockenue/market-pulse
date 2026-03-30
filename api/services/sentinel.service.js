@@ -133,6 +133,7 @@ async function buildOverridePayload(
   roomTypeId,
   overrides,
   source = "MANUAL",
+  changedBy = null,
 ) {
   // 1. Load Configuration (Facts & Rules)
   const config = await getHotelConfig(hotelId);
@@ -186,9 +187,9 @@ async function buildOverridePayload(
     if (oldRate !== baseRate) {
       dbUpdates.push(
         db.query(
-          `INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-          [hotelId, roomTypeId, date, oldRate, baseRate, source],
+          `INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, changed_by, created_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [hotelId, roomTypeId, date, oldRate, baseRate, source, changedBy],
         ),
       );
     }
@@ -198,11 +199,11 @@ async function buildOverridePayload(
     // [UPDATED] Now uses the dynamic 'source' argument instead of hardcoded 'Manual'
     dbUpdates.push(
       db.query(
-        `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
+        `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, changed_by, last_updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())
          ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
-         SET rate = EXCLUDED.rate, source = EXCLUDED.source, last_updated_at = NOW()`,
-        [hotelId, date, roomTypeId, baseRate, source],
+         SET rate = EXCLUDED.rate, source = EXCLUDED.source, changed_by = EXCLUDED.changed_by, last_updated_at = NOW()`,
+        [hotelId, date, roomTypeId, baseRate, source, changedBy],
       ),
     );
 

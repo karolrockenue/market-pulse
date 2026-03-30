@@ -26,18 +26,13 @@ import { Button } from "@/components/ui/button";
 import { DatePickerCalendar } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { OccupancyVisualizer } from "./OccupancyVisualizer";
+import { OccupancyVisualizer } from "../RateManager/OccupancyVisualizer";
 import {
   useRateGrid,
   calculateSellRate,
   calculateRequiredOverride,
 } from "../../hooks/useRateGrid";
-import {
-  getConfigs,
-  getPmsPropertyIds,
-  getSentinelStatus,
-  triggerSentinelRun,
-} from "../../api/sentinel.api";
+import { getPmsPropertyIds } from "../../api/sentinel.api";
 
 // --- STYLES ---
 const styles: { [key: string]: React.CSSProperties } = {
@@ -52,8 +47,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     position: "relative",
     zIndex: 10,
     padding: "32px",
-    maxWidth: "none", // [CHANGED] Allow full width expansion
-    // margin: "0 auto", // No longer strictly needed without max-width
+    maxWidth: "none",
   },
 
   // Header
@@ -89,7 +83,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     letterSpacing: "0.05em",
   },
 
-  // [RESTORED] Visibility & Action Section (Separate from Grid)
+  // Visibility & Action Section
   gridSection: {
     backgroundColor: "#1a1a1a",
     borderRadius: "8px",
@@ -120,7 +114,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   rowVisibilityButtons: { display: "flex", alignItems: "center", gap: "12px" },
 
-  // [RESTORED] Grid Container (Separate Block)
+  // Grid Container
   gridContainer: {
     position: "relative",
     minHeight: "400px",
@@ -186,16 +180,17 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-interface RateManagerViewProps {
+interface HotelRateWindowProps {
   allHotels: any[];
+  userHotels: any[];
 }
 
-export function RateManagerView({ allHotels }: RateManagerViewProps) {
+export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps) {
   // --- STATE ---
   const [selectedHotelId, setSelectedHotelId] = useState<string>(
     () => localStorage.getItem("sentinel_last_hotel_id") || "",
   );
-  const [sentinelConfigs, setSentinelConfigs] = useState<any[]>([]);
+  const [hotelConfigs, setHotelConfigs] = useState<any[]>([]);
   const [pmsIdMap, setPmsIdMap] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [nightsToView, setNightsToView] = useState("30");
@@ -206,20 +201,13 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     string | null
   >(null);
   const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
-  // appliedPredictions removed (now in hook)
   const [hoveredAiCell, setHoveredAiCell] = useState<string | null>(null);
   const [paceCurves, setPaceCurves] = useState<any[]>([]);
-  const [sentinelStatus, setSentinelStatus] = useState<{
-    lastRun: string | null;
-    changesLast24h: number;
-  } | null>(null);
-  const [recentJobs, setRecentJobs] = useState<any[]>([]);
-  const [isRunningSentinel, setIsRunningSentinel] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
     aiPredictions,
-    aiApprovedPending, // [NEW]
+    aiApprovedPending,
     calendarData,
     pickupWindow,
     setPickupWindow,
@@ -233,94 +221,90 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     loadRates,
     setOverride,
     clearOverride,
-    applyAiPrediction, // [NEW]
-    bulkApplyAi, // [NEW]
     submitChanges,
   } = useRateGrid();
 
   // --- INIT ---
   useEffect(() => {
+    if (!userHotels || userHotels.length === 0) return;
+
     const init = async () => {
-      const [cfg, ids] = await Promise.all([getConfigs(), getPmsPropertyIds()]);
-      // [FIX] Only include hotels where Sentinel is enabled
-      const list = Object.values(cfg).filter((c: any) => c.sentinel_enabled);
-      setSentinelConfigs(list);
+      let ids: Record<string, string> = {};
+      try {
+        ids = await getPmsPropertyIds();
+      } catch {
+        // Non-admin users may not have access — continue without PMS IDs
+      }
+
+      // Only include hotels that have a sentinel config (managed + enabled)
+      const configChecks = await Promise.all(
+        userHotels.map(async (h: any) => {
+          const hid = h.hotel_id || h.property_id;
+          try {
+            const res = await fetch(`/api/sentinel/hotel-config/${hid}`);
+            if (res.ok) {
+              const json = await res.json();
+              if (json.success && json.config?.sentinel_enabled) {
+                return { hotel_id: hid, ...json.config };
+              }
+            }
+          } catch {}
+          return null;
+        }),
+      );
+      const list = configChecks.filter(Boolean);
+      setHotelConfigs(list);
       setPmsIdMap(ids);
 
-      // Default to the first ENABLED hotel if none selected
+      // Default to the first hotel if none selected
       if (!selectedHotelId && list.length > 0) {
         setSelectedHotelId(String(list[0].hotel_id));
       }
     };
     init();
-  }, []);
+  }, [userHotels]);
 
-  // [NEW] Load Pace Curves, Status & Recent Jobs
+  // Load hotel config + pace curves when hotel changes
   useEffect(() => {
     if (!selectedHotelId) return;
     const loadData = async () => {
       try {
-        const [paceRes, statusData, jobsRes] = await Promise.all([
-          fetch(`/api/sentinel/pace-curves/${selectedHotelId}`),
-          getSentinelStatus(selectedHotelId),
-          fetch(`/api/sentinel/recent-jobs/${selectedHotelId}`),
-        ]);
+        // Fetch sentinel config for this hotel (base_room_type_id, etc.)
+        const configRes = await fetch(`/api/sentinel/hotel-config/${selectedHotelId}`);
+        if (configRes.ok) {
+          const configJson = await configRes.json();
+          if (configJson.success && configJson.config) {
+            setHotelConfigs((prev) =>
+              prev.map((h) =>
+                String(h.hotel_id) === selectedHotelId
+                  ? { ...h, ...configJson.config }
+                  : h,
+              ),
+            );
+          }
+        }
 
+        const paceRes = await fetch(
+          `/api/sentinel/pace-curves/${selectedHotelId}`,
+        );
         if (paceRes.ok) {
           const json = await paceRes.json();
           setPaceCurves(Array.isArray(json.data) ? json.data : []);
         }
-
-        if (jobsRes.ok) {
-          const jobs = await jobsRes.json();
-          setRecentJobs(Array.isArray(jobs) ? jobs : []);
-        }
-
-        setSentinelStatus(statusData);
       } catch (err) {
-        console.error("Failed to load auxiliary data", err);
+        console.error("Failed to load hotel data", err);
       }
     };
     loadData();
   }, [selectedHotelId]);
 
-  const handleRunSentinel = async () => {
-    if (!selectedHotelId) return;
-    setIsRunningSentinel(true);
-    try {
-      // Calculate 365 day window
-      const start = new Date();
-      const end = new Date();
-      end.setDate(end.getDate() + 365);
-
-      const sStr = format(start, "yyyy-MM-dd");
-      const eStr = format(end, "yyyy-MM-dd");
-
-      // Trigger Prediction Run
-      await triggerSentinelRun(selectedHotelId, sStr, eStr, "PREDICTION");
-
-      toast.success("Sentinel Analysis Complete. Predictions updated.");
-
-      // Refresh status after a short delay
-      setTimeout(async () => {
-        const s = await getSentinelStatus(selectedHotelId);
-        setSentinelStatus(s);
-        handleLoad(); // Reload grid
-      }, 2000);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to run Sentinel");
-    } finally {
-      setIsRunningSentinel(false);
-    }
-  };
-
   // --- MEMOIZED HELPERS ---
   const selectedHotel = useMemo(() => {
-    const cfg = sentinelConfigs.find(
+    const cfg = hotelConfigs.find(
       (c) => String(c.hotel_id) === selectedHotelId,
     );
     const details = allHotels.find(
-      (h) => String(h.hotel_id) === selectedHotelId,
+      (h) => String(h.hotel_id || h.property_id) === selectedHotelId,
     );
     return {
       id: selectedHotelId,
@@ -328,7 +312,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
       baseRoomTypeId: cfg?.base_room_type_id,
       pmsPropertyId: pmsIdMap[selectedHotelId],
     };
-  }, [selectedHotelId, sentinelConfigs, allHotels, pmsIdMap]);
+  }, [selectedHotelId, hotelConfigs, allHotels, pmsIdMap]);
 
   const visibleData = useMemo(() => {
     const startStr = startDate.toISOString().split("T")[0];
@@ -344,18 +328,18 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     return calendarData.slice(safeStart, safeStart + parseInt(nightsToView));
   }, [calendarData, startDate, nightsToView]);
 
-  // [NEW] Helper to get Pace Value
+  // Helper to get Pace Value
   const getPaceValue = (dateStr: string) => {
-    if (!paceCurves.length || !sentinelConfigs.length) return null;
+    if (!paceCurves.length || !hotelConfigs.length) return null;
 
-    const config = sentinelConfigs.find(
+    const config = hotelConfigs.find(
       (c) => String(c.hotel_id) === selectedHotelId,
     );
     if (!config?.seasonality_profile) return null;
 
     const targetDate = new Date(dateStr);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize
+    today.setHours(0, 0, 0, 0);
 
     const diffTime = targetDate.getTime() - today.getTime();
     const daysOut = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -365,9 +349,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     const monthKey = String(targetDate.getMonth() + 1);
     let tier = config.seasonality_profile[monthKey];
 
-    // [FIX] Robust Normalization
     if (!tier) return null;
-    tier = String(tier).toLowerCase(); // Force lowercase string
+    tier = String(tier).toLowerCase();
     if (tier === "medium") tier = "mid";
 
     const curve = paceCurves.find(
@@ -379,10 +362,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     return val !== undefined ? val : null;
   };
 
-  // [NEW] Helper for Seasonality Tier Display
+  // Helper for Seasonality Tier Display
   const getSeasonalityTier = (dateStr: string) => {
-    if (!sentinelConfigs.length) return "-";
-    const config = sentinelConfigs.find(
+    if (!hotelConfigs.length) return "-";
+    const config = hotelConfigs.find(
       (c) => String(c.hotel_id) === selectedHotelId,
     );
     if (!config?.seasonality_profile) return "-";
@@ -397,12 +380,34 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
   };
 
   // --- HANDLERS ---
-  const handleLoad = () => {
-    if (!selectedHotel.baseRoomTypeId) {
+  const handleLoad = async () => {
+    let baseRoomTypeId = selectedHotel.baseRoomTypeId;
+
+    // If config hasn't loaded yet, fetch it directly
+    if (!baseRoomTypeId) {
+      try {
+        const res = await fetch(`/api/sentinel/hotel-config/${selectedHotelId}`);
+        if (res.ok) {
+          const json = await res.json();
+          baseRoomTypeId = json.config?.base_room_type_id;
+          if (baseRoomTypeId) {
+            setHotelConfigs((prev) =>
+              prev.map((h) =>
+                String(h.hotel_id) === selectedHotelId
+                  ? { ...h, ...json.config }
+                  : h,
+              ),
+            );
+          }
+        }
+      } catch {}
+    }
+
+    if (!baseRoomTypeId) {
       toast.error("Hotel has no Base Room Type configured.");
       return;
     }
-    loadRates(selectedHotelId, selectedHotel.baseRoomTypeId);
+    loadRates(selectedHotelId, baseRoomTypeId);
   };
 
   const toggleRow = (row: string) => {
@@ -420,7 +425,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     gap: "6px",
     padding: "0px 10px",
     height: "24px",
-    borderRadius: "4px", // Fixed height
+    borderRadius: "4px",
     fontSize: "12px",
     border: "none",
     cursor: "pointer",
@@ -460,9 +465,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
-          <h1 style={styles.title}>Sentinel Rate Manager</h1>
+          <h1 style={styles.title}>My Rates</h1>
           <p style={styles.subtitle}>
-            Super Admin • 365-Day Rate Calendar • AI + Manual Control
+            View and manage your daily room rates
           </p>
         </div>
 
@@ -508,15 +513,15 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       padding: "4px",
                     }}
                   >
-                    {[...sentinelConfigs]
+                    {[...hotelConfigs]
                       .sort((a, b) => {
-                        const nameA = allHotels.find((h) => h.hotel_id === a.hotel_id)?.property_name || "";
-                        const nameB = allHotels.find((h) => h.hotel_id === b.hotel_id)?.property_name || "";
+                        const nameA = allHotels.find((h) => (h.hotel_id || h.property_id) === a.hotel_id)?.property_name || "";
+                        const nameB = allHotels.find((h) => (h.hotel_id || h.property_id) === b.hotel_id)?.property_name || "";
                         return nameA.localeCompare(nameB);
                       })
                       .map((c) => {
                         const h = allHotels.find(
-                          (ah) => ah.hotel_id === c.hotel_id,
+                          (ah) => (ah.hotel_id || ah.property_id) === c.hotel_id,
                         );
                         return (
                           <SelectItem
@@ -588,7 +593,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                 </Select>
               </div>
 
-              {/* [NEW] Pickup Window */}
+              {/* Pickup Window */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Pickup vs</label>
                 <Select
@@ -627,114 +632,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
             </div>
 
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              {/* Status Block Container */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "16px",
-                  alignItems: "center",
-                  marginRight: "8px",
-                }}
-              >
-                {/* Recent Jobs (Last 3 Pushes) */}
-                {recentJobs.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: "#9ca3af",
-                        textTransform: "uppercase",
-                        marginBottom: "2px",
-                      }}
-                    >
-                      Last 3 Pushes
-                    </div>
-                    {recentJobs.map((job, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          fontSize: "11px",
-                          color: idx === 0 ? "#e5e5e5" : "#6b7280",
-                          lineHeight: "1.2",
-                        }}
-                      >
-                        {format(new Date(job.latest_timestamp), "HH:mm dd/MM")}{" "}
-                        • {job.days_count} days
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* AI Status */}
-                {sentinelStatus && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: "#9ca3af",
-                        textTransform: "uppercase",
-                        marginBottom: "2px",
-                      }}
-                    >
-                      Last AI Run
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#e5e5e5" }}>
-                      {sentinelStatus.lastRun
-                        ? format(
-                            new Date(sentinelStatus.lastRun),
-                            "HH:mm dd/MM",
-                          )
-                        : "Never"}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color:
-                          sentinelStatus.changesLast24h > 0
-                            ? "#39BDF8"
-                            : "#6b7280",
-                      }}
-                    >
-                      {sentinelStatus.changesLast24h} updates (24h)
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Run Button - Only visible if data is loaded */}
-              {calendarData.length > 0 && (
-                <Button
-                  onClick={handleRunSentinel}
-                  disabled={isRunningSentinel || !selectedHotelId}
-                  variant="outline"
-                  className="h-9 text-sm"
-                  style={{
-                    borderColor: "#39BDF8",
-                    color: "#39BDF8",
-                    backgroundColor: "rgba(57, 189, 248, 0.05)",
-                  }}
-                >
-                  {isRunningSentinel ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <Zap className="w-4 h-4 mr-2" />
-                  )}
-                  Run Sentinel
-                </Button>
-              )}
-
               <Button
                 onClick={handleLoad}
                 disabled={isLoading || !selectedHotelId}
@@ -766,11 +663,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
               data={calendarData.map((d) => ({
                 ...d,
                 pmsRate: d.liveRate,
-                aiShadowRate: aiPredictions[d.date]?.rate, // Inject the Shadow Rate
+                aiShadowRate: aiPredictions[d.date]?.rate,
               }))}
             />
 
-            {/* [RESTORED] Grid Section (Unified Container) */}
+            {/* Grid Section (Unified Container) */}
             <div style={styles.gridSection}>
               {/* Header: Visibility + Submit */}
               <div
@@ -812,43 +709,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <Eye size={14} />
                           )}{" "}
                           <span>Occupancy</span>
-                        </button>
-                        <button
-                          onClick={() => toggleRow("curveTier")}
-                          style={getToggleButtonStyle(
-                            hiddenRows.has("curveTier"),
-                          )}
-                        >
-                          {hiddenRows.has("curveTier") ? (
-                            <EyeOff size={14} />
-                          ) : (
-                            <Eye size={14} />
-                          )}{" "}
-                          <span>Curve</span>
-                        </button>
-                        <button
-                          onClick={() => toggleRow("curveTarget")}
-                          style={getToggleButtonStyle(
-                            hiddenRows.has("curveTarget"),
-                          )}
-                        >
-                          {hiddenRows.has("curveTarget") ? (
-                            <EyeOff size={14} />
-                          ) : (
-                            <Eye size={14} />
-                          )}{" "}
-                          <span>Curve Target</span>
-                        </button>
-                        <button
-                          onClick={() => toggleRow("delta")}
-                          style={getToggleButtonStyle(hiddenRows.has("delta"))}
-                        >
-                          {hiddenRows.has("delta") ? (
-                            <EyeOff size={14} />
-                          ) : (
-                            <Eye size={14} />
-                          )}{" "}
-                          <span>Delta</span>
                         </button>
                         <button
                           onClick={() => toggleRow("minRate")}
@@ -919,43 +779,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                     </div>
                   </div>
                 </div>
-
-                {/* [NEW] Bulk Apply AI Button */}
-                <Button
-                  onClick={() => {
-                    // Filter for non-frozen days that actually have an AI prediction
-                    const validDates = visibleData
-                      .filter((d) => !d.isFrozen && aiPredictions[d.date])
-                      .map((d) => d.date);
-
-                    if (validDates.length === 0) {
-                      toast.info("No valid AI predictions in this view.");
-                      return;
-                    }
-
-                    bulkApplyAi(validDates);
-                    toast.success(
-                      `Applied AI rates for ${validDates.length} days.`,
-                    );
-                  }}
-                  variant="outline"
-                  style={{
-                    borderColor: "#39BDF8",
-                    color: "#39BDF8",
-                    backgroundColor: "rgba(57, 189, 248, 0.1)",
-                    marginRight: "12px",
-                  }}
-                  className="h-9 text-sm"
-                >
-                  <Zap className="w-4 h-4 mr-2" />
-                  Apply AI (
-                  {
-                    visibleData.filter(
-                      (d) => !d.isFrozen && aiPredictions[d.date],
-                    ).length
-                  }
-                  )
-                </Button>
 
                 {/* Submit Button */}
                 <Button
@@ -1242,261 +1065,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       )}
 
-                      {!hiddenRows.has("curveTier") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#e5e5e5" }}>Curve</span>
-                              <button
-                                onClick={() => toggleRow("curveTier")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                fontSize: "11px",
-                                padding: "12px 8px",
-                                color: "#e5e5e5",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              {getSeasonalityTier(day.date)}
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-
-                      {/* Curve Target Row */}
-                      {!hiddenRows.has("curveTarget") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <Target size={16} color="#3b82f6" /> Curve Target
-                              <button
-                                onClick={() => toggleRow("curveTarget")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => {
-                            const target = getPaceValue(day.date);
-                            return (
-                              <td
-                                key={day.date}
-                                style={{
-                                  borderRight: "1px solid #2a2a2a",
-                                  textAlign: "center",
-                                  fontSize: "13px",
-                                  padding: "12px 8px",
-                                  fontFamily: "monospace",
-                                  color: "#e5e5e5",
-                                  backgroundColor:
-                                    hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
-                                }}
-                              >
-                                {target !== null
-                                  ? `${Math.round(target)}%`
-                                  : "-"}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      )}
-
-                      {/* Delta Row */}
-                      {!hiddenRows.has("delta") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#e5e5e5" }}>Delta</span>
-                              <button
-                                onClick={() => toggleRow("delta")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => {
-                            const target = getPaceValue(day.date);
-                            const delta =
-                              target !== null ? day.occupancy - target : null;
-                            const color =
-                              delta !== null
-                                ? delta >= 0
-                                  ? "#10b981"
-                                  : "#ef4444"
-                                : "#4a4a48";
-                            const sign = delta !== null && delta > 0 ? "+" : "";
-                            return (
-                              <td
-                                key={day.date}
-                                style={{
-                                  borderRight: "1px solid #2a2a2a",
-                                  textAlign: "center",
-                                  fontSize: "13px",
-                                  padding: "12px 8px",
-                                  fontFamily: "monospace",
-                                  fontWeight: "bold",
-                                  color: color,
-                                  backgroundColor:
-                                    hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
-                                }}
-                              >
-                                {delta !== null
-                                  ? `${sign}${Math.round(delta)}%`
-                                  : "-"}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      )}
-
-                      {/* Data 1 Placeholder */}
-                      {!hiddenRows.has("data1") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#6b7280" }}>Data 1</span>{" "}
-                              <button
-                                onClick={() => toggleRow("data1")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                color: "#4a4a48",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              -
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-                      {/* Data 2 Placeholder */}
-                      {!hiddenRows.has("data2") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#6b7280" }}>Data 2</span>{" "}
-                              <button
-                                onClick={() => toggleRow("data2")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                color: "#4a4a48",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              -
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-
                       {!hiddenRows.has("minRate") && (
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
                           <td style={styles.tdSticky}>
@@ -1683,8 +1251,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             </div>
                           </td>
                           {visibleData.map((day) => {
-                            // [MODIFIED] Calculate on-the-fly from PMS Rate (Data 3)
-                            // Logic: PMS Rate * Multiplier * Discounts (Standard Stack)
                             let c = 0;
                             if (day.liveRate > 0 && calcState) {
                               c = calculateSellRate(
@@ -1741,7 +1307,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </td>
                         {visibleData.map((day) => {
                           const pred = aiPredictions[day.date];
-                          // [FIX] Use Hook State
                           const isApplied =
                             aiApprovedPending.has(day.date) ||
                             day.source === "AI_SUGGESTED";
@@ -1810,8 +1375,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (pred) {
-                                        // [FIX] Use Hook Function
-                                        applyAiPrediction(day.date, pred.rate);
+                                        // Apply AI prediction as a manual override
+                                        setOverride(day.date, pred.rate);
                                         toast.success(
                                           `AI Rate £${pred.rate} applied`,
                                         );
@@ -1953,7 +1518,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     onBlur={(e) => {
                                       const v = parseFloat(e.target.value);
                                       if (!isNaN(v) && v > 0 && calcState) {
-                                        // Reverse Math
                                         const reqOverride =
                                           calculateRequiredOverride(
                                             v,
@@ -1963,11 +1527,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                             { includeTargeting: false },
                                           );
 
-                                        // Round to integer (no decimals) for the Override (Base)
                                         const roundedOverride =
                                           Math.round(reqOverride);
 
-                                        // Enforce Min Rate on the resulting Base
                                         if (
                                           day.guardrailMin > 0 &&
                                           roundedOverride < day.guardrailMin
@@ -2056,7 +1618,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   onBlur={(e) => {
                                     const v = parseFloat(e.target.value);
                                     if (!isNaN(v) && v > 0) {
-                                      // [NEW] Enforce Min Rate Guardrail
                                       if (
                                         day.guardrailMin > 0 &&
                                         v < day.guardrailMin
@@ -2080,12 +1641,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     if (e.key === "Tab") {
                                       e.preventDefault();
 
-                                      // 1. Save current value manually before switching
                                       const v = parseFloat(
                                         e.currentTarget.value,
                                       );
                                       if (!isNaN(v) && v > 0) {
-                                        // [NEW] Enforce Min Rate Guardrail (Tab)
                                         if (
                                           day.guardrailMin > 0 &&
                                           v < day.guardrailMin
@@ -2104,7 +1663,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         clearOverride(day.date);
                                       }
 
-                                      // 2. Find and activate next cell
                                       const currIdx = visibleData.findIndex(
                                         (d) => d.date === day.date,
                                       );

@@ -15,6 +15,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarWidget } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import {
@@ -24,7 +30,7 @@ import {
   CheckCircle2,
   Info,
   Database,
-  Calendar,
+  Calendar as CalendarIcon,
   BarChart3,
   Settings2,
   Building2,
@@ -35,6 +41,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 // Props interface to accept the propertyId from App.tsx
 interface CloudbedsAPIExplorerProps {
@@ -699,21 +706,29 @@ export function CloudbedsAPIExplorer({
                             gap: "6px",
                           }}
                         >
-                          <Calendar className="w-3.5 h-3.5" />
+                          <CalendarIcon className="w-3.5 h-3.5" />
                           Start Date
                         </label>
-                        <Input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          style={{
-                            backgroundColor: "#262626",
-                            borderColor: "#3a3a35",
-                            color: "#e5e5e5",
-                            height: "36px",
-                            fontSize: "14px",
-                          }}
-                        />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="justify-start text-left h-9"
+                              style={{
+                                backgroundColor: "#0f0f0f",
+                                border: "1px solid #2a2a2a",
+                                color: "#e5e5e5",
+                                fontSize: "13px",
+                              }}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {startDate ? format(new Date(startDate), "dd MMM yyyy") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                            <CalendarWidget mode="single" selected={startDate ? new Date(startDate) : undefined} onSelect={(d) => d && setStartDate(format(d, "yyyy-MM-dd"))} initialFocus />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div>
                         <label
@@ -726,21 +741,29 @@ export function CloudbedsAPIExplorer({
                             gap: "6px",
                           }}
                         >
-                          <Calendar className="w-3.5 h-3.5" />
+                          <CalendarIcon className="w-3.5 h-3.5" />
                           End Date
                         </label>
-                        <Input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          style={{
-                            backgroundColor: "#262626",
-                            borderColor: "#3a3a35",
-                            color: "#e5e5e5",
-                            height: "36px",
-                            fontSize: "14px",
-                          }}
-                        />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="justify-start text-left h-9"
+                              style={{
+                                backgroundColor: "#0f0f0f",
+                                border: "1px solid #2a2a2a",
+                                color: "#e5e5e5",
+                                fontSize: "13px",
+                              }}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {endDate ? format(new Date(endDate), "dd MMM yyyy") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                            <CalendarWidget mode="single" selected={endDate ? new Date(endDate) : undefined} onSelect={(d) => d && setEndDate(format(d, "yyyy-MM-dd"))} initialFocus />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
 

@@ -1,6 +1,10 @@
 // web/src/features/reports/components/ReportControls.tsx
 
-import { Play, Loader2 } from 'lucide-react';
+import { Play, Loader2, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
 
 interface ReportControlsProps {
   startDate: string;
@@ -122,23 +126,75 @@ export function ReportControls({
         {/* Start Date */}
         <div style={{ flex: 1, minWidth: '150px' }}>
           <label style={labelStyle}>Start Date</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            style={inputStyle}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left h-9"
+                style={{
+                  backgroundColor: "#0f0f0f",
+                  border: "1px solid #2a2a2a",
+                  color: "#e5e5e5",
+                  fontSize: "13px",
+                }}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {startDate ? format(new Date(startDate), "dd MMM yyyy") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto p-0"
+              align="start"
+              style={{
+                backgroundColor: "#1a1a18",
+                border: "1px solid #2a2a2a",
+              }}
+            >
+              <Calendar
+                mode="single"
+                selected={startDate ? new Date(startDate) : undefined}
+                onSelect={(d) => d && setStartDate(format(d, "yyyy-MM-dd"))}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* End Date */}
         <div style={{ flex: 1, minWidth: '150px' }}>
           <label style={labelStyle}>End Date</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            style={inputStyle}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left h-9"
+                style={{
+                  backgroundColor: "#0f0f0f",
+                  border: "1px solid #2a2a2a",
+                  color: "#e5e5e5",
+                  fontSize: "13px",
+                }}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDate ? format(new Date(endDate), "dd MMM yyyy") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto p-0"
+              align="start"
+              style={{
+                backgroundColor: "#1a1a18",
+                border: "1px solid #2a2a2a",
+              }}
+            >
+              <Calendar
+                mode="single"
+                selected={endDate ? new Date(endDate) : undefined}
+                onSelect={(d) => d && setEndDate(format(d, "yyyy-MM-dd"))}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Granularity */}

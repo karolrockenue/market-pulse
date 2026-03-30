@@ -27,7 +27,9 @@ import {
   type PropertyTier,
 } from "./components/PropertyClassificationModal";
 
+import { CompetitiveData } from "./features/market-intel/components/CompetitiveData";
 import { SentinelHub } from "./features/sentinel/SentinelHub";
+import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/HotelRateWindow";
 
 import { LandingPage } from "./components/LandingPage";
 // [NEW] Import the legal page components
@@ -713,6 +715,28 @@ export default function App() {
                 </p>
               </div>
             ))}
+
+          {activeView === "competitive-intel" && (
+            <CompetitiveData
+              propertyId={property}
+              currencySymbol={
+                currencyCode === "GBP"
+                  ? "£"
+                  : currencyCode === "EUR"
+                    ? "€"
+                    : "$"
+              }
+              hotelCategory={selectedPropertyDetails?.category || null}
+              properties={properties}
+              onPropertyChange={setProperty}
+              onNavigate={handleViewChange}
+              budgetExists={false}
+            />
+          )}
+
+          {activeView === "hotelRates" && (
+            <HotelRateWindow allHotels={properties} userHotels={properties} />
+          )}
 
           {/* Sentinel Domain Hub */}
           {(activeView === "sentinel" ||

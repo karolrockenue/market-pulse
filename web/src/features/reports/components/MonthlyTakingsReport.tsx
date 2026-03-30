@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   Loader2,
-  Calendar,
+  Calendar as CalendarIcon,
   RefreshCw,
   Filter,
   CheckSquare,
@@ -10,7 +10,10 @@ import {
   Save,
   Clock,
 } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -362,31 +365,47 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
               </Button>
 
               <div className="flex items-center gap-4 bg-[#1A1A1A] p-2 rounded-lg border border-[#2a2a2a]">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    background: "transparent",
-                    color: "white",
-                    border: "none",
-                    outline: "none",
-                    fontSize: "13px",
-                  }}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left h-9"
+                      style={{
+                        backgroundColor: "#0f0f0f",
+                        border: "1px solid #2a2a2a",
+                        color: "#e5e5e5",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(new Date(startDate), "dd MMM yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                    <Calendar mode="single" selected={startDate ? new Date(startDate) : undefined} onSelect={(d) => d && setStartDate(format(d, "yyyy-MM-dd"))} initialFocus />
+                  </PopoverContent>
+                </Popover>
                 <span style={{ color: "#6b7280" }}>to</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    background: "transparent",
-                    color: "white",
-                    border: "none",
-                    outline: "none",
-                    fontSize: "13px",
-                  }}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left h-9"
+                      style={{
+                        backgroundColor: "#0f0f0f",
+                        border: "1px solid #2a2a2a",
+                        color: "#e5e5e5",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(new Date(endDate), "dd MMM yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                    <Calendar mode="single" selected={endDate ? new Date(endDate) : undefined} onSelect={(d) => d && setEndDate(format(d, "yyyy-MM-dd"))} initialFocus />
+                  </PopoverContent>
+                </Popover>
                 <Button
                   onClick={loadData}
                   size="sm"

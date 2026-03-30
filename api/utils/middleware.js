@@ -203,6 +203,52 @@ const requireManagePermission = (req, res, next) => {
   });
 };
 
+/**
+ * Middleware: requireHotelRateAccess
+ * Grants access to admins/super_admins unconditionally.
+ * For owner/user roles, verifies the user has access to the specified hotel
+ * via the user_properties table.
+ */
+async function requireHotelRateAccess(req, res, next) {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+
+  const role = req.session.role;
+
+  // Admins and super_admins get unconditional access
+  if (role === "admin" || role === "super_admin") {
+    return next();
+  }
+
+  // Owners and users must prove access to the specific hotel
+  if (role === "owner" || role === "user") {
+    const hotelId = req.body.hotelId || req.params.hotelId;
+    if (!hotelId) {
+      return res.status(400).json({ error: "hotelId is required." });
+    }
+
+    try {
+      const result = await pgPool.query(
+        "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3",
+        [req.user.cloudbedsId, req.user.internalId, hotelId],
+      );
+
+      if (result.rows.length > 0) {
+        return next();
+      }
+
+      return res.status(403).json({ error: "Access denied" });
+    } catch (error) {
+      console.error("Error in requireHotelRateAccess middleware:", error);
+      return res.status(500).json({ error: "Internal server error during access check." });
+    }
+  }
+
+  // All other roles are denied
+  return res.status(403).json({ error: "Access denied" });
+}
+
 module.exports = {
   requireUserApi,
   requireAdminApi, // Export the new permissive middleware
@@ -210,4 +256,5 @@ module.exports = {
   requirePageLogin,
   requireAccountOwner,
   requireManagePermission,
+  requireHotelRateAccess,
 };

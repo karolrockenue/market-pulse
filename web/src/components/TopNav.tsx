@@ -12,6 +12,7 @@ import {
   Home,
   TerminalSquare,
   DollarSign,
+  Trophy,
 } from "lucide-react";
 import {
   Select,
@@ -86,12 +87,14 @@ export function TopNav({
       "reports",
       "demand-pace",
       "settings",
+      "hotelRates",
       "sentinel",
       "sentinel-group",
       "riskOverview",
       "rateManager",
       "propertyHub",
       "shadowfax",
+      "competitive-intel",
     ];
 
     if (property === "ALL" && singlePropertyViews.includes(view)) {
@@ -121,7 +124,14 @@ export function TopNav({
       icon: BarChart3,
       isAdmin: false,
     },
+    {
+      label: "Competitive Intel",
+      value: "competitive-intel",
+      icon: Trophy,
+      isAdmin: false,
+    },
     { label: "Settings", value: "settings", icon: Settings, isAdmin: false },
+    { label: "My Rates", value: "hotelRates", icon: DollarSign, isAdmin: false },
     {
       label: "Sentinel",
       value: "sentinel-group",

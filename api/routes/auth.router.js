@@ -486,15 +486,11 @@ router.post("/mews/validate", async (req, res) => {
   try {
     // Check if a user with this email already exists in the database
     const existingUser = await pgPool.query(
-      "SELECT user_id FROM users WHERE email = $1",
+      "SELECT user_id, cloudbeds_user_id, role FROM users WHERE email = $1",
       [email]
     );
-    if (existingUser.rows.length > 0) {
-      // Use status 409 Conflict for an existing resource
-      return res
-        .status(409)
-        .json({ message: "An account with this email already exists." });
-    }
+    const userExists = existingUser.rows.length > 0;
+    const existingUserData = userExists ? existingUser.rows[0] : null;
 
     // --- FIX: Combine the server's ClientToken with the user's AccessToken ---
     // --- FIX: Combine the server's ClientToken with the user's AccessToken ---
@@ -528,6 +524,8 @@ router.post("/mews/validate", async (req, res) => {
       // Respond to the frontend with the list of hotels
       return res.status(200).json({
         tokenType: "portfolio",
+        userExists,
+        existingUserId: existingUserData?.cloudbeds_user_id || null,
         properties: portfolioHotels, // Expects an array of {id, name} objects
       });
     } else {
@@ -535,6 +533,8 @@ router.post("/mews/validate", async (req, res) => {
       // Respond to the frontend with the single hotel's details.
       return res.status(200).json({
         tokenType: "single",
+        userExists,
+        existingUserId: existingUserData?.cloudbeds_user_id || null,
         properties: [
           {
             id: propertyDetails.id,
@@ -585,45 +585,72 @@ router.post("/mews/create", async (req, res) => {
       clientToken: process.env.MEWS_CLIENT_TOKEN, // Also store the client token used
     };
 
-    // --- 2. Create the User ---
-    // --- 2. Create the User ---
-    const userResult = await client.query(
-      `INSERT INTO users (email, first_name, last_name, role, pms_type)
-   VALUES ($1, $2, $3, 'owner', 'mews')
-   RETURNING user_id`,
-      [email, firstName, lastName]
+    // --- 2. Create the User (or use existing) ---
+    const existingUser = await client.query(
+      "SELECT user_id, cloudbeds_user_id, role FROM users WHERE email = $1",
+      [email]
     );
-    const newUserIdInt = userResult.rows[0].user_id; // This is the integer ID
 
-    // --- NEW: Generate and save a unique string ID for the session ---
-    const newUserStringId = `mews-${newUserIdInt}-${crypto
-      .randomBytes(4)
-      .toString("hex")}`;
-    await client.query(
-      `UPDATE users SET cloudbeds_user_id = $1 WHERE user_id = $2`,
-      [newUserStringId, newUserIdInt]
-    );
-    // --- END NEW ---
+    let newUserIdInt;
+    let newUserStringId;
+
+    if (existingUser.rows.length > 0) {
+      // User already exists — reuse their account
+      newUserIdInt = existingUser.rows[0].user_id;
+      newUserStringId = existingUser.rows[0].cloudbeds_user_id;
+      console.log(`[Mews Onboarding] Linking to existing user ${newUserIdInt} (${email})`);
+    } else {
+      // Create new user
+      const userResult = await client.query(
+        `INSERT INTO users (email, first_name, last_name, role, pms_type)
+         VALUES ($1, $2, $3, 'owner', 'mews')
+         RETURNING user_id`,
+        [email, firstName, lastName]
+      );
+      newUserIdInt = userResult.rows[0].user_id;
+
+      newUserStringId = `mews-${newUserIdInt}-${crypto
+        .randomBytes(4)
+        .toString("hex")}`;
+      await client.query(
+        `UPDATE users SET cloudbeds_user_id = $1 WHERE user_id = $2`,
+        [newUserStringId, newUserIdInt]
+      );
+      console.log(`[Mews Onboarding] Created new user ${newUserIdInt} (${email})`);
+    }
 
     const newHotelIds = [];
 
     // --- 3. Create Hotels and Link to User ---
     for (const property of selectedProperties) {
-      // ... (rest of the loop is the same)
-      const hotelResult = await client.query(
-        `INSERT INTO hotels (pms_property_id, property_name, pms_type)
-     VALUES ($1, $2, 'mews')
-     RETURNING hotel_id`,
-        [property.id, property.name]
+      // Check if this Mews property is already onboarded
+      const existingHotel = await client.query(
+        "SELECT hotel_id FROM hotels WHERE pms_property_id = $1 AND pms_type = 'mews'",
+        [property.id]
       );
-      const newHotelId = hotelResult.rows[0].hotel_id;
+
+      let newHotelId;
+      if (existingHotel.rows.length > 0) {
+        // Hotel already exists — just link user to it
+        newHotelId = existingHotel.rows[0].hotel_id;
+        console.log(`[Mews Onboarding] Hotel ${newHotelId} already exists for enterprise ${property.id}, linking user`);
+      } else {
+        const hotelResult = await client.query(
+          `INSERT INTO hotels (pms_property_id, property_name, pms_type)
+           VALUES ($1, $2, 'mews')
+           RETURNING hotel_id`,
+          [property.id, property.name]
+        );
+        newHotelId = hotelResult.rows[0].hotel_id;
+      }
       newHotelIds.push(newHotelId);
 
-      // Link the user to the new property
+      // Link the user to the property (skip if already linked)
       await client.query(
         `INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
-     VALUES ($1, $2, $3, 'syncing')`,
-        [newUserStringId, newHotelId, storedCredentials] // <-- FIX: Use the new string ID here
+         VALUES ($1, $2, $3, 'syncing')
+         ON CONFLICT (user_id, property_id) DO NOTHING`,
+        [newUserStringId, newHotelId, storedCredentials]
       );
     }
 
@@ -639,8 +666,8 @@ router.post("/mews/create", async (req, res) => {
           .status(500)
           .json({ message: "Could not log you in automatically." });
       }
-      req.session.userId = newUserStringId; // <-- FIX: Use the new string ID for the session
-      req.session.role = "owner";
+      req.session.userId = newUserStringId;
+      req.session.role = existingUser.rows.length > 0 ? existingUser.rows[0].role : "owner";
       req.session.save();
 
       // --- 5. Asynchronously Trigger Initial Sync for each new property ---

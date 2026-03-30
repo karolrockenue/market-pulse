@@ -63,7 +63,139 @@ router.all("/process-queue", async (req, res) => {
 });
 
 // =============================================================================
-// 2. ADMIN MIDDLEWARE (Protects all routes below this line)
+// 2. HOTEL USER ENDPOINTS (Scoped Access - before admin middleware)
+// =============================================================================
+const { requireHotelRateAccess } = require("../utils/middleware");
+
+// GET /api/sentinel/hotel-rates/:hotelId - Rate calendar for hotel user
+router.get("/hotel-rates/:hotelId", requireHotelRateAccess, async (req, res) => {
+  const { hotelId } = req.params;
+  try {
+    const configRes = await db.query(
+      "SELECT base_room_type_id FROM sentinel_configurations WHERE hotel_id = $1",
+      [hotelId]
+    );
+    if (!configRes.rows.length) return res.status(404).json({ error: "No configuration found" });
+    const roomTypeId = configRes.rows[0].base_room_type_id;
+
+    // Fetch from sentinel_rates_calendar + live PMS rates
+    const calendarRes = await db.query(
+      `SELECT stay_date, rate, source FROM sentinel_rates_calendar
+       WHERE hotel_id = $1 AND room_type_id = $2 AND stay_date >= CURRENT_DATE
+       ORDER BY stay_date`,
+      [hotelId, roomTypeId]
+    );
+
+    // Also get AI predictions
+    const aiRes = await db.query(
+      `SELECT DISTINCT ON (stay_date) stay_date, suggested_rate, confidence_score, is_applied
+       FROM sentinel_ai_predictions
+       WHERE hotel_id = $1 AND stay_date >= CURRENT_DATE
+       ORDER BY stay_date ASC, created_at DESC`,
+      [hotelId]
+    );
+
+    res.json({
+      success: true,
+      calendar: calendarRes.rows,
+      predictions: aiRes.rows,
+      baseRoomTypeId: roomTypeId
+    });
+  } catch (err) {
+    console.error("[Hotel Rates] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/sentinel/hotel-config/:hotelId - Minimal read-only config
+router.get("/hotel-config/:hotelId", requireHotelRateAccess, async (req, res) => {
+  const { hotelId } = req.params;
+  try {
+    const { rows } = await db.query(
+      `SELECT base_room_type_id, sentinel_enabled, rate_freeze_period,
+              guardrail_min, guardrail_max, monthly_min_rates
+       FROM sentinel_configurations WHERE hotel_id = $1`,
+      [hotelId]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Not found" });
+    res.json({ success: true, config: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sentinel/hotel-overrides - Submit rate overrides (hotel user)
+router.post("/hotel-overrides", requireHotelRateAccess, async (req, res) => {
+  const { hotelId, overrides } = req.body;
+  if (!hotelId || !overrides?.length) {
+    return res.status(400).json({ error: "hotelId and overrides required" });
+  }
+  try {
+    // Auto-resolve pmsPropertyId and baseRoomTypeId
+    const hotelRes = await db.query(
+      "SELECT pms_property_id FROM hotels WHERE hotel_id = $1", [hotelId]
+    );
+    const configRes = await db.query(
+      "SELECT base_room_type_id FROM sentinel_configurations WHERE hotel_id = $1", [hotelId]
+    );
+    const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
+    const roomTypeId = configRes.rows[0]?.base_room_type_id;
+    if (!pmsPropertyId || !roomTypeId) {
+      return res.status(400).json({ error: "Hotel not properly configured" });
+    }
+
+    const changedBy = req.user?.internalId || req.user?.cloudbedsId || "unknown";
+
+    const batchPayload = await sentinelService.buildOverridePayload(
+      hotelId, pmsPropertyId, roomTypeId, overrides, "HOTEL_USER", changedBy
+    );
+
+    if (batchPayload?.length > 0) {
+      const CHUNK_SIZE = 30;
+      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
+        const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
+        await db.query(
+          `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
+          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
+        );
+      }
+    }
+
+    res.json({ success: true, message: `${batchPayload?.length || 0} rate changes queued.` });
+  } catch (err) {
+    console.error("[Hotel Overrides] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sentinel/hotel-unlock - Re-enable AI for selected dates
+router.post("/hotel-unlock", requireHotelRateAccess, async (req, res) => {
+  const { hotelId, dates } = req.body;
+  if (!hotelId || !dates?.length) {
+    return res.status(400).json({ error: "hotelId and dates required" });
+  }
+  try {
+    const configRes = await db.query(
+      "SELECT base_room_type_id FROM sentinel_configurations WHERE hotel_id = $1", [hotelId]
+    );
+    const roomTypeId = configRes.rows[0]?.base_room_type_id;
+
+    await db.query(
+      `UPDATE sentinel_rates_calendar
+       SET source = 'AI', changed_by = $4, last_updated_at = NOW()
+       WHERE hotel_id = $1 AND room_type_id = $2 AND stay_date = ANY($3::date[])
+         AND source IN ('MANUAL', 'HOTEL_USER')`,
+      [hotelId, roomTypeId, dates, req.user?.internalId || "unknown"]
+    );
+
+    res.json({ success: true, message: `${dates.length} date(s) unlocked for AI.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =============================================================================
+// 3. ADMIN MIDDLEWARE (Protects all routes below this line)
 // =============================================================================
 router.use(requireAdminApi);
 // ... existing imports ...

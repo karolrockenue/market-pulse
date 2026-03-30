@@ -10,8 +10,10 @@ import {
   Check,
   Loader2,
   Trash2,
-  Calendar,
+  Calendar as CalendarIcon,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   Card,
   CardContent,
@@ -2115,7 +2117,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                       }}
                                       className="hover:bg-[#39BDF8]/10"
                                     >
-                                      <Calendar className="w-4 h-4 mr-2" />
+                                      <CalendarIcon className="w-4 h-4 mr-2" />
                                       Edit
                                     </Button>
                                   </span>
@@ -3392,16 +3394,46 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 >
                   Start Date
                 </Label>
-                <Input
-                  type="date"
-                  value={newEventStartDate}
-                  onChange={(e) => setNewEventStartDate(e.target.value)}
-                  style={{
-                    backgroundColor: "#0f0f0f",
-                    borderColor: "#2a2a2a",
-                    color: "#e5e5e5",
-                  }}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left h-9 w-full"
+                      style={{
+                        backgroundColor: "#0f0f0f",
+                        border: "1px solid #2a2a2a",
+                        color: "#e5e5e5",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newEventStartDate
+                        ? format(new Date(newEventStartDate), "dd MMM yyyy")
+                        : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-auto p-0"
+                    align="start"
+                    style={{
+                      backgroundColor: "#1a1a18",
+                      border: "1px solid #2a2a2a",
+                    }}
+                  >
+                    <Calendar
+                      mode="single"
+                      selected={
+                        newEventStartDate
+                          ? new Date(newEventStartDate)
+                          : undefined
+                      }
+                      onSelect={(d) =>
+                        d && setNewEventStartDate(format(d, "yyyy-MM-dd"))
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label
@@ -3414,16 +3446,46 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 >
                   End Date
                 </Label>
-                <Input
-                  type="date"
-                  value={newEventEndDate}
-                  onChange={(e) => setNewEventEndDate(e.target.value)}
-                  style={{
-                    backgroundColor: "#0f0f0f",
-                    borderColor: "#2a2a2a",
-                    color: "#e5e5e5",
-                  }}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left h-9 w-full"
+                      style={{
+                        backgroundColor: "#0f0f0f",
+                        border: "1px solid #2a2a2a",
+                        color: "#e5e5e5",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newEventEndDate
+                        ? format(new Date(newEventEndDate), "dd MMM yyyy")
+                        : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-auto p-0"
+                    align="start"
+                    style={{
+                      backgroundColor: "#1a1a18",
+                      border: "1px solid #2a2a2a",
+                    }}
+                  >
+                    <Calendar
+                      mode="single"
+                      selected={
+                        newEventEndDate
+                          ? new Date(newEventEndDate)
+                          : undefined
+                      }
+                      onSelect={(d) =>
+                        d && setNewEventEndDate(format(d, "yyyy-MM-dd"))
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
