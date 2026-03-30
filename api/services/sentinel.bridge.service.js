@@ -565,7 +565,7 @@ class SentinelBridgeService {
                   `
                   INSERT INTO sentinel_price_history (hotel_id, room_type_id, stay_date, old_price, new_price, source, created_at)
                   SELECT 
-                      t.hid, t.rid::int, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
+                      t.hid, t.rid, t.sdate, c.rate, t.new_price, 'SENTINEL', NOW()
                   FROM UNNEST($1::int[], $2::text[], $3::date[], $4::numeric[]) AS t(hid, rid, sdate, new_price)
                   JOIN sentinel_rates_calendar c 
                       ON c.hotel_id = t.hid 
