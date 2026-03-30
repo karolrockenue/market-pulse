@@ -143,6 +143,14 @@ async function buildOverridePayload(
   const { rate_id_map: rateIdMap, room_differentials: roomDifferentials } =
     config;
 
+  // Detect PMS type — Mews shares one rate across all categories, so differentials
+  // must NOT be pushed as separate rate writes (last write overwrites the base).
+  const pmsTypeRes = await db.query(
+    "SELECT pms_type FROM hotels WHERE hotel_id = $1",
+    [hotelId],
+  );
+  const isMews = pmsTypeRes.rows[0]?.pms_type === "mews";
+
   if (!rateIdMap)
     throw new Error("Rate ID Map is missing. Please re-sync the hotel.");
 
@@ -224,7 +232,8 @@ async function buildOverridePayload(
     }
 
     // D. Calculate Differentials (Derived Rooms)
-    if (roomDifferentials && Array.isArray(roomDifferentials)) {
+    // Skip for Mews — all categories share one rate ID, differentials handled by Mews CategoryAdjustments
+    if (!isMews && roomDifferentials && Array.isArray(roomDifferentials)) {
       for (const rule of roomDifferentials) {
         // Skip invalid rules or rules targeting the base room itself
         if (!rule || rule.value === undefined || rule.roomTypeId === roomTypeId)

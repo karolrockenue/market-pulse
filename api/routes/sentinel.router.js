@@ -322,6 +322,10 @@ router.post("/recalculate", async (req, res) => {
     const baseRoomTypeId = config.base_room_type_id;
     const differentials = config.room_differentials || [];
     const pmsRoomTypes = config.pms_room_types?.data || [];
+
+    // Detect Mews — skip differential room loops (all categories share one rate ID)
+    const pmsTypeRes = await db.query("SELECT pms_type FROM hotels WHERE hotel_id = $1", [hotelId]);
+    const isMewsHotel = pmsTypeRes.rows[0]?.pms_type === "mews";
     const pmsRatePlans = config.pms_rate_plans?.data || [];
 
     if (!baseRoomTypeId) {
@@ -370,8 +374,12 @@ router.post("/recalculate", async (req, res) => {
     // 3. Build Master Payload
     const allOverrides = [];
 
-    // Loop through EVERY room type
-    for (const room of pmsRoomTypes) {
+    // Loop through room types — for Mews, only process base room (shared rate ID)
+    const roomsToProcess = isMewsHotel
+      ? pmsRoomTypes.filter((r) => String(r.roomTypeID) === String(baseRoomTypeId))
+      : pmsRoomTypes;
+
+    for (const room of roomsToProcess) {
       const roomTypeId = room.roomTypeID;
       let isBase = String(roomTypeId) === String(baseRoomTypeId);
       let diffRule = differentials.find(
@@ -385,8 +393,8 @@ router.post("/recalculate", async (req, res) => {
 
         let finalRate = parseFloat(day.finalRate);
 
-        // Apply Differential
-        if (!isBase && diffRule) {
+        // Apply Differential (skip for Mews — handled by CategoryAdjustments)
+        if (!isMewsHotel && !isBase && diffRule) {
           const val = parseFloat(diffRule.value);
           if (diffRule.operator === "+") {
             finalRate = finalRate * (1 + val / 100);
