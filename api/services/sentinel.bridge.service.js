@@ -203,7 +203,7 @@ class SentinelBridgeService {
      INSERT INTO sentinel_ai_predictions 
           (hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version, is_applied, created_at)
          SELECT * FROM UNNEST(
-            $1::int[], $2::int[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
+            $1::int[], $2::text[], $3::date[], $4::numeric[], $5::numeric[], $6::text[], $7::text[], $8::boolean[], $9::timestamptz[]
           )
           ON CONFLICT (hotel_id, room_type_id, stay_date)
           DO UPDATE SET 
