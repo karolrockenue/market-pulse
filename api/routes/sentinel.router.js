@@ -1228,14 +1228,21 @@ router.post("/sync", async (req, res) => {
             const queryText = `
                INSERT INTO sentinel_rates_calendar (hotel_id, room_type_id, stay_date, rate, source, last_updated_at)
                VALUES ${rateValues.join(", ")}
-               ON CONFLICT (hotel_id, room_type_id, stay_date) 
-               DO UPDATE SET 
-                 source = CASE 
-                   WHEN sentinel_rates_calendar.rate = EXCLUDED.rate THEN sentinel_rates_calendar.source 
-                   ELSE 'SYNC' 
+               ON CONFLICT (hotel_id, room_type_id, stay_date)
+               DO UPDATE SET
+                 source = CASE
+                   WHEN sentinel_rates_calendar.source IN ('SENTINEL', 'LOCKED', 'MANUAL') THEN sentinel_rates_calendar.source
+                   WHEN sentinel_rates_calendar.rate = EXCLUDED.rate THEN sentinel_rates_calendar.source
+                   ELSE 'SYNC'
                  END,
-                 rate = EXCLUDED.rate, 
-                 last_updated_at = NOW()
+                 rate = CASE
+                   WHEN sentinel_rates_calendar.source IN ('SENTINEL', 'LOCKED', 'MANUAL') THEN sentinel_rates_calendar.rate
+                   ELSE EXCLUDED.rate
+                 END,
+                 last_updated_at = CASE
+                   WHEN sentinel_rates_calendar.source IN ('SENTINEL', 'LOCKED', 'MANUAL') THEN sentinel_rates_calendar.last_updated_at
+                   ELSE NOW()
+                 END
             `;
             await db.query(queryText, rateParams);
             console.log(
