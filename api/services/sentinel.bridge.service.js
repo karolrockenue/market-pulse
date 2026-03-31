@@ -660,7 +660,6 @@ class SentinelBridgeService {
       client.release();
     }
   }
-}
 
   /**
    * [RETRY] Sweep unapplied predictions and re-process them through autonomy gates.

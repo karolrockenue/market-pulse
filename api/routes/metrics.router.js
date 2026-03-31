@@ -330,6 +330,32 @@ router.get("/market-context", requireUserApi, async (req, res) => {
       marketRooms = parseInt(mktRes.rows[0].rooms, 10);
     }
 
+    // Breakdown by category (quality tier) in the same city
+    let byTier = [];
+    if (city) {
+      const tierRes = await pgPool.query(
+        "SELECT category AS tier, COUNT(*) AS cnt FROM hotels WHERE city = $1 AND category IS NOT NULL GROUP BY category ORDER BY cnt DESC",
+        [city],
+      );
+      byTier = tierRes.rows.map((r) => ({
+        tier: r.tier,
+        count: parseInt(r.cnt, 10) * 2,
+      }));
+    }
+
+    // Breakdown by neighborhood in the same city
+    let byNeighborhood = [];
+    if (city) {
+      const nbrRes = await pgPool.query(
+        "SELECT neighborhood AS area, COUNT(*) AS cnt FROM hotels WHERE city = $1 AND neighborhood IS NOT NULL AND neighborhood != '' GROUP BY neighborhood ORDER BY cnt DESC",
+        [city],
+      );
+      byNeighborhood = nbrRes.rows.map((r) => ({
+        area: r.area,
+        count: parseInt(r.cnt, 10) * 2,
+      }));
+    }
+
     // Presentation multiplier — doubles counts to reflect broader market presence.
     // See Blueprint.md §7.0 for context. Remove when real market data is available.
     res.json({
@@ -337,6 +363,8 @@ router.get("/market-context", requireUserApi, async (req, res) => {
       segmentRooms: segmentRooms * 2,
       marketHotels: marketHotels * 2,
       marketRooms: marketRooms * 2,
+      byTier,
+      byNeighborhood,
     });
   } catch (error) {
     console.error("Error in /market-context:", error);

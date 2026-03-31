@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, CSSProperties } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, TrendingDown, Trophy, AlertTriangle, Target, Zap, Loader2, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, AlertTriangle, Target, Zap, Loader2, ChevronDown, Building2 } from 'lucide-react';
 import { format, addDays, addMonths } from 'date-fns';
 import { DatePickerCalendar } from '@/components/ui/date-picker';
 import {
@@ -83,7 +83,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
   const [ranking, setRanking] = useState<any>({ occupancy: {}, adr: {}, revpar: {} });
 
   // Market context state
-  const [marketContext, setMarketContext] = useState<{ segmentHotels: number; segmentRooms: number; marketHotels: number; marketRooms: number } | null>(null);
+  const [marketContext, setMarketContext] = useState<{ segmentHotels: number; segmentRooms: number; marketHotels: number; marketRooms: number; byTier?: { tier: string; count: number }[]; byNeighborhood?: { area: string; count: number }[] } | null>(null);
 
   useEffect(() => {
     if (!propertyId || propertyId === 'ALL') { setMarketContext(null); return; }
@@ -812,283 +812,537 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
           );
         })()}
 
-        {/* Pacing Chart */}
-        <div style={styles.chartCard}>
-          <div style={styles.chartHeader}>
-            <div>
-              <div style={styles.chartTitle}>Forward Booking Pace</div>
-              <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px' }}>
-                Track your competitive position over time
-              </div>
-            </div>
-            <div style={styles.chartControls}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showOccupancy}
-                  onChange={(e) => setShowOccupancy(e.target.checked)}
-                  style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                />
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>Occupancy</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showADR}
-                  onChange={(e) => setShowADR(e.target.checked)}
-                  style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                />
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>ADR</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showRevPAR}
-                  onChange={(e) => setShowRevPAR(e.target.checked)}
-                  style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                />
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>RevPAR</span>
-              </label>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#6b7280', gap: '8px' }}>
-              <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
-              <span style={{ fontSize: '13px' }}>Loading data...</span>
-            </div>
-          ) : pacingData.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#6b7280', fontSize: '13px' }}>
-              No data available for this date range
-            </div>
-          ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={pacingData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#6b7280" 
-                fontSize={10}
-                tickLine={false}
-              />
-              <YAxis 
-                stroke="#6b7280" 
-                fontSize={10}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend 
-                wrapperStyle={{ fontSize: '11px', paddingTop: '16px' }}
-                iconType="line"
-              />
-              {showOccupancy && (
-                <>
-                  <Line 
-                    type="monotone" 
-                    dataKey="myOccupancy" 
-                    stroke="#39BDF8" 
-                    strokeWidth={2.5}
-                    name="My Occupancy"
-                    dot={false}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="compsetOccupancy" 
-                    stroke="#f59e0b" 
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Compset Occupancy"
-                    dot={false}
-                  />
-                </>
-              )}
-              {showADR && (
-                <>
-                  <Line 
-                    type="monotone" 
-                    dataKey="myADR" 
-                    stroke="#8b5cf6" 
-                    strokeWidth={2.5}
-                    name="My ADR"
-                    dot={false}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="compsetADR" 
-                    stroke="#ec4899" 
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Compset ADR"
-                    dot={false}
-                  />
-                </>
-              )}
-              {showRevPAR && (
-                <>
-                  <Line 
-                    type="monotone" 
-                    dataKey="myRevPAR" 
-                    stroke="#10b981" 
-                    strokeWidth={2.5}
-                    name="My RevPAR"
-                    dot={false}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="compsetRevPAR" 
-                    stroke="#ef4444" 
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Compset RevPAR"
-                    dot={false}
-                  />
-                </>
-              )}
-            </LineChart>
-          </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Daily Drill-Down Table */}
-        {isLoading ? (
-          <div style={{ ...styles.table, padding: '16px' }}>
-            <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ width: '200px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                <div style={{ width: '120px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-              </div>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} style={{ display: 'flex', gap: '16px' }}>
-                  <div style={{ width: '80px', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+        {/* Main Content Grid: Chart + Table (left 2/3) | Insights sidebar (right 1/3) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px' }}>
+          {/* ── Left Column ── */}
+          <div>
+            {/* Pacing Chart */}
+            <div style={styles.chartCard}>
+              <div style={styles.chartHeader}>
+                <div>
+                  <div style={styles.chartTitle}>Forward Booking Pace</div>
+                  <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px' }}>
+                    Track your competitive position over time
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <div>
-              <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
-                Daily Performance Drill-Down
+                <div style={styles.chartControls}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showOccupancy}
+                      onChange={(e) => setShowOccupancy(e.target.checked)}
+                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>Occupancy</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showADR}
+                      onChange={(e) => setShowADR(e.target.checked)}
+                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>ADR</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showRevPAR}
+                      onChange={(e) => setShowRevPAR(e.target.checked)}
+                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>RevPAR</span>
+                  </label>
+                </div>
               </div>
-              <div style={{ color: '#6b7280', fontSize: '11px' }}>
-                Day-by-day comparison with configurable metrics
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showDrillOccupancy}
-                  onChange={(e) => setShowDrillOccupancy(e.target.checked)}
-                  style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                />
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>Occupancy</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showDrillADR}
-                  onChange={(e) => setShowDrillADR(e.target.checked)}
-                  style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                />
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>ADR</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showDrillRevPAR}
-                  onChange={(e) => setShowDrillRevPAR(e.target.checked)}
-                  style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                />
-                <span style={{ color: '#9ca3af', fontSize: '11px' }}>RevPAR</span>
-              </label>
-            </div>
-          </div>
 
-          <div style={styles.table}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `120px repeat(${(showDrillOccupancy ? 1 : 0) + (showDrillADR ? 1 : 0) + (showDrillRevPAR ? 1 : 0)}, 1fr 1fr)`,
-              gap: '12px',
-              padding: '12px 16px',
-              borderBottom: '1px solid #2a2a2a',
-              backgroundColor: '#1d1d1c'
-            }}>
-              <div style={styles.tableHeaderCell}>Date</div>
-              {showDrillOccupancy && (
-                <>
-                  <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My Occ %</div>
-                  <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp Occ %</div>
-                </>
-              )}
-              {showDrillADR && (
-                <>
-                  <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My ADR</div>
-                  <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp ADR</div>
-                </>
-              )}
-              {showDrillRevPAR && (
-                <>
-                  <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My RevPAR</div>
-                  <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp RevPAR</div>
-                </>
+              {isLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#6b7280', gap: '8px' }}>
+                  <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: '13px' }}>Loading data...</span>
+                </div>
+              ) : pacingData.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#6b7280', fontSize: '13px' }}>
+                  No data available for this date range
+                </div>
+              ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={pacingData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#6b7280"
+                    fontSize={10}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    stroke="#6b7280"
+                    fontSize={10}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend
+                    wrapperStyle={{ fontSize: '11px', paddingTop: '16px' }}
+                    iconType="line"
+                  />
+                  {showOccupancy && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="myOccupancy"
+                        stroke="#39BDF8"
+                        strokeWidth={2.5}
+                        name="My Occupancy"
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="compsetOccupancy"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        name="Compset Occupancy"
+                        dot={false}
+                      />
+                    </>
+                  )}
+                  {showADR && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="myADR"
+                        stroke="#8b5cf6"
+                        strokeWidth={2.5}
+                        name="My ADR"
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="compsetADR"
+                        stroke="#ec4899"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        name="Compset ADR"
+                        dot={false}
+                      />
+                    </>
+                  )}
+                  {showRevPAR && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="myRevPAR"
+                        stroke="#10b981"
+                        strokeWidth={2.5}
+                        name="My RevPAR"
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="compsetRevPAR"
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        name="Compset RevPAR"
+                        dot={false}
+                      />
+                    </>
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
               )}
             </div>
-            {dailyData.map((row, index) => (
-              <div 
-                key={index} 
-                style={{
+
+            {/* Daily Drill-Down Table */}
+            {isLoading ? (
+              <div style={{ ...styles.table, padding: '16px' }}>
+                <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ width: '200px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                    <div style={{ width: '120px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  </div>
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} style={{ display: 'flex', gap: '16px' }}>
+                      <div style={{ width: '80px', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div>
+                  <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
+                    Daily Performance Drill-Down
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: '11px' }}>
+                    Day-by-day comparison with configurable metrics
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showDrillOccupancy}
+                      onChange={(e) => setShowDrillOccupancy(e.target.checked)}
+                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>Occupancy</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showDrillADR}
+                      onChange={(e) => setShowDrillADR(e.target.checked)}
+                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>ADR</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showDrillRevPAR}
+                      onChange={(e) => setShowDrillRevPAR(e.target.checked)}
+                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                    />
+                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>RevPAR</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style={styles.table}>
+                <div style={{
                   display: 'grid',
                   gridTemplateColumns: `120px repeat(${(showDrillOccupancy ? 1 : 0) + (showDrillADR ? 1 : 0) + (showDrillRevPAR ? 1 : 0)}, 1fr 1fr)`,
                   gap: '12px',
                   padding: '12px 16px',
                   borderBottom: '1px solid #2a2a2a',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(57, 189, 248, 0.05)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div style={styles.tableCell}>{row.date}</div>
-                {showDrillOccupancy && (
-                  <>
-                    <div style={styles.tableCell}>
-                      <span style={{ color: row.myOcc > row.compOcc ? '#10b981' : '#e5e5e5' }}>
-                        {row.myOcc}%
-                      </span>
-                    </div>
-                    <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{row.compOcc}%</div>
-                  </>
-                )}
-                {showDrillADR && (
-                  <>
-                    <div style={styles.tableCell}>
-                      <span style={{ color: row.myRate > row.compRate ? '#10b981' : row.myRate < row.compRate - 10 ? '#ef4444' : '#e5e5e5' }}>
-                        {currencySymbol}{row.myRate}
-                      </span>
-                    </div>
-                    <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{currencySymbol}{row.compRate}</div>
-                  </>
-                )}
-                {showDrillRevPAR && (
-                  <>
-                    <div style={styles.tableCell}>
-                      <span style={{ color: row.myRevPAR > row.compRevPAR ? '#10b981' : '#ef4444' }}>
-                        {currencySymbol}{row.myRevPAR}
-                      </span>
-                    </div>
-                    <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{currencySymbol}{row.compRevPAR}</div>
-                  </>
-                )}
+                  backgroundColor: '#1d1d1c'
+                }}>
+                  <div style={styles.tableHeaderCell}>Date</div>
+                  {showDrillOccupancy && (
+                    <>
+                      <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My Occ %</div>
+                      <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp Occ %</div>
+                    </>
+                  )}
+                  {showDrillADR && (
+                    <>
+                      <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My ADR</div>
+                      <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp ADR</div>
+                    </>
+                  )}
+                  {showDrillRevPAR && (
+                    <>
+                      <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My RevPAR</div>
+                      <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp RevPAR</div>
+                    </>
+                  )}
+                </div>
+                {dailyData.map((row, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: `120px repeat(${(showDrillOccupancy ? 1 : 0) + (showDrillADR ? 1 : 0) + (showDrillRevPAR ? 1 : 0)}, 1fr 1fr)`,
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderBottom: '1px solid #2a2a2a',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(57, 189, 248, 0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <div style={styles.tableCell}>{row.date}</div>
+                    {showDrillOccupancy && (
+                      <>
+                        <div style={styles.tableCell}>
+                          <span style={{ color: row.myOcc > row.compOcc ? '#10b981' : '#e5e5e5' }}>
+                            {row.myOcc}%
+                          </span>
+                        </div>
+                        <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{row.compOcc}%</div>
+                      </>
+                    )}
+                    {showDrillADR && (
+                      <>
+                        <div style={styles.tableCell}>
+                          <span style={{ color: row.myRate > row.compRate ? '#10b981' : row.myRate < row.compRate - 10 ? '#ef4444' : '#e5e5e5' }}>
+                            {currencySymbol}{row.myRate}
+                          </span>
+                        </div>
+                        <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{currencySymbol}{row.compRate}</div>
+                      </>
+                    )}
+                    {showDrillRevPAR && (
+                      <>
+                        <div style={styles.tableCell}>
+                          <span style={{ color: row.myRevPAR > row.compRevPAR ? '#10b981' : '#ef4444' }}>
+                            {currencySymbol}{row.myRevPAR}
+                          </span>
+                        </div>
+                        <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{currencySymbol}{row.compRevPAR}</div>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            )}
+          </div>
+
+          {/* ── Right Column: Insights Sidebar ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+            {/* Key Insights */}
+            {(() => {
+              const myOcc = kpis.yourHotel?.occupancy != null ? Math.round(Number(kpis.yourHotel.occupancy) * 100) : null;
+              const compOcc = kpis.market?.occupancy != null ? Math.round(Number(kpis.market.occupancy) * 100) : null;
+              const myAdr = kpis.yourHotel?.adr != null ? Math.round(Number(kpis.yourHotel.adr)) : null;
+              const compAdr = kpis.market?.adr != null ? Math.round(Number(kpis.market.adr)) : null;
+              const myRev = kpis.yourHotel?.revpar != null ? Math.round(Number(kpis.yourHotel.revpar)) : null;
+              const compRev = kpis.market?.revpar != null ? Math.round(Number(kpis.market.revpar)) : null;
+
+              const occWin = myOcc != null && compOcc != null && myOcc >= compOcc;
+              const adrWin = myAdr != null && compAdr != null && myAdr >= compAdr;
+              const revWin = myRev != null && compRev != null && myRev >= compRev;
+
+              const insights = [
+                {
+                  label: 'Occupancy',
+                  win: occWin,
+                  detail: myOcc != null && compOcc != null
+                    ? occWin
+                      ? <>{comparison === 'total-market' ? 'Leading market' : 'Leading segment'} by <span style={{ color: '#10b981', fontWeight: 600 }}>+{myOcc - compOcc} pts</span></>
+                      : <>{comparison === 'total-market' ? 'Market' : 'Segment'} leads by <span style={{ color: '#ef4444', fontWeight: 600 }}>{compOcc - myOcc} pts</span></>
+                    : <>No data</>
+                },
+                {
+                  label: 'ADR',
+                  win: adrWin,
+                  detail: myAdr != null && compAdr != null
+                    ? adrWin
+                      ? <>Pricing <span style={{ color: '#10b981', fontWeight: 600 }}>{currencySymbol}{myAdr - compAdr} above</span> average</>
+                      : <>{comparison === 'total-market' ? 'Market' : 'Segment'} pricing <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr} higher</span></>
+                    : <>No data</>
+                },
+                {
+                  label: 'RevPAR',
+                  win: revWin,
+                  detail: myRev != null && compRev != null
+                    ? revWin
+                      ? <>Outperforming by <span style={{ color: '#10b981', fontWeight: 600 }}>{currencySymbol}{myRev - compRev}</span> per room</>
+                      : <>Trailing by <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compRev - myRev}</span> per room</>
+                    : <>No data</>
+                },
+              ];
+
+              return (
+                <div style={{ ...styles.card }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <Zap style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
+                    <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
+                      Key Insights
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {isLoading ? (
+                      <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} style={{ height: '56px', backgroundColor: '#1d1d1c', borderRadius: '6px' }} />
+                        ))}
+                      </div>
+                    ) : insights.map((item) => (
+                      <div key={item.label} style={{
+                        backgroundColor: '#1d1d1c',
+                        borderRadius: '6px',
+                        borderLeft: `2px solid ${item.win ? '#10b981' : '#ef4444'}`,
+                        padding: '12px',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ color: '#e5e5e5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{item.label}</span>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            backgroundColor: item.win ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                            color: item.win ? '#10b981' : '#ef4444',
+                            border: `1px solid ${item.win ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                          }}>
+                            {item.win ? 'WIN' : 'LOSS'}
+                          </span>
+                        </div>
+                        <div style={{ color: '#9ca3af', fontSize: '11px' }}>{item.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Market Position */}
+            {(() => {
+              const displayTotal = (t: number | undefined) => t != null ? t * 2 : undefined;
+              const metrics = [
+                { label: 'Occupancy', rank: ranking.occupancy?.rank, total: displayTotal(ranking.occupancy?.total) },
+                { label: 'ADR', rank: ranking.adr?.rank, total: displayTotal(ranking.adr?.total) },
+                { label: 'RevPAR', rank: ranking.revpar?.rank, total: displayTotal(ranking.revpar?.total) },
+              ];
+
+              return (
+                <div style={{ ...styles.card }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <Target style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
+                    <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
+                      Market Position
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {isLoading ? (
+                      <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {[1, 2, 3].map((i) => (
+                          <div key={i}>
+                            <div style={{ width: '80px', height: '10px', backgroundColor: '#2a2a2a', borderRadius: '4px', marginBottom: '8px' }} />
+                            <div style={{ height: '8px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : metrics.map((m) => {
+                      const hasData = m.rank != null && m.total != null && m.total > 0;
+                      const pct = hasData ? Math.round(((m.total - m.rank + 1) / m.total) * 100) : 0;
+                      const rankPct = hasData ? m.rank / m.total : 1;
+                      const barColor = rankPct <= 0.33 ? '#10b981' : rankPct <= 0.66 ? '#f59e0b' : '#ef4444';
+                      const badgeLabel = rankPct <= 0.33 ? `Top ${Math.round(rankPct * 100)}%` : rankPct <= 0.66 ? `Mid ${Math.round(rankPct * 100)}%` : `Bottom ${Math.round((1 - rankPct) * 100)}%`;
+
+                      return (
+                        <div key={m.label}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ color: '#9ca3af', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{m.label}</span>
+                            <span style={{ color: '#e5e5e5', fontSize: '12px', fontWeight: 500 }}>
+                              {hasData ? `#${m.rank} of ${m.total}` : '--'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1, height: '8px', backgroundColor: '#0d0d0d', borderRadius: '4px', overflow: 'hidden', border: '1px solid #2a2a2a' }}>
+                              <div style={{ height: '100%', borderRadius: '4px', backgroundColor: hasData ? barColor : '#2a2a2a', width: `${hasData ? pct : 0}%`, transition: 'width 0.4s ease' }} />
+                            </div>
+                            {hasData && (
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                backgroundColor: `${barColor}15`,
+                                color: barColor,
+                                border: `1px solid ${barColor}4D`,
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {badgeLabel}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Market Composition */}
+            <div style={{ ...styles.card }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <Building2 style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
+                <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
+                  Market Composition
+                </div>
+              </div>
+              {marketContext ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Summary counts */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
+                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Segment Hotels</div>
+                      <div style={{ color: '#39BDF8', fontSize: '22px', fontWeight: 600 }}>{marketContext.segmentHotels}</div>
+                    </div>
+                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
+                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Segment Rooms</div>
+                      <div style={{ color: '#39BDF8', fontSize: '22px', fontWeight: 600 }}>{marketContext.segmentRooms.toLocaleString()}</div>
+                    </div>
+                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
+                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Market Hotels</div>
+                      <div style={{ color: '#e5e5e5', fontSize: '22px', fontWeight: 600 }}>{marketContext.marketHotels}</div>
+                    </div>
+                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
+                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Market Rooms</div>
+                      <div style={{ color: '#e5e5e5', fontSize: '22px', fontWeight: 600 }}>{marketContext.marketRooms.toLocaleString()}</div>
+                    </div>
+                  </div>
+
+                  {/* By Quality Tier */}
+                  {marketContext.byTier && marketContext.byTier.length > 0 && (
+                    <div>
+                      <div style={{ color: '#9ca3af', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '10px', fontWeight: 600 }}>
+                        By Quality Tier
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {marketContext.byTier.map((item) => {
+                          const pct = marketContext.marketHotels > 0 ? Math.round((item.count / marketContext.marketHotels) * 100) : 0;
+                          return (
+                            <div key={item.tier}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: '#e5e5e5', fontSize: '12px' }}>{item.tier}</span>
+                                <span style={{ color: '#9ca3af', fontSize: '10px' }}>{item.count} hotels</span>
+                              </div>
+                              <div style={{ height: '6px', backgroundColor: '#0d0d0d', borderRadius: '3px', overflow: 'hidden', border: '1px solid #2a2a2a' }}>
+                                <div style={{ height: '100%', borderRadius: '3px', backgroundColor: '#39BDF8', width: `${pct}%`, transition: 'width 0.4s ease' }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* By Location */}
+                  {marketContext.byNeighborhood && marketContext.byNeighborhood.length > 0 && (
+                    <div>
+                      <div style={{ color: '#9ca3af', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '10px', fontWeight: 600 }}>
+                        By Location
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {marketContext.byNeighborhood.map((item) => {
+                          const pct = marketContext.marketHotels > 0 ? Math.round((item.count / marketContext.marketHotels) * 100) : 0;
+                          return (
+                            <div key={item.area}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: '#e5e5e5', fontSize: '12px' }}>{item.area}</span>
+                                <span style={{ color: '#9ca3af', fontSize: '10px' }}>{item.count} hotels</span>
+                              </div>
+                              <div style={{ height: '6px', backgroundColor: '#0d0d0d', borderRadius: '3px', overflow: 'hidden', border: '1px solid #2a2a2a' }}>
+                                <div style={{ height: '100%', borderRadius: '3px', backgroundColor: '#f59e0b', width: `${pct}%`, transition: 'width 0.4s ease' }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: '#6b7280', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
+                  Select a property to see market composition
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
-        )}
       </div>
     </div>
   );
