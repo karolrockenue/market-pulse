@@ -362,6 +362,15 @@ class SentinelBridgeService {
         const validUpdates = [];
         let skFrozen = 0, skManual = 0, skSanity = 0, skDelta = 0, skRateMap = 0;
 
+        // [DEBUG] Log first 3 predictions to trace gate behavior
+        const debugSample = hotelDecisions.slice(0, 3);
+        for (const s of debugSample) {
+          const dStr = new Date(s.stay_date).toISOString().split("T")[0];
+          const k = `${s.room_type_id}_${dStr}`;
+          const cal = calendarMap[k];
+          console.log(`[Autonomy Debug] Hotel ${hotelId} | ${dStr} | room=${s.room_type_id} | aiRate=${s.suggested_rate} | calKey=${k} | calFound=${!!cal} | calRate=${cal?.rate} | calSource=${cal?.source}`);
+        }
+
         for (const pred of hotelDecisions) {
           const dateStr = new Date(pred.stay_date).toISOString().split("T")[0];
           const stayDateObj = new Date(pred.stay_date);
@@ -431,6 +440,9 @@ class SentinelBridgeService {
             Math.abs(safeRate - currentRate) < 1.0
           ) {
             skDelta++;
+            if (skDelta <= 3) {
+              console.log(`[Autonomy Delta Skip] Hotel ${hotelId} | ${dateStr} | ai=${safeRate} | cal=${currentRate} | diff=${Math.abs(safeRate - currentRate).toFixed(2)}`);
+            }
             continue; // No change needed (Price change is insignificant)
           }
 
@@ -487,6 +499,12 @@ class SentinelBridgeService {
         validUpdates.push(...expandedUpdates);
 
         // --- EXECUTION ---
+        if (validUpdates.length === 0) {
+          console.log(
+            `[Autonomy] Hotel ${hotelId}: ${hotelDecisions.length} predictions → 0 passed gates, 0 mapped to PMS | Filtered: frozen=${skFrozen} manual=${skManual} delta=${skDelta} sanity=${skSanity} rateMap=0`
+          );
+        }
+
         if (validUpdates.length > 0) {
           // [FIX] Construct the Cloudbeds JSON Payload
           // Structure: { pmsPropertyId, rates: [{ rate_id, date, amount }] }
