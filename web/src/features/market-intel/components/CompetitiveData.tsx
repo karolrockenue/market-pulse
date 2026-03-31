@@ -82,11 +82,22 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
   const [kpis, setKpis] = useState<{ yourHotel: any; market: any }>({ yourHotel: {}, market: {} });
   const [ranking, setRanking] = useState<any>({ occupancy: {}, adr: {}, revpar: {} });
 
+  // Market context state
+  const [marketContext, setMarketContext] = useState<{ segmentHotels: number; segmentRooms: number; marketHotels: number; marketRooms: number } | null>(null);
+
+  useEffect(() => {
+    if (!propertyId || propertyId === 'ALL') { setMarketContext(null); return; }
+    fetch(`/api/metrics/market-context?propertyId=${propertyId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setMarketContext)
+      .catch(() => setMarketContext(null));
+  }, [propertyId]);
+
   // Portfolio summary state
   const isGroup = properties.length > 1;
   const [portfolioData, setPortfolioData] = useState<PortfolioRow[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
-  const [portfolioExpanded, setPortfolioExpanded] = useState(true);
+  const [portfolioExpanded, setPortfolioExpanded] = useState(false);
 
   useEffect(() => {
     if (!isGroup) { setPortfolioData([]); return; }
@@ -97,7 +108,8 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
         const rows: PortfolioRow[] = await Promise.all(
           properties.map(async (prop) => {
             const id = prop.property_id.toString();
-            const params = new URLSearchParams({ propertyId: id, startDate, endDate });
+            const scope = comparison === 'total-market' ? 'total-market' : 'my-segment';
+            const params = new URLSearchParams({ propertyId: id, startDate, endDate, scope });
 
             const [kpiRes, rankRes, detailRes] = await Promise.all([
               fetch(`/api/metrics/kpi-summary?${params}`),
@@ -141,7 +153,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
     };
 
     fetchPortfolio();
-  }, [isGroup, properties, startDate, endDate]);
+  }, [isGroup, properties, startDate, endDate, comparison]);
 
   useEffect(() => {
     if (!propertyId) return;
@@ -149,14 +161,16 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        const scope = comparison === 'total-market' ? 'total-market' : 'my-segment';
         const params = new URLSearchParams({
           propertyId,
           startDate,
           endDate,
           granularity: 'daily',
+          scope,
         });
 
-        const kpiParams = new URLSearchParams({ propertyId, startDate, endDate });
+        const kpiParams = new URLSearchParams({ propertyId, startDate, endDate, scope });
 
         const [myRes, compRes, kpiRes, rankRes] = await Promise.all([
           fetch(`/api/metrics/range?${params}`),
@@ -221,7 +235,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
     };
 
     fetchData();
-  }, [propertyId, startDate, endDate]);
+  }, [propertyId, startDate, endDate, comparison]);
 
   // Daily drill-down derives from real pacingData
   const dailyData = useMemo(() => {
@@ -522,6 +536,39 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
           </div>
         </div>
 
+        {/* Market Context Bar */}
+        {marketContext && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            backgroundColor: 'rgb(26, 26, 26)',
+            borderRadius: '8px',
+            border: '1px solid #2a2a2a',
+            marginBottom: '24px',
+            overflow: 'hidden',
+          }}>
+            {[
+              { label: 'Segment Hotels', value: marketContext.segmentHotels, suffix: 'hotels' },
+              { label: 'Segment Rooms', value: marketContext.segmentRooms.toLocaleString(), suffix: 'rooms' },
+              { label: 'Total Market Hotels', value: marketContext.marketHotels, suffix: 'hotels' },
+              { label: 'Total Market Rooms', value: marketContext.marketRooms.toLocaleString(), suffix: 'rooms' },
+            ].map((item, idx) => (
+              <div key={idx} style={{
+                padding: '16px 20px',
+                borderRight: idx < 3 ? '1px solid #2a2a2a' : 'none',
+              }}>
+                <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '8px' }}>
+                  {item.label}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                  <span style={{ color: '#39BDF8', fontSize: '24px', fontWeight: 600 }}>{item.value}</span>
+                  <span style={{ color: '#6b7280', fontSize: '11px' }}>{item.suffix}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Portfolio Competitive Summary */}
         {isGroup && (
           <div style={{
@@ -537,7 +584,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
             >
               <div>
                 <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
-                  Portfolio Competitive Summary
+                  Property-by-Property Market Comparison
                 </div>
                 <div style={{ color: '#6b7280', fontSize: '11px' }}>
                   Each hotel compared against its own segment — click a row to drill in
@@ -696,7 +743,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ ...styles.metricValue, color: '#9ca3af', fontSize: '20px' }}>{compOcc}{compOcc !== '--' && '%'}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>Segment Avg</div>
+                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
                   </div>
                 </div>
               </div>
@@ -714,7 +761,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ ...styles.metricValue, color: '#9ca3af', fontSize: '20px' }}>{compAdr !== '--' && currencySymbol}{compAdr}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>Segment Avg</div>
+                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
                   </div>
                 </div>
               </div>
@@ -732,7 +779,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ ...styles.metricValue, color: '#9ca3af', fontSize: '20px' }}>{compRev !== '--' && currencySymbol}{compRev}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>Segment Avg</div>
+                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
                   </div>
                 </div>
               </div>

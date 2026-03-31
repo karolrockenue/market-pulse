@@ -290,6 +290,7 @@ export function PortfolioOverview() {
   // Helper to aggregate data for a specific month index across all hotels
   const getAggregatesForMonth = (monthOffset: number) => {
     const targetDate = new Date();
+    targetDate.setDate(1); // Prevent month overflow (e.g. Mar 31 + 1 month = May 1)
     targetDate.setMonth(targetDate.getMonth() + monthOffset);
     const mNum = targetDate.getMonth() + 1;
     const year = targetDate.getFullYear();

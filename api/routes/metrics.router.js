@@ -71,33 +71,44 @@ router.get("/kpi-summary", requireUserApi, async (req, res) => {
       Expires: "0",
       "Surrogate-Control": "no-store",
     });
-    const { startDate, endDate, propertyId } = req.query;
+    const { startDate, endDate, propertyId, scope } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // Note: We assume middleware or service handles detailed ACL in a full refactor,
-    // but for now we rely on the Service to just fetch data.
-    // TODO: Move 'competitorIds' resolution to a helper or Service to clean this up.
+    let competitorIds = [];
 
-    // Quick CompSet Fetch (Inline for now, move to HotelService later)
-    const compSetResult = await pgPool.query(
-      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId],
-    );
-    let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id,
-    );
-    if (competitorIds.length === 0) {
-      const catRes = await pgPool.query(
-        "SELECT category, city FROM hotels WHERE hotel_id = $1",
+    if (scope === 'total-market') {
+      const cityRes = await pgPool.query(
+        "SELECT city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
-      if (catRes.rows[0]?.category) {
-        const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
-          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+      if (cityRes.rows[0]?.city) {
+        const allCity = await pgPool.query(
+          "SELECT hotel_id FROM hotels WHERE city = $1 AND hotel_id != $2",
+          [cityRes.rows[0].city, propertyId],
         );
-        competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        competitorIds = allCity.rows.map((r) => r.hotel_id);
+      }
+    } else {
+      const compSetResult = await pgPool.query(
+        "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+        [propertyId],
+      );
+      competitorIds = compSetResult.rows.map(
+        (row) => row.competitor_hotel_id,
+      );
+      if (competitorIds.length === 0) {
+        const catRes = await pgPool.query(
+          "SELECT category, city FROM hotels WHERE hotel_id = $1",
+          [propertyId],
+        );
+        if (catRes.rows[0]?.category) {
+          const autoComp = await pgPool.query(
+            "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+            [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+          );
+          competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        }
       }
     }
 
@@ -142,29 +153,44 @@ router.get("/range", requireUserApi, async (req, res) => {
 // 3. Competitor Metrics
 router.get("/competitors", requireUserApi, async (req, res) => {
   try {
-    const { startDate, endDate, granularity, propertyId } = req.query;
+    const { startDate, endDate, granularity, propertyId, scope } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // Fetch CompSet (Inline for now)
-    const compSetResult = await pgPool.query(
-      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId],
-    );
-    let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id,
-    );
-    if (competitorIds.length === 0) {
-      const catRes = await pgPool.query(
-        "SELECT category, city FROM hotels WHERE hotel_id = $1",
+    let competitorIds = [];
+
+    if (scope === 'total-market') {
+      const cityRes = await pgPool.query(
+        "SELECT city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
-      if (catRes.rows[0]?.category) {
-        const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
-          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+      if (cityRes.rows[0]?.city) {
+        const allCity = await pgPool.query(
+          "SELECT hotel_id FROM hotels WHERE city = $1 AND hotel_id != $2",
+          [cityRes.rows[0].city, propertyId],
         );
-        competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        competitorIds = allCity.rows.map((r) => r.hotel_id);
+      }
+    } else {
+      const compSetResult = await pgPool.query(
+        "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+        [propertyId],
+      );
+      competitorIds = compSetResult.rows.map(
+        (row) => row.competitor_hotel_id,
+      );
+      if (competitorIds.length === 0) {
+        const catRes = await pgPool.query(
+          "SELECT category, city FROM hotels WHERE hotel_id = $1",
+          [propertyId],
+        );
+        if (catRes.rows[0]?.category) {
+          const autoComp = await pgPool.query(
+            "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+            [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+          );
+          competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        }
       }
     }
 
@@ -174,8 +200,9 @@ router.get("/competitors", requireUserApi, async (req, res) => {
       endDate,
       granularity,
     );
-    // Add static source text as per original router
-    data.source = "a comp set of local hotels in a similar quality class";
+    data.source = scope === 'total-market'
+      ? "all hotels in the same city"
+      : "a comp set of local hotels in a similar quality class";
     res.json(data);
   } catch (error) {
     console.error("Error in /competitors:", error);
@@ -186,29 +213,44 @@ router.get("/competitors", requireUserApi, async (req, res) => {
 // 4. Market Ranking
 router.get("/ranking", requireUserApi, async (req, res) => {
   try {
-    const { startDate, endDate, propertyId } = req.query;
+    const { startDate, endDate, propertyId, scope } = req.query;
     if (!propertyId)
       return res.status(400).json({ error: "A propertyId is required." });
 
-    // Fetch CompSet (Inline)
-    const compSetResult = await pgPool.query(
-      "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
-      [propertyId],
-    );
-    let competitorIds = compSetResult.rows.map(
-      (row) => row.competitor_hotel_id,
-    );
-    if (competitorIds.length === 0) {
-      const catRes = await pgPool.query(
-        "SELECT category, city FROM hotels WHERE hotel_id = $1",
+    let competitorIds = [];
+
+    if (scope === 'total-market') {
+      const cityRes = await pgPool.query(
+        "SELECT city FROM hotels WHERE hotel_id = $1",
         [propertyId],
       );
-      if (catRes.rows[0]?.category) {
-        const autoComp = await pgPool.query(
-          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
-          [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+      if (cityRes.rows[0]?.city) {
+        const allCity = await pgPool.query(
+          "SELECT hotel_id FROM hotels WHERE city = $1 AND hotel_id != $2",
+          [cityRes.rows[0].city, propertyId],
         );
-        competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        competitorIds = allCity.rows.map((r) => r.hotel_id);
+      }
+    } else {
+      const compSetResult = await pgPool.query(
+        "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+        [propertyId],
+      );
+      competitorIds = compSetResult.rows.map(
+        (row) => row.competitor_hotel_id,
+      );
+      if (competitorIds.length === 0) {
+        const catRes = await pgPool.query(
+          "SELECT category, city FROM hotels WHERE hotel_id = $1",
+          [propertyId],
+        );
+        if (catRes.rows[0]?.category) {
+          const autoComp = await pgPool.query(
+            "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+            [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+          );
+          competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        }
       }
     }
 
@@ -247,6 +289,51 @@ router.get("/ranking", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error("Error in /ranking:", error);
     res.status(500).json({ error: "Failed to fetch market ranking." });
+  }
+});
+
+// 4b. Market Context (segment + total-market hotel & room counts)
+router.get("/market-context", requireUserApi, async (req, res) => {
+  try {
+    const { propertyId } = req.query;
+    if (!propertyId)
+      return res.status(400).json({ error: "A propertyId is required." });
+
+    // Get this hotel's category and city
+    const hotelRes = await pgPool.query(
+      "SELECT category, city FROM hotels WHERE hotel_id = $1",
+      [propertyId],
+    );
+    const { category, city } = hotelRes.rows[0] || {};
+
+    // Segment: same category + same city (includes this hotel)
+    let segmentHotels = 0;
+    let segmentRooms = 0;
+    if (category && city) {
+      const segRes = await pgPool.query(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_rooms), 0) AS rooms FROM hotels WHERE category = $1 AND city = $2",
+        [category, city],
+      );
+      segmentHotels = parseInt(segRes.rows[0].cnt, 10);
+      segmentRooms = parseInt(segRes.rows[0].rooms, 10);
+    }
+
+    // Total market: all hotels in the same city
+    let marketHotels = 0;
+    let marketRooms = 0;
+    if (city) {
+      const mktRes = await pgPool.query(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_rooms), 0) AS rooms FROM hotels WHERE city = $1",
+        [city],
+      );
+      marketHotels = parseInt(mktRes.rows[0].cnt, 10);
+      marketRooms = parseInt(mktRes.rows[0].rooms, 10);
+    }
+
+    res.json({ segmentHotels, segmentRooms, marketHotels, marketRooms });
+  } catch (error) {
+    console.error("Error in /market-context:", error);
+    res.status(500).json({ error: "Failed to fetch market context." });
   }
 });
 
