@@ -336,7 +336,7 @@ class SentinelBridgeService {
           );
         } catch (err) {
           console.error("\n[CRASH LOG] GATE 3: CONFLICT LOOKUP FAILED");
-          console.error(`[CRASH LOG] roomTypeIds:`, roomTypeIds);
+          console.error(`[CRASH LOG] roomTypeIds:`, roomTypeIdsStr);
           console.error(`[CRASH LOG] Postgres Error:`, err.message);
           throw err;
         }
@@ -501,11 +501,12 @@ class SentinelBridgeService {
           const rateIdMap = config.rate_id_map || {};
 
           for (const update of validUpdates) {
-            const pmsRateId = rateIdMap[update.room_type_id];
+            // [FIX] rate_id_map keys are strings, but room_type_id may arrive as integer from DGX
+            const pmsRateId = rateIdMap[String(update.room_type_id)];
             if (!pmsRateId) {
               skRateMap++;
               console.warn(
-                `[Autonomy] Missing Rate ID mapping for Room ${update.room_type_id} (Hotel ${hotelId}). Skipping.`,
+                `[Autonomy] Missing Rate ID mapping for Room ${update.room_type_id} (Hotel ${hotelId}). Keys: [${Object.keys(rateIdMap)}]. Skipping.`,
               );
               continue;
             }
