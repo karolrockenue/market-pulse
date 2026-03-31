@@ -17,20 +17,28 @@ import {
   Target,
   ChevronRight,
 } from "lucide-react";
-// [FIX] Removed the invalid '@2.0.3' version from the import path
 import { toast } from "sonner";
 
-// [FIX] Renamed to match the component name we will use
 interface LandingPageProps {
   onSignIn: () => void;
-  onViewChange: (view: string) => void; // [NEW] Add the view change prop
+  onViewChange: (view: string) => void;
 }
 
+// Color constants matching TopNav + Dashboard
+const BLUE = "#39BDF8";
+const WHITE = "#e5e5e5";
+const GRAY = "#9ca3af";
+const DIM = "#6b7280";
+const BG_PAGE = "#1d1d1c";
+const BG_CARD = "#1a1a1a";
+const BG_INPUT = "#2C2C2C";
+const BORDER = "#2a2a2a";
+const GREEN = "#10b981";
+const RED = "#ef4444";
+
 export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
-  // [NEW] Destructure the new prop
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  // [NEW] State to hold the API status message and type
   const [apiStatus, setApiStatus] = useState<{
     type: "success" | "error" | null;
     message: string;
@@ -38,10 +46,9 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    setApiStatus({ type: null, message: "" }); // Clear previous status
+    setApiStatus({ type: null, message: "" });
 
     if (!email) {
-      // [MODIFIED] Set error state instead of toast
       setApiStatus({
         type: "error",
         message: "Please enter your email address",
@@ -61,14 +68,12 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       const result = await response.json();
 
       if (response.ok) {
-        // [MODIFIED] Set success state instead of toast
         setApiStatus({
           type: "success",
           message: result.message || "Magic link sent! Check your inbox.",
         });
         setEmail("");
       } else {
-        // Extract error message or default
         const errorMessage =
           result.error ||
           (response.status === 404
@@ -78,11 +83,9 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       }
     } catch (error: any) {
       console.error("Magic link error:", error);
-      // [MODIFIED] Set error state instead of toast
       setApiStatus({ type: "error", message: error.message });
     } finally {
       setIsLoading(false);
-      // [NEW] Clear the status message after 5 seconds
       setTimeout(() => {
         setApiStatus({ type: null, message: "" });
       }, 5000);
@@ -95,49 +98,58 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a09] text-[#e5e5e5] overflow-x-hidden">
+    <div
+      className="min-h-screen overflow-x-hidden"
+      style={{ backgroundColor: BG_PAGE, color: WHITE }}
+    >
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden">
-        {/* Radial Gradient Background */}
+        {/* Background — matches dashboard subtle blue grid + gradient */}
         <div className="absolute inset-0">
-          {/* Center radial gradient */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#faff6a]/8 via-[#252521] to-[#0a0a09]" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(to bottom right, rgba(57, 189, 248, 0.03), transparent, rgba(57, 189, 248, 0.03))`,
+            }}
+          />
+        </div>
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)`,
+            backgroundSize: "64px 64px",
+            pointerEvents: "none",
+          }}
+        />
 
-          {/* Additional accent gradients */}
-          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle,_var(--tw-gradient-stops))] from-[#10b981]/10 via-transparent to-transparent blur-2xl" />
-          <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-[radial-gradient(circle,_var(--tw-gradient-stops))] from-[#faff6a]/10 via-transparent to-transparent blur-2xl" />
-        </div>
-        {/* Dot Pattern Overlay */}
-        <div className="absolute inset-0 opacity-[0.15]">
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `radial-gradient(circle, #faff6a 1px, transparent 1px)`,
-              backgroundSize: "40px 40px",
-            }}
-          />
-        </div>
-        {/* Grid Pattern Background (subtle) */}
-        <div className="absolute inset-0 opacity-[0.02]">
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `linear-gradient(#faff6a 1px, transparent 1px), linear-gradient(90deg, #faff6a 1px, transparent 1px)`,
-              backgroundSize: "60px 60px",
-            }}
-          />
-        </div>
         <div className="relative z-10 max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
           {/* Left: Value Proposition */}
           <div className="space-y-8">
-            <h1 className="text-5xl lg:text-6xl text-[#e5e5e5] leading-tight">
+            {/* Logo — matches TopNav ( MARKET PULSE ) */}
+            <div className="flex items-center gap-1 mb-4">
+              <span style={{ color: BLUE, fontSize: "32px" }}>(</span>
+              <span
+                style={{
+                  color: WHITE,
+                  fontSize: "18px",
+                  letterSpacing: "0.025em",
+                  position: "relative",
+                  top: "2px",
+                }}
+              >
+                MARKET PULSE
+              </span>
+              <span style={{ color: BLUE, fontSize: "32px" }}>)</span>
+            </div>
+
+            <h1 className="text-5xl lg:text-6xl leading-tight" style={{ color: WHITE }}>
               The Sharpest View of Your{" "}
-              <span className="text-[#faff6a]">Hotel Market.</span>
+              <span style={{ color: BLUE }}>Hotel Market.</span>
               <br />
-              <span className="text-[#e5e5e5]">For Free.</span>
+              <span style={{ color: WHITE }}>For Free.</span>
             </h1>
 
-            <p className="text-xl text-[#9ca3af] leading-relaxed">
+            <p className="text-xl leading-relaxed" style={{ color: GRAY }}>
               Real-time analytics, competitive benchmarking, and market
               intelligence — all the insights you need to outperform your comp
               set.
@@ -151,10 +163,13 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                 "Connect your PMS in under 5 minutes",
               ].map((benefit, idx) => (
                 <div key={idx} className="flex items-start gap-3">
-                  <div className="mt-1 w-5 h-5 rounded-full bg-[#10b981]/20 flex items-center justify-center flex-shrink-0">
-                    <Check className="w-3 h-3 text-[#10b981]" />
+                  <div
+                    className="mt-1 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `rgba(16, 185, 129, 0.2)` }}
+                  >
+                    <Check className="w-3 h-3" style={{ color: GREEN }} />
                   </div>
-                  <span className="text-[#e5e5e5]">{benefit}</span>
+                  <span style={{ color: WHITE }}>{benefit}</span>
                 </div>
               ))}
             </div>
@@ -164,31 +179,45 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                 {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
-                    className="w-10 h-10 rounded-full bg-[#3a3a35] border-2 border-[#1a1a18] flex items-center justify-center"
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: BG_INPUT,
+                      border: `2px solid ${BG_PAGE}`,
+                    }}
                   >
-                    <Users className="w-5 h-5 text-[#9ca3af]" />
+                    <Users className="w-5 h-5" style={{ color: DIM }} />
                   </div>
                 ))}
               </div>
               <div className="text-sm">
-                <div className="text-[#e5e5e5]">Trusted by 500+ hotels</div>
-                <div className="text-[#9ca3af]">across 25 countries</div>
+                <div style={{ color: WHITE }}>Trusted by 500+ hotels</div>
+                <div style={{ color: GRAY }}>across 25 countries</div>
               </div>
             </div>
           </div>
-          {/* Right: Login/Signup Card */}
+
+          {/* Right: Login/Signup Card — matches dashboard card style */}
           <div className="relative">
-            {/* Glassmorphism Card */}
-            <div className="relative bg-[#1a1a18]/60 backdrop-blur-xl border border-[#3a3a35] rounded-2xl p-8 shadow-2xl">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#faff6a]/5 to-transparent rounded-2xl" />
+            <div
+              className="relative rounded-lg p-8 shadow-2xl"
+              style={{
+                backgroundColor: BG_CARD,
+                border: `1px solid ${BORDER}`,
+              }}
+            >
               <div className="relative space-y-6">
                 {/* Welcome Back Section */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#faff6a]/10 flex items-center justify-center">
-                      <Zap className="w-4 h-4 text-[#faff6a]" />
+                    <div
+                      className="w-8 h-8 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: `rgba(57, 189, 248, 0.15)` }}
+                    >
+                      <Zap className="w-4 h-4" style={{ color: BLUE }} />
                     </div>
-                    <h3 className="text-xl text-[#e5e5e5]">Welcome Back</h3>
+                    <h3 className="text-xl" style={{ color: WHITE }}>
+                      Welcome Back
+                    </h3>
                   </div>
                   <form onSubmit={handleMagicLink} className="space-y-3">
                     <Input
@@ -196,52 +225,68 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                       placeholder="your@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-12 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="h-12"
+                      style={{
+                        backgroundColor: BG_INPUT,
+                        borderColor: BORDER,
+                        color: WHITE,
+                      }}
                     />
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full h-12 bg-[#faff6a] text-[#1a1a18] hover:bg-[#faff6a]/90 transition-all"
+                      className="w-full h-12 transition-all"
+                      style={{
+                        backgroundColor: BLUE,
+                        color: BG_PAGE,
+                        fontWeight: 600,
+                      }}
                     >
                       {isLoading ? "Sending..." : "Send Magic Link"}
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
-                  </form>{" "}
-                  {/* <<< Correct end of the form */}
-                  {/* [NEW] Conditionally display the API status message */}
+                  </form>
                   {apiStatus.message && (
                     <div
-                      className={`mt-2 text-center text-sm ${
-                        apiStatus.type === "success"
-                          ? "text-[#10b981]"
-                          : "text-[#ef4444]"
-                      }`}
+                      className="mt-2 text-center text-sm"
+                      style={{
+                        color:
+                          apiStatus.type === "success" ? GREEN : RED,
+                      }}
                     >
                       {apiStatus.message}
                     </div>
                   )}
-                  {/* --- Duplicate elements removed --- */}
-                </div>{" "}
-                {/* <<< Closing div for the "Welcome Back" section */}
-                {/* [FIX] This 'div' (line 206) was closing the content wrapper prematurely and has been removed. */}
+                </div>
+
                 {/* Divider */}
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[#3a3a35]" />
+                    <div
+                      className="w-full"
+                      style={{ borderTop: `1px solid ${BORDER}` }}
+                    />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-[#1a1a18] text-[#9ca3af]">
+                    <span
+                      className="px-4"
+                      style={{ backgroundColor: BG_CARD, color: GRAY }}
+                    >
                       or connect your hotel
                     </span>
                   </div>
                 </div>
+
                 {/* PMS Connect Section */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#10b981]/10 flex items-center justify-center">
-                      <Target className="w-4 h-4 text-[#10b981]" />
+                    <div
+                      className="w-8 h-8 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: `rgba(16, 185, 129, 0.15)` }}
+                    >
+                      <Target className="w-4 h-4" style={{ color: GREEN }} />
                     </div>
-                    <h3 className="text-xl text-[#e5e5e5]">
+                    <h3 className="text-xl" style={{ color: WHITE }}>
                       New to Market Pulse?
                     </h3>
                   </div>
@@ -249,7 +294,12 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                   <div className="space-y-3">
                     <Button
                       onClick={() => handlePMSConnect("Cloudbeds")}
-                      className="w-full h-12 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a]/50 transition-all"
+                      className="w-full h-12 transition-all"
+                      style={{
+                        backgroundColor: BG_INPUT,
+                        border: `1px solid ${BORDER}`,
+                        color: WHITE,
+                      }}
                     >
                       <div className="flex items-center justify-center gap-3">
                         <div className="w-6 h-6 rounded bg-[#4a9eff] flex items-center justify-center text-white text-xs font-bold">
@@ -261,7 +311,12 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
                     <Button
                       onClick={() => handlePMSConnect("Mews")}
-                      className="w-full h-12 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] hover:border-[#faff6a]/50 transition-all"
+                      className="w-full h-12 transition-all"
+                      style={{
+                        backgroundColor: BG_INPUT,
+                        border: `1px solid ${BORDER}`,
+                        color: WHITE,
+                      }}
                     >
                       <div className="flex items-center justify-center gap-3">
                         <div className="w-6 h-6 rounded bg-[#00c9a7] flex items-center justify-center text-white text-xs font-bold">
@@ -272,26 +327,31 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                     </Button>
                   </div>
 
-                  <p className="text-xs text-[#6b7280] text-center">
+                  <p
+                    className="text-xs text-center"
+                    style={{ color: DIM }}
+                  >
                     <Clock className="w-3 h-3 inline mr-1" />
                     Setup takes less than 5 minutes
                   </p>
                 </div>
               </div>
             </div>
+
             {/* Trust Badge */}
-            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-[#9ca3af]">
-              <Shield className="w-4 h-4 text-[#10b981]" />
+            <div
+              className="mt-6 flex items-center justify-center gap-2 text-sm"
+              style={{ color: GRAY }}
+            >
+              <Shield className="w-4 h-4" style={{ color: GREEN }} />
               <span>Your data is encrypted and secure</span>
-            </div>{" "}
-            {/* Closes the Trust Badge div */}
-          </div>{" "}
-          {/* Closes the Right: Card container div */}
-        </div>{" "}
-        {/* [FIX] Added missing closing tag for the main grid container (from line 113) */}
+            </div>
+          </div>
+        </div>
+
         {/* Scroll Indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce">
-          <ChevronRight className="w-6 h-6 text-[#faff6a] rotate-90" />
+          <ChevronRight className="w-6 h-6 rotate-90" style={{ color: BLUE }} />
         </div>
       </section>
 
@@ -299,89 +359,194 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       <section className="relative py-32 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Left: Mockup */}
+            {/* Left: Dashboard Mockup — mirrors actual dashboard card style */}
             <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-[#faff6a]/20 to-[#10b981]/20 blur-3xl opacity-50" />
-              <div className="relative bg-[#1a1a18] border border-[#3a3a35] rounded-xl p-6 shadow-2xl">
-                {/* Mock KPI Cards */}
+              <div
+                className="relative rounded-lg p-6 shadow-2xl"
+                style={{
+                  backgroundColor: BG_CARD,
+                  border: `1px solid ${BORDER}`,
+                }}
+              >
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-6">
-                    <h4 className="text-[#9ca3af] text-sm uppercase tracking-wider">
+                    <span
+                      style={{
+                        color: DIM,
+                        fontSize: "12px",
+                        textTransform: "uppercase",
+                        letterSpacing: "-0.025em",
+                      }}
+                    >
                       Today's Performance
-                    </h4>
-                    <div className="text-xs text-[#faff6a]">Live</div>
+                    </span>
+                    <span style={{ fontSize: "12px", color: GREEN }}>
+                      Live
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     {/* Occupancy Card */}
-                    <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4">
-                      <div className="text-[#9ca3af] text-xs mb-2">
+                    <div
+                      className="rounded-lg p-4"
+                      style={{
+                        backgroundColor: "#1D1D1C",
+                        border: `1px solid ${BORDER}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: DIM,
+                          fontSize: "10px",
+                          textTransform: "uppercase",
+                          letterSpacing: "-0.025em",
+                          marginBottom: "8px",
+                        }}
+                      >
                         Occupancy
                       </div>
                       <div className="flex items-end gap-4">
                         <div>
-                          <div className="text-[#6b7280] text-xs">You</div>
-                          <div className="text-[#e5e5e5] text-2xl">78.5%</div>
+                          <div style={{ color: DIM, fontSize: "10px" }}>You</div>
+                          <div style={{ color: BLUE, fontSize: "24px" }}>
+                            78.5%
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[#6b7280] text-xs">Market</div>
-                          <div className="text-[#9ca3af] text-2xl">72.1%</div>
+                          <div style={{ color: DIM, fontSize: "10px" }}>
+                            Market
+                          </div>
+                          <div style={{ color: GRAY, fontSize: "24px" }}>
+                            72.1%
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-2 flex items-center gap-1 text-[#10b981] text-xs">
+                      <div
+                        className="mt-2 flex items-center gap-1"
+                        style={{ color: GREEN, fontSize: "12px" }}
+                      >
                         <TrendingUp className="w-3 h-3" />
                         <span>+6.4% vs market</span>
                       </div>
                     </div>
 
                     {/* ADR Card */}
-                    <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4">
-                      <div className="text-[#9ca3af] text-xs mb-2">ADR</div>
+                    <div
+                      className="rounded-lg p-4"
+                      style={{
+                        backgroundColor: "#1D1D1C",
+                        border: `1px solid ${BORDER}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: DIM,
+                          fontSize: "10px",
+                          textTransform: "uppercase",
+                          letterSpacing: "-0.025em",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        ADR
+                      </div>
                       <div className="flex items-end gap-4">
                         <div>
-                          <div className="text-[#6b7280] text-xs">You</div>
-                          <div className="text-[#e5e5e5] text-2xl">$245</div>
+                          <div style={{ color: DIM, fontSize: "10px" }}>You</div>
+                          <div style={{ color: BLUE, fontSize: "24px" }}>
+                            £245
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[#6b7280] text-xs">Market</div>
-                          <div className="text-[#9ca3af] text-2xl">$238</div>
+                          <div style={{ color: DIM, fontSize: "10px" }}>
+                            Market
+                          </div>
+                          <div style={{ color: GRAY, fontSize: "24px" }}>
+                            £238
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-2 flex items-center gap-1 text-[#10b981] text-xs">
+                      <div
+                        className="mt-2 flex items-center gap-1"
+                        style={{ color: GREEN, fontSize: "12px" }}
+                      >
                         <TrendingUp className="w-3 h-3" />
                         <span>+2.9% vs market</span>
                       </div>
                     </div>
 
                     {/* RevPAR Card */}
-                    <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-4">
-                      <div className="text-[#9ca3af] text-xs mb-2">RevPAR</div>
+                    <div
+                      className="rounded-lg p-4"
+                      style={{
+                        backgroundColor: "#1D1D1C",
+                        border: `1px solid ${BORDER}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: DIM,
+                          fontSize: "10px",
+                          textTransform: "uppercase",
+                          letterSpacing: "-0.025em",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        RevPAR
+                      </div>
                       <div className="flex items-end gap-4">
                         <div>
-                          <div className="text-[#6b7280] text-xs">You</div>
-                          <div className="text-[#e5e5e5] text-2xl">$192</div>
+                          <div style={{ color: DIM, fontSize: "10px" }}>You</div>
+                          <div style={{ color: BLUE, fontSize: "24px" }}>
+                            £192
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[#6b7280] text-xs">Market</div>
-                          <div className="text-[#9ca3af] text-2xl">$172</div>
+                          <div style={{ color: DIM, fontSize: "10px" }}>
+                            Market
+                          </div>
+                          <div style={{ color: GRAY, fontSize: "24px" }}>
+                            £172
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-2 flex items-center gap-1 text-[#10b981] text-xs">
+                      <div
+                        className="mt-2 flex items-center gap-1"
+                        style={{ color: GREEN, fontSize: "12px" }}
+                      >
                         <TrendingUp className="w-3 h-3" />
                         <span>+11.6% vs market</span>
                       </div>
                     </div>
 
-                    {/* Market Rank Card */}
-                    <div className="bg-gradient-to-br from-[#faff6a]/10 to-transparent border border-[#faff6a]/30 rounded-lg p-4">
-                      <div className="text-[#faff6a] text-xs mb-2">
+                    {/* Market Rank Card — blue accent instead of yellow */}
+                    <div
+                      className="rounded-lg p-4"
+                      style={{
+                        background: `linear-gradient(to bottom right, rgba(57, 189, 248, 0.1), transparent)`,
+                        border: `1px solid rgba(57, 189, 248, 0.3)`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: BLUE,
+                          fontSize: "10px",
+                          textTransform: "uppercase",
+                          letterSpacing: "-0.025em",
+                          marginBottom: "8px",
+                        }}
+                      >
                         Market Rank
                       </div>
-                      <div className="text-[#faff6a] text-3xl font-bold">
+                      <div style={{ color: BLUE, fontSize: "32px", fontWeight: "bold" }}>
                         #2
                       </div>
-                      <div className="text-[#9ca3af] text-xs">of 15 hotels</div>
-                      <div className="mt-2 text-[#6b7280] text-xs">
+                      <div style={{ color: GRAY, fontSize: "12px" }}>
+                        of 15 hotels
+                      </div>
+                      <div
+                        className="mt-2"
+                        style={{ color: DIM, fontSize: "12px" }}
+                      >
                         by RevPAR
                       </div>
                     </div>
@@ -392,17 +557,23 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
             {/* Right: Content */}
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-full text-[#faff6a] text-sm">
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm"
+                style={{
+                  backgroundColor: `rgba(57, 189, 248, 0.15)`,
+                  color: BLUE,
+                }}
+              >
                 <BarChart3 className="w-4 h-4" />
                 <span>Live Dashboards</span>
               </div>
 
-              <h2 className="text-4xl text-[#e5e5e5]">
+              <h2 className="text-4xl" style={{ color: WHITE }}>
                 See exactly how you stack up.{" "}
-                <span className="text-[#faff6a]">Every single day.</span>
+                <span style={{ color: BLUE }}>Every single day.</span>
               </h2>
 
-              <p className="text-lg text-[#9ca3af] leading-relaxed">
+              <p className="text-lg leading-relaxed" style={{ color: GRAY }}>
                 Your performance metrics benchmarked against your competitive
                 set in real-time. No more waiting for weekly reports or manual
                 data entry. Market Pulse automatically syncs with your PMS and
@@ -428,12 +599,21 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                   },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-[#2C2C2C] border border-[#3a3a35] flex items-center justify-center flex-shrink-0">
-                      <item.icon className="w-5 h-5 text-[#faff6a]" />
+                    <div
+                      className="w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0"
+                      style={{
+                        backgroundColor: `rgba(57, 189, 248, 0.15)`,
+                      }}
+                    >
+                      <item.icon className="w-5 h-5" style={{ color: BLUE }} />
                     </div>
                     <div>
-                      <div className="text-[#e5e5e5] mb-1">{item.title}</div>
-                      <div className="text-sm text-[#9ca3af]">{item.desc}</div>
+                      <div className="mb-1" style={{ color: WHITE }}>
+                        {item.title}
+                      </div>
+                      <div className="text-sm" style={{ color: GRAY }}>
+                        {item.desc}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -444,42 +624,48 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       </section>
 
       {/* Feature Section 2: Advanced Reporting */}
-      <section className="relative py-32 px-6 bg-[#0d0d0c]">
+      <section
+        className="relative py-32 px-6"
+        style={{ backgroundColor: "#141414" }}
+      >
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Left: Content */}
             <div className="space-y-6 lg:order-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#10b981]/10 border border-[#10b981]/30 rounded-full text-[#10b981] text-sm">
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm"
+                style={{
+                  backgroundColor: `rgba(16, 185, 129, 0.15)`,
+                  color: GREEN,
+                }}
+              >
                 <LineChart className="w-4 h-4" />
                 <span>Advanced Analytics</span>
               </div>
 
-              <h2 className="text-4xl text-[#e5e5e5]">
+              <h2 className="text-4xl" style={{ color: WHITE }}>
                 Build reports that actually{" "}
-                <span className="text-[#faff6a]">answer your questions.</span>
+                <span style={{ color: BLUE }}>answer your questions.</span>
               </h2>
 
-              <p className="text-lg text-[#9ca3af] leading-relaxed">
+              <p className="text-lg leading-relaxed" style={{ color: GRAY }}>
                 Powerful reporting tools that go beyond basic dashboards.
                 Analyze trends, compare time periods, segment by property
                 attributes, and export custom datasets. All without touching a
                 spreadsheet.
               </p>
+
               <div className="grid grid-cols-2 gap-4 pt-4">
                 {[
-                  // [NEW] More compelling feature based on the OTA crawler
                   {
                     label: "Forward-Looking Demand",
                     value: "From live OTA data",
                   },
-                  // [NEW] More compelling feature based on the core value prop
                   {
                     label: "Comp Set Benchmarking",
                     value: "Track KPIs vs. your market",
                   },
-                  // [KEPT] This one is a good feature
                   { label: "Automated Delivery", value: "Email schedules" },
-                  // [NEW] More compelling feature based on dashboard
                   {
                     label: "Market Rank Tracking",
                     value: "See your rank by RevPAR",
@@ -487,115 +673,122 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                 ].map((stat, idx) => (
                   <div
                     key={idx}
-                    className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4"
+                    className="rounded-lg p-4"
+                    style={{
+                      backgroundColor: BG_CARD,
+                      border: `1px solid ${BORDER}`,
+                    }}
                   >
-                    <div className="text-[#9ca3af] text-xs mb-1">
+                    <div
+                      style={{
+                        color: DIM,
+                        fontSize: "10px",
+                        textTransform: "uppercase",
+                        letterSpacing: "-0.025em",
+                        marginBottom: "4px",
+                      }}
+                    >
                       {stat.label}
                     </div>
-                    <div className="text-[#faff6a]">{stat.value}</div>
+                    <div style={{ color: BLUE, fontSize: "14px" }}>
+                      {stat.value}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Right: Mockup */}
+            {/* Right: Report Table Mockup */}
             <div className="relative lg:order-2">
-              <div className="absolute -inset-4 bg-gradient-to-l from-[#10b981]/20 to-[#faff6a]/20 blur-3xl opacity-50" />
-              <div className="relative bg-[#1a1a18] border border-[#3a3a35] rounded-xl p-6 shadow-2xl">
-                {/* Mock Report Table */}
+              <div
+                className="relative rounded-lg p-6 shadow-2xl"
+                style={{
+                  backgroundColor: BG_CARD,
+                  border: `1px solid ${BORDER}`,
+                }}
+              >
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-[#e5e5e5]">Performance Report</h4>
-                    <div className="text-xs text-[#9ca3af]">Last 30 days</div>
+                    <span style={{ color: WHITE, fontSize: "14px" }}>
+                      Performance Report
+                    </span>
+                    <span style={{ color: DIM, fontSize: "12px" }}>
+                      Last 30 days
+                    </span>
                   </div>
 
                   {/* Table Header */}
-                  <div className="grid grid-cols-4 gap-2 pb-2 border-b border-[#3a3a35]">
-                    <div className="text-[#9ca3af] text-xs">Date</div>
-                    <div className="text-[#9ca3af] text-xs text-right">
+                  <div
+                    className="grid grid-cols-4 gap-2 pb-2"
+                    style={{ borderBottom: `1px solid ${BORDER}` }}
+                  >
+                    <div style={{ color: DIM, fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em" }}>
+                      Date
+                    </div>
+                    <div className="text-right" style={{ color: DIM, fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em" }}>
                       Occ %
                     </div>
-                    <div className="text-[#9ca3af] text-xs text-right">ADR</div>
-                    <div className="text-[#9ca3af] text-xs text-right">
+                    <div className="text-right" style={{ color: DIM, fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em" }}>
+                      ADR
+                    </div>
+                    <div className="text-right" style={{ color: DIM, fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em" }}>
                       RevPAR
                     </div>
                   </div>
 
                   {/* Table Rows */}
                   {[
-                    {
-                      date: "Dec 15",
-                      occ: "82.5%",
-                      adr: "$245",
-                      revpar: "$202",
-                      trend: "up",
-                    },
-                    {
-                      date: "Dec 14",
-                      occ: "79.2%",
-                      adr: "$238",
-                      revpar: "$188",
-                      trend: "up",
-                    },
-                    {
-                      date: "Dec 13",
-                      occ: "75.8%",
-                      adr: "$242",
-                      revpar: "$183",
-                      trend: "down",
-                    },
-                    {
-                      date: "Dec 12",
-                      occ: "88.1%",
-                      adr: "$251",
-                      revpar: "$221",
-                      trend: "up",
-                    },
-                    {
-                      date: "Dec 11",
-                      occ: "76.4%",
-                      adr: "$239",
-                      revpar: "$182",
-                      trend: "up",
-                    },
+                    { date: "Mar 15", occ: "82.5%", adr: "£245", revpar: "£202", trend: "up" },
+                    { date: "Mar 14", occ: "79.2%", adr: "£238", revpar: "£188", trend: "up" },
+                    { date: "Mar 13", occ: "75.8%", adr: "£242", revpar: "£183", trend: "down" },
+                    { date: "Mar 12", occ: "88.1%", adr: "£251", revpar: "£221", trend: "up" },
+                    { date: "Mar 11", occ: "76.4%", adr: "£239", revpar: "£182", trend: "up" },
                   ].map((row, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-4 gap-2 py-2 border-b border-[#3a3a35]/50 hover:bg-[#2C2C2C]/50 transition-colors"
+                      className="grid grid-cols-4 gap-2 py-2"
+                      style={{
+                        borderBottom: `1px solid rgba(42, 42, 42, 0.5)`,
+                        backgroundColor: "#1D1D1C",
+                        padding: "10px 0",
+                        transition: "background-color 0.2s",
+                      }}
                     >
-                      <div className="text-[#e5e5e5] text-sm">{row.date}</div>
-                      <div className="text-[#e5e5e5] text-sm text-right">
+                      <div style={{ color: WHITE, fontSize: "12px" }}>
+                        {row.date}
+                      </div>
+                      <div className="text-right" style={{ color: WHITE, fontSize: "12px" }}>
                         {row.occ}
                       </div>
-                      <div className="text-[#e5e5e5] text-sm text-right">
+                      <div className="text-right" style={{ color: WHITE, fontSize: "12px" }}>
                         {row.adr}
                       </div>
-                      <div className="text-[#e5e5e5] text-sm text-right flex items-center justify-end gap-1">
-                        {row.revpar}
+                      <div className="text-right flex items-center justify-end gap-1" style={{ fontSize: "12px" }}>
+                        <span style={{ color: WHITE }}>{row.revpar}</span>
                         <TrendingUp
-                          className={`w-3 h-3 ${
-                            row.trend === "up"
-                              ? "text-[#10b981]"
-                              : "text-[#ef4444]"
-                          }`}
+                          className="w-3 h-3"
+                          style={{
+                            color: row.trend === "up" ? GREEN : RED,
+                          }}
                         />
                       </div>
                     </div>
                   ))}
 
                   {/* Summary Row */}
-                  <div className="grid grid-cols-4 gap-2 pt-2 bg-[#2C2C2C] -mx-6 px-6 py-3">
-                    <div className="text-[#faff6a] text-sm">Average</div>
-                    <div className="text-[#faff6a] text-sm text-right">
+                  <div
+                    className="grid grid-cols-4 gap-2 -mx-6 px-6 py-3"
+                    style={{ backgroundColor: BG_INPUT }}
+                  >
+                    <div style={{ color: BLUE, fontSize: "12px" }}>Average</div>
+                    <div className="text-right" style={{ color: BLUE, fontSize: "12px" }}>
                       80.4%
                     </div>
-                    <div className="text-[#faff6a] text-sm text-right">
-                      $243
+                    <div className="text-right" style={{ color: BLUE, fontSize: "12px" }}>
+                      £243
                     </div>
-                    {/* [FIX] Replicate the flex structure from the data rows for perfect alignment */}
-                    <div className="text-[#faff6a] text-sm text-right flex items-center justify-end gap-1">
-                      <span>$195</span>
-                      {/* This invisible spacer has the same w-3 (width) as the icon, forcing alignment */}
+                    <div className="text-right flex items-center justify-end gap-1">
+                      <span style={{ color: BLUE, fontSize: "12px" }}>£195</span>
                       <div className="w-3 h-3" />
                     </div>
                   </div>
@@ -610,53 +803,82 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       <section className="relative py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-full text-[#faff6a] text-sm mb-6">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm mb-6"
+              style={{
+                backgroundColor: `rgba(57, 189, 248, 0.15)`,
+                color: BLUE,
+              }}
+            >
               <Calendar className="w-4 h-4" />
               <span>Market Intelligence</span>
             </div>
-            <h2 className="text-4xl text-[#e5e5e5] mb-4">
+            <h2 className="text-4xl mb-4" style={{ color: WHITE }}>
               Don't just track the past.{" "}
-              <span className="text-[#faff6a]">Predict the future.</span>
+              <span style={{ color: BLUE }}>Predict the future.</span>
             </h2>
-            <p className="text-lg text-[#9ca3af] max-w-2xl mx-auto">
+            <p className="text-lg max-w-2xl mx-auto" style={{ color: GRAY }}>
               Forward-looking demand data, seasonality trends, and neighborhood
               performance to help you make smarter pricing decisions.
             </p>
           </div>
 
-          {/* Actual Market Calendar (Static Preview) */}
+          {/* Calendar Preview */}
           <div className="relative">
-            <div className="absolute -inset-4 bg-gradient-to-r from-[#faff6a]/20 via-[#10b981]/20 to-[#faff6a]/20 blur-3xl opacity-50" />
-            <div className="relative bg-[#1a1a18] border border-[#3a3a35] rounded-xl overflow-hidden shadow-2xl">
-              {/* Fake Calendar Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#3a3a35] bg-[#232320]">
+            <div
+              className="relative rounded-lg overflow-hidden shadow-2xl"
+              style={{
+                backgroundColor: BG_CARD,
+                border: `1px solid ${BORDER}`,
+              }}
+            >
+              {/* Window chrome */}
+              <div
+                className="flex items-center justify-between px-4 py-3"
+                style={{
+                  borderBottom: `1px solid ${BORDER}`,
+                  backgroundColor: "#1D1D1C",
+                }}
+              >
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
-                  <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
-                  <div className="w-3 h-3 rounded-full bg-[#10b981]" />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: RED }} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: GREEN }} />
                 </div>
-                <div className="text-xs text-[#9ca3af] font-mono">
+                <div
+                  className="font-mono"
+                  style={{ fontSize: "12px", color: DIM }}
+                >
                   market_demand_forecast.pdf
                 </div>
               </div>
 
-              {/* Fake Calendar Grid */}
+              {/* Heatmap Grid */}
               <div className="p-6 grid grid-cols-7 gap-1 opacity-75">
                 {Array.from({ length: 28 }).map((_, i) => {
-                  // Generate random "heat map" colors for the preview
                   const intensity = [
-                    "bg-[#3b82f6]/20 border-[#3b82f6]/30", // Low
-                    "bg-[#faff6a]/20 border-[#faff6a]/30", // Med
-                    "bg-[#f97316]/20 border-[#f97316]/30", // High
-                    "bg-[#ef4444]/20 border-[#ef4444]/30", // Critical
+                    { bg: "rgba(57, 189, 248, 0.15)", border: "rgba(57, 189, 248, 0.25)" },
+                    { bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.25)" },
+                    { bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.25)" },
+                    { bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.25)" },
                   ][i % 4];
 
                   return (
                     <div
                       key={i}
-                      className={`h-12 rounded border ${intensity} flex items-center justify-center`}
+                      className="h-12 rounded flex items-center justify-center"
+                      style={{
+                        backgroundColor: intensity.bg,
+                        border: `1px solid ${intensity.border}`,
+                      }}
                     >
-                      <span className="text-[10px] text-[#e5e5e5] opacity-50">
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: WHITE,
+                          opacity: 0.5,
+                        }}
+                      >
                         {i + 1}
                       </span>
                     </div>
@@ -666,7 +888,14 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
               {/* Overlay Label */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-[#1a1a18]/90 backdrop-blur border border-[#faff6a]/30 px-6 py-3 rounded-full text-[#faff6a] text-sm font-medium">
+                <div
+                  className="backdrop-blur px-6 py-3 rounded-full text-sm font-medium"
+                  style={{
+                    backgroundColor: "rgba(26, 26, 26, 0.9)",
+                    border: `1px solid rgba(57, 189, 248, 0.3)`,
+                    color: BLUE,
+                  }}
+                >
                   Live Interactive Calendar
                 </div>
               </div>
@@ -676,13 +905,16 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       </section>
 
       {/* Social Proof / Trust Section */}
-      <section className="relative py-32 px-6 bg-[#0d0d0c]">
+      <section
+        className="relative py-32 px-6"
+        style={{ backgroundColor: "#141414" }}
+      >
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl text-[#e5e5e5] mb-4">
+            <h2 className="text-3xl mb-4" style={{ color: WHITE }}>
               Trusted by forward-thinking hoteliers
             </h2>
-            <p className="text-[#9ca3af]">
+            <p style={{ color: GRAY }}>
               Join hundreds of hotels using Market Pulse to optimize their
               revenue strategy
             </p>
@@ -715,20 +947,30 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
             ].map((testimonial, idx) => (
               <div
                 key={idx}
-                className="bg-[#1a1a18] border border-[#3a3a35] rounded-xl p-6 space-y-4"
+                className="rounded-lg p-6 space-y-4"
+                style={{
+                  backgroundColor: BG_CARD,
+                  border: `1px solid ${BORDER}`,
+                }}
               >
-                <div className="text-[#e5e5e5] leading-relaxed">
+                <div className="leading-relaxed" style={{ color: WHITE }}>
                   "{testimonial.quote}"
                 </div>
-                <div className="flex items-center gap-3 pt-4 border-t border-[#3a3a35]">
-                  <div className="w-10 h-10 rounded-full bg-[#3a3a35] flex items-center justify-center">
-                    <Users className="w-5 h-5 text-[#9ca3af]" />
+                <div
+                  className="flex items-center gap-3 pt-4"
+                  style={{ borderTop: `1px solid ${BORDER}` }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: BG_INPUT }}
+                  >
+                    <Users className="w-5 h-5" style={{ color: DIM }} />
                   </div>
                   <div>
-                    <div className="text-[#e5e5e5] text-sm">
+                    <div className="text-sm" style={{ color: WHITE }}>
                       {testimonial.author}
                     </div>
-                    <div className="text-[#9ca3af] text-xs">
+                    <div style={{ fontSize: "12px", color: DIM }}>
                       {testimonial.role}, {testimonial.type}
                     </div>
                   </div>
@@ -739,27 +981,49 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
           {/* Partner Logos */}
           <div className="text-center">
-            <div className="text-[#9ca3af] text-sm mb-6">
+            <div className="text-sm mb-6" style={{ color: GRAY }}>
               Integrated with leading PMS providers
             </div>
             <div className="flex items-center justify-center gap-12 flex-wrap">
-              <div className="flex items-center gap-2 px-6 py-3 bg-[#1a1a18] border border-[#3a3a35] rounded-lg">
+              <div
+                className="flex items-center gap-2 px-6 py-3 rounded-lg"
+                style={{
+                  backgroundColor: BG_CARD,
+                  border: `1px solid ${BORDER}`,
+                }}
+              >
                 <div className="w-8 h-8 rounded bg-[#4a9eff] flex items-center justify-center text-white font-bold">
                   CB
                 </div>
-                <span className="text-[#e5e5e5]">Cloudbeds</span>
+                <span style={{ color: WHITE }}>Cloudbeds</span>
               </div>
-              <div className="flex items-center gap-2 px-6 py-3 bg-[#1a1a18] border border-[#3a3a35] rounded-lg">
+              <div
+                className="flex items-center gap-2 px-6 py-3 rounded-lg"
+                style={{
+                  backgroundColor: BG_CARD,
+                  border: `1px solid ${BORDER}`,
+                }}
+              >
                 <div className="w-8 h-8 rounded bg-[#00c9a7] flex items-center justify-center text-white font-bold">
                   M
                 </div>
-                <span className="text-[#e5e5e5]">Mews</span>
+                <span style={{ color: WHITE }}>Mews</span>
               </div>
-              <div className="flex items-center gap-2 px-6 py-3 bg-[#1a1a18] border border-[#3a3a35] rounded-lg opacity-50">
-                <div className="w-8 h-8 rounded bg-[#6b7280] flex items-center justify-center text-white text-xs">
+              <div
+                className="flex items-center gap-2 px-6 py-3 rounded-lg"
+                style={{
+                  backgroundColor: BG_CARD,
+                  border: `1px solid ${BORDER}`,
+                  opacity: 0.5,
+                }}
+              >
+                <div
+                  className="w-8 h-8 rounded flex items-center justify-center text-white text-xs"
+                  style={{ backgroundColor: DIM }}
+                >
                   More
                 </div>
-                <span className="text-[#e5e5e5]">Coming Soon</span>
+                <span style={{ color: WHITE }}>Coming Soon</span>
               </div>
             </div>
           </div>
@@ -768,23 +1032,31 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
       {/* Final CTA Section */}
       <section className="relative py-32 px-6 overflow-hidden">
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#faff6a]/20 rounded-full blur-3xl" />
-        </div>
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to bottom right, rgba(57, 189, 248, 0.03), transparent, rgba(57, 189, 248, 0.03))`,
+          }}
+        />
 
         <div className="relative max-w-4xl mx-auto text-center">
-          <h2 className="text-5xl text-[#e5e5e5] mb-6">
+          <h2 className="text-5xl mb-6" style={{ color: WHITE }}>
             Ready to get the{" "}
-            <span className="text-[#faff6a]">sharpest view</span> of your
-            market?
+            <span style={{ color: BLUE }}>sharpest view</span> of your market?
           </h2>
-          <p className="text-xl text-[#9ca3af] mb-12">
+          <p className="text-xl mb-12" style={{ color: GRAY }}>
             Start analyzing your competitive position in under 5 minutes. No
             credit card required.
           </p>
 
-          {/* Simplified CTA Box */}
-          <div className="bg-[#1a1a18]/60 backdrop-blur-xl border border-[#3a3a35] rounded-2xl p-8 max-w-md mx-auto">
+          {/* CTA Box */}
+          <div
+            className="rounded-lg p-8 max-w-md mx-auto"
+            style={{
+              backgroundColor: BG_CARD,
+              border: `1px solid ${BORDER}`,
+            }}
+          >
             <div className="space-y-4">
               <form onSubmit={handleMagicLink} className="space-y-3">
                 <Input
@@ -792,12 +1064,22 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                   placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                  className="h-12"
+                  style={{
+                    backgroundColor: BG_INPUT,
+                    borderColor: BORDER,
+                    color: WHITE,
+                  }}
                 />
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-12 bg-[#faff6a] text-[#1a1a18] hover:bg-[#faff6a]/90 transition-all"
+                  className="w-full h-12 transition-all"
+                  style={{
+                    backgroundColor: BLUE,
+                    color: BG_PAGE,
+                    fontWeight: 600,
+                  }}
                 >
                   Get Started Free
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -806,17 +1088,30 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#3a3a35]" />
+                  <div
+                    className="w-full"
+                    style={{ borderTop: `1px solid ${BORDER}` }}
+                  />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-[#1a1a18] text-[#9ca3af]">or</span>
+                  <span
+                    className="px-4"
+                    style={{ backgroundColor: BG_CARD, color: GRAY }}
+                  >
+                    or
+                  </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   onClick={() => handlePMSConnect("Cloudbeds")}
-                  className="h-11 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] transition-all text-sm"
+                  className="h-11 transition-all text-sm"
+                  style={{
+                    backgroundColor: BG_INPUT,
+                    border: `1px solid ${BORDER}`,
+                    color: WHITE,
+                  }}
                 >
                   <div className="w-5 h-5 rounded bg-[#4a9eff] flex items-center justify-center text-white text-xs font-bold mr-2">
                     CB
@@ -825,7 +1120,12 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
                 </Button>
                 <Button
                   onClick={() => handlePMSConnect("Mews")}
-                  className="h-11 bg-[#2C2C2C] border border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] transition-all text-sm"
+                  className="h-11 transition-all text-sm"
+                  style={{
+                    backgroundColor: BG_INPUT,
+                    border: `1px solid ${BORDER}`,
+                    color: WHITE,
+                  }}
                 >
                   <div className="w-5 h-5 rounded bg-[#00c9a7] flex items-center justify-center text-white text-xs font-bold mr-2">
                     M
@@ -836,17 +1136,20 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-6 mt-8 text-sm text-[#9ca3af]">
+          <div
+            className="flex items-center justify-center gap-6 mt-8 text-sm"
+            style={{ color: GRAY }}
+          >
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#10b981]" />
+              <Check className="w-4 h-4" style={{ color: GREEN }} />
               <span>100% Free</span>
             </div>
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#10b981]" />
+              <Check className="w-4 h-4" style={{ color: GREEN }} />
               <span>No Credit Card</span>
             </div>
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#10b981]" />
+              <Check className="w-4 h-4" style={{ color: GREEN }} />
               <span>5 Min Setup</span>
             </div>
           </div>
@@ -854,41 +1157,64 @@ export function LandingPage({ onSignIn, onViewChange }: LandingPageProps) {
       </section>
 
       {/* Footer */}
-      <footer className="relative border-t border-[#3a3a35] py-12 px-6">
+      <footer
+        className="relative py-12 px-6"
+        style={{ borderTop: `1px solid ${BORDER}` }}
+      >
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#faff6a] flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-[#1a1a18]" />
-              </div>
-              <span className="text-[#e5e5e5] text-xl">Market Pulse</span>
+            {/* Logo */}
+            <div className="flex items-center gap-1">
+              <span style={{ color: BLUE, fontSize: "24px" }}>(</span>
+              <span
+                style={{
+                  color: WHITE,
+                  fontSize: "14px",
+                  letterSpacing: "0.025em",
+                  position: "relative",
+                  top: "2px",
+                }}
+              >
+                MARKET PULSE
+              </span>
+              <span style={{ color: BLUE, fontSize: "24px" }}>)</span>
             </div>
 
-            <div className="flex items-center gap-8 text-sm text-[#9ca3af]">
-              {/* [NEW] Changed to buttons that call the onViewChange handler */}
+            <div
+              className="flex items-center gap-8 text-sm"
+              style={{ color: GRAY }}
+            >
               <button
                 onClick={() => onViewChange("privacy")}
-                className="hover:text-[#faff6a] transition-colors"
+                className="transition-colors"
+                style={{ color: GRAY }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = BLUE)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = GRAY)}
               >
                 Privacy Policy
               </button>
               <button
                 onClick={() => onViewChange("terms")}
-                className="hover:text-[#faff6a] transition-colors"
+                className="transition-colors"
+                style={{ color: GRAY }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = BLUE)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = GRAY)}
               >
                 Terms of Service
               </button>
-              {/* [NEW] Changed contact to a standard mailto link */}
               <a
                 href="mailto:support@marketpulse.com"
-                className="hover:text-[#faff6a] transition-colors"
+                className="transition-colors"
+                style={{ color: GRAY }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = BLUE)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = GRAY)}
               >
                 Contact
               </a>
             </div>
 
-            <div className="text-sm text-[#6b7280]">
-              © 2025 Market Pulse. All rights reserved.
+            <div className="text-sm" style={{ color: DIM }}>
+              &copy; 2026 Market Pulse. All rights reserved.
             </div>
           </div>
         </div>
