@@ -263,7 +263,7 @@ class SentinelBridgeService {
         // --- GATE 1: PERMISSION (Is Autopilot ON?) ---
         // [FIX] Also fetch rate_id_map to build the PMS payload later
         const configRes = await client.query(
-          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map, room_differentials 
+          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map, room_differentials, last_minute_floor
            FROM sentinel_configurations WHERE hotel_id = $1::int`,
           [hotelId],
         );
@@ -390,7 +390,7 @@ class SentinelBridgeService {
 
           // --- GATE 2: POLICY (Hard Bounds) ---
 
-          // 2a. Min Rate Check
+          // 2a. Min Rate Check (with LMF override)
           const monthNames = [
             "jan",
             "feb",
@@ -406,7 +406,22 @@ class SentinelBridgeService {
             "dec",
           ];
           const monthKey = monthNames[stayDateObj.getMonth()];
-          const minRate = parseFloat(minRates[monthKey] || 0);
+          const monthlyMin = parseFloat(minRates[monthKey] || 0);
+
+          // Last-Minute Floor: if active for this date, it REPLACES the monthly min
+          const lmf = config.last_minute_floor || {};
+          const lmfEnabled = lmf.enabled || false;
+          const lmfDays = parseInt(lmf.days || "0", 10);
+          const lmfRate = parseFloat(lmf.rate || "0");
+          const lmfDow = new Set(lmf.dow || []);
+          const dayNamesLmf = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+          const dowStr = dayNamesLmf[stayDateObj.getUTCDay()];
+
+          let minRate = monthlyMin;
+          if (lmfEnabled && daysUntilStay <= lmfDays && lmfDow.has(dowStr)) {
+            minRate = lmfRate; // LMF floor replaces monthly min
+          }
+
           if (safeRate < minRate) safeRate = minRate;
 
           // 2b. Dynamic Ceiling Check (94th Percentile Cap)
