@@ -662,4 +662,44 @@ class SentinelBridgeService {
   }
 }
 
+  /**
+   * [RETRY] Sweep unapplied predictions and re-process them through autonomy gates.
+   * Fetches all is_applied=FALSE predictions for future dates and feeds them
+   * back through saveDecisions() as if the DGX just sent them.
+   */
+  async retryUnapplied() {
+    console.log("[Bridge] Starting retry sweep for unapplied predictions...");
+    const result = await db.query(
+      `SELECT DISTINCT ON (hotel_id, room_type_id, stay_date)
+         hotel_id, room_type_id, stay_date, suggested_rate, confidence_score, reasoning, model_version
+       FROM sentinel_ai_predictions
+       WHERE is_applied = FALSE AND stay_date >= CURRENT_DATE
+       ORDER BY hotel_id, room_type_id, stay_date, created_at DESC`
+    );
+
+    if (result.rows.length === 0) {
+      console.log("[Bridge] No unapplied predictions to retry.");
+      return { retried: 0, queued: 0 };
+    }
+
+    console.log(`[Bridge] Found ${result.rows.length} unapplied predictions. Re-processing...`);
+
+    // Re-format as DGX-style decisions payload
+    const decisions = result.rows.map((r) => ({
+      hotel_id: r.hotel_id,
+      room_type_id: r.room_type_id,
+      stay_date: new Date(r.stay_date).toISOString().split("T")[0],
+      suggested_rate: parseFloat(r.suggested_rate),
+      confidence_score: parseFloat(r.confidence_score) || 0,
+      reasoning: r.reasoning || "Retry sweep",
+      model_version: r.model_version || "v1.0-retry",
+    }));
+
+    // Feed through the same saveDecisions pipeline
+    const saveResult = await this.saveDecisions(decisions);
+    console.log(`[Bridge] Retry sweep complete: ${saveResult.saved} processed, ${saveResult.queued} queued.`);
+    return { retried: decisions.length, queued: saveResult.queued };
+  }
+}
+
 module.exports = new SentinelBridgeService();

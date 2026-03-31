@@ -73,4 +73,21 @@ router.post("/decisions", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bridge/retry-unapplied
+ * Sweeps all is_applied=FALSE predictions and re-processes them through autonomy gates.
+ */
+router.post("/retry-unapplied", async (req, res) => {
+  try {
+    const result = await bridgeService.retryUnapplied();
+    res.status(200).json({
+      success: true,
+      message: `Retry sweep: ${result.retried} predictions re-processed, ${result.queued} queued for PMS.`,
+    });
+  } catch (error) {
+    console.error("[Bridge] Retry sweep failed:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;
