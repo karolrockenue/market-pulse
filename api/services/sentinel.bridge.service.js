@@ -362,15 +362,6 @@ class SentinelBridgeService {
         const validUpdates = [];
         let skFrozen = 0, skManual = 0, skSanity = 0, skDelta = 0, skRateMap = 0;
 
-        // [DEBUG] Log first 3 predictions to trace gate behavior
-        const debugSample = hotelDecisions.slice(0, 3);
-        for (const s of debugSample) {
-          const dStr = new Date(s.stay_date).toISOString().split("T")[0];
-          const k = `${s.room_type_id}_${dStr}`;
-          const cal = calendarMap[k];
-          console.log(`[Autonomy Debug] Hotel ${hotelId} | ${dStr} | room=${s.room_type_id} | aiRate=${s.suggested_rate} | calKey=${k} | calFound=${!!cal} | calRate=${cal?.rate} | calSource=${cal?.source}`);
-        }
-
         for (const pred of hotelDecisions) {
           const dateStr = new Date(pred.stay_date).toISOString().split("T")[0];
           const stayDateObj = new Date(pred.stay_date);
@@ -385,14 +376,14 @@ class SentinelBridgeService {
             continue; // Frozen period
           }
 
-          // 3b. Manual Lock (Human Override)
+          // 3b. Explicit Lock Check
           const key = `${pred.room_type_id}_${dateStr}`;
           const currentData = calendarMap[key] || {};
           const currentSource = (currentData.source || "").toUpperCase();
 
-          // AI is FORBIDDEN from touching MANUAL (Market Pulse) or PMS_LOCKED.
-          // AI IS ALLOWED to overwrite SYNC (Cloudbeds) and SENTINEL.
-          if (currentSource === "MANUAL" || currentSource === "PMS_LOCKED") {
+          // AI only respects explicit LOCKED (padlock) and PMS_LOCKED sources.
+          // MANUAL (Rate Manager saves) and SYNC are now overridable by autopilot.
+          if (currentSource === "LOCKED" || currentSource === "PMS_LOCKED") {
             skManual++;
             continue;
           }
@@ -440,9 +431,6 @@ class SentinelBridgeService {
             Math.abs(safeRate - currentRate) < 1.0
           ) {
             skDelta++;
-            if (skDelta <= 3) {
-              console.log(`[Autonomy Delta Skip] Hotel ${hotelId} | ${dateStr} | ai=${safeRate} | cal=${currentRate} | diff=${Math.abs(safeRate - currentRate).toFixed(2)}`);
-            }
             continue; // No change needed (Price change is insignificant)
           }
 
