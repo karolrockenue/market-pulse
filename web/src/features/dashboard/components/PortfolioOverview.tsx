@@ -361,7 +361,7 @@ export function PortfolioOverview() {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(135deg, rgba(57, 189, 248, 0.01) 0%, transparent 50%, rgba(250, 255, 106, 0.01) 100%)",
+            "linear-gradient(135deg, rgba(57, 189, 248, 0.01) 0%, transparent 50%, rgba(57, 189, 248, 0.01) 100%)",
         }}
       />
       <div
@@ -535,7 +535,7 @@ export function PortfolioOverview() {
                       color: matrixMetric === m ? "#e5e5e5" : "#6b7280",
                       border:
                         matrixMetric === m
-                          ? "1px solid #3a3a3a"
+                          ? "1px solid #2a2a2a"
                           : "1px solid #2a2a2a",
                     }}
                   >
@@ -560,7 +560,7 @@ export function PortfolioOverview() {
                 <SelectTrigger
                   style={{
                     width: "200px",
-                    backgroundColor: "#0a0a0a",
+                    backgroundColor: "#1d1d1c",
                     borderColor: "#2a2a2a",
                     color: "#e5e5e5",
                     height: "2.25rem",
@@ -608,7 +608,7 @@ export function PortfolioOverview() {
                     style={{
                       width: "220px",
                       justifyContent: "space-between",
-                      backgroundColor: "#0a0a0a",
+                      backgroundColor: "#1d1d1c",
                       border: "1px solid #2a2a2a",
                       color: "#e5e5e5",
                       height: "2.25rem",
@@ -986,7 +986,7 @@ export function PortfolioOverview() {
                 <div
                   style={{
                     padding: "1rem 1.5rem",
-                    background: "#0f0f0f",
+                    background: "#1d1d1c",
                     borderBottom: "1px solid #2a2a2a",
                     display: "flex",
                     justifyContent: "space-between",

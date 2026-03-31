@@ -47,7 +47,7 @@ function MarketDemandPatterns({ patterns }: { patterns: any }) {
   return (
     <div className="grid grid-cols-2 gap-6">
       {/* Busiest Days Card */}
-      <div className="bg-[#1A1A1A] border border-[#3a3a35] rounded-lg p-4">
+      <div className="bg-[#1A1A1A] border border-[#2a2a2a] rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-full bg-[#ef4444]/20 flex items-center justify-center">
             <TrendingUp className="w-4 h-4 text-[#ef4444]" />
@@ -87,7 +87,7 @@ function MarketDemandPatterns({ patterns }: { patterns: any }) {
       </div>
 
       {/* Quietest Days Card */}
-      <div className="bg-[#1A1A1A] border border-[#3a3a35] rounded-lg p-4">
+      <div className="bg-[#1A1A1A] border border-[#2a2a2a] rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-full bg-[#10b981]/20 flex items-center justify-center">
             <TrendingDown className="w-4 h-4 text-[#10b981]" />
@@ -456,7 +456,7 @@ export function DemandPace({
   // Helper function for price index color
   const getPriceIndexColor = (index: number) => {
     if (index >= 90) return "#ef4444";
-    if (index >= 40) return "#faff6a";
+    if (index >= 40) return "#f59e0b";
     return "#3b82f6";
   };
 
@@ -499,7 +499,7 @@ export function DemandPace({
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100vh",
-          background: "#252521",
+          background: "#1d1d1c",
           color: "#e5e5e5",
           padding: "24px",
           textAlign: "center",
@@ -513,7 +513,7 @@ export function DemandPace({
         <code
           style={{
             background: "#1a1a18",
-            border: "1px solid #3a3a35",
+            border: "1px solid #2a2a2a",
             padding: "8px 12px",
             borderRadius: "4px",
             marginTop: "12px",
@@ -596,8 +596,8 @@ export function DemandPace({
               display: "inline-flex",
               alignItems: "center",
               gap: "8px",
-              backgroundColor: "#262626",
-              border: "1px solid #3a3a35",
+              backgroundColor: "#2C2C2C",
+              border: "1px solid #2a2a2a",
               borderRadius: "9999px",
               padding: "8px 16px",
             }}
@@ -632,7 +632,7 @@ export function DemandPace({
             style={{
               backgroundColor: "#1A1A1A",
               borderRadius: "8px",
-              border: "1px solid #3a3a35",
+              border: "1px solid #2a2a2a",
               padding: "20px",
             }}
           >
@@ -672,25 +672,25 @@ export function DemandPace({
                   value={paceAnalysisPeriod}
                   onValueChange={setPaceAnalysisPeriod}
                 >
-                  <SelectTrigger className="w-[120px] h-8 bg-[#1f1f1c] border-[#3a3a35] text-[#e5e5e5]">
+                  <SelectTrigger className="w-[120px] h-8 bg-[#1d1d1c] border-[#2a2a2a] text-[#e5e5e5]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1f1f1c] border-[#3a3a35]">
+                  <SelectContent className="bg-[#1d1d1c] border-[#2a2a2a]">
                     <SelectItem
                       value="1"
-                      className="text-[#e5e5e5] focus:bg-[#262626] focus:text-[#39BDF8]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
                     >
                       1 Day
                     </SelectItem>
                     <SelectItem
                       value="3"
-                      className="text-[#e5e5e5] focus:bg-[#262626] focus:text-[#39BDF8]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
                     >
                       3 Days
                     </SelectItem>
                     <SelectItem
                       value="7"
-                      className="text-[#e5e5e5] focus:bg-[#262626] focus:text-[#39BDF8]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
                     >
                       7 Days
                     </SelectItem>
@@ -702,17 +702,17 @@ export function DemandPace({
             {/* Charts Container */}
             <div
               style={{
-                backgroundColor: "#1f1f1c",
+                backgroundColor: "#1d1d1c",
                 borderRadius: "8px",
-                border: "1px solid #3a3a35",
+                border: "1px solid #2a2a2a",
               }}
             >
               {/* Chart 1: Market Demand / Supply Landscape */}
               <div
                 style={{
                   padding: "20px",
-                  borderBottom: "1px solid #3a3a35",
-                  backgroundColor: "#1f1f1c",
+                  borderBottom: "1px solid #2a2a2a",
+                  backgroundColor: "#1d1d1c",
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
@@ -734,40 +734,40 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a25"
+                        stroke="#2a2a2a"
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         interval={6}
                       />
                       <YAxis
                         yAxisId="left"
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         width={45}
                         domain={[0, 100]}
                       />
                       <YAxis
                         yAxisId="right"
                         orientation="right"
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         width={45}
                         domain={[0, "auto"]}
                       />
                       <Tooltip
-                        cursor={{ fill: "rgba(250, 255, 106, 0.1)" }}
+                        cursor={{ fill: "rgba(57, 189, 248, 0.08)" }}
                         labelFormatter={(label, payload) => {
                           if (payload && payload.length) {
                             return payload[0].payload.fullDate;
@@ -775,8 +775,8 @@ export function DemandPace({
                           return label;
                         }}
                         contentStyle={{
-                          backgroundColor: "rgba(26, 26, 24, 0.95)",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "rgba(26, 26, 26, 0.95)",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "4px",
                           padding: "8px",
                         }}
@@ -811,7 +811,7 @@ export function DemandPace({
                           } else if (demand >= 70) {
                             fill = "#f97316";
                           } else if (demand >= 40) {
-                            fill = "#faff6a";
+                            fill = "#f59e0b";
                           }
 
                           return <Cell key={`cell-${index}`} fill={fill} />;
@@ -826,8 +826,8 @@ export function DemandPace({
               <div
                 style={{
                   padding: "20px",
-                  borderBottom: "1px solid #3a3a35",
-                  backgroundColor: "#1f1f1c",
+                  borderBottom: "1px solid #2a2a2a",
+                  backgroundColor: "#1d1d1c",
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
@@ -849,24 +849,24 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a25"
+                        stroke="#2a2a2a"
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         interval={6}
                       />
                       <YAxis
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         width={45}
                         domain={[0, 100]}
                       />
@@ -880,8 +880,8 @@ export function DemandPace({
                         }}
                         formatter={(value) => Math.round(value as number)}
                         contentStyle={{
-                          backgroundColor: "rgba(26, 26, 24, 0.95)",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "rgba(26, 26, 26, 0.95)",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "4px",
                           padding: "8px",
                         }}
@@ -920,8 +920,8 @@ export function DemandPace({
               <div
                 style={{
                   padding: "20px",
-                  borderBottom: "1px solid #3a3a35",
-                  backgroundColor: "#1f1f1c",
+                  borderBottom: "1px solid #2a2a2a",
+                  backgroundColor: "#1d1d1c",
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
@@ -943,24 +943,24 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a25"
+                        stroke="#2a2a2a"
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         interval={6}
                       />
                       <YAxis
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         width={45}
                         label={{
                           value: `Price Change (${currencySymbol})`,
@@ -971,7 +971,7 @@ export function DemandPace({
                         }}
                       />
                       <Tooltip
-                        cursor={{ fill: "rgba(250, 255, 106, 0.1)" }}
+                        cursor={{ fill: "rgba(57, 189, 248, 0.08)" }}
                         labelFormatter={(label, payload) => {
                           if (payload && payload.length) {
                             return payload[0].payload.fullDate;
@@ -979,8 +979,8 @@ export function DemandPace({
                           return label;
                         }}
                         contentStyle={{
-                          backgroundColor: "rgba(26, 26, 24, 0.95)",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "rgba(26, 26, 26, 0.95)",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "4px",
                           padding: "8px",
                         }}
@@ -1011,7 +1011,7 @@ export function DemandPace({
               <div
                 style={{
                   padding: "20px",
-                  backgroundColor: "#1f1f1c",
+                  backgroundColor: "#1d1d1c",
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
@@ -1034,24 +1034,24 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a25"
+                        stroke="#2a2a2a"
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         interval={6}
                       />
                       <YAxis
-                        stroke="#3a3a35"
+                        stroke="#2a2a2a"
                         tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#3a3a35" }}
-                        axisLine={{ stroke: "#3a3a35" }}
+                        tickLine={{ stroke: "#2a2a2a" }}
+                        axisLine={{ stroke: "#2a2a2a" }}
                         width={45}
                         label={{
                           value: "Supply Change (%)",
@@ -1062,7 +1062,7 @@ export function DemandPace({
                         }}
                       />
                       <Tooltip
-                        cursor={{ fill: "rgba(250, 255, 106, 0.1)" }}
+                        cursor={{ fill: "rgba(57, 189, 248, 0.08)" }}
                         labelFormatter={(label, payload) => {
                           if (payload && payload.length) {
                             return payload[0].payload.fullDate;
@@ -1071,8 +1071,8 @@ export function DemandPace({
                         }}
                         formatter={(value) => [`${value}%`, "Supply Change"]}
                         contentStyle={{
-                          backgroundColor: "rgba(26, 26, 24, 0.95)",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "rgba(26, 26, 26, 0.95)",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "4px",
                           padding: "8px",
                         }}

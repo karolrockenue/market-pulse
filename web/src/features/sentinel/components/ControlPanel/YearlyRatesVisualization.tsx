@@ -342,7 +342,7 @@ export function YearlyRatesVisualization({
                                   left: "0",
                                   right: "0",
                                   height: "2px",
-                                  backgroundColor: "#faff6a",
+                                  backgroundColor: "#39BDF8",
                                   borderRadius: "1px",
                                 }}
                               />
@@ -443,7 +443,7 @@ export function YearlyRatesVisualization({
                 </span>
                 <span
                   style={{
-                    color: "#faff6a",
+                    color: "#39BDF8",
                     fontWeight: "600",
                     fontSize: "14px",
                   }}
@@ -563,7 +563,7 @@ export function YearlyRatesVisualization({
                   style={{
                     width: "16px",
                     height: "2px",
-                    backgroundColor: "#faff6a",
+                    backgroundColor: "#39BDF8",
                     borderRadius: "1px",
                   }}
                 />

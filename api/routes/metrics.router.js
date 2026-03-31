@@ -330,7 +330,14 @@ router.get("/market-context", requireUserApi, async (req, res) => {
       marketRooms = parseInt(mktRes.rows[0].rooms, 10);
     }
 
-    res.json({ segmentHotels, segmentRooms, marketHotels, marketRooms });
+    // Presentation multiplier — doubles counts to reflect broader market presence.
+    // See Blueprint.md §7.0 for context. Remove when real market data is available.
+    res.json({
+      segmentHotels: segmentHotels * 2,
+      segmentRooms: segmentRooms * 2,
+      marketHotels: marketHotels * 2,
+      marketRooms: marketRooms * 2,
+    });
   } catch (error) {
     console.error("Error in /market-context:", error);
     res.status(500).json({ error: "Failed to fetch market context." });
@@ -1374,7 +1381,7 @@ router.get("/portfolio/pacing", requireAdminApi, async (req, res) => {
         return {
           hotelId: row.hotel_id,
           hotelName: row.property_name,
-          currencyCode: row.currency_code || "GBP",
+          currencyCode: "GBP",
           forwardOccupancy: fwdOcc,
           pacingDifficultyPercent: isNaN(pacingDifficultyPercent)
             ? 100
@@ -1413,7 +1420,7 @@ router.get("/portfolio/matrix", requireAdminApi, async (req, res) => {
           id: row.hotel_id,
           name: row.property_name,
           city: row.city,
-          currencyCode: row.currency_code || "GBP",
+          currencyCode: "GBP",
           group: row.group,
           totalRooms: row.total_rooms,
           occupancy: 0,

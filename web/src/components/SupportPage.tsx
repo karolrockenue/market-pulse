@@ -95,14 +95,14 @@ return (
         <div className="mb-8">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-[#9ca3af] hover:text-[#faff6a] transition-colors mb-6"
+            className="flex items-center gap-2 text-[#9ca3af] hover:text-[#39BDF8] transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back</span>
           </button>
 
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-1 h-8 bg-[#faff6a]" />
+            <div className="w-1 h-8 bg-[#39BDF8]" />
             <h1 className="text-[#e5e5e5] tracking-wide">Support Center</h1>
           </div>
           <p className="text-[#9ca3af] ml-4">
@@ -134,13 +134,13 @@ return (
                             onClick={() => setRequestType(type.value)}
                             className={`p-4 rounded-lg border-2 transition-all ${
                               requestType === type.value
-                                ? 'border-[#faff6a] bg-[#faff6a]/5'
-                                : 'border-[#2C2C2C] bg-[#252521] hover:border-[#3a3a35]'
+                                ? 'border-[#39BDF8] bg-[#39BDF8]/5'
+                                : 'border-[#2C2C2C] bg-[#1d1d1c] hover:border-[#2a2a2a]'
                             }`}
                           >
                             <Icon
                               className={`w-6 h-6 mx-auto mb-2 ${
-                                requestType === type.value ? 'text-[#faff6a]' : 'text-[#9ca3af]'
+                                requestType === type.value ? 'text-[#39BDF8]' : 'text-[#9ca3af]'
                               }`}
                             />
                             <div
@@ -168,7 +168,7 @@ return (
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="bg-[#1d1d1c] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
                   </div>
 
@@ -190,7 +190,7 @@ return (
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       required
-                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
+                      className="bg-[#1d1d1c] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280]"
                     />
                   </div>
 
@@ -203,7 +203,7 @@ return (
                       <Select value={pmsType} onValueChange={setPmsType} required>
                         <SelectTrigger
                           id="pms-type"
-                          className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5]"
+                          className="bg-[#1d1d1c] border-[#2C2C2C] text-[#e5e5e5]"
                         >
                           <SelectValue placeholder="Select your PMS" />
                         </SelectTrigger>
@@ -240,18 +240,18 @@ return (
                       onChange={(e) => setMessage(e.target.value)}
                       required
                       rows={6}
-                      className="bg-[#252521] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280] resize-none"
+                      className="bg-[#1d1d1c] border-[#2C2C2C] text-[#e5e5e5] placeholder:text-[#6b7280] resize-none"
                     />
                   </div>
 {/* Submit Button */}
 <Button
   type="submit"
-  className="w-full bg-[#faff6a] text-[#1f1f1c] hover:bg-[#f0f055] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+  className="w-full bg-[#39BDF8] text-[#1d1d1c] hover:bg-[#f0f055] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
   disabled={isSubmitting} // [NEW] Disable button while submitting
 >
   {isSubmitting ? (
     // [NEW] Show a loading spinner
-    <div className="w-4 h-4 border-2 border-[#1f1f1c] border-t-transparent border-solid rounded-full animate-spin mr-2" />
+    <div className="w-4 h-4 border-2 border-[#1d1d1c] border-t-transparent border-solid rounded-full animate-spin mr-2" />
   ) : (
     // [MODIFIED] Show the icon only when not loading
     <Send className="w-4 h-4 mr-2" />
@@ -269,7 +269,7 @@ return (
             {/* Direct Contact */}
             <Card className="bg-[#1a1a18] border-[#2C2C2C] p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Mail className="w-5 h-5 text-[#faff6a]" />
+                <Mail className="w-5 h-5 text-[#39BDF8]" />
                 <h3 className="text-[#e5e5e5]">Direct Contact</h3>
               </div>
               <p className="text-[#9ca3af] text-sm mb-4">
@@ -280,7 +280,7 @@ return (
                   <div className="text-xs text-[#6b7280] mb-1">Email Support</div>
                   <a
                     href="mailto:support@market-pulse.io"
-                    className="text-[#faff6a] hover:text-[#f0f055] transition-colors text-sm"
+                    className="text-[#39BDF8] hover:text-[#f0f055] transition-colors text-sm"
                   >
                    support@market-pulse.io
                   </a>
@@ -294,19 +294,19 @@ return (
               <h3 className="text-[#e5e5e5] mb-3">Response Time</h3>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#faff6a] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#39BDF8] mt-1.5" />
                   <span className="text-[#9ca3af]">
                     <span className="text-[#e5e5e5]">General inquiries:</span> Within 24 hours
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#faff6a] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#39BDF8] mt-1.5" />
                   <span className="text-[#9ca3af]">
                     <span className="text-[#e5e5e5]">Feature requests:</span> 2-3 business days
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#faff6a] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#39BDF8] mt-1.5" />
                   <span className="text-[#9ca3af]">
                     <span className="text-[#e5e5e5]">PMS integrations:</span> 3-5 business days
                   </span>
@@ -319,19 +319,19 @@ return (
               <h3 className="text-[#e5e5e5] mb-3">Popular Requests</h3>
               <ul className="space-y-2 text-sm text-[#9ca3af]">
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#3a3a35] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a2a] mt-1.5" />
                   <span>Custom report templates</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#3a3a35] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a2a] mt-1.5" />
                   <span>Mobile app for iOS/Android</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#3a3a35] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a2a] mt-1.5" />
                   <span>Multi-property dashboards</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#3a3a35] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a2a] mt-1.5" />
                   <span>Advanced forecasting tools</span>
                 </li>
               </ul>

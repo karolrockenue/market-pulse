@@ -157,7 +157,7 @@ export default function AdminHub() {
           style={{
             backgroundColor: "#1A1A1A",
             borderRadius: "8px",
-            border: "1px solid #3a3a35",
+            border: "1px solid #2a2a2a",
             padding: "24px",
           }}
         >
@@ -175,8 +175,8 @@ export default function AdminHub() {
                 style={{
                   width: "288px",
                   height: "36px",
-                  backgroundColor: "#1f1f1c",
-                  borderColor: "#3a3a35",
+                  backgroundColor: "#1d1d1c",
+                  borderColor: "#2a2a2a",
                   color: "#e5e5e5",
                 }}
               >
@@ -185,7 +185,7 @@ export default function AdminHub() {
               <SelectContent
                 style={{
                   backgroundColor: "#2C2C2C",
-                  borderColor: "#3a3a35",
+                  borderColor: "#2a2a2a",
                   color: "#e5e5e5",
                 }}
               >

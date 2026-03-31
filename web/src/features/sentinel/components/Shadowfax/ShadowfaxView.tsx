@@ -171,7 +171,7 @@ export function ShadowfaxView() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <Switch id="member-discount" checked={applyGeniusDiscount} onCheckedChange={setApplyGeniusDiscount} />
                     <Label htmlFor="member-discount" style={{ color: '#e5e5e5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Percent className="w-4 h-4" style={{ color: '#faff6a' }} /> Member Discount Adjustment
+                      <Percent className="w-4 h-4" style={{ color: '#39BDF8' }} /> Member Discount Adjustment
                     </Label>
                   </div>
                 </div>
@@ -233,7 +233,7 @@ export function ShadowfaxView() {
                                     {adj ? (
                                       <>
                                         <div className="text-[#9ca3af] line-through text-[10px]">{res.price}</div>
-                                        <div className="text-[#faff6a] text-sm font-medium">{adj}</div>
+                                        <div className="text-[#39BDF8] text-sm font-medium">{adj}</div>
                                       </>
                                     ) : <div className="text-[#e5e5e5] text-sm font-medium">{res.price}</div>}
                                     <div className="text-[#6b7280] text-[10px] truncate max-w-[120px] mx-auto mt-1">{res.roomName}</div>

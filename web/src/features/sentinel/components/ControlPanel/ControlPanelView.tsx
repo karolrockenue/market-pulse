@@ -133,7 +133,7 @@ const getAggressionColor = (level: string) => {
     case "mid":
       return {
         bg: "rgba(250,255,106,0.1)",
-        text: "#faff6a",
+        text: "#39BDF8",
         border: "rgba(250,255,106,0.3)",
       };
     case "high":
@@ -998,7 +998,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
 
                               if (group.maxMult <= 1.5) {
                                 impactLabel = "Medium Demand";
-                                color = "#faff6a";
+                                color = "#39BDF8";
                                 bg = "rgba(250, 255, 106, 0.1)";
                                 border = "rgba(250, 255, 106, 0.3)";
                               } else if (group.maxMult >= 3.0) {
@@ -1138,7 +1138,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
 
                                         if (eMult <= 1.5) {
                                           eLabel = "Medium Demand";
-                                          eColor = "#faff6a";
+                                          eColor = "#39BDF8";
                                           eBg = "rgba(250, 255, 106, 0.05)";
                                           eBorder = "rgba(250, 255, 106, 0.2)";
                                         } else if (eMult >= 3.0) {
@@ -1528,7 +1528,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 }
                               : {
                                   backgroundColor: "rgba(250, 255, 106, 0.1)",
-                                  color: "#faff6a",
+                                  color: "#39BDF8",
                                   borderColor: "rgba(250, 255, 106, 0.3)",
                                   whiteSpace: "nowrap",
                                   width: "100%",
@@ -2378,7 +2378,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                       width: "0.75rem",
                                       height: "0.75rem",
                                       borderRadius: "50%",
-                                      background: "#faff6a",
+                                      background: "#39BDF8",
                                     }}
                                   />
                                   <span
@@ -3167,7 +3167,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 style={{
                                   backgroundColor: "rgba(250, 255, 106, 0.1)",
                                   borderColor: "rgba(250, 255, 106, 0.5)",
-                                  color: "#faff6a",
+                                  color: "#39BDF8",
                                 }}
                               >
                                 {isRepushing === String(hotel.hotel_id) && (
@@ -3339,8 +3339,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            style={{ color: "#faff6a" }}
-                            className="hover:text-[#faff6a]/80 hover:bg-[#faff6a]/10"
+                            style={{ color: "#39BDF8" }}
+                            className="hover:text-[#39BDF8]/80 hover:bg-[#39BDF8]/10"
                           >
                             Test
                           </Button>
@@ -3549,7 +3549,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       borderColor: "#2a2a2a",
                     }}
                   >
-                    <SelectItem value="1.50" style={{ color: "#faff6a" }}>
+                    <SelectItem value="1.50" style={{ color: "#39BDF8" }}>
                       Medium (1.5x)
                     </SelectItem>
                     <SelectItem value="2.50" style={{ color: "#ef4444" }}>
@@ -3632,7 +3632,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                         >
                           <SelectItem
                             value="1.50"
-                            style={{ color: "#faff6a", fontSize: "0.75rem" }}
+                            style={{ color: "#39BDF8", fontSize: "0.75rem" }}
                           >
                             Medium
                           </SelectItem>

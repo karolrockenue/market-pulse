@@ -118,7 +118,7 @@ export function SystemHealth({
               width: "16px",
               height: "16px",
               borderRadius: "50%",
-              backgroundColor: "#3a3a35",
+              backgroundColor: "#2a2a2a",
             }}
           />
         );

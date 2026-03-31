@@ -11,12 +11,12 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
     <div className="min-h-screen bg-[#1a1a18] text-[#e5e5e5]">
 {/* Header */}
       {/* [FIX] Removed bg opacity (/80) and backdrop-blur-sm to make the header opaque */}
-      <div className="border-b border-[#3a3a35] bg-[#1a1a18] sticky top-0 z-10">
+      <div className="border-b border-[#2a2a2a] bg-[#1a1a18] sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <Button
             onClick={onBack}
             variant="ghost"
-            className="text-[#9ca3af] hover:text-[#faff6a] hover:bg-transparent"
+            className="text-[#9ca3af] hover:text-[#39BDF8] hover:bg-transparent"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -32,7 +32,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Title Section */}
         <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-full text-[#faff6a] text-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-full text-[#39BDF8] text-sm mb-6">
             <Shield className="w-4 h-4" />
             <span>Privacy & Security</span>
           </div>
@@ -69,9 +69,9 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             <h2 className="text-2xl text-[#e5e5e5]">Information We Collect</h2>
             <p>We collect and process the following types of information:</p>
             
-            <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-6 space-y-4">
+            <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="text-lg text-[#faff6a] mb-2">Account Information</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">Account Information</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Email address (for magic link authentication)</li>
                   <li>Hotel property details (name, location, room count)</li>
@@ -80,7 +80,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               </div>
 
               <div>
-                <h3 className="text-lg text-[#faff6a] mb-2">Property Management System (PMS) Data</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">Property Management System (PMS) Data</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Occupancy rates and room night statistics</li>
                   <li>Average Daily Rate (ADR) and revenue data</li>
@@ -90,7 +90,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               </div>
 
               <div>
-                <h3 className="text-lg text-[#faff6a] mb-2">Usage Information</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">Usage Information</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Platform usage statistics and feature interactions</li>
                   <li>Report generation and export activities</li>
@@ -99,7 +99,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               </div>
 
               <div>
-                <h3 className="text-lg text-[#faff6a] mb-2">Technical Information</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">Technical Information</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>IP address and browser information</li>
                   <li>Device type and operating system</li>
@@ -150,7 +150,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             </p>
             
             <div className="space-y-3 ml-4">
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
                 <h3 className="text-[#e5e5e5] mb-2">PMS Integration Partners</h3>
                 <p>
                   We connect with your PMS provider (Cloudbeds, Mews, etc.) to retrieve performance data. 
@@ -158,7 +158,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 </p>
               </div>
 
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
                 <h3 className="text-[#e5e5e5] mb-2">Anonymized Market Data</h3>
                 <p>
                   We aggregate data from multiple properties to create market-level insights. This data is 
@@ -166,7 +166,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 </p>
               </div>
 
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
                 <h3 className="text-[#e5e5e5] mb-2">Service Providers</h3>
                 <p>
                   We use trusted third-party service providers for hosting, analytics, and email delivery. 
@@ -174,7 +174,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 </p>
               </div>
 
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
                 <h3 className="text-[#e5e5e5] mb-2">Legal Requirements</h3>
                 <p>
                   We may disclose information when required by law, court order, or government regulation, 
@@ -200,8 +200,8 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               <li>Regular backups and disaster recovery procedures</li>
             </ul>
 
-            <div className="bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-lg p-4 mt-4">
-              <p className="text-[#faff6a]">
+            <div className="bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-lg p-4 mt-4">
+              <p className="text-[#39BDF8]">
                 <strong>Important:</strong> While we implement robust security measures, no system is 100% secure. 
                 We encourage you to use strong passwords and keep your login credentials confidential.
               </p>
@@ -231,33 +231,33 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             </p>
             
             <div className="grid md:grid-cols-2 gap-4 mt-4">
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
-                <h3 className="text-[#faff6a] mb-2">Access</h3>
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
+                <h3 className="text-[#39BDF8] mb-2">Access</h3>
                 <p className="text-sm">Request a copy of the personal data we hold about you</p>
               </div>
               
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
-                <h3 className="text-[#faff6a] mb-2">Correction</h3>
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
+                <h3 className="text-[#39BDF8] mb-2">Correction</h3>
                 <p className="text-sm">Request corrections to inaccurate or incomplete data</p>
               </div>
               
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
-                <h3 className="text-[#faff6a] mb-2">Deletion</h3>
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
+                <h3 className="text-[#39BDF8] mb-2">Deletion</h3>
                 <p className="text-sm">Request deletion of your personal data (subject to legal requirements)</p>
               </div>
               
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
-                <h3 className="text-[#faff6a] mb-2">Export</h3>
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
+                <h3 className="text-[#39BDF8] mb-2">Export</h3>
                 <p className="text-sm">Request a portable copy of your data in a common format</p>
               </div>
               
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
-                <h3 className="text-[#faff6a] mb-2">Opt-out</h3>
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
+                <h3 className="text-[#39BDF8] mb-2">Opt-out</h3>
                 <p className="text-sm">Unsubscribe from marketing communications at any time</p>
               </div>
               
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
-                <h3 className="text-[#faff6a] mb-2">Object</h3>
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
+                <h3 className="text-[#39BDF8] mb-2">Object</h3>
                 <p className="text-sm">Object to certain types of data processing activities</p>
               </div>
             </div>
@@ -265,7 +265,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
        <p className="mt-4">
               To exercise any of these rights, please contact us at{' '}
               {/* [FIX] Standardized email to support@ */}
-              <a href="mailto:support@market-pulse.io" className="text-[#faff6a] hover:underline">
+              <a href="mailto:support@market-pulse.io" className="text-[#39BDF8] hover:underline">
                 support@market-pulse.io
               </a>
             </p>
@@ -332,12 +332,12 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               please contact us:
             </p>
             
-   <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-6">
+   <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-6">
               <div className="space-y-2">
                 <p>
                   <span className="text-[#e5e5e5]">Email:</span>{' '}
                   {/* [FIX] Standardized email to support@ */}
-                  <a href="mailto:support@market-pulse.io" className="text-[#faff6a] hover:underline">
+                  <a href="mailto:support@market-pulse.io" className="text-[#39BDF8] hover:underline">
                     support@market-pulse.io
                   </a>
                 </p>
@@ -348,7 +348,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-[#3a3a35] text-center">
+        <div className="mt-12 pt-8 border-t border-[#2a2a2a] text-center">
           <p className="text-[#6b7280] text-sm">
             © 2025 Market Pulse. All rights reserved.
           </p>

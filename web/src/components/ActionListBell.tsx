@@ -19,7 +19,7 @@ export function ActionListBell() {
       <DropdownMenuTrigger asChild>
         <button
           className="relative p-2 rounded-lg transition-colors focus:outline-none group"
-          style={{ backgroundColor: isOpen ? "#262626" : "transparent" }}
+          style={{ backgroundColor: isOpen ? "#2C2C2C" : "transparent" }}
         >
           <div className="relative inline-block">
             <ClipboardList

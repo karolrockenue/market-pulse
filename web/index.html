@@ -15,6 +15,19 @@
     <body>
       <div id="root"></div>
       <script type="module" src="/src/main.tsx"></script>
+      <script>
+        // Auto-refresh on stale deploy: if the JS bundle 404s after a deploy,
+        // the #root stays empty. Detect this and reload once to pick up new HTML.
+        setTimeout(function() {
+          var root = document.getElementById('root');
+          if (root && root.children.length === 0 && !sessionStorage.getItem('_mp_reloaded')) {
+            sessionStorage.setItem('_mp_reloaded', '1');
+            window.location.reload();
+          } else {
+            sessionStorage.removeItem('_mp_reloaded');
+          }
+        }, 3000);
+      </script>
     </body>
   </html>
   

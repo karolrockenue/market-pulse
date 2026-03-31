@@ -200,7 +200,7 @@ export function PortfolioFlowcast({
               width: "0.375rem",
               height: "0.375rem",
               borderRadius: "9999px",
-              backgroundColor: "#faff6a",
+              backgroundColor: "#39BDF8",
             }}
           ></div>
           <span
@@ -426,7 +426,7 @@ export function PortfolioFlowcast({
                                     metrics.avgOccupancy >= 70
                                       ? "#10b981"
                                       : metrics.avgOccupancy >= 50
-                                      ? "#faff6a"
+                                      ? "#39BDF8"
                                       : "#ef4444",
                                   fontFamily: "monospace",
                                 }}
@@ -442,7 +442,7 @@ export function PortfolioFlowcast({
                                     pickupTrend === "up"
                                       ? "#10b981"
                                       : pickupTrend === "stable"
-                                      ? "#faff6a"
+                                      ? "#39BDF8"
                                       : "#6b7280",
                                   fontFamily: "monospace",
                                 }}
@@ -677,7 +677,7 @@ export function PortfolioFlowcast({
                               metrics.avgOccupancy >= 70
                                 ? "#10b981"
                                 : metrics.avgOccupancy >= 50
-                                ? "#faff6a"
+                                ? "#39BDF8"
                                 : "#ef4444",
                             fontWeight: "600",
                             fontFamily: "monospace",
@@ -705,7 +705,7 @@ export function PortfolioFlowcast({
                               pickupTrend === "up"
                                 ? "#10b981"
                                 : pickupTrend === "stable"
-                                ? "#faff6a"
+                                ? "#39BDF8"
                                 : "#6b7280",
                             fontFamily: "monospace",
                           }}
@@ -914,7 +914,7 @@ export function PortfolioFlowcast({
                                 </TooltipTrigger>
                                 <TooltipContent
                                   style={{
-                                    backgroundColor: "#1f1f1c",
+                                    backgroundColor: "#1d1d1c",
                                     borderColor: "#3a3a3a",
                                     color: "#e5e5e5",
                                   }}
@@ -988,12 +988,12 @@ export function PortfolioFlowcast({
                           >
                             <stop
                               offset="0%"
-                              stopColor="#faff6a"
+                              stopColor="#39BDF8"
                               stopOpacity="0.15"
                             />
                             <stop
                               offset="100%"
-                              stopColor="#faff6a"
+                              stopColor="#39BDF8"
                               stopOpacity="0.02"
                             />
                           </linearGradient>
@@ -1041,7 +1041,7 @@ export function PortfolioFlowcast({
                             })
                             .join(" ")}
                           fill="none"
-                          stroke="#faff6a"
+                          stroke="#39BDF8"
                           strokeOpacity="0.8"
                           strokeWidth="2"
                           strokeLinecap="round"

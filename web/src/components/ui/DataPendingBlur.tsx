@@ -62,7 +62,7 @@ export const DataPendingBlur: React.FC<DataPendingBlurProps> = ({
             boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
           }}
         >
-          <Loader2 className="w-4 h-4 text-[#faff6a] animate-spin" />
+          <Loader2 className="w-4 h-4 text-[#39BDF8] animate-spin" />
           <span style={{ fontSize: "12px", color: "#e5e5e5", fontWeight: 500 }}>
             {message}
           </span>

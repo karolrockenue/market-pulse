@@ -1258,5 +1258,95 @@ market-pulse/
 │ └── Guidelines.md
 └── Attributions.md
 
+7.0 BRAND STYLE GUIDE (UI COLOR SYSTEM)
+
+All UI surfaces must follow this palette. No other hex values should be introduced without updating this section.
+
+7.1 Core Palette
+
+Primary Accent: #39BDF8 (Sentinel Blue) — revenue values, active states, CTA buttons, logo brackets, progress bars, interactive highlights.
+
+Success / Positive: #10b981 — positive trends, check marks, trust indicators.
+
+Warning / Amber: #f59e0b — medium-demand indicators, caution states.
+
+Danger / Negative: #ef4444 — errors, negative trends, high-demand alerts.
+
+Purple (Informational): #8b5cf6 — overbooked indicators, supply change negative.
+
+7.2 Text Hierarchy
+
+White (Primary): #e5e5e5 — headings, body text, table values.
+
+Gray (Secondary): #9ca3af — subtitles, descriptions, muted labels.
+
+Dim (Tertiary): #6b7280 — uppercase labels, timestamps, column headers.
+
+7.3 Surface & Border System
+
+Page Background: #1d1d1c — main content area background.
+
+Card Background: #1a1a1a / rgb(26, 26, 26) — all card surfaces.
+
+Inner Surface (Table Rows): #1D1D1C — table row backgrounds, alternating sections.
+
+Alternate Section Background: #141414 — used for alternating full-width sections (e.g., landing page).
+
+Input / Badge Background: #2C2C2C — form inputs, tags, secondary surfaces.
+
+Border: #2a2a2a — all card borders, table dividers, separators. (NOT #3a3a35, which is deprecated.)
+
+7.4 Background Effects
+
+Grid Overlay: linear-gradient at rgba(57, 189, 248, 0.03) opacity, 64px spacing.
+
+Gradient Wash: linear-gradient to bottom right at rgba(57, 189, 248, 0.01).
+
+7.5 Chart & Data Visualization
+
+Chart Grid: stroke #2a2a2a, opacity 0.5.
+
+Axis Lines / Ticks: stroke #2a2a2a (NOT #3a3a35).
+
+Tooltip Background: rgba(26, 26, 26, 0.95), border #2a2a2a.
+
+Tooltip Cursor: rgba(57, 189, 248, 0.08).
+
+Accent Backgrounds (Icon Badges): rgba(57, 189, 248, 0.15) with #39BDF8 icon.
+
+7.6 Typography Constants
+
+Labels: 10-12px, uppercase, letter-spacing: -0.025em, color #6b7280.
+
+Section Titles: 14-18px, color #e5e5e5, font-weight 600.
+
+KPI Values: 24-32px, color #39BDF8, font-weight 600.
+
+7.7 Logo
+
+Format: ( MARKET PULSE ) — blue brackets (#39BDF8), white text (#e5e5e5).
+
+Font size: brackets 24-32px, text 14-18px, letter-spacing 0.025em.
+
+7.8 Deprecated Colors (Do Not Use)
+
+#faff6a (old yellow primary) — replaced by #39BDF8.
+
+#3a3a35 (old border) — replaced by #2a2a2a.
+
+#262626 (old badge bg) — replaced by #2C2C2C.
+
+#1f1f1c (old inner surface) — replaced by #1d1d1c.
+
+#2a2a25 (old chart grid, greenish) — replaced by #2a2a2a.
+
+#252521 (old page bg) — replaced by #1d1d1c.
+
+8.0 PRESENTATION ADJUSTMENTS (TEMPORARY)
+
+8.1 Market Context Multiplier
+
+The /api/metrics/market-context endpoint applies a 2x multiplier to all returned counts (segment hotels, segment rooms, market hotels, market rooms). This is a deliberate presentation adjustment to reflect broader market maturity while the platform is in its growth phase. This multiplier will be removed once real third-party market data sources (e.g., STR, PredictHQ) are integrated. The multiplier lives in metrics.router.js — search for "Presentation multiplier" to find and remove it.
+
 End of Blueprint.
 Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.

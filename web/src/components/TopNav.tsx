@@ -165,8 +165,8 @@ export function TopNav({
   const BLUE = "#39BDF8";
   const WHITE = "#e5e5e5";
   const GRAY = "#9ca3af";
-  const BG_DARK = "#1f1f1c";
-  const BORDER_DARK = "#3a3a35";
+  const BG_DARK = "#1d1d1c";
+  const BORDER_DARK = "#2a2a2a";
 
   return (
     <div
@@ -261,14 +261,22 @@ export function TopNav({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="w-48"
+                    className="w-52"
                     align="start"
                     style={{
-                      backgroundColor: "#1a1a18",
+                      backgroundColor: "#1a1a1a",
                       border: `1px solid ${BORDER_DARK}`,
                       color: WHITE,
+                      padding: "4px",
                     }}
                   >
+                    <DropdownMenuLabel
+                      className="px-2 py-1.5"
+                      style={{ color: GRAY, fontSize: "11px", textTransform: "uppercase" as const, letterSpacing: "-0.025em" }}
+                    >
+                      Sentinel Tools
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator style={{ backgroundColor: BORDER_DARK }} />
                     <DropdownMenuGroup>
                       {item.items.map((child: any) => {
                         const ChildIcon = child.icon;
@@ -279,19 +287,22 @@ export function TopNav({
                             onSelect={() => handleNavClick(child.value)}
                             style={{
                               backgroundColor: isChildActive
-                                ? "#2C2C2C"
+                                ? "rgba(57, 189, 248, 0.15)"
                                 : "transparent",
                               color: isChildActive ? BLUE : WHITE,
                               cursor: "pointer",
+                              borderRadius: "4px",
+                              padding: "8px 8px",
+                              margin: "2px 0",
                             }}
                           >
                             <ChildIcon
                               className="w-4 h-4 mr-2"
                               style={{
-                                color: isChildActive ? BLUE : "inherit",
+                                color: isChildActive ? BLUE : GRAY,
                               }}
                             />
-                            <span>{child.label}</span>
+                            <span style={{ fontSize: "13px" }}>{child.label}</span>
                           </DropdownMenuItem>
                         );
                       })}
@@ -349,7 +360,7 @@ export function TopNav({
                   width: "268px",
                   maxWidth: "268px",
                   minWidth: "268px",
-                  backgroundColor: "#1a1a18",
+                  backgroundColor: "#1a1a1a",
                   borderColor: BORDER_DARK,
                   color: WHITE,
                   padding: "4px",
@@ -441,7 +452,7 @@ export function TopNav({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#1f1f1c",
+                color: "#1d1d1c",
                 fontSize: "12px",
                 fontWeight: "bold",
                 border: "none",
@@ -454,7 +465,7 @@ export function TopNav({
           <DropdownMenuContent
             style={{
               width: "224px",
-              backgroundColor: "#1a1a18",
+              backgroundColor: "#1a1a1a",
               borderColor: BORDER_DARK,
               color: WHITE,
             }}

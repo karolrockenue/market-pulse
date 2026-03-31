@@ -786,7 +786,6 @@ const MetricsService = {
       SELECT
         h.hotel_id,
         h.property_name,
-        COALESCE(h.currency_code, 'GBP') AS currency_code,
         COALESCE(h.total_rooms, 0) AS total_rooms,
         COALESCE(f30.forward_occupancy, 0) AS "forwardOccupancy",
         COALESCE(t_cur.target_revenue_gross, 0) AS "currentMonthTargetRevenue",
@@ -834,7 +833,6 @@ const MetricsService = {
         h.hotel_id,
         h.property_name,
         h.city,
-        COALESCE(h.currency_code, 'GBP') AS currency_code,
         h.management_group AS "group",
         h.total_rooms,
         d.stay_date,

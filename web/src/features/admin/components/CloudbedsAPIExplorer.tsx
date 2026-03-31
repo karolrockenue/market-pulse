@@ -515,8 +515,8 @@ export function CloudbedsAPIExplorer({
                       </TooltipTrigger>
                       <TooltipContent
                         style={{
-                          backgroundColor: "#1f1f1c",
-                          borderColor: "#3a3a35",
+                          backgroundColor: "#1d1d1c",
+                          borderColor: "#2a2a2a",
                           color: "#e5e5e5",
                           maxWidth: "320px",
                         }}
@@ -554,7 +554,7 @@ export function CloudbedsAPIExplorer({
                         cursor: "pointer",
                         transition: "all 0.2s",
                         borderColor:
-                          datasetId === ds.id ? "#39BDF8" : "#3a3a35",
+                          datasetId === ds.id ? "#39BDF8" : "#2a2a2a",
                         backgroundColor:
                           datasetId === ds.id
                             ? "rgba(57, 189, 248, 0.1)"
@@ -586,7 +586,7 @@ export function CloudbedsAPIExplorer({
                               variant="outline"
                               style={{
                                 fontSize: "10px",
-                                borderColor: "#3a3a35",
+                                borderColor: "#2a2a2a",
                                 color: "#9ca3af",
                               }}
                             >
@@ -621,7 +621,7 @@ export function CloudbedsAPIExplorer({
                   style={{
                     width: "100%",
                     marginTop: "16px",
-                    backgroundColor: "#3a3a35",
+                    backgroundColor: "#2a2a2a",
                     color: "#e5e5e5",
                     borderColor: "#4a4a45",
                   }}
@@ -646,10 +646,10 @@ export function CloudbedsAPIExplorer({
               {structureLoaded && (
                 <div
                   style={{
-                    backgroundColor: "#1f1f1c",
+                    backgroundColor: "#1d1d1c",
                     borderRadius: "0.5rem",
                     padding: "16px",
-                    border: "1px solid #3a3a35",
+                    border: "1px solid #2a2a2a",
                   }}
                 >
                   <div
@@ -789,8 +789,8 @@ export function CloudbedsAPIExplorer({
                             </TooltipTrigger>
                             <TooltipContent
                               style={{
-                                backgroundColor: "#1f1f1c",
-                                borderColor: "#3a3a35",
+                                backgroundColor: "#1d1d1c",
+                                borderColor: "#2a2a2a",
                                 color: "#e5e5e5",
                                 maxWidth: "320px",
                               }}
@@ -805,12 +805,12 @@ export function CloudbedsAPIExplorer({
                       </label>
                       <div
                         style={{
-                          backgroundColor: "#262626",
+                          backgroundColor: "#2C2C2C",
                           borderRadius: "0.25rem",
                           padding: "10px",
                           maxHeight: "128px",
                           overflowY: "auto",
-                          border: "1px solid #3a3a35",
+                          border: "1px solid #2a2a2a",
                           display: "flex",
                           flexDirection: "column",
                           gap: "6px",
@@ -871,10 +871,10 @@ export function CloudbedsAPIExplorer({
               {structureLoaded && (
                 <div
                   style={{
-                    backgroundColor: "#1f1f1c",
+                    backgroundColor: "#1d1d1c",
                     borderRadius: "0.5rem",
                     padding: "16px",
-                    border: "1px solid #3a3a35",
+                    border: "1px solid #2a2a2a",
                   }}
                 >
                   <div
@@ -909,7 +909,7 @@ export function CloudbedsAPIExplorer({
                       style={{
                         marginLeft: "auto",
                         fontSize: "10px",
-                        borderColor: "#3a3a35",
+                        borderColor: "#2a2a2a",
                         color: "#9ca3af",
                       }}
                     >
@@ -919,12 +919,12 @@ export function CloudbedsAPIExplorer({
 
                   <div
                     style={{
-                      backgroundColor: "#262626",
+                      backgroundColor: "#2C2C2C",
                       borderRadius: "0.25rem",
                       padding: "10px",
                       maxHeight: "224px",
                       overflowY: "auto",
-                      border: "1px solid #3a3a35",
+                      border: "1px solid #2a2a2a",
                       display: "flex",
                       flexDirection: "column",
                       gap: "6px",
@@ -969,7 +969,7 @@ export function CloudbedsAPIExplorer({
                               variant="outline"
                               style={{
                                 fontSize: "10px",
-                                borderColor: "#3a3a35",
+                                borderColor: "#2a2a2a",
                                 color: "#6b7280",
                               }}
                             >
@@ -990,10 +990,10 @@ export function CloudbedsAPIExplorer({
               {structureLoaded && (
                 <div
                   style={{
-                    backgroundColor: "#1f1f1c",
+                    backgroundColor: "#1d1d1c",
                     borderRadius: "0.5rem",
                     padding: "16px",
-                    border: "1px solid #3a3a35",
+                    border: "1px solid #2a2a2a",
                   }}
                 >
                   <div
@@ -1076,7 +1076,7 @@ export function CloudbedsAPIExplorer({
                       padding: "0 8px",
                       color: "#9ca3af",
                     }}
-                    className="hover:text-[#39BDF8] hover:bg-[#3a3a35]"
+                    className="hover:text-[#39BDF8] hover:bg-[#2a2a2a]"
                   >
                     {copied ? (
                       <>
@@ -1096,8 +1096,8 @@ export function CloudbedsAPIExplorer({
                 value={apiResponse}
                 readOnly
                 style={{
-                  backgroundColor: "#1f1f1c",
-                  borderColor: "#3a3a35",
+                  backgroundColor: "#1d1d1c",
+                  borderColor: "#2a2a2a",
                   color: "#10b981",
                   fontFamily: "monospace",
                   fontSize: "12px",
@@ -1129,7 +1129,7 @@ export function CloudbedsAPIExplorer({
                   backgroundColor: "#0F0F0F",
                   borderRadius: "0.5rem",
                   padding: "16px",
-                  border: "1px solid #3a3a35",
+                  border: "1px solid #2a2a2a",
                 }}
               >
                 <h3
@@ -1203,13 +1203,13 @@ export function CloudbedsAPIExplorer({
                             style={{
                               width: "100%",
                               backgroundColor: "#1A1A1A",
-                              borderColor: "#3a3a35",
+                              borderColor: "#2a2a2a",
                               color: "#e5e5e5",
                               justifyContent: "flex-start",
                               height: "auto",
                               padding: "12px",
                             }}
-                            className="group hover:bg-[#3a3a35] hover:border-[#39BDF8]"
+                            className="group hover:bg-[#2a2a2a] hover:border-[#39BDF8]"
                           >
                             {loadingEndpoint === endpoint ? (
                               <Loader2 className="w-4 h-4 mr-2.5 flex-shrink-0 animate-spin text-[#39BDF8]" />
@@ -1260,7 +1260,7 @@ export function CloudbedsAPIExplorer({
                       padding: "0 8px",
                       color: "#9ca3af",
                     }}
-                    className="hover:text-[#39BDF8] hover:bg-[#3a3a35]"
+                    className="hover:text-[#39BDF8] hover:bg-[#2a2a2a]"
                   >
                     {copied ? (
                       <>
@@ -1280,8 +1280,8 @@ export function CloudbedsAPIExplorer({
                 value={apiResponse}
                 readOnly
                 style={{
-                  backgroundColor: "#1f1f1c",
-                  borderColor: "#3a3a35",
+                  backgroundColor: "#1d1d1c",
+                  borderColor: "#2a2a2a",
                   color: "#10b981",
                   fontFamily: "monospace",
                   fontSize: "12px",

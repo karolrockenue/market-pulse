@@ -100,7 +100,7 @@ export function NotificationBell() {
       <DropdownMenuTrigger asChild>
         <button 
             className="relative p-2 rounded-lg transition-colors focus:outline-none"
-            style={{ backgroundColor: isOpen ? '#262626' : 'transparent' }}
+            style={{ backgroundColor: isOpen ? '#2C2C2C' : 'transparent' }}
         >
           <div className="relative inline-block">
             <Bell className="w-5 h-5" style={{ color: '#9ca3af' }} />
@@ -160,7 +160,7 @@ export function NotificationBell() {
         <div className="max-h-[400px] overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: '#262626' }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: '#2C2C2C' }}>
                 <Bell className="w-5 h-5" style={{ color: '#6b7280' }} />
               </div>
               <p style={{ color: '#6b7280', fontSize: '0.8rem' }}>No new notifications</p>

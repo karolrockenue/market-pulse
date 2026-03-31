@@ -262,7 +262,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
             <Button
               variant="ghost"
               onClick={onBack}
-              className="text-[#9ca3af] hover:text-[#faff6a] pl-0"
+              className="text-[#9ca3af] hover:text-[#e5e5e5] pl-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Reports
@@ -290,7 +290,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={toggleAll}
-                  className="text-xs text-[#faff6a] hover:text-[#faff6a] hover:bg-[#2a2a2a]"
+                  className="text-xs text-[#39BDF8] hover:text-[#e5e5e5] hover:bg-[#2a2a2a]"
                 >
                   {selectedHotelIds.length === availableHotels.length
                     ? "Deselect All"
@@ -309,13 +309,13 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         cursor-pointer flex items-center p-2 rounded border text-sm transition-colors select-none
                         ${
                           isSelected
-                            ? "bg-[#faff6a]/10 border-[#faff6a] text-white"
+                            ? "bg-[#39BDF8]/10 border-[#39BDF8] text-white"
                             : "bg-[#1A1A1A] border-[#2a2a2a] text-gray-500 hover:border-gray-500"
                         }
                       `}
                     >
                       {isSelected ? (
-                        <CheckSquare className="w-4 h-4 mr-2 text-[#faff6a]" />
+                        <CheckSquare className="w-4 h-4 mr-2 text-[#39BDF8]" />
                       ) : (
                         <Square className="w-4 h-4 mr-2" />
                       )}
@@ -358,7 +358,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                 variant="outline"
                 onClick={() => setIsScheduleModalOpen(true)}
                 disabled={selectedHotelIds.length === 0}
-                className="bg-[#2C2C2C] border-[#3a3a35] text-[#e5e5e5] hover:bg-[#3a3a35] h-10"
+                className="bg-[#2C2C2C] border-[#2a2a2a] text-[#e5e5e5] hover:bg-[#2C2C2C] h-10"
               >
                 <Clock className="w-4 h-4 mr-2" />
                 Schedule Report
@@ -410,7 +410,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                   onClick={loadData}
                   size="sm"
                   style={{
-                    background: "#faff6a",
+                    background: "#39BDF8",
                     color: "black",
                     fontWeight: "bold",
                     marginLeft: "8px",
@@ -433,7 +433,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
         {/* Main Table */}
         {loading ? (
           <div className="flex items-center justify-center h-64 border border-[#2a2a2a] rounded-lg bg-[#1A1A1A]">
-            <Loader2 className="w-8 h-8 text-[#faff6a] animate-spin" />
+            <Loader2 className="w-8 h-8 text-[#39BDF8] animate-spin" />
           </div>
         ) : (
           <div
@@ -616,7 +616,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#faff6a",
+                      color: "#39BDF8",
                       fontSize: "10px",
                       fontWeight: "600",
                       textTransform: "uppercase",
@@ -862,7 +862,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#faff6a",
+                      color: "#39BDF8",
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",

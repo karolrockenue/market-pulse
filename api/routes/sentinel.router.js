@@ -1435,6 +1435,14 @@ async function runBackgroundWorker() {
               `UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`,
               [job.id],
             );
+          } else if (result && result.success === false) {
+            // Cloudbeds accepted the HTTP request but rejected the rate update
+            const cbError = JSON.stringify(result).substring(0, 500);
+            console.error(`[Sentinel Worker] Job ${job.id} rejected by PMS:`, cbError);
+            await client.query(
+              `UPDATE sentinel_job_queue SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1`,
+              [job.id, `PMS rejected: ${cbError}`],
+            );
           } else {
             await client.query(
               `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,

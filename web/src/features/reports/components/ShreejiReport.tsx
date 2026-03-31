@@ -423,7 +423,7 @@ export function ShreejiReport({
                     <SelectItem
                       key={hotel.hotel_id}
                       value={hotel.hotel_id}
-                      className="text-[#e5e5e5] focus:bg-[#3a3a35] focus:text-[#39BDF8]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
                     >
                       {hotel.property_name}
                     </SelectItem>
@@ -580,7 +580,7 @@ export function ShreejiReport({
                       <SelectItem
                         key={hotel.hotel_id}
                         value={hotel.hotel_id}
-                        className="text-[#e5e5e5] focus:bg-[#3a3a35] focus:text-[#39BDF8]"
+                        className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
                       >
                         {hotel.property_name}
                       </SelectItem>
@@ -616,134 +616,134 @@ export function ShreejiReport({
                   >
                     <SelectItem
                       value="14:05"
-                      className="text-[#e5e5e5] focus:bg-[#3a3a35]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C]"
                     >
                       14:05
                     </SelectItem>
                     <SelectItem
                       value="14:10"
-                      className="text-[#e5e5e5] focus:bg-[#3a3a35]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C]"
                     >
                       14:10
                     </SelectItem>
                     <SelectItem
                       value="08:00"
-                      className="text-[#e5e5e5] focus:bg-[#3a3a35]"
+                      className="text-[#e5e5e5] focus:bg-[#2C2C2C]"
                     >
                       08:00
                     </SelectItem>
                     {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
                     <SelectItem
                       value="06:30"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       06:30 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:35"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       06:35 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:40"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       06:40 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:45"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       06:45 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:50"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       06:50 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:55"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       06:55 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:00"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:00 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:05"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:05 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:10"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:10 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:15"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:15 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:20"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:20 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:25"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:25 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:30"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:30 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:35"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:35 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:40"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:40 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:45"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:45 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:50"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:50 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:55"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       07:55 (Test)
                     </SelectItem>
                     <SelectItem
                       value="08:00"
-                      className="text-[#faff6a] focus:bg-[#3a3a35]"
+                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
                     >
                       08:00 (Test)
                     </SelectItem>
@@ -1123,7 +1123,7 @@ export function ShreejiReport({
                     }}
                   >
                     <div className="max-w-md">
-                      <div className="mb-6 pb-4 border-b border-[#3a3a35]">
+                      <div className="mb-6 pb-4 border-b border-[#2a2a2a]">
                         <div className="text-[#9ca3af] text-sm mb-1">
                           Total Taken
                         </div>

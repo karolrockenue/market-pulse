@@ -530,7 +530,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#1a1a18] flex items-center justify-center">
         {/* Simple loader */}
-        <div className="w-12 h-12 border-4 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -668,7 +668,7 @@ export default function App() {
               <div className="flex justify-center">
                 <button
                   onClick={() => setShowPropertySetup(true)}
-                  className="bg-[#faff6a] text-[#1a1a1a] px-6 py-3 rounded hover:bg-[#e8ef5a]"
+                  className="bg-[#39BDF8] text-[#1a1a1a] px-6 py-3 rounded hover:bg-[#e8ef5a]"
                 >
                   Open Property Setup Modal
                 </button>

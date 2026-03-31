@@ -118,8 +118,8 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
       return (
         <div
           style={{
-            backgroundColor: "rgba(26, 26, 24, 0.98)",
-            border: "1px solid #3a3a35",
+            backgroundColor: "rgba(26, 26, 26, 0.95)",
+            border: "1px solid #2a2a2a",
             borderRadius: "6px",
             padding: "12px",
             boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3)",
@@ -249,7 +249,7 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
           >
             <CartesianGrid
               strokeDasharray="0"
-              stroke="#2a2a25"
+              stroke="#2a2a2a"
               opacity={0.5}
               vertical={true}
               horizontal={true}
@@ -257,18 +257,18 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
 
             <XAxis
               dataKey="date"
-              stroke="#3a3a35"
+              stroke="#2a2a2a"
               tick={{ fill: "#6b7280", fontSize: 9 }}
-              tickLine={{ stroke: "#3a3a35" }}
-              axisLine={{ stroke: "#3a3a35" }}
+              tickLine={{ stroke: "#2a2a2a" }}
+              axisLine={{ stroke: "#2a2a2a" }}
               interval={6} // Show approx weekly labels (90 days / 6 ≈ 15 labels)
             />
 
             <YAxis
-              stroke="#3a3a35"
+              stroke="#2a2a2a"
               tick={{ fill: "#6b7280", fontSize: 9 }}
-              tickLine={{ stroke: "#3a3a35" }}
-              axisLine={{ stroke: "#3a3a35" }}
+              tickLine={{ stroke: "#2a2a2a" }}
+              axisLine={{ stroke: "#2a2a2a" }}
               width={35}
               domain={[0, 100]}
               label={{

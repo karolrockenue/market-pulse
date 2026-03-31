@@ -51,7 +51,10 @@ app.set("trust proxy", 1);
 // Serve all static assets (JS, CSS, images) from the React build directory.
 // This MUST come BEFORE any CORS or session middleware, as static files
 // don't need authentication and should be served immediately.
-app.use(express.static(publicPath));
+// IMPORTANT: Exclude index.html from static serving so it always goes through
+// the catch-all route which sets no-cache headers. This prevents stale HTML
+// from referencing old JS bundle hashes after a deploy.
+app.use(express.static(publicPath, { index: false }));
 
 // --- MIDDLEWARE SETUP (CORS, Session) ---
 const allowedOrigins = [

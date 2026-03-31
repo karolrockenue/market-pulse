@@ -2062,7 +2062,7 @@ function BudgetContent({ hotelId }: { hotelId: string }) {
                   Total Revenue Target
                 </span>
                 <TrendingUp
-                  style={{ width: "16px", height: "16px", color: "#faff6a" }}
+                  style={{ width: "16px", height: "16px", color: "#39BDF8" }}
                 />
               </div>
               <div style={{ color: "#e5e5e5", fontSize: "24px" }}>

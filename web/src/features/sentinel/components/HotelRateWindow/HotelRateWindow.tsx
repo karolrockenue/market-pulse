@@ -871,7 +871,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   size={10}
                                   color={
                                     pendingOverrides[day.date]
-                                      ? "#faff6a"
+                                      ? "#f59e0b"
                                       : "#9ca3af"
                                   }
                                 />
@@ -907,7 +907,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               : "PENDING";
                             color = aiApprovedPending.has(day.date)
                               ? "#39BDF8"
-                              : "#faff6a";
+                              : "#f59e0b";
                           } else if (
                             currentSource === "SENTINEL" ||
                             currentSource === "AI_AUTO" ||
@@ -1309,7 +1309,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           const pred = aiPredictions[day.date];
                           const isApplied =
                             aiApprovedPending.has(day.date) ||
-                            day.source === "AI_SUGGESTED";
+                            day.source === "SENTINEL";
 
                           const isHovered = hoveredAiCell === day.date;
                           const showArrow =
@@ -1682,7 +1682,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               ) : (
                                 <span
                                   style={{
-                                    color: isPending ? "#faff6a" : "#e5e5e5",
+                                    color: isPending ? "#f59e0b" : "#e5e5e5",
                                     fontWeight: isPending ? "bold" : "normal",
                                     fontFamily: "monospace",
                                     fontSize: "13px",

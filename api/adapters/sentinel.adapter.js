@@ -139,8 +139,12 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
 
     const response = await axios.post(endpoint, params, { headers });
 
-    console.log(`[Sentinel] Batch Job ID: ${response.data.jobReferenceID}`);
-    return response.data;
+    const rd = response.data;
+    console.log(`[Sentinel] Batch Job ID: ${rd.jobReferenceID} | Success: ${rd.success} | Status: ${response.status}`);
+    if (!rd.success) {
+      console.error(`[Sentinel] Cloudbeds putRate REJECTED for hotel ${hotelId}:`, JSON.stringify(rd));
+    }
+    return rd;
   } catch (error) {
     handleAxiosError(error, "postRateBatch");
   }

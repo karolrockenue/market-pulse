@@ -966,7 +966,7 @@ export function DailyMaxRatesDialog({
                               style={{
                                 fontSize: "12px",
                                 fontWeight: "500",
-                                color: isWeekend ? "#faff6a" : "#9ca3af",
+                                color: isWeekend ? "#39BDF8" : "#9ca3af",
                               }}
                             >
                               {day}

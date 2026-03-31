@@ -130,7 +130,7 @@ export function OccupancyVisualizer({
                 style={{
                   width: "1rem",
                   height: "1rem",
-                  color: "#faff6a",
+                  color: "#39BDF8",
                   transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
                   transition: "transform 0.2s",
                 }}
@@ -140,7 +140,7 @@ export function OccupancyVisualizer({
                   width: "0.375rem",
                   height: "0.375rem",
                   borderRadius: "9999px",
-                  backgroundColor: "#faff6a",
+                  backgroundColor: "#39BDF8",
                 }}
               ></div>
               <span
@@ -537,7 +537,7 @@ export function OccupancyVisualizer({
                           </TooltipTrigger>
                           <TooltipContent
                             style={{
-                              backgroundColor: "#1f1f1c",
+                              backgroundColor: "#1d1d1c",
                               borderColor: "#3a3a3a",
                               color: "#e5e5e5",
                             }}

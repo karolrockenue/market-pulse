@@ -85,7 +85,7 @@ function getCurrencySymbol(currencyCode?: string): string {
 const QUADRANT_COLORS: Record<string, string> = {
   "Critical Risk": "#ef4444", // red
   "Fill Risk": "#f59e0b", // orange
-  "Rate Strategy Risk": "#faff6a", // yellow
+  "Rate Strategy Risk": "#39BDF8", // yellow
   "On Pace": "#10b981", // green
 };
 
@@ -160,7 +160,7 @@ function colorFromPayload(payload: any): string {
   // Bottom-Right (Rate Strategy / Selling too cheap)
   if (x >= 60 && y >= 115) {
     // console.log(`[DOT DEBUG] ${hotelName}: Bottom-Right (Yellow)`, { x, y });
-    return "#faff6a"; // Yellow
+    return "#39BDF8"; // Yellow
   }
 
   // Top-Right (On Pace)
@@ -306,20 +306,20 @@ const styles = {
     padding: "12px",
   },
   cardYellowBorder: {
-    backgroundColor: "#1f1f1c",
-    border: "1px solid #3a3a35",
+    backgroundColor: "#1d1d1c",
+    border: "1px solid #2a2a2a",
     borderRadius: "4px",
     padding: "8px",
   },
   cardOrangeBorder: {
-    backgroundColor: "#1f1f1c",
-    border: "1px solid #3a3a35",
+    backgroundColor: "#1d1d1c",
+    border: "1px solid #2a2a2a",
     borderRadius: "4px",
     padding: "8px",
   },
   cardRedBorder: {
-    backgroundColor: "#1f1f1c",
-    border: "1px solid #3a3a35",
+    backgroundColor: "#1d1d1c",
+    border: "1px solid #2a2a2a",
     borderRadius: "4px",
     padding: "8px",
   },
@@ -348,7 +348,7 @@ const styles = {
   textRedLight: { color: "#f87171" },
   textOrange: { color: "#f59e0b" },
   textGreen: { color: "#10b981" },
-  textYellow: { color: "#faff6a" },
+  textYellow: { color: "#39BDF8" },
 
   flex: { display: "flex" },
   flexCol: { display: "flex", flexDirection: "column" as "column" },
@@ -412,7 +412,7 @@ const styles = {
   },
   matrixDateToday: {
     backgroundColor: "rgba(250, 255, 106, 0.1)",
-    borderLeft: "2px solid #faff6a",
+    borderLeft: "2px solid #39BDF8",
   },
   matrixRow: {
     display: "flex",
@@ -448,7 +448,7 @@ const styles = {
   },
   matrixDataCellToday: {
     backgroundColor: "rgba(250, 255, 106, 0.05)",
-    borderLeft: "2px solid #faff6a",
+    borderLeft: "2px solid #39BDF8",
   },
   matrixTooltip: {
     position: "absolute" as "absolute",
@@ -456,7 +456,7 @@ const styles = {
     transform: "translateX(-50%)",
     bottom: "100%",
     marginBottom: "4px",
-    backgroundColor: "#1f1f1c",
+    backgroundColor: "#1d1d1c",
     border: "1px solid #2a2a2a",
     borderRadius: "4px",
     padding: "8px",
@@ -515,10 +515,10 @@ const styles = {
     gap: "16px",
   },
   quadrantActionItem: {
-    backgroundColor: "#1f1f1c",
+    backgroundColor: "#1d1d1c",
     borderRadius: "4px",
     padding: "8px",
-    border: "1px solid #3a3a35",
+    border: "1px solid #2a2a2a",
   },
 
   flexHalf: { display: "flex", gap: "24px", marginBottom: "32px" },
@@ -538,7 +538,7 @@ const styles = {
   loadingSpinner: {
     width: "40px",
     height: "40px",
-    border: "3px solid #faff6a",
+    border: "3px solid #39BDF8",
     borderTopColor: "transparent",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
@@ -592,7 +592,7 @@ const getOccupancyColor = (value: number) => {
 const getOccupancyTextColor = (value: number) => {
   if (value >= 100) return { color: "#c084fc" }; // text-purple-400
   if (value >= 80) return { color: "#34d399" }; // text-emerald-400
-  if (value >= 70) return { color: "#faff6a" }; // text-[#faff6a]
+  if (value >= 70) return { color: "#39BDF8" }; // text-[#39BDF8]
   if (value >= 50) return { color: "#fb923c" }; // text-orange-400
   if (value >= 40) return { color: "#f97316" }; // text-orange-500
   return { color: "#f87171" }; // text-red-400
@@ -611,7 +611,7 @@ const getPaceVarianceColor = (variance: number) => {
       borderColor: "rgba(239, 68, 68, 0.4)",
     }; // Light Red
   if (variance <= 10)
-    return { backgroundColor: "#3a3a35", borderColor: "#4a4a45" }; // Grey
+    return { backgroundColor: "#2a2a2a", borderColor: "#4a4a45" }; // Grey
   return {
     backgroundColor: "rgba(16, 185, 129, 0.3)",
     borderColor: "rgba(16, 185, 129, 0.5)",
@@ -669,8 +669,8 @@ const QuadrantTooltip = ({ active, payload }: any) => {
     return (
       <div
         style={{
-          backgroundColor: "#1f1f1c",
-          border: "1px solid #faff6a",
+          backgroundColor: "#1d1d1c",
+          border: "1px solid #39BDF8",
           borderRadius: "8px",
           padding: "8px 12px",
           boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
@@ -1813,8 +1813,8 @@ export function PortfolioRiskOverview() {
                   left: "0.5rem",
                   width: "0.75rem",
                   height: "0.75rem",
-                  borderTop: "2px solid #faff6a",
-                  borderLeft: "2px solid #faff6a",
+                  borderTop: "2px solid #39BDF8",
+                  borderLeft: "2px solid #39BDF8",
                   opacity: 0.25,
                 }}
               ></div>
@@ -1825,8 +1825,8 @@ export function PortfolioRiskOverview() {
                   right: "0.5rem",
                   width: "0.75rem",
                   height: "0.75rem",
-                  borderTop: "2px solid #faff6a",
-                  borderRight: "2px solid #faff6a",
+                  borderTop: "2px solid #39BDF8",
+                  borderRight: "2px solid #39BDF8",
                   opacity: 0.25,
                 }}
               ></div>
@@ -1837,8 +1837,8 @@ export function PortfolioRiskOverview() {
                   left: "0.5rem",
                   width: "0.75rem",
                   height: "0.75rem",
-                  borderBottom: "2px solid #faff6a",
-                  borderLeft: "2px solid #faff6a",
+                  borderBottom: "2px solid #39BDF8",
+                  borderLeft: "2px solid #39BDF8",
                   opacity: 0.25,
                 }}
               ></div>
@@ -1849,8 +1849,8 @@ export function PortfolioRiskOverview() {
                   right: "0.5rem",
                   width: "0.75rem",
                   height: "0.75rem",
-                  borderBottom: "2px solid #faff6a",
-                  borderRight: "2px solid #faff6a",
+                  borderBottom: "2px solid #39BDF8",
+                  borderRight: "2px solid #39BDF8",
                   opacity: 0.25,
                 }}
               ></div>
@@ -1894,7 +1894,7 @@ export function PortfolioRiskOverview() {
                       style={{
                         width: "0.875rem",
                         height: "0.875rem",
-                        color: "#faff6a",
+                        color: "#39BDF8",
                       }}
                     />
                   </div>
@@ -1960,7 +1960,7 @@ export function PortfolioRiskOverview() {
                               )
                             : 0
                         }%`,
-                        backgroundColor: "#faff6a",
+                        backgroundColor: "#39BDF8",
                         opacity: 0.75,
                         transition: "width 0.3s",
                       }}
@@ -2187,7 +2187,7 @@ export function PortfolioRiskOverview() {
                   <ScatterChart
                     margin={{ top: 30, right: 30, bottom: 60, left: 80 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#3a3a35" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                     <XAxis
                       type="number"
                       dataKey="forwardOccupancy"
@@ -2224,20 +2224,20 @@ export function PortfolioRiskOverview() {
                     />
                     <ZAxis range={[100, 100]} />
                     <Tooltip
-                      cursor={{ strokeDasharray: "3 3", stroke: "#faff6a" }}
+                      cursor={{ strokeDasharray: "3 3", stroke: "#39BDF8" }}
                       content={<QuadrantTooltip />}
                     />
 
                     {/* Reference Lines */}
                     <ReferenceLine
                       y={115}
-                      stroke="#faff6a"
+                      stroke="#39BDF8"
                       strokeWidth={1}
                       strokeDasharray="5 5"
                     />
                     <ReferenceLine
                       x={60}
-                      stroke="#faff6a"
+                      stroke="#39BDF8"
                       strokeWidth={1}
                       strokeDasharray="5 5"
                     />
@@ -2344,8 +2344,8 @@ export function PortfolioRiskOverview() {
                       <div
                         key={i}
                         style={{
-                          backgroundColor: "#1f1f1c",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "#1d1d1c",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "0.25rem",
                           padding: "0.5rem",
                         }}
@@ -2426,12 +2426,12 @@ export function PortfolioRiskOverview() {
                     style={{
                       width: "0.875rem",
                       height: "0.875rem",
-                      color: "#faff6a",
+                      color: "#39BDF8",
                     }}
                   />
                   <h3
                     style={{
-                      color: "#faff6a",
+                      color: "#39BDF8",
                       fontSize: "0.75rem",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
@@ -2444,7 +2444,7 @@ export function PortfolioRiskOverview() {
                     style={{
                       marginLeft: "auto",
                       backgroundColor: "rgba(250, 255, 106, 0.1)",
-                      color: "#faff6a",
+                      color: "#39BDF8",
                       fontSize: "0.65rem",
                       padding: "1px 6px",
                       borderRadius: "4px",
@@ -2483,8 +2483,8 @@ export function PortfolioRiskOverview() {
                       <div
                         key={i}
                         style={{
-                          backgroundColor: "#1f1f1c",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "#1d1d1c",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "0.25rem",
                           padding: "0.5rem",
                         }}
@@ -2512,7 +2512,7 @@ export function PortfolioRiskOverview() {
                             Occ: {num(hotel.forwardOccupancy).toFixed(0)}%
                           </span>
                           <span
-                            style={{ color: "#faff6a", fontSize: "0.65rem" }}
+                            style={{ color: "#39BDF8", fontSize: "0.65rem" }}
                           >
                             {num(hotel.pacingDifficultyPercent).toFixed(0)}%
                             Pressure
@@ -2621,8 +2621,8 @@ export function PortfolioRiskOverview() {
                       <div
                         key={i}
                         style={{
-                          backgroundColor: "#1f1f1c",
-                          border: "1px solid #3a3a35",
+                          backgroundColor: "#1d1d1c",
+                          border: "1px solid #2a2a2a",
                           borderRadius: "0.25rem",
                           padding: "0.5rem",
                         }}
@@ -2845,7 +2845,7 @@ export function PortfolioRiskOverview() {
                 className={`px-3 py-1.5 rounded text-sm transition-all ${
                   sortByRisk
                     ? "bg-[#ef4444] text-white"
-                    : "bg-[#1f1f1c] border border-[#3a3a35] text-[#9ca3af] hover:border-[#ef4444]/50"
+                    : "bg-[#1d1d1c] border border-[#2a2a2a] text-[#9ca3af] hover:border-[#ef4444]/50"
                 }`}
               >
                 {sortByRisk ? "Showing Highest Risk First" : "Sort by Risk"}
@@ -2944,7 +2944,7 @@ export function PortfolioRiskOverview() {
                           <div
                             style={{
                               fontSize: "10px",
-                              color: isToday ? "#faff6a" : "#6b7280",
+                              color: isToday ? "#39BDF8" : "#6b7280",
                             }}
                           >
                             {dayOfWeek}
@@ -2952,7 +2952,7 @@ export function PortfolioRiskOverview() {
                           <div
                             style={{
                               ...styles.textXs,
-                              color: isToday ? "#faff6a" : "#9ca3af",
+                              color: isToday ? "#39BDF8" : "#9ca3af",
                             }}
                           >
                             {month} {dayOfMonth}
@@ -3028,7 +3028,7 @@ export function PortfolioRiskOverview() {
                                       ...styles.matrixDataCellInner,
                                       ...(matrixMetric === "occupancy"
                                         ? colorStyle
-                                        : { backgroundColor: "#1f1f1c" }),
+                                        : { backgroundColor: "#1d1d1c" }),
                                       ...textStyle,
                                     }}
                                   >
@@ -3093,7 +3093,7 @@ export function PortfolioRiskOverview() {
                                     </div>
                                     <div
                                       style={{
-                                        borderTop: "1px solid #3a3a35",
+                                        borderTop: "1px solid #2a2a2a",
                                         marginTop: "4px",
                                         paddingTop: "4px",
                                         display: "flex",
@@ -3243,7 +3243,7 @@ export function PortfolioRiskOverview() {
                         ...styles.cardRow,
                         ...styles.grid12,
                         ...styles.textSm,
-                        borderTop: index === 0 ? "none" : "1px solid #3a3a35",
+                        borderTop: index === 0 ? "none" : "1px solid #2a2a2a",
                       }}
                     >
                       <div style={{ ...styles.colSpan3, ...styles.textWhite }}>

@@ -362,7 +362,7 @@ export function HotelManagementTable({
                           isChecked
                         );
                       }}
-                      className="data-[state=checked]:bg-[#39BDF8] data-[state=unchecked]:bg-[#3a3a35]"
+                      className="data-[state=checked]:bg-[#39BDF8] data-[state=unchecked]:bg-[#2a2a2a]"
                     />
                     <span
                       style={{
@@ -547,7 +547,7 @@ function GroupCombobox({
               // The text color class is defined in index.css and works.
               className="text-[#d4d4a0] text-xs"
               style={{
-                backgroundColor: "rgba(58, 58, 53, 0.4)", // This is bg-[#3a3a35]/40
+                backgroundColor: "rgba(58, 58, 53, 0.4)", // This is bg-[#2a2a2a]/40
                 borderColor: "#4a4a45", // This is border-[#4a4a45]
               }}
             >
@@ -596,7 +596,7 @@ function GroupCombobox({
                   <button
                     onClick={handleCreate}
                     style={{
-                      color: "#faff6a",
+                      color: "#39BDF8",
                       fontSize: "12px",
                       display: "flex",
                       alignItems: "center",
@@ -645,11 +645,11 @@ function GroupCombobox({
                     <Check
                       className={`mr-2 h-4 w-4 ${
                         value === group
-                          ? "text-[#faff6a] opacity-100"
+                          ? "text-[#39BDF8] opacity-100"
                           : "opacity-0"
                       }`}
                     />
-                    <Building2 className="w-3 h-3 mr-2 text-[#faff6a]" />
+                    <Building2 className="w-3 h-3 mr-2 text-[#39BDF8]" />
                     {group}
                   </CommandItem>
                 ))}
@@ -662,7 +662,7 @@ function GroupCombobox({
               >
                 <CommandItem
                   onSelect={handleCreate}
-                  style={{ color: "#faff6a", cursor: "pointer" }}
+                  style={{ color: "#39BDF8", cursor: "pointer" }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Create new: "{searchValue}"

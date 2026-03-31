@@ -494,7 +494,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                   </div>
                   <Badge
                     variant="outline"
-                    className="bg-[#faff6a]/10 text-[#faff6a] border-[#faff6a]/30"
+                    className="bg-[#39BDF8]/10 text-[#39BDF8] border-[#39BDF8]/30"
                   >
                     Coming Soon
                   </Badge>
@@ -744,7 +744,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                     badgeStyle = {
                                       backgroundColor:
                                         "rgba(250, 255, 106, 0.1)",
-                                      color: "#faff6a",
+                                      color: "#39BDF8",
                                       border:
                                         "1px solid rgba(250, 255, 106, 0.3)",
                                     };
@@ -927,7 +927,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                                       backgroundColor:
                                                         "#1a1a18",
                                                       border:
-                                                        "1px solid #262626",
+                                                        "1px solid #2C2C2C",
 
                                                       color: "#e5e5e5",
                                                       width: "165px",
@@ -1663,7 +1663,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                             <SelectContent
                                               style={{
                                                 backgroundColor: "#1a1a18",
-                                                border: "1px solid #262626",
+                                                border: "1px solid #2C2C2C",
                                                 color: "#e5e5e5",
                                               }}
                                             >
@@ -1910,7 +1910,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                                 rate: currentRate,
                                                 indent: 0,
                                                 isBold: true,
-                                                color: "#faff6a",
+                                                color: "#39BDF8",
                                               });
                                             }
 

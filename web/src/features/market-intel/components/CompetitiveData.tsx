@@ -500,7 +500,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   width: '280px',
                   minWidth: '280px',
                   backgroundColor: '#1a1a18',
-                  border: '1px solid #3a3a35',
+                  border: '1px solid #2a2a2a',
                   color: '#e5e5e5',
                   padding: '4px',
                 }}

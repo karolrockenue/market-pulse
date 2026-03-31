@@ -11,12 +11,12 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
     <div className="min-h-screen bg-[#1a1a18] text-[#e5e5e5]">
       {/* Header */}
       {/* [FIX] Removed bg opacity (/80) and backdrop-blur-sm to make the header opaque */}
-      <div className="border-b border-[#3a3a35] bg-[#1a1a18] sticky top-0 z-10">
+      <div className="border-b border-[#2a2a2a] bg-[#1a1a18] sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <Button
             onClick={onBack}
             variant="ghost"
-            className="text-[#9ca3af] hover:text-[#faff6a] hover:bg-transparent"
+            className="text-[#9ca3af] hover:text-[#39BDF8] hover:bg-transparent"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -32,7 +32,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Title Section */}
         <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-full text-[#faff6a] text-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-full text-[#39BDF8] text-sm mb-6">
             <FileText className="w-4 h-4" />
             <span>Legal Agreement</span>
           </div>
@@ -74,8 +74,8 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
               Management System (PMS) on a <strong>read-only basis</strong>.
             </p>
 
-            <div className="bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-lg p-4 mt-4">
-              <p className="text-[#faff6a]">
+            <div className="bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-lg p-4 mt-4">
+              <p className="text-[#39BDF8]">
                 <strong>Fees and Changes to Service</strong>
               </p>
               <p className="text-[#e5e5e5] mt-2">
@@ -126,9 +126,9 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
           <section className="space-y-4">
             <h2 className="text-2xl text-[#e5e5e5]">Data Usage and Privacy</h2>
             
-            <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-6 space-y-4">
+            <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="text-lg text-[#faff6a] mb-2">Your Property Data</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">Your Property Data</h3>
                 <p>
                   You retain all ownership rights to your hotel's performance data. By using Market Pulse, you 
                   grant us a limited license to process this data solely to provide our services.
@@ -137,7 +137,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
 
               <div>
                 {/* [MERGE] This entire section is replaced with the critical 'commercial rights' clause from the old file */}
-                <h3 className="text-lg text-[#faff6a] mb-2">License to Your Data</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">License to Your Data</h3>
                 <p>
                   To operate and improve the Service, you grant us a worldwide,
                   perpetual, irrevocable, royalty-free license to use, host,
@@ -208,9 +208,9 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
           <section className="space-y-4">
             <h2 className="text-2xl text-[#e5e5e5]">Disclaimers and Limitations</h2>
             
-            <div className="bg-[#2C2C2C] border border-[#3a3a35] rounded-lg p-6 space-y-4">
+            <div className="bg-[#2C2C2C] border border-[#2a2a2a] rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="text-lg text-[#faff6a] mb-2">"AS IS" Basis</h3>
+                <h3 className="text-lg text-[#39BDF8] mb-2">"AS IS" Basis</h3>
                 <p>
                   {/* [MERGE] Using old file's text */}
                   The Service is provided on an "AS IS" and "AS AVAILABLE" basis.
@@ -275,19 +275,19 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
             <h2 className="text-2xl text-[#e5e5e5]">Dispute Resolution</h2>
             
             <div className="space-y-4">
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
                 <h3 className="text-[#e5e5e5] mb-2">Informal Resolution</h3>
                 <p>
                   {/* [MERGE] Using support@ email */}
                   Before filing a formal claim, please contact us at{' '}
-                  <a href="mailto:support@market-pulse.io" className="text-[#faff6a] hover:underline">
+                  <a href="mailto:support@market-pulse.io" className="text-[#39BDF8] hover:underline">
                     support@market-pulse.io
                   </a>{' '}
                   to attempt to resolve the dispute informally.
                 </p>
               </div>
 
-              <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-4">
+              <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
                 <h3 className="text-[#e5e5e5] mb-2">Governing Law</h3>
                 <p>
                   {/* [FIX] Updated jurisdiction per user request */}
@@ -305,7 +305,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
               If you have any questions about these Terms, please contact us at:
             </p>
             
-            <div className="bg-[#1a1a18] border border-[#3a3a35] rounded-lg p-6">
+            <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-6">
               <div className="space-y-2">
                 <p>
                   {/* [MERGE] Using old file's simple contact block */}
@@ -317,7 +317,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
 
           {/* Acknowledgment */}
           <section className="space-y-4">
-            <div className="bg-[#faff6a]/10 border border-[#faff6a]/30 rounded-lg p-6">
+            <div className="bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-lg p-6">
               <p className="text-[#e5e5e5]">
                 BY CREATING AN ACCOUNT OR USING MARKET PULSE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, 
                 AND AGREE TO BE BOUND BY THESE TERMS OF SERVICE.
@@ -327,7 +327,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-[#3a3a35] text-center">
+        <div className="mt-12 pt-8 border-t border-[#2a2a2a] text-center">
           <p className="text-[#6b7280] text-sm">
             © 2025 Market Pulse. All rights reserved.
           </p>

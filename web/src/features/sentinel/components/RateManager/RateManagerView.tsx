@@ -1048,7 +1048,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   size={10}
                                   color={
                                     pendingOverrides[day.date]
-                                      ? "#faff6a"
+                                      ? "#f59e0b"
                                       : "#9ca3af"
                                   }
                                 />
@@ -1084,7 +1084,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               : "PENDING";
                             color = aiApprovedPending.has(day.date)
                               ? "#39BDF8"
-                              : "#faff6a";
+                              : "#39BDF8";
                           } else if (
                             currentSource === "SENTINEL" ||
                             currentSource === "AI_AUTO" ||
@@ -1744,7 +1744,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           // [FIX] Use Hook State
                           const isApplied =
                             aiApprovedPending.has(day.date) ||
-                            day.source === "AI_SUGGESTED";
+                            day.source === "SENTINEL";
 
                           const isHovered = hoveredAiCell === day.date;
                           const showArrow =
@@ -2124,7 +2124,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               ) : (
                                 <span
                                   style={{
-                                    color: isPending ? "#faff6a" : "#e5e5e5",
+                                    color: isPending ? "#f59e0b" : "#e5e5e5",
                                     fontWeight: isPending ? "bold" : "normal",
                                     fontFamily: "monospace",
                                     fontSize: "13px",

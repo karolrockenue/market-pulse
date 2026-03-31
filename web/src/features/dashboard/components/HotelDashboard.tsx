@@ -399,7 +399,7 @@ export function HotelDashboard({
         >
           <div style={{ textAlign: "center", color: "#9ca3af" }}>
             <div
-              className="w-12 h-12 border-4 border-[#faff6a] border-t-transparent border-solid rounded-full animate-spin"
+              className="w-12 h-12 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin"
               style={{ margin: "0 auto 20px auto" }}
             ></div>
             Loading Dashboard...
@@ -955,7 +955,7 @@ export function HotelDashboard({
               </p>
               <div style={styles.viewLink}>
                 <span
-                  style={{ color: "#faff6a", fontSize: "12px", opacity: 0 }}
+                  style={{ color: "#39BDF8", fontSize: "12px", opacity: 0 }}
                 >
                   View
                 </span>
@@ -977,35 +977,35 @@ export function HotelDashboard({
                   >
                     <CartesianGrid
                       strokeDasharray="0"
-                      stroke="#2a2a25"
+                      stroke="#2a2a2a"
                       opacity={0.5}
                       vertical={true}
                       horizontal={true}
                     />
                     <XAxis
                       dataKey="date"
-                      stroke="#3a3a35"
+                      stroke="#2a2a2a"
                       tick={{ fill: "#6b7280", fontSize: 9 }}
-                      tickLine={{ stroke: "#3a3a35" }}
-                      axisLine={{ stroke: "#3a3a35" }}
+                      tickLine={{ stroke: "#2a2a2a" }}
+                      axisLine={{ stroke: "#2a2a2a" }}
                       interval={13}
                     />
                     <YAxis
                       yAxisId="left"
-                      stroke="#3a3a35"
+                      stroke="#2a2a2a"
                       tick={{ fill: "#6b7280", fontSize: 9 }}
-                      tickLine={{ stroke: "#3a3a35" }}
-                      axisLine={{ stroke: "#3a3a35" }}
+                      tickLine={{ stroke: "#2a2a2a" }}
+                      axisLine={{ stroke: "#2a2a2a" }}
                       width={35}
                       domain={[0, 100]}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      stroke="#3a3a35"
+                      stroke="#2a2a2a"
                       tick={{ fill: "#6b7280", fontSize: 9 }}
-                      tickLine={{ stroke: "#3a3a35" }}
-                      axisLine={{ stroke: "#3a3a35" }}
+                      tickLine={{ stroke: "#2a2a2a" }}
+                      axisLine={{ stroke: "#2a2a2a" }}
                       width={35}
                       domain={[0, "auto"]}
                     />
@@ -1013,7 +1013,7 @@ export function HotelDashboard({
                       cursor={{ fill: "rgba(250, 255, 106, 0.1)" }}
                       contentStyle={{
                         backgroundColor: "rgba(26, 26, 24, 0.95)",
-                        border: "1px solid #3a3a35",
+                        border: "1px solid #2a2a2a",
                         borderRadius: "4px",
                         padding: "6px",
                         fontSize: "10px",
@@ -1045,7 +1045,7 @@ export function HotelDashboard({
                         let fill = "#3b82f6";
                         if (entry.marketDemand >= 85) fill = "#ef4444";
                         else if (entry.marketDemand >= 70) fill = "#f97316";
-                        else if (entry.marketDemand >= 40) fill = "#faff6a";
+                        else if (entry.marketDemand >= 40) fill = "#f59e0b";
                         return <Cell key={`cell-${index}`} fill={fill} />;
                       })}
                     </Bar>
