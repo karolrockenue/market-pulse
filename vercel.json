@@ -9,7 +9,8 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["api/**", "web/build/index.html"]
+        "includeFiles": ["api/**", "web/build/index.html"],
+        "excludeFiles": ["web/build/assets/**"]
       }
     }
   ],
