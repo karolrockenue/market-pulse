@@ -915,31 +915,44 @@ SELECT
 
   static async getProfileNeighbourhoods(city) {
     const citySlug = slugify(city);
+    // Compare neighbourhood supply from the oldest scrape vs the newest scrape
+    // for overlapping check-in dates — shows which areas absorbed the most
     const sql = `
-      WITH far AS (
-        SELECT checkin_date, facet_neighbourhood
+      WITH scrape_range AS (
+        SELECT MIN(scraped_at::date) AS earliest, MAX(scraped_at::date) AS latest
         FROM market_availability_snapshots
         WHERE LOWER(city_slug) = LOWER($1)
-          AND (checkin_date - scraped_at::date) BETWEEN 28 AND 35
-          AND checkin_date BETWEEN CURRENT_DATE - 60 AND CURRENT_DATE + 30
       ),
-      near AS (
-        SELECT checkin_date, facet_neighbourhood
-        FROM market_availability_snapshots
+      early AS (
+        SELECT DISTINCT ON (checkin_date) checkin_date, facet_neighbourhood
+        FROM market_availability_snapshots, scrape_range
         WHERE LOWER(city_slug) = LOWER($1)
-          AND (checkin_date - scraped_at::date) BETWEEN 3 AND 9
-          AND checkin_date BETWEEN CURRENT_DATE - 60 AND CURRENT_DATE + 30
+          AND scraped_at::date <= earliest + 3
+          AND facet_neighbourhood IS NOT NULL
+        ORDER BY checkin_date, scraped_at ASC
+      ),
+      late AS (
+        SELECT DISTINCT ON (checkin_date) checkin_date, facet_neighbourhood
+        FROM market_availability_snapshots, scrape_range
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND scraped_at::date >= latest - 3
+          AND facet_neighbourhood IS NOT NULL
+        ORDER BY checkin_date, scraped_at DESC
       )
       SELECT
         key AS neighbourhood,
-        ROUND(AVG((far.facet_neighbourhood->>key)::numeric)) AS supply_30d,
-        ROUND(AVG((near.facet_neighbourhood->>key)::numeric)) AS supply_7d,
-        ROUND((1 - AVG((near.facet_neighbourhood->>key)::numeric) / NULLIF(AVG((far.facet_neighbourhood->>key)::numeric), 0)) * 100, 1) AS pct_absorbed
-      FROM far, jsonb_object_keys(far.facet_neighbourhood) AS key
-      JOIN near ON far.checkin_date = near.checkin_date
+        ROUND(AVG((early.facet_neighbourhood->>key)::numeric)) AS supply_30d,
+        ROUND(AVG((late.facet_neighbourhood->>key)::numeric)) AS supply_7d,
+        ROUND((1 - AVG((late.facet_neighbourhood->>key)::numeric) / NULLIF(AVG((early.facet_neighbourhood->>key)::numeric), 0)) * 100, 1) AS pct_absorbed
+      FROM early
+      JOIN late ON early.checkin_date = late.checkin_date
+      CROSS JOIN LATERAL jsonb_object_keys(early.facet_neighbourhood) AS key
+      WHERE (early.facet_neighbourhood->>key) IS NOT NULL
+        AND (late.facet_neighbourhood->>key) IS NOT NULL
       GROUP BY key
-      HAVING AVG((far.facet_neighbourhood->>key)::numeric) > 50
-      ORDER BY pct_absorbed DESC;
+      HAVING AVG((early.facet_neighbourhood->>key)::numeric) > 50
+      ORDER BY pct_absorbed DESC
+      LIMIT 15;
     `;
     const { rows } = await db.query(sql, [citySlug]);
     return rows;
