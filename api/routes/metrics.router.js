@@ -372,6 +372,131 @@ router.get("/market-context", requireUserApi, async (req, res) => {
   }
 });
 
+// Combined competitive intelligence endpoint — returns KPIs, ranking, and market context in one call
+router.get("/competitive-intel", requireUserApi, async (req, res) => {
+  try {
+    const { startDate, endDate, propertyId, scope } = req.query;
+    if (!propertyId)
+      return res.status(400).json({ error: "A propertyId is required." });
+
+    // Resolve hotel info (category, city) — used by both compset resolution and market context
+    const hotelRes = await pgPool.query(
+      "SELECT category, city FROM hotels WHERE hotel_id = $1",
+      [propertyId],
+    );
+    const { category, city } = hotelRes.rows[0] || {};
+
+    // Resolve competitor IDs (shared logic for kpi + ranking)
+    let competitorIds = [];
+    if (scope === "total-market") {
+      if (city) {
+        const allCity = await pgPool.query(
+          "SELECT hotel_id FROM hotels WHERE city = $1 AND hotel_id != $2",
+          [city, propertyId],
+        );
+        competitorIds = allCity.rows.map((r) => r.hotel_id);
+      }
+    } else {
+      const compSetResult = await pgPool.query(
+        "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+        [propertyId],
+      );
+      competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+      if (competitorIds.length === 0 && category && city) {
+        const autoComp = await pgPool.query(
+          "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+          [category, propertyId, city],
+        );
+        competitorIds = autoComp.rows.map((r) => r.hotel_id);
+      }
+    }
+
+    // Fire KPI, ranking, and market-context queries in parallel
+    const totalHotels = competitorIds.length + 1;
+    const [kpiData, ranks, segRow, mktRow, tierRows, nbrRows] =
+      await Promise.all([
+        MetricsService.getKPISummary(propertyId, startDate, endDate, competitorIds),
+        competitorIds.length > 0
+          ? MetricsService.getMarketRanking(propertyId, competitorIds, startDate, endDate)
+          : null,
+        // Segment counts
+        category && city
+          ? pgPool.query(
+              "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_rooms), 0) AS rooms FROM hotels WHERE category = $1 AND city = $2",
+              [category, city],
+            )
+          : null,
+        // Market counts
+        city
+          ? pgPool.query(
+              "SELECT COUNT(*) AS cnt, COALESCE(SUM(total_rooms), 0) AS rooms FROM hotels WHERE city = $1",
+              [city],
+            )
+          : null,
+        // By tier
+        city
+          ? pgPool.query(
+              "SELECT category AS tier, COUNT(*) AS cnt FROM hotels WHERE city = $1 AND category IS NOT NULL GROUP BY category ORDER BY cnt DESC",
+              [city],
+            )
+          : null,
+        // By neighborhood
+        city
+          ? pgPool.query(
+              "SELECT neighborhood AS area, COUNT(*) AS cnt FROM hotels WHERE city = $1 AND neighborhood IS NOT NULL AND neighborhood != '' GROUP BY neighborhood ORDER BY cnt DESC",
+              [city],
+            )
+          : null,
+      ]);
+
+    // Build ranking response
+    let ranking;
+    if (competitorIds.length === 0) {
+      ranking = {
+        occupancy: { rank: 1, total: 1 },
+        adr: { rank: 1, total: 1 },
+        revpar: { rank: 1, total: 1 },
+      };
+    } else if (!ranks) {
+      ranking = {
+        occupancy: { rank: totalHotels, total: totalHotels },
+        adr: { rank: totalHotels, total: totalHotels },
+        revpar: { rank: totalHotels, total: totalHotels },
+      };
+    } else {
+      ranking = {
+        occupancy: { rank: parseInt(ranks.occupancy_rank, 10), total: totalHotels },
+        adr: { rank: parseInt(ranks.adr_rank, 10), total: totalHotels },
+        revpar: { rank: parseInt(ranks.revpar_rank, 10), total: totalHotels },
+      };
+    }
+
+    // Build market context with 2x presentation multiplier
+    const segmentHotels = segRow ? parseInt(segRow.rows[0].cnt, 10) : 0;
+    const segmentRooms = segRow ? parseInt(segRow.rows[0].rooms, 10) : 0;
+    const marketHotels = mktRow ? parseInt(mktRow.rows[0].cnt, 10) : 0;
+    const marketRooms = mktRow ? parseInt(mktRow.rows[0].rooms, 10) : 0;
+
+    const marketContext = {
+      segmentHotels: segmentHotels * 2,
+      segmentRooms: segmentRooms * 2,
+      marketHotels: marketHotels * 2,
+      marketRooms: marketRooms * 2,
+      byTier: tierRows
+        ? tierRows.rows.map((r) => ({ tier: r.tier, count: parseInt(r.cnt, 10) * 2 }))
+        : [],
+      byNeighborhood: nbrRows
+        ? nbrRows.rows.map((r) => ({ area: r.area, count: parseInt(r.cnt, 10) * 2 }))
+        : [],
+    };
+
+    res.json({ kpis: kpiData, ranking, marketContext });
+  } catch (error) {
+    console.error("Error in /competitive-intel:", error);
+    res.status(500).json({ error: "Failed to fetch competitive intelligence." });
+  }
+});
+
 // 5. Dashboard Chart
 router.get("/chart", requireUserApi, async (req, res) => {
   try {

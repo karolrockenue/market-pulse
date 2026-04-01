@@ -30,30 +30,32 @@ window.addEventListener("error", (event) => {
 // Global Error Boundary for Chunk Loading Failures
 class GlobalErrorBoundary extends Component<
   { children: ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; error: any }
 > {
   constructor(props: { children: ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: any) {
+    const isChunkError =
+      error?.message?.includes("Loading chunk") ||
+      error?.message?.includes("Importing a module") ||
+      error?.message?.includes("Failed to fetch dynamically imported module");
+    return { hasError: true, error, isChunkError };
   }
 
   componentDidCatch(error: any) {
     console.error("Global Error Caught:", error);
-    // Auto-reload on chunk errors (404s from old deployments)
-    if (
+    const isChunkError =
       error?.message?.includes("Loading chunk") ||
-      error?.message?.includes("Importing a module")
-    ) {
-      // [FIX] Prevent infinite reload loops
+      error?.message?.includes("Importing a module") ||
+      error?.message?.includes("Failed to fetch dynamically imported module");
+
+    if (isChunkError) {
       const lastReload = sessionStorage.getItem("chunk_reload_ts");
       const now = Date.now();
-
       if (!lastReload || now - parseInt(lastReload) > 10000) {
-        // Only reload if we haven't done so in the last 10 seconds
         sessionStorage.setItem("chunk_reload_ts", String(now));
         window.location.reload();
       }
@@ -62,6 +64,7 @@ class GlobalErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
+      const isDev = import.meta.env.DEV;
       return (
         <div
           style={{
@@ -73,12 +76,34 @@ class GlobalErrorBoundary extends Component<
             alignItems: "center",
             justifyContent: "center",
             color: "#e5e5e5",
+            padding: "24px",
           }}
         >
-          <h2>Update Required</h2>
-          <p style={{ color: "#9ca3af", marginBottom: "20px" }}>
-            New version detected. Refreshing...
-          </p>
+          <h2>{isDev ? "Runtime Error" : "Update Required"}</h2>
+          {isDev && this.state.error && (
+            <pre style={{
+              color: "#ef4444",
+              fontSize: "13px",
+              maxWidth: "800px",
+              overflow: "auto",
+              backgroundColor: "#0a0a0a",
+              padding: "16px",
+              borderRadius: "8px",
+              border: "1px solid #2a2a2a",
+              marginBottom: "20px",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}>
+              {this.state.error?.message || String(this.state.error)}
+              {"\n\n"}
+              {this.state.error?.stack}
+            </pre>
+          )}
+          {!isDev && (
+            <p style={{ color: "#9ca3af", marginBottom: "20px" }}>
+              New version detected. Refreshing...
+            </p>
+          )}
           <button
             onClick={() => window.location.reload()}
             style={{

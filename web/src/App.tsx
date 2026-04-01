@@ -32,6 +32,7 @@ import { SentinelHub } from "./features/sentinel/SentinelHub";
 import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/HotelRateWindow";
 
 import { LandingPage } from "./components/LandingPage";
+import { Deck } from "./components/Deck";
 // [NEW] Import the legal page components
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { SupportPage } from "./components/SupportPage"; // [NEW] Import the new support page
@@ -574,6 +575,12 @@ export default function App() {
     );
   }
 
+  if (activeView === "deck") {
+    return (
+      <Deck onBack={() => setActiveView(previousView || "dashboard")} />
+    );
+  }
+
   return (
     activeView && (
       // [MODIFIED] Wrap the entire app content with ActionListProvider (ErrorBoundary moved to main.tsx)
@@ -607,7 +614,7 @@ export default function App() {
             properties={properties}
             // Pass the new state variable down to the TopNav component
             lastUpdatedAt={lastUpdatedAt}
-            // [NEW] Pass the user info down to the TopNav
+            cityName={selectedPropertyDetails?.city}
             userInfo={userInfo}
           />
           {/* Landing View block is now removed and handled above */}

@@ -1,5 +1,7 @@
 0.0 AI PROTOCOL (FOR ALL AI AGENTS)
 
+IMPORTANT: At the start of every session, read all documents in the /claude folder in the project root. These contain active to-do items, decisions, and context that must inform your work.
+
 This section is binding. Ignore older docs, memories, assumptions, and “best practices” that contradict this.
 
 Analyze First
@@ -1347,6 +1349,85 @@ Font size: brackets 24-32px, text 14-18px, letter-spacing 0.025em.
 8.1 Market Context Multiplier
 
 The /api/metrics/market-context endpoint applies a 2x multiplier to all returned counts (segment hotels, segment rooms, market hotels, market rooms). This is a deliberate presentation adjustment to reflect broader market maturity while the platform is in its growth phase. This multiplier will be removed once real third-party market data sources (e.g., STR, PredictHQ) are integrated. The multiplier lives in metrics.router.js — search for "Presentation multiplier" to find and remove it.
+
+9.0 ACCOMMODATION MAP (OpenStreetMap / Overpass API)
+
+9.1 Purpose
+
+The Accommodation Supply Map visualises every hotel, hostel, guest house, apartment and motel in a city on an interactive Leaflet map with marker clustering. It is powered by OpenStreetMap data fetched via the Overpass API and cached locally.
+
+9.2 Architecture
+
+Data Source: OpenStreetMap via Overpass API (free, no API key, global coverage).
+
+Cache Table: city_accommodation_pois (city_slug TEXT PK, pois JSONB, fetched_at TIMESTAMPTZ).
+
+Cache TTL: 90 days. On expiry, next request triggers a fresh Overpass query.
+
+Fallback Mirrors: Primary endpoint is overpass-api.de. Falls back to overpass.kumi.systems if primary returns non-200.
+
+9.3 Data Flow
+
+1. User visits Demand & Pace page for a city.
+2. Frontend (NeighbourhoodMaps.tsx, lazy-loaded) calls GET /api/market/accommodation-map?citySlug=london.
+3. Backend (MarketService.getAccommodationMap in market.service.js) checks city_accommodation_pois cache.
+4. Cache hit (< 90 days old): returns cached JSONB array immediately.
+5. Cache miss: derives bounding box from hotels table lat/lng for that city. Falls back to hardcoded bbox for London/Las Vegas if no hotel coordinates exist.
+6. Queries Overpass API for all nodes/ways/relations with tourism=hotel|hostel|guest_house|apartment|motel within the bounding box.
+7. Parses response into array of { name, type, lat, lng, stars }.
+8. Upserts into city_accommodation_pois cache (ON CONFLICT updates).
+9. Returns result to frontend.
+
+9.4 New City Onboarding
+
+When a hotel from a new city onboards, the map works automatically:
+- First visit to Demand & Pace triggers Overpass query for that city.
+- Bounding box is derived from the hotel's lat/lng (with 20% padding).
+- Result is cached for 90 days.
+- No manual coordinate files or per-city configuration needed.
+
+9.5 Frontend Components
+
+NeighbourhoodMaps.tsx (web/src/components/NeighbourhoodMaps.tsx):
+- Lazy-loaded via React.lazy() in DemandPace.tsx.
+- Uses react-leaflet with CartoDB dark tile layer.
+- Marker clustering via react-leaflet-cluster (clusters merge when zoomed out, split when zoomed in).
+- Cluster icons styled in brand palette (#39BDF8 accent, translucent backgrounds).
+- Dots color-coded by property type (hotel=blue, hostel=amber, guest_house=green, apartment=purple, motel=pink).
+- Hover tooltips show property name, type, and star rating.
+- Passes type counts up to parent via onTypeCounts callback for the property type treemap.
+
+Property Type Treemap (inline in DemandPace.tsx):
+- Pure HTML/CSS treemap (no Recharts SVG — for crisp text rendering).
+- Data sourced from the same Overpass POIs as the map (numbers match exactly).
+- Monochrome blue palette with opacity scaled by size.
+- Labels: uppercase type name, count in accent blue, percentage in muted gray.
+
+9.6 API Reference
+
+GET /api/market/accommodation-map
+
+Query params: citySlug (required, e.g. "london", "las-vegas").
+
+Response: { citySlug, pois: [{ name, type, lat, lng, stars }], fetchedAt, source }.
+
+source values: "cache" (from DB), "overpass" (fresh fetch), "error" (API failed), "no-data" (no bbox available).
+
+9.7 Dependencies
+
+npm packages (web): leaflet, react-leaflet@4, @types/leaflet, react-leaflet-cluster.
+
+External API: Overpass API (overpass-api.de + kumi.systems mirror). Rate-limited — cache prevents repeated hits.
+
+9.8 Database
+
+Table: city_accommodation_pois
+
+- city_slug (TEXT, PK) — e.g. "london"
+- pois (JSONB) — array of { name, type, lat, lng, stars }
+- fetched_at (TIMESTAMPTZ) — when the Overpass data was last fetched
+
+Migration: api/migration_003_city_accommodation_pois.js
 
 End of Blueprint.
 Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.

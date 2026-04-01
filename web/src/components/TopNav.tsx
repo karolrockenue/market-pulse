@@ -13,6 +13,7 @@ import {
   TerminalSquare,
   DollarSign,
   Trophy,
+  Presentation,
 } from "lucide-react";
 import {
   Select,
@@ -44,6 +45,7 @@ interface TopNavProps {
   onPropertyChange: (property: string) => void;
   properties: Property[];
   lastUpdatedAt: string | null;
+  cityName?: string;
   userInfo: {
     firstName: string;
     lastName: string;
@@ -59,6 +61,7 @@ export function TopNav({
   onPropertyChange,
   properties,
   lastUpdatedAt,
+  cityName,
   userInfo,
 }: TopNavProps) {
   const getInitials = () => {
@@ -117,19 +120,19 @@ export function TopNav({
       icon: LayoutDashboard,
       isAdmin: false,
     },
-    { label: "Reports Hub", value: "reports", icon: FileText, isAdmin: false },
     {
-      label: "Market Intelligence",
+      label: cityName ? `Demand ${cityName.charAt(0).toUpperCase() + cityName.slice(1).replace(/-/g, " ")}` : "Demand",
       value: "demand-pace",
       icon: BarChart3,
       isAdmin: false,
     },
     {
-      label: "Competitive Intel",
+      label: "Compset Intel",
       value: "competitive-intel",
       icon: Trophy,
       isAdmin: false,
     },
+    { label: "Reports", value: "reports", icon: FileText, isAdmin: false },
     { label: "Settings", value: "settings", icon: Settings, isAdmin: false },
     { label: "My Rates", value: "hotelRates", icon: DollarSign, isAdmin: false },
     {
@@ -144,6 +147,7 @@ export function TopNav({
         { label: "Rate Manager", value: "rateManager", icon: DollarSign },
         { label: "Property Hub", value: "propertyHub", icon: Home },
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
+        { label: "Deck", value: "deck", icon: Presentation },
       ],
     },
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },
@@ -182,9 +186,9 @@ export function TopNav({
         zIndex: 50,
       }}
     >
-      <div className="flex items-center gap-10">
+      <div style={{ display: "flex", alignItems: "center", gap: "24px", minWidth: 0, flex: 1 }}>
         {/* LOGO */}
-        <div className="flex items-center gap-1">
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
           <span style={{ color: BLUE, fontSize: "24px" }}>(</span>
           <span
             style={{
@@ -193,6 +197,7 @@ export function TopNav({
               letterSpacing: "0.025em",
               position: "relative",
               top: "2px",
+              whiteSpace: "nowrap",
             }}
           >
             MARKET PULSE
@@ -201,7 +206,7 @@ export function TopNav({
         </div>
 
         {/* NAV ITEMS */}
-        <nav className="flex gap-6">
+        <nav style={{ display: "flex", gap: "16px", flexWrap: "nowrap", overflowX: "auto", minWidth: 0 }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -218,6 +223,8 @@ export function TopNav({
               fontSize: "14px",
               transition: "colors 0.2s",
               position: "relative" as const,
+              whiteSpace: "nowrap" as const,
+              flexShrink: 0,
               color: item.isAdmin
                 ? BLUE // Admin items always Blue text
                 : isActive

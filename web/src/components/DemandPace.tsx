@@ -29,103 +29,10 @@ import {
   SelectValue,
 } from "./ui/select";
 import { MarketOutlookBanner } from "../features/dashboard/components/MarketOutlookBanner";
+import React, { Suspense } from "react";
 
-// Internal component for Market Demand Patterns
-function MarketDemandPatterns({ patterns }: { patterns: any }) {
-  if (!patterns) return null;
+const NeighbourhoodMaps = React.lazy(() => import("./NeighbourhoodMaps"));
 
-  const { busiestDays, quietestDays } = patterns;
-
-  const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  return (
-    <div className="grid grid-cols-2 gap-6">
-      {/* Busiest Days Card */}
-      <div className="bg-[#1A1A1A] border border-[#2a2a2a] rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-full bg-[#ef4444]/20 flex items-center justify-center">
-            <TrendingUp className="w-4 h-4 text-[#ef4444]" />
-          </div>
-          <div>
-            <div className="text-[#e5e5e5] text-sm">High Demand Days</div>
-            <div className="text-[#9ca3af] text-xs">
-              Peak market saturation periods
-            </div>
-          </div>
-        </div>
-        <div className="space-y-1">
-          {busiestDays.map((day: any, i: number) => (
-            <div
-              key={i}
-              className="flex items-center justify-between p-2 hover:bg-[#2C2C2C] rounded transition-colors border-b border-[#2a2a2a] last:border-0"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[#6b7280] text-xs w-4">{i + 1}</span>
-                <div>
-                  <div className="text-[#e5e5e5] text-xs">
-                    {formatDate(day.date)}
-                  </div>
-                  <div className="text-[#6b7280] text-[10px]">
-                    {day.dayOfWeek}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[#ef4444] text-xs font-medium bg-[#ef4444]/10 px-2 py-0.5 rounded">
-                  {day.availability}%
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Quietest Days Card */}
-      <div className="bg-[#1A1A1A] border border-[#2a2a2a] rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-full bg-[#10b981]/20 flex items-center justify-center">
-            <TrendingDown className="w-4 h-4 text-[#10b981]" />
-          </div>
-          <div>
-            <div className="text-[#e5e5e5] text-sm">Low Demand Days</div>
-            <div className="text-[#9ca3af] text-xs">Soft market periods</div>
-          </div>
-        </div>
-        <div className="space-y-1">
-          {quietestDays.map((day: any, i: number) => (
-            <div
-              key={i}
-              className="flex items-center justify-between p-2 hover:bg-[#2C2C2C] rounded transition-colors border-b border-[#2a2a2a] last:border-0"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[#6b7280] text-xs w-4">{i + 1}</span>
-                <div>
-                  <div className="text-[#e5e5e5] text-xs">
-                    {formatDate(day.date)}
-                  </div>
-                  <div className="text-[#6b7280] text-[10px]">
-                    {day.dayOfWeek}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[#10b981] text-xs font-medium bg-[#10b981]/10 px-2 py-0.5 rounded">
-                  {day.availability}%
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Define the props the component will receive from App.tsx
 interface DemandPaceProps {
@@ -145,6 +52,9 @@ export function DemandPace({
     return map[code] || code || "£";
   };
   const currencySymbol = getCurrencySymbol(currencyCode);
+
+  // Accommodation type counts from map POI data
+  const [accommodationTypes, setAccommodationTypes] = useState<Record<string, number>>({});
 
   // Pace Analysis period selector
   const [paceAnalysisPeriod, setPaceAnalysisPeriod] = useState("7");
@@ -293,7 +203,7 @@ export function DemandPace({
 
   // Data Merging Effect
   useEffect(() => {
-    if (marketData.length === 0 || hotelData.length === 0) return;
+    if (marketData.length === 0) return;
 
     const processedData = mergeAndProcessData(
       marketData,
@@ -480,7 +390,7 @@ export function DemandPace({
           style={{ color: "#39BDF8", stroke: "#39BDF8" }}
         />
         <h2 className="text-xl font-light" style={{ color: "#e5e5e5" }}>
-          Loading Market Intelligence
+          Loading Demand Data
         </h2>
         <p className="text-[#6b7280] text-sm mt-2">
           Fetching and processing 90-day forecast data...
@@ -581,7 +491,7 @@ export function DemandPace({
                 margin: 0,
               }}
             >
-              Market Intelligence
+              Demand {citySlug ? citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, " ") : ""}
             </h1>
           </div>
           <p style={{ color: "#9ca3af", margin: 0 }}>
@@ -1101,7 +1011,149 @@ export function DemandPace({
             </div>
           </div>
 
-          {/* Data Attribution Footer */}
+          {/* Neighbourhood Supply Heatmap (lazy-loaded) */}
+          <div style={{ maxWidth: "50%" }}>
+            <Suspense fallback={
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#6b7280", fontSize: "13px" }}>
+                Loading maps...
+              </div>
+            }>
+              <NeighbourhoodMaps citySlug={citySlug} onTypeCounts={setAccommodationTypes} />
+            </Suspense>
+          </div>
+
+          {/* ── Property Type Visualisation Options ── */}
+          <div style={{ maxWidth: "50%" }}>
+          {(() => {
+            const LABEL_MAP: Record<string, string> = {
+              hotel: "Hotels",
+              hostel: "Hostels",
+              guest_house: "Guest Houses",
+              apartment: "Apartments",
+              motel: "Motels",
+            };
+            const types = Object.entries(accommodationTypes)
+              .map(([key, count]) => ({ name: LABEL_MAP[key] || key.replace("_", " "), size: count }))
+              .sort((a, b) => b.size - a.size);
+            if (types.length === 0) return null;
+            const total = types.reduce((s, t) => s + t.size, 0);
+
+            return (
+              <div style={{
+                backgroundColor: "rgb(26, 26, 26)",
+                borderRadius: "8px",
+                border: "1px solid #2a2a2a",
+                padding: "20px",
+                marginTop: "24px",
+              }}>
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ color: "#e5e5e5", fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>
+                    Market Supply by Property Type
+                  </div>
+                  <div style={{ color: "#6b7280", fontSize: "11px" }}>
+                    Tile size represents share of total available supply ({total.toLocaleString()} properties)
+                  </div>
+                </div>
+                {(() => {
+                  // Simple squarified treemap layout
+                  const sorted = [...types].sort((a, b) => b.size - a.size);
+                  const totalSize = sorted.reduce((s, t) => s + t.size, 0);
+                  const tiles: { name: string; size: number; x: number; y: number; w: number; h: number }[] = [];
+                  let rx = 0, ry = 0, rw = 100, rh = 100;
+
+                  sorted.forEach((t, i) => {
+                    const remaining = sorted.slice(i).reduce((s, r) => s + r.size, 0);
+                    const frac = t.size / remaining;
+                    if (rw >= rh) {
+                      const w = rw * frac;
+                      tiles.push({ name: t.name, size: t.size, x: rx, y: ry, w, h: rh });
+                      rx += w;
+                      rw -= w;
+                    } else {
+                      const h = rh * frac;
+                      tiles.push({ name: t.name, size: t.size, x: rx, y: ry, w: rw, h });
+                      ry += h;
+                      rh -= h;
+                    }
+                  });
+
+                  return (
+                    <div style={{ position: "relative", width: "100%", height: "320px" }}>
+                      {tiles.map((t) => {
+                        const opacity = 0.12 + (t.size / sorted[0].size) * 0.5;
+                        const pct = Math.round((t.size / totalSize) * 100);
+                        const showCount = t.w > 12 && t.h > 15;
+                        const showPct = t.w > 12 && t.h > 22;
+                        return (
+                          <div
+                            key={t.name}
+                            style={{
+                              position: "absolute",
+                              left: `${t.x}%`,
+                              top: `${t.y}%`,
+                              width: `${t.w}%`,
+                              height: `${t.h}%`,
+                              padding: "2px",
+                              boxSizing: "border-box",
+                            }}
+                          >
+                            <div style={{
+                              width: "100%",
+                              height: "100%",
+                              backgroundColor: `rgba(57, 189, 248, ${opacity})`,
+                              border: "1px solid #2a2a2a",
+                              borderRadius: "4px",
+                              padding: "10px",
+                              boxSizing: "border-box",
+                              overflow: "hidden",
+                            }}>
+                              <div style={{
+                                color: "#e5e5e5",
+                                fontSize: "11px",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "-0.025em",
+                                lineHeight: 1,
+                                marginBottom: "6px",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}>
+                                {t.name}
+                              </div>
+                              {showCount && (
+                                <div style={{
+                                  color: "#39BDF8",
+                                  fontSize: t.w > 20 ? "18px" : "14px",
+                                  fontWeight: 600,
+                                  lineHeight: 1,
+                                  marginBottom: "4px",
+                                }}>
+                                  {t.size.toLocaleString()}
+                                </div>
+                              )}
+                              {showPct && (
+                                <div style={{
+                                  color: "#6b7280",
+                                  fontSize: "10px",
+                                  letterSpacing: "-0.025em",
+                                  lineHeight: 1,
+                                }}>
+                                  {pct}% of market
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
+          </div>
+
           <div
             style={{
               textAlign: "center",
@@ -1119,8 +1171,6 @@ export function DemandPace({
             })}
           </div>
 
-          {/* Market Demand Patterns - Outside charts container like prototype */}
-          <MarketDemandPatterns patterns={futurePatterns} />
         </div>
       </div>
     </div>

@@ -587,6 +587,180 @@ SELECT
       price,
     };
   }
+
+  /**
+   * Returns aggregated neighbourhood supply data from the most complete
+   * recent scrape batch (last 14 days). Sums facet_neighbourhood counts
+   * across all forward checkin dates to give a full market picture.
+   */
+  static async getNeighbourhoodSupply(citySlug) {
+    const slug = slugify(citySlug);
+
+    // Find the most complete batch in the last 14 days
+    const batchRes = await db.query(
+      `SELECT scraped_at::date AS batch_date, COUNT(*) AS days_covered
+       FROM market_availability_snapshots
+       WHERE city_slug = $1
+         AND scraped_at >= CURRENT_DATE - INTERVAL '14 days'
+       GROUP BY scraped_at::date
+       ORDER BY days_covered DESC, batch_date DESC
+       LIMIT 1`,
+      [slug],
+    );
+
+    if (batchRes.rows.length === 0) return { batchDate: null, neighbourhoods: [] };
+
+    const batchDate = batchRes.rows[0].batch_date;
+
+    // Pull all facet_neighbourhood JSONB for that batch
+    const dataRes = await db.query(
+      `SELECT facet_neighbourhood
+       FROM market_availability_snapshots
+       WHERE city_slug = $1
+         AND scraped_at::date = $2
+         AND facet_neighbourhood IS NOT NULL`,
+      [slug, batchDate],
+    );
+
+    // Aggregate: sum counts per neighbourhood across all checkin dates
+    const totals = {};
+    let dayCount = 0;
+    for (const row of dataRes.rows) {
+      const facets = row.facet_neighbourhood;
+      if (!facets || typeof facets !== "object") continue;
+      dayCount++;
+      for (const [name, count] of Object.entries(facets)) {
+        const num = parseInt(count, 10) || 0;
+        if (!totals[name]) totals[name] = 0;
+        totals[name] += num;
+      }
+    }
+
+    // Build sorted array with average per day
+    const neighbourhoods = Object.entries(totals)
+      .map(([name, total]) => ({
+        name,
+        totalProperties: total,
+        avgProperties: dayCount > 0 ? Math.round(total / dayCount) : 0,
+      }))
+      .sort((a, b) => b.totalProperties - a.totalProperties);
+
+    return { batchDate, daysCovered: dayCount, neighbourhoods };
+  }
+
+  /**
+   * Returns accommodation POIs for a city, using a DB cache.
+   * On cache miss, queries OpenStreetMap Overpass API and stores the result.
+   * Cache is considered fresh for 30 days.
+   */
+  static async getAccommodationMap(citySlug) {
+    const slug = slugify(citySlug);
+
+    // Check cache
+    const cached = await db.query(
+      `SELECT pois, fetched_at FROM city_accommodation_pois
+       WHERE city_slug = $1 AND fetched_at > NOW() - INTERVAL '90 days'
+       LIMIT 1`,
+      [slug],
+    );
+
+    if (cached.rows.length > 0) {
+      return { citySlug: slug, pois: cached.rows[0].pois, fetchedAt: cached.rows[0].fetched_at, source: "cache" };
+    }
+
+    // Derive bounding box from hotels in this city
+    const bboxRes = await db.query(
+      `SELECT
+         MIN(latitude) AS min_lat, MAX(latitude) AS max_lat,
+         MIN(longitude) AS min_lng, MAX(longitude) AS max_lng
+       FROM hotels
+       WHERE LOWER(REPLACE(city, ' ', '-')) = $1
+         AND latitude IS NOT NULL AND longitude IS NOT NULL`,
+      [slug],
+    );
+
+    const bbox = bboxRes.rows[0];
+    if (bbox) {
+      bbox.min_lat = parseFloat(bbox.min_lat);
+      bbox.max_lat = parseFloat(bbox.max_lat);
+      bbox.min_lng = parseFloat(bbox.min_lng);
+      bbox.max_lng = parseFloat(bbox.max_lng);
+    }
+    if (!bbox || isNaN(bbox.min_lat)) {
+      // Fallback: use well-known city centers with generous bbox
+      const CITY_BBOX = {
+        "london": { s: 51.28, n: 51.69, w: -0.51, e: 0.33 },
+        "las-vegas": { s: 35.92, n: 36.33, w: -115.38, e: -114.92 },
+      };
+      const fb = CITY_BBOX[slug];
+      if (!fb) return { citySlug: slug, pois: [], fetchedAt: null, source: "no-data" };
+      bbox.min_lat = fb.s;
+      bbox.max_lat = fb.n;
+      bbox.min_lng = fb.w;
+      bbox.max_lng = fb.e;
+    } else {
+      // Expand bbox by ~20% to capture surrounding area
+      const latPad = (bbox.max_lat - bbox.min_lat) * 0.2 || 0.05;
+      const lngPad = (bbox.max_lng - bbox.min_lng) * 0.2 || 0.05;
+      bbox.min_lat -= latPad;
+      bbox.max_lat += latPad;
+      bbox.min_lng -= lngPad;
+      bbox.max_lng += lngPad;
+    }
+
+    // Query Overpass API for accommodation nodes
+    const bb = `${bbox.min_lat},${bbox.min_lng},${bbox.max_lat},${bbox.max_lng}`;
+    const types = ["hotel", "hostel", "guest_house", "apartment", "motel"];
+    const unions = types.flatMap((t) => [
+      'nwr["tourism"="' + t + '"](' + bb + ");",
+    ]).join("");
+    const overpassQuery = '[out:json][timeout:90];(' + unions + ");out center;";
+
+    const endpoints = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+    ];
+    let resp;
+    for (const url of endpoints) {
+      try {
+        resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `data=${encodeURIComponent(overpassQuery)}`,
+        });
+        if (resp.ok) break;
+        console.warn(`Overpass mirror ${url} returned ${resp.status}, trying next...`);
+      } catch (err) {
+        console.warn(`Overpass mirror ${url} failed: ${err.message}, trying next...`);
+      }
+    }
+
+    if (!resp || !resp.ok) {
+      console.error("All Overpass mirrors failed");
+      return { citySlug: slug, pois: [], fetchedAt: null, source: "error" };
+    }
+
+    const data = await resp.json();
+    const pois = (data.elements || [])
+      .map((el) => ({
+        name: el.tags?.name || null,
+        type: el.tags?.tourism || "hotel",
+        lat: el.lat || el.center?.lat,
+        lng: el.lon || el.center?.lon,
+        stars: el.tags?.stars ? parseInt(el.tags.stars, 10) : null,
+      }))
+      .filter((p) => p.lat && p.lng);
+
+    // Upsert into cache
+    await db.query(
+      `INSERT INTO city_accommodation_pois (city_slug, pois, fetched_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (city_slug) DO UPDATE SET pois = $2, fetched_at = NOW()`,
+      [slug, JSON.stringify(pois)],
+    );
+
+    return { citySlug: slug, pois, fetchedAt: new Date().toISOString(), source: "overpass" };
+  }
 }
 
 module.exports = MarketService;

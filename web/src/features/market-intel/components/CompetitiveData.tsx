@@ -85,19 +85,12 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
   // Market context state
   const [marketContext, setMarketContext] = useState<{ segmentHotels: number; segmentRooms: number; marketHotels: number; marketRooms: number; byTier?: { tier: string; count: number }[]; byNeighborhood?: { area: string; count: number }[] } | null>(null);
 
-  useEffect(() => {
-    if (!propertyId || propertyId === 'ALL') { setMarketContext(null); return; }
-    fetch(`/api/metrics/market-context?propertyId=${propertyId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setMarketContext)
-      .catch(() => setMarketContext(null));
-  }, [propertyId]);
-
   // Portfolio summary state
   const isGroup = properties.length > 1;
   const [portfolioData, setPortfolioData] = useState<PortfolioRow[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [portfolioExpanded, setPortfolioExpanded] = useState(false);
+  const [neighborhoodsExpanded, setNeighborhoodsExpanded] = useState(false);
 
   useEffect(() => {
     if (!isGroup) { setPortfolioData([]); return; }
@@ -162,44 +155,43 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       setIsLoading(true);
       try {
         const scope = comparison === 'total-market' ? 'total-market' : 'my-segment';
-        const params = new URLSearchParams({
+        const chartParams = new URLSearchParams({
           propertyId,
           startDate,
           endDate,
           granularity: 'daily',
           scope,
         });
+        const intelParams = new URLSearchParams({ propertyId, startDate, endDate, scope });
 
-        const kpiParams = new URLSearchParams({ propertyId, startDate, endDate, scope });
-
-        const [myRes, compRes, kpiRes, rankRes] = await Promise.all([
-          fetch(`/api/metrics/range?${params}`),
-          fetch(`/api/metrics/competitors?${params}`),
-          fetch(`/api/metrics/kpi-summary?${kpiParams}`),
-          fetch(`/api/metrics/ranking?${kpiParams}`),
+        // 2 calls instead of 5: combined intel + chart data
+        const [intelRes, myRes, compRes] = await Promise.all([
+          fetch(`/api/metrics/competitive-intel?${intelParams}`),
+          fetch(`/api/metrics/range?${chartParams}`),
+          fetch(`/api/metrics/competitors?${chartParams}`),
         ]);
 
+        const intelJson = await intelRes.json();
         const myJson = await myRes.json();
         const compJson = await compRes.json();
-        const kpiJson = await kpiRes.json();
-        const rankJson = await rankRes.json();
 
-        // Normalize KPI shape — backend returns different field names depending on compset presence
-        const yh = kpiJson.yourHotel || {};
+        // KPIs + ranking + market context from single endpoint
+        const yh = intelJson.kpis?.yourHotel || {};
         setKpis({
           yourHotel: {
             occupancy: yh.occupancy ?? yh.your_occupancy ?? yh.your_occupancy_direct ?? null,
             adr: yh.adr ?? yh.your_adr ?? null,
             revpar: yh.revpar ?? yh.your_revpar ?? null,
           },
-          market: kpiJson.market || {},
+          market: intelJson.kpis?.market || {},
         });
-        setRanking(rankJson);
+        setRanking(intelJson.ranking || { occupancy: {}, adr: {}, revpar: {} });
+        setMarketContext(intelJson.marketContext || null);
 
+        // Merge chart data
         const myMetrics = myJson.metrics || [];
         const compMetrics = compJson.metrics || [];
 
-        // Index compset data by period for fast lookup
         const compByPeriod: Record<string, any> = {};
         compMetrics.forEach((row: any) => {
           const key = row.period?.slice(0, 10);
@@ -227,7 +219,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
 
         setPacingData(merged);
       } catch (err) {
-        console.error('CompetitiveData: failed to fetch pacing data', err);
+        console.error('CompetitiveData: failed to fetch data', err);
         setPacingData([]);
       } finally {
         setIsLoading(false);
@@ -458,8 +450,8 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       <div style={styles.contentWrapper}>
         {/* Header */}
         <div style={styles.header}>
-          <div style={styles.title}>Competitive Intelligence</div>
-          <div style={styles.subtitle}>Compare your performance against your competitive set and market segment</div>
+          <div style={styles.title}>Compset Intel</div>
+          <div style={styles.subtitle}>Compare your performance against your compset and market segment</div>
         </div>
 
         {/* Filter Bar */}
@@ -536,38 +528,6 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
           </div>
         </div>
 
-        {/* Market Context Bar */}
-        {marketContext && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            backgroundColor: 'rgb(26, 26, 26)',
-            borderRadius: '8px',
-            border: '1px solid #2a2a2a',
-            marginBottom: '24px',
-            overflow: 'hidden',
-          }}>
-            {[
-              { label: 'Segment Hotels', value: marketContext.segmentHotels, suffix: 'hotels' },
-              { label: 'Segment Rooms', value: marketContext.segmentRooms.toLocaleString(), suffix: 'rooms' },
-              { label: 'Total Market Hotels', value: marketContext.marketHotels, suffix: 'hotels' },
-              { label: 'Total Market Rooms', value: marketContext.marketRooms.toLocaleString(), suffix: 'rooms' },
-            ].map((item, idx) => (
-              <div key={idx} style={{
-                padding: '16px 20px',
-                borderRight: idx < 3 ? '1px solid #2a2a2a' : 'none',
-              }}>
-                <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '8px' }}>
-                  {item.label}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                  <span style={{ color: '#39BDF8', fontSize: '24px', fontWeight: 600 }}>{item.value}</span>
-                  <span style={{ color: '#6b7280', fontSize: '11px' }}>{item.suffix}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Portfolio Competitive Summary */}
         {isGroup && (
@@ -820,9 +780,9 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
             <div style={styles.chartCard}>
               <div style={styles.chartHeader}>
                 <div>
-                  <div style={styles.chartTitle}>Forward Booking Pace</div>
+                  <div style={styles.chartTitle}>Performance vs Market</div>
                   <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px' }}>
-                    Track your competitive position over time
+                    Your hotel compared against {comparison === 'total-market' ? 'total market' : 'segment'} average
                   </div>
                 </div>
                 <div style={styles.chartControls}>
@@ -1107,36 +1067,42 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
               const myRev = kpis.yourHotel?.revpar != null ? Math.round(Number(kpis.yourHotel.revpar)) : null;
               const compRev = kpis.market?.revpar != null ? Math.round(Number(kpis.market.revpar)) : null;
 
-              const occWin = myOcc != null && compOcc != null && myOcc >= compOcc;
-              const adrWin = myAdr != null && compAdr != null && myAdr >= compAdr;
-              const revWin = myRev != null && compRev != null && myRev >= compRev;
+              const occResult: 'win' | 'tie' | 'loss' = myOcc != null && compOcc != null ? (myOcc > compOcc ? 'win' : myOcc === compOcc ? 'tie' : 'loss') : 'tie';
+              const adrResult: 'win' | 'tie' | 'loss' = myAdr != null && compAdr != null ? (myAdr > compAdr ? 'win' : myAdr === compAdr ? 'tie' : 'loss') : 'tie';
+              const revResult: 'win' | 'tie' | 'loss' = myRev != null && compRev != null ? (myRev > compRev ? 'win' : myRev === compRev ? 'tie' : 'loss') : 'tie';
 
               const insights = [
                 {
                   label: 'Occupancy',
-                  win: occWin,
+                  result: occResult,
                   detail: myOcc != null && compOcc != null
-                    ? occWin
+                    ? occResult === 'win'
                       ? <>{comparison === 'total-market' ? 'Leading market' : 'Leading segment'} by <span style={{ color: '#10b981', fontWeight: 600 }}>+{myOcc - compOcc} pts</span></>
-                      : <>{comparison === 'total-market' ? 'Market' : 'Segment'} leads by <span style={{ color: '#ef4444', fontWeight: 600 }}>{compOcc - myOcc} pts</span></>
+                      : occResult === 'tie'
+                        ? <>Matching {comparison === 'total-market' ? 'market' : 'segment'} average</>
+                        : <>{comparison === 'total-market' ? 'Market' : 'Segment'} leads by <span style={{ color: '#ef4444', fontWeight: 600 }}>{compOcc - myOcc} pts</span></>
                     : <>No data</>
                 },
                 {
                   label: 'ADR',
-                  win: adrWin,
+                  result: adrResult,
                   detail: myAdr != null && compAdr != null
-                    ? adrWin
+                    ? adrResult === 'win'
                       ? <>Pricing <span style={{ color: '#10b981', fontWeight: 600 }}>{currencySymbol}{myAdr - compAdr} above</span> average</>
-                      : <>{comparison === 'total-market' ? 'Market' : 'Segment'} pricing <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr} higher</span></>
+                      : adrResult === 'tie'
+                        ? <>Matching {comparison === 'total-market' ? 'market' : 'segment'} average</>
+                        : <>{comparison === 'total-market' ? 'Market' : 'Segment'} pricing <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr} higher</span></>
                     : <>No data</>
                 },
                 {
                   label: 'RevPAR',
-                  win: revWin,
+                  result: revResult,
                   detail: myRev != null && compRev != null
-                    ? revWin
+                    ? revResult === 'win'
                       ? <>Outperforming by <span style={{ color: '#10b981', fontWeight: 600 }}>{currencySymbol}{myRev - compRev}</span> per room</>
-                      : <>Trailing by <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compRev - myRev}</span> per room</>
+                      : revResult === 'tie'
+                        ? <>Matching {comparison === 'total-market' ? 'market' : 'segment'} average</>
+                        : <>Trailing by <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compRev - myRev}</span> per room</>
                     : <>No data</>
                 },
               ];
@@ -1156,30 +1122,37 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                           <div key={i} style={{ height: '56px', backgroundColor: '#1d1d1c', borderRadius: '6px' }} />
                         ))}
                       </div>
-                    ) : insights.map((item) => (
-                      <div key={item.label} style={{
-                        backgroundColor: '#1d1d1c',
-                        borderRadius: '6px',
-                        borderLeft: `2px solid ${item.win ? '#10b981' : '#ef4444'}`,
-                        padding: '12px',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <span style={{ color: '#e5e5e5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{item.label}</span>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            backgroundColor: item.win ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: item.win ? '#10b981' : '#ef4444',
-                            border: `1px solid ${item.win ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                          }}>
-                            {item.win ? 'WIN' : 'LOSS'}
-                          </span>
+                    ) : insights.map((item) => {
+                      const borderColor = item.result === 'win' ? '#10b981' : item.result === 'tie' ? '#f59e0b' : '#ef4444';
+                      const badgeBg = item.result === 'win' ? 'rgba(16,185,129,0.15)' : item.result === 'tie' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
+                      const badgeColor = item.result === 'win' ? '#10b981' : item.result === 'tie' ? '#f59e0b' : '#ef4444';
+                      const badgeBorder = item.result === 'win' ? 'rgba(16,185,129,0.3)' : item.result === 'tie' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)';
+                      const badgeLabel = item.result === 'win' ? 'WIN' : item.result === 'tie' ? 'TIE' : 'LOSS';
+                      return (
+                        <div key={item.label} style={{
+                          backgroundColor: '#1d1d1c',
+                          borderRadius: '6px',
+                          borderLeft: `2px solid ${borderColor}`,
+                          padding: '12px',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ color: '#e5e5e5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{item.label}</span>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              backgroundColor: badgeBg,
+                              color: badgeColor,
+                              border: `1px solid ${badgeBorder}`,
+                            }}>
+                              {badgeLabel}
+                            </span>
+                          </div>
+                          <div style={{ color: '#9ca3af', fontSize: '11px' }}>{item.detail}</div>
                         </div>
-                        <div style={{ color: '#9ca3af', fontSize: '11px' }}>{item.detail}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -1316,7 +1289,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                         By Location
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {marketContext.byNeighborhood.map((item) => {
+                        {(neighborhoodsExpanded ? marketContext.byNeighborhood : marketContext.byNeighborhood.slice(0, 5)).map((item) => {
                           const pct = marketContext.marketHotels > 0 ? Math.round((item.count / marketContext.marketHotels) * 100) : 0;
                           return (
                             <div key={item.area}>
@@ -1331,6 +1304,15 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                           );
                         })}
                       </div>
+                      {marketContext.byNeighborhood.length > 5 && (
+                        <button
+                          onClick={() => setNeighborhoodsExpanded(!neighborhoodsExpanded)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '11px', padding: 0 }}
+                        >
+                          <span style={{ display: 'inline-block', transform: neighborhoodsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', fontSize: '10px' }}>&#9660;</span>
+                          {neighborhoodsExpanded ? 'Show less' : `Show all ${marketContext.byNeighborhood.length} areas`}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

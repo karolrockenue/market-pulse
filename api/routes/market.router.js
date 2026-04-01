@@ -154,4 +154,28 @@ router.post('/shadowfax/price', requireAdminApi, async (req, res) => {
   }
 });
 
+router.get("/accommodation-map", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.query;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+    const data = await MarketService.getAccommodationMap(citySlug);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /accommodation-map:", error);
+    res.status(500).json({ error: "Failed to fetch accommodation map data." });
+  }
+});
+
+router.get("/neighbourhood-supply", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.query;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+    const data = await MarketService.getNeighbourhoodSupply(citySlug);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /neighbourhood-supply:", error);
+    res.status(500).json({ error: "Failed to fetch neighbourhood supply." });
+  }
+});
+
 module.exports = router;
