@@ -178,4 +178,90 @@ router.get("/neighbourhood-supply", requireUserApi, async (req, res) => {
   }
 });
 
+// --- 4. MARKET PROFILE (City-level analytics) ---
+
+router.get('/profile/overview', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileOverview(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/overview:', err);
+    res.status(500).json({ error: 'Failed to fetch profile overview.' });
+  }
+});
+
+router.get('/profile/seasonal', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileSeasonal(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/seasonal:', err);
+    res.status(500).json({ error: 'Failed to fetch seasonal data.' });
+  }
+});
+
+router.get('/profile/absorption-dow', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileAbsorptionDow(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/absorption-dow:', err);
+    res.status(500).json({ error: 'Failed to fetch absorption data.' });
+  }
+});
+
+router.get('/profile/price-movement', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfilePriceMovement(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/price-movement:', err);
+    res.status(500).json({ error: 'Failed to fetch price movement.' });
+  }
+});
+
+router.get('/profile/absorption-date', requireAdminApi, async (req, res) => {
+  try {
+    const { city, date } = req.query;
+    if (!city || !date) return res.status(400).json({ error: 'City and date required.' });
+    const data = await MarketService.getProfileAbsorptionDate(city, date);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/absorption-date:', err);
+    res.status(500).json({ error: 'Failed to fetch absorption curve.' });
+  }
+});
+
+router.get('/profile/compression', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileCompression(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/compression:', err);
+    res.status(500).json({ error: 'Failed to fetch compression data.' });
+  }
+});
+
+router.get('/profile/neighbourhoods', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileNeighbourhoods(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/neighbourhoods:', err);
+    res.status(500).json({ error: 'Failed to fetch neighbourhood data.' });
+  }
+});
+
 module.exports = router;

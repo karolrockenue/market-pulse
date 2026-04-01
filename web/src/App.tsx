@@ -33,6 +33,7 @@ import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/
 
 import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
+import { MarketProfile } from "./components/MarketProfile";
 // [NEW] Import the legal page components
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { SupportPage } from "./components/SupportPage"; // [NEW] Import the new support page
@@ -645,6 +646,7 @@ export default function App() {
             />
           )}
           {activeView === "admin" && <AdminHub />}
+          {activeView === "marketProfile" && <MarketProfile />}
           {activeView === "settings" && (
             <SettingsPage
               hotelId={property}

@@ -147,6 +147,7 @@ export function TopNav({
         { label: "Rate Manager", value: "rateManager", icon: DollarSign },
         { label: "Property Hub", value: "propertyHub", icon: Home },
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
+        { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },
       ],
     },

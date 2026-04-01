@@ -34,7 +34,6 @@
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
-            "csv-parser": "^3.0.0",
             "date-fns": "^3.6.0",
             "date-fns-tz": "3.2.0",
             "embla-carousel-react": "^8.6.0",
@@ -54,8 +53,7 @@
             "tailwind-merge": "*",
             "vaul": "^1.1.2",
             "vite": "6.3.5",
-            "xlsx": "^0.18.5",
-            "yargs": "^17.7.2"
+            "xlsx": "^0.18.5"
       },
       "devDependencies": {
             "@types/leaflet": "^1.9.21",

@@ -761,6 +761,189 @@ SELECT
 
     return { citySlug: slug, pois, fetchedAt: new Date().toISOString(), source: "overpass" };
   }
+
+  // ═══════════════════════════════════════════════════════
+  // MARKET PROFILE — City-level analytics from scrape data
+  // ═══════════════════════════════════════════════════════
+
+  static async getProfileOverview(city) {
+    const citySlug = slugify(city);
+    // KPIs: total supply, hotels only, avg WAP, weekend premium, peak/cheapest
+    const sql = `
+      WITH latest AS (
+        SELECT DISTINCT ON (checkin_date)
+          checkin_date, total_results, weighted_avg_price,
+          facet_property_type, EXTRACT(DOW FROM checkin_date) AS dow
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 90
+        ORDER BY checkin_date, scraped_at DESC
+      )
+      SELECT
+        ROUND(AVG(total_results)) AS avg_supply,
+        ROUND(AVG(weighted_avg_price)) AS avg_wap,
+        ROUND(AVG(CASE WHEN dow IN (5,6) THEN weighted_avg_price END)) AS weekend_wap,
+        ROUND(AVG(CASE WHEN dow NOT IN (5,6) THEN weighted_avg_price END)) AS weekday_wap,
+        MAX(total_results) AS max_supply,
+        MIN(total_results) AS min_supply
+      FROM latest;
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+
+    // Property types from latest scrape
+    const typesSql = `
+      SELECT facet_property_type
+      FROM market_availability_snapshots
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND checkin_date = CURRENT_DATE + 1
+      ORDER BY scraped_at DESC LIMIT 1;
+    `;
+    const typesRes = await db.query(typesSql, [citySlug]);
+    const propertyTypes = typesRes.rows[0]?.facet_property_type || {};
+
+    return { kpis: rows[0] || {}, propertyTypes };
+  }
+
+  static async getProfileSeasonal(city) {
+    const citySlug = slugify(city);
+    const sql = `
+      SELECT
+        TO_CHAR(checkin_date, 'Mon') AS month,
+        EXTRACT(MONTH FROM checkin_date) AS month_num,
+        TRIM(TO_CHAR(checkin_date, 'Dy')) AS dow,
+        EXTRACT(DOW FROM checkin_date) AS dow_num,
+        ROUND(AVG(weighted_avg_price)) AS avg_wap
+      FROM market_availability_snapshots
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND (checkin_date - scraped_at::date) BETWEEN 25 AND 35
+      GROUP BY month, month_num, dow, dow_num
+      ORDER BY month_num, dow_num;
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+    return rows;
+  }
+
+  static async getProfileAbsorptionDow(city) {
+    const citySlug = slugify(city);
+    const sql = `
+      WITH snapshots AS (
+        SELECT
+          checkin_date,
+          TRIM(TO_CHAR(checkin_date, 'Day')) AS dow,
+          EXTRACT(DOW FROM checkin_date) AS dow_num,
+          (checkin_date - scraped_at::date) AS days_out,
+          total_results
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND checkin_date >= CURRENT_DATE - INTERVAL '90 days'
+      ),
+      baseline AS (
+        SELECT checkin_date, dow, dow_num, MAX(total_results) AS max_supply
+        FROM snapshots
+        WHERE days_out >= 60
+        GROUP BY checkin_date, dow, dow_num
+      )
+      SELECT
+        b.dow,
+        s.days_out,
+        ROUND(AVG(s.total_results::numeric / NULLIF(b.max_supply, 0) * 100), 1) AS pct_remaining
+      FROM snapshots s
+      JOIN baseline b ON s.checkin_date = b.checkin_date
+      WHERE s.days_out IN (60, 45, 30, 21, 14, 7, 3, 1)
+      GROUP BY b.dow, b.dow_num, s.days_out
+      ORDER BY b.dow_num, s.days_out DESC;
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+    return rows;
+  }
+
+  static async getProfilePriceMovement(city) {
+    const citySlug = slugify(city);
+    const sql = `
+      SELECT
+        (checkin_date - scraped_at::date) AS days_out,
+        ROUND(AVG(weighted_avg_price)) AS avg_wap,
+        ROUND(AVG(total_results)) AS avg_supply
+      FROM market_availability_snapshots
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND EXTRACT(DOW FROM checkin_date) = 6
+        AND checkin_date >= CURRENT_DATE - INTERVAL '90 days'
+        AND (checkin_date - scraped_at::date) IN (90, 60, 30, 14, 7, 3, 1)
+      GROUP BY days_out
+      ORDER BY days_out DESC;
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+    return rows;
+  }
+
+  static async getProfileAbsorptionDate(city, targetDate) {
+    const citySlug = slugify(city);
+    const sql = `
+      SELECT
+        checkin_date,
+        scraped_at::date AS snapshot_date,
+        (checkin_date - scraped_at::date) AS days_out,
+        total_results,
+        ROUND(weighted_avg_price::numeric, 0) AS weighted_avg_price,
+        facet_star_rating
+      FROM market_availability_snapshots
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND checkin_date = $2
+      ORDER BY scraped_at ASC;
+    `;
+    const { rows } = await db.query(sql, [citySlug, targetDate]);
+    return rows;
+  }
+
+  static async getProfileCompression(city) {
+    const citySlug = slugify(city);
+    const sql = `
+      SELECT DISTINCT ON (checkin_date)
+        checkin_date,
+        (max_price_anchor - min_price_anchor) AS price_spread,
+        ROUND(weighted_avg_price::numeric, 0) AS wap,
+        total_results AS supply
+      FROM market_availability_snapshots
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND scraped_at::date = (SELECT MAX(scraped_at::date) FROM market_availability_snapshots WHERE LOWER(city_slug) = LOWER($1))
+        AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 90
+      ORDER BY checkin_date, scraped_at DESC;
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+    return rows;
+  }
+
+  static async getProfileNeighbourhoods(city) {
+    const citySlug = slugify(city);
+    const sql = `
+      WITH far AS (
+        SELECT checkin_date, facet_neighbourhood
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND (checkin_date - scraped_at::date) BETWEEN 28 AND 35
+          AND checkin_date BETWEEN CURRENT_DATE - 60 AND CURRENT_DATE + 30
+      ),
+      near AS (
+        SELECT checkin_date, facet_neighbourhood
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND (checkin_date - scraped_at::date) BETWEEN 3 AND 9
+          AND checkin_date BETWEEN CURRENT_DATE - 60 AND CURRENT_DATE + 30
+      )
+      SELECT
+        key AS neighbourhood,
+        ROUND(AVG((far.facet_neighbourhood->>key)::numeric)) AS supply_30d,
+        ROUND(AVG((near.facet_neighbourhood->>key)::numeric)) AS supply_7d,
+        ROUND((1 - AVG((near.facet_neighbourhood->>key)::numeric) / NULLIF(AVG((far.facet_neighbourhood->>key)::numeric), 0)) * 100, 1) AS pct_absorbed
+      FROM far, jsonb_object_keys(far.facet_neighbourhood) AS key
+      JOIN near ON far.checkin_date = near.checkin_date
+      GROUP BY key
+      HAVING AVG((far.facet_neighbourhood->>key)::numeric) > 50
+      ORDER BY pct_absorbed DESC;
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+    return rows;
+  }
 }
 
 module.exports = MarketService;
