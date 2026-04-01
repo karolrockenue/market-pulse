@@ -273,7 +273,7 @@ app.get("*", (req, res) => {
   // it means express.static didn't find it. We must return 404, not HTML.
   if (
     req.path.match(
-      /\.(js|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/,
+      /\.(js|mjs|css|png|jpg|jpeg|gif|ico|json|map|woff|woff2|ttf|svg)$/,
     )
   ) {
     return res.status(404).send("Asset not found");

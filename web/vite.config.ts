@@ -52,6 +52,12 @@ export default defineConfig({
   build: {
     target: "esnext",
     outDir: "build",
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name]-[hash].mjs",
+        chunkFileNames: "assets/[name]-[hash].mjs",
+      },
+    },
   },
   server: {
     port: 3000,

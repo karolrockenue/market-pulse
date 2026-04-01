@@ -2,21 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/build/assets/**",
-      "use": "@vercel/static"
-    },
-    {
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["api/**", "web/build/index.html"],
-        "excludeFiles": ["web/build/assets/**"]
+        "includeFiles": ["web/build/**", "api/**"]
       }
     }
   ],
   "rewrites": [
-    { "source": "/assets/:path*", "destination": "/web/build/assets/:path*" },
-    { "source": "/(.*)", "destination": "/server.js" }
+    {
+      "source": "/(.*)",
+      "destination": "/server.js"
+    }
   ],
   "headers": [
     {
