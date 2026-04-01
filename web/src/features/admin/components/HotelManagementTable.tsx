@@ -81,7 +81,7 @@ export function HotelManagementTable({
     // Show a loading toast
     const toastId = toast.loading("Updating category...");
     try {
-      const response = await fetch("/api/admin/update-hotel-category", {
+      const response = await fetch("/api/hotels/category", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hotelId: hotelId, category: newCategory }),
