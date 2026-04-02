@@ -65,10 +65,10 @@ router.all("/process-queue", async (req, res) => {
 // =============================================================================
 // 2. HOTEL USER ENDPOINTS (Scoped Access - before admin middleware)
 // =============================================================================
-const { requireHotelRateAccess } = require("../utils/middleware");
+const { requireHotelRateAccess, requireUserApi } = require("../utils/middleware");
 
 // GET /api/sentinel/hotel-rates/:hotelId - Rate calendar for hotel user
-router.get("/hotel-rates/:hotelId", requireHotelRateAccess, async (req, res) => {
+router.get("/hotel-rates/:hotelId", requireUserApi, requireHotelRateAccess, async (req, res) => {
   const { hotelId } = req.params;
   try {
     const configRes = await db.query(
@@ -108,7 +108,7 @@ router.get("/hotel-rates/:hotelId", requireHotelRateAccess, async (req, res) => 
 });
 
 // GET /api/sentinel/hotel-config/:hotelId - Minimal read-only config
-router.get("/hotel-config/:hotelId", requireHotelRateAccess, async (req, res) => {
+router.get("/hotel-config/:hotelId", requireUserApi, requireHotelRateAccess, async (req, res) => {
   const { hotelId } = req.params;
   try {
     const { rows } = await db.query(
@@ -125,7 +125,7 @@ router.get("/hotel-config/:hotelId", requireHotelRateAccess, async (req, res) =>
 });
 
 // POST /api/sentinel/hotel-overrides - Submit rate overrides (hotel user)
-router.post("/hotel-overrides", requireHotelRateAccess, async (req, res) => {
+router.post("/hotel-overrides", requireUserApi, requireHotelRateAccess, async (req, res) => {
   const { hotelId, overrides } = req.body;
   if (!hotelId || !overrides?.length) {
     return res.status(400).json({ error: "hotelId and overrides required" });
@@ -169,7 +169,7 @@ router.post("/hotel-overrides", requireHotelRateAccess, async (req, res) => {
 });
 
 // POST /api/sentinel/hotel-unlock - Re-enable AI for selected dates
-router.post("/hotel-unlock", requireHotelRateAccess, async (req, res) => {
+router.post("/hotel-unlock", requireUserApi, requireHotelRateAccess, async (req, res) => {
   const { hotelId, dates } = req.body;
   if (!hotelId || !dates?.length) {
     return res.status(400).json({ error: "hotelId and dates required" });

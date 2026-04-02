@@ -31,7 +31,7 @@ export const adminApi = {
 
   // Update Hotel Category
   updateHotelCategory: async (hotelId: number, category: string): Promise<SyncResponse> => {
-    const res = await fetch('/api/admin/update-hotel-category', {
+    const res = await fetch('/api/hotels/category', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hotelId, category }),
