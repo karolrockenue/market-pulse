@@ -34,6 +34,7 @@ import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/
 import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
 import { MarketProfile } from "./components/MarketProfile";
+import { MarketVeil } from "./components/MarketVeil";
 // [NEW] Import the legal page components
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { SupportPage } from "./components/SupportPage"; // [NEW] Import the new support page
@@ -95,6 +96,7 @@ export default function App() {
   const [isGranting, setIsGranting] = useState(false); // <--- Added
 
   const [showPropertySetup, setShowPropertySetup] = useState(false); // [MODIFIED] Default to false
+  const [marketHotelCount, setMarketHotelCount] = useState<number>(0);
 
   useEffect(() => {
     const fetchHotelDetails = async () => {
@@ -121,10 +123,20 @@ export default function App() {
         } else {
           setCurrencyCode("USD"); // Default
         }
+
+        // Fetch market hotel count for veil logic (use raw count, not presentation multiplier)
+        try {
+          const mcRes = await fetch(`/api/metrics/market-context?propertyId=${property}`);
+          if (mcRes.ok) {
+            const mcData = await mcRes.json();
+            setMarketHotelCount(mcData.rawMarketHotels ?? mcData.marketHotels ?? 0);
+          }
+        } catch { /* non-critical */ }
       } catch (error) {
         console.error("Error fetching hotel details:", error);
         setCurrencyCode("USD"); // Default on error
         setSelectedPropertyDetails(null); // Clear details on error
+        setMarketHotelCount(0);
       }
     };
 
@@ -687,19 +699,19 @@ export default function App() {
 
           {/* [NEW] Render the Demand & Pace page */}
           {activeView === "demand-pace" &&
-            // [FIX] Add a conditional check.
-            // We must wait until 'selectedPropertyDetails' (which includes city and total_rooms)
-            // has been fetched before we can render the component that depends on it.
             (selectedPropertyDetails ? (
-              <DemandPace
-                // We can now safely use 'selectedPropertyDetails' for ALL props,
-                // as we know it's not null.
-                propertyId={selectedPropertyDetails.hotel_id}
-                // Pass the currencyCode we already have in state
-                currencyCode={currencyCode}
-                // Pass the 'city' string from our details object
-                citySlug={selectedPropertyDetails.city}
-              />
+              marketHotelCount < 5 ? (
+                <MarketVeil
+                  cityName={selectedPropertyDetails.city}
+                  currentCount={marketHotelCount}
+                />
+              ) : (
+                <DemandPace
+                  propertyId={selectedPropertyDetails.hotel_id}
+                  currencyCode={currencyCode}
+                  citySlug={selectedPropertyDetails.city}
+                />
+              )
             ) : (
               // [NEW] Render a simple loader while we wait for the property details to load.
               // This covers the brief moment between selecting a property and the API returning its details.
@@ -726,21 +738,28 @@ export default function App() {
             ))}
 
           {activeView === "competitive-intel" && (
-            <CompetitiveData
-              propertyId={property}
-              currencySymbol={
-                currencyCode === "GBP"
-                  ? "£"
-                  : currencyCode === "EUR"
-                    ? "€"
-                    : "$"
-              }
-              hotelCategory={selectedPropertyDetails?.category || null}
-              properties={properties}
-              onPropertyChange={setProperty}
-              onNavigate={handleViewChange}
-              budgetExists={false}
-            />
+            marketHotelCount < 5 ? (
+              <MarketVeil
+                cityName={selectedPropertyDetails?.city}
+                currentCount={marketHotelCount}
+              />
+            ) : (
+              <CompetitiveData
+                propertyId={property}
+                currencySymbol={
+                  currencyCode === "GBP"
+                    ? "£"
+                    : currencyCode === "EUR"
+                      ? "€"
+                      : "$"
+                }
+                hotelCategory={selectedPropertyDetails?.category || null}
+                properties={properties}
+                onPropertyChange={setProperty}
+                onNavigate={handleViewChange}
+                budgetExists={false}
+              />
+            )
           )}
 
           {activeView === "hotelRates" && (

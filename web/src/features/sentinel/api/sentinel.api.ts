@@ -90,6 +90,28 @@ export const saveDailyMaxRates = async (
   return json;
 };
 
+// [NEW] Min Rates API (daily floor overrides)
+export const getDailyMinRates = async (hotelId: string) => {
+  const res = await fetch(`/api/sentinel/min-rates/${hotelId}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to fetch min rates");
+  return json.data || {};
+};
+
+export const saveDailyMinRates = async (
+  hotelId: string,
+  rates: Record<string, number | null>
+) => {
+  const res = await fetch(`/api/sentinel/min-rates/${hotelId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rates }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to save min rates");
+  return json;
+};
+
 // --- RATE MANAGER (PRICING) ---
 
 export const getRateCalendar = async (

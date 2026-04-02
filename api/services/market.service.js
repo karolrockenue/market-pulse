@@ -918,26 +918,34 @@ SELECT
     // Compare neighbourhood supply from the oldest scrape vs the newest scrape
     // for overlapping check-in dates — shows which areas absorbed the most
     const sql = `
-      WITH scrape_range AS (
-        SELECT MIN(scraped_at::date) AS earliest, MAX(scraped_at::date) AS latest
+      WITH date_range AS (
+        SELECT checkin_date,
+               MIN(scraped_at::date) AS first_scraped,
+               MAX(scraped_at::date) AS last_scraped
         FROM market_availability_snapshots
         WHERE LOWER(city_slug) = LOWER($1)
+          AND facet_neighbourhood IS NOT NULL
+          AND checkin_date >= CURRENT_DATE
+        GROUP BY checkin_date
+        HAVING COUNT(DISTINCT scraped_at::date) >= 2
       ),
       early AS (
-        SELECT DISTINCT ON (checkin_date) checkin_date, facet_neighbourhood
-        FROM market_availability_snapshots, scrape_range
-        WHERE LOWER(city_slug) = LOWER($1)
-          AND scraped_at::date <= earliest + 3
-          AND facet_neighbourhood IS NOT NULL
-        ORDER BY checkin_date, scraped_at ASC
+        SELECT DISTINCT ON (m.checkin_date) m.checkin_date, m.facet_neighbourhood
+        FROM market_availability_snapshots m
+        JOIN date_range d ON m.checkin_date = d.checkin_date
+        WHERE LOWER(m.city_slug) = LOWER($1)
+          AND m.scraped_at::date <= d.first_scraped + 3
+          AND m.facet_neighbourhood IS NOT NULL
+        ORDER BY m.checkin_date, m.scraped_at ASC
       ),
       late AS (
-        SELECT DISTINCT ON (checkin_date) checkin_date, facet_neighbourhood
-        FROM market_availability_snapshots, scrape_range
-        WHERE LOWER(city_slug) = LOWER($1)
-          AND scraped_at::date >= latest - 3
-          AND facet_neighbourhood IS NOT NULL
-        ORDER BY checkin_date, scraped_at DESC
+        SELECT DISTINCT ON (m.checkin_date) m.checkin_date, m.facet_neighbourhood
+        FROM market_availability_snapshots m
+        JOIN date_range d ON m.checkin_date = d.checkin_date
+        WHERE LOWER(m.city_slug) = LOWER($1)
+          AND m.scraped_at::date >= d.last_scraped - 3
+          AND m.facet_neighbourhood IS NOT NULL
+        ORDER BY m.checkin_date, m.scraped_at DESC
       )
       SELECT
         key AS neighbourhood,

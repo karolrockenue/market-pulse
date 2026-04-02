@@ -80,7 +80,7 @@ const requireAdminApi = (req, res, next) => {
   // 1. Robot Bypass
   if (isInternalRobot(req)) return next();
 
-  if (!req.session.userId) {
+  if (!req.session || !req.session.userId) {
     return res
       .status(401)
       .json({ error: "Unauthorized: User session required." });
@@ -101,7 +101,7 @@ const requireSuperAdminOnly = (req, res, next) => {
   // 1. Robot Bypass
   if (isInternalRobot(req)) return next();
 
-  if (!req.session.userId) {
+  if (!req.session || !req.session.userId) {
     return res
       .status(401)
       .json({ error: "Unauthorized: User session required." });

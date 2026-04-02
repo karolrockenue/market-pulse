@@ -668,7 +668,9 @@ router.post("/mews/create", async (req, res) => {
       }
       req.session.userId = newUserStringId;
       req.session.role = existingUser.rows.length > 0 ? existingUser.rows[0].role : "owner";
-      req.session.save();
+      req.session.save((saveErr) => {
+        if (saveErr) console.error("Mews onboarding: session.save() failed:", saveErr);
+      });
 
       // --- 5. Asynchronously Trigger Initial Sync for each new property ---
       for (const hotelId of newHotelIds) {

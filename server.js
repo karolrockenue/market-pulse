@@ -165,10 +165,16 @@ app.use(
 
 // --- [NEW] SECURE CRON JOB ENDPOINT ---
 app.get("/api/cron/daily-refresh", (req, res) => {
-  // Check for the secret key in the query parameters
-  const { secret } = req.query;
+  // Vercel Cron sends CRON_SECRET via Authorization header. Also accept query param for backward compat.
+  const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+  const querySecret = req.query.secret;
 
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  const isAuthorized = cronSecret && (
+    authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret
+  );
+
+  if (!isAuthorized) {
     console.warn(
       "CRON JOB FAILED: Unauthorized attempt at /api/cron/daily-refresh",
     );

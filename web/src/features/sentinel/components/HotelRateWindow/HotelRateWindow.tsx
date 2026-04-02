@@ -200,6 +200,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
   const [editingEffectiveCell, setEditingEffectiveCell] = useState<
     string | null
   >(null);
+  const [editingMinCell, setEditingMinCell] = useState<string | null>(null);
   const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
   const [hoveredAiCell, setHoveredAiCell] = useState<string | null>(null);
   const [paceCurves, setPaceCurves] = useState<any[]>([]);
@@ -222,6 +223,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     setOverride,
     clearOverride,
     submitChanges,
+    saveMinRate,
   } = useRateGrid();
 
   // --- INIT ---
@@ -327,6 +329,22 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
 
     return calendarData.slice(safeStart, safeStart + parseInt(nightsToView));
   }, [calendarData, startDate, nightsToView]);
+
+  const amberDates = useMemo(() => {
+    const s = new Set<string>();
+    visibleData.forEach((d) => {
+      if (d.isDailyMinOverride && d.guardrailMin < d.monthlyMinDefault) {
+        s.add(d.date);
+      }
+    });
+    return s;
+  }, [visibleData]);
+
+  const getColBg = (date: string) => {
+    if (hoveredColumn === date) return "rgba(57,189,248,0.05)";
+    if (amberDates.has(date)) return "rgba(245, 158, 11, 0.06)";
+    return "transparent";
+  };
 
   // Helper to get Pace Value
   const getPaceValue = (dateStr: string) => {
@@ -747,7 +765,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           ) : (
                             <Eye size={14} />
                           )}{" "}
-                          <span>PMS Rates</span>
+                          <span>Live PMS Rate</span>
                         </button>
                         <button
                           onClick={() => toggleRow("sellRate")}
@@ -773,7 +791,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           ) : (
                             <Eye size={14} />
                           )}{" "}
-                          <span>Effective Rate</span>
+                          <span>Target Sell Rate</span>
                         </button>
                       </div>
                     </div>
@@ -827,7 +845,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               backgroundColor:
                                 hoveredColumn === day.date
                                   ? "rgba(58, 58, 53, 0.3)"
-                                  : "#1A1A1A",
+                                  : amberDates.has(day.date)
+                                    ? "rgba(245, 158, 11, 0.08)"
+                                    : "#1A1A1A",
                               borderBottom: "1px solid #2a2a2a",
                               borderRight: "1px solid #2a2a2a",
                               textAlign: "center",
@@ -934,9 +954,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 padding: "12px 8px",
                                 width: "84px",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               <span
@@ -1002,9 +1020,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                                 opacity: day.isFrozen ? 0.4 : 1,
                               }}
                             >
@@ -1048,9 +1064,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                                 color:
                                   day.occupancy > 80
                                     ? "#10b981"
@@ -1065,9 +1079,14 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         </tr>
                       )}
 
+                      {/* Spacer between metrics and pricing sections */}
+                      <tr style={{ height: "8px" }}>
+                        <td colSpan={visibleData.length + 1} style={{ borderBottom: "1px solid #2a2a2a" }}></td>
+                      </tr>
+
                       {!hiddenRows.has("minRate") && (
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                          <td style={{ ...styles.tdSticky, color: "#f59e0b" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1090,27 +1109,69 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               </button>
                             </div>
                           </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                color: "#6b7280",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              {day.guardrailMin > 0
-                                ? `£${Math.round(day.guardrailMin)}`
-                                : "-"}
-                            </td>
-                          ))}
+                          {visibleData.map((day) => {
+                            const isBelowMonthly = day.isDailyMinOverride && day.guardrailMin < day.monthlyMinDefault;
+                            return (
+                              <td
+                                key={day.date}
+                                onClick={() => !day.isFrozen && setEditingMinCell(day.date)}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  color: isBelowMonthly ? "#ef4444" : "#6b7280",
+                                  fontSize: "12px",
+                                  padding: "12px 8px",
+                                  fontFamily: "monospace",
+                                  cursor: day.isFrozen ? "not-allowed" : "pointer",
+                                  backgroundColor:
+                                    editingMinCell === day.date
+                                      ? "transparent"
+                                      : isBelowMonthly
+                                        ? "rgba(239, 68, 68, 0.15)"
+                                        : getColBg(day.date),
+                                  borderBottom: isBelowMonthly ? "2px solid #ef4444" : undefined,
+                                }}
+                                title={isBelowMonthly ? `Monthly default: £${Math.round(day.monthlyMinDefault)}` : undefined}
+                              >
+                                {editingMinCell === day.date ? (
+                                  <input
+                                    autoFocus
+                                    style={{
+                                      ...styles.input,
+                                      color: "#ef4444",
+                                      fontWeight: "bold",
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      border: "1px solid #ef4444",
+                                    }}
+                                    defaultValue={day.guardrailMin > 0 ? Math.round(day.guardrailMin) : ""}
+                                    onFocus={(e) => e.target.select()}
+                                    onBlur={(e) => {
+                                      const v = parseFloat(e.target.value);
+                                      if (!isNaN(v) && v > 0 && selectedHotelId) {
+                                        saveMinRate(selectedHotelId, day.date, v);
+                                        if (v < day.monthlyMinDefault) {
+                                          toast.warning(
+                                            `Min rate set to £${Math.round(v)} — below monthly default of £${Math.round(day.monthlyMinDefault)}. Make sure you know what you're doing.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                          );
+                                        }
+                                      } else if (e.target.value === "" && selectedHotelId) {
+                                        saveMinRate(selectedHotelId, day.date, day.monthlyMinDefault);
+                                      }
+                                      setEditingMinCell(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") e.currentTarget.blur();
+                                    }}
+                                  />
+                                ) : (
+                                  day.guardrailMin > 0
+                                    ? `£${Math.round(day.guardrailMin)}`
+                                    : "-"
+                                )}
+                              </td>
+                            );
+                          })}
                         </tr>
                       )}
                       {!hiddenRows.has("floorRate") && (
@@ -1149,9 +1210,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               {day.floorRateLMF
@@ -1162,15 +1221,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         </tr>
                       )}
 
-                      {/* Separator */}
-                      <tr
-                        style={{ height: "12px", backgroundColor: "#1a1a1a" }}
-                      >
-                        <td
-                          colSpan={visibleData.length + 1}
-                          style={{ borderBottom: "1px dashed #2a2a2a" }}
-                        ></td>
-                      </tr>
 
                       {!hiddenRows.has("pmsRates") && (
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
@@ -1183,8 +1233,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 gap: "8px",
                               }}
                             >
-                              <Zap size={14} color="#6b7280" /> PMS Rates (Data
-                              3){" "}
+                              Live PMS Rate{" "}
                               <button
                                 onClick={() => toggleRow("pmsRates")}
                                 style={{
@@ -1209,9 +1258,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               {day.liveRate > 0
@@ -1272,10 +1319,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   fontWeight: "bold",
                                   fontFamily: "monospace",
                                   color: c > 0 ? "#10b981" : "#4a4a48",
-                                  backgroundColor:
-                                    hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
+                                  backgroundColor: getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                 }}
                               >
@@ -1300,7 +1344,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             padding: "16px",
                           }}
                         >
-                          <Zap size={16} color="#39BDF8" />{" "}
                           <span style={{ fontWeight: 600 }}>
                             Sentinel AI Rate
                           </span>
@@ -1339,6 +1382,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   ? "rgba(16, 185, 129, 0.05)"
                                   : hoveredColumn === day.date
                                     ? "rgba(57,189,248,0.1)"
+                                    : amberDates.has(day.date)
+                                      ? "rgba(245, 158, 11, 0.06)"
                                     : "transparent",
                               }}
                             >
@@ -1410,9 +1455,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         })}
                       </tr>
 
-                      {/* Separator */}
+                      {/* Separator — divides read-only rows from editable inputs */}
                       <tr
-                        style={{ height: "16px", backgroundColor: "#1A1A1A" }}
+                        style={{ height: "4px", backgroundColor: "#10b981", opacity: 0.3 }}
                       >
                         <td colSpan={visibleData.length + 1}></td>
                       </tr>
@@ -1421,13 +1466,14 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         <tr
                           style={{
                             borderBottom: "1px solid #2a2a2a",
-                            backgroundColor: "rgba(16, 185, 129, 0.05)",
+                            backgroundColor: "rgba(16, 185, 129, 0.03)",
                           }}
                         >
                           <td
                             style={{
                               ...styles.tdSticky,
                               backgroundColor: "rgba(16, 185, 129, 0.05)",
+                              borderLeft: "3px solid #10b981",
                             }}
                           >
                             <div
@@ -1439,7 +1485,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               }}
                             >
                               <span style={{ color: "#10b981" }}>
-                                Effective Sell Rate
+                                Target Sell Rate
                               </span>{" "}
                               <button
                                 onClick={() => toggleRow("effectiveRate")}
@@ -1489,9 +1535,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   backgroundColor:
                                     editingEffectiveCell === day.date
                                       ? "transparent"
-                                      : hoveredColumn === day.date
-                                        ? "rgba(57,189,248,0.05)"
-                                        : "transparent",
+                                      : getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                   cursor: day.isFrozen
                                     ? "not-allowed"
@@ -1532,21 +1576,19 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
 
                                         if (
                                           day.guardrailMin > 0 &&
-                                          roundedOverride < day.guardrailMin
+                                          roundedOverride < day.guardrailMin &&
+                                          selectedHotelId
                                         ) {
+                                          saveMinRate(selectedHotelId, day.date, roundedOverride);
                                           toast.warning(
-                                            `Required Base Rate (£${roundedOverride}) is below Min (£${day.guardrailMin}). Set to Min.`,
-                                          );
-                                          setOverride(
-                                            day.date,
-                                            day.guardrailMin,
-                                          );
-                                        } else {
-                                          setOverride(
-                                            day.date,
-                                            roundedOverride,
+                                            `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }
+                                        setOverride(
+                                          day.date,
+                                          roundedOverride,
+                                        );
                                       } else if (e.target.value === "") {
                                         clearOverride(day.date);
                                       }
@@ -1568,14 +1610,21 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           })}
                         </tr>
                       )}
-                      {/* 4. Override Input */}
+                      {/* 4. PMS Override Input */}
                       <tr
                         style={{
                           borderTop: "1px solid #2a2a2a",
                           borderBottom: "1px solid #2a2a2a",
+                          backgroundColor: "rgba(16, 185, 129, 0.03)",
                         }}
                       >
-                        <td style={styles.tdSticky}>Override</td>
+                        <td style={{
+                          ...styles.tdSticky,
+                          backgroundColor: "rgba(16, 185, 129, 0.05)",
+                          borderLeft: "3px solid #10b981",
+                        }}>
+                          <span style={{ color: "#10b981" }}>PMS Override</span>
+                        </td>
                         {visibleData.map((day) => {
                           const savedVal = savedOverrides[day.date];
                           const pendingVal = pendingOverrides[day.date];
@@ -1620,15 +1669,16 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     if (!isNaN(v) && v > 0) {
                                       if (
                                         day.guardrailMin > 0 &&
-                                        v < day.guardrailMin
+                                        v < day.guardrailMin &&
+                                        selectedHotelId
                                       ) {
+                                        saveMinRate(selectedHotelId, day.date, v);
                                         toast.warning(
-                                          `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`,
+                                          `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                          { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
                                         );
-                                        setOverride(day.date, day.guardrailMin);
-                                      } else {
-                                        setOverride(day.date, v);
                                       }
+                                      setOverride(day.date, v);
                                     } else if (e.target.value === "") {
                                       clearOverride(day.date);
                                     }
@@ -1647,18 +1697,16 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                       if (!isNaN(v) && v > 0) {
                                         if (
                                           day.guardrailMin > 0 &&
-                                          v < day.guardrailMin
+                                          v < day.guardrailMin &&
+                                          selectedHotelId
                                         ) {
+                                          saveMinRate(selectedHotelId, day.date, v);
                                           toast.warning(
-                                            `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`,
+                                            `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
-                                          setOverride(
-                                            day.date,
-                                            day.guardrailMin,
-                                          );
-                                        } else {
-                                          setOverride(day.date, v);
                                         }
+                                        setOverride(day.date, v);
                                       } else if (e.currentTarget.value === "") {
                                         clearOverride(day.date);
                                       }
@@ -1704,7 +1752,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                 <div style={styles.footer}>
                   <Info size={14} />
                   <span>
-                    Scroll to view 365 days • Click 'Override' cells to set
+                    Scroll to view 365 days • Click 'PMS Override' or 'Target Sell Rate' to set
                     manual rates • Live PMS sync active
                   </span>
                 </div>

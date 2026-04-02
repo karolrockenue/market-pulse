@@ -54,8 +54,10 @@ const DEFAULT_CALCULATOR_STATE: CalculatorState = {
 // --- Math Logic (Preserved from PropertyHubPage.tsx) ---
 
 const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
-  if (!testDate || !camp.active || !camp.startDate || !camp.endDate)
-    return false;
+  if (!camp.active) return false;
+  // Long campaigns have no dates — always valid
+  if (camp.slug === "long-campaign") return true;
+  if (!testDate || !camp.startDate || !camp.endDate) return false;
   try {
     return isWithinInterval(testDate, {
       start: camp.startDate,
@@ -109,7 +111,7 @@ const calculateSellRate = (
     const isMobileBlocked =
       !!deepDeal ||
       validStandard.some((c) =>
-        ["early-deal", "late-escape", "getaway-deal"].includes(c.slug)
+        ["long-campaign", "early-deal", "late-escape", "getaway-deal"].includes(c.slug)
       );
     if (state.mobileActive && !isMobileBlocked) {
       currentRate = currentRate * (1 - Number(state.mobilePercent) / 100);
@@ -147,7 +149,7 @@ const calculateRequiredPMSRate = (
     const isMobileBlocked =
       !!deepDeal ||
       validStandard.some((c) =>
-        ["early-deal", "late-escape", "getaway-deal"].includes(c.slug)
+        ["long-campaign", "early-deal", "late-escape", "getaway-deal"].includes(c.slug)
       );
 
     if (state.mobileActive && !isMobileBlocked)

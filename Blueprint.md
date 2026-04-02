@@ -610,6 +610,24 @@ Min Rate
 
 EffectiveRate = max(CalculatedRate, MinRate)
 
+MinRate is resolved per-day with the following priority:
+
+1. Daily min override (sentinel_daily_min_rates) — if a per-day override exists, it wins.
+2. Monthly min rate (sentinel_configurations → monthly_min_rates) — fallback default.
+
+Daily min overrides can be set in two ways from the Rate Manager UI:
+
+- Editing the Min Rate row directly for a specific date.
+- Entering a PMS Override or Target Sell Rate below the current min — the system auto-lowers the daily min to match and shows a red warning toast.
+
+When a daily min override is below the monthly default, the UI signals this clearly:
+
+- The Min Rate cell turns red with a red bottom border.
+- The entire column for that date gets an amber tint across all rows.
+- A tooltip on the cell shows the monthly default for reference.
+
+To revert a daily override, clear the min rate cell (empty input) — it reverts to the monthly default.
+
 Max Rate
 
 EffectiveRate = min(EffectiveRate, MaxRate)
@@ -781,7 +799,34 @@ is_manual_override (Boolean)
 
 updated_at
 
-4.6 daily_bookings_record (Sales Ledger)
+4.6 sentinel_daily_min_rates
+
+Stores granular daily price floors (per-day min rate overrides).
+
+When present, overrides the monthly min rate from sentinel_configurations for that specific date. Used when a revenue manager needs to temporarily lower the floor for a specific day (e.g. distressed inventory) without changing the monthly default.
+
+Fields:
+
+hotel_id (PK, Integer)
+
+stay_date (PK, Date)
+
+min_price (Numeric)
+
+is_manual_override (Boolean)
+
+updated_at
+
+Resolution priority in sentinel.pricing.engine.js → applyGuardrails:
+1. Daily min override (this table) — if exists and > 0, used as the floor.
+2. Monthly min rate (sentinel_configurations → monthly_min_rates) — fallback.
+3. Last-Minute Floor (LMF) — when active, replaces both of the above.
+
+API: GET/POST /api/sentinel/min-rates/:hotelId
+
+Migration: api/migration_004_daily_min_rates.js
+
+4.7 daily_bookings_record (Sales Ledger)
 
 Stores individual booking transactions for "Recent Bookings" and granular revenue tracking.
 
@@ -970,6 +1015,16 @@ Supports bulk inserts of events. Updates existing events on conflict.
 DELETE /market-events/:id
 
 Permanently deletes an event by its UUID.
+
+GET /min-rates/:hotelId
+
+Returns per-day min rate overrides from sentinel_daily_min_rates as { "YYYY-MM-DD": price }.
+
+POST /min-rates/:hotelId
+
+Body: { rates: { "YYYY-MM-DD": price, ... } }
+
+Saves per-day min rate overrides. Pass null for a date to revert to monthly default (deletes the row).
 
 Rule:
 If you need new Sentinel functionality, extend the service and then expose a minimal API route here, instead of embedding logic in the router.

@@ -67,6 +67,8 @@ export interface RateCalendarDay {
   occupancy: number;
   adr: number;
   guardrailMin: number;
+  monthlyMinDefault: number;
+  isDailyMinOverride: boolean;
   floorRateLMF: number | null;
   pickup?: number; // [NEW] Daily pickup (Live - Yesterday)
 }

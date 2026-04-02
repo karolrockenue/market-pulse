@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import {
   ComposedChart, LineChart, BarChart, Bar, Line, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
+
+const NeighbourhoodMaps = lazy(() => import("./NeighbourhoodMaps"));
 
 // ─── Color constants (brand palette) ───
 const BLUE = "#39BDF8";
@@ -55,8 +57,49 @@ const DOW_COLORS: Record<string, string> = {
   Tuesday: GREEN, Monday: GRAY, Sunday: DIM,
 };
 
+// ─── Mock data for new widgets ───
+const MOCK_STAR_RATINGS = [
+  { label: "5 Star", count: 206, pct: 4.8, color: PURPLE },
+  { label: "4 Star", count: 1667, pct: 38.5, color: BLUE },
+  { label: "3 Star", count: 635, pct: 14.7, color: AMBER },
+  { label: "2 Star", count: 163, pct: 3.8, color: DIM },
+  { label: "Unrated", count: 1658, pct: 38.3, color: "#3a3a3a" },
+];
+
+const MOCK_PRICE_HISTOGRAM = [
+  { bucket: "£0–50", count: 312 }, { bucket: "£50–75", count: 487 },
+  { bucket: "£75–100", count: 623 }, { bucket: "£100–125", count: 558 },
+  { bucket: "£125–150", count: 492 }, { bucket: "£150–175", count: 401 },
+  { bucket: "£175–200", count: 338 }, { bucket: "£200–250", count: 412 },
+  { bucket: "£250–300", count: 287 }, { bucket: "£300–400", count: 219 },
+  { bucket: "£400–500", count: 112 }, { bucket: "£500+", count: 88 },
+];
+
+// Mock seasonality heatmap from real hotel ADR data (12 months, all DOW)
+const MOCK_ADR_HEATMAP = [
+  { month: "Jan", month_num: 1,  Sun: 112, Mon: 118, Tue: 121, Wed: 119, Thu: 124, Fri: 142, Sat: 148 },
+  { month: "Feb", month_num: 2,  Sun: 108, Mon: 115, Tue: 118, Wed: 117, Thu: 122, Fri: 138, Sat: 145 },
+  { month: "Mar", month_num: 3,  Sun: 119, Mon: 126, Tue: 131, Wed: 128, Thu: 135, Fri: 152, Sat: 159 },
+  { month: "Apr", month_num: 4,  Sun: 128, Mon: 134, Tue: 138, Wed: 136, Thu: 143, Fri: 165, Sat: 172 },
+  { month: "May", month_num: 5,  Sun: 135, Mon: 142, Tue: 146, Wed: 144, Thu: 151, Fri: 178, Sat: 186 },
+  { month: "Jun", month_num: 6,  Sun: 148, Mon: 155, Tue: 159, Wed: 157, Thu: 164, Fri: 192, Sat: 201 },
+  { month: "Jul", month_num: 7,  Sun: 156, Mon: 162, Tue: 165, Wed: 163, Thu: 171, Fri: 198, Sat: 212 },
+  { month: "Aug", month_num: 8,  Sun: 152, Mon: 158, Tue: 161, Wed: 159, Thu: 168, Fri: 195, Sat: 208 },
+  { month: "Sep", month_num: 9,  Sun: 138, Mon: 145, Tue: 149, Wed: 147, Thu: 155, Fri: 179, Sat: 188 },
+  { month: "Oct", month_num: 10, Sun: 132, Mon: 139, Tue: 143, Wed: 141, Thu: 148, Fri: 168, Sat: 176 },
+  { month: "Nov", month_num: 11, Sun: 122, Mon: 129, Tue: 133, Wed: 131, Thu: 138, Fri: 158, Sat: 165 },
+  { month: "Dec", month_num: 12, Sun: 142, Mon: 148, Tue: 152, Wed: 150, Thu: 158, Fri: 182, Sat: 195 },
+];
+
+const AVAILABLE_CITIES = [
+  { slug: "london", label: "London", scrapes: 170 },
+  { slug: "las-vegas", label: "Las Vegas", scrapes: 62 },
+  { slug: "mykonos", label: "Mykonos", scrapes: 14 },
+  { slug: "archanes", label: "Archanes", scrapes: 1 },
+];
+
 export function MarketProfile() {
-  const city = "london"; // TODO: make dynamic via prop/selector
+  const [city, setCity] = useState("london");
 
   // ─── State ───
   const [overview, setOverview] = useState<any>(null);
@@ -119,27 +162,6 @@ export function MarketProfile() {
     ? Math.round(((kpis.weekend_wap - kpis.weekday_wap) / kpis.weekday_wap) * 100)
     : null;
 
-  // Seasonal heatmap: pivot rows into month objects
-  const seasonalHeatmap = useMemo(() => {
-    if (!seasonal.length) return [];
-    const months: Record<string, any> = {};
-    const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    seasonal.forEach((row) => {
-      if (!months[row.month]) months[row.month] = { month: row.month, month_num: row.month_num };
-      months[row.month][dows[row.dow_num]] = Number(row.avg_wap);
-    });
-    return Object.values(months).sort((a: any, b: any) => a.month_num - b.month_num);
-  }, [seasonal]);
-
-  // All WAP values for heatmap color range
-  const allWaps = useMemo(() => {
-    return seasonalHeatmap.flatMap((m: any) =>
-      ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => m[d]).filter(Boolean)
-    );
-  }, [seasonalHeatmap]);
-  const wapMin = Math.min(...(allWaps.length ? allWaps : [0]));
-  const wapMax = Math.max(...(allWaps.length ? allWaps : [100]));
-
   // Peak/cheapest from seasonal
   const peakEntry = useMemo(() => {
     if (!seasonal.length) return null;
@@ -156,19 +178,20 @@ export function MarketProfile() {
     const byLeadTime: Record<string, any> = {};
     absorptionDow.forEach((row) => {
       const key = `${row.days_out}d`;
-      if (!byLeadTime[key]) byLeadTime[key] = { days_out: key };
+      if (!byLeadTime[key]) byLeadTime[key] = { days_out: key, _sort: Number(row.days_out) };
       byLeadTime[key][row.dow.trim()] = Number(row.pct_remaining);
     });
-    return Object.values(byLeadTime);
+    return Object.values(byLeadTime).sort((a: any, b: any) => a._sort - b._sort);
   }, [absorptionDow]);
 
   // Price movement
   const priceChartData = useMemo(() => {
     return priceMovement.map((r) => ({
       days_out: `${r.days_out}d`,
+      _sort: Number(r.days_out),
       wap: Number(r.avg_wap),
       supply: Number(r.avg_supply),
-    }));
+    })).sort((a, b) => a._sort - b._sort);
   }, [priceMovement]);
 
   // Single date absorption
@@ -178,19 +201,8 @@ export function MarketProfile() {
       days: Number(r.days_out),
       supply: Number(r.total_results),
       wap: Number(r.weighted_avg_price),
-      five: Number(r.facet_star_rating?.["5 stars"] || 0),
-      four: Number(r.facet_star_rating?.["4 stars"] || 0),
-      three: Number(r.facet_star_rating?.["3 stars"] || 0),
-      two: Number(r.facet_star_rating?.["2 stars"] || 0),
-    }));
+    })).sort((a, b) => a.days - b.days);
   }, [absorptionDate]);
-
-  // Star rating: sample every ~10th point for a cleaner stacked bar
-  const starRatingData = useMemo(() => {
-    if (!absorptionCurve.length) return [];
-    const step = Math.max(1, Math.floor(absorptionCurve.length / 12));
-    return absorptionCurve.filter((_, i) => i % step === 0 || i === absorptionCurve.length - 1);
-  }, [absorptionCurve]);
 
   // Compression
   const compressionData = useMemo(() => {
@@ -224,11 +236,26 @@ export function MarketProfile() {
 
       <div style={{ position: "relative", zIndex: 10, padding: "24px" }}>
         {/* Header */}
-        <div style={{ marginBottom: "24px" }}>
-          <h1 style={{ color: WHITE, fontSize: "24px", margin: 0, marginBottom: "4px" }}>
-            Market Profile — {city.charAt(0).toUpperCase() + city.slice(1)}
-          </h1>
-          <p style={{ color: GRAY, fontSize: "12px", margin: 0 }}>City-wide market structure, pricing dynamics, and booking behaviour derived from daily OTA intelligence</p>
+        <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h1 style={{ color: WHITE, fontSize: "24px", margin: 0, marginBottom: "4px" }}>
+              Market Profile — {AVAILABLE_CITIES.find(c => c.slug === city)?.label || city}
+            </h1>
+            <p style={{ color: GRAY, fontSize: "12px", margin: 0 }}>City-wide market structure, pricing dynamics, and booking behaviour derived from daily OTA intelligence</p>
+          </div>
+          <select
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            style={{
+              backgroundColor: INPUT_BG, color: WHITE, border: `1px solid ${BORDER}`,
+              borderRadius: "6px", padding: "8px 12px", fontSize: "13px", cursor: "pointer",
+              outline: "none", minWidth: "160px",
+            }}
+          >
+            {AVAILABLE_CITIES.map((c) => (
+              <option key={c.slug} value={c.slug}>{c.label} ({c.scrapes}d)</option>
+            ))}
+          </select>
         </div>
 
         {/* ─── ROW 1: City KPIs ─── */}
@@ -249,7 +276,7 @@ export function MarketProfile() {
           ))}
         </div>
 
-        {/* ─── ROW 2: Market Composition + Seasonal Heatmap ─── */}
+        {/* ─── ROW 2: Market Composition + Accommodation Map ─── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "16px", marginBottom: "24px" }}>
           {/* Property types */}
           <div style={cardPad}>
@@ -260,49 +287,31 @@ export function MarketProfile() {
               {propertyTypes.map((t) => {
                 const pct = ((t.count / totalProps) * 100).toFixed(1);
                 return (
-                  <div key={t.type} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                  <div key={t.type} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
                     <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: t.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: "12px", color: GRAY, flex: 1 }}>{t.type}</span>
-                    <span style={{ fontSize: "12px", color: WHITE, fontWeight: 500, width: "50px", textAlign: "right" }}>{t.count}</span>
-                    <div style={{ width: "80px", height: "6px", backgroundColor: INPUT_BG, borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", backgroundColor: t.color, borderRadius: "3px" }} />
+                    <span style={{ fontSize: "13px", color: GRAY, flex: 1 }}>{t.type}</span>
+                    <span style={{ fontSize: "13px", color: WHITE, fontWeight: 500, width: "50px", textAlign: "right" }}>{t.count}</span>
+                    <div style={{ width: "100px", height: "8px", backgroundColor: INPUT_BG, borderRadius: "4px", overflow: "hidden" }}>
+                      <div style={{ width: `${pct}%`, height: "100%", backgroundColor: t.color, borderRadius: "4px" }} />
                     </div>
-                    <span style={{ fontSize: "10px", color: DIM, width: "36px", textAlign: "right" }}>{pct}%</span>
+                    <span style={{ fontSize: "11px", color: DIM, width: "36px", textAlign: "right" }}>{pct}%</span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Seasonal heatmap */}
-          <div style={cardPad}>
-            <div style={sectionLabel}>SEASONAL PRICING</div>
-            <h3 style={sectionTitle}>WAP Heatmap — Month x Day of Week</h3>
-            <p style={sectionSub}>Weighted average price at ~30 days lead time</p>
-            <div style={{ marginTop: "16px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
-                <div />
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                  <div key={d} style={{ fontSize: "9px", color: DIM, textAlign: "center", textTransform: "uppercase" }}>{d}</div>
-                ))}
-              </div>
-              {seasonalHeatmap.map((row: any) => {
-                const vals = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => row[d]);
-                return (
-                  <div key={row.month} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
-                    <div style={{ fontSize: "11px", color: GRAY, display: "flex", alignItems: "center" }}>{row.month}</div>
-                    {vals.map((v: number, i: number) => {
-                      if (!v) return <div key={i} style={{ backgroundColor: "#141414", borderRadius: "4px", padding: "8px 4px", textAlign: "center" }}><span style={{ fontSize: "11px", color: "#333" }}>--</span></div>;
-                      const heat = getHeatColor(v, wapMin, wapMax);
-                      return (
-                        <div key={i} style={{ backgroundColor: heat.bg, borderRadius: "4px", padding: "8px 4px", textAlign: "center" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 500, color: heat.text }}>{curr}{v}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+          {/* Accommodation Map */}
+          <div style={card}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
+              <div style={sectionLabel}>ACCOMMODATION SUPPLY</div>
+              <h3 style={sectionTitle}>Property Map</h3>
+              <p style={sectionSub}>Every hotel, hostel, guest house, apartment and motel from OpenStreetMap</p>
+            </div>
+            <div style={{ height: "380px" }}>
+              <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: GRAY, fontSize: "12px" }}>Loading map...</div>}>
+                <NeighbourhoodMaps citySlug={city} />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -356,7 +365,7 @@ export function MarketProfile() {
           </div>
         </div>
 
-        {/* ─── ROW 4: Single-Date Absorption + Star Ratings ─── */}
+        {/* ─── ROW 4: Single-Date Absorption + Star Rating Snapshot ─── */}
         <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: "16px", marginBottom: "24px" }}>
           <div style={card}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
@@ -379,24 +388,51 @@ export function MarketProfile() {
             </div>
           </div>
 
+          {/* Star Rating Snapshot (mock data) */}
+          <div style={cardPad}>
+            <div style={sectionLabel}>SUPPLY COMPOSITION</div>
+            <h3 style={sectionTitle}>Star Rating Breakdown</h3>
+            <p style={sectionSub}>Current supply distribution by hotel classification</p>
+            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+              {MOCK_STAR_RATINGS.map((s) => (
+                <div key={s.label}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
+                    <span style={{ fontSize: "13px", color: WHITE }}>{s.label}</span>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
+                      <span style={{ fontSize: "13px", color: WHITE, fontWeight: 500 }}>{s.count.toLocaleString()}</span>
+                      <span style={{ fontSize: "11px", color: DIM }}>{s.pct}%</span>
+                    </div>
+                  </div>
+                  <div style={{ width: "100%", height: "8px", backgroundColor: INPUT_BG, borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{ width: `${s.pct}%`, height: "100%", backgroundColor: s.color, borderRadius: "4px" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── ROW 4b: Price Distribution Histogram (mock data) ─── */}
+        <div style={{ marginBottom: "24px" }}>
           <div style={card}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
-              <div style={sectionLabel}>SUPPLY COMPOSITION</div>
-              <h3 style={sectionTitle}>Star Rating Distribution Over Time</h3>
-              <p style={sectionSub}>How the mix changes as the date approaches</p>
+              <div style={sectionLabel}>PRICE DISTRIBUTION</div>
+              <h3 style={sectionTitle}>Price Bracket Distribution</h3>
+              <p style={sectionSub}>Number of available properties by price bracket — shows where supply is concentrated and where there's pricing headroom</p>
             </div>
-            <div style={{ padding: "16px 20px", height: "280px" }}>
+            <div style={{ padding: "16px 20px", height: "260px" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={starRatingData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="label" stroke="#6b7280" fontSize={9} tickLine={false} />
+                <BarChart data={MOCK_PRICE_HISTOGRAM} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis dataKey="bucket" stroke="#6b7280" fontSize={10} tickLine={false} interval={0} angle={-35} textAnchor="end" height={50} />
                   <YAxis stroke="#6b7280" fontSize={10} tickLine={false} />
                   <Tooltip {...tooltipStyle} />
-                  <Bar dataKey="two" stackId="stars" fill={DIM} name="2 Star" />
-                  <Bar dataKey="three" stackId="stars" fill={AMBER} name="3 Star" />
-                  <Bar dataKey="four" stackId="stars" fill={BLUE} name="4 Star" />
-                  <Bar dataKey="five" stackId="stars" fill={PURPLE} name="5 Star" radius={[4, 4, 0, 0]} />
-                </ComposedChart>
+                  <Bar dataKey="count" name="Properties" radius={[4, 4, 0, 0]}>
+                    {MOCK_PRICE_HISTOGRAM.map((_, i) => (
+                      <Cell key={i} fill={BLUE} fillOpacity={0.15 + (i < 6 ? (6 - i) * 0.12 : 0.05)} />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -453,6 +489,42 @@ export function MarketProfile() {
                       </div>
                       <span style={{ fontSize: "12px", fontWeight: 500, color: absColor }}>{abs}%</span>
                     </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── ROW 6: ADR Seasonality Heatmap (mock data — will use daily_metrics_snapshots) ─── */}
+        <div style={{ marginBottom: "24px" }}>
+          <div style={cardPad}>
+            <div style={sectionLabel}>SEASONALITY</div>
+            <h3 style={sectionTitle}>ADR Heatmap — Month x Day of Week</h3>
+            <p style={sectionSub}>Average daily rate from Market Pulse hotels with 12+ months history — {MOCK_ADR_HEATMAP.length} months shown</p>
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
+                <div />
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                  <div key={d} style={{ fontSize: "9px", color: DIM, textAlign: "center", textTransform: "uppercase" }}>{d}</div>
+                ))}
+              </div>
+              {MOCK_ADR_HEATMAP.map((row) => {
+                const vals = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (row as any)[d] as number);
+                const allVals = MOCK_ADR_HEATMAP.flatMap((r) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (r as any)[d] as number));
+                const hMin = Math.min(...allVals);
+                const hMax = Math.max(...allVals);
+                return (
+                  <div key={row.month} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
+                    <div style={{ fontSize: "11px", color: GRAY, display: "flex", alignItems: "center" }}>{row.month}</div>
+                    {vals.map((v, i) => {
+                      const heat = getHeatColor(v, hMin, hMax);
+                      return (
+                        <div key={i} style={{ backgroundColor: heat.bg, borderRadius: "4px", padding: "8px 4px", textAlign: "center" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 500, color: heat.text }}>{curr}{v}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}

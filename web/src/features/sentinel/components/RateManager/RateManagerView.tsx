@@ -205,6 +205,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
   const [editingEffectiveCell, setEditingEffectiveCell] = useState<
     string | null
   >(null);
+  const [editingMinCell, setEditingMinCell] = useState<string | null>(null);
   const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
   // appliedPredictions removed (now in hook)
   const [hoveredAiCell, setHoveredAiCell] = useState<string | null>(null);
@@ -236,6 +237,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     applyAiPrediction, // [NEW]
     bulkApplyAi, // [NEW]
     submitChanges,
+    saveMinRate,
   } = useRateGrid();
 
   // --- INIT ---
@@ -343,6 +345,24 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
     return calendarData.slice(safeStart, safeStart + parseInt(nightsToView));
   }, [calendarData, startDate, nightsToView]);
+
+  // Dates where daily min is overridden below monthly default — whole column gets amber tint
+  const amberDates = useMemo(() => {
+    const s = new Set<string>();
+    visibleData.forEach((d) => {
+      if (d.isDailyMinOverride && d.guardrailMin < d.monthlyMinDefault) {
+        s.add(d.date);
+      }
+    });
+    return s;
+  }, [visibleData]);
+
+  // Column background: amber for daily min override, blue for hover, else transparent
+  const getColBg = (date: string, fallback = "transparent") => {
+    if (hoveredColumn === date) return "rgba(57,189,248,0.05)";
+    if (amberDates.has(date)) return "rgba(245, 158, 11, 0.06)";
+    return fallback;
+  };
 
   // [NEW] Helper to get Pace Value
   const getPaceValue = (dateStr: string) => {
@@ -887,7 +907,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           ) : (
                             <Eye size={14} />
                           )}{" "}
-                          <span>PMS Rates</span>
+                          <span>Live PMS Rate</span>
                         </button>
                         <button
                           onClick={() => toggleRow("sellRate")}
@@ -913,7 +933,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           ) : (
                             <Eye size={14} />
                           )}{" "}
-                          <span>Effective Rate</span>
+                          <span>Target Sell Rate</span>
                         </button>
                       </div>
                     </div>
@@ -1004,7 +1024,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               backgroundColor:
                                 hoveredColumn === day.date
                                   ? "rgba(58, 58, 53, 0.3)"
-                                  : "#1A1A1A",
+                                  : amberDates.has(day.date)
+                                    ? "rgba(245, 158, 11, 0.08)"
+                                    : "#1A1A1A",
                               borderBottom: "1px solid #2a2a2a",
                               borderRight: "1px solid #2a2a2a",
                               textAlign: "center",
@@ -1111,9 +1133,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 padding: "12px 8px",
                                 width: "84px",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               <span
@@ -1179,9 +1199,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                                 opacity: day.isFrozen ? 0.4 : 1,
                               }}
                             >
@@ -1225,9 +1243,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                                 color:
                                   day.occupancy > 80
                                     ? "#10b981"
@@ -1277,9 +1293,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 padding: "12px 8px",
                                 color: "#e5e5e5",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               {getSeasonalityTier(day.date)}
@@ -1327,9 +1341,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   fontFamily: "monospace",
                                   color: "#e5e5e5",
                                   backgroundColor:
-                                    hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
+                                    getColBg(day.date),
                                 }}
                               >
                                 {target !== null
@@ -1390,9 +1402,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   fontWeight: "bold",
                                   color: color,
                                   backgroundColor:
-                                    hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
+                                    getColBg(day.date),
                                 }}
                               >
                                 {delta !== null
@@ -1404,102 +1414,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       )}
 
-                      {/* Data 1 Placeholder */}
-                      {!hiddenRows.has("data1") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#6b7280" }}>Data 1</span>{" "}
-                              <button
-                                onClick={() => toggleRow("data1")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                color: "#4a4a48",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              -
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-                      {/* Data 2 Placeholder */}
-                      {!hiddenRows.has("data2") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#6b7280" }}>Data 2</span>{" "}
-                              <button
-                                onClick={() => toggleRow("data2")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                color: "#4a4a48",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              -
-                            </td>
-                          ))}
-                        </tr>
-                      )}
+                      {/* Spacer between metrics and pricing sections */}
+                      <tr style={{ height: "8px" }}>
+                        <td colSpan={visibleData.length + 1} style={{ borderBottom: "1px solid #2a2a2a" }}></td>
+                      </tr>
 
                       {!hiddenRows.has("minRate") && (
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                          <td style={{ ...styles.tdSticky, color: "#f59e0b" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1522,27 +1444,72 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               </button>
                             </div>
                           </td>
-                          {visibleData.map((day) => (
-                            <td
-                              key={day.date}
-                              style={{
-                                borderRight: "1px solid #2a2a2a",
-                                textAlign: "center",
-                                color: "#6b7280",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
-                                backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
-                              }}
-                            >
-                              {day.guardrailMin > 0
-                                ? `£${Math.round(day.guardrailMin)}`
-                                : "-"}
-                            </td>
-                          ))}
+                          {visibleData.map((day) => {
+                            const isBelowMonthly = day.isDailyMinOverride && day.guardrailMin < day.monthlyMinDefault;
+                            return (
+                              <td
+                                key={day.date}
+                                onClick={() => !day.isFrozen && setEditingMinCell(day.date)}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  color: isBelowMonthly ? "#ef4444" : "#6b7280",
+                                  fontSize: "12px",
+                                  padding: "12px 8px",
+                                  fontFamily: "monospace",
+                                  cursor: day.isFrozen ? "not-allowed" : "pointer",
+                                  backgroundColor:
+                                    editingMinCell === day.date
+                                      ? "transparent"
+                                      : isBelowMonthly
+                                        ? "rgba(239, 68, 68, 0.15)"
+                                        : hoveredColumn === day.date
+                                          ? "rgba(245, 158, 11, 0.1)"
+                                          : "transparent",
+                                  borderBottom: isBelowMonthly ? "2px solid #ef4444" : undefined,
+                                }}
+                                title={isBelowMonthly ? `Monthly default: £${Math.round(day.monthlyMinDefault)}` : undefined}
+                              >
+                                {editingMinCell === day.date ? (
+                                  <input
+                                    autoFocus
+                                    style={{
+                                      ...styles.input,
+                                      color: "#ef4444",
+                                      fontWeight: "bold",
+                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                      border: "1px solid #ef4444",
+                                    }}
+                                    defaultValue={day.guardrailMin > 0 ? Math.round(day.guardrailMin) : ""}
+                                    onFocus={(e) => e.target.select()}
+                                    onBlur={(e) => {
+                                      const v = parseFloat(e.target.value);
+                                      if (!isNaN(v) && v > 0 && selectedHotelId) {
+                                        saveMinRate(selectedHotelId, day.date, v);
+                                        if (v < day.monthlyMinDefault) {
+                                          toast.warning(
+                                            `Min rate set to £${Math.round(v)} — below monthly default of £${Math.round(day.monthlyMinDefault)}. Make sure you know what you're doing.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                          );
+                                        }
+                                      } else if (e.target.value === "" && selectedHotelId) {
+                                        // Revert to monthly default — delete the daily override
+                                        saveMinRate(selectedHotelId, day.date, day.monthlyMinDefault);
+                                      }
+                                      setEditingMinCell(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") e.currentTarget.blur();
+                                    }}
+                                  />
+                                ) : (
+                                  day.guardrailMin > 0
+                                    ? `£${Math.round(day.guardrailMin)}`
+                                    : "-"
+                                )}
+                              </td>
+                            );
+                          })}
                         </tr>
                       )}
                       {!hiddenRows.has("floorRate") && (
@@ -1581,9 +1548,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               {day.floorRateLMF
@@ -1615,8 +1580,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <Zap size={14} color="#6b7280" /> PMS Rates (Data
-                              3){" "}
+                              Live PMS Rate{" "}
                               <button
                                 onClick={() => toggleRow("pmsRates")}
                                 style={{
@@ -1641,9 +1605,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 padding: "12px 8px",
                                 fontFamily: "monospace",
                                 backgroundColor:
-                                  hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.05)"
-                                    : "transparent",
+                                  getColBg(day.date),
                               }}
                             >
                               {day.liveRate > 0
@@ -1707,9 +1669,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   fontFamily: "monospace",
                                   color: c > 0 ? "#10b981" : "#4a4a48",
                                   backgroundColor:
-                                    hoveredColumn === day.date
-                                      ? "rgba(57,189,248,0.05)"
-                                      : "transparent",
+                                    getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                 }}
                               >
@@ -1734,7 +1694,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             padding: "16px",
                           }}
                         >
-                          <Zap size={16} color="#39BDF8" />{" "}
                           <span style={{ fontWeight: 600 }}>
                             Sentinel AI Rate
                           </span>
@@ -1774,7 +1733,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   ? "rgba(16, 185, 129, 0.05)"
                                   : hoveredColumn === day.date
                                     ? "rgba(57,189,248,0.1)"
-                                    : "transparent",
+                                    : getColBg(day.date),
                               }}
                             >
                               <div
@@ -1845,9 +1804,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         })}
                       </tr>
 
-                      {/* Separator */}
+                      {/* Separator — divides read-only rows from editable inputs */}
                       <tr
-                        style={{ height: "16px", backgroundColor: "#1A1A1A" }}
+                        style={{ height: "4px", backgroundColor: "#10b981", opacity: 0.3 }}
                       >
                         <td colSpan={visibleData.length + 1}></td>
                       </tr>
@@ -1856,13 +1815,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <tr
                           style={{
                             borderBottom: "1px solid #2a2a2a",
-                            backgroundColor: "rgba(16, 185, 129, 0.05)",
+                            backgroundColor: "rgba(16, 185, 129, 0.03)",
                           }}
                         >
                           <td
                             style={{
                               ...styles.tdSticky,
                               backgroundColor: "rgba(16, 185, 129, 0.05)",
+                              borderLeft: "3px solid #10b981",
                             }}
                           >
                             <div
@@ -1874,7 +1834,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               }}
                             >
                               <span style={{ color: "#10b981" }}>
-                                Effective Sell Rate
+                                Target Sell Rate
                               </span>{" "}
                               <button
                                 onClick={() => toggleRow("effectiveRate")}
@@ -1924,9 +1884,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   backgroundColor:
                                     editingEffectiveCell === day.date
                                       ? "transparent"
-                                      : hoveredColumn === day.date
-                                        ? "rgba(57,189,248,0.05)"
-                                        : "transparent",
+                                      : getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                   cursor: day.isFrozen
                                     ? "not-allowed"
@@ -1967,24 +1925,21 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         const roundedOverride =
                                           Math.round(reqOverride);
 
-                                        // Enforce Min Rate on the resulting Base
                                         if (
                                           day.guardrailMin > 0 &&
-                                          roundedOverride < day.guardrailMin
+                                          roundedOverride < day.guardrailMin &&
+                                          selectedHotelId
                                         ) {
+                                          saveMinRate(selectedHotelId, day.date, roundedOverride);
                                           toast.warning(
-                                            `Required Base Rate (£${roundedOverride}) is below Min (£${day.guardrailMin}). Set to Min.`,
-                                          );
-                                          setOverride(
-                                            day.date,
-                                            day.guardrailMin,
-                                          );
-                                        } else {
-                                          setOverride(
-                                            day.date,
-                                            roundedOverride,
+                                            `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }
+                                        setOverride(
+                                          day.date,
+                                          roundedOverride,
+                                        );
                                       } else if (e.target.value === "") {
                                         clearOverride(day.date);
                                       }
@@ -2006,14 +1961,21 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           })}
                         </tr>
                       )}
-                      {/* 4. Override Input */}
+                      {/* 4. PMS Override Input */}
                       <tr
                         style={{
                           borderTop: "1px solid #2a2a2a",
                           borderBottom: "1px solid #2a2a2a",
+                          backgroundColor: "rgba(16, 185, 129, 0.03)",
                         }}
                       >
-                        <td style={styles.tdSticky}>Override</td>
+                        <td style={{
+                          ...styles.tdSticky,
+                          backgroundColor: "rgba(16, 185, 129, 0.05)",
+                          borderLeft: "3px solid #10b981",
+                        }}>
+                          <span style={{ color: "#10b981" }}>PMS Override</span>
+                        </td>
                         {visibleData.map((day) => {
                           const savedVal = savedOverrides[day.date];
                           const pendingVal = pendingOverrides[day.date];
@@ -2056,18 +2018,18 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   onBlur={(e) => {
                                     const v = parseFloat(e.target.value);
                                     if (!isNaN(v) && v > 0) {
-                                      // [NEW] Enforce Min Rate Guardrail
                                       if (
                                         day.guardrailMin > 0 &&
-                                        v < day.guardrailMin
+                                        v < day.guardrailMin &&
+                                        selectedHotelId
                                       ) {
+                                        saveMinRate(selectedHotelId, day.date, v);
                                         toast.warning(
-                                          `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`,
+                                          `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                          { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
                                         );
-                                        setOverride(day.date, day.guardrailMin);
-                                      } else {
-                                        setOverride(day.date, v);
                                       }
+                                      setOverride(day.date, v);
                                     } else if (e.target.value === "") {
                                       clearOverride(day.date);
                                     }
@@ -2085,21 +2047,18 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         e.currentTarget.value,
                                       );
                                       if (!isNaN(v) && v > 0) {
-                                        // [NEW] Enforce Min Rate Guardrail (Tab)
                                         if (
                                           day.guardrailMin > 0 &&
-                                          v < day.guardrailMin
+                                          v < day.guardrailMin &&
+                                          selectedHotelId
                                         ) {
+                                          saveMinRate(selectedHotelId, day.date, v);
                                           toast.warning(
-                                            `Rate below Min (£${day.guardrailMin}). Auto-adjusted.`,
+                                            `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
-                                          setOverride(
-                                            day.date,
-                                            day.guardrailMin,
-                                          );
-                                        } else {
-                                          setOverride(day.date, v);
                                         }
+                                        setOverride(day.date, v);
                                       } else if (e.currentTarget.value === "") {
                                         clearOverride(day.date);
                                       }
@@ -2146,7 +2105,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                 <div style={styles.footer}>
                   <Info size={14} />
                   <span>
-                    Scroll to view 365 days • Click 'Override' cells to set
+                    Scroll to view 365 days • Click 'PMS Override' or 'Target Sell Rate' to set
                     manual rates • Live PMS sync active
                   </span>
                 </div>
