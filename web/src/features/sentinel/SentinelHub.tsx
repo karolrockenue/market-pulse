@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { ControlPanelView } from "./components/ControlPanel/ControlPanelView";
 import { RateManagerView } from "./components/RateManager/RateManagerView";
 import { ShadowfaxView } from "./components/Shadowfax/ShadowfaxView";
-import { PropertyHubView } from "./components/PropertyHub/PropertyHubView";
+// PropertyHub merged into ControlPanel as PromoConfigSection
 import { PortfolioRiskOverview } from "./components/RiskOverview/PortfolioRiskOverview";
 
 // Admin Hook logic (simplified here to avoid circular dependency on Admin feature)
@@ -57,9 +57,6 @@ export function SentinelHub({ activeView, onNavigate }: SentinelHubProps) {
         {activeView === "rateManager" && <RateManagerView allHotels={hotels} />}
         {activeView === "sentinel" && <ControlPanelView allHotels={hotels} />}
         {activeView === "shadowfax" && <ShadowfaxView />}
-        {activeView === "propertyHub" && (
-          <PropertyHubView onNavigate={onNavigate} />
-        )}
         {activeView === "riskOverview" && <PortfolioRiskOverview />}
       </div>
     </div>

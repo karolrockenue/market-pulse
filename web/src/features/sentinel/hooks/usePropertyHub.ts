@@ -34,7 +34,7 @@ export interface CalculatorState {
   editingField: "pms" | "target";
 }
 
-const DEFAULT_CALCULATOR_STATE: CalculatorState = {
+export const DEFAULT_CALCULATOR_STATE: CalculatorState = {
   multiplier: 1.3,
   taxType: "inclusive",
   taxPercent: 0,
@@ -53,7 +53,7 @@ const DEFAULT_CALCULATOR_STATE: CalculatorState = {
 
 // --- Math Logic (Preserved from PropertyHubPage.tsx) ---
 
-const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
+export const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
   if (!camp.active) return false;
   // Long campaigns have no dates — always valid
   if (camp.slug === "long-campaign") return true;
@@ -68,7 +68,7 @@ const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
   }
 };
 
-const calculateSellRate = (
+export const calculateSellRate = (
   pmsRate: number,
   geniusPct: number,
   state: CalculatorState
@@ -123,7 +123,7 @@ const calculateSellRate = (
   return currentRate;
 };
 
-const calculateRequiredPMSRate = (
+export const calculateRequiredPMSRate = (
   targetRate: number,
   geniusPct: number,
   state: CalculatorState

@@ -770,7 +770,6 @@ export default function App() {
           {(activeView === "sentinel" ||
             activeView === "rateManager" ||
             activeView === "shadowfax" ||
-            activeView === "propertyHub" ||
             activeView === "riskOverview") && (
             <SentinelHub
               activeView={activeView}

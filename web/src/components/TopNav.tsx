@@ -9,7 +9,6 @@ import {
   Zap,
   ChevronDown,
   Tag,
-  Home,
   TerminalSquare,
   DollarSign,
   Trophy,
@@ -95,7 +94,6 @@ export function TopNav({
       "sentinel-group",
       "riskOverview",
       "rateManager",
-      "propertyHub",
       "shadowfax",
       "competitive-intel",
     ];
@@ -145,7 +143,6 @@ export function TopNav({
         { label: "Risk Overview", value: "riskOverview", icon: Shield },
         { label: "Control Panel", value: "sentinel", icon: TerminalSquare },
         { label: "Rate Manager", value: "rateManager", icon: DollarSign },
-        { label: "Property Hub", value: "propertyHub", icon: Home },
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },

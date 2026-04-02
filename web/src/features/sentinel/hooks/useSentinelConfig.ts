@@ -6,10 +6,19 @@ import {
   getConfig,
   saveConfig,
   syncFacts,
-  getDailyMaxRates, // [NEW]
-  saveDailyMaxRates, // [NEW]
+  getDailyMaxRates,
+  saveDailyMaxRates,
+  getAssets,
+  updateAsset,
 } from "../api/sentinel.api";
-import { SentinelConfig } from "../api/types";
+import { SentinelConfig, AssetConfig } from "../api/types";
+import {
+  CalculatorState,
+  DEFAULT_CALCULATOR_STATE,
+  calculateSellRate as calcSellRate,
+  calculateRequiredPMSRate,
+  isCampaignValidForDate,
+} from "./usePropertyHub";
 
 // Default "Rules" for a new hotel config (Copied from SentinelControlPanel.tsx)
 const DEFAULT_RULES: Partial<SentinelConfig> = {
@@ -70,6 +79,10 @@ export const useSentinelConfig = (allHotels: any[]) => {
     Record<string, Partial<SentinelConfig>>
   >({});
 
+  // --- Asset / Promo Config State ---
+  const [assets, setAssets] = useState<AssetConfig[]>([]);
+  const [calculatorStates, setCalculatorStates] = useState<Record<string, CalculatorState>>({});
+
   // --- UI State ---
   const [isLoading, setIsLoading] = useState(true);
   const [loadingHotelId, setLoadingHotelId] = useState<string | null>(null);
@@ -81,12 +94,47 @@ export const useSentinelConfig = (allHotels: any[]) => {
     const init = async () => {
       setIsLoading(true);
       try {
-        const [configs, ids] = await Promise.all([
+        const [configs, ids, assetData] = await Promise.all([
           getConfigs(),
           getPmsPropertyIds(),
+          getAssets(),
         ]);
         setServerConfigs(configs);
         setPmsIdMap(ids);
+        setAssets(assetData);
+
+        // Hydrate calculator states keyed by market_pulse_hotel_id
+        const initialCalc: Record<string, CalculatorState> = {};
+        assetData.forEach((asset: AssetConfig) => {
+          if (!asset.market_pulse_hotel_id) return;
+          const hotelId = String(asset.market_pulse_hotel_id);
+          const s = asset.calculator_settings || {};
+          initialCalc[hotelId] = {
+            multiplier: asset.strategic_multiplier ? parseFloat(String(asset.strategic_multiplier)) : 1.3,
+            taxType: s.tax?.type || "inclusive",
+            taxPercent: s.tax?.percent || 0,
+            campaigns: s.campaigns ? s.campaigns.map((c: any) => ({
+              ...c,
+              startDate: c.startDate ? new Date(c.startDate) : undefined,
+              endDate: c.endDate ? new Date(c.endDate) : undefined,
+              isEditing: false,
+            })) : [],
+            mobileActive: s.mobile?.active ?? true,
+            mobilePercent: s.mobile?.percent ?? 10,
+            nonRefundableActive: s.nonRef?.active ?? true,
+            nonRefundablePercent: s.nonRef?.percent ?? 15,
+            countryRateActive: s.country?.active ?? false,
+            countryRatePercent: s.country?.percent ?? 5,
+            targetSellRate: 100,
+            pmsRate: 0,
+            testStayDate: new Date(),
+            editingField: "target",
+          };
+          // Calculate initial PMS rate from default target
+          const pmsVal = calculateRequiredPMSRate(100, asset.genius_discount_pct || 0, initialCalc[hotelId]);
+          initialCalc[hotelId].pmsRate = pmsVal;
+        });
+        setCalculatorStates(initialCalc);
       } catch (error) {
         console.error("Failed to load Sentinel data:", error);
         toast.error("Failed to load configuration data.");
@@ -363,6 +411,63 @@ export const useSentinelConfig = (allHotels: any[]) => {
     }
   };
 
+  // --- Promo Config: Update Calculator ---
+  const updateCalculator = (hotelId: string, updates: Partial<CalculatorState>) => {
+    setCalculatorStates((prev) => {
+      const current = prev[hotelId] || DEFAULT_CALCULATOR_STATE;
+      const newState = { ...current, ...updates };
+      const asset = assets.find((a) => String(a.market_pulse_hotel_id) === hotelId);
+      const genius = asset?.genius_discount_pct || 0;
+
+      if (newState.editingField === "target") {
+        newState.pmsRate = calculateRequiredPMSRate(newState.targetSellRate, genius, newState);
+      } else {
+        newState.targetSellRate = calcSellRate(newState.pmsRate, genius, newState);
+      }
+      return { ...prev, [hotelId]: newState };
+    });
+  };
+
+  // --- Promo Config: Save to rockenue_managed_assets ---
+  const savePromoConfig = async (hotelId: string, geniusOverride?: number) => {
+    const asset = assets.find((a) => String(a.market_pulse_hotel_id) === hotelId);
+    if (!asset) return;
+
+    const calcState = calculatorStates[hotelId];
+    if (!calcState) return;
+
+    const settingsPayload = {
+      tax: { type: calcState.taxType, percent: calcState.taxPercent },
+      mobile: { active: calcState.mobileActive, percent: calcState.mobilePercent },
+      nonRef: { active: calcState.nonRefundableActive, percent: calcState.nonRefundablePercent },
+      country: { active: calcState.countryRateActive, percent: calcState.countryRatePercent },
+      campaigns: calcState.campaigns.map(({ isEditing, ...rest }: any) => rest),
+    };
+
+    const payload: any = {
+      ...asset,
+      strategic_multiplier: calcState.multiplier,
+      calculator_settings: settingsPayload,
+    };
+    if (geniusOverride !== undefined) {
+      payload.genius_discount_pct = geniusOverride;
+    }
+
+    // Optimistic UI
+    setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...payload } : a)));
+
+    try {
+      await updateAsset(asset.id, payload);
+      toast.success("Promo config saved");
+    } catch (e) {
+      toast.error("Failed to save promo config");
+    }
+  };
+
+  // Helper: get asset by hotel ID
+  const getAssetForHotel = (hotelId: string) =>
+    assets.find((a) => String(a.market_pulse_hotel_id) === hotelId);
+
   return {
     // State
     isLoading,
@@ -373,11 +478,19 @@ export const useSentinelConfig = (allHotels: any[]) => {
     activeHotels,
     formState,
 
+    // Promo Config
+    assets,
+    calculatorStates,
+    updateCalculator,
+    savePromoConfig,
+    getAssetForHotel,
+    isCampaignValidForDate,
+
     // Actions
     loadHotelRules,
     updateRule,
     activateHotel,
     saveRules,
-    saveDailyMaxRates, // Export API wrapper for direct usage
+    saveDailyMaxRates,
   };
 };

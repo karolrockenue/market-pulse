@@ -81,6 +81,7 @@ import { getDailyMaxRates as fetchDailyMaxRates } from "../../api/sentinel.api";
 import { DailyMaxRatesDialog } from "./DailyMaxRatesDialog";
 import { YearlyRatesVisualization } from "./YearlyRatesVisualization";
 import { ImportCurvesDialog } from "./ImportCurvesDialog";
+import { PromoConfigSection } from "./PromoConfigSection";
 
 // --- VISUAL CONSTANTS ---
 
@@ -175,6 +176,12 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     updateRule,
     activateHotel,
     saveRules,
+    // Promo Config
+    calculatorStates,
+    updateCalculator,
+    savePromoConfig,
+    getAssetForHotel,
+    isCampaignValidForDate,
   } = useSentinelConfig(allHotels);
 
   // Local UI State
@@ -3202,6 +3209,24 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               </Button>
                             </div>
                           </div>
+
+                          {/* Promo Config (from Property Hub) */}
+                          {(() => {
+                            const promoAsset = getAssetForHotel(String(hotel.hotel_id));
+                            const promoCalcState = calculatorStates[String(hotel.hotel_id)];
+                            if (!promoAsset || !promoCalcState) return null;
+                            return (
+                              <PromoConfigSection
+                                hotelId={String(hotel.hotel_id)}
+                                asset={promoAsset}
+                                calcState={promoCalcState}
+                                updateCalculator={updateCalculator}
+                                savePromoConfig={savePromoConfig}
+                                isCampaignValidForDate={isCampaignValidForDate}
+                              />
+                            );
+                          })()}
+
                           <div
                             style={{
                               display: "flex",
