@@ -89,6 +89,65 @@ async function saveDailyMaxRates(hotelId, ratesMap) {
 }
 
 /**
+ * Fetch Daily Min Rates (per-day floor overrides)
+ * Returns { "YYYY-MM-DD": min_price }
+ */
+async function getDailyMinRates(hotelId, startDate, endDate) {
+  const query = `
+    SELECT to_char(stay_date, 'YYYY-MM-DD') as date, min_price
+    FROM sentinel_daily_min_rates
+    WHERE hotel_id = $1
+    ${startDate ? "AND stay_date >= $2" : ""}
+    ${endDate ? "AND stay_date <= $3" : ""}
+  `;
+  const params = [hotelId];
+  if (startDate) params.push(startDate);
+  if (endDate) params.push(endDate);
+
+  const { rows } = await db.query(query, params);
+  const map = {};
+  rows.forEach((r) => {
+    map[r.date] = parseFloat(r.min_price);
+  });
+  return map;
+}
+
+/**
+ * Save Daily Min Rates (per-day floor overrides)
+ * Accepts { "YYYY-MM-DD": price }
+ */
+async function saveDailyMinRates(hotelId, ratesMap) {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    for (const [dateStr, price] of Object.entries(ratesMap)) {
+      if (price === null || price === undefined || price === "") {
+        // Delete the override to revert to monthly default
+        await client.query(
+          `DELETE FROM sentinel_daily_min_rates WHERE hotel_id = $1 AND stay_date = $2`,
+          [hotelId, dateStr],
+        );
+        continue;
+      }
+      await client.query(
+        `INSERT INTO sentinel_daily_min_rates (hotel_id, stay_date, min_price, is_manual_override, updated_at)
+         VALUES ($1, $2, $3, TRUE, NOW())
+         ON CONFLICT (hotel_id, stay_date)
+         DO UPDATE SET min_price = EXCLUDED.min_price, is_manual_override = TRUE, updated_at = NOW()`,
+        [hotelId, dateStr, price],
+      );
+    }
+    await client.query("COMMIT");
+    return { success: true };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Fetches Sentinel Configuration for a hotel.
  */
 async function getHotelConfig(hotelId) {
@@ -288,14 +347,15 @@ async function previewCalendar({
   startDate,
   endDate,
 }) {
-  // 1. Fetch Config, Asset Settings, AND Daily Max Rates (SQL)
-  const [config, assetRes, dailyMaxRates] = await Promise.all([
+  // 1. Fetch Config, Asset Settings, AND Daily Max/Min Rates (SQL)
+  const [config, assetRes, dailyMaxRates, dailyMinRates] = await Promise.all([
     getHotelConfig(hotelId),
     db.query(
       `SELECT * FROM rockenue_managed_assets WHERE market_pulse_hotel_id = $1`,
       [hotelId],
     ),
     getDailyMaxRates(hotelId, startDate, endDate),
+    getDailyMinRates(hotelId, startDate, endDate),
   ]);
 
   if (!config) throw new Error("Sentinel config not found");
@@ -303,6 +363,7 @@ async function previewCalendar({
   // [INJECTION] Overwrite the legacy JSON blob with the fresh SQL data
   // This ensures the pricing engine (applyGuardrails) uses the new table data.
   config.daily_max_rates = dailyMaxRates;
+  config.daily_min_rates = dailyMinRates;
   const asset = assetRes.rows[0];
 
   // 2. Fetch Live Rates & Stored Overrides (Parallel)
@@ -453,6 +514,8 @@ async function previewCalendar({
       isFrozen: guardrailResult.isFrozen,
       isFloorActive: guardrailResult.isFloorActive,
       guardrailMin: guardrailResult.minApplied,
+      monthlyMinDefault: guardrailResult.monthlyMinDefault || guardrailResult.minApplied,
+      isDailyMinOverride: guardrailResult.isDailyMinOverride || false,
       source: isManual
         ? "MANUAL"
         : guardrailResult.isFrozen
@@ -684,6 +747,8 @@ module.exports = {
   previewCalendar,
   getDailyMaxRates,
   saveDailyMaxRates,
+  getDailyMinRates,
+  saveDailyMinRates,
   getPaceCurves,
   copyPaceCurves,
   getSentinelStatus,

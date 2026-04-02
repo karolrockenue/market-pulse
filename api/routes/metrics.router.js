@@ -363,6 +363,7 @@ router.get("/market-context", requireUserApi, async (req, res) => {
       segmentRooms: segmentRooms * 2,
       marketHotels: marketHotels * 2,
       marketRooms: marketRooms * 2,
+      rawMarketHotels: marketHotels, // Real count, no multiplier — used for veil gating
       byTier,
       byNeighborhood,
     });

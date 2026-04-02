@@ -1,5 +1,89 @@
 # To Do
 
+## New Feature — Market Profile Page
+
+### What It Is
+A city-level market intelligence page that visualises data derived from months of daily OTA scrapes (Market Codex). The page shows the full market structure, pricing dynamics, booking velocity patterns, and neighbourhood demand for any city that has scrape data. Currently hardcoded to London, will be made dynamic.
+
+### Where It Lives
+- **Frontend**: `web/src/components/MarketProfile.tsx`
+- **Backend**: 7 new endpoints in `api/routes/market.router.js` under `/api/market/profile/*`, all admin-only (`requireAdminApi`)
+- **Service**: 7 new methods in `api/services/market.service.js`
+- **Navigation**: Accessible from Sentinel dropdown > "Market Profile" (admin only)
+
+### Data Source
+All data comes from `market_availability_snapshots` table, populated daily by the Market Codex scraper (separate repo on Render). Each row contains:
+- `city_slug`, `checkin_date`, `scraped_at` — identifies what and when
+- `total_results` — total supply (properties available)
+- `weighted_avg_price` — WAP (market ADR proxy)
+- `min_price_anchor`, `max_price_anchor` — price range
+- `facet_property_type` (JSONB) — Hotels, Apartments, Hostels, etc.
+- `facet_neighbourhood` (JSONB) — supply by area
+- `facet_star_rating` (JSONB) — supply by star rating
+- `facet_price_histogram` (JSONB) — 50-bar price distribution
+
+Currently have data for: London (170 scrape days), Las Vegas (62 days), Mykonos (14 days), Archanes (1 day).
+
+### What The Page Shows (7 Sections)
+
+**Row 1 — City KPIs** (6 cards)
+- Total listed properties, Hotels only, Avg WAP, Weekend premium %, Peak WAP (month + DOW), Cheapest WAP (month + DOW)
+- Endpoint: `GET /api/market/profile/overview?city=london`
+- SQL: Queries latest scrape snapshot, calculates weekend vs weekday WAP, extracts property type counts from JSONB
+
+**Row 2 — Market Composition + Seasonal Pricing Heatmap**
+- Left: Property type breakdown with bars (from `facet_property_type` JSONB)
+- Right: Month x Day-of-Week WAP heatmap — color-coded cells showing when the city is most expensive. Uses ~30 day lead time snapshots for consistency.
+- Endpoint: `GET /api/market/profile/seasonal?city=london`
+- SQL: Groups by month + DOW from all scrapes where lead time was 25-35 days, averages WAP. London data shows Dec Saturday (£281) is peak, Feb Sunday (£177) is cheapest.
+
+**Row 3 — Booking Velocity + Price Dynamics**
+- Left: DOW absorption curves (7 lines, one per day of week). Shows % of original supply remaining at each lead time (60d, 45d, 30d, 21d, 14d, 7d, 3d, 1d). Saturday drops to 67% by day 1, Sunday barely moves. Proves London is a weekend leisure market.
+- Endpoint: `GET /api/market/profile/absorption-dow?city=london`
+- SQL: Cross-joins each check-in date's snapshots with its baseline supply (earliest scrape at 60+ days out), calculates % remaining, groups by DOW.
+- Right: WAP & Supply vs Lead Time for Saturdays. Bar chart (supply declining) + line (WAP at £234 at 90d dropping to £189 at 1d). Shows expensive properties sell first.
+- Endpoint: `GET /api/market/profile/price-movement?city=london`
+
+**Row 4 — Single-Date Absorption Curve + Star Rating Shifts**
+- Left: Picks a specific future Saturday, plots supply + WAP from first scrape to arrival date. Shows the full booking lifecycle for one date.
+- Right: Stacked bar chart showing 5/4/3/2 star composition changing over time. Shows whether budget or luxury sells out first.
+- Endpoint: `GET /api/market/profile/absorption-date?city=london&date=2026-04-19` (returns both supply data and star ratings per snapshot)
+
+**Row 5 — Market Compression + Neighbourhood Sell-Out**
+- Left: Price spread (max_price_anchor - min_price_anchor) + WAP over 90 days forward. Narrow spread = compressed market (everyone pricing similarly = high demand). Wide = diverse/soft market.
+- Endpoint: `GET /api/market/profile/compression?city=london`
+- Right: Table showing which neighbourhoods absorb supply fastest. Compares supply from earliest scrape vs latest scrape for overlapping check-in dates. Tower Hamlets absorbs 10.3%, Camden 7.3%, West End only 1.2%.
+- Endpoint: `GET /api/market/profile/neighbourhoods?city=london`
+- SQL: Compares earliest scrape dates vs latest scrape dates for each neighbourhood from `facet_neighbourhood` JSONB, calculates absorption %.
+
+### Exploratory SQL Queries
+All queries saved in `city-profile-queries.sql` in project root. CSV results from London data saved in `claude/` folder (8 CSV files from April 1 2026 run).
+
+### Current Layout (as of April 2026)
+- Row 1: City KPIs (6 cards)
+- Row 2: Property Types (composition bars) + Accommodation Map (NeighbourhoodMaps, moved here from DemandPace)
+- Row 3: DOW Absorption curves + WAP & Supply vs Lead Time (charts flipped so 0d is on the left)
+- Row 4: Single-date Absorption curve + Star Rating Breakdown (static bars, MOCK DATA)
+- Row 4b: Price Bracket Distribution (full width histogram, MOCK DATA)
+- Row 5: Market Compression + Neighbourhood Demand
+- Row 6: ADR Seasonality Heatmap (full width, MOCK DATA)
+
+### Data Source Shift — daily_metrics_snapshots for Seasonality
+The OTA scrape data (market_availability_snapshots) only has partial month coverage — London has 170 scrape days but only covers Dec-May + Nov. The WAP heatmap looked great for those months but had gaps for Jun-Oct. Since Market Pulse hotels have 12+ months of real performance data in `daily_metrics_snapshots` (ADR, occupancy, revenue), we're switching the seasonality heatmap to use that instead. Filter: only hotels where `go_live_date` is 365+ days ago to ensure full-year coverage. This gives a complete 12-month x 7-DOW grid from actual hotel data, not OTA estimates.
+
+### TODO for Market Profile
+- Wire up mock widgets to real data:
+  - **Star Rating Breakdown**: pull from `facet_star_rating` in latest scrape snapshot
+  - **Price Bracket Distribution**: pull from `facet_price_histogram` in latest scrape snapshot
+  - **ADR Seasonality Heatmap**: new endpoint querying `daily_metrics_snapshots` grouped by month x DOW, filtered to hotels with `go_live_date` <= NOW() - 365 days, city matched via `hotels` table
+- Add date picker for the single-date absorption curve
+- Neighbourhoods query was rewritten (per-checkin-date early/late matching) — verify it returns data for London
+- City selector is functional (dropdown triggers re-fetch) but available cities list is hardcoded — could query the DB for cities with scrape data
+- Style polish / cosmetic pass
+- Consider adding: event overlay, price histogram from scrape facets
+
+---
+
 ## Active Tasks
 
 ### Remove Budget Functionality
@@ -7,6 +91,13 @@
 - Budget section already removed from Settings page UI
 - Still need to remove: budget API endpoints, budget DB queries in hotel.service.js, budget-related imports/references across the codebase, budget report in ReportsHub
 - Do NOT delete the database table — just remove all code that reads/writes to it
+
+### Investigate Booking Source Mix Data
+- Do we have channel/source data (Booking.com, Expedia, Direct, etc.) flowing in from webhooks or PMS APIs?
+- Check what Cloudbeds and Mews webhooks send — is there a source/channel field on reservations?
+- Check `daily_bookings_record.source` — what values are actually stored there?
+- If the data exists, surface it on the dashboard or reports (source mix pie chart / breakdown)
+- If not available from current integrations, document what API calls would be needed to get it
 
 ### Settings Page — PMS Disconnect Button
 - The Properties section in Settings needs a working "Disconnect" button per property

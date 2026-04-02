@@ -14,6 +14,14 @@ export function RecentBookings({
   // Use passed data
   const bookingData = data || [];
 
+  // Format large numbers compactly (e.g. 228193564 → "228.2M", 1500000 → "1.5M", 12500 → "12.5K")
+  const formatCompact = (value: number): string => {
+    const abs = Math.abs(value);
+    if (abs >= 1_000_000) return (value / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+    if (abs >= 10_000) return (value / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+    return Math.round(value).toLocaleString();
+  };
+
   const styles: Record<string, CSSProperties> = {
     container: {
       backgroundColor: "#1a1a1a",
@@ -54,7 +62,7 @@ export function RecentBookings({
     },
     tableHeader: {
       display: "grid",
-      gridTemplateColumns: "1fr 65px 80px 50px 60px",
+      gridTemplateColumns: "1fr minmax(50px, auto) minmax(60px, auto) minmax(55px, auto) minmax(65px, auto)",
       gap: "12px",
       padding: "6px 10px",
       backgroundColor: "#141414",
@@ -69,7 +77,7 @@ export function RecentBookings({
     },
     row: {
       display: "grid",
-      gridTemplateColumns: "1fr 65px 80px 50px 60px",
+      gridTemplateColumns: "1fr minmax(50px, auto) minmax(60px, auto) minmax(55px, auto) minmax(65px, auto)",
       gap: "12px",
       padding: "10px 10px",
       backgroundColor: "#1D1D1C",
@@ -168,9 +176,9 @@ export function RecentBookings({
             </div>
 
             <div style={styles.valueCell}>
-              <div style={styles.mainValue}>
+              <div style={{ ...styles.mainValue, whiteSpace: "nowrap" }}>
                 {currencySymbol}
-                {Math.round(day.adr)}
+                {formatCompact(day.adr)}
               </div>
             </div>
 
@@ -180,10 +188,11 @@ export function RecentBookings({
                   ...styles.mainValue,
                   color: "#39BDF8",
                   fontSize: "11px",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {currencySymbol}
-                {Math.round(day.revenue).toLocaleString()}
+                {formatCompact(day.revenue)}
               </div>
             </div>
           </div>

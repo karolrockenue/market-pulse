@@ -333,48 +333,24 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
     updateCalculator(assetId, updates);
   };
 
-  // Re-implement Campaign Helpers using the Hook's updateCalculator
-  const addCampaign = (assetId: string, slug: string) => {
-    const now = new Date();
-    let name = "New Campaign";
-    let discount = 10;
-    let start = now;
-    let end = new Date(now);
-    end.setDate(now.getDate() + 14);
-
-    if (slug === "late-escape") {
-      name = "Late Escape";
-      discount = 30;
-      end.setDate(now.getDate() + 7);
-    } else if (slug === "early-deal") {
-      name = "Early Deal";
-      discount = 20;
-      start = new Date(now);
-      start.setDate(now.getDate() + 30);
-      end = new Date(start);
-      end.setDate(start.getDate() + 30);
-    } else if (slug === "basic-deal") {
-      name = "Basic Deal";
-      discount = 15;
-    } else if (slug === "black-friday") {
-      name = "Black Friday";
-      discount = 40;
-    }
-
+  // Ensure a long-campaign entry exists in state
+  const ensureLongCampaign = (assetId: string) => {
+    const currentCamps = calculatorStates[assetId]?.campaigns || [];
+    if (currentCamps.find((c) => c.slug === "long-campaign")) return;
     const newCampaign = {
       id: Math.random().toString(36).substr(2, 9),
-      slug,
-      name,
-      discount,
-      startDate: start,
-      endDate: end,
+      slug: "long-campaign",
+      name: "Long Campaign",
+      discount: 20,
+      startDate: undefined as Date | undefined,
+      endDate: undefined as Date | undefined,
       active: true,
-      isEditing: true,
+      isEditing: false,
     };
-
-    const currentCamps = calculatorStates[assetId]?.campaigns || [];
     updateCalculator(assetId, { campaigns: [...currentCamps, newCampaign] });
   };
+  // Keep addCampaign as alias for compatibility
+  const addCampaign = (assetId: string, _slug: string) => ensureLongCampaign(assetId);
 
   const updateCampaign = (assetId: string, campId: string, updates: any) => {
     const currentCamps = calculatorStates[assetId]?.campaigns || [];
@@ -1263,424 +1239,78 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                         </div>
                                       </div>
 
-                                      {/* Campaigns */}
-                                      <div>
-                                        <Label style={styles.sectionLabel}>
-                                          Campaigns
-                                        </Label>
+                                      {/* Long Campaign — static row like Genius */}
+                                      <div style={styles.cardBg}>
                                         <div
                                           style={{
                                             display: "flex",
-                                            flexDirection: "column",
-                                            gap: "12px",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
                                           }}
                                         >
-                                          {/* Campaign List */}
-                                          {(calcState.campaigns || []).map(
-                                            (camp) => (
-                                              <div
-                                                key={camp.id}
-                                                style={{
-                                                  ...styles.cardBg,
-                                                  ...(camp.isEditing
-                                                    ? {
-                                                        backgroundColor:
-                                                          "rgba(57, 189, 248, 0.05)",
-                                                        border:
-                                                          "1px solid #39BDF8",
-                                                      }
-                                                    : {}),
-                                                }}
-                                              >
-                                                <div
-                                                  style={{
-                                                    display: "flex",
-                                                    flexDirection:
-                                                      camp.isEditing
-                                                        ? "column"
-                                                        : "row",
-                                                    alignItems: camp.isEditing
-                                                      ? "flex-start"
-                                                      : "center",
-                                                    justifyContent:
-                                                      "space-between",
-                                                    gap: camp.isEditing
-                                                      ? "16px"
-                                                      : "0",
-                                                  }}
-                                                >
-                                                  {/* Left: Toggle & Name */}
-                                                  <div
-                                                    style={{
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: "12px",
-                                                      width: camp.isEditing
-                                                        ? "100%"
-                                                        : "auto",
-                                                    }}
-                                                  >
-                                                    <Checkbox
-                                                      checked={camp.active}
-                                                      onCheckedChange={(c) =>
-                                                        updateCampaign(
-                                                          asset.id,
-                                                          camp.id,
-                                                          { active: !!c }
-                                                        )
-                                                      }
-                                                      style={{
-                                                        borderColor: "#2a2a2a",
-                                                      }}
-                                                    />
-                                                    <Label
-                                                      style={{
-                                                        ...styles.inputLabel,
-                                                        marginBottom: 0,
-                                                        color: camp.isEditing
-                                                          ? "#39BDF8"
-                                                          : "#e5e5e5",
-                                                      }}
-                                                    >
-                                                      {camp.name}
-                                                    </Label>
-                                                  </div>
-
-                                                  {/* Right: Date Logic & Controls */}
-                                                  <div
-                                                    style={{
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: "12px",
-                                                      width: camp.isEditing
-                                                        ? "100%"
-                                                        : "auto",
-                                                      justifyContent:
-                                                        camp.isEditing
-                                                          ? "space-between"
-                                                          : "flex-end",
-                                                    }}
-                                                  >
-                                                    {/* Mode: EDITING */}
-                                                    {camp.isEditing ? (
-                                                      <div
-                                                        style={{
-                                                          display: "flex",
-                                                          gap: "16px",
-                                                          width: "100%",
-                                                        }}
-                                                      >
-                                                        <div
-                                                          style={{
-                                                            display: "grid",
-                                                            gridTemplateColumns:
-                                                              "1fr 1fr 80px",
-                                                            gap: "12px",
-                                                            flex: 1,
-                                                          }}
-                                                        >
-                                                          <div>
-                                                            <Label
-                                                              style={{
-                                                                fontSize:
-                                                                  "10px",
-                                                                color:
-                                                                  "#9ca3af",
-                                                                marginBottom:
-                                                                  "4px",
-                                                              }}
-                                                            >
-                                                              Start Date
-                                                            </Label>
-                                                            <Popover>
-                                                              <PopoverTrigger
-                                                                asChild
-                                                              >
-                                                                <Button
-                                                                  variant="outline"
-                                                                  className="w-full h-8 text-xs border-[#39BDF8]/30 bg-[#0f0f0f] text-[#e5e5e5] justify-start text-left font-normal"
-                                                                >
-                                                                  <CalendarIcon className="mr-2 h-3 w-3 opacity-50" />
-                                                                  {camp.startDate
-                                                                    ? format(
-                                                                        camp.startDate,
-                                                                        "MMM d"
-                                                                      )
-                                                                    : "Pick date"}
-                                                                </Button>
-                                                              </PopoverTrigger>
-                                                              <PopoverContent className="w-auto p-0 bg-[#1a1a18] border-[#2a2a2a]">
-                                                                <Calendar
-                                                                  mode="single"
-                                                                  selected={
-                                                                    camp.startDate
-                                                                  }
-                                                                  onSelect={(
-                                                                    d
-                                                                  ) =>
-                                                                    updateCampaign(
-                                                                      asset.id,
-                                                                      camp.id,
-                                                                      {
-                                                                        startDate:
-                                                                          d,
-                                                                      }
-                                                                    )
-                                                                  }
-                                                                />
-                                                              </PopoverContent>
-                                                            </Popover>
-                                                          </div>
-                                                          <div>
-                                                            <Label
-                                                              style={{
-                                                                fontSize:
-                                                                  "10px",
-                                                                color:
-                                                                  "#9ca3af",
-                                                                marginBottom:
-                                                                  "4px",
-                                                              }}
-                                                            >
-                                                              End Date
-                                                            </Label>
-                                                            <Popover>
-                                                              <PopoverTrigger
-                                                                asChild
-                                                              >
-                                                                <Button
-                                                                  variant="outline"
-                                                                  className="w-full h-8 text-xs border-[#39BDF8]/30 bg-[#0f0f0f] text-[#e5e5e5] justify-start text-left font-normal"
-                                                                >
-                                                                  <CalendarIcon className="mr-2 h-3 w-3 opacity-50" />
-                                                                  {camp.endDate
-                                                                    ? format(
-                                                                        camp.endDate,
-                                                                        "MMM d"
-                                                                      )
-                                                                    : "Pick date"}
-                                                                </Button>
-                                                              </PopoverTrigger>
-                                                              <PopoverContent className="w-auto p-0 bg-[#1a1a18] border-[#2a2a2a]">
-                                                                <Calendar
-                                                                  mode="single"
-                                                                  selected={
-                                                                    camp.endDate
-                                                                  }
-                                                                  onSelect={(
-                                                                    d
-                                                                  ) =>
-                                                                    updateCampaign(
-                                                                      asset.id,
-                                                                      camp.id,
-                                                                      {
-                                                                        endDate:
-                                                                          d,
-                                                                      }
-                                                                    )
-                                                                  }
-                                                                />
-                                                              </PopoverContent>
-                                                            </Popover>
-                                                          </div>
-                                                          <div>
-                                                            <Label
-                                                              style={{
-                                                                fontSize:
-                                                                  "10px",
-                                                                color:
-                                                                  "#9ca3af",
-                                                                marginBottom:
-                                                                  "4px",
-                                                              }}
-                                                            >
-                                                              Discount %
-                                                            </Label>
-                                                            <Input
-                                                              type="number"
-                                                              value={
-                                                                camp.discount
-                                                              }
-                                                              onChange={(e) =>
-                                                                updateCampaign(
-                                                                  asset.id,
-                                                                  camp.id,
-                                                                  {
-                                                                    discount:
-                                                                      parseFloat(
-                                                                        e.target
-                                                                          .value
-                                                                      ) || 0,
-                                                                  }
-                                                                )
-                                                              }
-                                                              style={{
-                                                                backgroundColor:
-                                                                  "#0f0f0f",
-                                                                height: "32px",
-                                                              }}
-                                                              className="border-[#39BDF8]/30 text-[#e5e5e5] focus:border-[#39BDF8]"
-                                                            />
-                                                          </div>
-                                                        </div>
-                                                        <div
-                                                          style={{
-                                                            display: "flex",
-                                                            alignItems:
-                                                              "flex-end",
-                                                          }}
-                                                        >
-                                                          <Button
-                                                            size="sm"
-                                                            onClick={() =>
-                                                              confirmCampaignEdit(
-                                                                asset.id,
-                                                                camp.id
-                                                              )
-                                                            }
-                                                            className="h-8 bg-[#39BDF8] text-[#0f0f0f] hover:bg-[#29ADEE]"
-                                                          >
-                                                            <Check className="h-4 w-4" />
-                                                          </Button>
-                                                        </div>
-                                                      </div>
-                                                    ) : (
-                                                      // Mode: VIEW
-                                                      <>
-                                                        <div
-                                                          style={{
-                                                            fontSize: "11px",
-                                                            color: "#6b7280",
-                                                            display: "flex",
-                                                            flexDirection:
-                                                              "column",
-                                                            alignItems:
-                                                              "flex-end",
-                                                            lineHeight: "1.1",
-                                                          }}
-                                                        >
-                                                          <span
-                                                            onClick={() =>
-                                                              editCampaign(
-                                                                asset.id,
-                                                                camp.id
-                                                              )
-                                                            }
-                                                            style={{
-                                                              cursor: "pointer",
-                                                              borderBottom:
-                                                                "1px dashed #2a2a2a",
-                                                            }}
-                                                            className="hover:text-[#39BDF8] hover:border-[#39BDF8]"
-                                                          >
-                                                            {camp.startDate
-                                                              ? format(
-                                                                  camp.startDate,
-                                                                  "MMM d"
-                                                                )
-                                                              : "?"}{" "}
-                                                            -{" "}
-                                                            {camp.endDate
-                                                              ? format(
-                                                                  camp.endDate,
-                                                                  "MMM d"
-                                                                )
-                                                              : "?"}
-                                                          </span>
-                                                        </div>
-                                                        <div
-                                                          style={{
-                                                            display: "flex",
-                                                            alignItems:
-                                                              "center",
-                                                            gap: "4px",
-                                                          }}
-                                                        >
-                                                          <Input
-                                                            type="number"
-                                                            value={
-                                                              camp.discount
-                                                            }
-                                                            onChange={(e) =>
-                                                              updateCampaign(
-                                                                asset.id,
-                                                                camp.id,
-                                                                {
-                                                                  discount:
-                                                                    parseFloat(
-                                                                      e.target
-                                                                        .value
-                                                                    ) || 0,
-                                                                }
-                                                              )
-                                                            }
-                                                            style={
-                                                              styles.inputSmall
-                                                            }
-                                                          />
-                                                          <span
-                                                            style={{
-                                                              color: "#6b7280",
-                                                              fontSize: "12px",
-                                                            }}
-                                                          >
-                                                            %
-                                                          </span>
-                                                        </div>
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
-                                                          onClick={() =>
-                                                            removeCampaign(
-                                                              asset.id,
-                                                              camp.id
-                                                            )
-                                                          }
-                                                          className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                                        >
-                                                          <X className="h-4 w-4" />
-                                                        </Button>
-                                                      </>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            )
-                                          )}
-
-                                          {/* Add Campaign Button */}
-                                          <Select
-                                            onValueChange={(val) =>
-                                              addCampaign(asset.id, val)
-                                            }
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "12px",
+                                            }}
                                           >
-                                            <SelectTrigger
-                                              style={styles.selectTrigger}
-                                              className="border-dashed border-[#2a2a2a] text-[#9ca3af] hover:text-[#39BDF8] hover:border-[#39BDF8] transition-colors"
-                                            >
-                                              <SelectValue placeholder="+ Add Campaign" />
-                                            </SelectTrigger>
-                                            <SelectContent
+                                            <Checkbox
+                                              checked={!!(calcState.campaigns || []).find(c => c.slug === "long-campaign")?.active}
+                                              onCheckedChange={(checked) => {
+                                                const camps = calcState.campaigns || [];
+                                                const existing = camps.find(c => c.slug === "long-campaign");
+                                                if (existing) {
+                                                  updateCampaign(asset.id, existing.id, { active: !!checked });
+                                                } else {
+                                                  addCampaign(asset.id, "long-campaign");
+                                                }
+                                              }}
                                               style={{
-                                                backgroundColor: "#1a1a18",
-                                                border: "1px solid #2C2C2C",
-                                                color: "#e5e5e5",
+                                                borderColor: "#2a2a2a",
+                                              }}
+                                            />
+                                            <Label
+                                              style={{
+                                                ...styles.inputLabel,
+                                                marginBottom: 0,
                                               }}
                                             >
-                                              <SelectItem value="late-escape">
-                                                Late Escape
-                                              </SelectItem>
-                                              <SelectItem value="early-deal">
-                                                Early Deal
-                                              </SelectItem>
-                                              <SelectItem value="basic-deal">
-                                                Basic Deal
-                                              </SelectItem>
-                                              <SelectItem value="black-friday">
-                                                Black Friday
-                                              </SelectItem>
-                                            </SelectContent>
-                                          </Select>
+                                              Long Campaign
+                                            </Label>
+                                          </div>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "4px",
+                                            }}
+                                          >
+                                            <Input
+                                              type="number"
+                                              value={(calcState.campaigns || []).find(c => c.slug === "long-campaign")?.discount ?? 20}
+                                              onChange={(e) => {
+                                                const camps = calcState.campaigns || [];
+                                                const existing = camps.find(c => c.slug === "long-campaign");
+                                                if (existing) {
+                                                  updateCampaign(asset.id, existing.id, {
+                                                    discount: parseFloat(e.target.value) || 0,
+                                                  });
+                                                } else {
+                                                  addCampaign(asset.id, "long-campaign");
+                                                }
+                                              }}
+                                              style={styles.inputSmall}
+                                            />
+                                            <span
+                                              style={{
+                                                color: "#6b7280",
+                                                fontSize: "12px",
+                                              }}
+                                            >
+                                              %
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
@@ -1990,6 +1620,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                                 !!deepDeal ||
                                                 validStandard.some((c) =>
                                                   [
+                                                    "long-campaign",
                                                     "early-deal",
                                                     "late-escape",
                                                     "getaway-deal",

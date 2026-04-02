@@ -225,6 +225,15 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
   const monthKey = monthNames[utcTarget.getUTCMonth()];
   const monthlyMin = parseFloat(monthly_min_rates[monthKey] || "0");
 
+  // A2. DAILY MIN OVERRIDE (takes precedence over monthly)
+  const { daily_min_rates = {} } = config;
+  const dateStrForMin = utcTarget.toISOString().split("T")[0];
+  const dailyMinVal = daily_min_rates[dateStrForMin] !== undefined
+    ? parseFloat(daily_min_rates[dateStrForMin])
+    : null;
+  const isDailyMinOverride = dailyMinVal !== null && !isNaN(dailyMinVal) && dailyMinVal > 0;
+  const resolvedMin = isDailyMinOverride ? dailyMinVal : monthlyMin;
+
   // B. FREEZE LOGIC
   // If freezePeriod > 0, we freeze days 0 to N-1
   const freezeDays = parseInt(rate_freeze_period, 10);
@@ -235,15 +244,19 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
     // Fallback to monthlyMin or suggestedRate to prevent accidental zero-out.
     if (!livePmsRate || isNaN(livePmsRate) || livePmsRate <= 0) {
       return {
-        finalRate: monthlyMin > 0 ? monthlyMin : suggestedRate,
+        finalRate: resolvedMin > 0 ? resolvedMin : suggestedRate,
         isFrozen: true,
         reason: "FROZEN_FALLBACK",
+        monthlyMinDefault: monthlyMin,
+        isDailyMinOverride,
       };
     }
     return {
       finalRate: livePmsRate,
       isFrozen: true,
       reason: "FROZEN",
+      monthlyMinDefault: monthlyMin,
+      isDailyMinOverride,
     };
   }
 
@@ -258,7 +271,7 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
 
   let effectiveRate = suggestedRate;
   let activeFloor = false;
-  let activeMinToEnforce = monthlyMin; // Default to standard min
+  let activeMinToEnforce = resolvedMin; // Daily override > monthly default
 
   if (lmfEnabled && daysFromNow <= lmfDays && lmfDow.has(dowStr)) {
     // [FIX] Priority Logic:
@@ -298,6 +311,8 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
     isFrozen: false,
     isFloorActive: activeFloor,
     minApplied: activeMinToEnforce, // [DEBUG] Shows which floor won
+    monthlyMinDefault: monthlyMin,
+    isDailyMinOverride,
     maxApplied: activeMax,
     reason: "CALCULATED",
   };

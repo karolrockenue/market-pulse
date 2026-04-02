@@ -1376,6 +1376,37 @@ router.post("/max-rates/:hotelId", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+/**
+ * GET /api/sentinel/min-rates/:hotelId
+ * Fetches per-day min rate overrides.
+ */
+router.get("/min-rates/:hotelId", async (req, res) => {
+  const { hotelId } = req.params;
+  try {
+    const data = await sentinelService.getDailyMinRates(hotelId);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error(`[Sentinel Router] get-min-rates failed:`, error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/sentinel/min-rates/:hotelId
+ * Saves per-day min rate overrides. Pass null to revert to monthly default.
+ */
+router.post("/min-rates/:hotelId", async (req, res) => {
+  const { hotelId } = req.params;
+  const { rates } = req.body; // { "2026-04-01": 60, "2026-04-02": null }
+  try {
+    await sentinelService.saveDailyMinRates(hotelId, rates);
+    res.status(200).json({ success: true, message: "Min rates saved." });
+  } catch (error) {
+    console.error(`[Sentinel Router] save-min-rates failed:`, error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 /**
  * [SHARED WORKER FUNCTION - SERVERLESS OPTIMIZED]
  * loops for up to 50 seconds processing small batches.

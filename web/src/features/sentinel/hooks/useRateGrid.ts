@@ -8,6 +8,7 @@ import {
   submitOverrides,
   getDailyPickup,
   getAiPredictions, // [NEW]
+  saveDailyMinRates, // [NEW] Daily min rate overrides
 } from "../api/sentinel.api";
 import { RateCalendarDay, AssetConfig, RateOverride } from "../api/types";
 
@@ -34,8 +35,10 @@ export interface CalculatorState {
 }
 
 const isCampaignValidForDate = (testDate: Date | undefined, camp: Campaign) => {
-  if (!testDate || !camp.active || !camp.startDate || !camp.endDate)
-    return false;
+  if (!camp.active) return false;
+  // Long campaigns have no dates — always valid
+  if (camp.slug === "long-campaign") return true;
+  if (!testDate || !camp.startDate || !camp.endDate) return false;
   try {
     return isWithinInterval(testDate, {
       start: camp.startDate,
@@ -97,7 +100,7 @@ export const getRateFactors = (
       const isMobileBlocked =
         !!deepDeal ||
         validStandard.some((c) =>
-          ["early-deal", "late-escape", "getaway-deal"].includes(c.slug)
+          ["long-campaign", "early-deal", "late-escape", "getaway-deal"].includes(c.slug)
         );
       if (state.mobileActive && !isMobileBlocked) {
         factor = factor * (1 - Number(state.mobilePercent) / 100);
@@ -302,6 +305,8 @@ export const useRateGrid = () => {
             // [FIX] Display the Floor Limit (£90), not the Final Price (£148)
             floorRateLMF: day.isFloorActive ? day.guardrailMin || 0 : null,
             guardrailMin: day.guardrailMin || 0,
+            monthlyMinDefault: day.monthlyMinDefault || day.guardrailMin || 0,
+            isDailyMinOverride: day.isDailyMinOverride || false,
             // Metrics (From Merged Data)
             occupancy: stats.occupancy,
             adr: stats.adr,
@@ -482,6 +487,23 @@ export const useRateGrid = () => {
     }
   };
 
+  // Save a daily min rate override and update local calendar data
+  const saveMinRate = async (hotelId: string, date: string, value: number) => {
+    try {
+      await saveDailyMinRates(hotelId, { [date]: value });
+      // Update local state immediately so UI reflects the change
+      setCalendarData((prev) =>
+        prev.map((day) =>
+          day.date === date
+            ? { ...day, guardrailMin: value, isDailyMinOverride: true }
+            : day
+        )
+      );
+    } catch (err: any) {
+      toast.error(`Failed to save min rate: ${err.message}`);
+    }
+  };
+
   return {
     aiPredictions, // [NEW]
     aiApprovedPending, // [NEW]
@@ -501,5 +523,6 @@ export const useRateGrid = () => {
     applyAiPrediction, // [NEW]
     bulkApplyAi, // [NEW]
     submitChanges,
+    saveMinRate,
   };
 };

@@ -154,8 +154,8 @@ export function TopNav({
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },
   ];
 
-  const navItems = allNavItems.filter((item) => {
-    if ((item as any).isSuperAdminOnly) {
+  const navItems = allNavItems.filter((item: any) => {
+    if (item.isSuperAdminOnly) {
       return userInfo?.role === "super_admin";
     }
     if (item.isAdmin) {
@@ -207,9 +207,22 @@ export function TopNav({
         </div>
 
         {/* NAV ITEMS */}
-        <nav style={{ display: "flex", gap: "16px", flexWrap: "nowrap", overflowX: "auto", minWidth: 0 }}>
-          {navItems.map((item) => {
+        <nav style={{ display: "flex", gap: "0", flexWrap: "nowrap", overflowX: "auto", minWidth: 0, alignItems: "center" }}>
+          {navItems.map((item: any, idx: number) => {
             const Icon = item.icon;
+            const separator = idx > 0 ? (
+              <div
+                key={`sep-${idx}`}
+                style={{
+                  width: "1px",
+                  height: "14px",
+                  backgroundColor: BORDER_DARK,
+                  flexShrink: 0,
+                  margin: "0 12px",
+                  opacity: 0.6,
+                }}
+              />
+            ) : null;
             const isActive =
               activeView === item.value ||
               (item.items &&
@@ -245,7 +258,9 @@ export function TopNav({
 
             if (item.isDropdown && item.items) {
               return (
-                <DropdownMenu key={item.value}>
+                <span key={item.value} style={{ display: "contents" }}>
+                {separator}
+                <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button style={buttonStyle}>
                       <span>{item.label}</span>
@@ -317,16 +332,18 @@ export function TopNav({
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                </span>
               );
             }
 
             return (
-              <button
-                key={item.value}
-                onClick={() => handleNavClick(item.value)}
-                style={buttonStyle}
-              >
-                <span>{item.label}</span>
+              <span key={item.value} style={{ display: "contents" }}>
+                {separator}
+                <button
+                  onClick={() => handleNavClick(item.value)}
+                  style={buttonStyle}
+                >
+                  <span>{item.label}</span>
                 {item.isAdmin && (
                   <Icon
                     className="w-3 h-3"
@@ -335,6 +352,7 @@ export function TopNav({
                 )}
                 <div style={underlineStyle} />
               </button>
+              </span>
             );
           })}
         </nav>
