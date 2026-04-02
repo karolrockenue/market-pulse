@@ -235,7 +235,7 @@ export const useRateGrid = () => {
             mobileActive: s.mobile?.active ?? true,
             mobilePercent: s.mobile?.percent ?? 10,
             nonRefundableActive: s.nonRef?.active ?? true,
-            nonRefundablePercent: s.nonRef?.percent ?? 15,
+            nonRefundablePercent: s.nonRef?.percent ?? 10,
             countryRateActive: s.country?.active ?? false,
             countryRatePercent: s.country?.percent ?? 5,
           });

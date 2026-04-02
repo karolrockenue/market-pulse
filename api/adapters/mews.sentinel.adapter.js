@@ -17,6 +17,7 @@
 
 const pgPool = require("../utils/db");
 const mewsAdapter = require("./mewsAdapter");
+const { toZonedTime } = require("date-fns-tz");
 
 // ─── Helper: Get hotel's stored config ─────────────────────────────
 
@@ -137,19 +138,27 @@ async function getRates(
     );
 
     const timeUnits = pricingData.TimeUnitStartsUtc || [];
+    const basePrices = pricingData.BaseAmountPrices || [];
 
-    // Try to find category-specific pricing for this room type
+    // Find category-specific pricing for this room type
     const categoryPricing = (pricingData.CategoryPrices || []).find(
       (cp) => cp.CategoryId === roomTypeId,
     );
 
-    // Use category pricing if available, otherwise fall back to base prices
-    const prices = categoryPricing
-      ? categoryPricing.AmountPrices
-      : pricingData.BaseAmountPrices || [];
+    if (chunkStartStr === startDate) {
+      console.log(`[Mews Sentinel] CategoryPrices IDs: ${(pricingData.CategoryPrices || []).map(cp => cp.CategoryId).join(", ")}`);
+      console.log(`[Mews Sentinel] Looking for roomTypeId: ${roomTypeId}, found match: ${!!categoryPricing}`);
+      if (basePrices[0]) console.log(`[Mews Sentinel] Sample base price day 0:`, JSON.stringify(basePrices[0]));
+      if (categoryPricing?.AmountPrices?.[0]) console.log(`[Mews Sentinel] Sample category price day 0:`, JSON.stringify(categoryPricing.AmountPrices[0]));
+    }
+
+    // Use category-specific prices if found, otherwise base prices
+    const prices = categoryPricing?.AmountPrices || basePrices;
 
     timeUnits.forEach((utcStr, index) => {
-      const date = new Date(utcStr).toISOString().split("T")[0];
+      // Convert UTC back to hotel's local timezone to get the correct local date
+      const localDate = toZonedTime(new Date(utcStr), ctx.timezone);
+      const date = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, "0")}-${String(localDate.getDate()).padStart(2, "0")}`;
       const priceObj = prices[index];
 
       if (priceObj) {

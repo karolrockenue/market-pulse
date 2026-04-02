@@ -367,8 +367,8 @@ const HotelService = {
     } = data;
     
     // Fallbacks
-    const fee = monthlyFee !== undefined ? parseFloat(monthlyFee) : null;
-    const rooms = totalRooms !== undefined ? parseInt(totalRooms, 10) : null;
+    const fee = monthlyFee != null ? parseFloat(monthlyFee) : null;
+    const rooms = totalRooms != null ? parseInt(totalRooms, 10) || null : null;
     const assetNameValue = hotelName || null;
     const cityValue = city || null;
     const groupValue = group || null;

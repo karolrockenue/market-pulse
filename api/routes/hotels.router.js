@@ -284,6 +284,7 @@ router.put("/assets/:id", requireSuperAdminOnly, async (req, res) => {
     if (!updatedAsset) return res.status(404).json({ error: "Property not found." });
     res.json(updatedAsset);
   } catch (error) {
+    console.error("[PUT /assets/:id] Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

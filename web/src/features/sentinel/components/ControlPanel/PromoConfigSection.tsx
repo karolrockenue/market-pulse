@@ -24,7 +24,7 @@ interface PromoConfigSectionProps {
 }
 
 const inputStyle: React.CSSProperties = {
-  width: "58px",
+  width: "64px",
   height: "26px",
   textAlign: "right",
   fontSize: "12px",
@@ -94,7 +94,7 @@ export function PromoConfigSection({
     update({
       campaigns: [
         ...(calcState.campaigns || []),
-        { id: Math.random().toString(36).substr(2, 9), slug: "long-campaign", name: "Long Campaign", discount: 20, startDate: undefined, endDate: undefined, active: true, isEditing: false },
+        { id: Math.random().toString(36).substr(2, 9), slug: "long-campaign", name: "Long Campaign", discount: 30, startDate: undefined, endDate: undefined, active: true, isEditing: false },
       ],
     });
   };
@@ -173,7 +173,7 @@ export function PromoConfigSection({
                 <span style={{ color: "#e5e5e5", fontSize: "12px" }}>Tax</span>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <Select value={calcState.taxType} onValueChange={(v: "inclusive" | "exclusive") => update({ taxType: v })}>
-                    <SelectTrigger style={{ width: "86px", height: "26px", fontSize: "11px", backgroundColor: "#1a1a1a", borderColor: "#2a2a2a", color: "#e5e5e5" }}>
+                    <SelectTrigger style={{ width: "100px", height: "26px", fontSize: "11px", backgroundColor: "#1a1a1a", borderColor: "#2a2a2a", color: "#e5e5e5" }}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}>
@@ -196,7 +196,7 @@ export function PromoConfigSection({
                 label="Long Campaign"
                 checked={!!longCampaign?.active}
                 onCheck={(checked) => { if (longCampaign) updateCampaign(longCampaign.id, { active: checked }); else ensureLongCampaign(); }}
-                value={longCampaign?.discount ?? 20}
+                value={longCampaign?.discount ?? 30}
                 onChange={(v) => { if (longCampaign) updateCampaign(longCampaign.id, { discount: v }); else ensureLongCampaign(); }}
               />
               <PromoRow label="Mobile Rate" checked={calcState.mobileActive} onCheck={(c) => update({ mobileActive: c })} value={calcState.mobilePercent} onChange={(v) => update({ mobilePercent: v })} />
