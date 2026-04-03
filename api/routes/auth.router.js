@@ -676,8 +676,8 @@ router.post("/mews/create", async (req, res) => {
       for (const hotelId of newHotelIds) {
         const syncUrl =
           process.env.VERCEL_ENV === "production"
-            ? "https://www.market-pulse.io/api/initial-sync"
-            : "http://localhost:3000/api/initial-sync";
+            ? "https://www.market-pulse.io/api/admin/initial-sync"
+            : "http://localhost:3000/api/admin/initial-sync";
         fetch(syncUrl, {
           method: "POST",
           headers: {

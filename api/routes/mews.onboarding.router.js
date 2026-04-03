@@ -287,8 +287,8 @@ router.post("/onboard", async (req, res) => {
     // Fire-and-forget: trigger full initial sync (5 years history + 365 days forward)
     const syncUrl =
       process.env.VERCEL_ENV === "production"
-        ? "https://www.market-pulse.io/api/initial-sync"
-        : "http://localhost:3000/api/initial-sync";
+        ? "https://www.market-pulse.io/api/admin/initial-sync"
+        : "http://localhost:3000/api/admin/initial-sync";
     fetch(syncUrl, {
       method: "POST",
       headers: {
