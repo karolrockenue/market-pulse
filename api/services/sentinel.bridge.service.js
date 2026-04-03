@@ -1,5 +1,6 @@
 const db = require("../utils/db");
 const pricingEngine = require("./sentinel.pricing.engine");
+const pmsRegistry = require("../adapters/pmsRegistry");
 
 /**
  * @file sentinel.bridge.service.js
@@ -359,6 +360,47 @@ class SentinelBridgeService {
           };
         });
 
+        // Fetch LIVE PMS rates for delta comparison (not stale calendar)
+        const liveRatesMap = {};
+        try {
+          const pmsType = await pmsRegistry.getPmsType(hotelId);
+          const sentinelAdapter = pmsRegistry.getSentinelAdapter(pmsType);
+
+          // Fetch live rates for each unique room type the AI predicted on
+          for (const roomTypeId of roomTypeIdsStr) {
+            const datesSorted = stayDates
+              .map((d) => new Date(d).toISOString().split("T")[0])
+              .sort();
+            const startDate = datesSorted[0];
+            const endDate = datesSorted[datesSorted.length - 1];
+
+            const liveRes = await sentinelAdapter.getRates(
+              hotelId,
+              pmsPropertyId,
+              roomTypeId,
+              startDate,
+              endDate,
+            );
+
+            const ratesList =
+              liveRes?.data?.roomRateDetailed || liveRes?.roomRateDetailed || [];
+
+            for (const row of ratesList) {
+              if (row.date && row.rate) {
+                const key = `${roomTypeId}_${row.date}`;
+                liveRatesMap[key] = parseFloat(row.rate);
+              }
+            }
+          }
+          console.log(
+            `[Autonomy] Hotel ${hotelId}: Fetched ${Object.keys(liveRatesMap).length} live PMS rates for delta comparison.`,
+          );
+        } catch (liveErr) {
+          console.warn(
+            `[Autonomy] Hotel ${hotelId}: Failed to fetch live PMS rates, falling back to calendar. Error: ${liveErr.message}`,
+          );
+        }
+
         const validUpdates = [];
         let skFrozen = 0, skManual = 0, skSanity = 0, skDelta = 0, skRateMap = 0;
 
@@ -435,20 +477,22 @@ class SentinelBridgeService {
           }
 
           // --- DELTA CHECK (Surgical Strike) ---
-          // Only push if the price is actually different.
-          // We check !== undefined to ensure we have a valid DB baseline.
-          // If DB has 0 (or null converted to 0), and AI has a real price, we MUST push.
-          const currentRate = currentData.rate;
+          // Compare against LIVE PMS rate (not stale calendar) to detect real deltas.
+          // Falls back to calendar rate if live fetch failed or date not found.
+          const liveKey = `${pred.room_type_id}_${dateStr}`;
+          const liveRate = liveRatesMap[liveKey];
+          const calendarRate = currentData.rate;
+          const deltaRate = liveRate !== undefined ? liveRate : calendarRate;
 
-          // [DEBUG] Log first 3 delta comparisons per hotel to diagnose filtering
+          // [DEBUG] Log first 3 delta comparisons per hotel
           if (skDelta + skFrozen + skManual + skSanity + validUpdates.length < 3) {
-            console.log(`[Autonomy Debug] Hotel ${hotelId} | ${dateStr} | AI=${safeRate} | Calendar=${currentRate} | Source=${currentSource} | Delta=${currentRate !== undefined ? Math.abs(safeRate - currentRate).toFixed(2) : 'N/A'}`);
+            console.log(`[Autonomy Debug] Hotel ${hotelId} | ${dateStr} | AI=${safeRate} | Live=${liveRate !== undefined ? liveRate : 'N/A'} | Calendar=${calendarRate} | Source=${currentSource} | Delta=${deltaRate !== undefined ? Math.abs(safeRate - deltaRate).toFixed(2) : 'N/A'}`);
           }
 
           // [UPDATED] Reduced deadband to £1.00 to allow Ruthless Decay micro-drops
           if (
-            currentRate !== undefined &&
-            Math.abs(safeRate - currentRate) < 1.0
+            deltaRate !== undefined &&
+            Math.abs(safeRate - deltaRate) < 1.0
           ) {
             skDelta++;
             continue; // No change needed (Price change is insignificant)
