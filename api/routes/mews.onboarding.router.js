@@ -244,6 +244,42 @@ router.post("/onboard", async (req, res) => {
 
     await client.query("COMMIT");
 
+    // ── Step 4c: Seed daily_metrics_snapshots so the sync screen passes ──
+    try {
+      console.log(`[Mews Onboarding] Seeding initial metrics for hotel ${hotelId}...`);
+      const seedCredentials = {
+        clientToken: process.env.MEWS_CLIENT_TOKEN,
+        accessToken,
+        client: "Rockenue MarketPulse 1.0.0",
+      };
+      const today = new Date().toISOString().split("T")[0];
+      const seedEnd = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+      const seedData = await mewsAdapter.getCombinedMetrics(
+        seedCredentials, serviceId, today, seedEnd, details.timezone
+      );
+      const seedDates = Object.keys(seedData);
+      if (seedDates.length > 0) {
+        const seedValues = [];
+        const seedParams = [];
+        let si = 1;
+        for (const date of seedDates) {
+          const m = seedData[date];
+          seedValues.push(`($${si}, $${si+1}, $${si+2}, $${si+3}, $${si+4}, $${si+5})`);
+          seedParams.push(date, hotelId, m.rooms_sold || 0, totalRooms, m.net_revenue || 0, m.gross_revenue || 0);
+          si += 6;
+        }
+        await pgPool.query(
+          `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, net_revenue, gross_revenue)
+           VALUES ${seedValues.join(", ")}
+           ON CONFLICT (hotel_id, stay_date) DO NOTHING`,
+          seedParams
+        );
+        console.log(`[Mews Onboarding] Seeded ${seedDates.length} days of metrics.`);
+      }
+    } catch (seedErr) {
+      console.warn(`[Mews Onboarding] Metrics seed failed (non-fatal): ${seedErr.message}`);
+    }
+
     // ── Step 5: Return success ──
     res.status(201).json({
       success: true,

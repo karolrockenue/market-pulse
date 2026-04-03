@@ -29,82 +29,37 @@ export function MewsOnboarding() {
   const [status, setStatus] = useState<"idle" | "connecting">("idle");
 
   const handleConnect = async () => {
-    setStatus("connecting"); // Disable button
-    const toastId = toast.loading("Validating details with Mews...");
+    setStatus("connecting");
+    const toastId = toast.loading("Connecting to Mews and fetching property data...");
 
     try {
-      // --- Step 1: Validate ---
-      const validateResponse = await fetch("/api/auth/mews/validate", {
+      const response = await fetch("/api/mews/onboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, accessToken }),
+        body: JSON.stringify({ accessToken }),
       });
 
-      const validateResult = await validateResponse.json();
+      const result = await response.json();
 
-      if (!validateResponse.ok) {
-        // Handle validation errors (e.g., user exists, invalid token)
-        throw new Error(validateResult.message || "Validation failed");
+      if (!response.ok) {
+        throw new Error(result.message || "Onboarding failed");
       }
 
-      // --- Step 2: Check Token Type & Create ---
-      if (validateResult.tokenType === "single") {
-        toast.loading("Validation successful. Creating connection...", {
-          id: toastId,
-        });
+      toast.success(
+        `${result.data?.propertyName || "Property"} onboarded successfully! ${result.data?.roomTypes || 0} room types, ${result.data?.ratePlans || 0} rate plans.`,
+        { id: toastId, duration: 5000 }
+      );
 
-        const createResponse = await fetch("/api/auth/mews/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            email,
-            accessToken,
-            // Pass the single property returned by the validate endpoint
-            selectedProperties: validateResult.properties,
-          }),
-        });
-
-        const createResult = await createResponse.json();
-
-        if (!createResponse.ok) {
-          throw new Error(
-            createResult.message || "Failed to create connection"
-          );
-        }
-
-        // --- Step 3: Success & Redirect ---
-        toast.success(
-          createResult.message || "Connection successful! Redirecting...",
-          { id: toastId, duration: 4000 }
-        );
-
-        // Redirect the user after a short delay
-        setTimeout(() => {
-          if (createResult.redirectTo) {
-            window.location.href = createResult.redirectTo; //
-          } else {
-            // Fallback if redirect URL is missing
-            window.location.href = "/app/";
-          }
-        }, 1500);
-        // Keep button disabled during redirect phase
-      } else if (validateResult.tokenType === "portfolio") {
-        //
-        // Handle portfolio tokens - show error for this component
-        throw new Error(
-          "Portfolio tokens are not supported in this form. Please use a single property token."
-        );
-      } else {
-        // Handle unexpected token types
-        throw new Error("Received an unknown token type from the server.");
-      }
+      // Reset form
+      setAccessToken("");
+      setEmail("");
+      setFirstName("");
+      setLastName("");
+      setStatus("idle");
     } catch (error: any) {
       toast.error(`Error: ${error.message}`, { id: toastId });
-      setStatus("idle"); // Re-enable button on error
+      setStatus("idle");
     }
-    // No 'finally' block needed here, button stays disabled on success until redirect
   };
 
   return (
