@@ -362,9 +362,10 @@ class SentinelBridgeService {
 
         // Fetch LIVE PMS rates for delta comparison (not stale calendar)
         const liveRatesMap = {};
+        let hotelPmsType = 'cloudbeds'; // default fallback
         try {
-          const pmsType = await pmsRegistry.getPmsType(hotelId);
-          const sentinelAdapter = pmsRegistry.getSentinelAdapter(pmsType);
+          hotelPmsType = await pmsRegistry.getPmsType(hotelId);
+          const sentinelAdapter = pmsRegistry.getSentinelAdapter(hotelPmsType);
 
           // Fetch live rates for each unique room type the AI predicted on
           for (const roomTypeId of roomTypeIdsStr) {
@@ -580,11 +581,17 @@ class SentinelBridgeService {
               .toISOString()
               .split("T")[0];
 
-            ratesPayload.push({
-              rateId: pmsRateId, // [CRITICAL] Must match Cloudbeds Adapter (camelCase)
+            const rateEntry = {
+              rateId: pmsRateId,
               date: dStr,
-              rate: update.price, // [CRITICAL] Must match Cloudbeds Adapter ('rate', not 'amount')
-            });
+              rate: update.price,
+            };
+            // Mews category-specific pricing: room_type_id IS the Mews CategoryId.
+            // Without this, updatePrice sets the base rate instead of the category price.
+            if (hotelPmsType === 'mews') {
+              rateEntry.categoryId = String(update.room_type_id);
+            }
+            ratesPayload.push(rateEntry);
           }
 
           console.log(
