@@ -132,17 +132,20 @@ module.exports = async (request, response) => {
               `-- Fetching Mews forecast chunk from ${startDateStr} to ${endDateStr}... --`,
             );
 
-            // Use the new getCombinedMetrics which returns canonical format
-            const chunkData = await mewsAdapter.getCombinedMetrics(
-              credentials,
-              serviceId,
-              startDateStr,
-              endDateStr,
-              tz,
-            );
-
-            // Merge chunk into main map
-            Object.assign(dataMap, chunkData);
+            try {
+              const chunkData = await mewsAdapter.getCombinedMetrics(
+                credentials,
+                serviceId,
+                startDateStr,
+                endDateStr,
+                tz,
+              );
+              Object.assign(dataMap, chunkData);
+            } catch (chunkErr) {
+              console.error(
+                `-- Mews chunk failed (${startDateStr} to ${endDateStr}): ${chunkErr.message}. Skipping chunk. --`,
+              );
+            }
 
             currentStartDate.setDate(currentStartDate.getDate() + 90);
           }

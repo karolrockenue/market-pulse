@@ -372,13 +372,16 @@ async function getOccupancyMetrics(
   timezone,
 ) {
   // 1. Get capacity via availability endpoint
+  const firstUtc = toMewsUtc(startDate, timezone);
+  const lastUtc = toMewsUtc(endDate, timezone);
+  console.log(`[Mews Availability] Service: ${serviceId} | First: ${firstUtc} | Last: ${lastUtc} | TZ: ${timezone}`);
   const availabilityData = await _callMewsApi(
     "services/getAvailability",
     credentials,
     {
       ServiceId: serviceId,
-      FirstTimeUnitStartUtc: toMewsUtc(startDate, timezone),
-      LastTimeUnitStartUtc: toMewsUtc(endDate, timezone),
+      FirstTimeUnitStartUtc: firstUtc,
+      LastTimeUnitStartUtc: lastUtc,
     },
   );
 
