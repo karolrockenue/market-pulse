@@ -187,17 +187,29 @@ async function getHotelDetails(credentials) {
 async function getAccommodationServiceId(credentials) {
   const response = await _callMewsApi("services/getAll", credentials);
 
-  const service = response.Services.find(
+  const reservable = response.Services.filter(
     (s) => s.Type === "Reservable" && s.IsActive === true,
   );
 
-  if (!service) {
+  // Log all candidates for debugging
+  reservable.forEach((s) => {
+    console.log(`[Mews] Service candidate: "${s.Name}" | StartTime: ${s.StartTime} | ID: ${s.Id}`);
+  });
+
+  if (reservable.length === 0) {
     throw new Error(
       "[Mews] Could not find an active Reservable service for this property.",
     );
   }
 
-  console.log(`[Mews] Service: ${service.Name} | TimeUnitPeriod: ${service.TimeUnitPeriod} | StartTime: ${service.StartTime} | ID: ${service.Id}`);
+  // Prefer services that aren't archived/disabled, and prefer daily (midnight start) over mid-stay
+  const service =
+    reservable.find((s) => {
+      const name = (s.Name || "").toLowerCase();
+      return !name.includes("archive") && !name.includes("do not use");
+    }) || reservable[0];
+
+  console.log(`[Mews] Selected service: "${service.Name}" | StartTime: ${service.StartTime} | ID: ${service.Id}`);
   return service.Id;
 }
 
