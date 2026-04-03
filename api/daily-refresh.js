@@ -15,14 +15,22 @@ module.exports = async (request, response) => {
     let totalRecordsUpdated = 0;
     let allProperties = []; // Define here to ensure it's in scope
 
-    // Step 1: Get a list of all hotels and their essential info.
-    // This is more efficient as it's one query for all properties.
-    // It also fetches the pms_type and timezone needed for branching.
+    // Step 1: Get a list of hotels to process.
+    // Supports optional ?hotelId= query param for single-hotel refresh.
+    const singleHotelId = request.query?.hotelId;
     const propertiesClient = await pgPool.connect();
     try {
-      const propertiesResult = await propertiesClient.query(
-        "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels",
-      );
+      let propertiesResult;
+      if (singleHotelId) {
+        propertiesResult = await propertiesClient.query(
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE hotel_id = $1",
+          [singleHotelId],
+        );
+      } else {
+        propertiesResult = await propertiesClient.query(
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels",
+        );
+      }
       console.log("...Initial property fetch query complete.");
       allProperties = propertiesResult.rows;
     } catch (e) {
@@ -30,11 +38,11 @@ module.exports = async (request, response) => {
         "CRITICAL: Failed to fetch initial property list.",
         e.message,
       );
-      throw e; // Re-throw to be caught by main catch block
+      throw e;
     } finally {
       propertiesClient.release();
     }
-    console.log(`Found ${allProperties.length} properties to process.`);
+    console.log(`Found ${allProperties.length} properties to process.${singleHotelId ? ` (filtered to hotel ${singleHotelId})` : ''}`);
 
     // Step 2: Loop through each property.
     for (const hotel of allProperties) {
