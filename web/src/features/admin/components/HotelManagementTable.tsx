@@ -63,6 +63,7 @@ export function HotelManagementTable({
   const [fullSyncingHotelId, setFullSyncingHotelId] = useState<number | null>(
     null
   );
+  const [refreshingHotelId, setRefreshingHotelId] = useState<number | null>(null);
 
   // This is the list of valid categories from the backend
   const validCategories = [
@@ -180,6 +181,28 @@ export function HotelManagementTable({
       setFullSyncingHotelId(null); // Re-enable button
     }
   };
+
+  const handleRefreshData = async (hotelId: number) => {
+    setRefreshingHotelId(hotelId);
+    const toastId = toast.loading("Refreshing metrics data for this hotel...");
+
+    try {
+      const response = await fetch(`/api/admin/daily-refresh?hotelId=${hotelId}`);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to refresh data");
+      }
+      toast.success(`Data refresh complete. ${result.totalRecordsUpdated || 0} records updated.`, {
+        id: toastId,
+        duration: 5000,
+      });
+    } catch (error: any) {
+      toast.error(`Refresh failed: ${error.message}`, { id: toastId, duration: 5000 });
+    } finally {
+      setRefreshingHotelId(null);
+    }
+  };
+
   return (
     <div
       style={{
@@ -462,6 +485,30 @@ export function HotelManagementTable({
                       {fullSyncingHotelId === hotel.hotel_id
                         ? "Syncing..."
                         : "Full Sync"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      style={{
+                        height: "28px",
+                        padding: "0 8px",
+                        fontSize: "12px",
+                        color: "#10b981",
+                      }}
+                      className="hover:bg-[#10b981]/10 hover:text-[#10b981]"
+                      onClick={() => handleRefreshData(hotel.hotel_id)}
+                      disabled={refreshingHotelId === hotel.hotel_id}
+                    >
+                      <RefreshCw
+                        className={`w-3 h-3 mr-1 ${
+                          refreshingHotelId === hotel.hotel_id
+                            ? "animate-spin"
+                            : ""
+                        }`}
+                      />
+                      {refreshingHotelId === hotel.hotel_id
+                        ? "Refreshing..."
+                        : "Refresh Data"}
                     </Button>
                   </div>
                 </td>
