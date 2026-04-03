@@ -155,11 +155,14 @@ router.post("/onboard", async (req, res) => {
     // ── Step 4: Insert into database (transaction) ──
     await client.query("BEGIN");
 
-    // 4a. Insert hotel
-    const totalRooms = roomTypes.reduce(
-      (sum, rt) => sum + (rt.capacity || 0),
-      0,
-    );
+    // 4a. Insert hotel — get actual room/space count from Mews resources
+    let totalRooms;
+    try {
+      totalRooms = await mewsAdapter.getResourceCount(credentials, serviceId);
+    } catch (e) {
+      console.warn(`[Mews Onboarding] Could not fetch resource count: ${e.message}. Falling back to room type capacity sum.`);
+      totalRooms = roomTypes.reduce((sum, rt) => sum + (rt.capacity || 0), 0);
+    }
 
     const hotelResult = await client.query(
       `INSERT INTO hotels (

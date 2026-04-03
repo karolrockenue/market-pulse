@@ -270,6 +270,31 @@ async function getResourceCategories(credentials, serviceId) {
 }
 
 /**
+ * Fetches the total number of active bookable resources (rooms/spaces) for a service.
+ * Uses resources/getAll to count individual rooms, not room types.
+ */
+async function getResourceCount(credentials, serviceId) {
+  const response = await _callMewsApi("resources/getAll", credentials, {
+    ServiceIds: [serviceId],
+    ActivityStates: ["Active"],
+    Limitation: { Count: 1 },
+  });
+
+  // The API returns Resources array — count it
+  // But with Limitation.Count=1, we need to check if there's a total
+  // Let's fetch all to get accurate count
+  const fullResponse = await _callMewsApi("resources/getAll", credentials, {
+    ServiceIds: [serviceId],
+    ActivityStates: ["Active"],
+    Limitation: { Count: 5000 },
+  });
+
+  const count = (fullResponse.Resources || []).length;
+  console.log(`[Mews] Resource count for service ${serviceId}: ${count} active spaces`);
+  return count;
+}
+
+/**
  * Fetches all rate plans for the accommodation service.
  * Maps to a shape compatible with our sentinel_configurations.pms_rate_plans.
  *
@@ -596,6 +621,7 @@ module.exports = {
   getHotelDetails,
   getAccommodationServiceId,
   getResourceCategories,
+  getResourceCount,
   getRatePlans,
   buildMewsRateIdMap,
 
