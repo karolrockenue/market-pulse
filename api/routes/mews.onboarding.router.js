@@ -49,20 +49,14 @@ router.post("/test-creds", async (req, res) => {
       client: "Rockenue MarketPulse 1.0.0",
     };
 
-    // Test: fetch hotel details
+    // Fetch hotel details
     const details = await mewsAdapter.getHotelDetails(credentials);
 
-    // Test: find accommodation service
-    const serviceId = await mewsAdapter.getAccommodationServiceId(credentials);
-
-    // Test: fetch room types
-    const roomTypes = await mewsAdapter.getResourceCategories(
-      credentials,
-      serviceId,
-    );
-
-    // Test: fetch rate plans
-    const ratePlans = await mewsAdapter.getRatePlans(credentials, serviceId);
+    // Fetch ALL reservable services so admin can pick the right one
+    const servicesResponse = await mewsAdapter._callMewsApi("services/getAll", credentials);
+    const reservableServices = (servicesResponse.Services || [])
+      .filter((s) => s.Type === "Reservable" && s.IsActive === true)
+      .map((s) => ({ id: s.Id, name: s.Name, startTime: s.StartTime }));
 
     res.status(200).json({
       success: true,
@@ -73,16 +67,7 @@ router.post("/test-creds", async (req, res) => {
         timezone: details.timezone,
         currency: details.currencyCode,
         enterpriseId: details.id,
-        serviceId,
-        roomTypes: roomTypes.map((r) => ({
-          id: r.roomTypeID,
-          name: r.roomTypeName,
-        })),
-        ratePlans: ratePlans.map((r) => ({
-          id: r.rateID,
-          name: r.ratePlanName,
-          isBase: !r.isDerived,
-        })),
+        services: reservableServices,
       },
     });
   } catch (error) {
@@ -108,7 +93,7 @@ router.post("/test-creds", async (req, res) => {
  * Returns the created hotel record.
  */
 router.post("/onboard", async (req, res) => {
-  const { accessToken } = req.body;
+  const { accessToken, serviceId: requestedServiceId } = req.body;
 
   if (!accessToken) {
     return res
@@ -136,7 +121,9 @@ router.post("/onboard", async (req, res) => {
     console.log("[Mews Onboarding] Fetching property configuration...");
 
     const details = await mewsAdapter.getHotelDetails(credentials);
-    const serviceId = await mewsAdapter.getAccommodationServiceId(credentials);
+    const serviceId = requestedServiceId || await mewsAdapter.getAccommodationServiceId(credentials);
+    console.log(`[Mews Onboarding] Using serviceId: ${serviceId}${requestedServiceId ? ' (user-selected)' : ' (auto-detected)'}`);
+
     const roomTypes = await mewsAdapter.getResourceCategories(
       credentials,
       serviceId,

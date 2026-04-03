@@ -3,72 +3,102 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Plug, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Label } from "@/components/ui/label"; // Ensure Label is imported or use standard label tag styled
 
-// Define the shape of the report object from the API
-interface Report {
-  report_id: string;
-  report_name: string;
-  property_name: string;
+interface MewsService {
+  id: string;
+  name: string;
+  startTime?: string;
 }
 
-// Define the props for the component
-interface ManualReportTriggerProps {
-  reports: Report[]; // Accept the list of reports
+interface TestResult {
+  propertyName: string;
+  city: string;
+  timezone: string;
+  currency: string;
+  enterpriseId: string;
+  services: MewsService[];
 }
 
-// Accept the reports prop
 export function MewsOnboarding() {
-  // Changed function name back to MewsOnboarding
   const [accessToken, setAccessToken] = useState("");
-  const [email, setEmail] = useState("");
-  // Add state for first and last name
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  // Simplify status for button state
-  const [status, setStatus] = useState<"idle" | "connecting">("idle");
+  const [status, setStatus] = useState<"idle" | "testing" | "tested" | "onboarding">("idle");
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
 
-  const handleConnect = async () => {
-    setStatus("connecting");
-    const toastId = toast.loading("Connecting to Mews and fetching property data...");
+  const handleTest = async () => {
+    setStatus("testing");
+    const toastId = toast.loading("Validating credentials with Mews...");
 
     try {
-      const response = await fetch("/api/mews/onboard", {
+      const response = await fetch("/api/mews/test-creds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accessToken }),
       });
 
       const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Test failed");
 
-      if (!response.ok) {
-        throw new Error(result.message || "Onboarding failed");
+      setTestResult(result.data);
+      // Auto-select if only one service
+      if (result.data.services.length === 1) {
+        setSelectedServiceId(result.data.services[0].id);
       }
-
-      toast.success(
-        `${result.data?.propertyName || "Property"} onboarded successfully! ${result.data?.roomTypes || 0} room types, ${result.data?.ratePlans || 0} rate plans.`,
-        { id: toastId, duration: 5000 }
-      );
-
-      // Reset form
-      setAccessToken("");
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setStatus("idle");
+      setStatus("tested");
+      toast.success(`Found: ${result.data.propertyName} (${result.data.city})`, { id: toastId });
     } catch (error: any) {
       toast.error(`Error: ${error.message}`, { id: toastId });
       setStatus("idle");
     }
   };
 
+  const handleOnboard = async () => {
+    if (!selectedServiceId) {
+      toast.error("Please select an accommodation service.");
+      return;
+    }
+
+    setStatus("onboarding");
+    const toastId = toast.loading("Onboarding property...");
+
+    try {
+      const response = await fetch("/api/mews/onboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken, serviceId: selectedServiceId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Onboarding failed");
+
+      toast.success(
+        `${result.data?.propertyName || "Property"} onboarded! ${result.data?.roomTypes || 0} room types, ${result.data?.ratePlans || 0} rate plans.`,
+        { id: toastId, duration: 5000 }
+      );
+
+      // Reset
+      setAccessToken("");
+      setTestResult(null);
+      setSelectedServiceId("");
+      setStatus("idle");
+    } catch (error: any) {
+      toast.error(`Error: ${error.message}`, { id: toastId });
+      setStatus("tested"); // Go back to tested state so they can retry
+    }
+  };
+
+  const handleReset = () => {
+    setAccessToken("");
+    setTestResult(null);
+    setSelectedServiceId("");
+    setStatus("idle");
+  };
+
   return (
     <div
       style={{
         backgroundColor: "#1a1a1a",
-        borderColor: "#2a2a2a",
-        borderWidth: "1px",
-        borderStyle: "solid",
+        border: "1px solid #2a2a2a",
         borderRadius: "0.5rem",
       }}
     >
@@ -92,158 +122,125 @@ export function MewsOnboarding() {
         </p>
       </div>
 
-      <div
-        style={{
-          padding: "24px",
-          paddingTop: "24px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gap: "16px",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label
-              style={{
-                color: "#9ca3af",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Owner's First Name
-            </label>
-            <Input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Jane"
-              style={{
-                backgroundColor: "#0f0f0f",
-                borderColor: "#2a2a2a",
-                color: "#e5e5e5",
-              }}
-              className="focus:border-[#39BDF8]/50"
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label
-              style={{
-                color: "#9ca3af",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Owner's Last Name
-            </label>
-            <Input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Doe"
-              style={{
-                backgroundColor: "#0f0f0f",
-                borderColor: "#2a2a2a",
-                color: "#e5e5e5",
-              }}
-              className="focus:border-[#39BDF8]/50"
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label
-              style={{
-                color: "#9ca3af",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Owner's Email Address
-            </label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@property.com"
-              style={{
-                backgroundColor: "#0f0f0f",
-                borderColor: "#2a2a2a",
-                color: "#e5e5e5",
-              }}
-              className="focus:border-[#39BDF8]/50"
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label
-              style={{
-                color: "#9ca3af",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Mews Access Token
-            </label>
-            <Input
-              type="password"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="Enter Mews API access token..."
-              style={{
-                backgroundColor: "#0f0f0f",
-                borderColor: "#2a2a2a",
-                color: "#e5e5e5",
-              }}
-              className="focus:border-[#39BDF8]/50"
-            />
-          </div>
+      <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* Step 1: Access Token */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <label style={{ color: "#9ca3af", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Mews Access Token
+          </label>
+          <Input
+            type="password"
+            value={accessToken}
+            onChange={(e) => { setAccessToken(e.target.value); if (status === "tested") handleReset(); }}
+            placeholder="Enter Mews API access token..."
+            disabled={status === "onboarding"}
+            style={{ backgroundColor: "#0f0f0f", borderColor: "#2a2a2a", color: "#e5e5e5" }}
+            className="focus:border-[#39BDF8]/50"
+          />
         </div>
 
-        <Button
-          onClick={handleConnect}
-          disabled={
-            !firstName ||
-            !lastName ||
-            !accessToken ||
-            !email ||
-            status === "connecting"
-          }
-          style={{
-            backgroundColor: "#39BDF8",
-            color: "#0f0f0f",
-            opacity:
-              !firstName ||
-              !lastName ||
-              !accessToken ||
-              !email ||
-              status === "connecting"
-                ? 0.5
-                : 1,
-          }}
-          className="hover:bg-[#29ADEE]"
-        >
-          {status === "connecting" ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Connecting...
-            </>
-          ) : (
-            <>
-              <Plug className="w-4 h-4 mr-2" />
-              Connect & Sync Property
-            </>
-          )}
-        </Button>
+        {/* Step 1 Button: Test */}
+        {status !== "tested" && (
+          <Button
+            onClick={handleTest}
+            disabled={!accessToken || status === "testing"}
+            style={{
+              backgroundColor: "#39BDF8",
+              color: "#0f0f0f",
+              opacity: !accessToken || status === "testing" ? 0.5 : 1,
+            }}
+            className="hover:bg-[#29ADEE]"
+          >
+            {status === "testing" ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testing...</>
+            ) : (
+              <><Plug className="w-4 h-4 mr-2" />Test Credentials</>
+            )}
+          </Button>
+        )}
+
+        {/* Step 2: Property Details + Service Picker */}
+        {testResult && status !== "idle" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {/* Property Info */}
+            <div style={{
+              backgroundColor: "rgba(57, 189, 248, 0.08)",
+              border: "1px solid rgba(57, 189, 248, 0.25)",
+              borderRadius: "6px",
+              padding: "12px 16px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <CheckCircle className="w-4 h-4" style={{ color: "#10b981" }} />
+                <span style={{ color: "#e5e5e5", fontSize: "14px", fontWeight: 600 }}>
+                  {testResult.propertyName}
+                </span>
+              </div>
+              <div style={{ color: "#9ca3af", fontSize: "12px", display: "flex", gap: "16px" }}>
+                <span>{testResult.city}</span>
+                <span>{testResult.timezone}</span>
+                <span>{testResult.currency}</span>
+              </div>
+            </div>
+
+            {/* Service Picker */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <label style={{ color: "#9ca3af", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Accommodation Service {testResult.services.length > 1 && `(${testResult.services.length} found — select the correct one)`}
+              </label>
+              {testResult.services.length === 1 ? (
+                <div style={{ color: "#e5e5e5", fontSize: "13px", padding: "8px 12px", backgroundColor: "#0f0f0f", border: "1px solid #2a2a2a", borderRadius: "6px" }}>
+                  {testResult.services[0].name}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {testResult.services.map((svc) => (
+                    <label
+                      key={svc.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "10px 12px",
+                        backgroundColor: selectedServiceId === svc.id ? "rgba(57, 189, 248, 0.1)" : "#0f0f0f",
+                        border: `1px solid ${selectedServiceId === svc.id ? "#39BDF8" : "#2a2a2a"}`,
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="mews-service"
+                        value={svc.id}
+                        checked={selectedServiceId === svc.id}
+                        onChange={() => setSelectedServiceId(svc.id)}
+                        style={{ accentColor: "#39BDF8" }}
+                      />
+                      <span style={{ color: "#e5e5e5", fontSize: "13px" }}>{svc.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Onboard Button */}
+            <Button
+              onClick={handleOnboard}
+              disabled={!selectedServiceId || status === "onboarding"}
+              style={{
+                backgroundColor: "#10b981",
+                color: "#0f0f0f",
+                opacity: !selectedServiceId || status === "onboarding" ? 0.5 : 1,
+              }}
+              className="hover:bg-[#0ea572]"
+            >
+              {status === "onboarding" ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Onboarding...</>
+              ) : (
+                <><Plug className="w-4 h-4 mr-2" />Onboard Property</>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
