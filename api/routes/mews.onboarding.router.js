@@ -170,13 +170,15 @@ router.post("/onboard", async (req, res) => {
         latitude, longitude, address_1, zip_postal_code, country,
         pms_type, pms_property_id,
         pms_credentials,
-        is_rockenue_managed, pricing_model
+        is_rockenue_managed, pricing_model,
+        neighborhood, tax_rate, tax_type, tax_name, go_live_date
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10,
         'mews', $11,
         $12,
-        true, 'inclusive'
+        true, 'inclusive',
+        $13, $14, $15, $16, CURRENT_DATE
       ) RETURNING hotel_id`,
       [
         details.propertyName,
@@ -195,6 +197,10 @@ router.post("/onboard", async (req, res) => {
           serviceId,
           timezone: details.timezone,
         }),
+        details.neighborhood,
+        details.taxRate,
+        details.taxType,
+        details.taxName,
       ],
     );
 

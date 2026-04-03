@@ -161,6 +161,17 @@ async function getHotelDetails(credentials) {
     ? e.Currencies.find((c) => c.IsDefault === true)
     : null;
 
+  // Derive tax defaults from country
+  const countryCode = e.Address?.CountryCode || null;
+  let taxRate = null;
+  let taxType = null;
+  let taxName = null;
+  if (countryCode === "GB") {
+    taxRate = 0.20; taxType = "inclusive"; taxName = "VAT";
+  } else if (countryCode === "US") {
+    taxRate = 0.13; taxType = "inclusive"; taxName = "TAX";
+  }
+
   return {
     id: e.Id,
     propertyName: e.Name,
@@ -170,10 +181,14 @@ async function getHotelDetails(credentials) {
     longitude: e.Address?.Longitude || null,
     timezone: e.TimeZoneIdentifier,
     address_1: e.Address?.Line1 || null,
+    address_2: e.Address?.Line2 || null,
     zip_postal_code: e.Address?.PostalCode || null,
-    country: e.Address?.CountryCode || null,
+    country: countryCode,
+    neighborhood: e.Address?.Line2 || e.Address?.SubdivisionCode || null,
+    taxRate,
+    taxType,
+    taxName,
     pmsType: "mews",
-    rawResponse: response,
   };
 }
 
