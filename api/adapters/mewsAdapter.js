@@ -197,6 +197,7 @@ async function getAccommodationServiceId(credentials) {
     );
   }
 
+  console.log(`[Mews] Service: ${service.Name} | TimeUnitPeriod: ${service.TimeUnitPeriod} | StartTime: ${service.StartTime} | ID: ${service.Id}`);
   return service.Id;
 }
 
