@@ -72,15 +72,15 @@ export function MewsOnboarding() {
       if (!response.ok) throw new Error(result.message || "Onboarding failed");
 
       toast.success(
-        `${result.data?.propertyName || "Property"} onboarded! ${result.data?.roomTypes || 0} room types, ${result.data?.ratePlans || 0} rate plans.`,
-        { id: toastId, duration: 5000 }
+        `${result.data?.propertyName || "Property"} onboarded! Syncing data...`,
+        { id: toastId, duration: 3000 }
       );
 
-      // Reset
-      setAccessToken("");
-      setTestResult(null);
-      setSelectedServiceId("");
-      setStatus("idle");
+      // Redirect to main app — triggers InitialSyncScreen + PropertyClassificationModal
+      const hotelId = result.data?.hotelId;
+      if (hotelId) {
+        window.location.href = `/?newConnection=true&propertyId=${hotelId}`;
+      }
     } catch (error: any) {
       toast.error(`Error: ${error.message}`, { id: toastId });
       setStatus("tested"); // Go back to tested state so they can retry

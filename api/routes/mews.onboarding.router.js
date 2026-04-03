@@ -10,6 +10,7 @@
  */
 
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 const { requireAdminApi } = require("../utils/middleware");
 const mewsAdapter = require("../adapters/mewsAdapter");
@@ -240,45 +241,31 @@ router.post("/onboard", async (req, res) => {
       `[Mews Onboarding] Sentinel config created for hotel ${hotelId}`,
     );
 
+    // 4c. Encrypt access token and insert user_properties (needed by initial-sync)
+    const iv = crypto.randomBytes(16);
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    let encryptedToken = cipher.update(accessToken, "utf8", "hex");
+    encryptedToken += cipher.final("hex");
+    const authTag = cipher.getAuthTag().toString("hex");
+
+    const storedCredentials = {
+      accessToken: `${iv.toString("hex")}:${authTag}:${encryptedToken}`,
+      clientToken: process.env.MEWS_CLIENT_TOKEN,
+      serviceId,
+    };
+
+    const userId = req.session.userId;
+    await client.query(
+      `INSERT INTO user_properties (user_id, property_id, pms_credentials, status)
+       VALUES ($1, $2, $3, 'syncing')
+       ON CONFLICT (user_id, property_id) DO UPDATE SET pms_credentials = $3, status = 'syncing'`,
+      [userId, hotelId, JSON.stringify(storedCredentials)],
+    );
+
     await client.query("COMMIT");
 
-    // ── Step 4c: Seed daily_metrics_snapshots so the sync screen passes ──
-    try {
-      console.log(`[Mews Onboarding] Seeding initial metrics for hotel ${hotelId}...`);
-      const seedCredentials = {
-        clientToken: process.env.MEWS_CLIENT_TOKEN,
-        accessToken,
-        client: "Rockenue MarketPulse 1.0.0",
-      };
-      const today = new Date().toISOString().split("T")[0];
-      const seedEnd = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
-      const seedData = await mewsAdapter.getCombinedMetrics(
-        seedCredentials, serviceId, today, seedEnd, details.timezone
-      );
-      const seedDates = Object.keys(seedData);
-      if (seedDates.length > 0) {
-        const seedValues = [];
-        const seedParams = [];
-        let si = 1;
-        for (const date of seedDates) {
-          const m = seedData[date];
-          seedValues.push(`($${si}, $${si+1}, $${si+2}, $${si+3}, $${si+4}, $${si+5})`);
-          seedParams.push(date, hotelId, m.rooms_sold || 0, totalRooms, m.net_revenue || 0, m.gross_revenue || 0);
-          si += 6;
-        }
-        await pgPool.query(
-          `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, net_revenue, gross_revenue)
-           VALUES ${seedValues.join(", ")}
-           ON CONFLICT (hotel_id, stay_date) DO NOTHING`,
-          seedParams
-        );
-        console.log(`[Mews Onboarding] Seeded ${seedDates.length} days of metrics.`);
-      }
-    } catch (seedErr) {
-      console.warn(`[Mews Onboarding] Metrics seed failed (non-fatal): ${seedErr.message}`);
-    }
-
-    // ── Step 5: Return success ──
+    // ── Step 5: Return success, then trigger initial-sync (fire-and-forget) ──
     res.status(201).json({
       success: true,
       message: `Mews property "${details.propertyName}" onboarded successfully.`,
@@ -296,6 +283,22 @@ router.post("/onboard", async (req, res) => {
         rateIdMap,
       },
     });
+
+    // Fire-and-forget: trigger full initial sync (5 years history + 365 days forward)
+    const syncUrl =
+      process.env.VERCEL_ENV === "production"
+        ? "https://www.market-pulse.io/api/initial-sync"
+        : "http://localhost:3000/api/initial-sync";
+    fetch(syncUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
+      },
+      body: JSON.stringify({ propertyId: hotelId }),
+    }).catch((syncErr) =>
+      console.error(`[Mews Onboarding] Failed to trigger initial sync for hotel ${hotelId}:`, syncErr)
+    );
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[Mews Onboarding] Failed:", error.message);

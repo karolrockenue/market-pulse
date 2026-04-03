@@ -376,11 +376,18 @@ async function runSync(propertyId) {
       };
       // --- END DECRYPTION LOGIC ---
 
+      // Read serviceId from stored credentials (set during onboarding)
+      const serviceId = storedCredentials.serviceId;
+      if (!serviceId) {
+        throw new Error(
+          `No serviceId in stored credentials for property ${propertyId}. Re-onboard the property.`
+        );
+      }
+      console.log(`Mews ServiceId: ${serviceId} (from stored credentials)`);
+
       // Sync hotel metadata from Mews
       console.log("Syncing hotel metadata from Mews...");
       const hotelDetails = await mewsAdapter.getHotelDetails(credentials);
-      const serviceId = await mewsAdapter.getAccommodationServiceId(credentials);
-      console.log(`Mews ServiceId: ${serviceId}`);
 
       const hotelTimezone = hotelDetails.timezone;
       if (!hotelTimezone) {
@@ -415,11 +422,6 @@ async function runSync(propertyId) {
           hotelDetails.zip_postal_code,
           hotelDetails.country,
         ]
-      );
-      // Store serviceId + timezone in hotels.pms_credentials for other features
-      await client.query(
-        `UPDATE hotels SET pms_credentials = $1 WHERE hotel_id = $2`,
-        [JSON.stringify({ accessToken: decryptedToken, serviceId, timezone: hotelTimezone }), propertyId]
       );
       console.log(`✅ Hotel metadata sync complete.`);
 
