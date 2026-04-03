@@ -3091,7 +3091,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                             >
                                               <Input
                                                 type="number"
-                                                value={rule.value || "15"}
+                                                value={rule.value ?? ""}
+                                                placeholder="0"
                                                 onChange={(e) =>
                                                   handleDifferentialChange(
                                                     String(hotel.hotel_id),

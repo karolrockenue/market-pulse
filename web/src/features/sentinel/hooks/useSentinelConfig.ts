@@ -414,31 +414,28 @@ export const useSentinelConfig = (allHotels: any[]) => {
       }
 
       // -----------------------------------------------------------------------
-      // [FIX] AUTOMATICALLY INJECT BASE ROOM DIFFERENTIAL
-      // The Python Sentinel requires the Base Room to be in the list (value: 0)
-      // to calculate rates for it. We add it here invisibly to the user.
+      // [FIX] ENSURE ALL ROOM TYPES HAVE A DIFFERENTIAL
+      // Room types without an explicit differential would be skipped entirely.
+      // Auto-inject 0% for any room type not already in the list (including base).
       // -----------------------------------------------------------------------
-      if (rules.base_room_type_id) {
-        // Ensure array exists and clone it
+      if (rules.pms_room_types?.data) {
         const currentDiffs = Array.isArray(rules.room_differentials)
           ? [...rules.room_differentials]
           : [];
 
-        // Check if base room is already explicitly defined
-        const baseRoomExists = currentDiffs.some(
-          (d) => d.roomTypeId === rules.base_room_type_id,
-        );
-
-        // If missing, inject it with a 0% offset
-        if (!baseRoomExists) {
-          currentDiffs.push({
-            roomTypeId: rules.base_room_type_id!,
-            value: "0",
-            operator: "+",
-          });
+        for (const room of rules.pms_room_types.data) {
+          const exists = currentDiffs.some(
+            (d) => d.roomTypeId === room.roomTypeID,
+          );
+          if (!exists) {
+            currentDiffs.push({
+              roomTypeId: room.roomTypeID,
+              value: "0",
+              operator: "+",
+            });
+          }
         }
 
-        // Update the payload (this does not affect local formState, only what is sent)
         rules.room_differentials = currentDiffs;
       }
       // -----------------------------------------------------------------------
