@@ -100,21 +100,24 @@ class SentinelBridgeService {
       const velocityRes = await client.query(
         `
         WITH latest_snapshot AS (
-            SELECT MAX(snapshot_date) as s_date 
-            FROM pacing_snapshots 
+            SELECT MAX(snapshot_date) as s_date
+            FROM pacing_snapshots
             WHERE hotel_id = $1 AND snapshot_date < CURRENT_DATE
         )
         SELECT DISTINCT ON (live.stay_date::date)
             live.stay_date::date as stay_date,
             live.rooms_sold,
             live.capacity_count as capacity,
-            (live.rooms_sold - COALESCE(hist.rooms_sold, 0)) as pickup_24h
+            CASE
+              WHEN (SELECT s_date FROM latest_snapshot) IS NULL THEN 0
+              ELSE (live.rooms_sold - COALESCE(hist.rooms_sold, 0))
+            END as pickup_24h
         FROM daily_metrics_snapshots live
-        LEFT JOIN pacing_snapshots hist 
-            ON live.hotel_id = hist.hotel_id 
+        LEFT JOIN pacing_snapshots hist
+            ON live.hotel_id = hist.hotel_id
             AND live.stay_date::date = hist.stay_date::date
             AND hist.snapshot_date = (SELECT s_date FROM latest_snapshot)
-        WHERE live.hotel_id = $1 
+        WHERE live.hotel_id = $1
           AND live.stay_date::date >= CURRENT_DATE
         ORDER BY live.stay_date::date ASC, live.snapshot_id DESC
         `,
