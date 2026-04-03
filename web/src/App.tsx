@@ -220,6 +220,9 @@ export default function App() {
           setIsSyncing(false); // Hide the sync screen
           if (pollingInterval) clearInterval(pollingInterval); // Stop polling
 
+          // Force dashboard view (not whatever was in sessionStorage before redirect)
+          setActiveView("dashboard");
+          sessionStorage.setItem("marketPulseActiveView", "dashboard");
           setShowPropertySetup(true);
 
           const url = new URL(window.location.href);
