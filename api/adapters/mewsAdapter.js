@@ -270,28 +270,30 @@ async function getResourceCategories(credentials, serviceId) {
 }
 
 /**
- * Fetches the total number of active bookable resources (rooms/spaces) for a service.
- * Uses resources/getAll to count individual rooms, not room types.
+ * Fetches the total number of bookable resources (rooms/spaces) for a service.
+ * Uses services/getAvailability on a far-future date where no bookings exist,
+ * so available count = total capacity.
  */
-async function getResourceCount(credentials, serviceId) {
-  const response = await _callMewsApi("resources/getAll", credentials, {
-    ServiceIds: [serviceId],
-    ActivityStates: ["Active"],
-    Limitation: { Count: 1 },
+async function getResourceCount(credentials, serviceId, timezone) {
+  // Pick a date ~11 months out where occupancy should be zero
+  const futureDate = new Date();
+  futureDate.setMonth(futureDate.getMonth() + 11);
+  const dateStr = futureDate.toISOString().split("T")[0];
+
+  const availData = await _callMewsApi("services/getAvailability", credentials, {
+    ServiceId: serviceId,
+    FirstTimeUnitStartUtc: toMewsUtc(dateStr, timezone),
+    LastTimeUnitStartUtc: toMewsUtc(dateStr, timezone),
   });
 
-  // The API returns Resources array — count it
-  // But with Limitation.Count=1, we need to check if there's a total
-  // Let's fetch all to get accurate count
-  const fullResponse = await _callMewsApi("resources/getAll", credentials, {
-    ServiceIds: [serviceId],
-    ActivityStates: ["Active"],
-    Limitation: { Count: 5000 },
+  let totalCapacity = 0;
+  const categories = availData.CategoryAvailabilities || [];
+  categories.forEach((cat) => {
+    totalCapacity += cat.Availabilities?.[0] || 0;
   });
 
-  const count = (fullResponse.Resources || []).length;
-  console.log(`[Mews] Resource count for service ${serviceId}: ${count} active spaces`);
-  return count;
+  console.log(`[Mews] Resource count for service ${serviceId}: ${totalCapacity} spaces (from availability on ${dateStr})`);
+  return totalCapacity;
 }
 
 /**
@@ -453,18 +455,19 @@ async function getOccupancyMetrics(
   const dailyMetrics = {};
   const timeUnits = availabilityData.TimeUnitStartsUtc || [];
 
+  // Calculate total physical capacity from the first time unit (sum of all adjustments + availabilities)
+  // Mews Availabilities = unsold rooms, so total = available + occupied
+  // We'll set available here and fix it after counting reservations
   timeUnits.forEach((utcStr, index) => {
     const date = new Date(utcStr).toISOString().split("T")[0];
-    let totalCapacity = 0;
+    let availableRooms = 0;
 
-    // Sum capacity across all resource categories for this day
     const categories = availabilityData.CategoryAvailabilities || [];
     categories.forEach((cat) => {
-      // Availabilities array is parallel to TimeUnitStartsUtc
-      totalCapacity += cat.Availabilities?.[index] || 0;
+      availableRooms += cat.Availabilities?.[index] || 0;
     });
 
-    dailyMetrics[date] = { occupied: 0, available: totalCapacity };
+    dailyMetrics[date] = { occupied: 0, available: availableRooms };
   });
 
   // 4. Count occupied rooms per day from reservations
@@ -484,7 +487,8 @@ async function getOccupancyMetrics(
   return Object.keys(dailyMetrics).map((date) => ({
     date,
     occupied: dailyMetrics[date].occupied,
-    available: dailyMetrics[date].available,
+    // Total capacity = unsold rooms (from availability) + occupied rooms (from reservations)
+    available: dailyMetrics[date].available + dailyMetrics[date].occupied,
   }));
 }
 

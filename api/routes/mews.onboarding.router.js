@@ -158,7 +158,7 @@ router.post("/onboard", async (req, res) => {
     // 4a. Insert hotel — get actual room/space count from Mews resources
     let totalRooms;
     try {
-      totalRooms = await mewsAdapter.getResourceCount(credentials, serviceId);
+      totalRooms = await mewsAdapter.getResourceCount(credentials, serviceId, details.timezone);
     } catch (e) {
       console.warn(`[Mews Onboarding] Could not fetch resource count: ${e.message}. Falling back to room type capacity sum.`);
       totalRooms = roomTypes.reduce((sum, rt) => sum + (rt.capacity || 0), 0);
