@@ -95,6 +95,90 @@ class SentinelBridgeService {
       console.timeEnd("Step 4.5 History");
       // -----------------------------------------------------
 
+      // --- Step 4.6: Overlay Live PMS Rates onto Inventory ---
+      // The calendar may contain stale SENTINEL-written rates from a previous AI run.
+      // Fetch live PMS rates and replace calendar rates so DGX sees real PMS state.
+      console.time("Step 4.6 Live PMS Overlay");
+      try {
+        const baseRoomId = config.base_room_type_id;
+        if (baseRoomId) {
+          const hotelPmsType = await pmsRegistry.getPmsType(hotelId);
+          const sentinelAdapter = pmsRegistry.getSentinelAdapter(hotelPmsType);
+
+          const pmsPropertyIdRes = await client.query(
+            "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
+            [hotelId],
+          );
+          const pmsPropertyId = pmsPropertyIdRes.rows[0]?.pms_property_id;
+
+          if (pmsPropertyId) {
+            const startDate = new Date().toISOString().split("T")[0];
+            const endDate = new Date(Date.now() + 365 * 86400000)
+              .toISOString()
+              .split("T")[0];
+
+            const liveRes = await sentinelAdapter.getRates(
+              hotelId,
+              pmsPropertyId,
+              baseRoomId,
+              startDate,
+              endDate,
+            );
+
+            const ratesList =
+              liveRes?.data?.roomRateDetailed || liveRes?.roomRateDetailed || [];
+
+            if (ratesList.length > 0) {
+              const liveMap = {};
+              for (const row of ratesList) {
+                if (row.date && row.rate) liveMap[row.date] = parseFloat(row.rate);
+              }
+
+              if (inventoryWithHistory.length > 0) {
+                // Overlay onto existing calendar rows
+                let overlayCount = 0;
+                for (const inv of inventoryWithHistory) {
+                  const dStr = new Date(inv.stay_date).toISOString().split("T")[0];
+                  const liveRate = liveMap[dStr];
+                  if (liveRate !== undefined && inv.source !== "MANUAL" && inv.source !== "LOCKED") {
+                    inv.rate = liveRate;
+                    inv.source = "SYNC";
+                    overlayCount++;
+                  }
+                }
+                console.log(
+                  `[Bridge] Live PMS overlay: replaced ${overlayCount}/${inventoryWithHistory.length} calendar rates with live PMS rates.`,
+                );
+              } else {
+                // Calendar is empty — populate from live PMS rates directly
+                for (const row of ratesList) {
+                  if (row.date && row.rate) {
+                    inventoryWithHistory.push({
+                      hotel_id: parseInt(hotelId),
+                      room_type_id: baseRoomId,
+                      stay_date: row.date,
+                      rate: parseFloat(row.rate),
+                      source: "SYNC",
+                      last_change_ts: null,
+                      last_change_val: null,
+                    });
+                  }
+                }
+                console.log(
+                  `[Bridge] Calendar empty — seeded ${inventoryWithHistory.length} dates from live PMS rates.`,
+                );
+              }
+            }
+          }
+        }
+      } catch (pmsErr) {
+        console.warn(
+          `[Bridge] Live PMS overlay failed (using calendar rates): ${pmsErr.message}`,
+        );
+      }
+      console.timeEnd("Step 4.6 Live PMS Overlay");
+      // -----------------------------------------------------
+
       console.time("Step 5 Velocity");
       // Step 5: Velocity
       const velocityRes = await client.query(
