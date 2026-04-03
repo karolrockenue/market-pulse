@@ -169,12 +169,14 @@ router.post("/onboard", async (req, res) => {
         property_name, city, timezone, currency_code, total_rooms,
         latitude, longitude, address_1, zip_postal_code, country,
         pms_type, pms_property_id,
-        pms_credentials
+        pms_credentials,
+        is_rockenue_managed, pricing_model
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10,
         'mews', $11,
-        $12
+        $12,
+        true, 'inclusive'
       ) RETURNING hotel_id`,
       [
         details.propertyName,
