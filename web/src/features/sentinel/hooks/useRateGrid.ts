@@ -314,17 +314,10 @@ export const useRateGrid = () => {
           };
         });
 
-        // [FIX] Populate savedOverrides from backend data where source is 'Manual'
-        const initialSavedOverrides: Record<string, number> = {};
+        // PMS Override + Target Sell Rate rows start empty on load.
+        // They only populate as the user types, and clear after submit.
 
-        fullCalendar.forEach((day: any) => {
-          // 1. Restore Manual Overrides
-          if (day.source === "Manual" && day.rate > 0) {
-            initialSavedOverrides[day.date] = parseFloat(day.rate);
-          }
-        });
-
-        // 2. Process Real AI Predictions
+        // Process Real AI Predictions
         // We must map the SQL rows (snake_case) to the UI Map (date key)
         // AND strictly filter for the current Base Room Type
         const realAiData: Record<string, { rate: number; confidence: number }> =
@@ -344,7 +337,7 @@ export const useRateGrid = () => {
           });
         }
 
-        setSavedOverrides(initialSavedOverrides);
+        setSavedOverrides({});
         setAiPredictions(realAiData); // [CONNECTED]
         setCalendarData(fullCalendar);
       } catch (err: any) {
@@ -391,13 +384,16 @@ export const useRateGrid = () => {
   // [NEW] Bulk Apply AI for a range of dates
   const bulkApplyAi = useCallback(
     (dates: string[]) => {
+      // Build a min-rate lookup from calendarData for clamping
+      const minMap: Record<string, number> = {};
+      calendarData.forEach((d) => { minMap[d.date] = d.guardrailMin || 0; });
+
       setPendingOverrides((prev) => {
         const next = { ...prev };
         dates.forEach((date) => {
-          const pred = aiPredictions[date]; // Access state directly from closure? No, need ref or dependency.
-          // Actually, aiPredictions is in scope.
+          const pred = aiPredictions[date];
           if (pred && pred.rate > 0) {
-            next[date] = pred.rate;
+            next[date] = Math.max(pred.rate, minMap[date] || 0);
           }
         });
         return next;
@@ -413,8 +409,8 @@ export const useRateGrid = () => {
         return next;
       });
     },
-    [aiPredictions]
-  ); // Re-create if predictions change
+    [aiPredictions, calendarData]
+  ); // Re-create if predictions or calendar change
 
   const submitChanges = async (
     hotelId: string,
@@ -432,9 +428,6 @@ export const useRateGrid = () => {
       source: aiApprovedPending.has(date) ? "AI_SUGGESTED" : "MANUAL",
     }));
 
-    // Optimistic Update
-    setSavedOverrides((prev) => ({ ...prev, ...snapshot }));
-
     // [FIX] Immediate UI update for Source Column to persist "AI SUGGESTED" status
     setCalendarData((prev) =>
       prev.map((d) => {
@@ -450,7 +443,9 @@ export const useRateGrid = () => {
       })
     );
 
+    // Clear pending + saved overrides so PMS Override / Target Sell Rate rows go blank after submit
     setPendingOverrides({});
+    setSavedOverrides({});
     setAiApprovedPending(new Set()); // Cleanup
 
     toast.message("Syncing...", {

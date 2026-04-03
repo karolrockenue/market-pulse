@@ -393,14 +393,9 @@ async function previewCalendar({
           endDate,
         );
       })
-      .catch(() => {
-        return sentinelAdapter.getRates(
-          hotelId,
-          pmsPropertyId,
-          baseRoomTypeId,
-          startDate,
-          endDate,
-        );
+      .catch((err) => {
+        console.error(`[Sentinel] Live rate fetch failed for hotel ${hotelId}:`, err.message);
+        return { success: true, data: { roomRateDetailed: [] } };
       }),
   ]);
 
@@ -677,15 +672,54 @@ async function updateConfig(hotelId, updates) {
   const pmsRoomTypes = currentConfig.pms_room_types?.data || [];
   const pmsRatePlans = currentConfig.pms_rate_plans?.data || [];
   let rateIdMap;
-  // Check if this is a Mews hotel (Mews rate IDs are UUIDs with dashes)
+  // Check if this is a Mews hotel — use hotels.pms_type (definitive) with UUID fallback
+  const pmsTypeRes = await db.query(
+    "SELECT pms_type FROM hotels WHERE hotel_id = $1",
+    [hotelId],
+  );
   const isMewsHotel =
-    pmsRatePlans.length > 0 &&
-    String(pmsRatePlans[0]?.rateID || "").includes("-");
+    pmsTypeRes.rows[0]?.pms_type === "mews" ||
+    (pmsRatePlans.length > 0 &&
+      String(pmsRatePlans[0]?.rateID || "").includes("-"));
+
+  console.log(`[DEBUG] Hotel ${hotelId}: pms_type=${pmsTypeRes.rows[0]?.pms_type}, isMews=${isMewsHotel}, ratePlans=${pmsRatePlans.length}, roomTypes=${pmsRoomTypes.length}`);
+
   if (isMewsHotel) {
     const mewsAdapter = require("../adapters/mewsAdapter");
     rateIdMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
   } else {
     rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+  }
+  console.log(`[DEBUG] Hotel ${hotelId}: rebuilt rate_id_map =`, JSON.stringify(rateIdMap));
+
+  // 2b. If monthly_min_rates changed, clear daily min overrides for affected months
+  //     so the new monthly value takes effect (last-save-wins semantics)
+  if (updates.monthly_min_rates) {
+    const oldMonthly = currentConfig.monthly_min_rates || {};
+    const newMonthly = monthly_min_rates;
+    const monthToNumber = {
+      jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+      jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+    };
+
+    const changedMonths = [];
+    for (const [mon, val] of Object.entries(newMonthly)) {
+      if (String(val) !== String(oldMonthly[mon] || "0")) {
+        changedMonths.push(monthToNumber[mon]);
+      }
+    }
+
+    if (changedMonths.length > 0) {
+      await db.query(
+        `DELETE FROM sentinel_daily_min_rates
+         WHERE hotel_id = $1
+           AND EXTRACT(MONTH FROM stay_date) = ANY($2::int[])`,
+        [hotelId, changedMonths],
+      );
+      console.log(
+        `[Sentinel] Cleared daily min overrides for hotel ${hotelId}, months: ${changedMonths.join(", ")}`,
+      );
+    }
   }
 
   // 3. Update Database (With Seasonality Profile & Rules)
@@ -740,6 +774,144 @@ async function getPaceCurves(hotelId) {
   const { rows } = await db.query(query, [hotelId]);
   return rows;
 }
+/**
+ * Recalculate rates for a hotel and push to job queue.
+ * Used by POST /recalculate endpoint and autopilot triggers.
+ */
+async function recalculateRates(hotelId, startDate, endDate) {
+  const configRes = await db.query(
+    "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
+    [hotelId],
+  );
+  if (configRes.rows.length === 0) {
+    throw new Error("Configuration not found.");
+  }
+
+  const config = configRes.rows[0];
+  const baseRoomTypeId = config.base_room_type_id;
+  const differentials = config.room_differentials || [];
+  const pmsRoomTypes = config.pms_room_types?.data || [];
+
+  if (!baseRoomTypeId) {
+    throw new Error("Base Room Type not defined in configuration.");
+  }
+
+  // Detect Mews
+  const pmsTypeRes = await db.query(
+    "SELECT pms_type FROM hotels WHERE hotel_id = $1",
+    [hotelId],
+  );
+  const isMewsHotel = pmsTypeRes.rows[0]?.pms_type === "mews";
+
+  // Self-heal rate ID map — PMS-aware
+  const pmsRatePlans = config.pms_rate_plans?.data || [];
+  let freshMap;
+  if (isMewsHotel) {
+    const mewsAdapter = require("../adapters/mewsAdapter");
+    freshMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
+  } else {
+    freshMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+  }
+  if (JSON.stringify(config.rate_id_map || {}) !== JSON.stringify(freshMap)) {
+    await db.query(
+      `UPDATE sentinel_configurations SET rate_id_map = $1, updated_at = NOW() WHERE hotel_id = $2`,
+      [JSON.stringify(freshMap), hotelId],
+    );
+    config.rate_id_map = freshMap;
+  }
+
+  // Get calculated rates
+  const calendar = await previewCalendar({
+    hotelId,
+    baseRoomTypeId,
+    startDate,
+    endDate,
+  });
+
+  // Build overrides for all room types
+  const allOverrides = [];
+  for (const room of pmsRoomTypes) {
+    const roomTypeId = room.roomTypeID;
+    const isBase = String(roomTypeId) === String(baseRoomTypeId);
+    const diffRule = differentials.find(
+      (r) => String(r.roomTypeId) === String(roomTypeId),
+    );
+
+    calendar.forEach((day) => {
+      if (!day.finalRate || day.finalRate <= 0) return;
+      let finalRate = parseFloat(day.finalRate);
+
+      if (!isBase && diffRule) {
+        const val = parseFloat(diffRule.value);
+        if (diffRule.operator === "+") finalRate *= 1 + val / 100;
+        else if (diffRule.operator === "-") finalRate *= 1 - val / 100;
+      }
+
+      finalRate = Math.round(finalRate * 100) / 100;
+      if (isNaN(finalRate) || finalRate <= 0) return;
+
+      allOverrides.push({
+        date: day.date,
+        room_type_id: roomTypeId,
+        rate: finalRate,
+        categoryId: isMewsHotel ? roomTypeId : undefined,
+      });
+    });
+  }
+
+  // Write to calendar + queue
+  const hotelRes = await db.query(
+    "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
+    [hotelId],
+  );
+  const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
+  const rateIdMap = config.rate_id_map || {};
+  const batchPayload = [];
+  const dbWrites = [];
+
+  for (const o of allOverrides) {
+    const rateId = rateIdMap[o.room_type_id];
+    if (!rateId) continue;
+
+    batchPayload.push({
+      rateId,
+      date: o.date,
+      rate: o.rate,
+      categoryId: o.categoryId,
+    });
+
+    dbWrites.push(
+      db.query(
+        `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
+         VALUES ($1, $2, $3, $4, 'SENTINEL', NOW())
+         ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
+         SET rate = EXCLUDED.rate, source = 'SENTINEL', last_updated_at = NOW()`,
+        [hotelId, o.date, o.room_type_id, o.rate],
+      ),
+    );
+  }
+
+  await Promise.all(dbWrites);
+
+  let totalQueued = 0;
+  if (batchPayload.length > 0) {
+    const CHUNK_SIZE = 30;
+    for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
+      const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
+      await db.query(
+        `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
+        [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
+      );
+    }
+    totalQueued = batchPayload.length;
+  }
+
+  console.log(
+    `[Sentinel] Recalculate complete: ${totalQueued} rates queued for hotel ${hotelId}.`,
+  );
+  return { totalQueued };
+}
+
 module.exports = {
   getHotelConfig,
   updateConfig,
@@ -754,6 +926,7 @@ module.exports = {
   getSentinelStatus,
   buildRateIdMap,
   getRecentJobBatches,
+  recalculateRates,
 };
 /**
  * [NEW] Get Sentinel Status (Last Run & Activity)

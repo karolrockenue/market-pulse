@@ -335,30 +335,27 @@ async function postRateBatch(hotelId, pmsPropertyId, ratesArray) {
       return update;
     });
 
-    // Mews allows max 1000 PriceUpdates per call — chunk if needed
-    const CHUNK_SIZE = 1000;
+    // Chunk into smaller batches to be gentle on Mews API
+    const CHUNK_SIZE = 50;
 
     for (let i = 0; i < priceUpdates.length; i += CHUNK_SIZE) {
       const chunk = priceUpdates.slice(i, i + CHUNK_SIZE);
 
       console.log(
-        `[Mews Sentinel] Pushing ${chunk.length} price updates for Rate ${rateId}`,
+        `[Mews Sentinel] Pushing ${chunk.length} price updates for Rate ${rateId} (chunk ${Math.floor(i / CHUNK_SIZE) + 1})`,
       );
 
-      console.log(
-        `[Mews Debug] postRateBatch credentials:`,
-        JSON.stringify({
-          clientToken: ctx.credentials.clientToken?.substring(0, 8),
-          accessToken: ctx.credentials.accessToken?.substring(0, 8),
-          client: ctx.credentials.client,
-        }),
-      );
       await mewsAdapter._callMewsApi("rates/updatePrice", ctx.credentials, {
         RateId: rateId,
         PriceUpdates: chunk,
       });
 
       totalPushed += chunk.length;
+
+      // Small delay between chunks to avoid overwhelming Mews API
+      if (i + CHUNK_SIZE < priceUpdates.length) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
     }
   }
 

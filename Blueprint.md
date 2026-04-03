@@ -151,11 +151,9 @@ Notifications for background job outcomes.
 
 Front-end responsibilities:
 
-Control Panel – configuration & guardrails.
+Control Panel – configuration, guardrails, and OTA discount stack (Promo Config). Property Hub functionality merged here as collapsible "OTA Discount Stack" section per hotel.
 
 Rate Manager – grid with live vs AI vs guardrails, overrides.
-
-Property Hub (Rate Replicator) – OTA discount stack & math.
 
 Risk Overview – portfolio risk lens inside Sentinel.
 
@@ -286,6 +284,8 @@ Builds override payloads using sentinel.pricing.engine.js.
 
 Drives preview calendars and DB writes.
 
+recalculateRates(hotelId, startDate, endDate) — reusable function for full rate recalculation + PMS queue push. Used by POST /recalculate endpoint and autopilot triggers.
+
 api/services/sentinel.bridge.service.js
 
 Logic owner for Machine-to-Machine interactions (AI Bridge).
@@ -392,6 +392,8 @@ Sentinel-focused Mews bridge (mirrors sentinel.adapter.js interface).
 Owns: getRates (via rates/getPricing), getRoomTypes, getRatePlans, postRate, postRateBatch (via rates/updatePrice), getJobStatus.
 
 All functions take the same parameters as sentinel.adapter.js for interface compatibility.
+
+Rate writes are chunked at 50 PriceUpdates per Mews API call with 500ms delay between chunks to avoid API throttling.
 
 api/adapters/pmsRegistry.js
 
@@ -517,7 +519,7 @@ Sub-components (structured by sub-domain):
 
 components/ControlPanel/ControlPanelView.tsx
 
-components/PropertyHub/PropertyHubView.tsx
+components/ControlPanel/PromoConfigSection.tsx
 
 components/RateManager/RateManagerView.tsx
 
@@ -529,11 +531,11 @@ components/Shadowfax/ShadowfaxView.tsx
 
 Hooks:
 
-hooks/usePropertyHub.ts
+hooks/usePropertyHub.ts (exports math functions for OTA discount stack — used by useSentinelConfig and useRateGrid)
 
 hooks/useRateGrid.ts
 
-hooks/useSentinelConfig.ts
+hooks/useSentinelConfig.ts (also loads rockenue_managed_assets for Promo Config)
 
 hooks/useShadowfax.ts
 
@@ -549,7 +551,7 @@ React components and hooks must not re-implement or diverge from those formulas.
 
 Shared Components & Utilities
 
-web/src/components/TopNav.tsx, LandingPage.tsx, InitialSyncScreen.tsx, NotificationBell.tsx, SettingsPage.tsx, SupportPage.tsx, modal components, etc.
+web/src/components/TopNav.tsx, LandingPage.tsx, InitialSyncScreen.tsx, NotificationBell.tsx, MarketVeil.tsx, SettingsPage.tsx, SupportPage.tsx, modal components, etc.
 
 web/src/components/ui/\* – shadcn primitives (omitted from file tree to reduce noise).
 
@@ -560,7 +562,7 @@ web/src/guidelines/Guidelines.md – internal UI rules.
 3.0 LOGIC HUBS & FORMULAS
 3.1 Rate Replicator (OTA Sell-Rate Calculator)
 
-Used primarily inside Property Hub under Sentinel.
+Configured per hotel inside the Control Panel's "OTA Discount Stack" collapsible section. Settings are stored in rockenue_managed_assets (calculator_settings JSONB + strategic_multiplier + genius_discount_pct). The simulator (price waterfall) is available inline next to the settings.
 
 Sequential discount stack:
 
@@ -580,7 +582,7 @@ Genius
 
 AfterGenius = AfterNonRef × (1 − Genius%)
 
-Campaigns (Late Escape, Early Booker, etc.)
+Long Campaign (always-on, no date range — replaces dated campaigns like Late Escape, Early Booker)
 
 AfterCampaign = AfterGenius × (1 − Campaign%)
 
@@ -614,6 +616,8 @@ MinRate is resolved per-day with the following priority:
 
 1. Daily min override (sentinel_daily_min_rates) — if a per-day override exists, it wins.
 2. Monthly min rate (sentinel_configurations → monthly_min_rates) — fallback default.
+
+Last-save-wins semantics: When monthly min rates are saved, all daily min overrides for the affected months are automatically deleted so the new monthly value takes effect. When per-day overrides are later set, they take precedence over the monthly default. If autopilot is enabled, saving monthly min rates triggers an immediate recalculation and PMS push.
 
 Daily min overrides can be set in two ways from the Rate Manager UI:
 
@@ -901,6 +905,13 @@ is_applied (Boolean) – True if user accepted the suggestion.
 4.10 sentinel_market_events
 
 Stores market-level event multipliers to preemptively inflate AI base rates.
+
+Event Tiers (UI dropdown values):
+- Medium: 1.5x — moderate demand events
+- High: 2.0x — strong demand events
+- Extreme: 2.5x — peak events (e.g. Wimbledon)
+
+Effect: Base Rate = Min Rate × Event Multiplier. The AI yields up from this inflated floor.
 
 Fields:
 
@@ -1193,6 +1204,7 @@ market-pulse/
 │ ├── initial-sync.js
 │ ├── migration_001_add_market_metrics.js
 │ ├── migration_002_fix_market_metrics.js
+│ ├── migration_004_daily_min_rates.js
 │ ├── send-scheduled-reports.js
 │ └── sync-rockenue-assets.js
 ├── scripts
@@ -1222,6 +1234,7 @@ market-pulse/
 │ ├── InviteUserModal.tsx
 │ ├── LandingPage.tsx
 │ ├── ManageSchedulesModal.tsx
+│ ├── MarketVeil.tsx (gates Demand & Compset pages when market has < 5 properties)
 │ ├── NotificationBell.tsx
 │ ├── PrivacyPolicy.tsx
 │ ├── PropertyClassificationModal.tsx
@@ -1288,10 +1301,9 @@ market-pulse/
 │ │ ├── components
 │ │ │ ├── ControlPanel
 │ │ │ │ ├── ControlPanelView.tsx
+│ │ │ │ ├── PromoConfigSection.tsx (OTA discount stack — merged from Property Hub)
 │ │ │ │ ├── DailyMaxRatesDialog.tsx
 │ │ │ │ └── YearlyRatesVisualization.tsx
-│ │ │ ├── PropertyHub
-│ │ │ │ └── PropertyHubView.tsx
 │ │ │ ├── RateManager
 │ │ │ │ ├── OccupancyVisualizer.tsx
 │ │ │ │ └── RateManagerView.tsx

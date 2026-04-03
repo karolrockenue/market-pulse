@@ -681,7 +681,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
               data={calendarData.map((d) => ({
                 ...d,
                 pmsRate: d.liveRate,
-                aiShadowRate: aiPredictions[d.date]?.rate,
+                aiShadowRate: aiPredictions[d.date]?.rate
+                  ? Math.max(aiPredictions[d.date].rate, d.guardrailMin || 0)
+                  : undefined,
               }))}
             />
 

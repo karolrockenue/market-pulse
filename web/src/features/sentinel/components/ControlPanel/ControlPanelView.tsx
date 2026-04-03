@@ -1008,7 +1008,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 color = "#39BDF8";
                                 bg = "rgba(250, 255, 106, 0.1)";
                                 border = "rgba(250, 255, 106, 0.3)";
-                              } else if (group.maxMult >= 3.0) {
+                              } else if (group.maxMult >= 2.5) {
                                 impactLabel = "Extreme Demand";
                                 color = "#c084fc";
                                 bg = "rgba(147, 51, 234, 0.1)";
@@ -1148,7 +1148,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           eColor = "#39BDF8";
                                           eBg = "rgba(250, 255, 106, 0.05)";
                                           eBorder = "rgba(250, 255, 106, 0.2)";
-                                        } else if (eMult >= 3.0) {
+                                        } else if (eMult >= 2.5) {
                                           eLabel = "Extreme Demand";
                                           eColor = "#c084fc";
                                           eBg = "rgba(147, 51, 234, 0.05)";
@@ -3577,11 +3577,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     <SelectItem value="1.50" style={{ color: "#39BDF8" }}>
                       Medium (1.5x)
                     </SelectItem>
-                    <SelectItem value="2.50" style={{ color: "#ef4444" }}>
-                      High (2.5x)
+                    <SelectItem value="2.00" style={{ color: "#ef4444" }}>
+                      High (2.0x)
                     </SelectItem>
-                    <SelectItem value="3.00" style={{ color: "#c084fc" }}>
-                      Extreme (3.0x)
+                    <SelectItem value="2.50" style={{ color: "#c084fc" }}>
+                      Extreme (2.5x)
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -3662,13 +3662,13 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             Medium
                           </SelectItem>
                           <SelectItem
-                            value="2.50"
+                            value="2.00"
                             style={{ color: "#ef4444", fontSize: "0.75rem" }}
                           >
                             High
                           </SelectItem>
                           <SelectItem
-                            value="3.00"
+                            value="2.50"
                             style={{ color: "#c084fc", fontSize: "0.75rem" }}
                           >
                             Extreme

@@ -360,7 +360,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
   // Column background: amber for daily min override, blue for hover, else transparent
   const getColBg = (date: string, fallback = "transparent") => {
     if (hoveredColumn === date) return "rgba(57,189,248,0.05)";
-    if (amberDates.has(date)) return "rgba(245, 158, 11, 0.06)";
+    // No column highlight for saved daily min overrides
     return fallback;
   };
 
@@ -786,7 +786,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
               data={calendarData.map((d) => ({
                 ...d,
                 pmsRate: d.liveRate,
-                aiShadowRate: aiPredictions[d.date]?.rate, // Inject the Shadow Rate
+                aiShadowRate: aiPredictions[d.date]?.rate
+                  ? Math.max(aiPredictions[d.date].rate, d.guardrailMin || 0)
+                  : undefined, // Clamp AI rate to min rate floor
               }))}
             />
 
@@ -1024,9 +1026,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               backgroundColor:
                                 hoveredColumn === day.date
                                   ? "rgba(58, 58, 53, 0.3)"
-                                  : amberDates.has(day.date)
-                                    ? "rgba(245, 158, 11, 0.08)"
-                                    : "#1A1A1A",
+                                  : "#1A1A1A",
                               borderBottom: "1px solid #2a2a2a",
                               borderRight: "1px solid #2a2a2a",
                               textAlign: "center",
@@ -1101,28 +1101,24 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             text = "FROZEN";
                             color = "#f59e0b";
                           } else if (pendingOverrides[day.date]) {
-                            text = aiApprovedPending.has(day.date)
-                              ? "SENTINEL"
-                              : "PENDING";
-                            color = aiApprovedPending.has(day.date)
-                              ? "#39BDF8"
-                              : "#39BDF8";
+                            text = "PENDING";
+                            color = "#f59e0b";
                           } else if (
                             currentSource === "SENTINEL" ||
                             currentSource === "AI_AUTO" ||
                             currentSource === "AI_SUGGESTED"
                           ) {
-                            text = "SENTINEL";
+                            text = "AI";
                             color = "#39BDF8";
-                          } else if (currentSource === "SYNC") {
-                            text = "SYNC";
-                            color = "#6b7280";
-                          } else if (
-                            savedOverrides[day.date] ||
-                            currentSource === "MANUAL"
-                          ) {
+                          } else if (currentSource === "MANUAL" || currentSource === "HOTEL_USER") {
                             text = "MANUAL";
                             color = "#9ca3af";
+                          } else if (currentSource === "SYNC" || currentSource === "IMPORT") {
+                            text = "PMS";
+                            color = "#6b7280";
+                          } else {
+                            text = "—";
+                            color = "#4a4a48";
                           }
                           return (
                             <td
@@ -1146,7 +1142,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               >
                                 {text}
                               </span>
-                              {(day.isFrozen || text === "MANUAL") && (
+                              {day.isFrozen && (
                                 <Lock
                                   size={10}
                                   color={color}
@@ -1419,7 +1415,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <td colSpan={visibleData.length + 1} style={{ borderBottom: "1px solid #2a2a2a" }}></td>
                       </tr>
 
-                      {!hiddenRows.has("minRate") && (
+                      {!hiddenRows.has("minRate") && (<>
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
                           <td style={{ ...styles.tdSticky, color: "#f59e0b" }}>
                             <div
@@ -1453,7 +1449,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 style={{
                                   borderRight: "1px solid #2a2a2a",
                                   textAlign: "center",
-                                  color: isBelowMonthly ? "#ef4444" : "#6b7280",
+                                  color: "#6b7280",
                                   fontSize: "12px",
                                   padding: "12px 8px",
                                   fontFamily: "monospace",
@@ -1462,11 +1458,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     editingMinCell === day.date
                                       ? "transparent"
                                       : isBelowMonthly
-                                        ? "rgba(239, 68, 68, 0.15)"
-                                        : hoveredColumn === day.date
-                                          ? "rgba(245, 158, 11, 0.1)"
-                                          : "transparent",
-                                  borderBottom: isBelowMonthly ? "2px solid #ef4444" : undefined,
+                                        ? "rgba(239, 68, 68, 0.06)"
+                                        : "transparent",
                                 }}
                                 title={isBelowMonthly ? `Monthly default: £${Math.round(day.monthlyMinDefault)}` : undefined}
                               >
@@ -1500,6 +1493,15 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     }}
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter") e.currentTarget.blur();
+                                      if (e.key === "Tab") {
+                                        e.preventDefault();
+                                        e.currentTarget.blur();
+                                        const idx = visibleData.findIndex((d) => d.date === day.date);
+                                        const next = e.shiftKey ? visibleData[idx - 1] : visibleData[idx + 1];
+                                        if (next && !next.isFrozen) {
+                                          setTimeout(() => setEditingMinCell(next.date), 0);
+                                        }
+                                      }
                                     }}
                                   />
                                 ) : (
@@ -1511,7 +1513,43 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             );
                           })}
                         </tr>
-                      )}
+                        {/* "Leads to" sub-row: shows sell rate at min rate */}
+                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                          <td style={{ ...styles.tdSticky, padding: "4px 16px" }}>
+                            <span style={{ color: "#4b5563", fontSize: "10px", fontStyle: "italic", paddingLeft: "2px" }}>
+                              Leads to
+                            </span>
+                          </td>
+                          {visibleData.map((day) => {
+                            let sellAtMin = 0;
+                            if (day.guardrailMin > 0 && calcState) {
+                              sellAtMin = calculateSellRate(
+                                day.guardrailMin,
+                                geniusPct,
+                                calcState,
+                                day.date,
+                                { includeTargeting: false },
+                              );
+                            }
+                            return (
+                              <td
+                                key={day.date}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  color: "#4b5563",
+                                  fontSize: "10px",
+                                  padding: "4px 8px",
+                                  fontFamily: "monospace",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                {sellAtMin > 0 ? `£${Math.round(sellAtMin)}` : "-"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </>)}
                       {!hiddenRows.has("floorRate") && (
                         <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
                           <td style={styles.tdSticky}>
@@ -1690,7 +1728,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <td
                           style={{
                             ...styles.tdSticky,
-                            backgroundColor: "rgba(57, 189, 248, 0.02)",
+                            backgroundColor: "#1b1d1e",
                             padding: "16px",
                           }}
                         >
@@ -1746,22 +1784,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   gap: "4px",
                                 }}
                               >
-                                {isApplied ? (
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "4px",
-                                      opacity: 0.8,
-                                    }}
-                                  >
-                                    <Check size={12} /> Applied
-                                  </div>
-                                ) : (
-                                  <span>
-                                    {pred ? `£${Math.round(pred.rate)}` : "-"}
-                                  </span>
-                                )}
+                                <span>
+                                  {pred ? `£${Math.round(pred.rate)}` : "-"}
+                                </span>
 
                                 {/* Hover Arrow Action */}
                                 {showArrow && (
@@ -1769,10 +1794,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (pred) {
-                                        // [FIX] Use Hook Function
-                                        applyAiPrediction(day.date, pred.rate);
+                                        // [FIX] Clamp AI rate to min rate floor
+                                        const clampedRate = Math.max(pred.rate, day.guardrailMin || 0);
+                                        applyAiPrediction(day.date, clampedRate);
                                         toast.success(
-                                          `AI Rate £${pred.rate} applied`,
+                                          `AI Rate £${clampedRate} applied`,
                                         );
                                       }
                                     }}
@@ -1811,156 +1837,6 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         <td colSpan={visibleData.length + 1}></td>
                       </tr>
 
-                      {!hiddenRows.has("effectiveRate") && (
-                        <tr
-                          style={{
-                            borderBottom: "1px solid #2a2a2a",
-                            backgroundColor: "rgba(16, 185, 129, 0.03)",
-                          }}
-                        >
-                          <td
-                            style={{
-                              ...styles.tdSticky,
-                              backgroundColor: "rgba(16, 185, 129, 0.05)",
-                              borderLeft: "3px solid #10b981",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#10b981" }}>
-                                Target Sell Rate
-                              </span>{" "}
-                              <button
-                                onClick={() => toggleRow("effectiveRate")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
-                          </td>
-                          {visibleData.map((day) => {
-                            const overrideVal =
-                              pendingOverrides[day.date] ??
-                              savedOverrides[day.date];
-                            let effectiveVal = 0;
-
-                            if (overrideVal && calcState) {
-                              effectiveVal = calculateSellRate(
-                                overrideVal,
-                                geniusPct,
-                                calcState,
-                                day.date,
-                                { includeTargeting: false },
-                              );
-                            }
-
-                            return (
-                              <td
-                                key={day.date}
-                                onClick={() => {
-                                  if (!day.isFrozen)
-                                    setEditingEffectiveCell(day.date);
-                                }}
-                                style={{
-                                  borderRight: "1px solid #2a2a2a",
-                                  textAlign: "center",
-                                  fontSize: "12px",
-                                  padding: "12px 8px",
-                                  fontWeight: "bold",
-                                  fontFamily: "monospace",
-                                  color:
-                                    effectiveVal > 0 ? "#10b981" : "#4a4a48",
-                                  backgroundColor:
-                                    editingEffectiveCell === day.date
-                                      ? "transparent"
-                                      : getColBg(day.date),
-                                  opacity: day.isFrozen ? 0.4 : 1,
-                                  cursor: day.isFrozen
-                                    ? "not-allowed"
-                                    : "pointer",
-                                }}
-                              >
-                                {editingEffectiveCell === day.date ? (
-                                  <input
-                                    autoFocus
-                                    style={{
-                                      ...styles.input,
-                                      color: "#10b981",
-                                      fontWeight: "bold",
-                                      backgroundColor:
-                                        "rgba(16, 185, 129, 0.1)",
-                                      border: "1px solid #10b981",
-                                    }}
-                                    defaultValue={
-                                      effectiveVal > 0
-                                        ? Math.round(effectiveVal)
-                                        : ""
-                                    }
-                                    onFocus={(e) => e.target.select()}
-                                    onBlur={(e) => {
-                                      const v = parseFloat(e.target.value);
-                                      if (!isNaN(v) && v > 0 && calcState) {
-                                        // Reverse Math
-                                        const reqOverride =
-                                          calculateRequiredOverride(
-                                            v,
-                                            geniusPct,
-                                            calcState,
-                                            day.date,
-                                            { includeTargeting: false },
-                                          );
-
-                                        // Round to integer (no decimals) for the Override (Base)
-                                        const roundedOverride =
-                                          Math.round(reqOverride);
-
-                                        if (
-                                          day.guardrailMin > 0 &&
-                                          roundedOverride < day.guardrailMin &&
-                                          selectedHotelId
-                                        ) {
-                                          saveMinRate(selectedHotelId, day.date, roundedOverride);
-                                          toast.warning(
-                                            `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
-                                          );
-                                        }
-                                        setOverride(
-                                          day.date,
-                                          roundedOverride,
-                                        );
-                                      } else if (e.target.value === "") {
-                                        clearOverride(day.date);
-                                      }
-                                      setEditingEffectiveCell(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.currentTarget.blur();
-                                      }
-                                    }}
-                                  />
-                                ) : effectiveVal > 0 ? (
-                                  `£${Math.round(effectiveVal)}`
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      )}
                       {/* 4. PMS Override Input */}
                       <tr
                         style={{
@@ -1971,7 +1847,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       >
                         <td style={{
                           ...styles.tdSticky,
-                          backgroundColor: "rgba(16, 185, 129, 0.05)",
+                          backgroundColor: "#1b2420",
                           borderLeft: "3px solid #10b981",
                         }}>
                           <span style={{ color: "#10b981" }}>PMS Override</span>
@@ -2098,6 +1974,155 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           );
                         })}
                       </tr>
+
+                      {/* 5. Target Sell Rate (calculated from PMS Override) */}
+                      {!hiddenRows.has("effectiveRate") && (
+                        <tr
+                          style={{
+                            borderBottom: "1px solid #2a2a2a",
+                            backgroundColor: "rgba(16, 185, 129, 0.03)",
+                          }}
+                        >
+                          <td
+                            style={{
+                              ...styles.tdSticky,
+                              backgroundColor: "#1b2420",
+                              borderLeft: "3px solid #10b981",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <span style={{ color: "#10b981" }}>
+                                Target Sell Rate
+                              </span>{" "}
+                              <button
+                                onClick={() => toggleRow("effectiveRate")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color="#6b7280" />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            const overrideVal =
+                              pendingOverrides[day.date] ??
+                              savedOverrides[day.date];
+                            let effectiveVal = 0;
+
+                            if (overrideVal && calcState) {
+                              effectiveVal = calculateSellRate(
+                                overrideVal,
+                                geniusPct,
+                                calcState,
+                                day.date,
+                                { includeTargeting: false },
+                              );
+                            }
+
+                            return (
+                              <td
+                                key={day.date}
+                                onClick={() => {
+                                  if (!day.isFrozen)
+                                    setEditingEffectiveCell(day.date);
+                                }}
+                                style={{
+                                  borderRight: "1px solid #2a2a2a",
+                                  textAlign: "center",
+                                  fontSize: "12px",
+                                  padding: "12px 8px",
+                                  fontWeight: "bold",
+                                  fontFamily: "monospace",
+                                  color:
+                                    effectiveVal > 0 ? "#10b981" : "#4a4a48",
+                                  backgroundColor:
+                                    editingEffectiveCell === day.date
+                                      ? "transparent"
+                                      : getColBg(day.date),
+                                  opacity: day.isFrozen ? 0.4 : 1,
+                                  cursor: day.isFrozen
+                                    ? "not-allowed"
+                                    : "pointer",
+                                }}
+                              >
+                                {editingEffectiveCell === day.date ? (
+                                  <input
+                                    autoFocus
+                                    style={{
+                                      ...styles.input,
+                                      color: "#10b981",
+                                      fontWeight: "bold",
+                                      backgroundColor:
+                                        "rgba(16, 185, 129, 0.1)",
+                                      border: "1px solid #10b981",
+                                    }}
+                                    defaultValue={
+                                      effectiveVal > 0
+                                        ? Math.round(effectiveVal)
+                                        : ""
+                                    }
+                                    onFocus={(e) => e.target.select()}
+                                    onBlur={(e) => {
+                                      const v = parseFloat(e.target.value);
+                                      if (!isNaN(v) && v > 0 && calcState) {
+                                        const reqOverride =
+                                          calculateRequiredOverride(
+                                            v,
+                                            geniusPct,
+                                            calcState,
+                                            day.date,
+                                            { includeTargeting: false },
+                                          );
+                                        const roundedOverride =
+                                          Math.round(reqOverride);
+
+                                        if (
+                                          day.guardrailMin > 0 &&
+                                          roundedOverride < day.guardrailMin &&
+                                          selectedHotelId
+                                        ) {
+                                          saveMinRate(selectedHotelId, day.date, roundedOverride);
+                                          toast.warning(
+                                            `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                          );
+                                        }
+                                        setOverride(
+                                          day.date,
+                                          roundedOverride,
+                                        );
+                                      } else if (e.target.value === "") {
+                                        clearOverride(day.date);
+                                      }
+                                      setEditingEffectiveCell(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                  />
+                                ) : effectiveVal > 0 ? (
+                                  `£${Math.round(effectiveVal)}`
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

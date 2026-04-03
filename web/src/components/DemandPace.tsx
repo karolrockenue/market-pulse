@@ -29,9 +29,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { MarketOutlookBanner } from "../features/dashboard/components/MarketOutlookBanner";
-import React, { Suspense } from "react";
+import React from "react";
 
-const NeighbourhoodMaps = React.lazy(() => import("./NeighbourhoodMaps"));
 
 
 // Define the props the component will receive from App.tsx
@@ -54,7 +53,6 @@ export function DemandPace({
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   // Accommodation type counts from map POI data
-  const [accommodationTypes, setAccommodationTypes] = useState<Record<string, number>>({});
 
   // Pace Analysis period selector
   const [paceAnalysisPeriod, setPaceAnalysisPeriod] = useState("7");
@@ -1011,148 +1009,6 @@ export function DemandPace({
             </div>
           </div>
 
-          {/* Neighbourhood Supply Heatmap (lazy-loaded) */}
-          <div style={{ maxWidth: "50%" }}>
-            <Suspense fallback={
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#6b7280", fontSize: "13px" }}>
-                Loading maps...
-              </div>
-            }>
-              <NeighbourhoodMaps citySlug={citySlug} onTypeCounts={setAccommodationTypes} />
-            </Suspense>
-          </div>
-
-          {/* ── Property Type Visualisation Options ── */}
-          <div style={{ maxWidth: "50%" }}>
-          {(() => {
-            const LABEL_MAP: Record<string, string> = {
-              hotel: "Hotels",
-              hostel: "Hostels",
-              guest_house: "Guest Houses",
-              apartment: "Apartments",
-              motel: "Motels",
-            };
-            const types = Object.entries(accommodationTypes)
-              .map(([key, count]) => ({ name: LABEL_MAP[key] || key.replace("_", " "), size: count }))
-              .sort((a, b) => b.size - a.size);
-            if (types.length === 0) return null;
-            const total = types.reduce((s, t) => s + t.size, 0);
-
-            return (
-              <div style={{
-                backgroundColor: "rgb(26, 26, 26)",
-                borderRadius: "8px",
-                border: "1px solid #2a2a2a",
-                padding: "20px",
-                marginTop: "24px",
-              }}>
-                <div style={{ marginBottom: "16px" }}>
-                  <div style={{ color: "#e5e5e5", fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>
-                    Market Supply by Property Type
-                  </div>
-                  <div style={{ color: "#6b7280", fontSize: "11px" }}>
-                    Tile size represents share of total available supply ({total.toLocaleString()} properties)
-                  </div>
-                </div>
-                {(() => {
-                  // Simple squarified treemap layout
-                  const sorted = [...types].sort((a, b) => b.size - a.size);
-                  const totalSize = sorted.reduce((s, t) => s + t.size, 0);
-                  const tiles: { name: string; size: number; x: number; y: number; w: number; h: number }[] = [];
-                  let rx = 0, ry = 0, rw = 100, rh = 100;
-
-                  sorted.forEach((t, i) => {
-                    const remaining = sorted.slice(i).reduce((s, r) => s + r.size, 0);
-                    const frac = t.size / remaining;
-                    if (rw >= rh) {
-                      const w = rw * frac;
-                      tiles.push({ name: t.name, size: t.size, x: rx, y: ry, w, h: rh });
-                      rx += w;
-                      rw -= w;
-                    } else {
-                      const h = rh * frac;
-                      tiles.push({ name: t.name, size: t.size, x: rx, y: ry, w: rw, h });
-                      ry += h;
-                      rh -= h;
-                    }
-                  });
-
-                  return (
-                    <div style={{ position: "relative", width: "100%", height: "320px" }}>
-                      {tiles.map((t) => {
-                        const opacity = 0.12 + (t.size / sorted[0].size) * 0.5;
-                        const pct = Math.round((t.size / totalSize) * 100);
-                        const showCount = t.w > 12 && t.h > 15;
-                        const showPct = t.w > 12 && t.h > 22;
-                        return (
-                          <div
-                            key={t.name}
-                            style={{
-                              position: "absolute",
-                              left: `${t.x}%`,
-                              top: `${t.y}%`,
-                              width: `${t.w}%`,
-                              height: `${t.h}%`,
-                              padding: "2px",
-                              boxSizing: "border-box",
-                            }}
-                          >
-                            <div style={{
-                              width: "100%",
-                              height: "100%",
-                              backgroundColor: `rgba(57, 189, 248, ${opacity})`,
-                              border: "1px solid #2a2a2a",
-                              borderRadius: "4px",
-                              padding: "10px",
-                              boxSizing: "border-box",
-                              overflow: "hidden",
-                            }}>
-                              <div style={{
-                                color: "#e5e5e5",
-                                fontSize: "11px",
-                                fontWeight: 500,
-                                textTransform: "uppercase",
-                                letterSpacing: "-0.025em",
-                                lineHeight: 1,
-                                marginBottom: "6px",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}>
-                                {t.name}
-                              </div>
-                              {showCount && (
-                                <div style={{
-                                  color: "#39BDF8",
-                                  fontSize: t.w > 20 ? "18px" : "14px",
-                                  fontWeight: 600,
-                                  lineHeight: 1,
-                                  marginBottom: "4px",
-                                }}>
-                                  {t.size.toLocaleString()}
-                                </div>
-                              )}
-                              {showPct && (
-                                <div style={{
-                                  color: "#6b7280",
-                                  fontSize: "10px",
-                                  letterSpacing: "-0.025em",
-                                  lineHeight: 1,
-                                }}>
-                                  {pct}% of market
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })()}
-          </div>
 
           <div
             style={{

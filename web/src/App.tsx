@@ -33,6 +33,7 @@ import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/
 
 import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
+import { ShreejiDeck } from "./components/ShreejiDeck";
 import { MarketProfile } from "./components/MarketProfile";
 import { MarketVeil } from "./components/MarketVeil";
 // [NEW] Import the legal page components
@@ -591,6 +592,12 @@ export default function App() {
   if (activeView === "deck") {
     return (
       <Deck onBack={() => setActiveView(previousView || "dashboard")} />
+    );
+  }
+
+  if (activeView === "shreejiDeck") {
+    return (
+      <ShreejiDeck onBack={() => setActiveView(previousView || "dashboard")} />
     );
   }
 

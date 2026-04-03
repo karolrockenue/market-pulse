@@ -146,6 +146,7 @@ export function TopNav({
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },
+        { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
       ],
     },
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },

@@ -269,7 +269,10 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
   const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   const dowStr = dayNames[utcTarget.getUTCDay()];
 
-  let effectiveRate = suggestedRate;
+  // [FIX] If suggestedRate is null/NaN (no PMS rate available), fall back to the min rate floor
+  let effectiveRate = (suggestedRate !== null && suggestedRate !== undefined && !isNaN(suggestedRate))
+    ? suggestedRate
+    : resolvedMin;
   let activeFloor = false;
   let activeMinToEnforce = resolvedMin; // Daily override > monthly default
 
