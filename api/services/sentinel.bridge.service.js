@@ -440,6 +440,11 @@ class SentinelBridgeService {
           // If DB has 0 (or null converted to 0), and AI has a real price, we MUST push.
           const currentRate = currentData.rate;
 
+          // [DEBUG] Log first 3 delta comparisons per hotel to diagnose filtering
+          if (skDelta + skFrozen + skManual + skSanity + validUpdates.length < 3) {
+            console.log(`[Autonomy Debug] Hotel ${hotelId} | ${dateStr} | AI=${safeRate} | Calendar=${currentRate} | Source=${currentSource} | Delta=${currentRate !== undefined ? Math.abs(safeRate - currentRate).toFixed(2) : 'N/A'}`);
+          }
+
           // [UPDATED] Reduced deadband to £1.00 to allow Ruthless Decay micro-drops
           if (
             currentRate !== undefined &&
