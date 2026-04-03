@@ -58,6 +58,31 @@ router.all("/process-queue", async (req, res) => {
   // Run the worker logic (waits up to 50s to drain queue)
   await runBackgroundWorker();
 
+  // --- DAILY REFRESH STALENESS GUARD ---
+  // If Vercel skipped the daily-refresh cron, trigger it via HTTP so it runs
+  // as its own independent serverless invocation (won't be killed when this function exits).
+  try {
+    const staleCheck = await db.query(
+      "SELECT value FROM system_state WHERE key = 'last_successful_refresh'"
+    );
+    const lastRefresh = staleCheck.rows[0]?.value?.timestamp;
+    const staleMs = 26 * 60 * 60 * 1000; // 26 hours
+
+    if (!lastRefresh || (Date.now() - new Date(lastRefresh).getTime()) > staleMs) {
+      console.log("[process-queue] Daily refresh is stale — triggering fallback via HTTP.");
+      const cronSecret = process.env.CRON_SECRET;
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "https://www.market-pulse.io";
+      // Fire-and-forget: don't await — let it run as a separate invocation
+      fetch(`${baseUrl}/api/cron/daily-refresh?secret=${encodeURIComponent(cronSecret)}`)
+        .then(r => console.log(`[process-queue] Fallback daily-refresh triggered: ${r.status}`))
+        .catch(err => console.error("[process-queue] Fallback daily-refresh call failed:", err.message));
+    }
+  } catch (err) {
+    console.error("[process-queue] Staleness check error:", err.message);
+  }
+
   // Respond only after work is done
   res.status(200).json({ success: true, message: "Worker cycle complete." });
 });
@@ -308,173 +333,11 @@ router.post("/recalculate", async (req, res) => {
       `[Sentinel] Recalculate Triggered: Hotel ${hotelId} | Range: ${startDate} to ${endDate}`,
     );
 
-    // 1. Fetch Configuration (Facts + Rules)
-    const configRes = await db.query(
-      "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
-      [hotelId],
-    );
+    const result = await sentinelService.recalculateRates(hotelId, startDate, endDate);
 
-    if (configRes.rows.length === 0) {
-      throw new Error("Configuration not found. Please Sync with PMS first.");
-    }
-
-    const config = configRes.rows[0];
-    const baseRoomTypeId = config.base_room_type_id;
-    const differentials = config.room_differentials || [];
-    const pmsRoomTypes = config.pms_room_types?.data || [];
-
-    // Detect Mews — skip differential room loops (all categories share one rate ID)
-    const pmsTypeRes = await db.query("SELECT pms_type FROM hotels WHERE hotel_id = $1", [hotelId]);
-    const isMewsHotel = pmsTypeRes.rows[0]?.pms_type === "mews";
-    const pmsRatePlans = config.pms_rate_plans?.data || [];
-
-    if (!baseRoomTypeId) {
-      throw new Error("Base Room Type not defined in configuration.");
-    }
-
-    // --- SELF-HEALING MAP LOGIC (Corrects "Death Spiral" targeting) ---
-    // Ensure we are targeting "Standard" plans, not "Net/Package" plans.
-    const currentMap = config.rate_id_map || {};
-    const freshMap = sentinelService.buildRateIdMap(pmsRoomTypes, pmsRatePlans);
-
-    // If the map is empty, we cannot proceed safely.
-    if (Object.keys(freshMap).length === 0) {
-      throw new Error(
-        "Critical: Unable to build a valid Rate ID Map. Check PMS Rate Plans.",
-      );
-    }
-
-    let needsUpdate = false;
-    if (JSON.stringify(currentMap) !== JSON.stringify(freshMap)) {
-      needsUpdate = true;
-    }
-
-    if (needsUpdate) {
-      console.log(
-        `[Sentinel] Healing Rate ID Map for Hotel ${hotelId} (Correcting Target Plans)...`,
-      );
-      await db.query(
-        `UPDATE sentinel_configurations SET rate_id_map = $1, updated_at = NOW() WHERE hotel_id = $2`,
-        [JSON.stringify(freshMap), hotelId],
-      );
-      // Update local config object so the rest of the function uses the new map
-      config.rate_id_map = freshMap;
-    }
-    // ----------------------------
-
-    // 2. Get Calculated Rates (Scoped strictly to requested range)
-    // [FIX] Pass the specific startDate/endDate to previewCalendar, NOT the full year.
-    const previewCalendar = await sentinelService.previewCalendar({
-      hotelId,
-      baseRoomTypeId,
-      startDate: startDate,
-      endDate: endDate,
-    });
-
-    // 3. Build Master Payload
-    const allOverrides = [];
-
-    // Loop through EVERY room type
-    for (const room of pmsRoomTypes) {
-      const roomTypeId = room.roomTypeID;
-      let isBase = String(roomTypeId) === String(baseRoomTypeId);
-      let diffRule = differentials.find(
-        (r) => String(r.roomTypeId) === String(roomTypeId),
-      );
-
-      // For each day in the calendar...
-      previewCalendar.forEach((day) => {
-        // [FIX] Use 'finalRate' instead of 'rate'
-        if (!day.finalRate || day.finalRate <= 0) return;
-
-        let finalRate = parseFloat(day.finalRate);
-
-        // Apply Differential
-        if (!isBase && diffRule) {
-          const val = parseFloat(diffRule.value);
-          if (diffRule.operator === "+") {
-            finalRate = finalRate * (1 + val / 100);
-          } else if (diffRule.operator === "-") {
-            finalRate = finalRate * (1 - val / 100);
-          }
-        }
-
-        finalRate = Math.round(finalRate * 100) / 100;
-
-        if (isNaN(finalRate) || finalRate <= 0) return;
-
-        allOverrides.push({
-          date: day.date,
-          room_type_id: roomTypeId,
-          rate: finalRate,
-          categoryId: isMewsHotel ? roomTypeId : undefined,
-        });
-      });
-    }
-
-    // --- DEBUG TRACE 1 ---
-    console.log(
-      `[Trace] Generated ${allOverrides.length} total overrides across ${pmsRoomTypes.length} rooms.`,
-    );
-    // ---------------------
-
-    // 4. Send to Queue
-    const hotelRes = await db.query(
-      "SELECT pms_property_id FROM hotels WHERE hotel_id = $1",
-      [hotelId],
-    );
-    const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
-    console.log(`[Trace] Using PMS Property ID: ${pmsPropertyId}`);
-
-    // Build PMS payload directly (differentials already applied above)
-    const rateIdMap = config.rate_id_map || {};
-    const batchPayload = [];
-    const dbWrites = [];
-
-    for (const o of allOverrides) {
-      const rateId = rateIdMap[o.room_type_id];
-      if (!rateId) continue;
-
-      batchPayload.push({ rateId, date: o.date, rate: o.rate, categoryId: o.categoryId });
-
-      // Write to sentinel_rates_calendar
-      dbWrites.push(
-        db.query(
-          `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
-           VALUES ($1, $2, $3, $4, 'SENTINEL', NOW())
-           ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
-           SET rate = EXCLUDED.rate, source = 'SENTINEL', last_updated_at = NOW()`,
-          [hotelId, o.date, o.room_type_id, o.rate],
-        ),
-      );
-    }
-
-    // Persist rate calendar updates
-    await Promise.all(dbWrites);
-
-    let totalQueued = 0;
-
-    if (batchPayload.length > 0) {
-      const CHUNK_SIZE = 30;
-      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
-        const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
-        await db.query(
-          `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
-          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
-        );
-      }
-      totalQueued = batchPayload.length;
-    }
-
-    console.log(
-      `[Sentinel] Recalculate complete: ${totalQueued} rates queued across ${Object.keys(rateIdMap).length} rooms.`,
-    );
-
-    // 5. [VERCEL OPTIMIZATION] Do not kick worker manually.
-    // The Cron job will pick up the PENDING jobs within 60 seconds.
     res.status(200).json({
       success: true,
-      message: `Recalculation queued. The background worker will process ${totalQueued} updates shortly.`,
+      message: `Recalculation queued. The background worker will process ${result.totalQueued} updates shortly.`,
     });
   } catch (error) {
     console.error("[Sentinel] Re-Push Failed:", error);
@@ -1231,16 +1094,16 @@ router.post("/sync", async (req, res) => {
                ON CONFLICT (hotel_id, room_type_id, stay_date)
                DO UPDATE SET
                  source = CASE
-                   WHEN sentinel_rates_calendar.source IN ('SENTINEL', 'LOCKED', 'MANUAL') THEN sentinel_rates_calendar.source
+                   WHEN sentinel_rates_calendar.source IN ('LOCKED', 'MANUAL') THEN sentinel_rates_calendar.source
                    WHEN sentinel_rates_calendar.rate = EXCLUDED.rate THEN sentinel_rates_calendar.source
                    ELSE 'SYNC'
                  END,
                  rate = CASE
-                   WHEN sentinel_rates_calendar.source IN ('SENTINEL', 'LOCKED', 'MANUAL') THEN sentinel_rates_calendar.rate
+                   WHEN sentinel_rates_calendar.source IN ('LOCKED', 'MANUAL') THEN sentinel_rates_calendar.rate
                    ELSE EXCLUDED.rate
                  END,
                  last_updated_at = CASE
-                   WHEN sentinel_rates_calendar.source IN ('SENTINEL', 'LOCKED', 'MANUAL') THEN sentinel_rates_calendar.last_updated_at
+                   WHEN sentinel_rates_calendar.source IN ('LOCKED', 'MANUAL') THEN sentinel_rates_calendar.last_updated_at
                    ELSE NOW()
                  END
             `;
@@ -1289,6 +1152,31 @@ router.post("/config/:hotelId", async (req, res) => {
   try {
     // [REFACTOR] Delegate logic to Service
     const updatedConfig = await sentinelService.updateConfig(hotelId, req.body);
+
+    // [NEW] If autopilot is on and monthly_min_rates changed, trigger recalculate
+    // so updated floors are immediately enforced and pushed to PMS.
+    if (updatedConfig.is_autopilot_enabled && req.body.monthly_min_rates) {
+      const today = new Date();
+      const startDate = today.toISOString().split("T")[0];
+      const endDate = new Date(today.getTime() + 365 * 86400000)
+        .toISOString()
+        .split("T")[0];
+
+      // Fire-and-forget: recalculate in background, don't block the response
+      setImmediate(async () => {
+        try {
+          console.log(
+            `[Sentinel] Autopilot: recalculating rates for hotel ${hotelId} after min rate change`,
+          );
+          await sentinelService.recalculateRates(hotelId, startDate, endDate);
+        } catch (err) {
+          console.error(
+            `[Sentinel] Autopilot recalculate failed for ${hotelId}:`,
+            err.message,
+          );
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -1642,15 +1530,20 @@ router.get("/rates/:hotelId/:roomTypeId", async (req, res) => {
         [hotelId, roomTypeId, startDateStr],
       ),
       // [BRIDGE UPDATE] Pass BOTH IDs — [MEWS] Route to correct PMS adapter
-      _getSentinelAdapterForHotel(hotelId).then((adapter) =>
-        adapter.getRates(
-          hotelId,
-          pmsPropertyId,
-          roomTypeId,
-          startDateStr,
-          endDateStr,
-        ),
-      ),
+      _getSentinelAdapterForHotel(hotelId)
+        .then((adapter) =>
+          adapter.getRates(
+            hotelId,
+            pmsPropertyId,
+            roomTypeId,
+            startDateStr,
+            endDateStr,
+          ),
+        )
+        .catch((err) => {
+          console.error(`[Sentinel Router] Live rate fetch failed for hotel ${hotelId}:`, err.message);
+          return { success: true, data: { roomRateDetailed: [] } };
+        }),
     ]);
 
     // 4. Create a Lookup Map for Live Rates

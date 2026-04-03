@@ -90,7 +90,7 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
     } catch (error) {
       const status = error.response?.status;
 
-      if ((status === 429 || status === 408) && attempt < MAX_RETRIES) {
+      if ((status === 429 || status === 408 || status === 401) && attempt < MAX_RETRIES) {
         const retryAfter =
           status === 429
             ? parseInt(error.response.headers["retry-after"] || "5", 10)
