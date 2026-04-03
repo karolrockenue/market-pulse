@@ -469,6 +469,7 @@ async function runSync(propertyId) {
           ),
           mewsAdapter.getRevenueMetrics(
             credentials,
+            serviceId,
             startDateStr,
             endDateStr,
             hotelTimezone

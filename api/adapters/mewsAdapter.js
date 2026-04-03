@@ -446,6 +446,7 @@ async function getOccupancyMetrics(
 
   do {
     const payload = {
+      ServiceIds: [serviceId],
       CollidingUtc: {
         StartUtc: toMewsUtc(startDate, timezone),
         EndUtc: toMewsUtc(endDate, timezone),
@@ -516,12 +517,13 @@ async function getOccupancyMetrics(
  * @param {string} timezone - IANA timezone
  * @returns {Promise<Array>} Array of { date, netRevenue, grossRevenue }
  */
-async function getRevenueMetrics(credentials, startDate, endDate, timezone) {
+async function getRevenueMetrics(credentials, serviceId, startDate, endDate, timezone) {
   let allOrderItems = [];
   let cursor = null;
 
   do {
     const payload = {
+      ServiceIds: [serviceId],
       ConsumedUtc: {
         StartUtc: toMewsUtc(startDate, timezone),
         EndUtc: toMewsUtc(endDate, timezone),
@@ -590,7 +592,7 @@ async function getCombinedMetrics(
 ) {
   const [occupancy, revenue] = await Promise.all([
     getOccupancyMetrics(credentials, serviceId, startDate, endDate, timezone),
-    getRevenueMetrics(credentials, startDate, endDate, timezone),
+    getRevenueMetrics(credentials, serviceId, startDate, endDate, timezone),
   ]);
 
   // Build revenue lookup

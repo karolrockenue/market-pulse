@@ -559,6 +559,7 @@ async function getMewsCredentials(propertyId) {
   return {
     clientToken: storedCredentials.clientToken,
     accessToken: decryptedToken,
+    serviceId: storedCredentials.serviceId || null,
   };
 }
 
@@ -856,6 +857,7 @@ router.get("/test-mews-revenue", requireAdminApi, async (req, res) => {
     // Call the adapter function with dynamic credentials and timezone.
     const revenueData = await mewsAdapter.getRevenueMetrics(
       credentials,
+      credentials.serviceId,
       finalStartDate,
       finalEndDate,
       hotelDetails.timezone // Use the dynamic timezone
