@@ -966,14 +966,46 @@ router.get("/config/:hotelId", async (req, res) => {
 });
 
 /**
- * [NEW] POST /api/sentinel/sync/:hotelId
+ * POST /api/sentinel/sync-preview
+ * Lightweight preflight: fetches room types & rate plans from PMS without saving.
+ * Used by the frontend to show a rate plan picker for Mews properties before activation.
+ */
+router.post("/sync-preview", async (req, res) => {
+  const { hotelId, pmsPropertyId } = req.body;
+  try {
+    const syncAdapter = await _getSentinelAdapterForHotel(hotelId);
+    const [roomTypesData, ratePlansData] = await Promise.all([
+      syncAdapter.getRoomTypes(hotelId, pmsPropertyId),
+      syncAdapter.getRatePlans(hotelId, pmsPropertyId),
+    ]);
+
+    const pmsRoomTypes = roomTypesData.data || [];
+    const pmsRatePlans = ratePlansData.data || [];
+    const hotelPmsType = await pmsRegistry.getPmsType(hotelId);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        pms_type: hotelPmsType,
+        pms_room_types: { data: pmsRoomTypes },
+        pms_rate_plans: { data: pmsRatePlans },
+      },
+    });
+  } catch (error) {
+    console.error(`[Sentinel Router] Sync preview failed for ${hotelId}:`, error.message);
+    res.status(500).json({ success: false, message: "Failed to fetch PMS data.", error: error.message });
+  }
+});
+
+/**
+ * POST /api/sentinel/sync
  * Performs a "Facts Sync" from the PMS.
- * This fetches room types & rate plans and saves them to our DB.
- * It is called by the "Enable" toggle and the "Sync with PMS" button.
- * This is non-destructive and will not overwrite user "Rules".
+ * Fetches room types & rate plans and saves them to our DB.
+ * For Mews: accepts optional `selectedRateId` to use a specific root rate plan
+ * instead of auto-detection (critical for properties with many rate plans).
  */
 router.post("/sync", async (req, res) => {
-  const { hotelId, pmsPropertyId } = req.body;
+  const { hotelId, pmsPropertyId, selectedRateId } = req.body;
   try {
     console.log(
       `[Sentinel Router] Starting Full Sync for hotelId: ${hotelId} (PMS ID: ${pmsPropertyId})`,
@@ -993,11 +1025,21 @@ router.post("/sync", async (req, res) => {
     const hotelPmsType = await pmsRegistry.getPmsType(hotelId);
     let rateIdMap;
     if (hotelPmsType === "mews") {
-      const mewsAdapterLocal = require("../adapters/mewsAdapter");
-      rateIdMap = mewsAdapterLocal.buildMewsRateIdMap(
-        pmsRatePlans,
-        pmsRoomTypes,
-      );
+      if (selectedRateId) {
+        // Admin explicitly selected a rate plan — map all room types to it
+        rateIdMap = {};
+        for (const cat of pmsRoomTypes) {
+          rateIdMap[cat.roomTypeID] = selectedRateId;
+        }
+        const selectedPlan = pmsRatePlans.find((r) => r.rateID === selectedRateId);
+        console.log(`[Mews] Admin selected rate plan: "${selectedPlan?.ratePlanName || "?"}" (${selectedRateId})`);
+      } else {
+        const mewsAdapterLocal = require("../adapters/mewsAdapter");
+        rateIdMap = mewsAdapterLocal.buildMewsRateIdMap(
+          pmsRatePlans,
+          pmsRoomTypes,
+        );
+      }
     } else {
       rateIdMap = sentinelService.buildRateIdMap(pmsRoomTypes, pmsRatePlans);
     }

@@ -54,14 +54,29 @@ export const saveConfig = async (
   return json.data;
 };
 
-export const syncFacts = async (
+export const syncPreview = async (
   hotelId: number | string,
   pmsPropertyId: string
+) => {
+  const res = await fetch("/api/sentinel/sync-preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hotelId, pmsPropertyId }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Preview failed");
+  return json.data;
+};
+
+export const syncFacts = async (
+  hotelId: number | string,
+  pmsPropertyId: string,
+  selectedRateId?: string
 ) => {
   const res = await fetch("/api/sentinel/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hotelId, pmsPropertyId }),
+    body: JSON.stringify({ hotelId, pmsPropertyId, selectedRateId }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.message || "Sync failed");

@@ -176,6 +176,10 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     updateRule,
     activateHotel,
     saveRules,
+    // Rate Plan Picker (Mews)
+    ratePlanPicker,
+    completeActivation,
+    dismissRatePlanPicker,
     // Promo Config
     calculatorStates,
     updateCalculator,
@@ -193,6 +197,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     useState(false);
   // [NEW] Repush Loading State
   const [isRepushing, setIsRepushing] = useState("");
+  // Rate Plan Picker (Mews)
+  const [selectedRateId, setSelectedRateId] = useState<string>("");
+  const [ratePlanSearch, setRatePlanSearch] = useState("");
 
   // [NEW] Max Rates badge presence map (daily ceilings present in DB)
   const [hasMaxRatesByHotelId, setHasMaxRatesByHotelId] = useState<
@@ -835,6 +842,192 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
             </Card>
           </div>
         )}
+
+        {/* RATE PLAN PICKER DIALOG (Mews properties with multiple root rate plans) */}
+        <Dialog
+          open={!!ratePlanPicker}
+          onOpenChange={(open) => {
+            if (!open) {
+              dismissRatePlanPicker();
+              setSelectedRateId("");
+              setRatePlanSearch("");
+            }
+          }}
+        >
+          <DialogContent
+            style={{
+              backgroundColor: "#1a1a1a",
+              borderColor: "#2a2a2a",
+              maxWidth: "600px",
+              maxHeight: "80vh",
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle style={{ color: "#e5e5e5" }}>
+                Select Rate Plan
+              </DialogTitle>
+              <DialogDescription style={{ color: "#9ca3af" }}>
+                This property has{" "}
+                <span style={{ color: "#39BDF8", fontWeight: 600 }}>
+                  {ratePlanPicker?.ratePlans.length}
+                </span>{" "}
+                root rate plans. Select the base rate plan Sentinel should use
+                for pricing.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div style={{ margin: "0.75rem 0" }}>
+              <Input
+                placeholder="Search rate plans..."
+                value={ratePlanSearch}
+                onChange={(e) => setRatePlanSearch(e.target.value)}
+                style={{
+                  backgroundColor: "#2C2C2C",
+                  borderColor: "#2a2a2a",
+                  color: "#e5e5e5",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                maxHeight: "400px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+              }}
+            >
+              {ratePlanPicker?.ratePlans
+                .filter((rp) =>
+                  ratePlanSearch
+                    ? (rp.ratePlanName || "")
+                        .toLowerCase()
+                        .includes(ratePlanSearch.toLowerCase())
+                    : true
+                )
+                .map((rp) => {
+                  const isAutoSuggested =
+                    rp.rateID === ratePlanPicker.autoSelected;
+                  const isSelected = rp.rateID === selectedRateId;
+                  return (
+                    <div
+                      key={rp.rateID}
+                      onClick={() => setSelectedRateId(rp.rateID)}
+                      style={{
+                        padding: "0.75rem 1rem",
+                        borderRadius: "0.375rem",
+                        cursor: "pointer",
+                        border: isSelected
+                          ? "1px solid #39BDF8"
+                          : "1px solid #2a2a2a",
+                        backgroundColor: isSelected
+                          ? "rgba(57,189,248,0.08)"
+                          : "#1D1D1C",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: "1rem",
+                            height: "1rem",
+                            borderRadius: "50%",
+                            border: isSelected
+                              ? "5px solid #39BDF8"
+                              : "2px solid #6b7280",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            color: "#e5e5e5",
+                            fontSize: "0.875rem",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {rp.ratePlanName}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: "0.375rem", flexShrink: 0 }}>
+                        {isAutoSuggested && (
+                          <Badge
+                            style={{
+                              backgroundColor: "rgba(57,189,248,0.15)",
+                              color: "#39BDF8",
+                              fontSize: "0.7rem",
+                              padding: "0.125rem 0.5rem",
+                            }}
+                          >
+                            Suggested
+                          </Badge>
+                        )}
+                        {(rp as any).isPublic && (
+                          <Badge
+                            style={{
+                              backgroundColor: "rgba(16,185,129,0.15)",
+                              color: "#10b981",
+                              fontSize: "0.7rem",
+                              padding: "0.125rem 0.5rem",
+                            }}
+                          >
+                            Public
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <DialogFooter style={{ marginTop: "1rem" }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  dismissRatePlanPicker();
+                  setSelectedRateId("");
+                  setRatePlanSearch("");
+                }}
+                style={{
+                  borderColor: "#2a2a2a",
+                  color: "#9ca3af",
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!selectedRateId || isSyncing !== null}
+                onClick={() => {
+                  if (ratePlanPicker && selectedRateId) {
+                    completeActivation(
+                      ratePlanPicker.hotelId,
+                      ratePlanPicker.pmsPropertyId,
+                      selectedRateId
+                    );
+                    setSelectedRateId("");
+                    setRatePlanSearch("");
+                  }
+                }}
+                style={{
+                  backgroundColor:
+                    selectedRateId ? "#39BDF8" : "rgba(57,189,248,0.3)",
+                  color: "#0f0f0f",
+                  fontWeight: 500,
+                }}
+              >
+                {isSyncing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}
+                Activate with Selected Plan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* 2. MARKET STRATEGY CARD */}
         <div style={{ marginBottom: "2rem" }}>

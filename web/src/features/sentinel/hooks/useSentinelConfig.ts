@@ -6,12 +6,13 @@ import {
   getConfig,
   saveConfig,
   syncFacts,
+  syncPreview,
   getDailyMaxRates,
   saveDailyMaxRates,
   getAssets,
   updateAsset,
 } from "../api/sentinel.api";
-import { SentinelConfig, AssetConfig } from "../api/types";
+import { SentinelConfig, AssetConfig, PMSRatePlan } from "../api/types";
 import {
   CalculatorState,
   DEFAULT_CALCULATOR_STATE,
@@ -88,6 +89,14 @@ export const useSentinelConfig = (allHotels: any[]) => {
   const [loadingHotelId, setLoadingHotelId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
+
+  // --- Rate Plan Picker (Mews properties with multiple root rate plans) ---
+  const [ratePlanPicker, setRatePlanPicker] = useState<{
+    hotelId: string;
+    pmsPropertyId: string;
+    ratePlans: PMSRatePlan[];
+    autoSelected: string | null;
+  } | null>(null);
 
   // 1. Fetch Initial Data (Configs + PMS IDs)
   useEffect(() => {
@@ -295,26 +304,65 @@ export const useSentinelConfig = (allHotels: any[]) => {
   // 5. Actions: Sync & Save
   const activateHotel = async (hotelId: string, pmsPropertyId: string) => {
     setIsSyncing(hotelId);
-    const toastId = toast.loading("Syncing with PMS...");
+    const toastId = toast.loading("Fetching PMS data...");
     try {
-      const data = await syncFacts(hotelId, pmsPropertyId);
+      // Step 1: Preview — fetch rate plans to check if we need manual selection
+      const preview = await syncPreview(hotelId, pmsPropertyId);
+      const ratePlans: PMSRatePlan[] = preview.pms_rate_plans?.data || [];
+      const isMews = preview.pms_type === "mews";
 
-      // Update Server Configs
+      if (isMews) {
+        const rootRates = ratePlans.filter((r: PMSRatePlan) => !r.isDerived);
+        if (rootRates.length > 1) {
+          // Multiple root rate plans — show picker
+          const autoName = ["base", "standard", "rack", "bar"];
+          const autoMatch = rootRates.find((r: PMSRatePlan) =>
+            autoName.some((kw) => (r.ratePlanName || "").toLowerCase().includes(kw))
+          );
+          setRatePlanPicker({
+            hotelId,
+            pmsPropertyId,
+            ratePlans: rootRates,
+            autoSelected: autoMatch?.rateID || null,
+          });
+          toast.info("Select a rate plan for this property.", { id: toastId });
+          setIsSyncing(null);
+          return; // Wait for user selection
+        }
+      }
+
+      // No picker needed — proceed with auto-detection
+      await completeActivation(hotelId, pmsPropertyId, undefined, toastId);
+    } catch (error: any) {
+      toast.error("Sync failed", { id: toastId, description: error.message });
+      setIsSyncing(null);
+    }
+  };
+
+  // Step 2: Complete activation (called directly or after rate plan selection)
+  const completeActivation = async (
+    hotelId: string,
+    pmsPropertyId: string,
+    selectedRateId?: string,
+    existingToastId?: string | number
+  ) => {
+    setIsSyncing(hotelId);
+    const toastId = existingToastId || toast.loading("Syncing with PMS...");
+    if (!existingToastId) toast.loading("Syncing with PMS...", { id: toastId });
+    try {
+      const data = await syncFacts(hotelId, pmsPropertyId, selectedRateId);
+
       setServerConfigs((prev) => ({ ...prev, [hotelId]: data }));
 
-      // Init Form State
       setFormState((prev) => {
         const existingRules = prev[hotelId] || DEFAULT_RULES;
-
         return {
           ...prev,
           [hotelId]: {
             ...existingRules,
-            // Only disable if it was never enabled; otherwise keep current state
             sentinel_enabled:
               data.sentinel_enabled ?? existingRules.sentinel_enabled,
             pms_room_types: data.pms_room_types,
-            // FIX: Prefer the saved Base Room ID from DB, then local state, then fallback to first room
             base_room_type_id:
               data.base_room_type_id ||
               existingRules.base_room_type_id ||
@@ -324,6 +372,7 @@ export const useSentinelConfig = (allHotels: any[]) => {
         };
       });
 
+      setRatePlanPicker(null);
       toast.success("Sync complete.", { id: toastId });
     } catch (error: any) {
       toast.error("Sync failed", { id: toastId, description: error.message });
@@ -331,6 +380,8 @@ export const useSentinelConfig = (allHotels: any[]) => {
       setIsSyncing(null);
     }
   };
+
+  const dismissRatePlanPicker = () => setRatePlanPicker(null);
 
   const saveRules = async (hotelId: string) => {
     setIsSaving(hotelId);
@@ -477,6 +528,11 @@ export const useSentinelConfig = (allHotels: any[]) => {
     availableHotels,
     activeHotels,
     formState,
+
+    // Rate Plan Picker (Mews)
+    ratePlanPicker,
+    completeActivation,
+    dismissRatePlanPicker,
 
     // Promo Config
     assets,
