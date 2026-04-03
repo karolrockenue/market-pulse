@@ -339,6 +339,14 @@ async function runSync(propertyId) {
     // replace with this
     else if (pmsType === "mews") {
       console.log("--- Running Mews Sync ---");
+
+      // Get total_rooms for consistent capacity (same as daily-refresh)
+      const hotelRoomsResult = await client.query(
+        "SELECT total_rooms FROM hotels WHERE hotel_id = $1",
+        [propertyId]
+      );
+      const totalRooms = hotelRoomsResult.rows[0]?.total_rooms || 0;
+
       // Get Mews credentials from the DB
       const credsResult = await client.query(
         "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
@@ -440,18 +448,19 @@ async function runSync(propertyId) {
         }
       }
 
-      // --- The rest of the historical data fetch remains unchanged ---
+      // Fetch 5 years back + 365 days forward (matches daily-refresh coverage)
       let allProcessedData = {};
       let currentStartDate = new Date();
       currentStartDate.setFullYear(currentStartDate.getFullYear() - 5);
-      const today = new Date();
+      const finalEndDate = new Date();
+      finalEndDate.setDate(finalEndDate.getDate() + 365);
 
-      while (currentStartDate < today) {
+      while (currentStartDate < finalEndDate) {
         let currentEndDate = new Date(currentStartDate);
         currentEndDate.setDate(currentEndDate.getDate() + 89);
 
-        if (currentEndDate > today) {
-          currentEndDate = today;
+        if (currentEndDate > finalEndDate) {
+          currentEndDate = finalEndDate;
         }
 
         const startDateStr = currentStartDate.toISOString().split("T")[0];
@@ -548,32 +557,24 @@ async function runSync(propertyId) {
         // Use the filtered list for bulk insertion
         const bulkInsertValues = filteredDatesToUpdate.map((date) => {
           const metrics = allProcessedData[date];
-          const net_adr =
-            metrics.rooms_sold > 0
-              ? metrics.net_revenue / metrics.rooms_sold
-              : 0;
-          const gross_adr =
-            metrics.rooms_sold > 0
-              ? metrics.gross_revenue / metrics.rooms_sold
-              : 0;
-          const net_revpar =
-            metrics.capacity_count > 0
-              ? metrics.net_revenue / metrics.capacity_count
-              : 0;
-          const gross_revpar =
-            metrics.capacity_count > 0
-              ? metrics.gross_revenue / metrics.capacity_count
-              : 0;
+          const capacity = totalRooms || metrics.capacity_count || 0;
+          const roomsSold = metrics.rooms_sold || 0;
+          const netRev = metrics.net_revenue || 0;
+          const grossRev = metrics.gross_revenue || 0;
+          const net_adr = roomsSold > 0 ? netRev / roomsSold : 0;
+          const gross_adr = roomsSold > 0 ? grossRev / roomsSold : 0;
+          const net_revpar = capacity > 0 ? netRev / capacity : 0;
+          const gross_revpar = capacity > 0 ? grossRev / capacity : 0;
 
           return [
             date,
             propertyId,
-            metrics.rooms_sold || 0,
-            metrics.capacity_count || 0,
-            metrics.occupancy || 0,
+            roomsSold,
+            capacity,
+            capacity > 0 ? roomsSold / capacity : 0,
             null,
-            metrics.net_revenue || 0,
-            metrics.gross_revenue || 0,
+            netRev,
+            grossRev,
             net_adr,
             gross_adr,
             net_revpar,
