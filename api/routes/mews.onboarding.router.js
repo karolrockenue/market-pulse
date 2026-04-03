@@ -241,7 +241,23 @@ router.post("/onboard", async (req, res) => {
       `[Mews Onboarding] Sentinel config created for hotel ${hotelId}`,
     );
 
-    // 4c. Encrypt access token and insert user_properties (needed by initial-sync)
+    // 4c. Create rockenue_managed_assets record (needed for Promo Config / OTA Discount Stack)
+    await client.query(
+      `INSERT INTO rockenue_managed_assets (
+        market_pulse_hotel_id, asset_name, city, total_rooms, management_group, monthly_fee
+      ) VALUES ($1, $2, $3, $4, $5, 0.00)
+      ON CONFLICT (market_pulse_hotel_id) DO NOTHING`,
+      [
+        String(hotelId),
+        details.propertyName,
+        details.city || null,
+        details.totalRooms || 0,
+        null,
+      ],
+    );
+    console.log(`[Mews Onboarding] Rockenue asset created for hotel ${hotelId}`);
+
+    // 4d. Encrypt access token and insert user_properties (needed by initial-sync)
     const iv = crypto.randomBytes(16);
     const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
     const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
