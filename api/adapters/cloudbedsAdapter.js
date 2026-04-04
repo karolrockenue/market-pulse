@@ -1438,24 +1438,25 @@ async function getMonthlyFinancials(
 ) {
   let takingsRecords = [];
 
-  // [FIX] Chunking Logic to bypass 12k row limit
+  // Weekly chunking: ~7-day windows stay under the 12k row limit while
+  // cutting the number of API round-trips from 31 to ~5.
   const start = new Date(startDate);
   const end = new Date(endDate);
   const chunks = [];
 
-  // [FIX] Daily Chunking to bypass 12k row limit
   let curr = new Date(start);
   while (curr <= end) {
-    const dayStr = curr.toISOString().split("T")[0];
-    chunks.push({ start: dayStr, end: dayStr }); // Single Day Chunk
-    curr.setDate(curr.getDate() + 1);
+    const chunkStart = curr.toISOString().split("T")[0];
+    const chunkEnd = new Date(Math.min(curr.getTime() + 6 * 86400000, end.getTime()));
+    chunks.push({ start: chunkStart, end: chunkEnd.toISOString().split("T")[0] });
+    curr = new Date(chunkEnd.getTime() + 86400000);
   }
 
-  console.log(`[Takings] Split request into ${chunks.length} chunks.`);
+  console.log(`[Takings] Split request into ${chunks.length} weekly chunks (parallel).`);
 
-  for (const chunk of chunks) {
-    console.log(`[Takings] Fetching Chunk: ${chunk.start} to ${chunk.end}`);
-
+  // Helper: fetch all paginated records for one chunk
+  async function fetchChunk(chunk) {
+    const records = [];
     const initialTakingsPayload = {
       property_ids: [propertyId],
       dataset_id: 1,
@@ -1471,13 +1472,11 @@ async function getMonthlyFinancials(
             operator: "less_than_or_equal",
             value: `${chunk.end}T23:59:59.999Z`,
           },
-          // [FIX] Restore strict Payment filter
           {
             cdf: { column: "transaction_type" },
             operator: "equals",
             value: "Payment",
           },
-          // [FIX] Exclude Imports at API level to save bandwidth
           {
             cdf: { column: "payment_method" },
             operator: "not_equals",
@@ -1501,8 +1500,6 @@ async function getMonthlyFinancials(
     };
 
     let nextToken = null;
-    let pageNum = 1;
-
     do {
       const payload = { ...initialTakingsPayload };
       if (nextToken) payload.nextToken = nextToken;
@@ -1525,7 +1522,7 @@ async function getMonthlyFinancials(
 
       if (data.records && data.records.credit_amount) {
         for (let i = 0; i < data.records.credit_amount.length; i++) {
-          takingsRecords.push({
+          records.push({
             id: data.records.id ? data.records.id[i] : "unknown",
             method: data.records.payment_method[i],
             amount: parseFloat(data.records.credit_amount[i] || 0),
@@ -1548,8 +1545,15 @@ async function getMonthlyFinancials(
         }
       }
       nextToken = data.nextToken;
-      pageNum++;
     } while (nextToken);
+
+    return records;
+  }
+
+  // Fire all weekly chunks in parallel
+  const chunkResults = await Promise.all(chunks.map(fetchChunk));
+  for (const records of chunkResults) {
+    takingsRecords = takingsRecords.concat(records);
   }
 
   console.log(`[Takings] Total Fetched (All Chunks): ${takingsRecords.length}`);
