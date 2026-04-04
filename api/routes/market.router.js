@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const MarketService = require("../services/market.service");
+const pool = require("../utils/db");
 const { requireUserApi, requireAdminApi } = require("../utils/middleware");
 
 // --- 1. MARKET DATA (Trends, KPIs, Neighborhoods) ---
@@ -163,6 +164,29 @@ router.get("/accommodation-map", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error("Error in /accommodation-map:", error);
     res.status(500).json({ error: "Failed to fetch accommodation map data." });
+  }
+});
+
+router.get("/airbnb-availability", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.query;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+
+    const { rows } = await pool.query(
+      `SELECT checkin_date, total_listings, avg_price, median_price, listings
+       FROM airbnb_availability_snapshots
+       WHERE city_slug = $1
+         AND scraped_at = (
+           SELECT MAX(scraped_at) FROM airbnb_availability_snapshots WHERE city_slug = $1
+         )
+       ORDER BY checkin_date ASC`,
+      [citySlug]
+    );
+
+    res.json({ citySlug, snapshots: rows });
+  } catch (error) {
+    console.error("Error in /airbnb-availability:", error);
+    res.status(500).json({ error: "Failed to fetch Airbnb availability data." });
   }
 });
 

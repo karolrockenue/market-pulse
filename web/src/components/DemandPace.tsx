@@ -1,5 +1,6 @@
 // Import React hooks for state and side effects
 import { useState, useEffect, useMemo } from "react";
+import { AirbnbAvailability } from "./AirbnbAvailability";
 import {
   MapPin,
   Calendar,
@@ -1009,6 +1010,13 @@ export function DemandPace({
             </div>
           </div>
 
+
+          {citySlug === "archanes" && (
+            <AirbnbAvailability
+              citySlug={citySlug}
+              currencySymbol={currencySymbol}
+            />
+          )}
 
           <div
             style={{

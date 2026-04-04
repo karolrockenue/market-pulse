@@ -710,7 +710,7 @@ export default function App() {
           {/* [NEW] Render the Demand & Pace page */}
           {activeView === "demand-pace" &&
             (selectedPropertyDetails ? (
-              marketHotelCount < 5 ? (
+              marketHotelCount < 5 && selectedPropertyDetails.city !== "archanes" ? (
                 <MarketVeil
                   cityName={selectedPropertyDetails.city}
                   currentCount={marketHotelCount}
@@ -748,7 +748,7 @@ export default function App() {
             ))}
 
           {activeView === "competitive-intel" && (
-            marketHotelCount < 5 ? (
+            marketHotelCount < 5 && selectedPropertyDetails?.city !== "archanes" ? (
               <MarketVeil
                 cityName={selectedPropertyDetails?.city}
                 currentCount={marketHotelCount}
@@ -780,7 +780,8 @@ export default function App() {
           {(activeView === "sentinel" ||
             activeView === "rateManager" ||
             activeView === "shadowfax" ||
-            activeView === "riskOverview") && (
+            activeView === "riskOverview" ||
+            activeView === "distribution") && (
             <SentinelHub
               activeView={activeView}
               onNavigate={handleViewChange}
