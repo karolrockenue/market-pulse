@@ -1,0 +1,16 @@
+{
+  "name": "airbnb-codex",
+  "version": "1.0.0",
+  "description": "Airbnb market availability scraper for small/rural markets",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "scrape:archanes": "node index.js archanes"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "node-fetch": "^2.7.0",
+    "pg": "^8.11.3",
+    "@sendgrid/mail": "^7.7.0"
+  }
+}
