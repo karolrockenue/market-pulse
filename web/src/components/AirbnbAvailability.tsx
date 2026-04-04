@@ -36,6 +36,8 @@ interface RegistryProperty {
   type: string;
   beds: string;
   location: string;
+  lat: number | null;
+  lng: number | null;
   rating: number | null;
   reviews: number;
   avg_price: number;
@@ -97,7 +99,16 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
 
         if (regRes.ok) {
           const regJson = await regRes.json();
-          if (!cancelled) setRegistry(regJson.properties || []);
+          if (!cancelled) {
+            // Sort by distance from Archanes center
+            const props = regJson.properties || [];
+            props.sort((a: RegistryProperty, b: RegistryProperty) => {
+              const da = a.lat && a.lng ? Math.sqrt(Math.pow((a.lat - 35.2352) * 111, 2) + Math.pow((a.lng - 25.1594) * 111 * Math.cos(35.2352 * Math.PI / 180), 2)) : 9999;
+              const db = b.lat && b.lng ? Math.sqrt(Math.pow((b.lat - 35.2352) * 111, 2) + Math.pow((b.lng - 25.1594) * 111 * Math.cos(35.2352 * Math.PI / 180), 2)) : 9999;
+              return da - db;
+            });
+            setRegistry(props);
+          }
         }
       } catch (err) {
         console.error("AirbnbAvailability fetch error:", err);
@@ -110,6 +121,15 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
   }, [citySlug]);
 
   const formatPrice = (v: number) => `${currencySymbol}${Math.round(v)}`;
+
+  // Archanes center coordinates
+  const CENTER = { lat: 35.2352, lng: 25.1594 };
+  const getDistanceKm = (lat: number | null, lng: number | null) => {
+    if (!lat || !lng) return null;
+    const dlat = (lat - CENTER.lat) * 111;
+    const dlng = (lng - CENTER.lng) * 111 * Math.cos(CENTER.lat * Math.PI / 180);
+    return Math.sqrt(dlat * dlat + dlng * dlng);
+  };
 
   const tooltipStyle: React.CSSProperties = {
     background: "rgba(26, 26, 26, 0.95)",
@@ -139,10 +159,15 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
   return (
     <div>
       {/* Section Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-        <Home size={18} color="#39BDF8" />
-        <span style={{ color: "#e5e5e5", fontSize: "16px", fontWeight: 600 }}>Airbnb Market Intelligence</span>
-        <span style={{ color: "#6b7280", fontSize: "12px" }}>Archanes & Surrounding Area</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Home size={18} color="#39BDF8" />
+          <span style={{ color: "#e5e5e5", fontSize: "16px", fontWeight: 600 }}>Airbnb Market Intelligence</span>
+          <span style={{ color: "#6b7280", fontSize: "12px" }}>Archanes & Surrounding Area</span>
+        </div>
+        <div style={{ color: "#6b7280", fontSize: "11px", textAlign: "right", lineHeight: "1.5" }}>
+          2-night stays • 90-day forward horizon • Scraped daily
+        </div>
       </div>
 
       {/* Charts Row */}
@@ -287,7 +312,7 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Name", "Type", "Location", "Beds", "Rating", "Avg Rate", "Min", "Max", "Seen", "First Seen", "Last Seen"].map((h) => (
+                  {["Name", "Type", "Location", "Dist.", "Beds", "Rating", "Avg Rate", "Min", "Max", "Seen", "First Seen", "Last Seen"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -318,6 +343,9 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
                     </td>
                     <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px" }}>
                       {p.location || "—"}
+                    </td>
+                    <td style={{ color: "#6b7280", fontSize: "11px", padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {(() => { const d = getDistanceKm(p.lat, p.lng); return d !== null ? `${d.toFixed(1)} km` : "—"; })()}
                     </td>
                     <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px" }}>
                       {p.beds || "—"}
