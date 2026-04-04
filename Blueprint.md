@@ -1496,5 +1496,84 @@ Table: city_accommodation_pois
 
 Migration: api/migration_003_city_accommodation_pois.js
 
+10.0 AIRBNB CODEX (SILOED SIDE PROJECT)
+
+10.1 Purpose
+
+Standalone Airbnb availability scraper for small/rural markets where Booking.com has limited coverage. Currently targets Archanes, Crete. This is a side project — siloed from Market Pulse product, not exposed to end users.
+
+10.2 Architecture
+
+Pure HTTP scraper (no browser/Playwright). Fetches Airbnb search result pages, extracts the embedded JSON from the `data-deferred-state-0` script tag, and parses listing data. No API key or hash maintenance required — reads server-rendered data.
+
+Deployed as a Render cron job. Runs daily at 04:00 UTC.
+
+10.3 File Structure
+
+```
+airbnb-codex/
+├── index.js          # Main scraper logic
+├── utils/
+│   └── db.js         # PostgreSQL connection pool (uses market-pulse .env)
+├── migration.sql     # Table creation script
+└── package.json      # Standalone deps (node-fetch, pg, sendgrid, dotenv)
+```
+
+10.4 How It Works
+
+1. Fetches `https://www.airbnb.com/s/<city>/homes?checkin=...&checkout=...` with browser-like headers.
+2. Extracts JSON from `<script id="data-deferred-state-0">` embedded in the HTML.
+3. Parses listings from `niobeClientData[].data.presentation.staysSearch.results.searchResults`.
+4. Paginates via `cursor` query param (base64-encoded offset, up to 5 pages).
+5. Extracts per listing: name, type, location, beds, coordinates, rating, reviews, nightly price.
+6. Calculates aggregates (avg price, median price, total count).
+7. Upserts into `airbnb_availability_snapshots` table.
+8. 2-night stays, 90-day forward horizon, 4s delay between dates.
+
+10.5 City Configuration
+
+Defined in `CITY_CONFIGS` object in `airbnb-codex/index.js`:
+
+| City | Slug | Currency | Query |
+|------|------|----------|-------|
+| Archanes, Crete | archanes | EUR | Archanes--Greece |
+
+Add new cities by adding entries to this object. Run: `node index.js <slug>`.
+
+10.6 Database
+
+Table: `airbnb_availability_snapshots`
+
+- id (UUID, PK)
+- city_slug (TEXT) — e.g. "archanes"
+- checkin_date (DATE)
+- total_listings (INTEGER)
+- listings (JSONB) — array of { id, name, type, location, beds, lat, lng, rating, reviews, price }
+- avg_price (NUMERIC)
+- median_price (NUMERIC)
+- scraped_at (TIMESTAMPTZ)
+- Unique constraint: one snapshot per city per checkin date per calendar day
+
+Migration: airbnb-codex/migration.sql
+
+10.7 Environment
+
+Uses the market-pulse root `.env` file (loads via `dotenv` with `path: "../.env"`). Requires `DATABASE_URL` and `SENDGRID_API_KEY`.
+
+Render cron job: separate service pointing at market-pulse repo, build command `cd airbnb-codex && npm install`, run command `cd airbnb-codex && node index.js archanes`.
+
+10.8 Key Differences from Market Codex (Booking.com)
+
+| | Market Codex | Airbnb Codex |
+|---|---|---|
+| Target | Booking.com | Airbnb |
+| Method | Playwright browser + proxy | Plain HTTP fetch (no browser) |
+| Horizon | 120 days, 1-night | 90 days, 2-night |
+| Data | Aggregates only (facets, histogram) | Per-listing + aggregates |
+| Hosting | Render (separate repo) | Render (inside market-pulse) |
+| Hash/key maintenance | None | None |
+
+Rule for AI: This is siloed from Market Pulse. Do not integrate Airbnb data into the Market Pulse UI or API unless explicitly instructed.
+
 End of Blueprint.
 Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.
