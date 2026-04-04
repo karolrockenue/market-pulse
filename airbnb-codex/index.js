@@ -168,14 +168,28 @@ function parseListings(pageData) {
 }
 
 // ---------------------------------------------------------------------------
-// Scrape first page for a single date (page 1 only — sufficient for Archanes)
+// Scrape all pages for a single date
 // ---------------------------------------------------------------------------
 
 async function scrapeDate(cityConfig, checkinDate, checkoutDate) {
-  console.log(`  Fetching ${checkinDate}...`);
+  let allListings = [];
+  let cursor = null;
+  let page = 0;
+  const MAX_PAGES = 5;
 
-  const pageData = await fetchAirbnbPage(cityConfig, checkinDate, checkoutDate);
-  const { listings } = parseListings(pageData);
+  do {
+    page++;
+    console.log(`  Fetching ${checkinDate} (page ${page})...`);
+
+    const pageData = await fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, cursor);
+    const { listings, nextCursor } = parseListings(pageData);
+    allListings = allListings.concat(listings);
+    cursor = nextCursor;
+
+    if (cursor) await delay(2000);
+  } while (cursor && page < MAX_PAGES);
+
+  const listings = allListings;
 
   // Calculate aggregates
   const prices = listings
