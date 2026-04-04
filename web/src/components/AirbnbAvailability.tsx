@@ -30,6 +30,22 @@ interface Listing {
   price: number;
 }
 
+interface RegistryProperty {
+  property_id: string;
+  name: string;
+  type: string;
+  beds: string;
+  location: string;
+  rating: number | null;
+  reviews: number;
+  avg_price: number;
+  min_price: number;
+  max_price: number;
+  times_seen: number;
+  first_seen: string;
+  last_seen: string;
+}
+
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 const cardStyle: React.CSSProperties = {
@@ -48,18 +64,20 @@ const formatDate = (dateStr: string) => {
 export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabilityProps) {
   const [data, setData] = useState<SnapshotRow[]>([]);
   const [topListings, setTopListings] = useState<Listing[]>([]);
+  const [registry, setRegistry] = useState<RegistryProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/market/airbnb-availability?citySlug=${citySlug}`,
-          { credentials: "include" }
-        );
-        if (!res.ok) throw new Error("fetch failed");
-        const json = await res.json();
+        const [availRes, regRes] = await Promise.all([
+          fetch(`${API_BASE}/api/market/airbnb-availability?citySlug=${citySlug}`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/market/airbnb-registry?citySlug=${citySlug}`, { credentials: "include" }),
+        ]);
+
+        if (!availRes.ok) throw new Error("availability fetch failed");
+        const json = await availRes.json();
         const rows: SnapshotRow[] = json.snapshots || [];
         if (cancelled) return;
         setData(rows);
@@ -75,6 +93,11 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
           }
           parsed.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
           setTopListings(parsed.slice(0, 20));
+        }
+
+        if (regRes.ok) {
+          const regJson = await regRes.json();
+          if (!cancelled) setRegistry(regJson.properties || []);
         }
       } catch (err) {
         console.error("AirbnbAvailability fetch error:", err);
@@ -247,6 +270,84 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Property Registry */}
+      {registry.length > 0 && (
+        <div style={{ ...cardStyle, marginTop: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <div style={{ color: "#e5e5e5", fontSize: "14px", fontWeight: 600 }}>
+              Property Registry
+            </div>
+            <span style={{ color: "#6b7280", fontSize: "12px" }}>
+              {registry.length} unique properties tracked
+            </span>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Name", "Type", "Location", "Beds", "Rating", "Avg Rate", "Min", "Max", "Seen", "First Seen", "Last Seen"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: h === "Name" || h === "Location" || h === "Beds" ? "left" : "right",
+                        color: "#6b7280",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "-0.025em",
+                        padding: "8px 10px",
+                        borderBottom: "1px solid #2a2a2a",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {registry.map((p, i) => (
+                  <tr key={p.property_id || i} style={{ borderBottom: "1px solid rgba(42,42,42,0.5)" }}>
+                    <td style={{ color: "#e5e5e5", fontSize: "12px", padding: "8px 10px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name || "—"}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px" }}>
+                      {p.type || "—"}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px" }}>
+                      {p.location || "—"}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px" }}>
+                      {p.beds || "—"}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px", textAlign: "right" }}>
+                      {p.rating ? `${p.rating} (${p.reviews})` : "—"}
+                    </td>
+                    <td style={{ color: "#39BDF8", fontSize: "12px", padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>
+                      {formatPrice(p.avg_price)}
+                    </td>
+                    <td style={{ color: "#10b981", fontSize: "12px", padding: "8px 10px", textAlign: "right" }}>
+                      {formatPrice(p.min_price)}
+                    </td>
+                    <td style={{ color: "#ef4444", fontSize: "12px", padding: "8px 10px", textAlign: "right" }}>
+                      {formatPrice(p.max_price)}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px", textAlign: "right" }}>
+                      {p.times_seen}x
+                    </td>
+                    <td style={{ color: "#6b7280", fontSize: "11px", padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {formatDate(p.first_seen)}
+                    </td>
+                    <td style={{ color: "#6b7280", fontSize: "11px", padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {formatDate(p.last_seen)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

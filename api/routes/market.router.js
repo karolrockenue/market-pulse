@@ -190,6 +190,45 @@ router.get("/airbnb-availability", requireUserApi, async (req, res) => {
   }
 });
 
+router.get("/airbnb-registry", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.query;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+
+    const { rows } = await pool.query(
+      `SELECT
+         listing->>'id' AS property_id,
+         listing->>'name' AS name,
+         listing->>'type' AS type,
+         listing->>'beds' AS beds,
+         listing->>'location' AS location,
+         (listing->>'lat')::numeric AS lat,
+         (listing->>'lng')::numeric AS lng,
+         MAX((listing->>'rating')::numeric) AS rating,
+         MAX((listing->>'reviews')::int) AS reviews,
+         ROUND(AVG((listing->>'price')::numeric), 2) AS avg_price,
+         MIN((listing->>'price')::numeric) AS min_price,
+         MAX((listing->>'price')::numeric) AS max_price,
+         COUNT(DISTINCT s.scraped_at::date) AS times_seen,
+         MIN(s.scraped_at::date) AS first_seen,
+         MAX(s.scraped_at::date) AS last_seen
+       FROM airbnb_availability_snapshots s,
+            jsonb_array_elements(s.listings) AS listing
+       WHERE s.city_slug = $1
+       GROUP BY listing->>'id', listing->>'name', listing->>'type',
+                listing->>'beds', listing->>'location',
+                (listing->>'lat')::numeric, (listing->>'lng')::numeric
+       ORDER BY avg_price DESC`,
+      [citySlug]
+    );
+
+    res.json({ citySlug, totalProperties: rows.length, properties: rows });
+  } catch (error) {
+    console.error("Error in /airbnb-registry:", error);
+    res.status(500).json({ error: "Failed to fetch Airbnb property registry." });
+  }
+});
+
 router.get("/neighbourhood-supply", requireUserApi, async (req, res) => {
   try {
     const { citySlug } = req.query;
