@@ -222,8 +222,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     loadRates,
     setOverride,
     clearOverride,
-    applyAiPrediction,
-    bulkApplyAi,
     submitChanges,
     saveMinRate,
   } = useRateGrid();
@@ -801,42 +799,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                     </div>
                   </div>
                 </div>
-
-                {/* Bulk Apply AI Button */}
-                <Button
-                  onClick={() => {
-                    const validDates = visibleData
-                      .filter((d) => !d.isFrozen && aiPredictions[d.date])
-                      .map((d) => d.date);
-
-                    if (validDates.length === 0) {
-                      toast.info("No valid AI predictions in this view.");
-                      return;
-                    }
-
-                    bulkApplyAi(validDates);
-                    toast.success(
-                      `Applied AI rates for ${validDates.length} days.`,
-                    );
-                  }}
-                  variant="outline"
-                  style={{
-                    borderColor: "#39BDF8",
-                    color: "#39BDF8",
-                    backgroundColor: "rgba(57, 189, 248, 0.1)",
-                    marginRight: "12px",
-                  }}
-                  className="h-9 text-sm"
-                >
-                  <Zap className="w-4 h-4 mr-2" />
-                  Apply AI (
-                  {
-                    visibleData.filter(
-                      (d) => !d.isFrozen && aiPredictions[d.date],
-                    ).length
-                  }
-                  )
-                </Button>
 
                 {/* Submit Button */}
                 <Button
@@ -1448,7 +1410,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                       e.stopPropagation();
                                       if (pred) {
                                         const clampedRate = Math.max(pred.rate, day.guardrailMin || 0);
-                                        applyAiPrediction(day.date, clampedRate);
+                                        setOverride(day.date, clampedRate);
                                         toast.success(
                                           `AI Rate £${clampedRate} applied`,
                                         );
@@ -1482,25 +1444,48 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         })}
                       </tr>
 
-                      {/* Separator — divides read-only rows from editable inputs */}
-                      <tr
-                        style={{ height: "4px", backgroundColor: "#10b981", opacity: 0.3 }}
-                      >
-                        <td colSpan={visibleData.length + 1}></td>
+                      {/* === YOUR RATE CONTROLS — editable zone === */}
+                      <tr>
+                        <td
+                          colSpan={visibleData.length + 1}
+                          style={{
+                            padding: "6px 16px",
+                            backgroundColor: "#141414",
+                            borderTop: "2px solid #39BDF8",
+                            borderBottom: "none",
+                          }}
+                        >
+                          <span style={{
+                            fontSize: "10px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1em",
+                            color: "#39BDF8",
+                            fontWeight: 600,
+                          }}>
+                            Your Rate Controls
+                          </span>
+                          <span style={{
+                            fontSize: "10px",
+                            color: "#6b7280",
+                            marginLeft: "8px",
+                          }}>
+                            — click any cell to edit
+                          </span>
+                        </td>
                       </tr>
 
                       {!hiddenRows.has("effectiveRate") && (
                         <tr
                           style={{
-                            borderBottom: "1px solid #2a2a2a",
-                            backgroundColor: "rgba(16, 185, 129, 0.03)",
+                            borderBottom: "1px solid rgba(57, 189, 248, 0.15)",
+                            backgroundColor: "rgba(57, 189, 248, 0.03)",
                           }}
                         >
                           <td
                             style={{
                               ...styles.tdSticky,
-                              backgroundColor: "rgba(16, 185, 129, 0.05)",
-                              borderLeft: "3px solid #10b981",
+                              backgroundColor: "rgba(57, 189, 248, 0.05)",
+                              borderLeft: "3px solid #39BDF8",
                             }}
                           >
                             <div
@@ -1511,7 +1496,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 gap: "8px",
                               }}
                             >
-                              <span style={{ color: "#10b981" }}>
+                              <span style={{ color: "#e5e5e5", fontWeight: 600 }}>
                                 Target Sell Rate
                               </span>{" "}
                               <button
@@ -1558,10 +1543,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   fontWeight: "bold",
                                   fontFamily: "monospace",
                                   color:
-                                    effectiveVal > 0 ? "#10b981" : "#4a4a48",
+                                    effectiveVal > 0 ? "#e5e5e5" : "#4a4a48",
                                   backgroundColor:
                                     editingEffectiveCell === day.date
-                                      ? "transparent"
+                                      ? "rgba(57, 189, 248, 0.05)"
                                       : getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                   cursor: day.isFrozen
@@ -1574,11 +1559,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     autoFocus
                                     style={{
                                       ...styles.input,
-                                      color: "#10b981",
+                                      color: "#e5e5e5",
                                       fontWeight: "bold",
                                       backgroundColor:
-                                        "rgba(16, 185, 129, 0.1)",
-                                      border: "1px solid #10b981",
+                                        "rgba(57, 189, 248, 0.1)",
+                                      border: "1px solid #39BDF8",
                                     }}
                                     defaultValue={
                                       effectiveVal > 0
@@ -1640,17 +1625,17 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       {/* 4. PMS Override Input */}
                       <tr
                         style={{
-                          borderTop: "1px solid #2a2a2a",
-                          borderBottom: "1px solid #2a2a2a",
-                          backgroundColor: "rgba(16, 185, 129, 0.03)",
+                          borderBottom: "2px solid #39BDF8",
+                          backgroundColor: "rgba(57, 189, 248, 0.03)",
                         }}
                       >
                         <td style={{
                           ...styles.tdSticky,
-                          backgroundColor: "rgba(16, 185, 129, 0.05)",
-                          borderLeft: "3px solid #10b981",
+                          backgroundColor: "rgba(57, 189, 248, 0.05)",
+                          borderLeft: "3px solid #39BDF8",
                         }}>
-                          <span style={{ color: "#10b981" }}>PMS Override</span>
+                          <span style={{ color: "#e5e5e5", fontWeight: 600 }}>PMS Override</span>
+                          <span style={{ color: "#6b7280", fontSize: "10px", marginLeft: "6px" }}>base rate</span>
                         </td>
                         {visibleData.map((day) => {
                           const savedVal = savedOverrides[day.date];
