@@ -1445,14 +1445,19 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       </tr>
 
                       {/* === YOUR RATE CONTROLS — editable zone === */}
-                      <tr style={{ borderTop: "2px solid #39BDF8" }}>
+                      <tr>
                         <td
                           style={{
-                            ...styles.tdSticky,
+                            position: "sticky",
+                            left: 0,
+                            zIndex: 20,
+                            width: "240px",
                             padding: "6px 16px",
                             backgroundColor: "#141414",
                             borderLeft: "3px solid #39BDF8",
+                            borderTop: "3px solid #39BDF8",
                             borderBottom: "none",
+                            borderRight: "1px solid #2a2a2a",
                           }}
                         >
                           <span style={{
@@ -1470,6 +1475,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           style={{
                             padding: "6px 16px",
                             backgroundColor: "#141414",
+                            borderTop: "3px solid #39BDF8",
                             borderBottom: "none",
                           }}
                         >
@@ -1633,7 +1639,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       {/* 4. PMS Override Input */}
                       <tr
                         style={{
-                          borderBottom: "2px solid #39BDF8",
+                          borderBottom: "3px solid #39BDF8",
                           backgroundColor: "rgba(57, 189, 248, 0.03)",
                         }}
                       >
