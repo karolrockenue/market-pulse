@@ -1445,15 +1445,14 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       </tr>
 
                       {/* === YOUR RATE CONTROLS — editable zone === */}
-                      <tr>
+                      <tr style={{ borderTop: "2px solid #39BDF8" }}>
                         <td
-                          colSpan={visibleData.length + 1}
                           style={{
+                            ...styles.tdSticky,
                             padding: "6px 16px",
                             backgroundColor: "#141414",
-                            borderTop: "2px solid #39BDF8",
-                            borderBottom: "none",
                             borderLeft: "3px solid #39BDF8",
+                            borderBottom: "none",
                           }}
                         >
                           <span style={{
@@ -1465,12 +1464,20 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           }}>
                             Your Rate Controls
                           </span>
+                        </td>
+                        <td
+                          colSpan={visibleData.length}
+                          style={{
+                            padding: "6px 16px",
+                            backgroundColor: "#141414",
+                            borderBottom: "none",
+                          }}
+                        >
                           <span style={{
                             fontSize: "10px",
                             color: "#6b7280",
-                            marginLeft: "8px",
                           }}>
-                            — click any cell to edit
+                            click any cell to edit
                           </span>
                         </td>
                       </tr>
