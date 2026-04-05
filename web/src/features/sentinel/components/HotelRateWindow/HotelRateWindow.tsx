@@ -1485,7 +1485,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           <td
                             style={{
                               ...styles.tdSticky,
-                              backgroundColor: "rgba(57, 189, 248, 0.05)",
+                              backgroundColor: "#1c2127",
                             }}
                           >
                             <div
@@ -1632,7 +1632,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       >
                         <td style={{
                           ...styles.tdSticky,
-                          backgroundColor: "rgba(57, 189, 248, 0.05)",
+                          backgroundColor: "#1c2127",
                         }}>
                           <span style={{ color: "#e5e5e5", fontWeight: 600 }}>PMS Override</span>
                           <span style={{ color: "#6b7280", fontSize: "10px", marginLeft: "6px" }}>base rate</span>
