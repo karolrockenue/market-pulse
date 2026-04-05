@@ -74,8 +74,8 @@ const corsOptions = {
       return;
     }
 
-    // 2. Allow any Vercel preview deployment
-    if (origin.endsWith(".vercel.app")) {
+    // 2. Allow any Vercel preview deployment or Railway deployment
+    if (origin.endsWith(".vercel.app") || origin.endsWith(".up.railway.app")) {
       callback(null, true);
       return;
     }
