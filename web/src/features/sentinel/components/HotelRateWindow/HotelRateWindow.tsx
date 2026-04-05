@@ -1448,16 +1448,12 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       <tr>
                         <td
                           style={{
-                            position: "sticky",
-                            left: 0,
-                            zIndex: 20,
-                            width: "240px",
+                            ...styles.tdSticky,
                             padding: "6px 16px",
                             backgroundColor: "#141414",
                             borderLeft: "3px solid #39BDF8",
                             borderTop: "3px solid #39BDF8",
                             borderBottom: "none",
-                            borderRight: "1px solid #2a2a2a",
                           }}
                         >
                           <span style={{
