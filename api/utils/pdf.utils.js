@@ -28,15 +28,23 @@ async function generatePdfFromHtml(templateName, data) {
     const htmlContent = await fs.readFile(templatePath, "utf-8");
 
     // --- [FIX 1] Environment-Aware Browser Launch ---
-    const isProduction = process.env.VERCEL_ENV === "production";
+    const isRailway = !!process.env.RAILWAY_ENVIRONMENT_NAME;
+    const isVercelProd = process.env.VERCEL_ENV === "production" && !isRailway;
 
-    if (isProduction) {
+    if (isVercelProd) {
       // FOR VERCEL: Use the lightweight @sparticuz/chromium package
       console.log("[pdf.utils.js] Launching Vercel (production) browser...");
       browser = await playwright.chromium.launch({
         args: chromium.args,
         executablePath: await chromium.executablePath(),
         headless: chromium.headless,
+      });
+    } else if (isRailway) {
+      // FOR RAILWAY: Use system-installed Chromium
+      console.log("[pdf.utils.js] Launching Railway browser...");
+      browser = await playwright.chromium.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
     } else {
       // FOR LOCAL DEV: Use the standard local Playwright installation.
