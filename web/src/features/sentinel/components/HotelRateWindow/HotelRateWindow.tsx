@@ -1342,7 +1342,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         <td
                           style={{
                             ...styles.tdSticky,
-                            backgroundColor: "rgba(57, 189, 248, 0.02)",
+                            backgroundColor: "#1A1A1A",
                             padding: "16px",
                           }}
                         >
