@@ -52,6 +52,20 @@ class SentinelBridgeService {
 
       console.timeEnd("Step 3 MaxRates");
 
+      console.time("Step 3b MinRates");
+      // Step 3b: Daily Min Rate Overrides
+      const minRatesRes = await client.query(
+        `SELECT to_char(stay_date, 'YYYY-MM-DD') as date, min_price
+         FROM sentinel_daily_min_rates
+         WHERE hotel_id = $1 AND stay_date >= CURRENT_DATE`,
+        [hotelId],
+      );
+      const dailyMinRatesMap = {};
+      minRatesRes.rows.forEach((r) => {
+        dailyMinRatesMap[r.date] = parseFloat(r.min_price);
+      });
+      console.timeEnd("Step 3b MinRates");
+
       console.time("Step 4 Curves");
       // Step 4: Pace Curves
       const curvesRes = await client.query(
@@ -229,6 +243,7 @@ class SentinelBridgeService {
         config: {
           peak_dates: peakDatesMap, // [NEW] Event Anchors for the Python Engine
           min_rates: config.monthly_min_rates || {},
+          daily_min_rates: dailyMinRatesMap,
           currency: "USD",
           seasonality: config.seasonality_profile || {},
           capacity: config.total_capacity || 0,
@@ -397,13 +412,25 @@ class SentinelBridgeService {
 
         // Fetch Dynamic Ceilings (Gate 2 Data)
         const ceilingsRes = await client.query(
-          `SELECT stay_date::text, max_price FROM sentinel_daily_max_rates 
+          `SELECT stay_date::text, max_price FROM sentinel_daily_max_rates
            WHERE hotel_id = $1::int AND stay_date = ANY($2::date[])`,
           [hotelId, stayDates],
         );
         const ceilingsMap = {};
         ceilingsRes.rows.forEach((r) => {
           ceilingsMap[r.stay_date.split("T")[0]] = parseFloat(r.max_price);
+        });
+
+        // Fetch Daily Min Rate Overrides (Gate 2 Data)
+        const dailyMinsRes = await client.query(
+          `SELECT to_char(stay_date, 'YYYY-MM-DD') as date, min_price
+           FROM sentinel_daily_min_rates
+           WHERE hotel_id = $1::int AND stay_date = ANY($2::date[])`,
+          [hotelId, stayDates],
+        );
+        const dailyMinsMap = {};
+        dailyMinsRes.rows.forEach((r) => {
+          dailyMinsMap[r.date] = parseFloat(r.min_price);
         });
 
         // Fetch Conflict Locks & Current Rates (Gate 3 & Delta Check)
@@ -538,7 +565,13 @@ class SentinelBridgeService {
           const monthKey = monthNames[stayDateObj.getMonth()];
           const monthlyMin = parseFloat(minRates[monthKey] || 0);
 
-          // Last-Minute Floor: if active for this date, it REPLACES the monthly min
+          // Daily min override takes precedence over monthly default
+          const dailyMinOverride = dailyMinsMap[dateStr];
+          let minRate = (dailyMinOverride !== undefined && dailyMinOverride > 0)
+            ? dailyMinOverride
+            : monthlyMin;
+
+          // Last-Minute Floor: if active for this date, it REPLACES both monthly and daily min
           const lmf = config.last_minute_floor || {};
           const lmfEnabled = lmf.enabled || false;
           const lmfDays = parseInt(lmf.days || "0", 10);
@@ -547,9 +580,8 @@ class SentinelBridgeService {
           const dayNamesLmf = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
           const dowStr = dayNamesLmf[stayDateObj.getUTCDay()];
 
-          let minRate = monthlyMin;
           if (lmfEnabled && daysUntilStay <= lmfDays && lmfDow.has(dowStr)) {
-            minRate = lmfRate; // LMF floor replaces monthly min
+            minRate = lmfRate; // LMF floor replaces all other mins
           }
 
           if (safeRate < minRate) safeRate = minRate;

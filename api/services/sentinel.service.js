@@ -496,7 +496,7 @@ async function previewCalendar({
 
     // Step C: Determine Final Display Data
     // If we have a Manual Override in DB, that takes precedence for the "Active" column
-    const isManual = dbEntry && dbEntry.source === "Manual";
+    const isManual = dbEntry && dbEntry.source.toUpperCase() === "MANUAL";
     const finalRate = isManual
       ? parseFloat(dbEntry.rate)
       : guardrailResult.finalRate;
