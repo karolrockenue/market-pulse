@@ -312,4 +312,60 @@ app.get("*", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+
+  // --- IN-PROCESS CRON JOBS (Railway only) ---
+  // On Vercel (serverless), crons are HTTP-triggered via vercel.json.
+  // On Railway (persistent process), we run them in-process via node-cron.
+  // Detection: Railway sets RAILWAY_ENVIRONMENT_NAME; Vercel does not.
+  if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+    const cron = require("node-cron");
+    console.log("[CRON] Railway detected — starting in-process cron jobs.");
+
+    // Every minute: process Sentinel rate push queue
+    cron.schedule("* * * * *", async () => {
+      try {
+        const res = await fetch(`http://localhost:${PORT}/api/sentinel/process-queue`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+        });
+        console.log(`[CRON] process-queue: ${res.status}`);
+      } catch (err) {
+        console.error("[CRON] process-queue failed:", err.message);
+      }
+    });
+
+    // Every day at 06:00 UTC: daily metrics refresh
+    cron.schedule("0 6 * * *", async () => {
+      try {
+        const res = await fetch(`http://localhost:${PORT}/api/cron/daily-refresh`, {
+          headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+        });
+        console.log(`[CRON] daily-refresh: ${res.status}`);
+      } catch (err) {
+        console.error("[CRON] daily-refresh failed:", err.message);
+      }
+    });
+
+    // Every 5 minutes: send scheduled reports
+    cron.schedule("*/5 * * * *", async () => {
+      try {
+        const res = await fetch(`http://localhost:${PORT}/api/send-scheduled-reports`);
+        console.log(`[CRON] send-scheduled-reports: ${res.status}`);
+      } catch (err) {
+        console.error("[CRON] send-scheduled-reports failed:", err.message);
+      }
+    });
+
+    // Every day at 06:00 UTC: sync Rockenue assets
+    cron.schedule("0 6 * * *", async () => {
+      try {
+        const res = await fetch(`http://localhost:${PORT}/api/sync-rockenue-assets`);
+        console.log(`[CRON] sync-rockenue-assets: ${res.status}`);
+      } catch (err) {
+        console.error("[CRON] sync-rockenue-assets failed:", err.message);
+      }
+    });
+
+    console.log("[CRON] All cron jobs registered.");
+  }
 });
