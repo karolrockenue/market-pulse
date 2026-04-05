@@ -52,11 +52,14 @@ router.get("/", requireAdminApi, async (req, res) => {
 router.get("/mine", requireUserApi, async (req, res) => {
   try {
     const userRole = req.session.role;
+    const includeDisconnected = req.query.includeDisconnected === "true";
+    const disconnectedFilter = includeDisconnected ? "" : "WHERE is_disconnected = false";
+    const disconnectedFilterAnd = includeDisconnected ? "" : "AND h.is_disconnected = false";
     let query;
     let params = [];
 
     if (userRole === "super_admin" || userRole === "admin") {
-      query = `SELECT hotel_id AS property_id, property_name, city FROM hotels ORDER BY property_name;`;
+      query = `SELECT hotel_id AS property_id, property_name, city, is_disconnected FROM hotels ${disconnectedFilter} ORDER BY property_name;`;
     } else {
       // Get internal ID
       const userRes = await pool.query("SELECT user_id FROM users WHERE cloudbeds_user_id = $1", [req.session.userId]);
@@ -64,10 +67,10 @@ router.get("/mine", requireUserApi, async (req, res) => {
       const internalId = userRes.rows[0].user_id;
 
       query = `
-        SELECT up.property_id, h.property_name, h.city
+        SELECT up.property_id, h.property_name, h.city, h.is_disconnected
         FROM user_properties up
         JOIN hotels h ON up.property_id = h.hotel_id
-        WHERE up.user_id = $1 OR up.user_id = $2::text
+        WHERE (up.user_id = $1 OR up.user_id = $2::text) ${disconnectedFilterAnd}
         ORDER BY h.property_name;
       `;
       params = [req.session.userId, internalId];
@@ -85,13 +88,13 @@ router.get("/mine", requireUserApi, async (req, res) => {
 router.get("/:propertyId/details", requireUserApi, async (req, res) => {
   try {
     const { propertyId } = req.params;
-    
+
     // Authorization Check
     const hasAccess = await verifyPropertyAccess(req, propertyId);
     if (!hasAccess) return res.status(403).json({ error: "Access denied." });
 
     const result = await pool.query(
-      `SELECT property_name, currency_code, tax_rate, tax_type, tax_name, category, city, hotel_id 
+      `SELECT property_name, currency_code, tax_rate, tax_type, tax_name, category, city, hotel_id
        FROM hotels WHERE hotel_id = $1`,
       [propertyId]
     );
@@ -141,61 +144,6 @@ router.patch("/:propertyId/tax-info", requireUserApi, async (req, res) => {
   }
 });
 
-// GET /api/hotels/mine -> List hotels for the current user
-router.get("/mine", requireUserApi, async (req, res) => {
-  try {
-    const userRole = req.session.role;
-    let query;
-    let params = [];
-
-    if (userRole === "super_admin" || userRole === "admin") {
-      query = `SELECT hotel_id AS property_id, property_name, city FROM hotels ORDER BY property_name;`;
-    } else {
-      // Get internal ID
-      const userRes = await pool.query("SELECT user_id FROM users WHERE cloudbeds_user_id = $1", [req.session.userId]);
-      if (userRes.rows.length === 0) return res.json([]);
-      const internalId = userRes.rows[0].user_id;
-
-      query = `
-        SELECT up.property_id, h.property_name, h.city
-        FROM user_properties up
-        JOIN hotels h ON up.property_id = h.hotel_id
-        WHERE up.user_id = $1 OR up.user_id = $2::text
-        ORDER BY h.property_name;
-      `;
-      params = [req.session.userId, internalId];
-    }
-
-    const result = await pool.query(query, params);
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Error fetching my properties:", error);
-    res.status(500).json({ error: "Failed to fetch user properties." });
-  }
-});
-
-// GET /api/hotels/:propertyId/details -> Specific Hotel Details
-router.get("/:propertyId/details", requireUserApi, async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    
-    // Authorization Check
-    const hasAccess = await verifyPropertyAccess(req, propertyId);
-    if (!hasAccess) return res.status(403).json({ error: "Access denied." });
-
-    const result = await pool.query(
-      `SELECT property_name, currency_code, tax_rate, tax_type, tax_name, category, city, hotel_id 
-       FROM hotels WHERE hotel_id = $1`,
-      [propertyId]
-    );
-
-    if (result.rows.length === 0) return res.status(404).json({ error: "Hotel not found." });
-    res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch hotel details." });
-  }
-});
-
 // POST /api/hotels/category -> Update Category
 router.post("/category", requireAdminApi, async (req, res) => {
   const { hotelId, category } = req.body;
@@ -236,6 +184,44 @@ router.get("/management-groups", requireAdminApi, async (req, res) => {
     res.json(groups);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch management groups." });
+  }
+});
+
+// POST /api/hotels/:hotelId/disconnect -> Soft Disconnect (preserves data)
+router.post("/:hotelId/disconnect", requireUserApi, async (req, res) => {
+  const { hotelId } = req.params;
+  try {
+    const hasAccess = await verifyPropertyAccess(req, hotelId);
+    if (!hasAccess) return res.status(403).json({ error: "Access denied." });
+
+    const result = await pool.query(
+      "UPDATE hotels SET is_disconnected = true WHERE hotel_id = $1 AND is_disconnected = false",
+      [hotelId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: "Hotel not found or already disconnected." });
+    res.json({ success: true, message: "Hotel disconnected. Data preserved." });
+  } catch (error) {
+    console.error("Disconnect error:", error);
+    res.status(500).json({ error: "Failed to disconnect hotel." });
+  }
+});
+
+// POST /api/hotels/:hotelId/reconnect -> Reconnect a soft-disconnected hotel
+router.post("/:hotelId/reconnect", requireUserApi, async (req, res) => {
+  const { hotelId } = req.params;
+  try {
+    const hasAccess = await verifyPropertyAccess(req, hotelId);
+    if (!hasAccess) return res.status(403).json({ error: "Access denied." });
+
+    const result = await pool.query(
+      "UPDATE hotels SET is_disconnected = false WHERE hotel_id = $1 AND is_disconnected = true",
+      [hotelId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: "Hotel not found or already active." });
+    res.json({ success: true, message: "Hotel reconnected." });
+  } catch (error) {
+    console.error("Reconnect error:", error);
+    res.status(500).json({ error: "Failed to reconnect hotel." });
   }
 });
 
@@ -395,6 +381,97 @@ router.get("/:hotelId/benchmarks/:month/:year", requireUserApi, async (req, res)
     res.json(benchmarks);
   } catch (error) {
     console.error("Error fetching benchmarks:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// GET /api/hotels/:hotelId/bookings?days=14
+// Returns daily summary + individual booking details for the Bookings Report.
+router.get("/:hotelId/bookings", requireUserApi, async (req, res) => {
+  try {
+    const hotelId = parseInt(req.params.hotelId);
+    const days = parseInt(req.query.days) || 14;
+
+    // Fetch reservations within the date range, grouped by booking_date
+    const result = await pool.query(
+      `SELECT id, guest_name, room_type, check_in, check_out, nights,
+              source, avg_nightly_rate, total_rate, status, booking_date
+       FROM reservations
+       WHERE hotel_id = $1
+         AND booking_date >= CURRENT_DATE - $2::int
+       ORDER BY booking_date DESC, created_at DESC`,
+      [hotelId, days]
+    );
+
+    // Group by booking_date
+    const dayMap = {};
+    const today = new Date().toISOString().split("T")[0];
+
+    for (const row of result.rows) {
+      const key = row.booking_date instanceof Date
+        ? row.booking_date.toISOString().split("T")[0]
+        : row.booking_date;
+
+      if (!dayMap[key]) {
+        const d = new Date(key + "T00:00:00");
+        dayMap[key] = {
+          dateKey: key,
+          dateStr: d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }),
+          isToday: key === today,
+          bookings: 0,
+          roomNights: 0,
+          totalRevenue: 0,
+          details: [],
+        };
+      }
+
+      const day = dayMap[key];
+      const isCancelled = (row.status || '').toLowerCase().includes('cancel');
+
+      day.bookings += 1;
+      // Exclude cancelled bookings from ADR/revenue/room nights totals
+      if (!isCancelled) {
+        day.roomNights += row.nights || 0;
+        day.totalRevenue += parseFloat(row.total_rate) || 0;
+      }
+      day.details.push({
+        id: row.id,
+        guestName: row.guest_name || row.id,
+        roomType: row.room_type,
+        checkIn: row.check_in,
+        checkOut: row.check_out,
+        nights: row.nights,
+        source: row.source,
+        avgNightlyRate: parseFloat(row.avg_nightly_rate) || 0,
+        totalRate: parseFloat(row.total_rate) || 0,
+        status: row.status,
+      });
+    }
+
+    // Sort details: confirmed/active first, cancelled last
+    const statusOrder = (s) => {
+      const lower = (s || '').toLowerCase();
+      if (lower.includes('cancel')) return 3;
+      if (lower.includes('checked_out') || lower.includes('processed')) return 2;
+      if (lower.includes('checked_in') || lower.includes('started')) return 1;
+      return 0; // confirmed at top
+    };
+
+    // Convert to sorted array and compute ADR
+    const days_arr = Object.values(dayMap)
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+      .map((d) => {
+        d.details.sort((a, b) => statusOrder(a.status) - statusOrder(b.status));
+        return {
+          ...d,
+          adr: d.roomNights > 0 ? Math.round(d.totalRevenue / d.roomNights) : 0,
+          revenue: Math.round(d.totalRevenue),
+        };
+      });
+
+    res.json({ days: days_arr });
+  } catch (error) {
+    console.error("Error fetching bookings:", error);
     res.status(500).json({ error: "Internal server error." });
   }
 });

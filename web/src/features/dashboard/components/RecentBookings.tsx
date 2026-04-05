@@ -1,18 +1,20 @@
 import { CSSProperties } from "react";
-import { Calendar } from "lucide-react";
+import { Calendar, ExternalLink } from "lucide-react";
 import { type RecentActivityDay } from "../api/dashboard.api";
 
 interface RecentBookingsProps {
   data: RecentActivityDay[];
   currencySymbol?: string;
+  onViewFullReport?: () => void;
 }
 
 export function RecentBookings({
   data,
   currencySymbol = "£",
+  onViewFullReport,
 }: RecentBookingsProps) {
-  // Use passed data
-  const bookingData = data || [];
+  // Use passed data, newest first
+  const bookingData = [...(data || [])].reverse();
 
   // Format large numbers compactly (e.g. 228193564 → "228.2M", 1500000 → "1.5M", 12500 → "12.5K")
   const formatCompact = (value: number): string => {
@@ -28,7 +30,7 @@ export function RecentBookings({
       borderRadius: "8px",
       border: "1px solid #2a2a2a",
       padding: "20px",
-      height: "460px", // Matches PROT fixed height
+      height: "460px",
       display: "flex",
       flexDirection: "column",
     },
@@ -137,7 +139,7 @@ export function RecentBookings({
         <div style={{ ...styles.headerCell, textAlign: "right" }}>Revenue</div>
       </div>
 
-      <div>
+      <div style={{ flex: 1 }}>
         {bookingData.map((day, index) => (
           <div
             key={index}
@@ -198,6 +200,35 @@ export function RecentBookings({
           </div>
         ))}
       </div>
+
+      {onViewFullReport && (
+        <button
+          onClick={onViewFullReport}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            padding: "10px 0",
+            marginTop: "auto",
+            backgroundColor: "transparent",
+            border: "none",
+            borderTop: "1px solid #2a2a2a",
+            cursor: "pointer",
+            color: "#6b7280",
+            fontSize: "11px",
+            textTransform: "uppercase",
+            letterSpacing: "-0.025em",
+            transition: "color 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "#39BDF8")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "#6b7280")}
+        >
+          View Full Report
+          <ExternalLink style={{ width: "12px", height: "12px" }} />
+        </button>
+      )}
     </div>
   );
 }

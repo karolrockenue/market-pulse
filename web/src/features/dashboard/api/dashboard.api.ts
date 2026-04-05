@@ -108,6 +108,11 @@ interface SnapshotPeriod {
   yoyChange: number;
   targetRevenue: number | null;
   pacingStatus: { statusTier: string; statusText: string } | null;
+  lastYear?: {
+    revenue: number;
+    occupancy: number;
+    adr: number;
+  };
 }
 
 interface PatternDay {

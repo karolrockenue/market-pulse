@@ -75,6 +75,16 @@ export function ReportSelector({
       requiredRole: "super_admin",
     },
 
+    {
+      id: "bookings-report",
+      title: "Bookings Report",
+      description:
+        "Daily booking summary and individual reservation details with guest names, rates, and sources",
+      icon: Calendar,
+      category: "Core Analytics",
+      available: true,
+    },
+
     // --- Financial ---
     {
       id: "financial-transactions",

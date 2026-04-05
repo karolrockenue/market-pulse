@@ -46,6 +46,7 @@ export function HotelDashboard({
       yoyChange: 0,
       targetRevenue: null,
       pacingStatus: null,
+      lastYear: { revenue: 0, occupancy: 0, adr: 0 },
     },
     currentMonth: {
       label: "...",
@@ -55,6 +56,7 @@ export function HotelDashboard({
       yoyChange: 0,
       targetRevenue: null,
       pacingStatus: null,
+      lastYear: { revenue: 0, occupancy: 0, adr: 0 },
     },
     nextMonth: {
       label: "...",
@@ -64,6 +66,7 @@ export function HotelDashboard({
       yoyChange: 0,
       targetRevenue: null,
       pacingStatus: null,
+      lastYear: { revenue: 0, occupancy: 0, adr: 0 },
     },
   };
 
@@ -100,19 +103,6 @@ export function HotelDashboard({
     return `${currencySymbol}${(value || 0).toLocaleString(undefined, {
       maximumFractionDigits: 0,
     })}`;
-  };
-
-  // Helper for Variance formatting
-  const getVariance = (current: number, target: number | null) => {
-    if (!target) return { value: 0, onTarget: false, label: "0" };
-    const diff = current - target;
-    return {
-      value: diff,
-      onTarget: diff >= 0, // Simplified rule: positive variance is "on target" for revenue
-      label: `${diff >= 0 ? "+" : ""}${currencySymbol}${Math.abs(
-        diff,
-      ).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-    };
   };
 
   // Inline Styles (Strictly copied from Prototype)
@@ -221,29 +211,6 @@ export function HotelDashboard({
       marginTop: "16px",
       paddingTop: "16px",
       borderTop: "1px solid #2a2a2a",
-    },
-    budgetProgress: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "8px",
-    },
-    budgetRow: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      fontSize: "12px",
-    },
-    progressBar: {
-      height: "6px",
-      backgroundColor: "#1a1a1a",
-      borderRadius: "9999px",
-      overflow: "hidden",
-    },
-    progressFill: {
-      height: "100%",
-      borderRadius: "9999px",
-      backgroundColor: "#39BDF8",
-      transition: "all 0.3s",
     },
     marketOutlookContainer: {
       marginBottom: "32px",
@@ -504,94 +471,38 @@ export function HotelDashboard({
             </div>
 
             <div style={styles.revenueSection}>
-              <div style={styles.revenueRow}>
-                <div style={styles.revenueValue}>
-                  {formatCurrency(snapshot.lastMonth.revenue)}
-                </div>
-                <div style={styles.occupancyLabel}>
-                  {(snapshot.lastMonth.occupancy || 0).toFixed(1)}% Occ
-                </div>
+              <div style={styles.revenueValue}>
+                {formatCurrency(snapshot.lastMonth.revenue)}
               </div>
               <div style={styles.label}>Total Revenue</div>
             </div>
 
-            {/* Budget / Variance Section (Replaces Old Component) */}
+            {/* Metrics comparison table */}
             <div style={styles.separator}>
-              <div style={{ ...styles.label, marginBottom: "8px" }}>Budget</div>
-              {snapshot.lastMonth.targetRevenue ? (
-                (() => {
-                  const budget = snapshot.lastMonth.targetRevenue;
-                  const actual = snapshot.lastMonth.revenue;
-                  const variance = getVariance(actual, budget);
-                  const pct = Math.min(100, (actual / budget) * 100);
-
-                  return (
-                    <div style={styles.budgetProgress}>
-                      <div style={styles.budgetRow}>
-                        <span style={{ color: "#6b7280" }}>Target</span>
-                        <span style={{ color: "#9ca3af" }}>
-                          {formatCurrency(budget)}
-                        </span>
-                      </div>
-                      <div style={styles.progressBar}>
-                        <div
-                          style={{ ...styles.progressFill, width: `${pct}%` }}
-                        />
-                      </div>
-                      <div style={styles.budgetRow}>
-                        <span
-                          style={{
-                            color: variance.onTarget ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {variance.onTarget ? "On Target" : "Off Target"}
-                        </span>
-                        <span
-                          style={{
-                            color: variance.onTarget ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {variance.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <button
-                  onClick={() => onNavigate("settings")}
-                  style={{
-                    width: "100%",
-                    textAlign: "center",
-                    padding: "8px 0",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    borderRadius: "4px",
-                    transition: "background-color 0.2s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#1a1a1a")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
-                >
-                  <div style={{ color: "#6b7280", fontSize: "12px" }}>
-                    Not configured
+              {(() => {
+                const ly = snapshot.lastMonth.lastYear;
+                const hasLY = ly && (ly.revenue > 0 || ly.occupancy > 0);
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0", fontSize: "12px" }}>
+                    {/* Header row */}
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px" }}></div>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px", textAlign: "right", minWidth: "70px" }}>This Year</div>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px", textAlign: "right", minWidth: "70px" }}>Last Year</div>
+                    {/* Revenue */}
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>Revenue</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{formatCurrency(snapshot.lastMonth.revenue)}</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? formatCurrency(ly!.revenue) : "—"}</div>
+                    {/* Occupancy */}
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>Occupancy</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{(snapshot.lastMonth.occupancy || 0).toFixed(1)}%</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? `${(ly!.occupancy || 0).toFixed(1)}%` : "—"}</div>
+                    {/* ADR */}
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>ADR</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{formatCurrency(snapshot.lastMonth.adr)}</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? formatCurrency(ly!.adr) : "—"}</div>
                   </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "10px",
-                      marginTop: "4px",
-                      opacity: 0.4,
-                    }}
-                  >
-                    Click to configure →
-                  </div>
-                </button>
-              )}
+                );
+              })()}
             </div>
           </div>
 
@@ -653,102 +564,34 @@ export function HotelDashboard({
             </div>
 
             <div style={styles.revenueSection}>
-              <div style={styles.revenueRow}>
-                <div style={styles.revenueValue}>
-                  {formatCurrency(snapshot.currentMonth.revenue)}
-                </div>
-                <div style={styles.occupancyLabel}>
-                  {(snapshot.currentMonth.occupancy || 0).toFixed(1)}% Occ
-                </div>
+              <div style={styles.revenueValue}>
+                {formatCurrency(snapshot.currentMonth.revenue)}
               </div>
               <div style={styles.label}>Total Revenue</div>
             </div>
 
+            {/* Metrics comparison table */}
             <div style={styles.separator}>
-              <div style={{ ...styles.label, marginBottom: "8px" }}>Budget</div>
-              {snapshot.currentMonth.targetRevenue ? (
-                (() => {
-                  const budget = snapshot.currentMonth.targetRevenue;
-                  const actual = snapshot.currentMonth.revenue;
-                  const variance = getVariance(actual, budget);
-                  const pct = Math.min(100, (actual / budget) * 100);
-
-                  return (
-                    <div style={styles.budgetProgress}>
-                      <div style={styles.budgetRow}>
-                        <span style={{ color: "#6b7280" }}>Target</span>
-                        <span style={{ color: "#9ca3af" }}>
-                          {formatCurrency(budget)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          ...styles.progressBar,
-                          backgroundColor: "#0f0f0f",
-                        }}
-                      >
-                        <div
-                          style={{
-                            ...styles.progressFill,
-                            backgroundColor: "#6b7280",
-                            width: `${pct}%`,
-                          }}
-                        />
-                      </div>
-                      <div style={styles.budgetRow}>
-                        <span
-                          style={{
-                            color: variance.onTarget ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {variance.onTarget ? "On Target" : "Off Target"}
-                        </span>
-                        <span
-                          style={{
-                            color: variance.onTarget ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {variance.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <button
-                  onClick={() => onNavigate("settings")}
-                  style={{
-                    width: "100%",
-                    textAlign: "center",
-                    padding: "8px 0",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    borderRadius: "4px",
-                    transition: "background-color 0.2s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#0f0f0f")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "transparent")
-                  }
-                >
-                  <div style={{ color: "#6b7280", fontSize: "12px" }}>
-                    Not configured
+              {(() => {
+                const ly = snapshot.currentMonth.lastYear;
+                const hasLY = ly && (ly.revenue > 0 || ly.occupancy > 0);
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0", fontSize: "12px" }}>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px" }}></div>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px", textAlign: "right", minWidth: "70px" }}>This Year</div>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px", textAlign: "right", minWidth: "70px" }}>Last Year</div>
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>Revenue</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{formatCurrency(snapshot.currentMonth.revenue)}</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? formatCurrency(ly!.revenue) : "—"}</div>
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>Occupancy</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{(snapshot.currentMonth.occupancy || 0).toFixed(1)}%</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? `${(ly!.occupancy || 0).toFixed(1)}%` : "—"}</div>
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>ADR</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{formatCurrency(snapshot.currentMonth.adr)}</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? formatCurrency(ly!.adr) : "—"}</div>
                   </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "10px",
-                      marginTop: "4px",
-                      opacity: 0.4,
-                    }}
-                  >
-                    Click to configure →
-                  </div>
-                </button>
-              )}
+                );
+              })()}
             </div>
           </div>
 
@@ -810,100 +653,34 @@ export function HotelDashboard({
             </div>
 
             <div style={styles.revenueSection}>
-              <div style={styles.revenueRow}>
-                <div style={styles.revenueValue}>
-                  {formatCurrency(snapshot.nextMonth.revenue)}
-                </div>
-                <div style={styles.occupancyLabel}>
-                  {(snapshot.nextMonth.occupancy || 0).toFixed(1)}% Occ
-                </div>
+              <div style={styles.revenueValue}>
+                {formatCurrency(snapshot.nextMonth.revenue)}
               </div>
               <div style={styles.label}>Total Revenue</div>
             </div>
 
+            {/* Metrics comparison table */}
             <div style={styles.separator}>
-              <div style={{ ...styles.label, marginBottom: "8px" }}>Budget</div>
-              {snapshot.nextMonth.targetRevenue ? (
-                (() => {
-                  const budget = snapshot.nextMonth.targetRevenue;
-                  const actual = snapshot.nextMonth.revenue;
-                  const variance = getVariance(actual, budget);
-                  const pct = Math.min(100, (actual / budget) * 100);
-
-                  return (
-                    <div style={styles.budgetProgress}>
-                      <div style={styles.budgetRow}>
-                        <span style={{ color: "#6b7280" }}>Target</span>
-                        <span style={{ color: "#9ca3af" }}>
-                          {formatCurrency(budget)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          ...styles.progressBar,
-                          backgroundColor: "#0f0f0f",
-                        }}
-                      >
-                        <div
-                          style={{ ...styles.progressFill, width: `${pct}%` }}
-                        />
-                      </div>
-                      <div style={styles.budgetRow}>
-                        <span
-                          style={{
-                            color: variance.onTarget ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {variance.onTarget ? "On Target" : "Off Target"}
-                        </span>
-                        <span
-                          style={{
-                            color: variance.onTarget ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {variance.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <button
-                  onClick={() => onNavigate("settings")}
-                  style={{
-                    width: "100%",
-                    textAlign: "center",
-                    padding: "10px 12px",
-                    backgroundColor: "transparent",
-                    border: "1px dashed #2a2a2a",
-                    borderRadius: "4px",
-                    transition: "all 0.3s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#0f0f0f";
-                    e.currentTarget.style.borderColor = "#6b7280";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                    e.currentTarget.style.borderColor = "#2a2a2a";
-                  }}
-                >
-                  <div style={{ color: "#6b7280", fontSize: "12px" }}>
-                    Not configured
+              {(() => {
+                const ly = snapshot.nextMonth.lastYear;
+                const hasLY = ly && (ly.revenue > 0 || ly.occupancy > 0);
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0", fontSize: "12px" }}>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px" }}></div>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px", textAlign: "right", minWidth: "70px" }}>This Year</div>
+                    <div style={{ color: "#4b5563", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", paddingBottom: "8px", textAlign: "right", minWidth: "70px" }}>Last Year</div>
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>Revenue</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{formatCurrency(snapshot.nextMonth.revenue)}</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? formatCurrency(ly!.revenue) : "—"}</div>
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>Occupancy</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{(snapshot.nextMonth.occupancy || 0).toFixed(1)}%</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? `${(ly!.occupancy || 0).toFixed(1)}%` : "—"}</div>
+                    <div style={{ color: "#6b7280", padding: "5px 0", borderTop: "1px solid #222" }}>ADR</div>
+                    <div style={{ color: "#e5e5e5", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{formatCurrency(snapshot.nextMonth.adr)}</div>
+                    <div style={{ color: hasLY ? "#6b7280" : "#333", padding: "5px 0", textAlign: "right", borderTop: "1px solid #222" }}>{hasLY ? formatCurrency(ly!.adr) : "—"}</div>
                   </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "10px",
-                      marginTop: "4px",
-                      opacity: 0.4,
-                    }}
-                  >
-                    Click to configure →
-                  </div>
-                </button>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -924,6 +701,7 @@ export function HotelDashboard({
             <RecentBookings
               data={data?.recentActivity || []}
               currencySymbol={currencySymbol}
+              onViewFullReport={() => onNavigate("reports")}
             />
           </div>
         </div>

@@ -721,6 +721,11 @@ router.get("/summary", requireUserApi, async (req, res) => {
         yoyChange: calcYOY(lastMonth.revenue, lastMonthLY.revenue),
         targetRevenue: budgetMap.get(formatPeriodKey(lastMonthDate)) || null,
         pacingStatus: lastMonthPacing,
+        lastYear: {
+          revenue: parseFloat(lastMonthLY.revenue || 0),
+          occupancy: parseFloat(lastMonthLY.occupancy || 0) * 100,
+          adr: parseFloat(lastMonthLY.adr || 0),
+        },
       },
       currentMonth: {
         label: format(today, "MMMM '(MTD)'"),
@@ -734,6 +739,11 @@ router.get("/summary", requireUserApi, async (req, res) => {
           parseFloat(currentMonth.total_sold_room_nights),
           formatPeriodKey(today),
         ),
+        lastYear: {
+          revenue: parseFloat(currentMonthLY.revenue || 0),
+          occupancy: parseFloat(currentMonthLY.occupancy || 0) * 100,
+          adr: parseFloat(currentMonthLY.adr || 0),
+        },
       },
       nextMonth: {
         label: format(addMonths(today, 1), "MMMM '(OTB)'"),
@@ -748,6 +758,11 @@ router.get("/summary", requireUserApi, async (req, res) => {
           parseFloat(nextMonth.total_sold_room_nights),
           formatPeriodKey(addMonths(today, 1)),
         ),
+        lastYear: {
+          revenue: parseFloat(nextMonthLY.revenue || 0),
+          occupancy: parseFloat(nextMonthLY.occupancy || 0) * 100,
+          adr: parseFloat(nextMonthLY.adr || 0),
+        },
       },
     };
 
