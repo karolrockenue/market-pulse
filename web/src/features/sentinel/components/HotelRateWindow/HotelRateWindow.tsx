@@ -1476,6 +1476,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       {!hiddenRows.has("effectiveRate") && (
                         <tr
                           style={{
+                            borderTop: "3px solid #39BDF8",
+                            borderLeft: "3px solid #39BDF8",
                             borderBottom: "1px solid rgba(57, 189, 248, 0.15)",
                             backgroundColor: "rgba(57, 189, 248, 0.03)",
                           }}
@@ -1484,8 +1486,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             style={{
                               ...styles.tdSticky,
                               backgroundColor: "rgba(57, 189, 248, 0.05)",
-                              borderLeft: "3px solid #39BDF8",
-                              borderTop: "3px solid #39BDF8",
                             }}
                           >
                             <div
@@ -1537,7 +1537,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 }}
                                 style={{
                                   borderRight: "1px solid #2a2a2a",
-                                  borderTop: "3px solid #39BDF8",
                                   textAlign: "center",
                                   fontSize: "12px",
                                   padding: "12px 8px",
@@ -1627,13 +1626,13 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       <tr
                         style={{
                           borderBottom: "3px solid #39BDF8",
+                          borderLeft: "3px solid #39BDF8",
                           backgroundColor: "rgba(57, 189, 248, 0.03)",
                         }}
                       >
                         <td style={{
                           ...styles.tdSticky,
                           backgroundColor: "rgba(57, 189, 248, 0.05)",
-                          borderLeft: "3px solid #39BDF8",
                         }}>
                           <span style={{ color: "#e5e5e5", fontWeight: 600 }}>PMS Override</span>
                           <span style={{ color: "#6b7280", fontSize: "10px", marginLeft: "6px" }}>base rate</span>
