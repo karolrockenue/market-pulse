@@ -1447,12 +1447,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       {/* === YOUR RATE CONTROLS — editable zone === */}
                       <tr>
                         <td
+                          colSpan={visibleData.length + 1}
                           style={{
-                            ...styles.tdSticky,
                             padding: "6px 16px",
                             backgroundColor: "#141414",
-                            borderLeft: "3px solid #39BDF8",
-                            borderTop: "3px solid #39BDF8",
                             borderBottom: "none",
                           }}
                         >
@@ -1465,21 +1463,12 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           }}>
                             Your Rate Controls
                           </span>
-                        </td>
-                        <td
-                          colSpan={visibleData.length}
-                          style={{
-                            padding: "6px 16px",
-                            backgroundColor: "#141414",
-                            borderTop: "3px solid #39BDF8",
-                            borderBottom: "none",
-                          }}
-                        >
                           <span style={{
                             fontSize: "10px",
                             color: "#6b7280",
+                            marginLeft: "8px",
                           }}>
-                            click any cell to edit
+                            — click any cell to edit
                           </span>
                         </td>
                       </tr>
@@ -1496,6 +1485,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               ...styles.tdSticky,
                               backgroundColor: "rgba(57, 189, 248, 0.05)",
                               borderLeft: "3px solid #39BDF8",
+                              borderTop: "3px solid #39BDF8",
                             }}
                           >
                             <div
@@ -1547,6 +1537,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 }}
                                 style={{
                                   borderRight: "1px solid #2a2a2a",
+                                  borderTop: "3px solid #39BDF8",
                                   textAlign: "center",
                                   fontSize: "12px",
                                   padding: "12px 8px",
