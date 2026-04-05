@@ -274,9 +274,10 @@ class SentinelBridgeService {
    * [WRITE] Save AI Predictions AND Execute Autonomy (if enabled).
    * Implements the 3-Layer Safety Protocol.
    */
-  async saveDecisions(decisions) {
+  async saveDecisions(decisions, mode) {
+    const isPreview = mode === 'preview';
     console.log(
-      `[Bridge] Processing ${decisions?.length} decisions (Shadow + Autonomy)...`,
+      `[Bridge] Processing ${decisions?.length} decisions (${isPreview ? 'PREVIEW — shadow only' : 'Shadow + Autonomy'})...`,
     );
 
     // [DEBUG] Log the Hotel ID type to confirm UUID vs Integer
@@ -348,6 +349,11 @@ class SentinelBridgeService {
       // ---------------------------------------------------------
       // PHASE 2: ACTIVE AUTONOMY (The 3-Layer Safety Protocol)
       // ---------------------------------------------------------
+      if (isPreview) {
+        console.log(`[Bridge] PREVIEW mode — skipping Phase 2 (autonomy). ${validDecisions.length} predictions saved as blue dots.`);
+        return { saved: validDecisions.length, queued: 0, mode: 'preview' };
+      }
+
       console.time("Phase 2: Autonomy Gates");
 
       // Group decisions by Hotel ID to fetch context efficiently

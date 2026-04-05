@@ -60,8 +60,9 @@ router.get("/context/:hotelId", async (req, res) => {
 router.post("/decisions", async (req, res) => {
   try {
     const decisions = req.body; // Expects Array of objects
+    const mode = req.query.mode; // 'preview' = shadow only, no autopilot
 
-    const result = await bridgeService.saveDecisions(decisions);
+    const result = await bridgeService.saveDecisions(decisions, mode);
 
     res.status(200).json({
       success: true,

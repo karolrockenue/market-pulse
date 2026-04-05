@@ -252,11 +252,16 @@ router.post("/trigger-dgx", async (req, res) => {
   try {
     console.log(`[Sentinel] Triggering DGX AI for Hotel ${hotelId}...`);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
     const response = await fetch(`${DGX_URL}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hotel_id: hotelId }),
+      body: JSON.stringify({ hotel_id: hotelId, mode: "preview" }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     // UNMASKING: Read raw text first in case Python throws a nasty HTML error page
     const rawText = await response.text();
@@ -1384,6 +1389,15 @@ async function runBackgroundWorker() {
         const savepointName = `sp_${job.id.replace(/-/g, "_")}`;
         try {
           await client.query(`SAVEPOINT ${savepointName}`);
+
+          // Skip jobs for disconnected hotels
+          const dcCheck = await client.query("SELECT is_disconnected FROM hotels WHERE hotel_id = $1", [job.hotel_id]);
+          if (dcCheck.rows[0]?.is_disconnected) {
+            await client.query(`UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`, [job.id]);
+            await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+            continue;
+          }
+
           const { pmsPropertyId, rates } = job.payload;
 
           // Adapter Call — [MEWS] Route to correct PMS adapter
