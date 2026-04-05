@@ -222,6 +222,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     loadRates,
     setOverride,
     clearOverride,
+    applyAiPrediction,
+    bulkApplyAi,
     submitChanges,
     saveMinRate,
   } = useRateGrid();
@@ -799,6 +801,42 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                     </div>
                   </div>
                 </div>
+
+                {/* Bulk Apply AI Button */}
+                <Button
+                  onClick={() => {
+                    const validDates = visibleData
+                      .filter((d) => !d.isFrozen && aiPredictions[d.date])
+                      .map((d) => d.date);
+
+                    if (validDates.length === 0) {
+                      toast.info("No valid AI predictions in this view.");
+                      return;
+                    }
+
+                    bulkApplyAi(validDates);
+                    toast.success(
+                      `Applied AI rates for ${validDates.length} days.`,
+                    );
+                  }}
+                  variant="outline"
+                  style={{
+                    borderColor: "#39BDF8",
+                    color: "#39BDF8",
+                    backgroundColor: "rgba(57, 189, 248, 0.1)",
+                    marginRight: "12px",
+                  }}
+                  className="h-9 text-sm"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Apply AI (
+                  {
+                    visibleData.filter(
+                      (d) => !d.isFrozen && aiPredictions[d.date],
+                    ).length
+                  }
+                  )
+                </Button>
 
                 {/* Submit Button */}
                 <Button
@@ -1399,22 +1437,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   gap: "4px",
                                 }}
                               >
-                                {isApplied ? (
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "4px",
-                                      opacity: 0.8,
-                                    }}
-                                  >
-                                    <Check size={12} /> Applied
-                                  </div>
-                                ) : (
-                                  <span>
-                                    {pred ? `£${Math.round(pred.rate)}` : "-"}
-                                  </span>
-                                )}
+                                <span>
+                                  {pred ? `£${Math.round(pred.rate)}` : "-"}
+                                </span>
 
                                 {/* Hover Arrow Action */}
                                 {showArrow && (
@@ -1422,10 +1447,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (pred) {
-                                        // Apply AI prediction as a manual override
-                                        setOverride(day.date, pred.rate);
+                                        const clampedRate = Math.max(pred.rate, day.guardrailMin || 0);
+                                        applyAiPrediction(day.date, clampedRate);
                                         toast.success(
-                                          `AI Rate £${pred.rate} applied`,
+                                          `AI Rate £${clampedRate} applied`,
                                         );
                                       }
                                     }}
