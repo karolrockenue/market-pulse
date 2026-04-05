@@ -201,6 +201,34 @@ User-facing issues are surfaced via sentinel_notifications.
 
 Core hotel & metrics tables remain part of Market Pulse.
 
+1.3 Fleet Inventory (Hotel ID Mapping)
+
+| Hotel Name | System ID | Type |
+|---|---|---|
+| The Portico Hotel | fbd2965d-34d9-4134-944f-28c3b512f2ff | UUID |
+| The W14 Hotel | ee9f3ef4-9a88-46a9-aaf6-83a5c17bea4a | UUID |
+| House of Toby | 1fa4727c-eb1a-44ce-bf95-5bc4fe6dac7d | UUID |
+| The 29 London | bb9b3c42-4d0d-4c0d-9f74-efd32aea7d52 | UUID |
+| Astor Victoria | 2400 | Integer |
+| Jubilee Hotel Victoria | 230719 | Integer |
+| The Cleveland Hotel | 289618 | Integer |
+| The Melita | 308760 | Integer |
+| Vilenza Hotel | 315428 | Integer |
+| Camden Suites | 315429 | Integer |
+| City Rooms | 315430 | Integer |
+| London Homes (Aldgate) | 315431 | Integer |
+| The Whitechapel Hotel | 315433 | Integer |
+| Citygate | 315435 | Integer |
+| Elysee Hyde Park | 315473 | Integer |
+| Notting Hill House Hotel | 316843 | Integer |
+| The Jade Hotel | 318238 | Integer |
+| Whitechapel Grand | 318297 | Integer |
+| London Suites | 318298 | Integer |
+| Studio 169 | 318301 | Integer |
+| Lancaster Court Hotel | 318302 | Integer |
+
+Missing Data (defined but no CSV history): St George Hotel Norfolk Square (318291), G Hotel Henderson (318303), St George's Inn Victoria (318305), Maiden Oval (318307), Aviator Bali (318310), The Pack and Carriage London (318312).
+
 Async Isolation
 
 User actions (overrides) never block on PMS writes.
@@ -238,7 +266,15 @@ Stack & Entry
 
 Node.js + Express.
 
-Deployed in a serverless-friendly way (Vercel).
+Deployed on Railway (persistent Node.js process). Migrated from Vercel on 2026-04-05.
+
+IMPORTANT — RAILWAY MIGRATION (2026-04-05):
+The platform moved from Vercel (serverless) to Railway (persistent process). Key differences:
+- Cron jobs now run in-process via `node-cron` (gated by `RAILWAY_ENVIRONMENT_NAME`), not HTTP-triggered via vercel.json.
+- PDF generation uses system-installed Playwright Chromium, not `@sparticuz/chromium` (Lambda-specific).
+- `VERCEL_ENV=production` is set on Railway as a compatibility shim — many files still reference it. Phase 5 cleanup will replace with `NODE_ENV`.
+- The full migration plan and status is in `claude/migration.md`.
+- AI agents should be mindful of this move: some areas may not have been fully verified yet. If touching webhooks (Cloudbeds/Mews), OAuth flows, or any code that references `VERCEL_ENV`/`VERCEL_URL`, verify it works on Railway.
 
 Single entrypoint: server.js
 
@@ -686,6 +722,55 @@ System respects the manual value.
 
 AI pushes nothing (no override) for that day.
 
+3.8 Priority Stack (Full Conflict Resolution)
+
+When multiple rules apply to the same date:
+
+1. Manual Padlock / Lock State – manual values always win.
+2. Freeze Window – frozen days preserve PMS live rate.
+3. Dynamic Rate Cap (The Ceiling) – Max Rate = (Historical 94th Percentile) × 1.30.
+4. Last-Minute Floor (LMF) – calculated rate overridden by floor unless frozen.
+5. Navigator Strategic Decision – the calculated rate from the pricing engine.
+
+3.9 Dynamic Seasonality Classification
+
+Seasonality is per-hotel, per-month, based on Pricing Power (not hard-coded calendar):
+
+- LOW (Pressure): Month ADR < 90% of Annual Average.
+- MID (Guide): Month ADR 90%–102% of Annual Average.
+- HIGH (Trap): Month ADR > 102% of Annual Average.
+
+The UI provides a "Seasonality Override" control to force a month into a different tier.
+
+3.10 Rate Stability (The Stopwatch)
+
+- Low Season: Hold rate if HoursSinceLastChange < 12h.
+- High Season: Hold rate if HoursSinceLastChange < 24h.
+- Velocity Guard: Only activates when delta >= 0 (on or ahead of target) AND projected fill (pickup_24h × lead_time) covers remaining rooms. When behind target (delta < 0), rate drops are always allowed regardless of pickup — catch up first, then protect. Ruthless Decay mode also bypasses velocity guard.
+- Noise Filter: £1.00 minimum change threshold to allow Ruthless Decay micro-drops.
+
+3.11 Navigator Zones (3-Zone Safety Protocol)
+
+Zone A – Deep Deficit (Anchor): Current occupancy > 20% behind target. Hard-lock to floor. AI forbidden from raising rates.
+
+Zone B – Momentum (Probe): Behind target but within 10% AND 48h velocity is strong (>5% of capacity). Allow conservative "probe" increase (20% of suggested hike).
+
+Zone C – On-Target (Navigator): Current occupancy >= target. Full yielding logic applies.
+
+3.12 Navigator v6 – Open Sky Model
+
+The engine uses Base + Step proportional ratchet (not min/max interpolation). The Dynamic Max is demoted to a final-stage cap only.
+
+Rule 1 – Base Anchor: Low Season base = Min Rate. Mid/High Season base = Min Rate × 1.50.
+
+Rule 2 – Hibernate Shield: If behind target and outside booking window (>30d weekends, >40d weekdays), hold base rate and ignore negative delta.
+
+Rule 3 – Proportional Ratchet (Up): Positive delta → percentage premium on base. High season 1.5x aggression (e.g., +20% delta → rate increases 30%).
+
+Rule 4 – Deep Deficit Override (Down): Inside booking window and struggling → gentle decay. At −30% or worse → immediate drop to Min Rate.
+
+Rule 5 – Ruthless Decay ("Sell Every Room"): If enabled and lead time ≤ 3 days, exponential decay (~1.9%/hour) gliding to Min Rate by 24h before arrival.
+
 4.0 DATABASE SCHEMA (SENTINEL + CONTEXT)
 4.1 sentinel_configurations
 
@@ -826,6 +911,8 @@ Resolution priority in sentinel.pricing.engine.js → applyGuardrails:
 2. Monthly min rate (sentinel_configurations → monthly_min_rates) — fallback.
 3. Last-Minute Floor (LMF) — when active, replaces both of the above.
 
+Daily min overrides are also passed to the DGX Python engine via the Bridge context (config.daily_min_rates). The DGX uses the same resolution priority: daily override > monthly default > LMF. The autonomy gates in sentinel.bridge.service.js also respect daily overrides when clamping floors.
+
 API: GET/POST /api/sentinel/min-rates/:hotelId
 
 Migration: api/migration_004_daily_min_rates.js
@@ -852,6 +939,55 @@ status
 
 source
 
+4.7b reservations (Detailed Booking Data)
+
+Stores individual reservation details for the Bookings Report. Populated from PMS webhooks (Cloudbeds, Mews) on every reservation event, plus one-time backfill via `scripts/backfill-reservations.js`.
+
+Key fields:
+
+id (PK, varchar — reservation ID from PMS)
+
+hotel_id (PK, integer — composite PK with id)
+
+guest_name (varchar — Cloudbeds: from API. Mews: requires `customers/getAll` permission, currently blocked)
+
+room_type (varchar — Cloudbeds: from `assigned[0].roomTypeName`. Mews: from `resourceCategories/getAll`)
+
+check_in (date)
+
+check_out (date)
+
+nights (integer)
+
+source (varchar — Cloudbeds: actual OTA name e.g. "Booking.com", "Expedia". Mews: generic origin only e.g. "ChannelManager", "Distributor", "Commander" — see §4.7c)
+
+avg_nightly_rate (numeric)
+
+total_rate (numeric)
+
+status (varchar — confirmed, checked_in, checked_out, canceled)
+
+booking_date (date — when the reservation was created)
+
+created_at, updated_at (timestamptz)
+
+Indexes: (hotel_id, booking_date DESC), (hotel_id, check_in).
+
+Migration: api/migration_006_reservations.js
+
+API: GET /api/hotels/:hotelId/bookings?days=14
+
+UI: Reports Hub → Bookings Report (admin only). Daily summary table with expandable accordion showing individual bookings per day. Cancelled bookings excluded from ADR/revenue totals, sorted to bottom.
+
+4.7c Mews Scope Limitations (as of April 2026)
+
+The current Mews integration (`MEWS_CLIENT_TOKEN`) lacks permissions for:
+
+- `customers/getAll` — needed for guest names. Without this, `reservations.guest_name` is NULL for all Mews hotels. The UI falls back to showing the reservation ID.
+- `sourceAssignments/getAll` — needed to resolve OTA names. Without this, `reservations.source` shows generic Mews origin values: "ChannelManager" (= OTA booking), "Distributor" (= Mews Booking Engine / direct), "Commander" (= manual entry). The actual OTA name (Booking.com, Expedia) is not available.
+
+To fix: enable these permissions in the Mews Marketplace integration settings. No code changes needed — the backfill script and webhook handler already handle both fields when data is available.
+
 4.7 sentinel_pace_curves
 
 Stores the 365-day booking pace targets for different seasonality tiers.
@@ -872,7 +1008,7 @@ created_at
 
 Sentinel reads from / relies on:
 
-hotels
+hotels (includes is_disconnected BOOLEAN — soft disconnect flag, added April 2026)
 
 users
 
@@ -921,6 +1057,33 @@ event_date (date)
 event_name (varchar)
 impact_multiplier (numeric)
 created_at (timestamptz)
+
+4.11 Schema Traps
+
+CRITICAL: hotel_id is INTEGER across all tables. room_type_id is MIXED TYPE — INTEGER in sentinel_ai_predictions but TEXT (VARCHAR) in sentinel_rates_calendar. When writing UNNEST arrays or cross-table JOINs, always cast room_type_id to text (e.g., room_type_id::text = ANY($2::text[])). Never cast to $X::int[] when touching the calendar table.
+
+4.12 Debug Queries
+
+"Why did the AI pick this price?"
+
+SELECT stay_date, suggested_rate, reasoning, is_applied, created_at
+FROM sentinel_ai_predictions
+WHERE hotel_id = {{ID}} AND stay_date = '{{DATE}}'
+ORDER BY created_at DESC LIMIT 5;
+
+"Last 5 PMS pushes for a date:"
+
+SELECT created_at, status, last_error,
+(SELECT x.rate FROM jsonb_to_recordset(payload->'rates') AS x(date text, rate float) WHERE x.date = '{{DATE}}' LIMIT 1) as rate_sent
+FROM sentinel_job_queue
+WHERE hotel_id = {{ID}} AND payload->'rates' @> '[{"date": "{{DATE}}"}]'
+ORDER BY created_at DESC LIMIT 5;
+
+"Who owns this date?"
+
+SELECT stay_date, rate, source, last_updated_at
+FROM sentinel_rates_calendar
+WHERE hotel_id = {{ID}} AND stay_date = '{{DATE}}';
 
 5.0 API REFERENCE (ACTIVE ENDPOINTS ONLY)
 
@@ -1067,6 +1230,22 @@ Pacing/pickup metrics.
 
 Hotel list & details.
 
+Soft Disconnect / Reconnect (added April 2026):
+
+POST /api/hotels/:hotelId/disconnect — sets is_disconnected = true. Data preserved, hotel hidden from dashboards/reports/sentinel. Requires user auth + property access.
+
+POST /api/hotels/:hotelId/reconnect — sets is_disconnected = false. Restores hotel to active state.
+
+GET /api/hotels/mine?includeDisconnected=true — optional param to include disconnected hotels (used by Settings page).
+
+POST /api/hotels/delete — admin only. Hard delete: removes hotel from all tables, notifies Cloudbeds. Irreversible.
+
+Disconnected hotels are filtered from: /api/hotels/mine (default), daily-refresh.js, sentinel queue worker, comp set fallback queries. Admin /api/hotels (GET /) still shows all hotels with is_disconnected flag.
+
+GET /api/hotels/:hotelId/bookings?days=14
+
+Admin-only. Returns daily booking summaries with nested individual reservation details for the Bookings Report. Groups by booking_date (when reservation was created). Cancelled bookings excluded from ADR/revenue/room night totals but included in booking count. Details sorted: confirmed first, cancelled last. Falls back to reservation ID when guest name is unavailable (Mews).
+
 Budgets.
 
 Compsets.
@@ -1100,19 +1279,31 @@ GET /context/:hotelId
 
 Returns full context for AI decision making:
 
-Inventory (sentinel_rates_calendar).
+Inventory (sentinel_rates_calendar + live PMS overlay).
 
-Config (Min/Max rates, Seasonality).
+Config (Min/Max rates, Daily Min Overrides, Seasonality, LMF, Rules).
 
 Pace Curves (Targets).
 
 Pickup Velocity (Calculated 24h delta).
 
+Market Events (peak date multipliers).
+
+Price History (last change timestamp per date).
+
 POST /decisions
 
 Accepts JSON array of rate predictions.
 
+Query param: ?mode=preview — shadow save only (no autopilot execution). Used by manual "Run Sentinel" button to show blue dots for user review.
+
+Without mode param: full autopilot execution (Phase 1 shadow save + Phase 2 autonomy gates + PMS queue). Used by hourly cron.
+
 Upserts into sentinel_ai_predictions.
+
+POST /retry-unapplied
+
+Sweeps all is_applied=FALSE predictions for future dates and re-processes them through autonomy gates.
 
 5.5 Mews Onboarding Endpoints (/api/mews)
 
@@ -1205,9 +1396,11 @@ market-pulse/
 │ ├── migration_001_add_market_metrics.js
 │ ├── migration_002_fix_market_metrics.js
 │ ├── migration_004_daily_min_rates.js
+│ ├── migration_006_reservations.js
 │ ├── send-scheduled-reports.js
 │ └── sync-rockenue-assets.js
 ├── scripts
+│ ├── backfill-reservations.js
 │ ├── import-daily-history.js
 │ └── import-monthly-history.js
 ├── server.js
@@ -1283,6 +1476,7 @@ market-pulse/
 │ │ │ ├── reports.api.ts
 │ │ │ └── types.ts
 │ │ ├── components
+│ │ │ ├── BookingsReport.tsx
 │ │ │ ├── BudgetReport.tsx
 │ │ │ ├── ReportActions.tsx
 │ │ │ ├── ReportControls.tsx
@@ -1574,6 +1768,69 @@ Render cron job: separate service pointing at market-pulse repo, build command `
 | Hash/key maintenance | None | None |
 
 Rule for AI: This is siloed from Market Pulse. Do not integrate Airbnb data into the Market Pulse UI or API unless explicitly instructed.
+
+11.0 DGX REMOTE COMPUTING (HYBRID INFRASTRUCTURE)
+
+11.1 Architecture
+
+The system uses Hybrid Execution:
+
+- Frontend & API (Railway): Runs the UI and backend API as a persistent Node.js process.
+- Heavyweight Compute (DGX Home Server): Runs the Python pricing engine (sentinel_live.py) on bare metal.
+- The Tunnel (Tailscale): Bridges the two securely without port forwarding.
+
+11.2 Connectivity
+
+Flow A (App → DGX): Railway POST → DGX_API_URL env var → Tailscale Funnel (Public HTTPS) → DGX Localhost:5000. Requires dgx-funnel service active.
+
+Flow B (Developer → DGX): Direct SSH via Tailscale mesh (100.x.x.x CGNAT IP). Host block: sentinel-hawaii in ~/.ssh/config, HostName 100.66.138.7, User sentinel.
+
+11.3 DGX Services
+
+Service A – Pricing Engine (sentinel.service): Runs python3 sentinel_live.py. Logs: journalctl -u sentinel.service -f.
+
+Service B – Public Tunnel (dgx-funnel.service): Runs /usr/bin/tailscale funnel 5000. Auto-restarts on crash.
+
+11.4 Cron Schedule (DGX)
+
+0 5 * * * — Fleet Sync (refreshes facts & calendar for all hotels).
+0 * * * * — Sentinel Run (generates & uploads decisions, hourly).
+
+11.5 Trigger Modes (Manual vs Cron)
+
+The DGX /run endpoint supports two modes:
+
+Manual Trigger (mode=preview): Activated when a user clicks "Run Sentinel" in the UI. Node sends { hotel_id, mode: "preview" } to the DGX. The DGX runs synchronously (blocks until complete) and uploads decisions with ?mode=preview. The Bridge saves predictions to sentinel_ai_predictions (blue dots) but skips Phase 2 autonomy — no PMS push. The user reviews and approves via "Apply AI" in the Rate Manager. The Node endpoint waits for the DGX response before returning to the UI (no instant 202 toast).
+
+Hourly Cron (no mode): Activated by the DGX cron job. No mode parameter. The DGX runs in a background thread (fire-and-forget, returns 202 instantly). Decisions are uploaded without mode param. The Bridge runs full Phase 1 + Phase 2: shadow save → autonomy gates → PMS queue push (if autopilot is enabled).
+
+Rule for AI: Manual triggers must never auto-push to PMS. They always produce blue dots for review.
+
+11.6 Self-Healing Authentication
+
+Cloudbeds token refresh can fail under high concurrency (33 hotels hourly). Usually transient — self-heals next cycle. Manual re-auth only if failures persist > 3 consecutive hours.
+
+12.0 MARKET CODEX ANALYTICS METHODOLOGY
+
+12.1 Core Calculated Metrics
+
+All derived from market_availability_snapshots. Always filter for a single scraped_at date.
+
+Price Step (Δ): Δ = (max_price_anchor − min_price_anchor) / 49. The monetary width of each histogram bar.
+
+Weighted Average Price (WAP£): Best proxy for market ADR. Calculates midpoint price per bar (min_price_anchor + i × Δ), then weighted average by bar height. Ideal for cross-date/season price comparison.
+
+Price Distribution Index (PDI): Weighted average of bar indices (0–49) instead of prices. Shows if supply skews cheap or expensive relative to its own range. Do NOT use PDI to compare different seasons — use WAP£.
+
+12.2 Market Codex Scraper
+
+Standalone microservice on Render (separate repo). Playwright browser scrapes Booking.com daily for 120-day forward availability. Currently active: London (GBP), Las Vegas (USD). Each city runs as a separate Render cron job at 03:00 UTC.
+
+Key quirks: Must handle cookie consent popup (#onetrust-accept-btn-handler) and Genius/sign-in banner (button[aria-label="Dismiss sign-in info."]). Histogram normalization needed — Booking.com sometimes returns 100-bar duplicated array instead of 50.
+
+12.3 Known Incident: WAP Calculation Failure (Nov 2025)
+
+The calculate_wap SQL function was overwritten with a version expecting [{count: N}] objects instead of the actual simple number array [4, 17, ...]. This broke the generated column. Fix: replaced function + "touched" a dependent column to force recalculation. If WAP goes NULL again, check the function source first.
 
 End of Blueprint.
 Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.
