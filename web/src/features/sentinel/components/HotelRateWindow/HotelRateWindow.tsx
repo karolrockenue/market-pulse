@@ -1453,6 +1453,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             backgroundColor: "#141414",
                             borderTop: "2px solid #39BDF8",
                             borderBottom: "none",
+                            borderLeft: "3px solid #39BDF8",
                           }}
                         >
                           <span style={{
