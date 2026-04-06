@@ -29,6 +29,7 @@ import {
 
 import { CompetitiveData } from "./features/market-intel/components/CompetitiveData";
 import { SentinelHub } from "./features/sentinel/SentinelHub";
+import { RockenueHub } from "./features/rockenue/RockenueHub";
 import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/HotelRateWindow";
 
 import { LandingPage } from "./components/LandingPage";
@@ -781,8 +782,19 @@ export default function App() {
             activeView === "rateManager" ||
             activeView === "shadowfax" ||
             activeView === "riskOverview" ||
-            activeView === "distribution") && (
+            activeView === "demandIntel") && (
             <SentinelHub
+              activeView={activeView}
+              onNavigate={handleViewChange}
+            />
+          )}
+
+          {/* Rockenue Domain Hub */}
+          {(activeView === "rockenueDashboard" ||
+            activeView === "distribution" ||
+            activeView === "crm" ||
+            activeView === "channelPricing") && (
+            <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
             />

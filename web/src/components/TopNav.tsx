@@ -14,6 +14,8 @@ import {
   Trophy,
   Presentation,
   Globe,
+  Building2,
+  ClipboardList,
 } from "lucide-react";
 import {
   Select,
@@ -97,6 +99,7 @@ export function TopNav({
       "rateManager",
       "shadowfax",
       "competitive-intel",
+      "demandIntel",
     ];
 
     if (property === "ALL" && singlePropertyViews.includes(view)) {
@@ -145,10 +148,23 @@ export function TopNav({
         { label: "Control Panel", value: "sentinel", icon: TerminalSquare },
         { label: "Rate Manager", value: "rateManager", icon: DollarSign },
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
+        { label: "Demand Intel", value: "demandIntel", icon: Globe },
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },
         { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
+      ],
+    },
+    {
+      label: "Rockenue",
+      value: "rockenue-group",
+      icon: Building2,
+      isDropdown: true,
+      isAdmin: true,
+      items: [
+        { label: "Dashboard", value: "rockenueDashboard", icon: LayoutDashboard },
         { label: "Distribution", value: "distribution", icon: Globe },
+        { label: "CRM", value: "crm", icon: ClipboardList },
+        { label: "Channel Pricing", value: "channelPricing", icon: DollarSign },
       ],
     },
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },
@@ -239,6 +255,9 @@ export function TopNav({
               position: "relative" as const,
               whiteSpace: "nowrap" as const,
               flexShrink: 0,
+              outline: "none",
+              border: "none",
+              background: "none",
               color: item.isAdmin
                 ? BLUE // Admin items always Blue text
                 : isActive
@@ -262,7 +281,7 @@ export function TopNav({
                 {separator}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button style={buttonStyle}>
+                    <button className="outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" style={buttonStyle}>
                       <span>{item.label}</span>
                       <ChevronDown
                         className="w-3 h-3 transition-transform"
@@ -297,7 +316,7 @@ export function TopNav({
                       className="px-2 py-1.5"
                       style={{ color: GRAY, fontSize: "11px", textTransform: "uppercase" as const, letterSpacing: "-0.025em" }}
                     >
-                      Sentinel Tools
+                      {item.label}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator style={{ backgroundColor: BORDER_DARK }} />
                     <DropdownMenuGroup>

@@ -45,6 +45,7 @@ const metricsRoutes = require("./api/routes/metrics.router.js"); // Unified Metr
 const hotelsRoutes = require("./api/routes/hotels.router.js"); // Unified Hotel/Config Engine
 const marketRoutes = require("./api/routes/market.router.js"); // Unified Market/Planning Engine
 const distributionRoutes = require("./api/routes/distribution.router.js"); // Distribution & CRM
+const flightRoutes = require("./api/routes/flight.router.js"); // Flight Demand Intelligence
 // --- EXPRESS APP INITIALIZATION ---
 
 // --- EXPRESS APP INITIALIZATION ---
@@ -303,6 +304,7 @@ app.use("/api/sentinel", sentinelRoutes); // AI Pricing
 app.use("/api/webhooks", webhooksRoutes); // PMS Events
 app.use("/api/bridge", bridgeRoutes); // Python AI Bridge
 app.use("/api/distribution", distributionRoutes); // Distribution & CRM
+app.use("/api/flights", flightRoutes); // Flight Demand Intelligence
 
 app.use("/api/mews-webhooks", mewsWebhooksRoutes);
 
@@ -399,6 +401,20 @@ app.listen(PORT, () => {
     cron.schedule("0 6 * * *", () =>
       cronRunner("sync-rockenue-assets", `http://localhost:${PORT}/api/sync-rockenue-assets`)
     );
+
+    // Every day at 04:00 UTC: refresh flight demand data for all cities
+    if (process.env.RAPIDAPI_KEY) {
+      cron.schedule("0 4 * * *", async () => {
+        const start = Date.now();
+        try {
+          const flightService = require("./api/services/flight.service");
+          const results = await flightService.refreshAllCities(90);
+          logger.info({ type: "cron", job: "flight-demand-refresh", status: 200, results, durationMs: Date.now() - start });
+        } catch (err) {
+          logger.error({ type: "cron", job: "flight-demand-refresh", error: err.message, durationMs: Date.now() - start });
+        }
+      });
+    }
 
     logger.info("[CRON] All cron jobs registered.");
   }
