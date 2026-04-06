@@ -1,0 +1,9 @@
+[phases.build]
+cmds = [
+  "npm install",
+  "cd web && npm install --legacy-peer-deps && npm run build && cd ..",
+  "npx playwright install --with-deps chromium"
+]
+
+[start]
+cmd = "npm start"
