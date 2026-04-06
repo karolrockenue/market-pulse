@@ -284,11 +284,6 @@ if (process.env.VERCEL_ENV !== "production") {
   });
 }
 
-// --- SENTRY VERIFICATION (temporary — remove after confirming) ---
-app.get("/debug-sentry", function mainHandler(req, res) {
-  throw new Error("My first Sentry error!");
-});
-
 // --- API ROUTERS ---
 // Mount all the dedicated routers to their respective paths.
 
