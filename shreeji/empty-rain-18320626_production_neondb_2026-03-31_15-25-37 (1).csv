@@ -1,0 +1,1260 @@
+"hotel_id","property_name","neighborhood","category","total_rooms","month","days_in_month","avg_adr","occupancy_pct","avg_revpar","total_rooms_sold","gross_revenue"
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-03-01",1,22.62,64.5,14.59,120.00,2714.36
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-04-01",30,27.15,68.9,19.16,3847.00,106893.26
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-05-01",31,29.65,81.8,24.58,4716.00,141736.67
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-06-01",30,31.04,79.6,25.01,4440.00,139568.06
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-07-01",31,30.91,70.6,22.49,4070.00,129701.10
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-08-01",31,27.72,70.3,19.90,4055.00,114745.19
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-09-01",30,27.26,75.1,20.94,4192.00,116867.66
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-10-01",31,29.17,80.0,23.57,4611.00,135930.88
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-11-01",30,28.67,68.2,20.62,3804.00,115086.60
+2400,"Astor Victoria","Pimlico","Hostel",186,"2024-12-01",31,32.96,55.9,19.79,3225.00,114092.58
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-01-01",31,22.39,42.8,9.94,2469.00,57302.45
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-02-01",28,24.54,62.3,15.57,3246.00,81096.72
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-03-01",31,26.10,64.3,17.26,3705.00,99520.40
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-04-01",30,24.69,62.5,15.81,3485.00,88244.50
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-05-01",31,28.03,66.3,18.85,3825.00,108700.78
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-06-01",30,32.23,60.4,19.81,3372.00,110556.85
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-07-01",31,35.20,62.3,22.90,3590.00,132067.52
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-08-01",31,25.06,60.3,15.37,3475.00,88617.71
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-09-01",30,27.52,73.0,20.68,4072.00,115398.12
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-10-01",31,29.39,69.5,20.85,4006.00,120244.38
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-11-01",30,28.56,61.5,18.80,3434.00,104908.34
+2400,"Astor Victoria","Pimlico","Hostel",186,"2025-12-01",31,30.72,50.1,16.79,2886.00,96390.26
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-01-01",31,22.49,35.4,8.17,2044.00,47004.89
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-02-01",28,21.58,39.7,8.81,2068.00,45859.84
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-03-01",31,25.82,61.9,16.43,3570.00,94864.39
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-04-01",30,29.84,27.2,9.38,1519.00,52998.57
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-05-01",31,0.00,0.1,0.00,5.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-06-01",30,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-07-01",31,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-08-01",31,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+2400,"Astor Victoria","Pimlico","Hostel",186,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2024-03-01",1,122.26,12.5,15.28,1.00,122.26
+315429,"Camden Suites","Holloway","Economy",8,"2024-04-01",30,132.48,26.3,34.65,63.00,8317.00
+315429,"Camden Suites","Holloway","Economy",8,"2024-05-01",31,137.44,34.3,47.97,85.00,11896.00
+315429,"Camden Suites","Holloway","Economy",8,"2024-06-01",30,161.60,25.8,42.25,62.00,10141.00
+315429,"Camden Suites","Holloway","Economy",8,"2024-07-01",31,54.07,29.0,31.54,72.00,7822.38
+315429,"Camden Suites","Holloway","Economy",8,"2024-08-01",31,104.77,75.8,80.41,188.00,19942.69
+315429,"Camden Suites","Holloway","Economy",8,"2024-09-01",30,112.25,79.2,90.90,190.00,21814.94
+315429,"Camden Suites","Holloway","Economy",8,"2024-10-01",31,113.19,87.9,100.38,218.00,24894.07
+315429,"Camden Suites","Holloway","Economy",8,"2024-11-01",30,108.18,72.9,83.15,175.00,19956.08
+315429,"Camden Suites","Holloway","Economy",8,"2024-12-01",31,119.81,80.6,99.27,200.00,24617.86
+315429,"Camden Suites","Holloway","Economy",8,"2025-01-01",31,76.94,35.1,34.41,87.00,8534.64
+315429,"Camden Suites","Holloway","Economy",8,"2025-02-01",28,80.92,70.1,58.27,157.00,13052.09
+315429,"Camden Suites","Holloway","Economy",8,"2025-03-01",31,91.03,75.0,69.24,186.00,17170.74
+315429,"Camden Suites","Holloway","Economy",8,"2025-04-01",30,98.09,73.3,74.42,176.00,17860.94
+315429,"Camden Suites","Holloway","Economy",8,"2025-05-01",31,98.54,83.1,83.87,206.00,20800.98
+315429,"Camden Suites","Holloway","Economy",8,"2025-06-01",30,116.95,91.7,107.51,220.00,25801.42
+315429,"Camden Suites","Holloway","Economy",8,"2025-07-01",31,105.67,88.7,95.55,220.00,23697.11
+315429,"Camden Suites","Holloway","Economy",8,"2025-08-01",31,101.61,82.7,84.92,205.00,21060.37
+315429,"Camden Suites","Holloway","Economy",8,"2025-09-01",30,113.35,84.2,97.33,202.00,23358.61
+315429,"Camden Suites","Holloway","Economy",8,"2025-10-01",31,103.83,83.9,87.96,208.00,21814.22
+315429,"Camden Suites","Holloway","Economy",8,"2025-11-01",30,100.50,75.8,80.88,182.00,19412.35
+315429,"Camden Suites","Holloway","Economy",8,"2025-12-01",31,123.16,79.8,101.14,198.00,25081.94
+315429,"Camden Suites","Holloway","Economy",8,"2026-01-01",31,71.05,65.7,49.23,163.00,12209.10
+315429,"Camden Suites","Holloway","Economy",8,"2026-02-01",28,78.64,62.5,52.37,140.00,11731.22
+315429,"Camden Suites","Holloway","Economy",8,"2026-03-01",31,80.59,71.8,60.87,178.00,15096.64
+315429,"Camden Suites","Holloway","Economy",8,"2026-04-01",30,98.66,35.8,42.66,86.00,10237.96
+315429,"Camden Suites","Holloway","Economy",8,"2026-05-01",31,45.18,5.6,8.02,14.00,1987.76
+315429,"Camden Suites","Holloway","Economy",8,"2026-06-01",30,60.55,3.8,9.06,9.00,2173.90
+315429,"Camden Suites","Holloway","Economy",8,"2026-07-01",31,53.58,15.3,23.37,38.00,5796.16
+315429,"Camden Suites","Holloway","Economy",8,"2026-08-01",31,14.83,2.0,2.32,5.00,574.84
+315429,"Camden Suites","Holloway","Economy",8,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2026-11-01",30,25.68,2.1,3.21,5.00,770.39
+315429,"Camden Suites","Holloway","Economy",8,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2027-01-01",31,0.00,0.8,0.00,2.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315429,"Camden Suites","Holloway","Economy",8,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315430,"City Rooms","Whitechapel","Economy",13,"2024-03-01",1,58.72,61.5,36.13,8.00,469.75
+315430,"City Rooms","Whitechapel","Economy",13,"2024-04-01",30,92.74,77.2,72.51,301.00,28278.00
+315430,"City Rooms","Whitechapel","Economy",13,"2024-05-01",31,102.90,79.7,82.88,321.00,33400.00
+315430,"City Rooms","Whitechapel","Economy",13,"2024-06-01",30,101.31,87.4,91.32,341.00,35614.00
+315430,"City Rooms","Whitechapel","Economy",13,"2024-07-01",31,35.51,16.6,14.47,67.00,5832.56
+315430,"City Rooms","Whitechapel","Economy",13,"2024-08-01",31,85.80,71.7,61.65,289.00,24846.85
+315430,"City Rooms","Whitechapel","Economy",13,"2024-09-01",30,95.85,80.0,77.42,312.00,30195.31
+315430,"City Rooms","Whitechapel","Economy",13,"2024-10-01",31,97.62,80.6,79.00,325.00,31837.22
+315430,"City Rooms","Whitechapel","Economy",13,"2024-11-01",30,102.34,84.1,88.19,328.00,34392.80
+315430,"City Rooms","Whitechapel","Economy",13,"2024-12-01",31,105.68,87.1,93.10,351.00,37518.43
+315430,"City Rooms","Whitechapel","Economy",13,"2025-01-01",31,74.05,59.3,43.75,239.00,17632.72
+315430,"City Rooms","Whitechapel","Economy",13,"2025-02-01",28,88.53,69.5,59.92,253.00,21810.61
+315430,"City Rooms","Whitechapel","Economy",13,"2025-03-01",31,89.31,75.9,68.33,306.00,27538.40
+315430,"City Rooms","Whitechapel","Economy",13,"2025-04-01",30,80.89,76.2,62.58,297.00,24407.02
+315430,"City Rooms","Whitechapel","Economy",13,"2025-05-01",31,92.67,79.7,74.64,321.00,30079.19
+315430,"City Rooms","Whitechapel","Economy",13,"2025-06-01",30,104.21,79.7,85.57,311.00,33372.92
+315430,"City Rooms","Whitechapel","Economy",13,"2025-07-01",31,95.95,87.6,84.74,353.00,34150.14
+315430,"City Rooms","Whitechapel","Economy",13,"2025-08-01",31,81.13,71.7,59.61,289.00,24023.40
+315430,"City Rooms","Whitechapel","Economy",13,"2025-09-01",30,100.30,84.9,87.58,331.00,34155.17
+315430,"City Rooms","Whitechapel","Economy",13,"2025-10-01",31,99.53,84.9,86.29,342.00,34914.70
+315430,"City Rooms","Whitechapel","Economy",13,"2025-11-01",30,93.27,87.9,81.40,343.00,31999.40
+315430,"City Rooms","Whitechapel","Economy",13,"2025-12-01",31,97.29,93.1,90.41,375.00,36435.64
+315430,"City Rooms","Whitechapel","Economy",13,"2026-01-01",31,62.30,72.2,45.31,291.00,18260.88
+315430,"City Rooms","Whitechapel","Economy",13,"2026-02-01",28,61.58,87.1,53.84,317.00,19599.25
+315430,"City Rooms","Whitechapel","Economy",13,"2026-03-01",31,83.33,79.7,65.99,321.00,26594.48
+315430,"City Rooms","Whitechapel","Economy",13,"2026-04-01",30,78.94,24.9,21.73,97.00,8691.09
+315430,"City Rooms","Whitechapel","Economy",13,"2026-05-01",31,15.07,1.0,1.16,4.00,467.12
+315430,"City Rooms","Whitechapel","Economy",13,"2026-06-01",30,0.00,0.0,0.00,0.00,0.00
+315430,"City Rooms","Whitechapel","Economy",13,"2026-07-01",31,52.36,4.0,6.62,16.00,2666.29
+315430,"City Rooms","Whitechapel","Economy",13,"2026-08-01",31,24.69,3.5,2.50,14.00,1008.02
+315430,"City Rooms","Whitechapel","Economy",13,"2026-09-01",30,28.57,1.8,2.20,7.00,856.96
+315430,"City Rooms","Whitechapel","Economy",13,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+315430,"City Rooms","Whitechapel","Economy",13,"2026-11-01",30,20.74,2.6,1.77,10.00,689.94
+315430,"City Rooms","Whitechapel","Economy",13,"2026-12-01",31,20.04,3.5,2.78,14.00,1119.96
+315430,"City Rooms","Whitechapel","Economy",13,"2027-01-01",31,10.06,1.0,0.77,4.00,312.00
+315430,"City Rooms","Whitechapel","Economy",13,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+315430,"City Rooms","Whitechapel","Economy",13,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315430,"City Rooms","Whitechapel","Economy",13,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2024-03-01",1,51.87,50.0,25.94,16.00,829.94
+315435,"Citygate","Stepney","Midscale",32,"2024-04-01",30,65.43,63.4,42.27,609.00,40575.00
+315435,"Citygate","Stepney","Midscale",32,"2024-05-01",31,71.85,81.6,59.36,809.00,58888.00
+315435,"Citygate","Stepney","Midscale",32,"2024-06-01",30,76.98,77.4,60.20,743.00,57791.00
+315435,"Citygate","Stepney","Midscale",32,"2024-07-01",31,20.39,11.8,7.17,117.00,7874.15
+315435,"Citygate","Stepney","Midscale",32,"2024-08-01",31,67.92,61.8,39.87,613.00,43260.70
+315435,"Citygate","Stepney","Midscale",32,"2024-09-01",30,68.45,76.7,49.07,736.00,51524.47
+315435,"Citygate","Stepney","Midscale",32,"2024-10-01",31,67.97,80.9,50.90,803.00,55225.19
+315435,"Citygate","Stepney","Midscale",32,"2024-11-01",30,67.81,85.7,54.10,823.00,56804.77
+315435,"Citygate","Stepney","Midscale",32,"2024-12-01",31,77.18,88.9,64.21,882.00,69670.28
+315435,"Citygate","Stepney","Midscale",32,"2025-01-01",31,48.08,51.1,23.16,507.00,25126.43
+315435,"Citygate","Stepney","Midscale",32,"2025-02-01",28,51.08,73.4,34.99,658.00,34288.03
+315435,"Citygate","Stepney","Midscale",32,"2025-03-01",31,51.10,78.2,37.32,776.00,40490.99
+315435,"Citygate","Stepney","Midscale",32,"2025-04-01",30,54.26,71.6,36.03,687.00,37835.26
+315435,"Citygate","Stepney","Midscale",32,"2025-05-01",31,66.62,76.0,46.92,754.00,50905.75
+315435,"Citygate","Stepney","Midscale",32,"2025-06-01",30,79.84,83.4,61.45,801.00,64624.68
+315435,"Citygate","Stepney","Midscale",32,"2025-07-01",31,85.89,86.0,72.60,853.00,74197.09
+315435,"Citygate","Stepney","Midscale",32,"2025-08-01",31,70.21,79.6,56.51,790.00,56785.16
+315435,"Citygate","Stepney","Midscale",32,"2025-09-01",30,82.03,81.7,67.97,784.00,65253.80
+315435,"Citygate","Stepney","Midscale",32,"2025-10-01",31,80.07,88.3,69.90,876.00,70670.12
+315435,"Citygate","Stepney","Midscale",32,"2025-11-01",30,84.69,84.9,73.66,815.00,70711.16
+315435,"Citygate","Stepney","Midscale",32,"2025-12-01",31,85.17,79.8,70.70,792.00,70134.31
+315435,"Citygate","Stepney","Midscale",32,"2026-01-01",31,57.32,56.7,32.26,562.00,31998.31
+315435,"Citygate","Stepney","Midscale",32,"2026-02-01",28,50.16,73.8,37.35,661.00,33462.94
+315435,"Citygate","Stepney","Midscale",32,"2026-03-01",31,55.54,71.8,40.40,712.00,40077.86
+315435,"Citygate","Stepney","Midscale",32,"2026-04-01",30,81.06,24.6,19.48,236.00,18574.58
+315435,"Citygate","Stepney","Midscale",32,"2026-05-01",31,89.23,8.0,8.51,79.00,8441.94
+315435,"Citygate","Stepney","Midscale",32,"2026-06-01",30,132.86,3.9,5.98,37.00,5745.29
+315435,"Citygate","Stepney","Midscale",32,"2026-07-01",31,117.20,10.6,14.57,105.00,14457.32
+315435,"Citygate","Stepney","Midscale",32,"2026-08-01",31,66.13,8.1,12.32,80.00,12218.76
+315435,"Citygate","Stepney","Midscale",32,"2026-09-01",30,3.77,0.2,0.24,2.00,226.28
+315435,"Citygate","Stepney","Midscale",32,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315435,"Citygate","Stepney","Midscale",32,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-07-01",31,74.42,30.6,36.44,608.00,77938.91
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-08-01",31,120.95,84.2,95.12,1671.00,203455.24
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-09-01",30,115.92,84.4,91.90,1621.00,190243.03
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-10-01",31,127.40,80.5,96.30,1597.00,205992.96
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-11-01",30,127.21,79.4,97.07,1524.00,199665.17
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2024-12-01",31,149.42,78.7,114.93,1561.00,242265.66
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-01-01",31,86.02,53.8,45.96,1068.00,96892.44
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-02-01",28,89.05,61.0,53.10,1094.00,101095.66
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-03-01",31,93.82,68.8,62.71,1364.00,132191.65
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-04-01",30,108.53,75.7,79.53,1453.00,162243.06
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-05-01",31,116.51,81.2,90.17,1611.00,190078.94
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-06-01",30,143.68,81.7,113.34,1568.00,231211.04
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-07-01",31,155.67,83.5,124.51,1656.00,262470.12
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-08-01",31,127.03,74.3,90.59,1474.00,190961.05
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-09-01",30,140.40,80.1,108.39,1538.00,221112.54
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-10-01",31,136.88,78.4,102.88,1556.00,216863.58
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-11-01",30,130.98,81.0,102.46,1556.00,209017.22
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2025-12-01",31,155.63,77.1,117.90,1529.00,248528.69
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-01-01",31,86.72,43.2,37.73,858.00,79540.51
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-02-01",28,77.54,56.4,42.79,1010.00,81469.25
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-03-01",31,83.17,66.0,53.30,1310.00,112593.14
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-04-01",30,113.29,51.3,54.42,984.00,112569.35
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-05-01",31,149.34,9.2,14.99,182.00,31979.06
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-06-01",30,179.89,9.1,16.59,174.00,33841.43
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-07-01",31,152.22,6.6,11.92,130.00,25133.53
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-08-01",31,12.79,0.3,0.83,5.00,956.88
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-09-01",30,0.00,0.2,0.00,3.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315473,"Elysee Hyde Park","Paddington","Midscale",64,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2025-07-01",1,122.00,3.4,122.00,1.00,122.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2025-08-01",30,59.99,15.3,50.36,133.00,9245.53
+318299,"Haringey Hotel","Harringay","Midscale",29,"2025-09-01",30,70.05,37.7,41.40,328.00,23862.16
+318299,"Haringey Hotel","Harringay","Midscale",29,"2025-10-01",31,56.82,54.7,36.66,492.00,30105.72
+318299,"Haringey Hotel","Harringay","Midscale",29,"2025-11-01",30,54.06,63.7,36.41,554.00,32558.66
+318299,"Haringey Hotel","Harringay","Midscale",29,"2025-12-01",31,53.47,58.6,34.85,527.00,31329.17
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-01-01",31,43.73,20.2,9.90,182.00,8900.51
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-02-01",28,64.94,29.2,19.14,237.00,15540.98
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-03-01",31,53.65,50.9,25.13,458.00,22587.78
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-04-01",30,79.32,19.9,17.19,173.00,14956.98
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-05-01",31,44.87,1.7,1.84,15.00,1653.14
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-06-01",30,23.46,0.6,1.09,5.00,950.05
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-07-01",31,81.82,16.8,25.22,151.00,22673.64
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-08-01",31,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-09-01",30,15.37,0.2,0.53,2.00,461.04
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318299,"Haringey Hotel","Harringay","Midscale",29,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-03-01",1,0.00,45.0,0.00,9.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-04-01",30,0.00,5.8,0.00,35.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-06-01",30,0.00,42.0,0.00,252.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-07-01",31,0.00,62.7,0.00,389.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-08-01",31,0.00,71.8,0.00,445.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-09-01",30,0.00,71.8,0.00,431.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-10-01",31,0.00,75.0,0.00,465.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-11-01",30,0.00,67.3,0.00,404.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2024-12-01",31,0.00,68.9,0.00,427.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-01-01",31,0.00,66.6,0.00,413.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-02-01",28,0.00,71.1,0.00,398.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-03-01",31,0.00,77.9,0.00,483.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-04-01",30,0.00,8.0,0.00,48.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-05-01",31,0.00,18.4,0.00,114.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-06-01",30,0.00,49.7,0.00,298.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-07-01",31,0.00,15.3,0.00,95.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-08-01",31,0.00,31.6,0.00,196.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-09-01",30,0.00,66.0,0.00,396.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-10-01",31,0.00,66.8,0.00,414.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-11-01",30,0.00,79.7,0.00,478.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2025-12-01",31,0.00,76.8,0.00,476.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-01-01",31,99.10,81.9,78.86,508.00,49635.06
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-02-01",28,101.83,84.8,96.39,475.00,48580.56
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-03-01",31,108.96,81.3,98.38,504.00,54895.69
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-04-01",30,136.64,49.8,75.15,299.00,40713.17
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-05-01",31,185.09,9.0,21.97,56.00,12259.63
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-06-01",30,214.94,14.3,37.94,86.00,20488.55
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-07-01",31,200.75,8.1,23.61,50.00,13173.64
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-08-01",31,168.89,6.8,15.46,42.00,8628.47
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-09-01",30,41.72,1.5,3.70,9.00,1999.84
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-10-01",31,32.13,0.6,1.78,4.00,995.90
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2026-12-01",31,36.06,0.6,2.00,4.00,1117.73
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2027-02-01",28,33.11,1.4,1.84,8.00,927.11
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318314,"Hyde Park Green Hotel","Bayswater","Midscale",20,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-07-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-08-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-09-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-10-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-11-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2024-12-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-01-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-02-01",28,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-03-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-04-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-05-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-06-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-07-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-08-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-09-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-10-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-11-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2025-12-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-01-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-02-01",28,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-03-01",31,2.59,0.7,0.45,5.00,400.76
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-04-01",30,54.30,1.9,3.12,14.00,2343.74
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-05-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-06-01",30,5.24,0.1,0.21,1.00,157.25
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-07-01",31,17.25,0.4,0.69,3.00,534.65
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-08-01",31,91.64,3.9,5.04,29.00,3908.03
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318319,"Jubilee Hotel Kensingston","Kensington","Midscale",24,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-03-01",1,123.82,73.1,88.35,19.00,2352.65
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-04-01",30,142.82,84.2,122.45,657.00,94658.64
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-05-01",31,150.96,92.3,140.14,744.00,112705.30
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-06-01",30,191.10,88.8,171.04,693.00,133918.96
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-07-01",31,192.12,92.8,178.93,748.00,144058.23
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-08-01",31,161.27,90.6,146.88,730.00,118175.76
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-09-01",30,171.14,89.1,154.91,695.00,119593.76
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-10-01",31,176.22,89.3,156.65,720.00,127302.28
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-11-01",30,159.75,88.7,139.94,692.00,111904.28
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2024-12-01",31,196.82,75.4,145.92,608.00,121982.10
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-01-01",31,126.67,56.6,72.54,456.00,59206.86
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-02-01",28,136.50,63.0,87.94,459.00,64017.43
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-03-01",31,143.39,72.5,106.02,584.00,85454.88
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-04-01",30,146.75,66.7,100.00,520.00,78003.78
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-05-01",31,157.35,82.5,131.56,665.00,106037.45
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-06-01",30,176.08,91.5,163.09,714.00,127213.56
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-07-01",31,182.77,95.3,175.35,768.00,141330.89
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-08-01",31,158.23,90.2,143.83,727.00,115928.44
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-09-01",30,180.35,90.3,163.69,704.00,127675.44
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-10-01",31,177.17,90.2,160.91,727.00,129691.26
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-11-01",30,170.47,87.2,151.31,680.00,118021.27
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2025-12-01",31,187.13,80.3,153.90,647.00,124040.16
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-01-01",31,118.43,52.6,61.58,424.00,49634.12
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-02-01",28,110.23,85.2,95.04,620.00,69189.90
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-03-01",31,125.26,71.3,90.51,575.00,72953.76
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-04-01",30,167.99,34.5,57.54,269.00,44881.96
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-05-01",31,194.25,19.2,38.54,155.00,31063.82
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-06-01",30,208.44,25.4,52.93,198.00,41453.80
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-07-01",31,206.61,20.5,44.33,165.00,35727.14
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-08-01",31,204.77,7.8,17.39,63.00,14886.26
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-09-01",30,152.94,12.4,20.72,97.00,16165.37
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-10-01",31,66.69,0.9,2.57,7.00,2067.46
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-11-01",30,49.78,0.8,2.37,6.00,1850.39
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2027-01-01",31,50.12,0.9,1.93,7.00,1553.57
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2027-02-01",28,10.70,0.3,0.41,2.00,299.52
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+230719,"Jubilee Hotel Victoria","Pimlico","Upper Midscale",26,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-03-01",1,83.51,82.9,69.25,34.00,2839.28
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-04-01",30,94.61,79.6,75.86,979.00,93313.66
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-05-01",31,98.09,85.9,85.19,1092.00,108280.12
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-06-01",30,114.25,86.3,99.72,1062.00,122657.76
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-07-01",31,120.41,83.0,101.25,1055.00,128686.60
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-08-01",31,92.75,87.3,81.55,1109.00,103652.02
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-09-01",30,92.08,81.5,76.26,1002.00,93800.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-10-01",31,100.22,86.2,87.08,1096.00,110683.25
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-11-01",30,104.13,82.0,87.37,1008.00,107468.36
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2024-12-01",31,120.83,78.3,97.61,995.00,124063.98
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-01-01",31,77.48,57.9,45.80,736.00,58209.19
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-02-01",28,80.45,70.4,57.41,808.00,65901.55
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-03-01",31,80.67,77.1,63.37,980.00,80548.03
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-04-01",30,89.19,77.6,70.58,954.00,86815.43
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-05-01",31,93.14,83.3,78.64,1060.00,100032.28
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-06-01",30,108.80,89.3,98.92,1098.00,121671.70
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-07-01",31,117.86,82.4,99.18,1047.00,126056.77
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-08-01",31,91.18,73.4,67.37,933.00,85621.12
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-09-01",30,103.77,89.1,93.42,1096.00,114908.77
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-10-01",31,105.04,84.3,89.58,1071.00,113856.84
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-11-01",30,100.19,82.8,84.67,1019.00,104141.53
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2025-12-01",31,118.91,72.9,89.35,927.00,113656.28
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-01-01",31,77.32,31.1,25.09,395.00,31890.26
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-02-01",28,67.58,61.1,42.04,701.00,48875.09
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-03-01",31,78.39,57.0,44.54,724.00,57989.86
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-04-01",30,97.78,42.0,40.89,516.00,50923.74
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-05-01",31,107.18,23.4,24.59,297.00,32337.05
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-06-01",30,121.05,18.7,23.22,230.00,29257.54
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-07-01",31,122.72,8.0,10.74,102.00,13986.66
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-08-01",31,79.88,3.6,3.77,46.00,4913.72
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-09-01",30,75.75,2.4,2.70,30.00,3404.98
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-10-01",31,11.53,0.2,0.27,3.00,357.49
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318302,"Lancaster Court Hotel","Paddington","Economy",41,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-03-01",1,125.44,72.7,91.23,8.00,1003.48
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-04-01",30,150.15,82.1,125.66,271.00,41467.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-05-01",31,167.69,80.1,135.40,273.00,46171.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-06-01",30,196.16,77.3,153.25,255.00,50574.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-07-01",31,79.86,28.4,51.44,97.00,17541.59
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-08-01",31,157.80,85.3,134.43,291.00,45841.25
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-09-01",30,149.11,82.7,124.19,273.00,40981.18
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-10-01",31,175.10,84.2,149.32,287.00,50916.84
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-11-01",30,168.62,75.5,131.90,249.00,43526.56
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2024-12-01",31,185.24,76.2,147.86,260.00,50421.96
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-01-01",31,120.87,68.0,85.70,232.00,29222.12
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-02-01",28,119.54,82.8,101.92,255.00,31392.42
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-03-01",31,125.91,82.1,107.23,280.00,36566.86
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-04-01",30,145.73,85.8,127.51,283.00,42077.53
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-05-01",31,147.28,80.1,118.92,273.00,40551.47
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-06-01",30,166.87,86.4,145.75,285.00,48097.69
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-07-01",31,170.82,83.9,142.91,286.00,48733.36
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-08-01",31,171.32,79.5,138.33,271.00,47171.39
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-09-01",30,169.99,78.2,135.17,258.00,44605.80
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-10-01",31,165.31,79.2,131.66,270.00,44897.09
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-11-01",30,149.45,73.0,112.15,241.00,37008.17
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2025-12-01",31,187.06,65.7,135.51,224.00,46209.77
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-01-01",31,116.34,23.5,34.37,80.00,11720.22
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-02-01",28,112.04,65.9,76.05,203.00,23423.02
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-03-01",31,100.54,73.3,74.54,250.00,25418.76
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-04-01",30,109.34,18.2,30.72,60.00,10773.80
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-05-01",31,138.04,11.1,23.27,38.00,7934.34
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-06-01",30,74.40,7.6,13.77,25.00,4544.14
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-07-01",31,15.62,1.2,1.42,4.00,484.28
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-08-01",31,67.84,11.4,15.47,39.00,5276.32
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315431,"London Homes (Aldgate)","Whitechapel","Upper Midscale",11,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2024-04-01",30,62.27,24.2,19.20,29.00,2304.00
+318298,"London Suites","Stepney","Midscale",4,"2024-05-01",31,69.90,70.2,52.90,87.00,6559.20
+318298,"London Suites","Stepney","Midscale",4,"2024-06-01",30,76.55,59.2,47.42,71.00,5690.40
+318298,"London Suites","Stepney","Midscale",4,"2024-07-01",31,0.00,0.8,0.00,1.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2024-08-01",31,16.87,9.7,6.20,12.00,768.22
+318298,"London Suites","Stepney","Midscale",4,"2024-09-01",30,50.23,51.7,36.65,62.00,4397.43
+318298,"London Suites","Stepney","Midscale",4,"2024-10-01",31,50.46,63.7,36.84,79.00,4568.66
+318298,"London Suites","Stepney","Midscale",4,"2024-11-01",30,58.92,63.3,40.53,76.00,4864.02
+318298,"London Suites","Stepney","Midscale",4,"2024-12-01",31,52.10,52.4,44.35,65.00,5499.99
+318298,"London Suites","Stepney","Midscale",4,"2025-01-01",31,9.30,5.6,4.03,7.00,499.13
+318298,"London Suites","Stepney","Midscale",4,"2025-02-01",28,9.58,9.8,3.58,11.00,401.04
+318298,"London Suites","Stepney","Midscale",4,"2025-03-01",31,35.71,26.6,13.35,33.00,1655.41
+318298,"London Suites","Stepney","Midscale",4,"2025-04-01",30,38.44,36.7,18.51,44.00,2220.94
+318298,"London Suites","Stepney","Midscale",4,"2025-05-01",31,52.32,66.1,37.96,82.00,4706.45
+318298,"London Suites","Stepney","Midscale",4,"2025-06-01",30,64.88,80.0,53.70,96.00,6443.69
+318298,"London Suites","Stepney","Midscale",4,"2025-07-01",31,64.94,72.6,49.63,90.00,6154.33
+318298,"London Suites","Stepney","Midscale",4,"2025-08-01",31,49.30,48.4,29.43,60.00,3649.47
+318298,"London Suites","Stepney","Midscale",4,"2025-09-01",30,62.11,85.8,57.13,103.00,6855.53
+318298,"London Suites","Stepney","Midscale",4,"2025-10-01",31,68.34,83.1,56.78,103.00,7040.96
+318298,"London Suites","Stepney","Midscale",4,"2025-11-01",30,66.58,84.2,56.58,101.00,6789.82
+318298,"London Suites","Stepney","Midscale",4,"2025-12-01",31,67.27,73.4,51.84,91.00,6428.21
+318298,"London Suites","Stepney","Midscale",4,"2026-01-01",31,51.26,34.7,22.67,43.00,2811.19
+318298,"London Suites","Stepney","Midscale",4,"2026-02-01",28,52.27,48.2,26.68,54.00,2987.93
+318298,"London Suites","Stepney","Midscale",4,"2026-03-01",31,56.04,37.1,24.97,46.00,3096.25
+318298,"London Suites","Stepney","Midscale",4,"2026-04-01",30,60.04,33.3,23.98,40.00,2877.31
+318298,"London Suites","Stepney","Midscale",4,"2026-05-01",31,44.39,20.2,16.77,25.00,2078.96
+318298,"London Suites","Stepney","Midscale",4,"2026-06-01",30,18.70,5.0,5.78,6.00,693.84
+318298,"London Suites","Stepney","Midscale",4,"2026-07-01",31,13.36,4.8,6.77,6.00,839.28
+318298,"London Suites","Stepney","Midscale",4,"2026-08-01",31,25.21,10.5,12.27,13.00,1521.08
+318298,"London Suites","Stepney","Midscale",4,"2026-09-01",30,25.76,7.5,11.57,9.00,1388.42
+318298,"London Suites","Stepney","Midscale",4,"2026-10-01",31,10.95,4.0,2.74,5.00,339.30
+318298,"London Suites","Stepney","Midscale",4,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2027-01-01",31,6.67,3.2,1.67,4.00,206.86
+318298,"London Suites","Stepney","Midscale",4,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318298,"London Suites","Stepney","Midscale",4,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-03-01",1,0.00,53.8,0.00,21.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-04-01",30,0.00,25.9,0.00,303.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-05-01",31,0.00,72.5,0.00,877.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-06-01",30,0.00,69.7,0.00,815.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-07-01",31,0.00,65.3,0.00,790.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-08-01",31,0.00,39.5,0.00,478.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-09-01",30,0.00,64.4,0.00,754.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-10-01",31,0.00,57.2,0.00,691.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-11-01",30,0.00,64.2,0.00,751.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2024-12-01",31,0.00,66.7,0.00,806.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-01-01",31,0.00,68.2,0.00,824.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-02-01",28,0.00,63.7,0.00,696.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-03-01",31,0.00,59.9,0.00,724.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-04-01",30,0.00,65.6,0.00,768.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-05-01",31,0.00,77.3,0.00,935.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-06-01",30,0.00,63.1,0.00,738.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-07-01",31,0.00,73.9,0.00,894.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-08-01",31,0.00,74.0,0.00,895.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-09-01",30,0.00,74.5,0.00,872.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-10-01",31,0.00,73.0,0.00,883.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-11-01",30,0.00,90.7,0.00,1061.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2025-12-01",31,117.14,56.1,73.98,693.00,87151.04
+318307,"Maiden Oval","Oval","Midscale",38,"2026-01-01",31,76.43,64.7,49.70,762.00,58545.20
+318307,"Maiden Oval","Oval","Midscale",38,"2026-02-01",28,69.73,90.2,62.87,960.00,66893.70
+318307,"Maiden Oval","Oval","Midscale",38,"2026-03-01",31,71.43,96.9,69.38,1142.00,81878.79
+318307,"Maiden Oval","Oval","Midscale",38,"2026-04-01",30,89.87,51.8,47.42,591.00,54148.92
+318307,"Maiden Oval","Oval","Midscale",38,"2026-05-01",31,90.94,8.7,9.68,103.00,11404.01
+318307,"Maiden Oval","Oval","Midscale",38,"2026-06-01",30,105.40,7.0,9.61,80.00,11086.14
+318307,"Maiden Oval","Oval","Midscale",38,"2026-07-01",31,107.35,5.6,6.73,66.00,8970.13
+318307,"Maiden Oval","Oval","Midscale",38,"2026-08-01",31,97.65,4.2,5.47,50.00,6445.69
+318307,"Maiden Oval","Oval","Midscale",38,"2026-09-01",30,65.25,1.5,1.94,17.00,2206.48
+318307,"Maiden Oval","Oval","Midscale",38,"2026-10-01",31,17.60,0.3,0.46,4.00,545.52
+318307,"Maiden Oval","Oval","Midscale",38,"2026-11-01",30,12.58,1.8,1.19,20.00,1277.69
+318307,"Maiden Oval","Oval","Midscale",38,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318307,"Maiden Oval","Oval","Midscale",38,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-03-01",1,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-04-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-05-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-06-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-07-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-08-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-09-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-10-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-11-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2024-12-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-01-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-02-01",28,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-03-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-04-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-05-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-06-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-07-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-08-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-09-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-10-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-11-01",30,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2025-12-01",31,0.00,,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-01-01",31,0.00,0.0,NaN,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-02-01",28,0.00,0.0,NaN,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-03-01",31,0.00,0.0,NaN,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-04-01",30,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-05-01",31,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-06-01",30,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-07-01",31,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-08-01",31,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-10-01",30,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318329,"Mason & Fifth, Belsize Park","Belsize Park","Upper Midscale",,"2027-04-01",1,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-07-01",31,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-08-01",31,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-09-01",30,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-10-01",31,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-11-01",30,120.06,44.1,74.15,172.00,28919.56
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2024-12-01",31,179.05,64.5,118.59,260.00,47791.22
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-01-01",31,128.84,50.4,66.35,203.00,26739.66
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-02-01",28,135.24,65.4,90.06,238.00,32780.45
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-03-01",31,143.16,79.9,115.07,322.00,46373.54
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-04-01",30,166.65,77.7,130.21,303.00,50780.21
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-05-01",31,171.13,76.4,132.17,308.00,53262.71
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-06-01",30,202.54,81.8,167.30,319.00,65246.32
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-07-01",31,203.40,87.6,178.96,353.00,72122.83
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-08-01",31,161.18,88.3,142.65,356.00,57487.28
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-09-01",30,176.65,85.6,151.69,334.00,59159.20
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-10-01",31,175.63,93.1,162.95,375.00,65669.35
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-11-01",30,158.52,87.2,139.54,340.00,54420.14
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2025-12-01",31,176.71,84.4,148.98,340.00,60036.95
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-01-01",31,113.70,57.6,66.54,232.00,26817.60
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-02-01",28,111.61,76.4,85.54,278.00,31135.25
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-03-01",31,106.64,86.8,93.38,350.00,37631.56
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-04-01",30,148.90,45.9,68.12,179.00,26695.86
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-05-01",31,199.46,16.9,33.45,68.00,13868.51
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-06-01",30,157.74,15.6,29.99,61.00,11856.49
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-07-01",31,106.59,10.9,21.57,44.00,8693.06
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-08-01",31,122.90,8.9,19.15,36.00,7715.52
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-09-01",30,28.31,1.0,2.18,4.00,849.30
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-10-01",31,19.82,1.2,1.87,5.00,753.56
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-11-01",30,5.20,0.3,0.40,1.00,156.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2027-01-01",31,17.13,2.0,2.10,8.00,846.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2027-02-01",28,18.64,1.6,1.43,6.00,522.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+316843,"Notting Hill House Hotel","Notting Hill","Upper Midscale",13,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-07-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-08-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-09-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-10-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-11-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2024-12-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-01-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-02-01",28,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-03-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-04-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-05-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-06-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-07-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-08-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-09-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-10-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-11-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2025-12-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-01-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-02-01",28,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-03-01",31,29.76,43.6,16.01,1688.00,62329.03
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-04-01",30,39.88,29.1,11.24,1093.00,42726.97
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-05-01",31,26.57,13.2,5.57,513.00,19786.93
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-06-01",30,0.00,0.2,0.00,6.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-07-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-08-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318326,"Park Hotel","Gants Hill","Midscale",125,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2025-08-01",13,46.93,19.6,13.18,56.00,3830.23
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2025-09-01",30,68.42,81.4,57.70,537.00,38084.82
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2025-10-01",31,94.96,78.4,75.11,535.00,51222.31
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2025-11-01",30,88.31,79.4,72.32,524.00,47732.22
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2025-12-01",31,116.44,81.8,98.33,558.00,67063.21
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-01-01",31,57.74,56.0,34.78,382.00,23721.72
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-02-01",28,60.68,80.2,50.56,494.00,31144.55
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-03-01",31,62.83,95.3,59.94,650.00,40948.17
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-04-01",30,109.41,50.3,56.31,332.00,37995.04
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-05-01",31,108.95,9.4,12.16,64.00,8291.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-06-01",30,170.76,14.4,24.95,95.00,16467.14
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-07-01",31,144.54,7.3,13.23,50.00,9020.04
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-08-01",31,110.90,48.8,55.89,333.00,37033.13
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-10-01",31,20.15,0.3,0.92,2.00,624.79
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318291,"St George Hotel Norfolk Square","Paddington","Economy",22,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-03-01",1,0.00,73.9,0.00,17.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-04-01",30,0.00,88.1,0.00,608.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-05-01",31,0.00,84.2,0.00,600.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-06-01",30,0.00,77.2,0.00,533.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-07-01",31,0.00,73.8,0.00,526.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-08-01",31,0.00,67.0,0.00,478.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-09-01",30,0.00,70.4,0.00,486.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-10-01",31,0.00,72.7,0.00,518.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-11-01",30,0.00,83.8,0.00,578.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2024-12-01",31,0.00,74.2,0.00,529.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-01-01",31,0.00,58.9,0.00,420.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-02-01",28,0.00,67.5,0.00,435.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-03-01",31,0.00,65.1,0.00,464.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-04-01",30,0.00,81.2,0.00,560.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-05-01",31,0.00,87.9,0.00,627.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-06-01",30,0.00,74.8,0.00,516.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-07-01",31,0.00,67.5,0.00,481.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-08-01",31,0.00,85.6,0.00,610.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-09-01",30,0.00,88.7,0.00,612.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-10-01",31,0.00,58.3,0.00,416.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-11-01",30,0.00,61.7,0.00,426.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2025-12-01",31,141.23,87.2,120.69,622.00,93070.38
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-01-01",31,89.17,85.1,76.51,607.00,54552.83
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-02-01",28,89.26,90.4,81.08,582.00,52217.83
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-03-01",31,91.96,90.5,83.47,645.00,59516.48
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-04-01",30,121.40,56.5,71.36,390.00,49739.64
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-05-01",31,123.21,60.6,76.17,432.00,54312.47
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-06-01",30,133.52,54.8,76.22,378.00,52593.50
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-07-01",31,135.06,41.2,58.90,294.00,41993.41
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-08-01",31,141.35,24.3,33.21,173.00,23675.29
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-09-01",30,36.44,1.4,2.15,10.00,1480.72
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-10-01",31,19.57,0.6,0.85,4.00,606.53
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2026-12-01",31,67.56,4.8,7.85,34.00,5597.54
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2027-01-01",31,43.87,6.0,4.47,43.00,3185.59
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2027-02-01",28,49.80,2.3,2.17,15.00,1394.30
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318305,"St George's Inn Victoria","Pimlico","Midscale",23,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-07-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-08-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-09-01",30,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-10-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-11-01",30,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2024-12-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2025-01-01",31,5.31,2.5,1.48,7.00,413.71
+318301,"Studio 169","West Hackney","Economy",9,"2025-02-01",28,33.66,21.8,11.07,55.00,2790.28
+318301,"Studio 169","West Hackney","Economy",9,"2025-03-01",31,44.72,54.8,24.78,153.00,6912.95
+318301,"Studio 169","West Hackney","Economy",9,"2025-04-01",30,49.60,48.5,24.63,131.00,6650.05
+318301,"Studio 169","West Hackney","Economy",9,"2025-05-01",31,50.28,54.8,28.73,153.00,8015.69
+318301,"Studio 169","West Hackney","Economy",9,"2025-06-01",30,58.60,64.1,38.34,173.00,10350.67
+318301,"Studio 169","West Hackney","Economy",9,"2025-07-01",31,64.73,59.5,41.06,166.00,11457.01
+318301,"Studio 169","West Hackney","Economy",9,"2025-08-01",31,52.01,55.9,29.69,156.00,8284.49
+318301,"Studio 169","West Hackney","Economy",9,"2025-09-01",30,55.57,74.8,41.78,202.00,11280.01
+318301,"Studio 169","West Hackney","Economy",9,"2025-10-01",31,53.71,74.2,40.83,207.00,11392.09
+318301,"Studio 169","West Hackney","Economy",9,"2025-11-01",30,62.09,70.7,46.31,191.00,12504.41
+318301,"Studio 169","West Hackney","Economy",9,"2025-12-01",31,63.83,62.4,42.43,174.00,11837.45
+318301,"Studio 169","West Hackney","Economy",9,"2026-01-01",31,47.18,19.4,11.45,54.00,3193.19
+318301,"Studio 169","West Hackney","Economy",9,"2026-02-01",28,52.77,37.3,20.75,94.00,5227.97
+318301,"Studio 169","West Hackney","Economy",9,"2026-03-01",31,53.04,58.1,29.62,162.00,8907.50
+318301,"Studio 169","West Hackney","Economy",9,"2026-04-01",30,63.31,53.3,32.15,144.00,9646.30
+318301,"Studio 169","West Hackney","Economy",9,"2026-05-01",31,64.51,13.3,12.68,37.00,3931.38
+318301,"Studio 169","West Hackney","Economy",9,"2026-06-01",30,95.85,15.6,15.88,42.00,4764.37
+318301,"Studio 169","West Hackney","Economy",9,"2026-07-01",31,53.79,13.6,16.41,38.00,5088.32
+318301,"Studio 169","West Hackney","Economy",9,"2026-08-01",31,68.24,20.4,13.26,57.00,4112.05
+318301,"Studio 169","West Hackney","Economy",9,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318301,"Studio 169","West Hackney","Economy",9,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-03-01",1,0.00,102.5,0.00,41.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-04-01",30,0.00,90.4,0.00,1085.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-05-01",31,0.00,81.7,0.00,1013.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-06-01",30,0.00,88.3,0.00,1060.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-07-01",31,0.00,60.8,0.00,754.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-08-01",31,0.00,49.4,0.00,612.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-09-01",30,0.00,80.6,0.00,967.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-10-01",31,0.00,83.7,0.00,1038.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-11-01",30,0.00,14.8,0.00,178.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2024-12-01",31,0.00,37.5,0.00,465.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-01-01",31,0.00,75.1,0.00,931.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-02-01",28,0.00,75.5,0.00,846.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-03-01",31,0.00,86.3,0.00,1070.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-04-01",30,0.00,46.2,0.00,554.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-05-01",31,0.00,93.8,0.00,1163.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-06-01",30,0.00,101.6,0.00,1219.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-07-01",31,0.00,89.1,0.00,1105.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-08-01",31,0.00,96.5,0.00,1196.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-09-01",30,0.00,81.3,0.00,975.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-10-01",31,0.00,83.9,0.00,1040.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-11-01",30,0.00,77.4,0.00,929.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2025-12-01",31,146.63,82.6,92.48,1070.00,166363.17
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-01-01",31,91.90,86.8,80.44,1076.00,99740.72
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-02-01",28,91.10,94.9,86.73,1063.00,97132.31
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-03-01",31,90.68,93.6,85.33,1161.00,105923.41
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-04-01",30,130.80,55.4,72.06,665.00,88529.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-05-01",31,163.92,18.5,30.77,230.00,39111.25
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-06-01",30,171.89,16.3,29.21,196.00,35055.40
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-07-01",31,194.35,8.1,16.08,101.00,19940.87
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-08-01",31,98.51,3.2,4.63,40.00,5735.42
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-09-01",30,65.20,2.7,4.06,32.00,4869.18
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-10-01",31,9.75,0.2,0.24,3.00,302.40
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-11-01",30,3.42,0.2,0.86,2.00,205.20
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2026-12-01",31,0.00,0.3,0.00,4.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318308,"The 29 London Hotel","Pimlico","Midscale",40,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-07-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-08-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-09-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-10-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-11-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2024-12-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-01-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-02-01",28,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-03-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-04-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-05-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-06-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-07-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-08-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-09-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-10-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-11-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2025-12-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-01-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-02-01",28,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-03-01",31,18.78,1.9,1.43,24.00,1856.74
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-04-01",30,62.02,14.1,8.12,169.00,12089.14
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-05-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-06-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-07-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-08-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318321,"The Barkston","Earl's Court","Midscale",40,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-03-01",1,138.87,86.7,120.35,26.00,3610.61
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-04-01",30,169.41,80.8,138.91,727.00,125021.83
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-05-01",31,193.14,81.5,159.70,758.00,148518.02
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-06-01",30,224.92,91.6,208.03,824.00,187227.88
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-07-01",31,236.66,89.0,212.06,828.00,197214.20
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-08-01",31,212.46,73.3,157.04,682.00,146048.74
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-09-01",30,191.83,72.0,139.14,648.00,125222.34
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-10-01",31,201.95,84.4,170.89,785.00,158928.78
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-11-01",30,181.83,81.1,150.77,730.00,135690.16
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2024-12-01",31,203.07,79.0,165.65,735.00,154058.03
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-01-01",31,125.86,61.0,78.31,567.00,72832.19
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-02-01",28,125.04,69.9,89.30,587.00,75011.62
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-03-01",31,140.54,77.8,111.04,724.00,103269.71
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-04-01",30,175.71,71.6,127.07,644.00,114367.16
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-05-01",31,174.54,88.9,156.96,827.00,145970.53
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-06-01",30,219.48,95.6,210.79,860.00,189715.48
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-07-01",31,226.78,96.3,219.17,896.00,203832.13
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-08-01",31,192.11,87.5,170.02,814.00,158118.80
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-09-01",30,191.07,94.1,181.03,847.00,162929.86
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-10-01",31,184.31,93.4,172.81,869.00,160717.51
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-11-01",30,178.26,86.2,157.38,776.00,141645.10
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2025-12-01",31,206.56,77.1,165.04,717.00,153486.05
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-01-01",31,114.65,62.6,72.29,582.00,67226.93
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-02-01",28,113.91,81.4,94.15,684.00,79085.69
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-03-01",31,126.58,75.5,96.66,702.00,89896.34
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-04-01",30,157.93,50.4,77.76,454.00,71681.73
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-05-01",31,214.38,17.5,33.53,163.00,34043.47
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-06-01",30,251.69,15.1,38.30,136.00,34469.10
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-07-01",31,279.85,10.4,29.72,97.00,27635.21
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-08-01",31,200.65,9.0,20.38,84.00,18954.02
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-09-01",30,62.60,1.8,2.98,16.00,2683.75
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-10-01",31,55.16,1.2,2.25,11.00,2090.69
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2027-02-01",28,7.84,0.4,0.26,3.00,219.48
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+289618,"The Cleveland Hotel","Paddington","Upper Midscale",30,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-03-01",1,0.00,88.9,0.00,8.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-04-01",30,0.00,88.5,0.00,239.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-05-01",31,0.00,92.1,0.00,257.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-06-01",30,0.00,78.5,0.00,212.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-07-01",31,0.00,89.2,0.00,249.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-08-01",31,0.00,89.2,0.00,249.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-09-01",30,0.00,85.6,0.00,231.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-10-01",31,0.00,87.1,0.00,243.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-11-01",30,0.00,73.0,0.00,197.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2024-12-01",31,0.00,67.0,0.00,187.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-01-01",31,0.00,56.6,0.00,158.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-02-01",28,0.00,63.9,0.00,161.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-03-01",31,0.00,78.5,0.00,219.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-04-01",30,0.00,52.2,0.00,141.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-05-01",31,0.00,80.3,0.00,224.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-06-01",30,0.00,67.4,0.00,182.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-07-01",31,0.00,66.3,0.00,185.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-08-01",31,0.00,72.8,0.00,203.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-09-01",30,0.00,78.1,0.00,211.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-10-01",31,0.00,84.9,0.00,237.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-11-01",30,0.00,95.9,0.00,259.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2025-12-01",31,19.47,65.8,13.75,202.00,5282.09
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-01-01",31,95.36,54.0,61.64,184.00,17198.04
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-02-01",28,83.68,71.8,73.83,221.00,18604.49
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-03-01",31,96.00,76.8,89.91,262.00,25173.98
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-04-01",30,114.04,60.6,85.84,200.00,23406.45
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-05-01",31,128.66,19.6,37.18,67.00,10372.38
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-06-01",30,116.06,18.8,37.28,62.00,10064.38
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-07-01",31,127.33,17.3,33.11,59.00,9502.49
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-08-01",31,121.50,15.2,28.98,52.00,8399.30
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-09-01",30,44.15,3.9,6.44,13.00,1877.18
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-10-01",31,29.54,1.8,3.28,6.00,915.89
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2027-01-01",31,46.47,10.3,9.66,35.00,2695.19
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2027-02-01",28,32.10,3.9,3.57,12.00,898.82
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318313,"The Duke Rooms London","Marylebone","Midscale",11,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-03-01",1,0.00,54.7,0.00,29.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-04-01",30,0.00,69.3,0.00,1102.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-05-01",31,0.00,70.0,0.00,1150.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-06-01",30,0.00,72.8,0.00,1157.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-07-01",31,0.00,73.4,0.00,1206.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-08-01",31,0.00,47.4,0.00,778.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-09-01",30,0.00,79.8,0.00,1269.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-10-01",31,0.00,76.9,0.00,1264.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-11-01",30,0.00,67.0,0.00,1066.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2024-12-01",31,0.00,69.9,0.00,1148.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-01-01",31,0.00,74.6,0.00,1226.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-02-01",28,0.00,61.5,0.00,912.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-03-01",31,0.00,67.1,0.00,1102.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-04-01",30,0.00,70.7,0.00,1124.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-05-01",31,0.00,69.3,0.00,1139.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-06-01",30,0.00,68.3,0.00,1086.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-07-01",31,0.00,87.7,0.00,1441.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-08-01",31,0.00,87.2,0.00,1432.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-09-01",30,0.00,83.3,0.00,1325.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-10-01",31,0.00,74.7,0.00,1228.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-11-01",30,0.00,55.8,0.00,887.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2025-12-01",31,63.81,85.0,46.49,1319.00,91726.45
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-01-01",31,90.27,96.6,87.29,1438.00,129893.59
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-02-01",28,95.86,97.2,93.20,1307.00,125256.30
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-03-01",31,103.70,96.6,100.19,1438.00,149080.87
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-04-01",30,138.81,45.7,61.09,658.00,89832.51
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-05-01",31,166.81,20.5,35.03,305.00,52955.36
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-06-01",30,180.42,19.9,37.53,286.00,54043.08
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-07-01",31,162.95,18.5,34.16,276.00,50833.62
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-08-01",31,131.26,9.1,14.75,136.00,21906.22
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318311,"The House of Toby","King's Cross","Midscale",48,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-03-01",1,0.00,160.0,0.00,88.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-04-01",30,0.00,169.7,0.00,2800.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-05-01",31,0.00,171.3,0.00,2920.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-06-01",30,0.00,172.5,0.00,2847.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-07-01",31,0.00,237.8,0.00,4054.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-08-01",31,0.00,185.7,0.00,3166.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-09-01",30,0.00,200.4,0.00,3307.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-10-01",31,0.00,166.5,0.00,2838.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-11-01",30,0.00,135.1,0.00,2229.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2024-12-01",31,0.00,124.5,0.00,2123.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-01-01",31,0.00,89.9,0.00,1532.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-02-01",28,0.00,157.5,0.00,2426.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-03-01",31,0.00,141.7,0.00,2416.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-04-01",30,0.00,135.5,0.00,2235.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-05-01",31,0.00,145.9,0.00,2488.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-06-01",30,0.00,158.1,0.00,2609.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-07-01",31,0.00,154.7,0.00,2637.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-08-01",31,0.00,154.8,0.00,2639.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-09-01",30,0.00,146.1,0.00,2411.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-10-01",31,0.00,139.9,0.00,2386.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-11-01",30,0.00,141.0,0.00,2327.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2025-12-01",31,0.00,134.9,0.00,2300.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-01-01",31,3.42,127.6,2.50,2189.00,10375.91
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-02-01",28,95.60,98.9,89.62,1550.00,148029.52
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-03-01",31,87.27,90.8,79.86,1577.00,138809.92
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-04-01",30,140.06,28.1,36.77,472.00,63557.39
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-05-01",31,194.56,6.6,12.75,114.00,22126.72
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-06-01",30,179.00,9.1,18.85,153.00,31410.52
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-07-01",31,124.18,1.6,3.60,28.00,6241.01
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-08-01",31,155.85,9.2,14.23,159.00,24710.72
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318316,"The House on Warwick","Pimlico","Midscale",56,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-03-01",1,75.44,90.0,67.90,27.00,2036.94
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-04-01",30,99.98,91.9,93.03,827.00,83724.73
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-05-01",31,121.62,93.0,113.87,865.00,105899.39
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-06-01",30,136.83,95.0,130.94,855.00,117842.66
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-07-01",31,129.95,93.7,122.41,871.00,113839.15
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-08-01",31,103.41,92.0,95.29,856.00,88619.02
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-09-01",30,117.17,92.4,109.62,832.00,98657.77
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-10-01",31,119.60,93.7,112.54,871.00,104663.54
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-11-01",30,117.76,91.8,109.32,826.00,98385.69
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2024-12-01",31,138.59,92.6,130.45,861.00,121319.29
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-01-01",31,79.33,76.6,61.66,712.00,57346.43
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-02-01",28,75.15,92.0,69.64,773.00,58498.02
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-03-01",31,80.57,92.0,74.33,856.00,69129.45
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-04-01",30,82.97,91.3,76.20,822.00,68577.58
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-05-01",31,97.68,78.6,77.44,731.00,71828.82
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-06-01",30,126.88,86.3,110.72,777.00,99649.38
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-07-01",31,134.73,92.2,125.09,857.00,116331.76
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-08-01",31,120.42,92.3,111.64,858.00,103828.57
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-09-01",30,143.86,96.1,139.02,865.00,125114.11
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-10-01",31,119.11,94.8,113.89,882.00,105917.20
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-11-01",30,117.14,91.9,109.36,827.00,98421.60
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2025-12-01",31,125.54,83.7,109.56,778.00,101889.98
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-01-01",31,70.22,77.4,54.89,720.00,51043.18
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-02-01",28,73.26,89.3,65.87,750.00,55334.20
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-03-01",31,72.49,87.1,63.41,810.00,58894.63
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-04-01",30,93.51,30.4,29.23,274.00,26692.21
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-05-01",31,107.99,50.0,55.24,465.00,51888.57
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-06-01",30,115.79,10.4,15.36,94.00,13824.48
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-07-01",31,69.89,3.4,4.81,32.00,4470.49
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-08-01",31,98.73,27.3,27.52,254.00,25773.79
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-09-01",30,47.38,1.7,2.16,15.00,1942.64
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-10-01",31,89.41,7.2,7.51,67.00,6981.90
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-11-01",30,26.78,0.8,0.89,7.00,803.41
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2026-12-01",31,59.18,3.1,3.92,29.00,3646.31
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2027-01-01",31,13.83,0.9,0.91,8.00,845.33
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318238,"The Jade Hotel","Earl's Court","Midscale",30,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-03-01",1,187.13,22.7,42.53,5.00,935.64
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-04-01",30,195.71,62.3,121.52,411.00,80206.22
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-05-01",31,215.31,85.5,186.03,583.00,126875.30
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-06-01",30,221.92,87.1,194.14,575.00,128133.98
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-07-01",31,204.57,82.6,171.06,563.00,116660.99
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-08-01",31,198.53,64.1,127.24,437.00,86779.36
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-09-01",30,209.26,71.2,151.84,470.00,100213.79
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-10-01",31,217.75,75.8,165.49,517.00,112867.12
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-11-01",30,207.68,76.7,161.97,506.00,106900.21
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2024-12-01",31,165.72,59.5,135.45,406.00,92377.55
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-01-01",31,168.64,29.0,51.85,198.00,35358.53
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-02-01",28,184.28,37.2,69.63,229.00,42894.22
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-03-01",31,187.22,54.5,101.25,372.00,69051.73
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-04-01",30,187.08,78.8,142.52,520.00,98282.35
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-05-01",31,216.48,69.8,154.26,476.00,105203.72
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-06-01",30,252.12,84.7,216.50,559.00,142889.87
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-07-01",31,251.59,88.6,223.84,604.00,152659.66
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-08-01",31,196.77,87.5,174.29,597.00,118862.89
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-09-01",30,218.69,90.3,199.94,596.00,131959.44
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-10-01",31,197.21,89.1,176.16,608.00,120143.69
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-11-01",30,174.51,91.1,160.69,601.00,106056.14
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2025-12-01",31,175.74,80.6,159.27,550.00,108623.06
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-01-01",31,144.98,43.4,61.85,296.00,42184.67
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-02-01",28,131.38,84.7,111.18,522.00,68487.97
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-03-01",31,149.53,82.4,123.30,562.00,84091.51
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-04-01",30,194.48,46.2,89.05,305.00,58198.45
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-05-01",31,228.12,23.0,53.61,157.00,36564.62
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-06-01",30,241.19,30.5,72.96,201.00,48156.11
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-07-01",31,281.22,23.3,65.44,159.00,44630.46
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-08-01",31,260.92,16.3,41.57,111.00,28352.72
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-09-01",30,211.76,15.6,34.32,103.00,22653.30
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-10-01",31,211.12,19.5,40.87,133.00,27872.76
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-11-01",30,18.79,0.3,0.85,2.00,563.64
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2026-12-01",31,15.85,0.1,0.72,1.00,491.40
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2027-01-01",31,41.13,1.3,2.48,9.00,1688.99
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2027-02-01",28,20.66,0.6,0.94,4.00,578.35
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+308760,"The Melita, London","Pimlico","Upper Midscale",22,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-03-01",1,0.00,64.3,0.00,9.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-04-01",30,0.00,80.0,0.00,336.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-05-01",31,0.00,80.0,0.00,347.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-06-01",30,0.00,19.0,0.00,80.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-07-01",31,0.00,69.1,0.00,300.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-08-01",31,0.00,84.8,0.00,368.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-09-01",30,0.00,83.1,0.00,349.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-10-01",31,0.00,73.0,0.00,317.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-11-01",30,0.00,73.3,0.00,308.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2024-12-01",31,0.00,96.3,0.00,418.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-01-01",31,0.00,64.5,0.00,280.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-02-01",28,0.00,82.7,0.00,324.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-03-01",31,0.00,85.7,0.00,372.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-04-01",30,0.00,85.2,0.00,358.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-05-01",31,0.00,80.2,0.00,348.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-06-01",30,0.00,88.1,0.00,370.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-07-01",31,0.00,92.2,0.00,400.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-08-01",31,0.00,73.3,0.00,318.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-09-01",30,0.00,88.8,0.00,373.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-10-01",31,0.00,74.0,0.00,321.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-11-01",30,0.00,95.5,0.00,401.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2025-12-01",31,69.62,78.3,47.43,349.00,28642.80
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-01-01",31,91.02,90.3,82.66,392.00,35874.60
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-02-01",28,93.69,98.2,92.29,385.00,36178.94
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-03-01",31,104.75,88.2,93.06,383.00,40657.67
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-04-01",30,134.55,36.2,51.25,152.00,22151.74
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-05-01",31,106.64,8.8,16.44,38.00,7134.55
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-06-01",30,140.85,9.3,18.09,39.00,7597.48
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-07-01",31,79.39,8.8,18.02,38.00,7822.79
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-08-01",31,43.76,3.0,3.72,13.00,1616.04
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-09-01",30,30.88,3.1,4.50,13.00,1890.12
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-10-01",31,5.89,0.2,0.42,1.00,182.52
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2026-12-01",31,49.14,3.0,4.39,13.00,1904.11
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2027-01-01",31,18.66,2.1,2.04,9.00,885.30
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318312,"The Pack and Carriage London","St Pancras","Midscale",14,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-06-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-07-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-08-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-09-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-10-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-11-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2024-12-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-01-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-02-01",28,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-03-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-04-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-05-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-06-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-07-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-08-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-09-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-10-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-11-01",30,1274.43,2.7,54.88,33.00,67501.60
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2025-12-01",31,172.40,92.2,165.77,1213.00,210692.45
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-01-01",31,102.33,87.1,90.02,1107.00,114417.37
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-02-01",28,102.41,95.7,98.31,1099.00,112856.24
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-03-01",31,101.35,95.2,96.64,1210.00,122824.66
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-04-01",30,159.60,47.3,71.30,582.00,89165.87
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-05-01",31,225.29,12.0,28.52,153.00,36245.02
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-06-01",30,222.91,12.8,29.69,157.00,36520.37
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-07-01",31,172.72,4.2,8.43,53.00,10712.26
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-08-01",31,154.73,2.5,5.88,32.00,7476.35
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-09-01",30,86.64,1.1,2.28,14.00,2801.90
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318304,"The Portico Hotel London","Pimlico","Midscale",41,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-03-01",1,0.00,64.3,0.00,9.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-04-01",30,0.00,74.5,0.00,313.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-05-01",31,0.00,84.1,0.00,365.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-06-01",30,0.00,75.2,0.00,316.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-07-01",31,0.00,80.2,0.00,348.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-08-01",31,0.00,70.5,0.00,306.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-09-01",30,0.00,70.5,0.00,296.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-10-01",31,0.00,61.8,0.00,268.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-11-01",30,0.00,79.3,0.00,333.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2024-12-01",31,0.00,72.8,0.00,316.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-01-01",31,0.00,45.4,0.00,197.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-02-01",28,0.00,58.4,0.00,229.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-03-01",31,0.00,59.2,0.00,257.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-04-01",30,0.00,68.8,0.00,289.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-05-01",31,0.00,80.4,0.00,349.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-06-01",30,0.00,78.1,0.00,328.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-07-01",31,0.00,75.3,0.00,327.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-08-01",31,0.00,64.3,0.00,279.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-09-01",30,0.00,79.0,0.00,332.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-10-01",31,0.00,93.1,0.00,404.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-11-01",30,0.00,79.3,0.00,333.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2025-12-01",31,0.00,68.0,0.00,295.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-01-01",31,7.99,69.6,7.85,302.00,3406.62
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-02-01",28,71.16,86.2,61.94,338.00,24281.34
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-03-01",31,79.67,82.3,66.20,357.00,28880.70
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-04-01",30,105.70,62.1,63.22,261.00,26995.05
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-05-01",31,109.44,13.1,16.25,57.00,7050.82
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-06-01",30,127.31,17.1,23.93,72.00,10049.26
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-07-01",31,109.45,10.8,15.52,47.00,6735.24
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-08-01",31,86.86,19.4,21.34,84.00,9260.24
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-09-01",30,39.15,3.1,3.72,13.00,1562.39
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-10-01",31,20.94,2.1,2.01,9.00,870.85
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2026-12-01",31,26.26,1.8,2.22,8.00,964.33
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2027-01-01",31,4.46,0.2,0.32,1.00,138.32
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318317,"The Tudor Inn Hotel","Pimlico","Midscale",14,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-03-01",1,0.00,0.0,0.00,0.00,0.00
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-04-01",30,0.00,0.0,0.00,0.00,0.00
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-05-01",31,0.00,0.0,0.00,0.00,0.00
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-06-01",30,41.91,6.9,12.08,58.00,8955.54
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-07-01",31,116.55,69.4,92.17,602.00,71608.78
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-08-01",31,105.63,65.1,76.04,565.00,61290.08
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-09-01",30,117.17,73.6,94.26,618.00,73524.94
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-10-01",31,120.62,80.8,105.81,701.00,85279.57
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-11-01",30,116.57,86.9,109.81,730.00,85648.54
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2024-12-01",31,120.37,89.5,116.57,777.00,93951.41
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-01-01",31,80.30,76.3,65.98,662.00,53180.05
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-02-01",28,87.09,71.6,68.17,561.00,49629.48
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-03-01",31,93.25,74.4,75.96,646.00,61220.15
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-04-01",30,105.72,76.5,88.75,643.00,69228.48
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-05-01",31,112.69,80.1,98.53,695.00,79418.42
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-06-01",30,144.35,88.7,139.25,745.00,108616.78
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-07-01",31,147.42,89.5,143.34,777.00,115531.88
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-08-01",31,111.33,84.9,102.80,737.00,82857.78
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-09-01",30,134.17,87.3,127.77,733.00,99664.22
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-10-01",31,119.59,82.5,107.17,716.00,86381.06
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-11-01",30,126.17,85.4,117.08,717.00,91325.63
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2025-12-01",31,132.40,81.2,119.10,705.00,95995.69
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-01-01",31,73.56,70.7,57.12,614.00,46040.36
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-02-01",28,80.20,82.0,71.41,643.00,51984.53
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-03-01",31,85.28,80.2,74.95,696.00,60412.39
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-04-01",30,100.30,30.7,32.58,258.00,25966.15
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-05-01",31,114.54,24.4,32.22,212.00,25968.59
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-06-01",30,118.11,6.7,10.52,56.00,8205.11
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-07-01",31,89.14,12.0,19.14,104.00,15425.11
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-08-01",31,64.00,3.2,4.98,28.00,4017.86
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-09-01",30,88.70,7.0,12.86,59.00,10028.89
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-10-01",31,16.66,0.7,0.64,6.00,516.60
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-11-01",30,13.93,0.5,0.54,4.00,417.79
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2026-12-01",31,30.11,1.6,1.72,14.00,1389.30
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2027-01-01",31,8.26,0.6,0.32,5.00,256.08
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2027-02-01",28,9.10,0.5,0.35,4.00,254.88
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315433,"The Whitechapel Hotel","Whitechapel","Midscale",28,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-03-01",1,123.84,60.0,74.30,12.00,1486.04
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-04-01",30,136.11,66.0,89.75,396.00,53850.00
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-05-01",31,155.01,84.2,130.53,522.00,80928.00
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-06-01",30,166.39,70.2,117.36,421.00,70418.00
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-07-01",31,150.29,93.4,104.31,579.00,87310.54
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-08-01",31,134.30,81.9,82.97,508.00,69448.49
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-09-01",30,112.38,96.0,81.97,576.00,66397.55
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-10-01",31,125.42,106.0,99.07,657.00,82921.80
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-11-01",30,122.04,103.7,95.33,622.00,77218.88
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2024-12-01",31,137.90,107.1,113.52,664.00,95016.68
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-01-01",31,80.80,62.9,40.01,390.00,33486.23
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-02-01",28,87.13,84.3,55.77,472.00,42159.95
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-03-01",31,90.87,99.2,68.27,615.00,57138.70
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-04-01",30,104.48,107.5,86.54,645.00,67930.09
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-05-01",31,110.65,109.2,94.74,677.00,76783.96
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-06-01",30,124.98,121.7,113.91,730.00,92270.11
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-07-01",31,133.80,117.3,118.21,727.00,98942.65
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-08-01",31,111.87,93.4,98.56,579.00,66169.08
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-09-01",30,111.93,94.0,106.16,564.00,63694.04
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-10-01",31,127.63,93.1,119.34,577.00,73989.13
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-11-01",30,127.36,90.7,117.82,544.00,70689.70
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2025-12-01",31,145.86,89.5,132.41,555.00,82091.16
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-01-01",31,88.33,67.6,61.75,419.00,38287.87
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-02-01",28,89.45,80.4,73.09,450.00,40927.93
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-03-01",31,101.53,78.7,81.25,488.00,50374.70
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-04-01",30,125.92,32.2,41.52,193.00,25411.02
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-05-01",31,114.72,31.1,38.39,193.00,23801.56
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-06-01",30,79.30,3.8,5.80,23.00,3479.74
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-07-01",31,117.50,10.6,19.29,66.00,11958.90
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-08-01",31,76.43,4.0,6.14,25.00,3805.56
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-09-01",30,63.29,3.5,4.08,21.00,2450.10
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-10-01",31,65.95,2.7,3.75,17.00,2322.94
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-11-01",30,11.25,0.5,0.56,3.00,337.36
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2026-12-01",31,18.19,0.5,0.91,3.00,563.88
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2027-01-01",31,16.36,1.3,1.25,8.00,775.73
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+315428,"Vilenza Hotel","Whitechapel","Midscale",20,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-03-01",1,0.00,56.5,0.00,39.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-04-01",30,0.00,40.0,0.00,829.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-05-01",31,0.00,68.3,0.00,1462.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-06-01",30,0.00,65.8,0.00,1362.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-07-01",31,0.00,47.2,0.00,1009.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-08-01",31,0.00,56.8,0.00,1214.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-09-01",30,0.00,72.5,0.00,1500.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-10-01",31,0.00,55.3,0.00,1182.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-11-01",30,0.00,71.4,0.00,1478.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2024-12-01",31,0.00,56.8,0.00,1214.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-01-01",31,0.00,46.7,0.00,998.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-02-01",28,0.00,66.8,0.00,1291.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-03-01",31,0.00,47.9,0.00,1025.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-04-01",30,0.00,75.8,0.00,1569.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-05-01",31,0.00,64.5,0.00,1379.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-06-01",30,0.00,67.0,0.00,1387.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-07-01",31,0.00,54.9,0.00,1174.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-08-01",31,0.00,55.4,0.00,1186.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-09-01",30,0.00,52.9,0.00,1096.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-10-01",31,0.00,74.4,0.00,1592.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-11-01",30,4.23,43.6,0.15,902.00,6066.29
+318309,"W14 Hotel","West Kensington","Midscale",65,"2025-12-01",31,105.55,79.8,72.09,1655.00,186393.58
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-01-01",31,74.73,77.5,58.79,1561.00,118455.46
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-02-01",28,76.49,83.7,64.84,1524.00,118009.91
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-03-01",31,84.41,87.3,75.13,1760.00,151453.61
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-04-01",30,103.88,33.9,32.85,662.00,65271.16
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-05-01",31,148.63,6.5,9.89,131.00,19923.02
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-06-01",30,129.61,9.4,14.20,183.00,29567.62
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-07-01",31,124.90,4.8,8.35,96.00,15302.05
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-08-01",31,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-09-01",30,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-10-01",31,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-11-01",30,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2026-12-01",31,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318309,"W14 Hotel","West Kensington","Midscale",65,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-03-01",1,90.80,66.7,60.53,2.00,181.60
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-04-01",30,139.67,65.6,92.41,59.00,8317.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-05-01",31,136.65,92.5,127.91,86.00,11896.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-06-01",30,127.08,81.1,112.68,73.00,10141.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-07-01",31,60.85,41.9,51.42,39.00,4781.93
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-08-01",31,111.78,91.4,102.78,85.00,9558.74
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-09-01",30,94.77,76.7,77.13,69.00,6941.68
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-10-01",31,106.15,91.4,96.71,85.00,8994.37
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-11-01",30,108.46,76.7,84.79,69.00,7631.06
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2024-12-01",31,119.43,86.0,106.67,80.00,9920.35
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-01-01",31,75.39,46.2,41.76,43.00,3883.71
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-02-01",28,82.66,61.9,56.24,52.00,4723.77
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-03-01",31,75.79,69.9,58.39,65.00,5430.54
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-04-01",30,76.77,88.9,68.61,80.00,6174.57
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-05-01",31,91.49,92.5,85.64,86.00,7964.84
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-06-01",30,94.49,81.1,83.79,73.00,7540.89
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-07-01",31,112.09,89.2,101.39,83.00,9429.62
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-08-01",31,98.81,71.0,72.07,66.00,6702.35
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-09-01",30,69.00,65.6,52.65,59.00,4738.11
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-10-01",31,100.52,87.1,87.26,81.00,8115.61
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-11-01",30,105.24,72.2,80.76,65.00,7268.14
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2025-12-01",31,125.63,82.8,110.07,77.00,10236.25
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-01-01",31,71.91,54.8,48.66,51.00,4525.79
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-02-01",28,81.47,65.5,53.46,55.00,4490.80
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-03-01",31,83.61,65.6,59.45,61.00,5582.68
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-04-01",30,89.94,32.2,38.84,29.00,3809.77
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-05-01",31,32.51,8.6,10.84,8.00,1007.81
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-06-01",30,75.45,37.8,42.32,34.00,3898.60
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-07-01",31,18.17,5.4,10.71,5.00,996.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-08-01",31,53.65,18.3,28.38,17.00,2639.40
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-09-01",30,2.67,1.1,0.89,1.00,80.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-10-01",31,8.71,2.2,2.90,2.00,270.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-11-01",30,4.50,1.1,1.50,1.00,135.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2026-12-01",31,5.19,1.1,1.73,1.00,160.80
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2027-01-01",31,0.00,0.0,0.00,0.00,0.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2027-02-01",28,0.00,0.0,0.00,0.00,0.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2027-03-01",31,0.00,0.0,0.00,0.00,0.00
+318297,"Whitechapel Grand","Whitechapel","Midscale",3,"2027-04-01",2,0.00,0.0,0.00,0.00,0.00

@@ -1,0 +1,45 @@
+options {
+    theme "gruvbox-dark"
+    copy_command "pbcopy"    
+    copy_on_select true                      
+}
+
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+        children
+        pane size=2 borderless=true {
+            plugin location="zellij:status-bar"
+        }
+    }
+
+    tab name="Development" focus=true {
+        pane split_direction="vertical" {
+            // Pane 1: Backend on Port 3001
+            pane name="BACKEND (3001)" command="sh" {
+                args "-c" "PORT=3001 npm start"
+            }
+            // Pane 2: Frontend on Port 3000
+            pane name="FRONTEND (3000)" cwd="web" command="npm" {
+                args "run" "dev"
+            }
+        }
+    }
+
+    tab name="Claude & Workspace" {
+        pane split_direction="horizontal" {
+            // Pane 3: Dedicated space for AI instructions/CLI
+            pane name="CLAUDE-AI" 
+            // Pane 4: General terminal for git/file management
+            pane name="SHELL"
+        }
+    }
+    
+    tab name="Logs/Monitoring" {
+        pane name="SENTINEL-SYNC" command="node" {
+            args "api/daily-refresh.js"
+        }
+    }
+}

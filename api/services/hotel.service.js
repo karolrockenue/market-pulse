@@ -38,7 +38,7 @@ const HotelService = {
    */
   getAllHotels: async () => {
     const { rows } = await pool.query(
-      "SELECT hotel_id, property_name, total_rooms, property_type, city, category, neighborhood, is_rockenue_managed, management_group FROM hotels ORDER BY property_name"
+      "SELECT hotel_id, property_name, total_rooms, property_type, city, category, neighborhood, is_rockenue_managed, management_group, is_disconnected FROM hotels ORDER BY property_name"
     );
     return rows;
   },
@@ -246,7 +246,7 @@ const HotelService = {
     const categoryCompSetQuery = `
       SELECT hotel_id, property_name, category, city
       FROM hotels
-      WHERE category = $1 AND hotel_id != $2
+      WHERE category = $1 AND hotel_id != $2 AND is_disconnected = false
       ORDER BY property_name;
     `;
     const { rows: categoryCompSet } = await pool.query(categoryCompSetQuery, [category, hotelId]);

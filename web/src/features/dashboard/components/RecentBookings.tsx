@@ -139,7 +139,7 @@ export function RecentBookings({
         <div style={{ ...styles.headerCell, textAlign: "right" }}>Revenue</div>
       </div>
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, overflow: "hidden" }}>
         {bookingData.map((day, index) => (
           <div
             key={index}

@@ -162,7 +162,7 @@ router.post("/", async (req, res) => {
       const rSource = r.sourceName || r.source || "Direct";
 
       await pgPool.query(
-        `INSERT INTO daily_bookings_record 
+        `INSERT INTO daily_bookings_record
          (id, hotel_id, booking_date, check_in_date, revenue, status, source, room_nights)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO UPDATE SET
@@ -182,8 +182,44 @@ router.post("/", async (req, res) => {
           calculatedNights,
         ]
       );
+
+      // --- Upsert into reservations table (detailed booking data) ---
+      const guestName = r.guestName || r.guestFirstName || null;
+      const allRooms = [...(r.assigned || []), ...(r.unassigned || [])];
+      const roomType = allRooms.length > 0 ? (allRooms[0].roomTypeName || allRooms[0].roomName || null) : null;
+      const avgNightlyRate = calculatedNights > 0 ? Math.round((totalRev / calculatedNights) * 100) / 100 : totalRev;
+
+      await pgPool.query(
+        `INSERT INTO reservations
+         (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (id, hotel_id) DO UPDATE SET
+           guest_name = EXCLUDED.guest_name,
+           room_type = EXCLUDED.room_type,
+           check_out = EXCLUDED.check_out,
+           nights = EXCLUDED.nights,
+           avg_nightly_rate = EXCLUDED.avg_nightly_rate,
+           total_rate = EXCLUDED.total_rate,
+           status = EXCLUDED.status,
+           updated_at = NOW()`,
+        [
+          reservationId,
+          hotel_id,
+          guestName,
+          roomType,
+          checkInDate,
+          checkOutDate,
+          calculatedNights,
+          rSource,
+          avgNightlyRate,
+          totalRev,
+          rStatus,
+          bookingDate,
+        ]
+      );
+
       console.log(
-        `[Webhook] Ledger updated for Res ${reservationId} (${rStatus})`
+        `[Webhook] Ledger + Reservations updated for Res ${reservationId} (${rStatus})`
       );
     } catch (ledgerErr) {
       console.error("[Webhook] Ledger Update Failed:", ledgerErr.message);

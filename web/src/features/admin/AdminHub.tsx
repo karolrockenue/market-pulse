@@ -147,7 +147,8 @@ export default function AdminHub() {
           hotels={hotels}
           onManagementChange={handleManagementChange}
           managementGroups={managementGroups}
-          onManageCompSet={() => {}} // Placeholder if needed
+          onManageCompSet={() => {}}
+          onHotelDeleted={refreshData}
         />
 
         <MewsOnboarding />

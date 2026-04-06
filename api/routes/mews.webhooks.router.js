@@ -257,8 +257,39 @@ router.post("/", async (req, res) => {
           ],
         );
 
+        // --- Upsert into reservations table (detailed booking data) ---
+        const checkOutDate = new Date(checkOut).toISOString().split("T")[0];
+        const avgNightlyRate = numNights > 0 ? Math.round((totalRevenue / numNights) * 100) / 100 : totalRevenue;
+
+        await pgPool.query(
+          `INSERT INTO reservations
+           (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           ON CONFLICT (id, hotel_id) DO UPDATE SET
+             check_out = EXCLUDED.check_out,
+             nights = EXCLUDED.nights,
+             avg_nightly_rate = EXCLUDED.avg_nightly_rate,
+             total_rate = EXCLUDED.total_rate,
+             status = EXCLUDED.status,
+             updated_at = NOW()`,
+          [
+            reservationId,
+            hotel_id,
+            null, // guest_name — Mews requires separate customer lookup
+            null, // room_type — not in current reservation fetch
+            checkInDate,
+            checkOutDate,
+            numNights,
+            rSource,
+            avgNightlyRate,
+            totalRevenue,
+            rStatus,
+            bookingDate,
+          ],
+        );
+
         console.log(
-          `[Mews Webhook] Ledger updated for Res ${reservationId} (${rStatus}, Revenue: ${totalRevenue.toFixed(2)})`,
+          `[Mews Webhook] Ledger + Reservations updated for Res ${reservationId} (${rStatus}, Revenue: ${totalRevenue.toFixed(2)})`,
         );
       } catch (ledgerErr) {
         console.error(

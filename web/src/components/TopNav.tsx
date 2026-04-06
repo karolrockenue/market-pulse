@@ -13,6 +13,7 @@ import {
   DollarSign,
   Trophy,
   Presentation,
+  Globe,
 } from "lucide-react";
 import {
   Select,
@@ -147,6 +148,7 @@ export function TopNav({
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },
         { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
+        { label: "Distribution", value: "distribution", icon: Globe },
       ],
     },
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },

@@ -53,9 +53,20 @@ export const settingsApi = {
 
   // Remove User (Placeholder API based on App.tsx)
   removeUser: async (userId: string): Promise<void> => {
-    // Note: The original App.tsx didn't have a real endpoint wired for this yet, 
-    // but we prepare the API method for when it does.
-    // For now, we simulate success to match current behavior.
-    return Promise.resolve(); 
-  }
+    return Promise.resolve();
+  },
+
+  // Soft disconnect a hotel (preserves data)
+  disconnectHotel: async (hotelId: string): Promise<{ success: boolean; message: string }> => {
+    const res = await fetch(`/api/hotels/${hotelId}/disconnect`, { method: 'POST', credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to disconnect hotel');
+    return res.json();
+  },
+
+  // Reconnect a soft-disconnected hotel
+  reconnectHotel: async (hotelId: string): Promise<{ success: boolean; message: string }> => {
+    const res = await fetch(`/api/hotels/${hotelId}/reconnect`, { method: 'POST', credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to reconnect hotel');
+    return res.json();
+  },
 };

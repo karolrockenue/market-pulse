@@ -23,12 +23,12 @@ module.exports = async (request, response) => {
       let propertiesResult;
       if (singleHotelId) {
         propertiesResult = await propertiesClient.query(
-          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE hotel_id = $1",
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE hotel_id = $1 AND is_disconnected = false",
           [singleHotelId],
         );
       } else {
         propertiesResult = await propertiesClient.query(
-          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels",
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE is_disconnected = false",
         );
       }
       console.log("...Initial property fetch query complete.");

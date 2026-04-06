@@ -26,8 +26,7 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
       borderRadius: "8px",
       border: "1px solid #2a2a2a",
       overflow: "hidden",
-      marginBottom: "24px",
-      // Removed "height: 100%" to prevent infinite growth loop
+      height: "460px",
     },
     header: {
       padding: "20px 24px",

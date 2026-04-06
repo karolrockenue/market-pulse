@@ -71,5 +71,15 @@ export const adminApi = {
       body: JSON.stringify({ propertyId }),
     });
     return res.json();
-  }
+  },
+
+  // Hard delete a hotel (permanent, removes all data)
+  deleteHotel: async (hotelId: number): Promise<SyncResponse> => {
+    const res = await fetch('/api/hotels/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hotelId }),
+    });
+    return res.json();
+  },
 };

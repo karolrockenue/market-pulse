@@ -92,19 +92,53 @@ The OTA scrape data (market_availability_snapshots) only has partial month cover
 - Still need to remove: budget API endpoints, budget DB queries in hotel.service.js, budget-related imports/references across the codebase, budget report in ReportsHub
 - Do NOT delete the database table — just remove all code that reads/writes to it
 
-### Investigate Booking Source Mix Data
-- Do we have channel/source data (Booking.com, Expedia, Direct, etc.) flowing in from webhooks or PMS APIs?
-- Check what Cloudbeds and Mews webhooks send — is there a source/channel field on reservations?
-- Check `daily_bookings_record.source` — what values are actually stored there?
-- If the data exists, surface it on the dashboard or reports (source mix pie chart / breakdown)
-- If not available from current integrations, document what API calls would be needed to get it
+### ~~Investigate Booking Source Mix Data~~ DONE (April 2026)
+- Source data is captured and surfaced in the Bookings Report
+- Cloudbeds: full OTA names (Booking.com, Expedia, Airbnb, Miki Travel, etc.)
+- Mews: generic origin only (ChannelManager, Distributor, Commander) — actual OTA names blocked by missing `sourceAssignments/getAll` permission
 
-### Settings Page — PMS Disconnect Button
-- The Properties section in Settings needs a working "Disconnect" button per property
-- Currently shows a placeholder toast ("Disconnect feature disabled")
-- Wire it to hit the PMS disconnect endpoint
-- Should confirm before disconnecting (destructive action)
-- After disconnect, update the property status in the UI
+---
+
+## Bookings Report & Reservations System (Built April 2026)
+
+### What Was Built
+- **`reservations` table** — stores individual reservation details (guest name, room type, dates, source, rates, status)
+- **Bookings Report** — admin-only report in Reports Hub. Daily summary table (Date, Bookings, Room Nights, ADR, Revenue) with clickable accordion expanding to individual bookings (Guest Name, Room Type, Source, Arrival, Departure, Nights, Avg Rate, Total)
+- **Webhook integration** — both Cloudbeds and Mews webhooks now upsert into `reservations` on every reservation event
+- **Backfill script** — `scripts/backfill-reservations.js <hotel_id> [days]` supports both PMS types
+- **Dashboard fix** — Recent Bookings widget now shows newest day first
+
+### What Works
+- Cloudbeds: guest names, room types, OTA sources, rates — all populated
+- Mews: room types, rates, generic source — populated. Guest names NULL (permission issue)
+- Cancelled bookings excluded from ADR/revenue totals, sorted to bottom of detail view
+- When guest name is unavailable, reservation ID shown as fallback
+
+### Mews Scope Limitations (Action Required)
+Two Mews API permissions need to be enabled in the Mews Marketplace integration settings:
+1. **`customers/getAll`** — enables guest names for Mews hotels
+2. **`sourceAssignments/getAll`** — enables resolving actual OTA names (Booking.com, Expedia) instead of generic "ChannelManager"
+
+No code changes needed once permissions are granted — re-run the backfill script to populate.
+
+### Future Considerations
+- **90-day rolling cleanup + aggregation**: not built yet, not needed at current scale. Table grows ~500 rows/day at 50 hotels. At 1,000 hotels (~16M rows/year, ~8GB), add a cron to compress old reservations into a `daily_booking_stats` aggregate table and delete detail rows older than 90 days
+- **Mews-friendly source labels**: once `sourceAssignments/getAll` is available, map ChannelManager → actual OTA. Interim option: relabel Distributor → "Direct (Mews)", Commander → "Manual", ChannelManager → "OTA"
+- **Source mix chart**: data is now available to build a channel mix breakdown (pie chart / bar) on dashboard or reports
+
+### ~~Settings Page — PMS Disconnect Button~~ DONE (April 2026)
+- Two-tier disconnect implemented: soft disconnect (Settings, preserves data) + hard delete (Admin, permanent)
+- Endpoints: POST /api/hotels/:hotelId/disconnect, /reconnect, POST /api/hotels/delete
+- Disconnected hotels filtered from dashboards, reports, sentinel, daily-refresh, queue worker
+- is_disconnected column added to hotels table
+
+### Admin — Rebuild Comp Set Management Modal
+- The "Comp Set" button in HotelManagementTable exists but does nothing (onManageCompSet={() => {}})
+- The ManageCompSetModal component was never migrated into the admin feature module
+- Need to rebuild: modal that lets admin pick which hotels form the comp set for a given hotel
+- Backend already exists: GET/POST /api/hotels/:hotelId/compset in hotels.router.js
+- Comp set is used for benchmarking — if no manual comp set, falls back to same-category hotels
+- Modal should show searchable list of all hotels, allow selecting/deselecting competitors, save via POST
 
 ---
 
@@ -204,3 +238,47 @@ The OTA scrape data (market_availability_snapshots) only has partial month cover
 - Rate data accuracy → always scrape "cheapest available" for standard double, 2 adults. Log the room type so discrepancies are visible.
 - Stale data → if a scrape fails for a competitor, keep showing last known data with timestamp. Alert after 48h of failures.
 - Proxy cost growth → monitor bandwidth usage. Consider scraping only changed dates (skip dates where rate hasn't changed in 24h) to reduce page loads by ~60%.
+
+---
+
+## Distribution Manager (New Feature — Prototype Ready)
+
+### Business Need
+We manage distribution across 45+ properties with a growing number of OTA channels (Booking.com, Expedia, Agoda, Hotelbeds, Trip.com, etc.). Each OTA has its own promotional programs — Booking.com has Genius, Non-Refundable, Mobile Rate, Geo Rate; Expedia has Member Deal, Pay Now; Agoda has Private Sale, CUG Deal, Insider Deal; and so on. Today this is managed with zero tooling — not even a spreadsheet.
+
+The day-to-day reality is chaotic:
+- Properties constantly toggle programs on and off due to rate parity issues, seasonal decisions, or management calls — and there's no record of who changed what or why
+- There are always 5-10 onboardings in the pipeline across different OTAs, at different stages, handled by different people — and the list changes daily ("add this hotel", "actually remove that one, add another")
+- Nobody has a single view of "which hotels are live on which OTAs" or "which programs are currently active across the portfolio"
+- When something goes wrong (e.g., a Genius rate undercuts direct), there's no audit trail to understand what was changed and when
+
+### What We're Building
+A Distribution section inside Market Pulse with three core workflows:
+
+1. **Distribution Matrix** — a grid of hotels × OTA channels showing connection status (live / pipeline / paused / not connected) at a glance. Click any cell to see program details, toggle programs, and view change history for that hotel+OTA pair.
+
+2. **Onboarding Pipeline** — a Kanban board tracking hotel onboardings by stage (Requested → Credentials → Room Mapping → Rates Loaded → Testing → Live). Cards show the hotel, OTA, assignee, days-in-stage, and notes. New onboardings are added as cards; completed ones move to Live.
+
+3. **Program Control Panel** — per-OTA view of all promotional programs with active/paused counts across the portfolio. Toggling a program off requires a reason (parity issue, seasonal, management decision), building an automatic audit trail.
+
+4. **Change Log** — immutable audit trail of every distribution change: program toggles, connection status changes, onboarding milestones. Shows who, what, when, and why.
+
+### Current Status (April 2026)
+- **UI prototype is live** in the Sentinel menu → "Distribution"
+- Built as a fully interactive visual mockup using real managed hotel names (21 properties from the fleet) and realistic mock data for 6 OTA channels and their programs
+- All four tabs are functional with mock data: Matrix, Pipeline, Programs, Change Log
+- Matrix cells are clickable with a slide-out detail panel showing program toggles and recent changes
+- No backend, no database tables, no API endpoints yet — purely frontend mockup
+
+### Where It Lives
+- **Frontend**: `web/src/features/sentinel/components/Distribution/DistributionView.tsx`
+- **Navigation**: Sentinel dropdown → "Distribution" (admin only)
+- **Routing**: Wired through `SentinelHub.tsx` and `App.tsx`
+
+### Next Steps for Production
+1. **Database schema**: tables for `distribution_channels`, `channel_connections` (hotel × OTA status), `channel_programs`, `program_enrollments` (hotel × program with status + reason), `distribution_pipeline` (onboarding tasks with stages), `distribution_changelog` (audit log)
+2. **API endpoints**: CRUD for connections, programs, pipeline tasks; changelog is append-only
+3. **Wire frontend to real data**: replace mock constants with API calls + hooks
+4. **Permissions**: decide if all team members can toggle programs or if changes need approval
+5. **Notifications**: optional Slack/email alerts when programs are paused or onboardings stall
+6. **Future**: rate parity detection (compare rates across channels automatically), integration with OTA extranets to push changes directly

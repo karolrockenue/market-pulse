@@ -30,6 +30,7 @@ import {
   ChevronsUpDown,
   Plus,
   Building2,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -40,22 +41,21 @@ import { Hotel } from "../api/types";
 interface HotelManagementTableProps {
   onManageCompSet: (hotelId: string, hotelName: string) => void;
   hotels: Hotel[];
-  // [NEW] Add the handler function from App.tsx
   onManagementChange: (
     hotelId: number,
     field: "is_rockenue_managed" | "management_group",
     value: string | boolean | null
   ) => void;
-  // [NEW] Add the list of groups for the combobox
   managementGroups: string[];
+  onHotelDeleted?: () => void;
 }
 
-// Destructure the new hotels prop
 export function HotelManagementTable({
   onManageCompSet,
   hotels,
   onManagementChange,
   managementGroups,
+  onHotelDeleted,
 }: HotelManagementTableProps) {
   // Add state to track which hotel is currently syncing. Value will be the hotel_id.
   const [syncingHotelId, setSyncingHotelId] = useState<number | null>(null);
@@ -64,6 +64,31 @@ export function HotelManagementTable({
     null
   );
   const [refreshingHotelId, setRefreshingHotelId] = useState<number | null>(null);
+  const [deletingHotelId, setDeletingHotelId] = useState<number | null>(null);
+
+  const handleDeleteHotel = async (hotelId: number, hotelName: string) => {
+    if (!window.confirm(
+      `WARNING: This will permanently delete ALL data for "${hotelName}" and disconnect from PMS. This cannot be undone.\n\nAre you sure?`
+    )) return;
+
+    setDeletingHotelId(hotelId);
+    const toastId = toast.loading(`Deleting ${hotelName}...`);
+    try {
+      const response = await fetch("/api/hotels/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hotelId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to delete hotel");
+      toast.success(`${hotelName} deleted permanently.`, { id: toastId });
+      onHotelDeleted?.();
+    } catch (error: any) {
+      toast.error(`Delete failed: ${error.message}`, { id: toastId });
+    } finally {
+      setDeletingHotelId(null);
+    }
+  };
 
   // This is the list of valid categories from the backend
   const validCategories = [
@@ -250,10 +275,9 @@ export function HotelManagementTable({
                 "Hotel ID",
                 "Property Name",
                 "Rooms",
-                "Type",
                 "City",
-                "Neighborhood",
                 "Category",
+                "Status",
                 "Managed",
                 "Group",
                 "Actions",
@@ -314,25 +338,20 @@ export function HotelManagementTable({
                     fontSize: "14px",
                   }}
                 >
-                  {hotel.property_type}
-                </td>
-                <td
-                  style={{
-                    padding: "16px 24px",
-                    color: "#9ca3af",
-                    fontSize: "14px",
-                  }}
-                >
                   {hotel.city}
                 </td>
-                <td
-                  style={{
-                    padding: "16px 24px",
-                    color: "#9ca3af",
-                    fontSize: "14px",
-                  }}
-                >
-                  {hotel.neighborhood}
+                <td style={{ padding: "16px 24px" }}>
+                  <Badge
+                    variant="outline"
+                    style={{
+                      backgroundColor: hotel.is_disconnected ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)",
+                      color: hotel.is_disconnected ? "#f59e0b" : "#10b981",
+                      borderColor: hotel.is_disconnected ? "rgba(245,158,11,0.3)" : "rgba(16,185,129,0.3)",
+                      fontSize: "10px",
+                    }}
+                  >
+                    {hotel.is_disconnected ? "Disconnected" : "Active"}
+                  </Badge>
                 </td>
                 <td style={{ padding: "16px 24px" }}>
                   <Select
@@ -509,6 +528,26 @@ export function HotelManagementTable({
                       {refreshingHotelId === hotel.hotel_id
                         ? "Refreshing..."
                         : "Refresh Data"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      style={{
+                        height: "28px",
+                        padding: "0 8px",
+                        fontSize: "12px",
+                        color: "#ef4444",
+                      }}
+                      className="hover:bg-[#ef4444]/10 hover:text-[#ef4444]"
+                      onClick={() => handleDeleteHotel(hotel.hotel_id, hotel.property_name)}
+                      disabled={deletingHotelId === hotel.hotel_id}
+                    >
+                      <Trash2
+                        className={`w-3 h-3 mr-1 ${
+                          deletingHotelId === hotel.hotel_id ? "animate-spin" : ""
+                        }`}
+                      />
+                      {deletingHotelId === hotel.hotel_id ? "Deleting..." : "Delete"}
                     </Button>
                   </div>
                 </td>

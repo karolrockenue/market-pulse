@@ -315,6 +315,20 @@ router.post("/onboard", async (req, res) => {
     }).catch((syncErr) =>
       console.error(`[Mews Onboarding] Failed to trigger initial sync for hotel ${hotelId}:`, syncErr)
     );
+
+    // Fire-and-forget: reservation backfill (14 days)
+    try {
+      const { spawn } = require("child_process");
+      const child = spawn("node", ["scripts/backfill-reservations.js", String(hotelId), "14"], {
+        cwd: require("path").resolve(__dirname, "../.."),
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      console.log(`[Mews Onboarding] Reservation backfill spawned for hotel ${hotelId}`);
+    } catch (bfErr) {
+      console.error(`[Mews Onboarding] Failed to spawn reservation backfill for hotel ${hotelId}:`, bfErr.message);
+    }
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[Mews Onboarding] Failed:", error.message);

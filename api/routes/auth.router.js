@@ -1133,6 +1133,22 @@ router.get("/cloudbeds/callback", async (req, res) => {
         }
         // --- [END] INITIAL SYNC TRIGGER (WITH LOGGING) ---
 
+        // --- Reservation backfill (fire-and-forget, 14 days) ---
+        for (const hotelId of newlySyncedInternalIds) {
+          try {
+            const { spawn } = require("child_process");
+            const child = spawn("node", ["scripts/backfill-reservations.js", String(hotelId), "14"], {
+              cwd: require("path").resolve(__dirname, "../.."),
+              detached: true,
+              stdio: "ignore",
+            });
+            child.unref();
+            console.log(`[AUTH CALLBACK] Reservation backfill spawned for hotel ${hotelId}`);
+          } catch (bfErr) {
+            console.error(`[AUTH CALLBACK] Failed to spawn reservation backfill for hotel ${hotelId}:`, bfErr.message);
+          }
+        }
+
         // 3. Redirect the user (this logic is unchanged)
         const primaryNewPropertyId = newlySyncedInternalIds[0];
         if (primaryNewPropertyId) {

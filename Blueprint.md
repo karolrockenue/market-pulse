@@ -977,7 +977,7 @@ Migration: api/migration_006_reservations.js
 
 API: GET /api/hotels/:hotelId/bookings?days=14
 
-UI: Reports Hub → Bookings Report (admin only). Daily summary table with expandable accordion showing individual bookings per day. Cancelled bookings excluded from ADR/revenue totals, sorted to bottom.
+UI: Reports Hub → Bookings Report (all users). Daily summary table with expandable accordion showing individual bookings per day. Cancelled bookings excluded from ADR/revenue totals, sorted to bottom. Dashboard Recent Bookings widget links to full report via "View Full Report" button.
 
 4.7c Mews Scope Limitations (as of April 2026)
 
@@ -1244,7 +1244,7 @@ Disconnected hotels are filtered from: /api/hotels/mine (default), daily-refresh
 
 GET /api/hotels/:hotelId/bookings?days=14
 
-Admin-only. Returns daily booking summaries with nested individual reservation details for the Bookings Report. Groups by booking_date (when reservation was created). Cancelled bookings excluded from ADR/revenue/room night totals but included in booking count. Details sorted: confirmed first, cancelled last. Falls back to reservation ID when guest name is unavailable (Mews).
+User-accessible (requireUserApi). Returns daily booking summaries with nested individual reservation details for the Bookings Report. Groups by booking_date (when reservation was created). Cancelled bookings excluded from ADR/revenue/room night totals but included in booking count. Details sorted: confirmed first, cancelled last. Falls back to reservation ID when guest name is unavailable (Mews).
 
 Budgets.
 

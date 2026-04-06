@@ -9,6 +9,7 @@ export interface Hotel {
   pms_type?: string;
   is_rockenue_managed: boolean;
   management_group: string | null;
+  is_disconnected: boolean;
 }
 
 export interface ScheduledReport {
