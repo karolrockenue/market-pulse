@@ -137,6 +137,7 @@ function generateDates(startDate, days) {
  * Get flight demand data for a city, optionally with YoY comparison.
  */
 async function getFlightDemand(citySlug, days = 90, includeYoY = false) {
+  citySlug = citySlug.toLowerCase();
   const airports = CITY_AIRPORTS[citySlug];
   if (!airports) {
     return { citySlug, airports: [], data: [], source: "no-config" };
@@ -225,6 +226,7 @@ async function getFlightDemand(citySlug, days = 90, includeYoY = false) {
  * Now also stores origin data and optionally fetches YoY period.
  */
 async function refreshFlightDemand(citySlug, days = 90, includeYoY = false) {
+  citySlug = citySlug.toLowerCase();
   if (!getRapidApiKey()) {
     throw new Error("RAPIDAPI_KEY environment variable not set");
   }
