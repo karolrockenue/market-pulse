@@ -22,14 +22,26 @@ router.get("/demand", requireAdminApi, async (req, res) => {
 
 // POST /api/flights/refresh?city=london&days=90
 // Triggers a fresh fetch from AeroDataBox (admin only)
+// Runs in the background — returns immediately with 202
 router.post("/refresh", requireAdminApi, async (req, res) => {
   try {
     const { city, days } = req.query;
     if (!city) {
       return res.status(400).json({ error: "city query param required" });
     }
-    const result = await flightService.refreshFlightDemand(city, parseInt(days) || 90);
-    res.json(result);
+
+    const airports = flightService.CITY_AIRPORTS[city];
+    if (!airports) {
+      return res.json({ citySlug: city, fetched: 0, skipped: 0, message: "No airport config for this city" });
+    }
+
+    // Return immediately — run fetch in background
+    res.json({ status: "started", citySlug: city, airports, message: "Fetching in background. Refresh page in a few minutes to see data." });
+
+    // Background fetch (not awaited)
+    flightService.refreshFlightDemand(city, parseInt(days) || 90)
+      .then((result) => logger.info({ msg: "Flight refresh complete", ...result }))
+      .catch((err) => logger.error({ msg: "Flight refresh failed", city, error: err.message }));
   } catch (err) {
     logger.error({ msg: "POST /flights/refresh error", error: err.message });
     res.status(500).json({ error: err.message });

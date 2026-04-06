@@ -92,15 +92,8 @@ export function DemandIntelView({ allHotels }: DemandIntelProps) {
     try {
       const res = await fetch(`/api/flights/refresh?city=${citySlug}&days=90`, { method: "POST" });
       if (!res.ok) throw new Error("Refresh failed");
-      const result = await res.json();
-      toast.success(`Fetched ${result.fetched} new data points (${result.skipped} cached)`);
-      // Re-fetch
-      const dataRes = await fetch(`/api/flights/demand?city=${citySlug}&days=90`);
-      if (dataRes.ok) {
-        const d = await dataRes.json();
-        setFlightData(d.data || []);
-        setFlightAirports(d.airports || []);
-      }
+      await res.json();
+      toast.success("Flight data fetch started — refresh the page in a few minutes to see results");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
