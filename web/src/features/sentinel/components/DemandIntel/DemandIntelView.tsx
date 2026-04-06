@@ -41,7 +41,11 @@ export function DemandIntelView({ allHotels }: DemandIntelProps) {
     return Array.from(cityMap.entries()).map(([slug, label]) => ({ slug, label }));
   }, [allHotels]);
 
-  const [citySlug, setCitySlug] = useState(cities[0]?.slug || "london");
+  const [citySlug, setCitySlug] = useState(() => {
+    // Default to "london" if available, otherwise first city
+    const london = cities.find((c) => c.slug === "london");
+    return london?.slug || cities[0]?.slug || "london";
+  });
   const currencyCode = allHotels.find((h) => (h.city || h.city_slug) === citySlug)?.currency_code || "GBP";
   const currencySymbol = currencyCode === "GBP" ? "£" : currencyCode === "EUR" ? "€" : "$";
 
