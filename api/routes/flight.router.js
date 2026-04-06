@@ -39,9 +39,17 @@ router.post("/refresh", requireAdminApi, async (req, res) => {
     res.json({ status: "started", citySlug: city, airports, message: "Fetching in background. Refresh page in a few minutes to see data." });
 
     // Background fetch (not awaited)
+    console.log(`[FLIGHT] Starting background refresh for ${city} (${airports.join(", ")})`);
+    console.log(`[FLIGHT] RAPIDAPI_KEY present: ${!!process.env.RAPIDAPI_KEY}, length: ${(process.env.RAPIDAPI_KEY || "").length}`);
+
     flightService.refreshFlightDemand(city, parseInt(days) || 90)
-      .then((result) => logger.info({ msg: "Flight refresh complete", ...result }))
-      .catch((err) => logger.error({ msg: "Flight refresh failed", city, error: err.message }));
+      .then((result) => {
+        console.log(`[FLIGHT] Refresh complete: fetched=${result.fetched}, skipped=${result.skipped}`);
+      })
+      .catch((err) => {
+        console.error(`[FLIGHT] Refresh FAILED: ${err.message}`);
+        console.error(err.stack);
+      });
   } catch (err) {
     logger.error({ msg: "POST /flights/refresh error", error: err.message });
     res.status(500).json({ error: err.message });

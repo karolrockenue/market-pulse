@@ -180,6 +180,8 @@ async function refreshFlightDemand(citySlug, days = 90) {
   let fetched = 0;
   let skipped = 0;
 
+  console.log(`[FLIGHT] Refresh loop starting: ${airports.length} airports × ${dates.length} dates, ${freshSet.size} already fresh`);
+
   for (const airportCode of airports) {
     for (const dateStr of dates) {
       const key = `${airportCode}_${dateStr}`;
