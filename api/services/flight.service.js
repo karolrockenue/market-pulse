@@ -133,7 +133,7 @@ async function refreshFlightDemand(citySlug, days = 90) {
 
   const airports = CITY_AIRPORTS[citySlug];
   if (!airports) {
-    throw new Error(`No airport config for city: ${citySlug}`);
+    return { citySlug, airports: [], fetched: 0, skipped: 0, totalDates: 0, message: "No airport config for this city" };
   }
 
   const today = new Date();
