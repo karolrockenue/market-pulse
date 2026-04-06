@@ -70,7 +70,7 @@ async function fetchDayFlights(airportCode, dateStr) {
     `${dateStr}T11:59`
   );
 
-  await new Promise((r) => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 1500));
 
   const afternoon = await fetchFlightWindow(
     airportCode,
@@ -206,8 +206,8 @@ async function refreshFlightDemand(citySlug, days = 90) {
         fetched++;
         logger.info({ msg: "Flight data fetched", airportCode, dateStr, ...counts });
 
-        // Rate limit: 1 second between full-day fetches
-        await new Promise((r) => setTimeout(r, 1000));
+        // Rate limit: 2 seconds between full-day fetches
+        await new Promise((r) => setTimeout(r, 2000));
       } catch (err) {
         logger.error({ msg: "Flight fetch error", airportCode, dateStr, error: err.message });
       }
