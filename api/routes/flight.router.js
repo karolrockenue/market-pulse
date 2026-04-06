@@ -4,15 +4,16 @@ const { requireAdminApi } = require("../utils/middleware");
 const flightService = require("../services/flight.service");
 const logger = require("../utils/logger");
 
-// GET /api/flights/demand?city=london&days=90
-// Returns cached flight demand data for a city
+// GET /api/flights/demand?city=london&days=90&yoy=true
+// Returns cached flight demand data for a city, optionally with YoY comparison
 router.get("/demand", requireAdminApi, async (req, res) => {
   try {
-    const { city, days } = req.query;
+    const { city, days, yoy } = req.query;
     if (!city) {
       return res.status(400).json({ error: "city query param required" });
     }
-    const result = await flightService.getFlightDemand(city, parseInt(days) || 90);
+    const includeYoY = yoy === "true" || yoy === "1";
+    const result = await flightService.getFlightDemand(city, parseInt(days) || 90, includeYoY);
     res.json(result);
   } catch (err) {
     logger.error({ msg: "GET /flights/demand error", error: err.message });
@@ -20,12 +21,12 @@ router.get("/demand", requireAdminApi, async (req, res) => {
   }
 });
 
-// POST /api/flights/refresh?city=london&days=90
+// POST /api/flights/refresh?city=london&days=90&yoy=true
 // Triggers a fresh fetch from AeroDataBox (admin only)
-// Runs in the background — returns immediately with 202
+// Runs in the background — returns immediately
 router.post("/refresh", requireAdminApi, async (req, res) => {
   try {
-    const { city, days } = req.query;
+    const { city, days, yoy } = req.query;
     if (!city) {
       return res.status(400).json({ error: "city query param required" });
     }
@@ -35,14 +36,15 @@ router.post("/refresh", requireAdminApi, async (req, res) => {
       return res.json({ citySlug: city, fetched: 0, skipped: 0, message: "No airport config for this city" });
     }
 
-    // Return immediately — run fetch in background
-    res.json({ status: "started", citySlug: city, airports, message: "Fetching in background. Refresh page in a few minutes to see data." });
+    const includeYoY = yoy === "true" || yoy === "1";
 
-    // Background fetch (not awaited)
-    console.log(`[FLIGHT] Starting background refresh for ${city} (${airports.join(", ")})`);
+    // Return immediately — run fetch in background
+    res.json({ status: "started", citySlug: city, airports, includeYoY, message: "Fetching in background. Refresh page in a few minutes to see data." });
+
+    console.log(`[FLIGHT] Starting background refresh for ${city} (${airports.join(", ")}) yoy=${includeYoY}`);
     console.log(`[FLIGHT] RAPIDAPI_KEY present: ${!!process.env.RAPIDAPI_KEY}, length: ${(process.env.RAPIDAPI_KEY || "").length}`);
 
-    flightService.refreshFlightDemand(city, parseInt(days) || 90)
+    flightService.refreshFlightDemand(city, parseInt(days) || 90, includeYoY)
       .then((result) => {
         console.log(`[FLIGHT] Refresh complete: fetched=${result.fetched}, skipped=${result.skipped}`);
       })
