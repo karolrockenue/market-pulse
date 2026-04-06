@@ -9,9 +9,19 @@ const CITY_AIRPORTS = {
   // "paris": ["CDG", "ORY"],
 };
 
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = "aerodatabox.p.rapidapi.com";
 const BASE_URL = `https://${RAPIDAPI_HOST}`;
+
+function getRapidApiKey() {
+  const key = process.env.RAPIDAPI_KEY;
+  if (!key) {
+    logger.error({ msg: "RAPIDAPI_KEY is not set in environment" });
+  }
+  return key;
+}
+
+// Startup check
+logger.info({ msg: "Flight service loaded", rapidApiKeyPresent: !!process.env.RAPIDAPI_KEY, cities: Object.keys(CITY_AIRPORTS) });
 
 // Cache TTL: 24 hours (re-fetch if older)
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -21,26 +31,32 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
  * Returns { arrivals: number, departures: number }
  */
 async function fetchFlightWindow(airportCode, fromLocal, toLocal) {
+  const apiKey = getRapidApiKey();
+  if (!apiKey) return { arrivals: 0, departures: 0 };
+
   const url = `${BASE_URL}/flights/airports/iata/${airportCode}/${fromLocal}/${toLocal}?direction=Both&withCodeshared=false&withCargo=false&withPrivate=false`;
+
+  logger.info({ msg: "AeroDataBox request", airportCode, fromLocal, toLocal });
 
   const res = await fetch(url, {
     headers: {
-      "X-RapidAPI-Key": RAPIDAPI_KEY,
+      "X-RapidAPI-Key": apiKey,
       "X-RapidAPI-Host": RAPIDAPI_HOST,
     },
   });
 
   if (!res.ok) {
     const text = await res.text();
-    logger.warn({ msg: "AeroDataBox API error", status: res.status, airportCode, fromLocal, text });
+    logger.error({ msg: "AeroDataBox API error", status: res.status, airportCode, fromLocal, body: text.substring(0, 200) });
     return { arrivals: 0, departures: 0 };
   }
 
   const data = await res.json();
-  return {
-    arrivals: Array.isArray(data.arrivals) ? data.arrivals.length : 0,
-    departures: Array.isArray(data.departures) ? data.departures.length : 0,
-  };
+  const arrivals = Array.isArray(data.arrivals) ? data.arrivals.length : 0;
+  const departures = Array.isArray(data.departures) ? data.departures.length : 0;
+  logger.info({ msg: "AeroDataBox response", airportCode, fromLocal, arrivals, departures });
+
+  return { arrivals, departures };
 }
 
 /**
@@ -127,7 +143,7 @@ async function getFlightDemand(citySlug, days = 90) {
  * Returns { fetched, skipped } counts.
  */
 async function refreshFlightDemand(citySlug, days = 90) {
-  if (!RAPIDAPI_KEY) {
+  if (!getRapidApiKey()) {
     throw new Error("RAPIDAPI_KEY environment variable not set");
   }
 
