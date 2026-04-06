@@ -336,6 +336,63 @@ export function DemandIntelView({ allHotels }: DemandIntelProps) {
           </div>
         </div>
 
+        {/* ── FLIGHT ARRIVALS CHART ── */}
+        <div className="bg-[#1A1A1A] rounded-lg border border-[#2a2a2a] p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Plane className="w-4 h-4 text-[#39BDF8]" />
+                <h2 className="text-[15px] font-medium text-[#e5e5e5]">Flight Arrivals</h2>
+              </div>
+              <p className="text-[11px] text-[#6b7280] mt-0.5">
+                Scheduled inbound passenger flights per day (excl. cargo, codeshare, private)
+                {flightAirports.length > 0 && ` — ${flightAirports.join(" + ")}`}
+              </p>
+            </div>
+          </div>
+          <div style={{ height: 240 }}>
+            {flightLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-6 h-6 animate-spin text-[#39BDF8]" />
+              </div>
+            ) : chartData.some((d) => d.arrivals > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }} syncId="intel">
+                  <CartesianGrid {...gridProps} />
+                  <XAxis {...xProps} />
+                  <YAxis {...yProps} domain={[0, "auto"]} />
+                  <Tooltip
+                    {...tipStyle}
+                    cursor={{ fill: "rgba(57, 189, 248, 0.06)" }}
+                    labelFormatter={(_l, p) => {
+                      const d = p?.[0]?.payload;
+                      return d ? `${d.dayName} ${d.label}` : _l;
+                    }}
+                    formatter={(value: number, name: string) => [value.toLocaleString(), name]}
+                  />
+                  <Area type="monotone" dataKey="arrivals" name="Arrivals" stroke="#39BDF8" strokeWidth={1.5} fill="#39BDF8" fillOpacity={0.06} dot={false} />
+                  <Bar dataKey="arrivals" name="Arrivals" radius={[3, 3, 0, 0]} maxBarSize={18} fillOpacity={0.75}>
+                    {chartData.map((entry, i) => {
+                      const avg = stats?.avgArrivals || 1;
+                      let fill = "#39BDF8";
+                      if (entry.arrivals > avg * 1.15) fill = "#ef4444";
+                      else if (entry.arrivals > avg * 1.05) fill = "#f59e0b";
+                      else if (entry.arrivals < avg * 0.85) fill = "#10b981";
+                      return <Cell key={i} fill={fill} />;
+                    })}
+                  </Bar>
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-[#6b7280]">
+                <Plane className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-[13px]">No flight data cached</p>
+                <p className="text-[11px]">Click "Refresh Flight Data" above to fetch from AeroDataBox</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ── TWO-COLUMN: Hot Dates + Quiet Dates ── */}
         {stats && (
           <div className="grid grid-cols-2 gap-4 mb-6">
