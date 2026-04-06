@@ -8,12 +8,13 @@
   "description": "",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
+    "start": "node --require ./instrument.js server.js",
     "build": "echo 'No root build script specified'",
     "vercel-build": "cd web && yarn install && yarn build"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
+    "@sentry/node": "^10.47.0",
     "@sparticuz/chromium": "^141.0.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
@@ -29,6 +30,8 @@
     "node-fetch": "^2.7.0",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "playwright-core": "^1.56.1",
     "yargs": "^17.7.2"
   },

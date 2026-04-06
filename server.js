@@ -4,11 +4,15 @@
 
 // --- CORE DEPENDENCIES ---
 require("dotenv").config();
+require("./instrument.js");
+const Sentry = require("@sentry/node");
 const express = require("express");
 const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
 const cors = require("cors");
 const path = require("path");
+const pinoHttp = require("pino-http");
+const logger = require("./api/utils/logger");
 
 // --- SHARED UTILITIES AND ROUTERS ---
 const pgPool = require("./api/utils/db");
@@ -40,12 +44,45 @@ const mewsWebhooksRoutes = require("./api/routes/mews.webhooks.router.js");
 const metricsRoutes = require("./api/routes/metrics.router.js"); // Unified Metrics Engine
 const hotelsRoutes = require("./api/routes/hotels.router.js"); // Unified Hotel/Config Engine
 const marketRoutes = require("./api/routes/market.router.js"); // Unified Market/Planning Engine
+const distributionRoutes = require("./api/routes/distribution.router.js"); // Distribution & CRM
 // --- EXPRESS APP INITIALIZATION ---
 
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.set("trust proxy", 1);
+
+// --- REQUEST LOGGING ---
+app.use(pinoHttp({
+  logger,
+  autoLogging: {
+    ignore: (req) => req.url === "/health" || req.url.match(/\.(js|css|png|ico|svg|woff2?)$/),
+  },
+  serializers: {
+    req(req) {
+      return { method: req.method, url: req.url };
+    },
+    res(res) {
+      return { statusCode: res.statusCode };
+    },
+  },
+}));
+
+// --- HEALTH CHECK ---
+app.get("/health", async (req, res) => {
+  try {
+    const dbResult = await pgPool.query("SELECT 1");
+    res.json({
+      status: "ok",
+      uptime: Math.floor(process.uptime()),
+      db: dbResult.rows.length === 1 ? "ok" : "error",
+      memory: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(503).json({ status: "error", db: "unreachable", error: err.message });
+  }
+});
 
 // --- STATIC ASSET SERVING ---
 // Serve all static assets (JS, CSS, images) from the React build directory.
@@ -247,6 +284,11 @@ if (process.env.VERCEL_ENV !== "production") {
   });
 }
 
+// --- SENTRY VERIFICATION (temporary — remove after confirming) ---
+app.get("/debug-sentry", function mainHandler(req, res) {
+  throw new Error("My first Sentry error!");
+});
+
 // --- API ROUTERS ---
 // Mount all the dedicated routers to their respective paths.
 
@@ -265,8 +307,15 @@ app.use("/api/market", marketRoutes); // Trends, Pace, Scraper, Shadowfax
 app.use("/api/sentinel", sentinelRoutes); // AI Pricing
 app.use("/api/webhooks", webhooksRoutes); // PMS Events
 app.use("/api/bridge", bridgeRoutes); // Python AI Bridge
+app.use("/api/distribution", distributionRoutes); // Distribution & CRM
 
 app.use("/api/mews-webhooks", mewsWebhooksRoutes);
+
+// --- SENTRY ERROR HANDLER (must be after routes, before fallback) ---
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
 // --- STATIC AND FALLBACK ROUTES ---
 // This must come AFTER all API routes
 
@@ -311,7 +360,7 @@ app.get("*", (req, res) => {
 // --- SERVER START ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  logger.info({ type: "startup", port: PORT, env: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.VERCEL_ENV || "development" });
 
   // --- IN-PROCESS CRON JOBS (Railway only) ---
   // On Vercel (serverless), crons are HTTP-triggered via vercel.json.
@@ -321,51 +370,41 @@ app.listen(PORT, () => {
     const cron = require("node-cron");
     console.log("[CRON] Railway detected — starting in-process cron jobs.");
 
-    // Every minute: process Sentinel rate push queue
-    cron.schedule("* * * * *", async () => {
+    const cronRunner = async (job, url, opts = {}) => {
+      const start = Date.now();
       try {
-        const res = await fetch(`http://localhost:${PORT}/api/sentinel/process-queue`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
-        });
-        console.log(`[CRON] process-queue: ${res.status}`);
+        const res = await fetch(url, opts);
+        logger.info({ type: "cron", job, status: res.status, durationMs: Date.now() - start });
       } catch (err) {
-        console.error("[CRON] process-queue failed:", err.message);
+        logger.error({ type: "cron", job, error: err.message, durationMs: Date.now() - start });
       }
-    });
+    };
+
+    // Every minute: process Sentinel rate push queue
+    cron.schedule("* * * * *", () =>
+      cronRunner("process-queue", `http://localhost:${PORT}/api/sentinel/process-queue`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+      })
+    );
 
     // Every day at 06:00 UTC: daily metrics refresh
-    cron.schedule("0 6 * * *", async () => {
-      try {
-        const res = await fetch(`http://localhost:${PORT}/api/cron/daily-refresh`, {
-          headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
-        });
-        console.log(`[CRON] daily-refresh: ${res.status}`);
-      } catch (err) {
-        console.error("[CRON] daily-refresh failed:", err.message);
-      }
-    });
+    cron.schedule("0 6 * * *", () =>
+      cronRunner("daily-refresh", `http://localhost:${PORT}/api/cron/daily-refresh`, {
+        headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+      })
+    );
 
     // Every 5 minutes: send scheduled reports
-    cron.schedule("*/5 * * * *", async () => {
-      try {
-        const res = await fetch(`http://localhost:${PORT}/api/send-scheduled-reports`);
-        console.log(`[CRON] send-scheduled-reports: ${res.status}`);
-      } catch (err) {
-        console.error("[CRON] send-scheduled-reports failed:", err.message);
-      }
-    });
+    cron.schedule("*/5 * * * *", () =>
+      cronRunner("send-scheduled-reports", `http://localhost:${PORT}/api/send-scheduled-reports`)
+    );
 
     // Every day at 06:00 UTC: sync Rockenue assets
-    cron.schedule("0 6 * * *", async () => {
-      try {
-        const res = await fetch(`http://localhost:${PORT}/api/sync-rockenue-assets`);
-        console.log(`[CRON] sync-rockenue-assets: ${res.status}`);
-      } catch (err) {
-        console.error("[CRON] sync-rockenue-assets failed:", err.message);
-      }
-    });
+    cron.schedule("0 6 * * *", () =>
+      cronRunner("sync-rockenue-assets", `http://localhost:${PORT}/api/sync-rockenue-assets`)
+    );
 
-    console.log("[CRON] All cron jobs registered.");
+    logger.info("[CRON] All cron jobs registered.");
   }
 });
