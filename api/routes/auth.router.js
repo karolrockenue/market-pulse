@@ -956,59 +956,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
           client
         );
 
-        // [NEW] Add Total Rooms Sync Logic (copied from admin.router.js)
-        console.log(
-          `[AUTH CALLBACK] Syncing total_rooms for new hotel: ${internalHotelId}`
-        );
-        let totalRooms = 0;
-        try {
-          const { credentials, pms_type, pms_property_id } =
-            await getCredentialsForHotel(internalHotelId);
-
-          const apiResponse = await getRoomTypesFromPMS(
-            internalHotelId,
-            pms_type,
-            credentials,
-            pms_property_id
-          );
-
-          if (apiResponse && Array.isArray(apiResponse.data)) {
-            totalRooms = apiResponse.data.reduce((sum, roomType) => {
-              const roomName = roomType.roomTypeName || roomType.Name || "";
-              if (roomName.toLowerCase().includes("virtual")) {
-                console.log(` -- Skipping room: "${roomName}" (virtual)`);
-                return sum;
-              }
-              return (
-                sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0)
-              );
-            }, 0);
-          } else {
-            throw new Error(
-              "Invalid API response structure. Expected { data: [...] }"
-            );
-          }
-
-          if (totalRooms > 0) {
-            await client.query(
-              "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
-              [totalRooms, internalHotelId]
-            );
-            console.log(
-              `[AUTH CALLBACK] SUCCESS: Set total_rooms to ${totalRooms} for hotel ${internalHotelId}.`
-            );
-          } else {
-            console.warn(
-              `[AUTH CALLBACK] Calculated total rooms was 0 for hotel ${internalHotelId}. Skipping update.`
-            );
-          }
-        } catch (roomError) {
-          // Log the error but do not fail the whole transaction
-          console.error(
-            `[AUTH CALLBACK] FAILED to update total_rooms for hotel ${internalHotelId}: ${roomError.message}`
-          );
-        }
-        // --- [END NEW] ---
+        // Total rooms sync skipped during re-auth — it consumes the refresh_token
+        // via getAdminAccessToken, rotating it before credentials are saved.
+        // Total rooms are already set for existing hotels.
 
         if (!internalHotelId) {
           console.warn(
