@@ -1978,6 +1978,7 @@ function CreateTaskPanel({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurFreq, setRecurFreq] = useState<"daily" | "weekly" | "biweekly" | "monthly">("weekly");
   const [creating, setCreating] = useState(false);
+  const [titleError, setTitleError] = useState(false);
   const [selStatus, setSelStatus] = useState<TaskStatus>(defaultStatus || "todo");
 
   const propertyRef = useRef<HTMLDivElement>(null);
@@ -2012,7 +2013,12 @@ function CreateTaskPanel({
   const channelLabel = selChannels.length === 0 ? "Select channels..." : selChannels.length === 1 ? selChannels[0] : `${selChannels.length} channels`;
 
   async function handleCreate() {
-    if (!title.trim() || creating) return;
+    if (creating) return;
+    if (!title.trim()) {
+      setTitleError(true);
+      setTimeout(() => setTitleError(false), 1500);
+      return;
+    }
     setCreating(true);
     try {
       // Resolve selected hotel names to IDs
@@ -2071,14 +2077,21 @@ function CreateTaskPanel({
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs to be done?"
-            style={{
-              width: "100%", padding: "10px 12px", background: INPUT_BG,
-              border: `1px solid ${BORDER}`, borderRadius: 6,
-              color: TEXT, fontSize: 18, fontWeight: 600, outline: "none",
-              marginBottom: 24, lineHeight: 1.4,
-              fontFamily: "system-ui, -apple-system, sans-serif",
-            }} />
+          <div style={{ marginBottom: 24 }}>
+            <input value={title} onChange={(e) => { setTitle(e.target.value); if (titleError) setTitleError(false); }} placeholder="What needs to be done?"
+              autoFocus
+              style={{
+                width: "100%", padding: "10px 12px", background: INPUT_BG,
+                border: `1px solid ${titleError ? RED : BORDER}`, borderRadius: 6,
+                color: TEXT, fontSize: 18, fontWeight: 600, outline: "none",
+                lineHeight: 1.4,
+                fontFamily: "system-ui, -apple-system, sans-serif",
+                animation: titleError ? "shake 0.4s ease" : "none",
+                boxShadow: titleError ? `0 0 0 2px ${RED}30` : "none",
+                transition: "border-color 0.2s, box-shadow 0.2s",
+              }} />
+            {titleError && <div style={{ color: RED, fontSize: 11, marginTop: 6, fontWeight: 500 }}>Task title is required</div>}
+          </div>
 
           <div style={{ marginBottom: 24, background: BG_PAGE, borderRadius: 8, border: `1px solid ${BORDER}`, padding: "4px 16px" }}>
 
@@ -2328,7 +2341,10 @@ function CreateTaskPanel({
         </div>
       </div>
 
-      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+      `}</style>
     </>
   );
 }
