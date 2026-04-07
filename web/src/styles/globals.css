@@ -204,3 +204,19 @@ html {
 [role="option"][data-state="checked"] {
   color: #39bdf8 !important;
 }
+
+/* TopNav: hide scrollbar on nav */
+.topnav-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.topnav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* TopNav: hide timestamp on narrow screens */
+@media (max-width: 1280px) {
+  .topnav-timestamp {
+    display: none !important;
+  }
+}

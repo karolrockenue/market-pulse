@@ -224,7 +224,7 @@ export function TopNav({
         </div>
 
         {/* NAV ITEMS */}
-        <nav style={{ display: "flex", gap: "0", flexWrap: "nowrap", overflowX: "auto", minWidth: 0, alignItems: "center" }}>
+        <nav className="topnav-scroll" style={{ display: "flex", gap: "0", flexWrap: "nowrap", overflowX: "auto", minWidth: 0, alignItems: "center" }}>
           {navItems.map((item: any, idx: number) => {
             const Icon = item.icon;
             const separator = idx > 0 ? (
@@ -457,14 +457,16 @@ export function TopNav({
           </>
         )}
 
-        {/* Last Updated Badge */}
+        {/* Last Updated Badge — hidden on narrow screens */}
         <div
+          className="topnav-timestamp"
           style={{
             fontSize: "12px",
             color: GRAY,
             backgroundColor: "#2C2C2C",
             padding: "6px 12px",
             borderRadius: "4px",
+            whiteSpace: "nowrap",
           }}
         >
           {lastUpdatedAt
