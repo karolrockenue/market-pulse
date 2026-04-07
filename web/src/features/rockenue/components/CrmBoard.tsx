@@ -229,6 +229,15 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
     setBulkMode(false);
   }
 
+  async function bulkDeleteTasks() {
+    if (!confirm(`Delete ${selectedTaskIds.size} task${selectedTaskIds.size > 1 ? "s" : ""}? This cannot be undone.`)) return;
+    for (const id of selectedTaskIds) {
+      await deleteTask(id);
+    }
+    setSelectedTaskIds(new Set());
+    setBulkMode(false);
+  }
+
   // ── Context menu handlers ──
   function handleContextMenu(taskId: number, e: React.MouseEvent) {
     e.preventDefault();
@@ -381,6 +390,12 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
               background: `${v.color}10`, color: v.color, fontSize: 11, fontWeight: 600, cursor: "pointer",
             }}>{v.label}</button>
           ))}
+          <div style={{ width: 1, height: 20, background: BORDER }} />
+          <button onClick={bulkDeleteTasks} style={{
+            padding: "4px 10px", borderRadius: 5, border: `1px solid ${RED}30`,
+            background: `${RED}10`, color: RED, fontSize: 11, fontWeight: 600, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+          }}><Trash2 size={11} /> Delete</button>
           <button onClick={() => { setSelectedTaskIds(new Set()); setBulkMode(false); }} style={{
             marginLeft: "auto", padding: "4px 10px", borderRadius: 5, border: `1px solid ${BORDER}`,
             background: INPUT_BG, color: TEXT_DIM, fontSize: 11, cursor: "pointer",
