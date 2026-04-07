@@ -2027,7 +2027,7 @@ function CreateTaskPanel({
   const channelLabel = selChannels.length === 0 ? "Select channels..." : selChannels.length === 1 ? selChannels[0] : `${selChannels.length} channels`;
 
   async function handleCreate() {
-    if (!title.trim()) return;
+    if (!title.trim() || creating) return;
     setCreating(true);
     try {
       const hotels = selectedHotels.length > 0 ? selectedHotels : [""];
