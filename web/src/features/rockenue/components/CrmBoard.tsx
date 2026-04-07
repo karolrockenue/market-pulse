@@ -2319,7 +2319,19 @@ function CreateTaskPanel({
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "24px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 0, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          {selectedHotels.length > 1 && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "10px 24px",
+              background: `${AMBER}08`, borderBottom: `1px solid ${AMBER}20`,
+            }}>
+              <AlertTriangle size={13} style={{ color: AMBER }} />
+              <span style={{ color: AMBER, fontSize: 12, fontWeight: 500 }}>
+                This will create <strong>{selectedHotels.length} separate tasks</strong> — one per property
+              </span>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 24px" }}>
           <button onClick={onClose} style={{
             height: 40, padding: "0 20px", borderRadius: 6, border: `1px solid ${BORDER}`,
             background: INPUT_BG, color: TEXT, fontSize: 13, cursor: "pointer",
@@ -2337,7 +2349,8 @@ function CreateTaskPanel({
           }}
             onMouseEnter={(e) => { if (!creating) e.currentTarget.style.background = "#29ADEE"; }}
             onMouseLeave={(e) => { if (!creating) e.currentTarget.style.background = BLUE; }}
-          >{creating ? "Creating..." : "Create"}</button>
+          >{creating ? "Creating..." : selectedHotels.length > 1 ? `Create ${selectedHotels.length} Tasks` : "Create"}</button>
+          </div>
         </div>
       </div>
 
