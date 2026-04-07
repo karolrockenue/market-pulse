@@ -938,36 +938,23 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       // /api/routes/auth.router.js
 
-      // This array will hold the internal IDs of the property/properties just synced.
+      // Credentials-only mode: skip all Cloudbeds API calls (hotel details, tax sync,
+      // total rooms). Just match properties to existing hotels and save credentials.
       const newlySyncedInternalIds = [];
 
-      // Sync hotel details and link properties to the user
       for (const property of userProperties) {
-        const internalHotelId = await cloudbedsAdapter.syncHotelDetailsToDb(
-          access_token,
-          property.property_id,
-          client
+        // Look up existing hotel by pms_property_id — no API calls
+        const existingHotel = await client.query(
+          `SELECT hotel_id FROM hotels WHERE pms_property_id = $1 LIMIT 1`,
+          [String(property.property_id)]
         );
-
-        // [NEW] Add Tax Sync Logic (copied from admin.router.js)
-        await cloudbedsAdapter.syncHotelTaxInfoToDb(
-          access_token,
-          property.property_id, // This is the external pms_property_id
-          client
-        );
-
-        // Total rooms sync skipped during re-auth — it consumes the refresh_token
-        // via getAdminAccessToken, rotating it before credentials are saved.
-        // Total rooms are already set for existing hotels.
+        const internalHotelId = existingHotel.rows[0]?.hotel_id;
 
         if (!internalHotelId) {
-          console.warn(
-            `Skipping property link for ${property.property_id} due to sync failure.`
-          );
+          console.log(`[AUTH CALLBACK] Property ${property.property_id} not found in hotels table — skipping.`);
           continue;
         }
 
-        // Add the new internal ID to our list.
         newlySyncedInternalIds.push(internalHotelId);
 
         const linkQuery = `
