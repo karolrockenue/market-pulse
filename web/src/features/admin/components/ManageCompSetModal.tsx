@@ -78,9 +78,12 @@ export function ManageCompSetModal({
     setSelectedIds(new Set());
   };
 
-  // Filter out the hotel itself, then apply search
+  // Get the primary hotel's city, then filter to same city only
+  const primaryHotel = allHotels.find((h) => h.hotel_id.toString() === hotelId);
+  const primaryCity = primaryHotel?.city || null;
+
   const otherHotels = allHotels.filter(
-    (h) => h.hotel_id.toString() !== hotelId
+    (h) => h.hotel_id.toString() !== hotelId && h.city === primaryCity
   );
   const filtered = search
     ? otherHotels.filter((h) =>
@@ -142,7 +145,7 @@ export function ManageCompSetModal({
                 margin: "4px 0 0",
               }}
             >
-              {hotelName} — {selectedIds.size} competitor
+              {hotelName}{primaryCity ? ` · ${primaryCity}` : ""} — {selectedIds.size} competitor
               {selectedIds.size !== 1 ? "s" : ""} selected
             </p>
           </div>

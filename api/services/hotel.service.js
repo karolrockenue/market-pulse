@@ -131,18 +131,18 @@ const HotelService = {
 
     if (customCompSet.length > 0) return customCompSet;
 
-    // 2. Fallback to Category
-    const hotelInfo = await pool.query("SELECT category FROM hotels WHERE hotel_id = $1", [hotelId]);
+    // 2. Fallback to same category + same city
+    const hotelInfo = await pool.query("SELECT category, city FROM hotels WHERE hotel_id = $1", [hotelId]);
     if (hotelInfo.rows.length === 0) throw new Error("Primary hotel not found.");
-    const category = hotelInfo.rows[0].category;
+    const { category, city } = hotelInfo.rows[0];
 
     const categoryCompSetQuery = `
       SELECT hotel_id, property_name, category, city
       FROM hotels
-      WHERE category = $1 AND hotel_id != $2 AND is_disconnected = false
+      WHERE category = $1 AND hotel_id != $2 AND city = $3 AND is_disconnected = false
       ORDER BY property_name;
     `;
-    const { rows: categoryCompSet } = await pool.query(categoryCompSetQuery, [category, hotelId]);
+    const { rows: categoryCompSet } = await pool.query(categoryCompSetQuery, [category, hotelId, city]);
     return categoryCompSet;
   },
 
