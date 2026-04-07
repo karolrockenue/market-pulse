@@ -1077,48 +1077,8 @@ router.get("/cloudbeds/callback", async (req, res) => {
           );
         }
 
-        // 2. Only trigger sync + backfill for genuinely NEW hotels (no existing data).
-        for (const hotelId of newlySyncedInternalIds) {
-          const hasData = await client.query(
-            "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1 LIMIT 1",
-            [hotelId]
-          );
-          if (hasData.rows.length > 0) {
-            console.log(`[AUTH CALLBACK] Hotel ${hotelId} already has data — skipping sync/backfill.`);
-            continue;
-          }
-
-          const syncUrl = `${baseUrl}/api/admin/initial-sync`;
-          const internalSecret = process.env.INTERNAL_API_SECRET;
-          if (!internalSecret) {
-            console.error(`[AUTH CALLBACK] INTERNAL_API_SECRET not set. Skipping sync for ${hotelId}.`);
-            continue;
-          }
-
-          fetch(syncUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${internalSecret}` },
-            body: JSON.stringify({ propertyId: hotelId }),
-          })
-            .then(async (res) => {
-              if (res.ok) console.log(`[AUTH CALLBACK] Sync triggered for new hotel ${hotelId}.`);
-              else console.error(`[AUTH CALLBACK] Sync failed for hotel ${hotelId}. Status: ${res.status}`);
-            })
-            .catch((err) => console.error(`[AUTH CALLBACK] Sync fetch error for hotel ${hotelId}:`, err.message));
-
-          try {
-            const { spawn } = require("child_process");
-            const child = spawn("node", ["scripts/backfill-reservations.js", String(hotelId), "14"], {
-              cwd: require("path").resolve(__dirname, "../.."),
-              detached: true,
-              stdio: "ignore",
-            });
-            child.unref();
-            console.log(`[AUTH CALLBACK] Reservation backfill spawned for new hotel ${hotelId}`);
-          } catch (bfErr) {
-            console.error(`[AUTH CALLBACK] Backfill spawn error for hotel ${hotelId}:`, bfErr.message);
-          }
-        }
+        // 2. Sync + backfill skipped for re-auth (existing hotels already have data).
+        console.log(`[AUTH CALLBACK] Re-auth flow — skipping sync/backfill for ${newlySyncedInternalIds.length} existing hotels.`);
 
         // 3. Redirect the user (this logic is unchanged)
         const primaryNewPropertyId = newlySyncedInternalIds[0];
