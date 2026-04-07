@@ -86,16 +86,6 @@ The OTA scrape data (market_availability_snapshots) only has partial month cover
 
 ## Active Tasks
 
-### ~~Remove Budget Functionality~~ DONE (April 2026)
-- Removed: 3 API endpoints (GET/POST budgets, GET benchmarks) from hotels.router.js
-- Removed: getBudgets() and saveBudgets() from hotel.service.js
-- Removed: budget SQL query and budgetMap from metrics.router.js (pacing targetRev set to 0, targetRevenue set to null)
-- Removed: BudgetReport.tsx component (deleted), import + rendering from ReportsHub.tsx
-- Removed: "performance-vs-budget" from ReportSelector.tsx and reports.api.ts
-- Removed: budgetExists prop from App.tsx and CompetitiveData.tsx
-- Removed: budget mention from SettingsPage.tsx description
-- Database table (hotel_budgets) preserved — only code removed
-
 ### ~~Investigate Booking Source Mix Data~~ DONE (April 2026)
 - Source data is captured and surfaced in the Bookings Report
 - Cloudbeds: full OTA names (Booking.com, Expedia, Airbnb, Miki Travel, etc.)
@@ -135,14 +125,6 @@ No code changes needed once permissions are granted — re-run the backfill scri
 - Endpoints: POST /api/hotels/:hotelId/disconnect, /reconnect, POST /api/hotels/delete
 - Disconnected hotels filtered from dashboards, reports, sentinel, daily-refresh, queue worker
 - is_disconnected column added to hotels table
-
-### ~~Admin — Rebuild Comp Set Management Modal~~ DONE (April 2026)
-- Built ManageCompSetModal component at web/src/features/admin/components/ManageCompSetModal.tsx
-- Wired into AdminHub.tsx — "Comp Set" button in HotelManagementTable now opens the modal
-- Modal: loads current comp set on mount, searchable hotel list with checkboxes, save/clear/cancel
-- Clearing all selections reverts to category-based fallback (existing backend behaviour)
-- Uses existing backend endpoints: GET/POST /api/hotels/:hotelId/compset
-- Modal should show searchable list of all hotels, allow selecting/deselecting competitors, save via POST
 
 ---
 

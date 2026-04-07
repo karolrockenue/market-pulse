@@ -9,6 +9,7 @@ import {
   Loader2,
   Info,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { ChannelsRegistry } from "./ChannelsRegistry";
 import { useDistributionGrid } from "../hooks/useDistributionGrid";
@@ -182,8 +183,8 @@ function SuspensionModal({
       }}>
         {/* Header */}
         <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${AMBER}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: AMBER }} />
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${BLUE}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <AlertTriangle size={15} style={{ color: BLUE }} />
           </div>
           <div>
             <div style={{ color: TEXT, fontSize: 14, fontWeight: 600 }}>Suspend Channel</div>
@@ -222,7 +223,7 @@ function SuspensionModal({
           >Cancel</button>
           <button onClick={() => { if (reason.trim()) { onConfirm(reason.trim()); onClose(); } }} style={{
             height: 36, padding: "0 20px", borderRadius: 6, border: "none",
-            background: reason.trim() ? AMBER : `${AMBER}30`, color: reason.trim() ? "#000" : TEXT_DIM,
+            background: reason.trim() ? BLUE : `${BLUE}30`, color: reason.trim() ? "#000" : TEXT_DIM,
             fontSize: 12, fontWeight: 600, cursor: reason.trim() ? "pointer" : "default",
             fontFamily: "system-ui, -apple-system, sans-serif", transition: "all 0.15s",
           }}>
@@ -268,16 +269,16 @@ function SuspensionInfoPopover({
     }}>
       <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: AMBER }} />
-          <span style={{ color: AMBER, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em" }}>Suspended</span>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: BLUE }} />
+          <span style={{ color: BLUE, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em" }}>Suspended</span>
         </div>
         <X size={12} style={{ color: TEXT_DIM, cursor: "pointer" }} onClick={onClose} />
       </div>
       <div style={{ padding: "10px 12px" }}>
         <div style={{ color: TEXT, fontSize: 12, lineHeight: 1.5, marginBottom: 8 }}>{reason}</div>
-        <div style={{ display: "flex", gap: 12, color: TEXT_DIM, fontSize: 10 }}>
-          {suspendedBy && <span>{suspendedBy}</span>}
-          {dateStr && <span>{dateStr}</span>}
+        <div style={{ display: "flex", gap: 12 }}>
+          {suspendedBy && <span style={{ color: TEXT_MID, fontSize: 10 }}>{suspendedBy}</span>}
+          {dateStr && <span style={{ color: TEXT_DIM, fontSize: 10 }}>{dateStr}</span>}
         </div>
       </div>
     </div>
@@ -402,10 +403,10 @@ export function DistributionView({ onPipelineNavigate }: DistributionViewProps) 
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           ) : (
-            <div style={{ padding: "0 32px 64px" }}>
+            <div>
 
         {/* ── Filters ── */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ position: "relative", width: 220 }}>
             <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: TEXT_DIM }} />
             <input type="text" placeholder="Search hotels..." value={search} onChange={(e) => setSearch(e.target.value)}
@@ -416,6 +417,8 @@ export function DistributionView({ onPipelineNavigate }: DistributionViewProps) 
             style={{ padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none", cursor: "pointer" }}>
             {Object.keys(HOTEL_GROUPS).map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
+
+          <div style={{ flex: 1 }} />
 
           <div style={{ display: "flex", gap: 3 }}>
             {(["all", "live", "onboarding", "suspended"] as const).map((s) => {
@@ -431,19 +434,6 @@ export function DistributionView({ onPipelineNavigate }: DistributionViewProps) 
                 </button>
               );
             })}
-          </div>
-
-          <div style={{ marginLeft: "auto", display: "flex", gap: 16, alignItems: "center" }}>
-            {(["live", "onboarding", "suspended"] as Status[]).map((s) => (
-              <div key={s} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_CFG[s].color }} />
-                <span style={{ color: TEXT_DIM, fontSize: 11 }}>{STATUS_CFG[s].label}</span>
-              </div>
-            ))}
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#3f3f46" }} />
-              <span style={{ color: TEXT_DIM, fontSize: 11 }}>Not connected</span>
-            </div>
           </div>
         </div>
 
@@ -520,11 +510,18 @@ export function DistributionView({ onPipelineNavigate }: DistributionViewProps) 
                               )}
                             </div>
                             {hasSuspensionInfo && (
-                              <Info
-                                size={10}
-                                style={{ color: AMBER, cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
+                              <div
                                 onClick={(e) => { e.stopPropagation(); setInfoCell(isInfoOpen ? null : cellKey); }}
-                              />
+                                style={{
+                                  width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                                  background: isInfoOpen ? `${BLUE}20` : `${BLUE}10`,
+                                  border: `1px solid ${isInfoOpen ? `${BLUE}40` : `${BLUE}20`}`,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  cursor: "pointer", transition: "all 0.15s",
+                                }}
+                              >
+                                <Info size={9} style={{ color: BLUE }} />
+                              </div>
                             )}
                           </div>
                           {isPopoverOpen && (

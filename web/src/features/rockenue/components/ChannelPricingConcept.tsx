@@ -215,42 +215,6 @@ export function ChannelPricingConcept() {
   // Reset edited steps when switching channels
   useEffect(() => { setEditedSteps(null); }, [selectedChannel]);
 
-  // The steps to render — edited if dirty, otherwise from channel
-  const activeSteps = editedSteps || channel?.steps || [];
-
-  function handleToggleStep(key: string) {
-    const steps = [...(editedSteps || channel?.steps || [])];
-    const idx = steps.findIndex(s => s.key === key);
-    if (idx === -1 || steps[idx].locked) return;
-    steps[idx] = { ...steps[idx], active: !steps[idx].active };
-    setEditedSteps(steps);
-  }
-
-  function handleChangeStepValue(key: string, value: number) {
-    const steps = [...(editedSteps || channel?.steps || [])];
-    const idx = steps.findIndex(s => s.key === key);
-    if (idx === -1) return;
-    steps[idx] = { ...steps[idx], value };
-    setEditedSteps(steps);
-  }
-
-  async function handleSaveSteps() {
-    if (!channel || !editedSteps || savingSteps) return;
-    setSavingSteps(true);
-    try {
-      await updateChannelPricingSteps(channel.channelId, editedSteps);
-      // Update local state
-      setChannels(prev => prev.map(c => c.channelId === channel.channelId ? { ...c, steps: editedSteps } : c));
-      setEditedSteps(null);
-    } catch (err) {
-      console.error("Save steps failed:", err);
-    } finally {
-      setSavingSteps(false);
-    }
-  }
-
-  const hasUnsavedChanges = editedSteps !== null;
-
   // ── Fetch channel detail when selectedChannel changes ──
   useEffect(() => {
     const ch = channels.find(c => c.slug === selectedChannel);
@@ -289,6 +253,41 @@ export function ChannelPricingConcept() {
 
   // ── Derived data ──
   const channel = channels.find(c => c.slug === selectedChannel);
+
+  // The steps to render — edited if dirty, otherwise from channel
+  const activeSteps = editedSteps || channel?.steps || [];
+
+  function handleToggleStep(key: string) {
+    const steps = [...(editedSteps || channel?.steps || [])];
+    const idx = steps.findIndex(s => s.key === key);
+    if (idx === -1 || steps[idx].locked) return;
+    steps[idx] = { ...steps[idx], active: !steps[idx].active };
+    setEditedSteps(steps);
+  }
+
+  function handleChangeStepValue(key: string, value: number) {
+    const steps = [...(editedSteps || channel?.steps || [])];
+    const idx = steps.findIndex(s => s.key === key);
+    if (idx === -1) return;
+    steps[idx] = { ...steps[idx], value };
+    setEditedSteps(steps);
+  }
+
+  async function handleSaveSteps() {
+    if (!channel || !editedSteps || savingSteps) return;
+    setSavingSteps(true);
+    try {
+      await updateChannelPricingSteps(channel.channelId, editedSteps);
+      setChannels(prev => prev.map(c => c.channelId === channel.channelId ? { ...c, steps: editedSteps } : c));
+      setEditedSteps(null);
+    } catch (err) {
+      console.error("Save steps failed:", err);
+    } finally {
+      setSavingSteps(false);
+    }
+  }
+
+  const hasUnsavedChanges = editedSteps !== null;
 
   const overriddenHotels = useMemo(() => {
     return overrides;
@@ -350,7 +349,7 @@ export function ChannelPricingConcept() {
         {/* VIEW 1: BY CHANNEL — Default + Overrides   */}
         {/* ═══════════════════════════════════════════ */}
         {viewMode === "channels" && (
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "310px 1fr", gap: 20 }}>
 
             {/* Left: Channel List */}
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -361,11 +360,12 @@ export function ChannelPricingConcept() {
                 return (
                   <button key={ch.slug} onClick={() => { setSelectedChannel(ch.slug); setShowChannelInfo(false); }} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 12px", borderRadius: 8, border: "none",
-                    background: isActive ? `${BLUE}08` : "transparent",
+                    padding: "11px 14px", borderRadius: 8, border: "none",
+                    background: isActive ? `${BLUE}12` : "transparent",
                     color: isActive ? TEXT : TEXT_MID, cursor: "pointer",
                     transition: "all 0.12s", textAlign: "left",
                     borderLeft: isActive ? `2px solid ${BLUE}` : "2px solid transparent",
+                    boxShadow: isActive ? `inset 0 0 0 1px ${BLUE}18` : "none",
                   }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1065,6 +1065,24 @@ const PAYMENT_METHODS = [
   { key: "bacs", label: "BACS" },
 ];
 
+const PRICING_MODELS = [
+  { key: "net", label: "Net" },
+  { key: "gross", label: "Gross" },
+];
+
+const TIER_OPTIONS = [
+  { key: "primary", label: "Primary" },
+  { key: "secondary", label: "Secondary" },
+  { key: "experimental", label: "Experimental" },
+];
+
+const INTEGRATION_OPTIONS = [
+  { key: "channel_manager", label: "Channel Manager" },
+  { key: "direct_api", label: "Direct API" },
+  { key: "extranet", label: "Extranet" },
+  { key: "meta_search", label: "Meta Search" },
+];
+
 function AddChannelModal({ onClose, onSave }: {
   onClose: () => void;
   onSave: (data: { name: string; channel_type: string; agreement_type: string; commission_pct: number | null; payment_method: string }) => Promise<void>;
@@ -1073,7 +1091,12 @@ function AddChannelModal({ onClose, onSave }: {
   const [channelType, setChannelType] = useState("ota");
   const [agreement, setAgreement] = useState("group");
   const [payment, setPayment] = useState("vcc");
+  const [pricingModel, setPricingModel] = useState("net");
+  const [tier, setTier] = useState("secondary");
+  const [integration, setIntegration] = useState("channel_manager");
   const [commission, setCommission] = useState<number | "">("");
+  const [contractExpiry, setContractExpiry] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1094,23 +1117,15 @@ function AddChannelModal({ onClose, onSave }: {
     }
   }
 
-  const BG = "#1a1a1a";
-  const BD = "#2a2a2a";
-  const INP = "#2C2C2C";
-  const BL = "#39BDF8";
-  const TX = "#e5e5e5";
-  const TM = "#9ca3af";
-  const TD = "#6b7280";
-
-  function ToggleGroup({ options, value, onChange }: { options: { key: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  function BtnGroup({ options, value, onChange }: { options: { key: string; label: string }[]; value: string; onChange: (v: string) => void }) {
     return (
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {options.map(o => (
           <button key={o.key} onClick={() => onChange(o.key)} style={{
-            padding: "6px 14px", borderRadius: 6,
-            border: `1px solid ${value === o.key ? `${BL}40` : BD}`,
-            background: value === o.key ? `${BL}12` : "transparent",
-            color: value === o.key ? BL : TD,
+            padding: "7px 14px", borderRadius: 6,
+            border: `1px solid ${value === o.key ? `${BLUE}40` : BORDER}`,
+            background: value === o.key ? `${BLUE}12` : "transparent",
+            color: value === o.key ? BLUE : TEXT_DIM,
             fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
           }}>
             {o.label}
@@ -1120,99 +1135,172 @@ function AddChannelModal({ onClose, onSave }: {
     );
   }
 
+  function FieldLabel({ children }: { children: string }) {
+    return <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 6 }}>{children}</div>;
+  }
+
   return (
     <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", zIndex: 60 }} />
       <div style={{
-        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        width: 480, background: BG, border: `1px solid ${BD}`, borderRadius: 10,
-        zIndex: 61, boxShadow: "0 0 20px rgba(57,189,248,0.08), 0 12px 40px rgba(0,0,0,0.5)",
-        overflow: "hidden",
+        position: "fixed", top: 0, right: 0, bottom: 0, width: 580,
+        background: CARD_BG, borderLeft: `1px solid ${BORDER}`, zIndex: 61,
+        display: "flex", flexDirection: "column",
+        boxShadow: "0 0 20px rgba(57,189,248,0.08), -8px 0 40px rgba(0,0,0,0.4)",
+        animation: "slideInRight 0.2s ease-out",
       }}>
         {/* Header */}
-        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BD}`, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${BL}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Globe size={16} style={{ color: BL }} />
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 8, background: BLUE, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Globe size={18} style={{ color: "#0a0a0a" }} />
+            </div>
+            <div>
+              <div style={{ color: TEXT, fontSize: 18, fontWeight: 600, letterSpacing: "-0.025em" }}>Add Channel</div>
+              <div style={{ color: TEXT_MID, fontSize: 12, marginTop: 2 }}>New distribution partner</div>
+            </div>
           </div>
-          <div>
-            <div style={{ color: TX, fontSize: 14, fontWeight: 600 }}>Add Channel</div>
-            <div style={{ color: TM, fontSize: 11, marginTop: 2 }}>New distribution partner</div>
-          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4 }}>
+            <span style={{ fontSize: 20 }}>&times;</span>
+          </button>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Name */}
-          <div>
-            <div style={{ color: TD, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 6 }}>Channel Name</div>
+        {/* Body — scrollable */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+
+          {/* Channel Name */}
+          <div style={{ marginBottom: 24 }}>
+            <FieldLabel>Channel Name</FieldLabel>
             <input
               autoFocus
               value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Secret Escapes, Miki Travel..."
               style={{
-                width: "100%", padding: "10px 12px", background: INP, border: `1px solid ${BD}`,
-                borderRadius: 6, color: TX, fontSize: 14, fontWeight: 600, outline: "none",
+                width: "100%", padding: "10px 12px", background: INPUT_BG, border: `1px solid ${BORDER}`,
+                borderRadius: 6, color: TEXT, fontSize: 16, fontWeight: 600, outline: "none",
                 fontFamily: "system-ui, -apple-system, sans-serif",
               }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = `${BL}40`)}
-              onBlur={(e) => (e.currentTarget.style.borderColor = BD)}
+              onFocus={(e) => (e.currentTarget.style.borderColor = `${BLUE}40`)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = BORDER)}
             />
           </div>
 
-          {/* Channel Type */}
-          <div>
-            <div style={{ color: TD, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 6 }}>Channel Type</div>
-            <ToggleGroup options={CHANNEL_TYPES} value={channelType} onChange={setChannelType} />
+          {/* Config card */}
+          <div style={{ background: BG_PAGE, borderRadius: 8, border: `1px solid ${BORDER}`, padding: "20px", marginBottom: 24 }}>
+
+            {/* Channel Type */}
+            <div style={{ marginBottom: 18 }}>
+              <FieldLabel>Channel Type</FieldLabel>
+              <BtnGroup options={CHANNEL_TYPES} value={channelType} onChange={setChannelType} />
+            </div>
+
+            {/* Pricing Model */}
+            <div style={{ marginBottom: 18 }}>
+              <FieldLabel>Pricing Model</FieldLabel>
+              <BtnGroup options={PRICING_MODELS} value={pricingModel} onChange={setPricingModel} />
+              <div style={{ color: TEXT_DIM, fontSize: 10, marginTop: 4 }}>
+                {pricingModel === "net" ? "You provide a net rate, OTA adds their margin on top" : "You provide the sell rate, OTA deducts commission from it"}
+              </div>
+            </div>
+
+            {/* Agreement + Tier — side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}>
+              <div>
+                <FieldLabel>Agreement</FieldLabel>
+                <BtnGroup options={AGREEMENT_TYPES} value={agreement} onChange={setAgreement} />
+              </div>
+              <div>
+                <FieldLabel>Tier</FieldLabel>
+                <BtnGroup options={TIER_OPTIONS} value={tier} onChange={setTier} />
+              </div>
+            </div>
+
+            {/* Payment + Integration — side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}>
+              <div>
+                <FieldLabel>Payment Method</FieldLabel>
+                <BtnGroup options={PAYMENT_METHODS} value={payment} onChange={setPayment} />
+              </div>
+              <div>
+                <FieldLabel>Integration</FieldLabel>
+                <BtnGroup options={INTEGRATION_OPTIONS} value={integration} onChange={setIntegration} />
+              </div>
+            </div>
+
+            {/* Commission + Contract — side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div>
+                <FieldLabel>Commission</FieldLabel>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input
+                    type="number" min={0} max={50} value={commission}
+                    onChange={(e) => setCommission(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="—"
+                    style={{
+                      width: 70, padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`,
+                      borderRadius: 6, color: TEXT, fontSize: 13, fontWeight: 600, textAlign: "center", outline: "none",
+                    }}
+                  />
+                  <span style={{ color: TEXT_DIM, fontSize: 11 }}>%</span>
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Contract Expiry</FieldLabel>
+                <input
+                  type="date" value={contractExpiry} onChange={(e) => setContractExpiry(e.target.value)}
+                  style={{
+                    padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`,
+                    borderRadius: 6, color: TEXT, fontSize: 12, outline: "none", cursor: "pointer",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Agreement + Payment — side by side */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div>
-              <div style={{ color: TD, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 6 }}>Agreement</div>
-              <ToggleGroup options={AGREEMENT_TYPES} value={agreement} onChange={setAgreement} />
-            </div>
-            <div>
-              <div style={{ color: TD, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 6 }}>Payment</div>
-              <ToggleGroup options={PAYMENT_METHODS} value={payment} onChange={setPayment} />
-            </div>
-          </div>
-
-          {/* Commission */}
+          {/* Notes */}
           <div>
-            <div style={{ color: TD, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 6 }}>Commission</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="number" min={0} max={50} value={commission}
-                onChange={(e) => setCommission(e.target.value === "" ? "" : Number(e.target.value))}
-                placeholder="—"
-                style={{
-                  width: 70, padding: "6px 10px", background: INP, border: `1px solid ${BD}`,
-                  borderRadius: 6, color: TX, fontSize: 13, fontWeight: 600, textAlign: "center", outline: "none",
-                }}
-              />
-              <span style={{ color: TD, fontSize: 11 }}>%</span>
-            </div>
+            <FieldLabel>Notes</FieldLabel>
+            <textarea
+              value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Internal notes about this channel..."
+              rows={3}
+              style={{
+                width: "100%", padding: "10px 12px", background: INPUT_BG, border: `1px solid ${BORDER}`,
+                borderRadius: 6, color: TEXT, fontSize: 12, outline: "none", resize: "vertical",
+                fontFamily: "system-ui, -apple-system, sans-serif", lineHeight: 1.5,
+              }}
+            />
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 24px", borderTop: `1px solid ${BD}` }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "16px 24px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <button onClick={onClose} style={{
-            height: 36, padding: "0 18px", borderRadius: 6, border: `1px solid ${BD}`,
-            background: INP, color: TX, fontSize: 12, cursor: "pointer",
-            fontFamily: "system-ui, -apple-system, sans-serif",
-          }}>Cancel</button>
+            height: 40, padding: "0 20px", borderRadius: 6, border: `1px solid ${BORDER}`,
+            background: INPUT_BG, color: TEXT, fontSize: 13, cursor: "pointer",
+            fontFamily: "system-ui, -apple-system, sans-serif", transition: "border-color 0.15s",
+          }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${BLUE}40`)}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = BORDER)}
+          >Cancel</button>
           <button onClick={handleSubmit} style={{
-            height: 36, padding: "0 20px", borderRadius: 6, border: "none",
-            background: name.trim() && !saving ? BL : `${BL}30`,
-            color: name.trim() && !saving ? "#000" : TD,
-            fontSize: 12, fontWeight: 600, cursor: name.trim() ? "pointer" : "default",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            height: 40, padding: "0 24px", borderRadius: 6, border: "none",
+            background: name.trim() && !saving ? BLUE : `${BLUE}30`,
+            color: name.trim() && !saving ? "#0a0a0a" : TEXT_DIM,
+            fontSize: 13, fontWeight: 600, cursor: name.trim() ? "pointer" : "default",
+            fontFamily: "system-ui, -apple-system, sans-serif", transition: "all 0.15s",
           }}>
             {saving ? "Creating..." : "Create Channel"}
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
     </>
   );
 }

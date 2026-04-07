@@ -294,12 +294,6 @@ export function TopNav({
                             : GRAY,
                         }}
                       />
-                      {item.isAdmin && (
-                        <Icon
-                          className="w-3 h-3"
-                          style={{ color: BLUE, marginLeft: "4px" }}
-                        />
-                      )}
                       <div style={underlineStyle} />
                     </button>
                   </DropdownMenuTrigger>

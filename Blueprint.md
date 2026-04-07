@@ -276,6 +276,14 @@ The platform moved from Vercel (serverless) to Railway (persistent process). Key
 - The full migration plan and status is in `claude/migration.md`.
 - AI agents should be mindful of this move: some areas may not have been fully verified yet. If touching webhooks (Cloudbeds/Mews), OAuth flows, or any code that references `VERCEL_ENV`/`VERCEL_URL`, verify it works on Railway.
 
+Observability (added 2026-04-06):
+
+- Structured logging: pino + pino-http. All API requests logged as JSON (method, URL, status, duration). Static assets and /health excluded. Logs are auto-parsed by Railway Log Explorer.
+- Health endpoint: GET /health — returns DB connectivity, uptime (seconds), memory (MB), timestamp. Can be used for Railway uptime monitoring.
+- Sentry error tracking: Initialized via instrument.js (loaded before server.js via --require flag in package.json start script). Gated by SENTRY_DSN env var. Captures unhandled exceptions and Express errors via Sentry.setupExpressErrorHandler(app).
+- Cron logging: All in-process cron jobs emit structured JSON with { type: "cron", job, status, durationMs }.
+- Key files: instrument.js (Sentry init), api/utils/logger.js (pino instance).
+
 Single entrypoint: server.js
 
 Mounts domain routers:
@@ -460,6 +468,8 @@ api/utils/email.utils.js, api/utils/emailTemplates.js – transactional emails.
 api/utils/middleware.js – auth, requireAdminApi, etc.
 
 api/utils/bridgeAuth.js – Security middleware for AI Bridge (x-api-key).
+
+api/utils/logger.js – shared pino logger instance (structured JSON logging).
 
 Workers & Scripts
 
@@ -1350,6 +1360,7 @@ This tree is intentionally trimmed to remove noise (favicons, shadcn primitives,
 UI primitives under web/src/components/ui and small static assets are not listed.
 
 market-pulse/
+├── instrument.js
 ├── api
 │ ├── adapters
 │ │ ├── cloudbedsAdapter.js
@@ -1384,6 +1395,7 @@ market-pulse/
 │ │ ├── db.js
 │ │ ├── email.utils.js
 │ │ ├── emailTemplates.js
+│ │ ├── logger.js
 │ │ ├── market-codex.utils.js
 │ │ ├── middleware.js
 │ │ ├── pacing.utils.js
