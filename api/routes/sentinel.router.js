@@ -1432,6 +1432,9 @@ async function runBackgroundWorker() {
             );
           }
           await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+
+          // Mews requires a delay between rate updates to avoid "Conflicting operation" errors
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         } catch (err) {
           // Failure Update
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);

@@ -2983,13 +2983,18 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                               formState[hotel.hotel_id]
                                                 ?.base_room_type_id
                                             }
-                                            onValueChange={(val) =>
-                                              updateRule(
-                                                String(hotel.hotel_id),
-                                                "base_room_type_id",
-                                                val,
-                                              )
-                                            }
+                                            onValueChange={(val) => {
+                                              const hid = String(hotel.hotel_id);
+                                              updateRule(hid, "base_room_type_id", val);
+                                              // Strip any differential rule for the new base room
+                                              const currentDiffs = formState[hid]?.room_differentials || [];
+                                              const cleaned = currentDiffs.filter(
+                                                (r: any) => r.roomTypeId !== val,
+                                              );
+                                              if (cleaned.length !== currentDiffs.length) {
+                                                updateRule(hid, "room_differentials", cleaned);
+                                              }
+                                            }}
                                           >
                                             <div
                                               style={{

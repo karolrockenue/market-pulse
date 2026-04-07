@@ -668,6 +668,22 @@ async function updateConfig(hotelId, updates) {
     }
   }
 
+  // 1b. Sanitize: strip any differential that targets the base room
+  const effectiveBase = base_room_type_id || currentConfig.base_room_type_id;
+  if (room_differentials && Array.isArray(room_differentials) && effectiveBase) {
+    const before = room_differentials.length;
+    const cleaned = room_differentials.filter(
+      (r) => String(r.roomTypeId) !== String(effectiveBase),
+    );
+    if (cleaned.length < before) {
+      console.log(
+        `[Sentinel] Stripped ${before - cleaned.length} self-referencing differential(s) for base room ${effectiveBase} (hotel ${hotelId})`,
+      );
+      room_differentials.length = 0;
+      room_differentials.push(...cleaned);
+    }
+  }
+
   // 2. Rebuild Rate ID Map — PMS-aware
   const pmsRoomTypes = currentConfig.pms_room_types?.data || [];
   const pmsRatePlans = currentConfig.pms_rate_plans?.data || [];
