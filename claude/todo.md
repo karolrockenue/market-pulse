@@ -86,11 +86,15 @@ The OTA scrape data (market_availability_snapshots) only has partial month cover
 
 ## Active Tasks
 
-### Remove Budget Functionality
-- Completely remove budget functionality from the application (frontend + backend)
-- Budget section already removed from Settings page UI
-- Still need to remove: budget API endpoints, budget DB queries in hotel.service.js, budget-related imports/references across the codebase, budget report in ReportsHub
-- Do NOT delete the database table — just remove all code that reads/writes to it
+### ~~Remove Budget Functionality~~ DONE (April 2026)
+- Removed: 3 API endpoints (GET/POST budgets, GET benchmarks) from hotels.router.js
+- Removed: getBudgets() and saveBudgets() from hotel.service.js
+- Removed: budget SQL query and budgetMap from metrics.router.js (pacing targetRev set to 0, targetRevenue set to null)
+- Removed: BudgetReport.tsx component (deleted), import + rendering from ReportsHub.tsx
+- Removed: "performance-vs-budget" from ReportSelector.tsx and reports.api.ts
+- Removed: budgetExists prop from App.tsx and CompetitiveData.tsx
+- Removed: budget mention from SettingsPage.tsx description
+- Database table (hotel_budgets) preserved — only code removed
 
 ### ~~Investigate Booking Source Mix Data~~ DONE (April 2026)
 - Source data is captured and surfaced in the Bookings Report
@@ -132,12 +136,12 @@ No code changes needed once permissions are granted — re-run the backfill scri
 - Disconnected hotels filtered from dashboards, reports, sentinel, daily-refresh, queue worker
 - is_disconnected column added to hotels table
 
-### Admin — Rebuild Comp Set Management Modal
-- The "Comp Set" button in HotelManagementTable exists but does nothing (onManageCompSet={() => {}})
-- The ManageCompSetModal component was never migrated into the admin feature module
-- Need to rebuild: modal that lets admin pick which hotels form the comp set for a given hotel
-- Backend already exists: GET/POST /api/hotels/:hotelId/compset in hotels.router.js
-- Comp set is used for benchmarking — if no manual comp set, falls back to same-category hotels
+### ~~Admin — Rebuild Comp Set Management Modal~~ DONE (April 2026)
+- Built ManageCompSetModal component at web/src/features/admin/components/ManageCompSetModal.tsx
+- Wired into AdminHub.tsx — "Comp Set" button in HotelManagementTable now opens the modal
+- Modal: loads current comp set on mount, searchable hotel list with checkboxes, save/clear/cancel
+- Clearing all selections reverts to category-based fallback (existing backend behaviour)
+- Uses existing backend endpoints: GET/POST /api/hotels/:hotelId/compset
 - Modal should show searchable list of all hotels, allow selecting/deselecting competitors, save via POST
 
 ---
@@ -241,44 +245,107 @@ No code changes needed once permissions are granted — re-run the backfill scri
 
 ---
 
-## Distribution Manager (New Feature — Prototype Ready)
+## Rockenue Hub — Distribution, CRM & Channel Pricing (Built April 2026)
 
-### Business Need
-We manage distribution across 45+ properties with a growing number of OTA channels (Booking.com, Expedia, Agoda, Hotelbeds, Trip.com, etc.). Each OTA has its own promotional programs — Booking.com has Genius, Non-Refundable, Mobile Rate, Geo Rate; Expedia has Member Deal, Pay Now; Agoda has Private Sale, CUG Deal, Insider Deal; and so on. Today this is managed with zero tooling — not even a spreadsheet.
+### What It Is
+A dedicated Rockenue internal ops hub for managing distribution channels, task management (CRM), and channel pricing waterfalls. Lives under a new "Rockenue" top-level dropdown in TopNav (admin-only), separate from Sentinel.
 
-The day-to-day reality is chaotic:
-- Properties constantly toggle programs on and off due to rate parity issues, seasonal decisions, or management calls — and there's no record of who changed what or why
-- There are always 5-10 onboardings in the pipeline across different OTAs, at different stages, handled by different people — and the list changes daily ("add this hotel", "actually remove that one, add another")
-- Nobody has a single view of "which hotels are live on which OTAs" or "which programs are currently active across the portfolio"
-- When something goes wrong (e.g., a Genius rate undercuts direct), there's no audit trail to understand what was changed and when
-
-### What We're Building
-A Distribution section inside Market Pulse with three core workflows:
-
-1. **Distribution Matrix** — a grid of hotels × OTA channels showing connection status (live / pipeline / paused / not connected) at a glance. Click any cell to see program details, toggle programs, and view change history for that hotel+OTA pair.
-
-2. **Onboarding Pipeline** — a Kanban board tracking hotel onboardings by stage (Requested → Credentials → Room Mapping → Rates Loaded → Testing → Live). Cards show the hotel, OTA, assignee, days-in-stage, and notes. New onboardings are added as cards; completed ones move to Live.
-
-3. **Program Control Panel** — per-OTA view of all promotional programs with active/paused counts across the portfolio. Toggling a program off requires a reason (parity issue, seasonal, management decision), building an automatic audit trail.
-
-4. **Change Log** — immutable audit trail of every distribution change: program toggles, connection status changes, onboarding milestones. Shows who, what, when, and why.
-
-### Current Status (April 2026)
-- **UI prototype is live** in the Sentinel menu → "Distribution"
-- Built as a fully interactive visual mockup using real managed hotel names (21 properties from the fleet) and realistic mock data for 6 OTA channels and their programs
-- All four tabs are functional with mock data: Matrix, Pipeline, Programs, Change Log
-- Matrix cells are clickable with a slide-out detail panel showing program toggles and recent changes
-- No backend, no database tables, no API endpoints yet — purely frontend mockup
+### Why It Was Built
+The original Distribution page was a UI mockup under Sentinel with hardcoded data. We needed:
+- A real CRM for tracking ops tasks across the team (onboardings, rate issues, content updates)
+- Persistent distribution status tracking (which hotels are live on which OTAs)
+- A way to manage OTA discount stacks (price waterfalls) at portfolio level with per-hotel overrides — previously this only existed for Booking.com in the Control Panel
 
 ### Where It Lives
-- **Frontend**: `web/src/features/sentinel/components/Distribution/DistributionView.tsx`
-- **Navigation**: Sentinel dropdown → "Distribution" (admin only)
-- **Routing**: Wired through `SentinelHub.tsx` and `App.tsx`
 
-### Next Steps for Production
-1. **Database schema**: tables for `distribution_channels`, `channel_connections` (hotel × OTA status), `channel_programs`, `program_enrollments` (hotel × program with status + reason), `distribution_pipeline` (onboarding tasks with stages), `distribution_changelog` (audit log)
-2. **API endpoints**: CRUD for connections, programs, pipeline tasks; changelog is append-only
-3. **Wire frontend to real data**: replace mock constants with API calls + hooks
-4. **Permissions**: decide if all team members can toggle programs or if changes need approval
-5. **Notifications**: optional Slack/email alerts when programs are paused or onboardings stall
-6. **Future**: rate parity detection (compare rates across channels automatically), integration with OTA extranets to push changes directly
+**Navigation**: Rockenue dropdown (admin-only) with 4 pages:
+- Dashboard — ops summary (task counts, overdue, team workload, distribution health)
+- Distribution — hotel×channel status grid + channel registry
+- CRM — task management (kanban, by hotel, by person views)
+- Channel Pricing — OTA discount waterfall config with per-hotel overrides
+
+**Frontend**: `web/src/features/rockenue/`
+```
+rockenue/
+├── RockenueHub.tsx                    # View switcher
+├── api/
+│   ├── types.ts                       # TypeScript interfaces
+│   └── distribution.api.ts            # API client (all endpoints)
+├── hooks/
+│   ├── useCrmTasks.ts                 # Tasks CRUD + optimistic updates
+│   ├── useChannels.ts                 # Channels CRUD
+│   └── useDistributionGrid.ts         # Grid fetch + cell updates
+├── components/
+│   ├── RockenueDashboard.tsx           # Ops overview cards + tables
+│   ├── DistributionView.tsx            # Hotel×channel grid + channels tab
+│   ├── CrmBoard.tsx                    # Kanban/hotel/person task views
+│   ├── ChannelsRegistry.tsx            # Channel management (contacts, notes, config)
+│   └── ChannelPricingConcept.tsx       # OTA waterfall config + overrides + simulator
+```
+
+**Backend**: `api/routes/distribution.router.js` mounted at `/api/distribution`
+- All endpoints admin-only (`requireAdminApi`)
+- ~30 endpoints covering: tasks, comments, subtasks, channels, contacts, notes, grid, team, channel pricing, hotel pricing overrides
+
+**Database tables** (9 tables):
+- `distribution_channels` — OTA partner registry (name, slug, type, commission, payment method, agreement, contract expiry)
+- `distribution_channel_contacts` — contacts per channel
+- `distribution_channel_notes` — internal notes per channel
+- `distribution_hotel_channels` — hotel×channel status matrix (live/onboarding/suspended/none) + suspension reason/date/who
+- `crm_tasks` — CRM tasks (title, description, hotel, channel, assignee, priority, status, category, due date, tags)
+- `crm_task_comments` — comments + auto-logged activity (status changes, assignments)
+- `crm_task_subtasks` — subtask items with done/order
+- `distribution_channel_pricing` — portfolio-level waterfall steps per channel (JSONB)
+- `distribution_hotel_pricing_overrides` — per hotel×channel overrides on the waterfall (JSONB)
+
+### Key Features
+
+**CRM Board**:
+- Three views: Kanban (4 status columns), By Hotel (grouped table), By Person (team workload)
+- Task detail slide-out panel with comments, subtasks, activity log
+- Create task with multi-hotel and multi-channel selection (pick groups from management_group, individual hotels, multiple OTAs)
+- Team members pulled from real users table (admin + super_admin)
+- Activity auto-logging: status changes, assignee changes, priority changes
+
+**Distribution Grid**:
+- Hotel×channel status matrix (live/onboarding/suspended/none)
+- Click cell → popover to change status
+- Suspending requires a reason (modal) — stored with who/when
+- Suspended cells show a blue info badge → click to see reason
+- Filters: search, hotel groups, status filter
+- Pipeline navigation: click "Create Task" on an onboarding cell → pre-filtered CRM task
+
+**Channel Pricing** (the OTA waterfall system):
+- **By Channel view**: left sidebar lists channels, right panel shows the waterfall steps (multiplier → discounts) with live simulator
+- Each channel has its own waterfall template with real program names:
+  - Booking.com: Multiplier, NRF, Genius (L1-L3), Long Campaign, Mobile Rate, Country Rate
+  - Expedia: Multiplier, NRF, One Key Member (10-20% by tier), Mobile, Package Rate, Same-Day Deal
+  - Agoda: Multiplier, NRF, VIP Platinum, Private Sale, Mobile, International Deal, Seasonal Campaign
+  - Hotelbeds: Net Rate Multiplier, Early Booking, Last Minute, Long Stay (B2B wholesaler)
+  - eDreams ODIGEO: Net Rate Multiplier, Prime Member, Prime Days
+  - Miki Travel: Net Rate Multiplier (pure wholesaler, no consumer promos)
+  - Direct: 1.00× (no markup), Returning Guest discount
+- Steps are toggleable and editable (save to DB)
+- Per-hotel overrides: expand a hotel to see a 5-column diff table (Step | Default | This Hotel | Running Total) showing exactly what's different
+- **Matrix view**: all hotels × all channels showing effective sell rate at a given PMS rate
+- **Simulator view**: side-by-side channel comparison with margin bars
+- **Channel details**: collapsible info strip in the header showing agreement, commission, payment method, contract expiry, primary contact, notes
+- **Add Channel**: slide-in panel with channel type, pricing model (net/gross), agreement, tier, payment method, integration type, commission, contract expiry, notes
+
+### Design Decisions
+- **Separate from Sentinel**: Distribution/CRM is ops work, not pricing engine. Different users, different workflows. Sentinel stays focused on AI pricing.
+- **Portfolio defaults + per-hotel overrides**: Set the Booking.com waterfall once for all hotels, override only where needed (e.g. "Elysee gets 20% Genius instead of 15%", "Astor Victoria doesn't qualify for Genius"). One source of truth, no duplication.
+- **Channel-specific program names**: Each OTA has different promo structures. The waterfall template is per-channel, not one-size-fits-all. Research conducted on real programs for Expedia, Agoda, Hotelbeds, eDreams, Miki Travel.
+- **Suspension accountability**: Changing status to "suspended" requires a reason, stored with who and when. Visible via info badge in the grid.
+- **Team from DB**: CRM assignees come from the users table (admin + super_admin), not hardcoded. Avatars with initials and color assignment.
+
+### What Still Needs Work
+- **Channel Pricing → Control Panel integration**: The existing Booking.com OTA discount stack in Control Panel (PromoConfigSection) needs to either read from the new `distribution_channel_pricing` table or be replaced entirely. Currently two separate systems — the old one per-hotel in `rockenue_managed_assets.calculator_settings` and the new one per-channel in `distribution_channel_pricing`. Need to unify.
+- **Editable hotel overrides in Channel Pricing UI**: The override display (diff table) is read-only. Need inline editing + save for per-hotel overrides.
+- **Distribution grid → Channel Pricing link**: Clicking a grid cell could navigate to the Channel Pricing page for that channel, pre-filtered.
+- **Remove old Distribution files**: The original mockup files in `web/src/features/sentinel/components/Distribution/` are still on disk (DistributionView.tsx, CrmBoard.tsx, ChannelsRegistry.tsx). They're no longer imported anywhere but should be deleted.
+- **CRM notifications**: Overdue task alerts, assignment notifications (email via SendGrid). The UI has notify/reminder/escalation toggles but they're not wired to backend yet.
+- **Recurring tasks**: e.g. "Review Expedia rates every Monday" — not built yet.
+- **File attachments**: CRM tasks reference attachment counts but no upload/storage system exists.
+- **Channels tab in Distribution**: Still renders `ChannelsRegistry` — could be removed now that all channel config lives in Channel Pricing.
+- **WhatsApp → CRM integration**: Option to connect WhatsApp Business API (via Twilio or Meta Cloud API directly) so that messages from hotel WhatsApp groups automatically create CRM tasks. Flow: hotel sends message with trigger keyword (e.g. #issue) → webhook hits backend → parses sender/hotel → creates CRM task → auto-replies with confirmation. Requires: Meta Business verification (under Rockenue Ltd or via colleague's verified account), a dedicated WhatsApp Business number, new webhook endpoint, group-to-hotel mapping table. Blocked on: getting WhatsApp Business API access (previous Meta account issues).

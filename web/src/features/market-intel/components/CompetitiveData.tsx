@@ -37,10 +37,9 @@ interface CompetitiveDataProps {
   properties: Property[];
   onPropertyChange: (id: string) => void;
   onNavigate: (view: string) => void;
-  budgetExists: boolean;
 }
 
-export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, properties, onPropertyChange, onNavigate, budgetExists }: CompetitiveDataProps) {
+export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, properties, onPropertyChange, onNavigate }: CompetitiveDataProps) {
   const today = new Date();
   const [startDate, setStartDate] = useState(format(today, 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addDays(today, 30), 'yyyy-MM-dd'));

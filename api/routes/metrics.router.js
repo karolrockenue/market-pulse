@@ -586,15 +586,6 @@ router.get("/summary", requireUserApi, async (req, res) => {
 
     // [FIX] Removed raw SQL. Delegating to Service.
 
-    const budgetSql = `
-      SELECT budget_year, month, target_revenue_gross
-      FROM hotel_budgets
-      WHERE hotel_id = $1 AND (
-          (budget_year = EXTRACT(YEAR FROM (CURRENT_DATE - INTERVAL '1 month'))::int AND month = EXTRACT(MONTH FROM (CURRENT_DATE - INTERVAL '1 month'))::int) OR
-          (budget_year = EXTRACT(YEAR FROM CURRENT_DATE)::int AND month = EXTRACT(MONTH FROM CURRENT_DATE)::int) OR
-          (budget_year = EXTRACT(YEAR FROM (CURRENT_DATE + INTERVAL '1 month'))::int AND month = EXTRACT(MONTH FROM (CURRENT_DATE + INTERVAL '1 month'))::int)
-      );
-    `;
 
     const [
       snapshotRows,
@@ -604,7 +595,6 @@ router.get("/summary", requireUserApi, async (req, res) => {
       benchmarkLast,
       benchmarkCurrent,
       benchmarkNext,
-      budgetResult,
       ytdTrendRows,
       physicalUnsoldRemaining,
       pickupRows,
@@ -632,7 +622,6 @@ router.get("/summary", requireUserApi, async (req, res) => {
         format(nextMonthDate, "MMM"),
         format(nextMonthDate, "yyyy"),
       ),
-      pgPool.query(budgetSql, [propertyId]),
       MetricsService.getYearOnYearMetrics(propertyId, lastYear, currentYear), // Reuse YTD Logic
       MetricsService.getPhysicalUnsold(propertyId),
       MetricsService.getPickupHistory(propertyId),
@@ -642,13 +631,6 @@ router.get("/summary", requireUserApi, async (req, res) => {
     ]);
 
     // --- Processing Logic (Copied from dashboard.router.js) ---
-
-    // Process Budgets
-    const budgetMap = new Map();
-    budgetResult.rows.forEach((r) => {
-      const key = `${r.budget_year}-${r.month.toString().padStart(2, "0")}`;
-      budgetMap.set(key, parseFloat(r.target_revenue_gross));
-    });
 
     // Process Pickup
     const pickupMap = new Map();
@@ -682,7 +664,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
       !current || !past ? 0 : ((current - past) / past) * 100;
 
     const lastMonthPacing = calculatePacingStatus({
-      targetRev: budgetMap.get(formatPeriodKey(lastMonthDate)) || 0,
+      targetRev: 0,
       actualRev: parseFloat(lastMonth.revenue || 0),
       capacityCount: parseFloat(lastMonth.capacity_count || 0),
       totalSoldRoomNights: parseFloat(lastMonth.total_sold_room_nights || 0),
@@ -692,7 +674,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
     });
 
     const currentMonthPacing = calculatePacingStatus({
-      targetRev: budgetMap.get(formatPeriodKey(today)) || 0,
+      targetRev: 0,
       actualRev: parseFloat(currentMonth.revenue || 0),
       capacityCount: parseFloat(currentMonth.capacity_count || 0),
       totalSoldRoomNights: parseFloat(currentMonth.total_sold_room_nights || 0),
@@ -703,7 +685,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
     });
 
     const nextMonthPacing = calculatePacingStatus({
-      targetRev: budgetMap.get(formatPeriodKey(nextMonthDate)) || 0,
+      targetRev: 0,
       actualRev: parseFloat(nextMonth.revenue || 0),
       capacityCount: parseFloat(nextMonth.capacity_count || 0),
       totalSoldRoomNights: parseFloat(nextMonth.total_sold_room_nights || 0),
@@ -719,7 +701,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
         occupancy: parseFloat(lastMonth.occupancy || 0) * 100,
         adr: parseFloat(lastMonth.adr || 0),
         yoyChange: calcYOY(lastMonth.revenue, lastMonthLY.revenue),
-        targetRevenue: budgetMap.get(formatPeriodKey(lastMonthDate)) || null,
+        targetRevenue: null,
         pacingStatus: lastMonthPacing,
         lastYear: {
           revenue: parseFloat(lastMonthLY.revenue || 0),
@@ -733,7 +715,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
         occupancy: parseFloat(currentMonth.occupancy || 0) * 100,
         adr: parseFloat(currentMonth.adr || 0),
         yoyChange: calcYOY(currentMonth.revenue, currentMonthLY.revenue),
-        targetRevenue: budgetMap.get(formatPeriodKey(today)) || null,
+        targetRevenue: null,
         pacingStatus: currentMonthPacing,
         pickup: calcPickup(
           parseFloat(currentMonth.total_sold_room_nights),
@@ -751,8 +733,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
         occupancy: parseFloat(nextMonth.occupancy || 0) * 100,
         adr: parseFloat(nextMonth.adr || 0),
         yoyChange: calcYOY(nextMonth.revenue, nextMonthLY.revenue),
-        targetRevenue:
-          budgetMap.get(formatPeriodKey(addMonths(today, 1))) || null,
+        targetRevenue: null,
         pacingStatus: nextMonthPacing,
         pickup: calcPickup(
           parseFloat(nextMonth.total_sold_room_nights),
@@ -927,7 +908,7 @@ router.get("/summary", requireUserApi, async (req, res) => {
       demandPatterns,
       rankings,
       ytdTrend,
-      budgetBenchmark: benchmarkCurrent,
+      budgetBenchmark: null,
       flowcast,
       recentActivity,
     });

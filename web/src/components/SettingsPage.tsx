@@ -149,7 +149,7 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
         {/* Header */}
         <div>
           <div style={{ color: "#e5e5e5", fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>Settings</div>
-          <div style={{ color: "#9ca3af", fontSize: "12px" }}>Profile, team, properties, and budget configuration</div>
+          <div style={{ color: "#9ca3af", fontSize: "12px" }}>Profile, team, and properties configuration</div>
         </div>
 
         {/* ── Profile ── */}

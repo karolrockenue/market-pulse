@@ -7,7 +7,6 @@ import {
   ArrowUpDown,
   FileText,
   ChevronRight,
-  PieChart,
   Target,
   Wallet,
 } from "lucide-react";
@@ -53,16 +52,6 @@ export function ReportSelector({
       category: "Core Analytics",
       available: true,
     },
-    {
-      id: "performance-vs-budget",
-      title: "Performance vs Budget",
-      description:
-        "Track performance against defined budget targets for ADR, Occupancy, and Revenue",
-      icon: PieChart,
-      category: "Core Analytics",
-      available: false,
-    },
-
     // --- Internal Reports (Restricted) ---
     {
       id: "shreeji-report",

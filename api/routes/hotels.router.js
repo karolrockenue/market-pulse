@@ -4,7 +4,6 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../utils/db");
 const hotelService = require("../services/hotel.service");
-const { getBenchmarks } = require("../utils/benchmark.utils");
 const {
   requireAdminApi,
   requireSuperAdminOnly,
@@ -314,74 +313,6 @@ router.post("/:hotelId/compset", requireAdminApi, async (req, res) => {
     res.json({ message: "Successfully updated competitive set." });
   } catch (error) {
     res.status(500).json({ error: "Failed to update competitive set." });
-  }
-});
-
-// =============================================================================
-// 4. BUDGETS & BENCHMARKS (User API)
-// Replaces budgets.router.js
-// =============================================================================
-
-router.get("/:hotelId/budgets/:year", requireUserApi, async (req, res) => {
-  const { hotelId, year } = req.params;
-  
-  if (isNaN(parseInt(hotelId)) || isNaN(parseInt(year))) {
-    return res.status(400).json({ error: "Invalid parameters." });
-  }
-
-  try {
-    const hasAccess = await verifyPropertyAccess(req, hotelId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: "Forbidden: Access denied to this property." });
-    }
-
-    const budgets = await hotelService.getBudgets(hotelId, parseInt(year));
-    res.json(budgets);
-  } catch (error) {
-    console.error("Error fetching budget:", error);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-router.post("/:hotelId/budgets/:year", requireUserApi, async (req, res) => {
-  const { hotelId, year } = req.params;
-  const budgetData = req.body;
-
-  if (isNaN(parseInt(hotelId)) || isNaN(parseInt(year))) {
-    return res.status(400).json({ error: "Invalid parameters." });
-  }
-  if (!Array.isArray(budgetData) || budgetData.length !== 12) {
-    return res.status(400).json({ error: "Invalid budget data format." });
-  }
-
-  try {
-    const hasAccess = await verifyPropertyAccess(req, hotelId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: "Forbidden: Access denied to this property." });
-    }
-
-    await hotelService.saveBudgets(hotelId, parseInt(year), budgetData);
-    res.json({ message: `Budget for ${year} saved successfully.` });
-  } catch (error) {
-    console.error("Error saving budget:", error);
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-router.get("/:hotelId/benchmarks/:month/:year", requireUserApi, async (req, res) => {
-  const { hotelId, month, year } = req.params;
-  
-  try {
-    const hasAccess = await verifyPropertyAccess(req, hotelId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: "Forbidden: Access denied to this property." });
-    }
-
-    const benchmarks = await getBenchmarks(parseInt(hotelId), month, year);
-    res.json(benchmarks);
-  } catch (error) {
-    console.error("Error fetching benchmarks:", error);
-    res.status(500).json({ error: "Internal server error." });
   }
 });
 

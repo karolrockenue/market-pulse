@@ -13,12 +13,11 @@ import { useAdminData } from "./hooks/useAdminData";
 
 // Components (These should now be in features/admin/components)
 import { HotelManagementTable } from "./components/HotelManagementTable";
+import { ManageCompSetModal } from "./components/ManageCompSetModal";
 import { SystemHealth } from "./components/SystemHealth";
 import { ManualReportTrigger } from "./components/ManualReportTrigger";
 import { MewsOnboarding } from "./components/MewsOnboarding";
 import { CloudbedsAPIExplorer } from "./components/CloudbedsAPIExplorer";
-
-// If you haven't moved ManageCompSetModal yet, keep it as '@/components/ManageCompSetModal'
 
 export default function AdminHub() {
   // 1. Use the custom hook for data
@@ -35,6 +34,10 @@ export default function AdminHub() {
   // 2. Local UI State (moved from App.tsx)
   const [adminSelectedPropertyId, setAdminSelectedPropertyId] =
     useState<string>("");
+  const [compSetModal, setCompSetModal] = useState<{
+    hotelId: string;
+    hotelName: string;
+  } | null>(null);
 
   // 3. Effects
   // Set default property selector when hotels load
@@ -147,7 +150,9 @@ export default function AdminHub() {
           hotels={hotels}
           onManagementChange={handleManagementChange}
           managementGroups={managementGroups}
-          onManageCompSet={() => {}}
+          onManageCompSet={(hotelId, hotelName) =>
+            setCompSetModal({ hotelId, hotelName })
+          }
           onHotelDeleted={refreshData}
         />
 
@@ -208,6 +213,15 @@ export default function AdminHub() {
 
         <CloudbedsAPIExplorer propertyId={adminSelectedPropertyId} />
       </div>
+
+      {compSetModal && (
+        <ManageCompSetModal
+          hotelId={compSetModal.hotelId}
+          hotelName={compSetModal.hotelName}
+          allHotels={hotels}
+          onClose={() => setCompSetModal(null)}
+        />
+      )}
     </div>
   );
 }

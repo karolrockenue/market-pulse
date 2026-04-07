@@ -12,7 +12,6 @@ import { RoundedGridReportControls } from "./components/RoundedGridReportControl
 import { MetricSelectorChips } from "./components/MetricSelectorChips";
 import { FormattingOptions } from "./components/FormattingOptions";
 import { ReportActions } from "./components/ReportActions";
-import { BudgetReport } from "./components/BudgetReport";
 import { YearOnYearReport } from "./components/YearOnYearReport";
 import { ShreejiReport } from "./components/ShreejiReport";
 
@@ -369,19 +368,6 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
   }
 
   // 2. Specialized Reports (These manage their own internal state/fetching)
-  if (activeReportType === "performance-vs-budget") {
-    return (
-      <BudgetReport
-        startDate={startDate}
-        endDate={endDate}
-        granularity={granularity}
-        propertyId={hotelId}
-        currencyCode={currencyCode}
-        onBack={handleBack}
-      />
-    );
-  }
-
   if (activeReportType === "year-on-year") {
     return (
       <YearOnYearReport

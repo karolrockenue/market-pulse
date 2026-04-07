@@ -768,7 +768,7 @@ export default function App() {
                 properties={properties}
                 onPropertyChange={setProperty}
                 onNavigate={handleViewChange}
-                budgetExists={false}
+
               />
             )
           )}

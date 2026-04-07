@@ -160,7 +160,6 @@ export const fetchReportTypes = async (): Promise<string[]> => {
   return [
     "performance-metrics",
     "year-on-year",
-    "performance-vs-budget",
     "monthly-takings",
   ];
 };

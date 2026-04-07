@@ -48,11 +48,7 @@ export interface DashboardData {
     revpar: Rank;
   };
   ytdTrend: any;
-  budgetBenchmark: {
-    benchmarkOcc: number;
-    benchmarkAdr: number;
-    source: string;
-  } | null;
+  budgetBenchmark: null;
 }
 
 export interface PortfolioMetrics {
