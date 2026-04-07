@@ -55,7 +55,8 @@ router.get("/tasks", async (req, res) => {
         dc.slug AS channel_slug,
         COALESCE(sub.subtask_done, 0) AS subtask_done,
         COALESCE(sub.subtask_total, 0) AS subtask_total,
-        COALESCE(cmt.comment_count, 0) AS comment_count
+        COALESCE(cmt.comment_count, 0) AS comment_count,
+        COALESCE(hn.hotel_names, '{}') AS hotel_names
       FROM crm_tasks t
       LEFT JOIN hotels h ON t.hotel_id = h.hotel_id
       LEFT JOIN distribution_channels dc ON t.channel_id = dc.id
@@ -67,6 +68,10 @@ router.get("/tasks", async (req, res) => {
         SELECT COUNT(*) AS comment_count
         FROM crm_task_comments WHERE task_id = t.id AND type = 'comment'
       ) cmt ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(hh.property_name ORDER BY hh.property_name) AS hotel_names
+        FROM hotels hh WHERE hh.hotel_id = ANY(t.hotel_ids)
+      ) hn ON true
       ${where}
       ORDER BY
         CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END,
@@ -83,14 +88,18 @@ router.get("/tasks", async (req, res) => {
 // POST /tasks — create task
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description, hotel_id, channel_id, assignee, priority, status, category, due_date, tags, created_by } = req.body;
+    const { title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by } = req.body;
     if (!title) return res.status(400).json({ error: "Title is required." });
 
+    // Support both hotel_ids (array) and legacy hotel_id (single)
+    const resolvedHotelIds = hotel_ids && hotel_ids.length > 0 ? hotel_ids : (hotel_id ? [hotel_id] : []);
+    const primaryHotelId = resolvedHotelIds[0] || null;
+
     const { rows } = await db.query(`
-      INSERT INTO crm_tasks (title, description, hotel_id, channel_id, assignee, priority, status, category, due_date, tags, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      INSERT INTO crm_tasks (title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
-    `, [title, description || null, hotel_id || null, channel_id || null, assignee || null, priority || 'medium', status || 'todo', category || 'operations', due_date || null, tags || [], created_by || null]);
+    `, [title, description || null, primaryHotelId, resolvedHotelIds, channel_id || null, assignee || null, priority || 'medium', status || 'todo', category || 'operations', due_date || null, tags || [], created_by || null]);
 
     // Auto-log creation activity
     if (rows[0]) {
@@ -99,11 +108,12 @@ router.post("/tasks", async (req, res) => {
         VALUES ($1, $2, $3, 'activity')
       `, [rows[0].id, created_by || 'System', 'Created this task']);
 
-      // Enrich with hotel name for notification
+      // Enrich with hotel names for notification
       const enriched = { ...rows[0] };
-      if (enriched.hotel_id) {
-        const h = (await db.query('SELECT property_name FROM hotels WHERE hotel_id = $1', [enriched.hotel_id])).rows[0];
-        enriched.hotel_name = h?.property_name || null;
+      if (resolvedHotelIds.length > 0) {
+        const hResult = await db.query('SELECT property_name FROM hotels WHERE hotel_id = ANY($1::int[])', [resolvedHotelIds]);
+        enriched.hotel_names = hResult.rows.map(r => r.property_name);
+        enriched.hotel_name = enriched.hotel_names.join(', ');
       }
       notifications.notifyTaskCreated(enriched, created_by).catch(() => {});
     }
@@ -128,7 +138,7 @@ router.patch("/tasks/:id", async (req, res) => {
     if (!old) return res.status(404).json({ error: "Task not found." });
 
     // Build dynamic SET clause
-    const allowed = ['title', 'description', 'hotel_id', 'channel_id', 'assignee', 'priority', 'status', 'category', 'due_date', 'tags'];
+    const allowed = ['title', 'description', 'hotel_id', 'hotel_ids', 'channel_id', 'assignee', 'priority', 'status', 'category', 'due_date', 'tags'];
     const sets = [];
     const params = [];
     let idx = 1;
@@ -172,7 +182,11 @@ router.patch("/tasks/:id", async (req, res) => {
 
     // Send notifications (fire-and-forget)
     const updated = rows[0];
-    if (updated.hotel_id) {
+    if (updated.hotel_ids && updated.hotel_ids.length > 0) {
+      const hResult = await db.query('SELECT property_name FROM hotels WHERE hotel_id = ANY($1::int[])', [updated.hotel_ids]);
+      updated.hotel_names = hResult.rows.map(r => r.property_name);
+      updated.hotel_name = updated.hotel_names.join(', ');
+    } else if (updated.hotel_id) {
       const h = (await db.query('SELECT property_name FROM hotels WHERE hotel_id = $1', [updated.hotel_id])).rows[0];
       updated.hotel_name = h?.property_name || null;
     }

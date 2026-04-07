@@ -15,8 +15,10 @@ export interface CrmTask {
   title: string;
   description: string | null;
   hotel_id: number | null;
+  hotel_ids: number[];
   channel_id: number | null;
   hotel_name: string | null;
+  hotel_names: string[];
   channel_name: string | null;
   channel_slug: string | null;
   assignee: string | null;

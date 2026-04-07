@@ -538,7 +538,7 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
                         const cCfg = CATEGORY_CFG[task.category];
                         const isOverdue = task.due_date ? task.due_date < todayStr : false;
                         const sCfg = STATUS_COLUMNS.find((s) => s.key === task.status)!;
-                        const hotelDisplay = task.hotel_name || "\u2014";
+                        const hotelDisplay = task.hotel_names?.length > 1 ? `${task.hotel_names.length} properties` : task.hotel_names?.[0] || task.hotel_name || "\u2014";
                         return (
                           <div key={task.id} onClick={() => setSelectedTaskId(task.id)} style={{
                             display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px",
@@ -1668,10 +1668,15 @@ function TaskDetailPanel({
             </DetailField>
 
             {/* Property */}
-            <DetailField label="Property">
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Building2 size={13} style={{ color: BLUE }} />
-                <span style={{ color: TEXT, fontSize: 12 }}>{task.hotel_name || "\u2014"}</span>
+            <DetailField label={task.hotel_names?.length > 1 ? `Properties (${task.hotel_names.length})` : "Property"}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <Building2 size={13} style={{ color: BLUE, flexShrink: 0 }} />
+                {task.hotel_names?.length > 0
+                  ? task.hotel_names.map((n) => (
+                    <span key={n} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: `${BLUE}10`, color: TEXT, border: `1px solid ${BLUE}15` }}>{n}</span>
+                  ))
+                  : <span style={{ color: TEXT, fontSize: 12 }}>{task.hotel_name || "\u2014"}</span>
+                }
               </div>
             </DetailField>
 
@@ -2030,21 +2035,23 @@ function CreateTaskPanel({
     if (!title.trim() || creating) return;
     setCreating(true);
     try {
-      const hotels = selectedHotels.length > 0 ? selectedHotels : [""];
-      for (const hotel of hotels) {
-        await onCreateTask({
-          title: title.trim(),
-          description: description.trim() || null,
-          assignee: selAssignee || null,
-          priority: selPriority === "urgent" ? "urgent" : "medium",
-          status: selStatus,
-          category: selCategory,
-          due_date: dueDate || null,
-          tags: selChannels.length > 0 ? selChannels : [],
-          hotel: hotel || null,
-          created_by: "Karol",
-        });
-      }
+      // Resolve selected hotel names to IDs
+      const hotelIds = selectedHotels
+        .map((name) => allHotels.find((h) => h.property_name === name)?.hotel_id)
+        .filter((id): id is number => id != null);
+
+      await onCreateTask({
+        title: title.trim(),
+        description: description.trim() || null,
+        assignee: selAssignee || null,
+        priority: selPriority === "urgent" ? "urgent" : "medium",
+        status: selStatus,
+        category: selCategory,
+        due_date: dueDate || null,
+        tags: selChannels.length > 0 ? selChannels : [],
+        hotel_ids: hotelIds.length > 0 ? hotelIds : undefined,
+        created_by: "Karol",
+      } as any);
       onClose();
     } catch (err) {
       console.error("Failed to create task", err);
@@ -2319,19 +2326,7 @@ function CreateTaskPanel({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 0, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
-          {selectedHotels.length > 1 && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "10px 24px",
-              background: `${AMBER}08`, borderBottom: `1px solid ${AMBER}20`,
-            }}>
-              <AlertTriangle size={13} style={{ color: AMBER }} />
-              <span style={{ color: AMBER, fontSize: 12, fontWeight: 500 }}>
-                This will create <strong>{selectedHotels.length} separate tasks</strong> — one per property
-              </span>
-            </div>
-          )}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 24px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 24px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <button onClick={onClose} style={{
             height: 40, padding: "0 20px", borderRadius: 6, border: `1px solid ${BORDER}`,
             background: INPUT_BG, color: TEXT, fontSize: 13, cursor: "pointer",
@@ -2349,8 +2344,7 @@ function CreateTaskPanel({
           }}
             onMouseEnter={(e) => { if (!creating) e.currentTarget.style.background = "#29ADEE"; }}
             onMouseLeave={(e) => { if (!creating) e.currentTarget.style.background = BLUE; }}
-          >{creating ? "Creating..." : selectedHotels.length > 1 ? `Create ${selectedHotels.length} Tasks` : "Create"}</button>
-          </div>
+          >{creating ? "Creating..." : "Create"}</button>
         </div>
       </div>
 
@@ -2378,7 +2372,7 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
 }) {
   const pCfg = PRIORITY_CFG[task.priority];
   const cCfg = CATEGORY_CFG[task.category];
-  const hotelDisplay = task.hotel_name || "\u2014";
+  const hotelDisplay = task.hotel_names?.length > 1 ? `${task.hotel_names.length} properties` : task.hotel_names?.[0] || task.hotel_name || "\u2014";
   const dueDateColor = dueTier === "overdue" ? RED : dueTier === "today" ? AMBER : dueTier === "this_week" ? PURPLE : TEXT_DIM;
   const dueDateLabel = dueTier === "overdue" ? "Overdue" : dueTier === "today" ? "Due today" : dueTier === "this_week" ? "This week" : "";
 
