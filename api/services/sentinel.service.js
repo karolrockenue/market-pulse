@@ -421,13 +421,26 @@ async function previewCalendar({
     liveRatesList = liveRatesRes.roomRateDetailed;
   }
 
+  // [DEBUG] Temporary logging for hotel 318313
+  if (String(hotelId) === '318313') {
+    console.log(`[DEBUG 318313] pmsPropertyId=${pmsPropertyId}, baseRoomTypeId=${baseRoomTypeId}`);
+    console.log(`[DEBUG 318313] liveRatesRes keys:`, liveRatesRes ? Object.keys(liveRatesRes) : 'null');
+    console.log(`[DEBUG 318313] liveRatesRes.data keys:`, liveRatesRes?.data ? Object.keys(liveRatesRes.data) : 'null');
+    console.log(`[DEBUG 318313] liveRatesList.length=${liveRatesList.length}`);
+    if (liveRatesList.length > 0) {
+      console.log(`[DEBUG 318313] sample entry:`, JSON.stringify(liveRatesList[0]));
+    }
+    console.log(`[DEBUG 318313] rate_id_map:`, JSON.stringify(config.rate_id_map));
+  }
+
   // [CRITICAL FIX] Target the correct Rate Plan ID
   // Prevents "Net Rate" or "Package Rate" ingestion (The Death Spiral Fix).
   const targetRateId = config.rate_id_map?.[baseRoomTypeId];
 
+  let debugFilteredRoom = 0, debugFilteredPlan = 0, debugFilteredNoRate = 0, debugAccepted = 0;
   liveRatesList.forEach((r) => {
     // 1. Filter by Room Type
-    if (r.roomTypeID && String(r.roomTypeID) !== String(baseRoomTypeId)) return;
+    if (r.roomTypeID && String(r.roomTypeID) !== String(baseRoomTypeId)) { debugFilteredRoom++; return; }
 
     // 2. Filter by Rate Plan ID (if we have a map)
     // If the PMS returns multiple plans (Standard, Net, Package), we MUST pick the mapped one.
@@ -436,11 +449,20 @@ async function previewCalendar({
       r.ratePlanID &&
       String(r.ratePlanID) !== String(targetRateId)
     ) {
+      debugFilteredPlan++;
       return;
     }
 
-    if (r.date && r.rate) liveMap[r.date] = parseFloat(r.rate);
+    if (r.date && r.rate) { debugAccepted++; liveMap[r.date] = parseFloat(r.rate); }
+    else { debugFilteredNoRate++; }
   });
+
+  // [DEBUG] Temporary logging for hotel 318313
+  if (String(hotelId) === '318313') {
+    console.log(`[DEBUG 318313] targetRateId=${targetRateId}`);
+    console.log(`[DEBUG 318313] filter results: accepted=${debugAccepted}, filteredByRoom=${debugFilteredRoom}, filteredByPlan=${debugFilteredPlan}, filteredNoRate=${debugFilteredNoRate}`);
+    console.log(`[DEBUG 318313] liveMap size=${Object.keys(liveMap).length}`);
+  }
 
   // 4. Build Context for Pricing Engine
   // Construct the 'CalculatorState' context from Asset Settings

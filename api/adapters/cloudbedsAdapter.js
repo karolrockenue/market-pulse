@@ -562,37 +562,23 @@ async function exchangeCodeForToken(code) {
  * @returns {Promise<object>} The pms_credentials object.
  */
 async function getCredentialsForProperty(propertyId) {
-  // Try direct lookup first (fastest path).
-  let credsResult = await pgPool.query(
-    `SELECT user_id, pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
+  // This query finds the user_properties record for the given property that contains
+  // a non-null refresh_token. This correctly handles the scenario where an invited admin
+  // has a link to a property, but the credentials belong to the original owner.
+  const credsResult = await pgPool.query(
+    `SELECT pms_credentials FROM user_properties WHERE property_id = $1 AND pms_credentials->>'refresh_token' IS NOT NULL LIMIT 1`,
     [propertyId],
   );
 
-  // Fallback: find credentials from ANY sibling property owned by the same user.
-  // Cloudbeds issues one refresh_token per user account, so any property's token works.
-  if (credsResult.rows.length === 0) {
-    credsResult = await pgPool.query(
-      `SELECT up2.user_id, up2.pms_credentials
-       FROM user_properties up1
-       JOIN user_properties up2 ON up1.user_id = up2.user_id
-       WHERE up1.property_id = $1
-       AND up2.pms_credentials->>'refresh_token' IS NOT NULL
-       LIMIT 1`,
-      [propertyId],
-    );
-  }
+  const credentials = credsResult.rows[0]?.pms_credentials;
 
-  const row = credsResult.rows[0];
-  const credentials = row?.pms_credentials;
-
+  // If no record is found, it means we have no way to authenticate for this property.
   if (!credentials || !credentials.refresh_token) {
     throw new Error(
       `Could not find valid credentials with a refresh_token for property ${propertyId}.`,
     );
   }
 
-  // Attach user_id so getAccessToken can update all properties for this user.
-  credentials._userId = row.user_id;
   return credentials;
 }
 
@@ -633,23 +619,7 @@ async function getAccessToken(propertyId) {
     );
   }
 
-  // Step 3: Persist the new refresh_token for ALL properties owned by this user.
-  // Cloudbeds rotates tokens per-account, so all properties sharing the same
-  // user must stay in sync to avoid invalidating sibling tokens.
-  if (tokenData.refresh_token && credentials._userId) {
-    await pgPool.query(
-      `UPDATE user_properties
-       SET pms_credentials = jsonb_set(
-         COALESCE(pms_credentials, '{}'::jsonb),
-         '{refresh_token}',
-         to_jsonb($1::text)
-       )
-       WHERE user_id = $2
-       AND pms_credentials->>'refresh_token' IS NOT NULL`,
-      [tokenData.refresh_token, credentials._userId],
-    );
-  }
-
+  // Return the new access token.
   return tokenData.access_token;
 }
 
