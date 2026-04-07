@@ -1077,64 +1077,35 @@ router.get("/cloudbeds/callback", async (req, res) => {
           );
         }
 
-        // 2. Loop through all new hotels and trigger the sync
-        console.log(
-          `[AUTH CALLBACK] DEBUG: Found ${newlySyncedInternalIds.length} new hotels to sync.`
-        );
-
+        // 2. Only trigger sync + backfill for genuinely NEW hotels (no existing data).
         for (const hotelId of newlySyncedInternalIds) {
-          const syncUrl = `${baseUrl}/api/admin/initial-sync`;
-          const bodyPayload = JSON.stringify({ propertyId: hotelId });
-          const internalSecret = process.env.INTERNAL_API_SECRET;
-
-          console.log(
-            `[AUTH CALLBACK] DEBUG: Preparing to trigger sync for hotel ${hotelId} via POST to ${syncUrl}`
+          const hasData = await client.query(
+            "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1 LIMIT 1",
+            [hotelId]
           );
-
-          if (!internalSecret) {
-            console.error(
-              `[AUTH CALLBACK] CRITICAL FAILURE: INTERNAL_API_SECRET is not set. Cannot trigger sync.`
-            );
-            continue; // Skip to next hotel
+          if (hasData.rows.length > 0) {
+            console.log(`[AUTH CALLBACK] Hotel ${hotelId} already has data — skipping sync/backfill.`);
+            continue;
           }
 
-          // We do this asynchronously and log the result.
+          const syncUrl = `${baseUrl}/api/admin/initial-sync`;
+          const internalSecret = process.env.INTERNAL_API_SECRET;
+          if (!internalSecret) {
+            console.error(`[AUTH CALLBACK] INTERNAL_API_SECRET not set. Skipping sync for ${hotelId}.`);
+            continue;
+          }
+
           fetch(syncUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${internalSecret}`,
-            },
-            body: bodyPayload,
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${internalSecret}` },
+            body: JSON.stringify({ propertyId: hotelId }),
           })
             .then(async (res) => {
-              // Check if the response was OK (status 200-299)
-              if (res.ok) {
-                const responseData = await res.json();
-                console.log(
-                  `[AUTH CALLBACK] SUCCESS: Triggered sync for hotel ${hotelId}. Server responded:`,
-                  responseData.message
-                );
-              } else {
-                // If the response was not OK, log the error
-                const errorData = await res.text(); // Get text in case JSON parse fails
-                console.error(
-                  `[AUTH CALLBACK] FAILURE: Trigger for hotel ${hotelId} failed. Status: ${res.status}. Response: ${errorData}`
-                );
-              }
+              if (res.ok) console.log(`[AUTH CALLBACK] Sync triggered for new hotel ${hotelId}.`);
+              else console.error(`[AUTH CALLBACK] Sync failed for hotel ${hotelId}. Status: ${res.status}`);
             })
-            .catch((syncErr) => {
-              // This catches network errors (e.g., fetch itself failed)
-              console.error(
-                `[AUTH CALLBACK] CRITICAL FETCH ERROR: Failed to trigger initial sync for hotel ${hotelId}:`,
-                syncErr.message
-              );
-            });
-        }
-        // --- [END] INITIAL SYNC TRIGGER (WITH LOGGING) ---
+            .catch((err) => console.error(`[AUTH CALLBACK] Sync fetch error for hotel ${hotelId}:`, err.message));
 
-        // --- Reservation backfill (fire-and-forget, 14 days) ---
-        for (const hotelId of newlySyncedInternalIds) {
           try {
             const { spawn } = require("child_process");
             const child = spawn("node", ["scripts/backfill-reservations.js", String(hotelId), "14"], {
@@ -1143,9 +1114,9 @@ router.get("/cloudbeds/callback", async (req, res) => {
               stdio: "ignore",
             });
             child.unref();
-            console.log(`[AUTH CALLBACK] Reservation backfill spawned for hotel ${hotelId}`);
+            console.log(`[AUTH CALLBACK] Reservation backfill spawned for new hotel ${hotelId}`);
           } catch (bfErr) {
-            console.error(`[AUTH CALLBACK] Failed to spawn reservation backfill for hotel ${hotelId}:`, bfErr.message);
+            console.error(`[AUTH CALLBACK] Backfill spawn error for hotel ${hotelId}:`, bfErr.message);
           }
         }
 
