@@ -859,29 +859,19 @@ router.get("/cloudbeds/callback", async (req, res) => {
       code: code,
     });
 
-    // Retry token exchange up to 3 times with backoff (Cloudbeds rate-limits rapid OAuth flows)
-    let tokenRes, tokenResponse;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      tokenRes = await fetch(
-        "https://hotels.cloudbeds.com/api/v1.1/access_token",
-        {
-          method: "POST",
-          body: params,
-        }
-      );
-      tokenResponse = await tokenRes.json();
-      if (tokenResponse.access_token) break;
-      if (attempt < 3) {
-        const delay = attempt * 5000;
-        console.warn(`[AUTH CALLBACK] Token exchange attempt ${attempt} failed (status ${tokenRes.status}), retrying in ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
+    const tokenRes = await fetch(
+      "https://hotels.cloudbeds.com/api/v1.1/access_token",
+      {
+        method: "POST",
+        body: params,
       }
-    }
+    );
+    const tokenResponse = await tokenRes.json();
 
     if (!tokenResponse.access_token) {
       console.error("[BREADCRUMB FAIL] Token exchange failed. Status:", tokenRes.status, "Response:", JSON.stringify(tokenResponse));
       throw new Error(
-        "Token exchange failed: " + JSON.stringify(tokenResponse)
+        "Token exchange failed (status " + tokenRes.status + "): " + (tokenResponse.error_description || JSON.stringify(tokenResponse))
       );
     }
     const { access_token, refresh_token, expires_in } = tokenResponse;
