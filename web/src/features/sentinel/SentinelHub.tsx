@@ -15,7 +15,7 @@ import { RateManagerView } from "./components/RateManager/RateManagerView";
 import { ShadowfaxView } from "./components/Shadowfax/ShadowfaxView";
 // PropertyHub merged into ControlPanel as PromoConfigSection
 import { PortfolioRiskOverview } from "./components/RiskOverview/PortfolioRiskOverview";
-import { DemandIntelView } from "./components/DemandIntel/DemandIntelView";
+
 
 // Admin Hook logic (simplified here to avoid circular dependency on Admin feature)
 const useAllHotels = () => {
@@ -59,7 +59,7 @@ export function SentinelHub({ activeView, onNavigate }: SentinelHubProps) {
         {activeView === "sentinel" && <ControlPanelView allHotels={hotels} />}
         {activeView === "shadowfax" && <ShadowfaxView />}
         {activeView === "riskOverview" && <PortfolioRiskOverview />}
-        {activeView === "demandIntel" && <DemandIntelView allHotels={hotels} />}
+
       </div>
     </div>
   );

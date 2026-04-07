@@ -99,7 +99,7 @@ export function TopNav({
       "rateManager",
       "shadowfax",
       "competitive-intel",
-      "demandIntel",
+
     ];
 
     if (property === "ALL" && singlePropertyViews.includes(view)) {
@@ -148,7 +148,7 @@ export function TopNav({
         { label: "Control Panel", value: "sentinel", icon: TerminalSquare },
         { label: "Rate Manager", value: "rateManager", icon: DollarSign },
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
-        { label: "Demand Intel", value: "demandIntel", icon: Globe },
+
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },
         { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
