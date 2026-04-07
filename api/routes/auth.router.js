@@ -942,13 +942,15 @@ router.get("/cloudbeds/callback", async (req, res) => {
       // total rooms). Just match properties to existing hotels and save credentials.
       const newlySyncedInternalIds = [];
 
+      console.log(`[AUTH CALLBACK] Processing ${userProperties.length} properties (credentials-only mode)`);
       for (const property of userProperties) {
-        // Look up existing hotel by pms_property_id — no API calls
+        // Look up existing hotel by pms_property_id OR hotel_id — no API calls
         const existingHotel = await client.query(
-          `SELECT hotel_id FROM hotels WHERE pms_property_id = $1 LIMIT 1`,
+          `SELECT hotel_id FROM hotels WHERE pms_property_id = $1 OR ($1 ~ '^[0-9]{1,10}$' AND hotel_id = ($1)::integer) LIMIT 1`,
           [String(property.property_id)]
         );
         const internalHotelId = existingHotel.rows[0]?.hotel_id;
+        console.log(`[AUTH CALLBACK] Property ${property.property_id} → hotel_id ${internalHotelId || 'NOT FOUND'}`);
 
         if (!internalHotelId) {
           console.log(`[AUTH CALLBACK] Property ${property.property_id} not found in hotels table — skipping.`);
