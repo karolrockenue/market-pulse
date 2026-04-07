@@ -834,14 +834,26 @@ router.get("/connect-pilot-property", requireUserApi, async (req, res) => {
 });
 // /api/routes/auth.router.js
 
-router.get("/cloudbeds/callback", async (req, res) => {
-  // BREADCRUMB 1: Log that the callback has been initiated.
+// Guard against duplicate callback hits (browser prefetch, double-click, refresh)
+const recentlyUsedCodes = new Set();
 
+router.get("/cloudbeds/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) {
-    console.error("[BREADCRUMB FAIL] No authorization code provided.");
+    console.error("[AUTH CALLBACK] No authorization code provided.");
     return res.status(400).send("Authorization code is missing.");
   }
+
+  // Prevent double-processing of the same auth code
+  if (recentlyUsedCodes.has(code)) {
+    console.warn("[AUTH CALLBACK] Duplicate callback detected for same code — ignoring.");
+    return res.redirect("/app/?error=duplicate_auth");
+  }
+  recentlyUsedCodes.add(code);
+  // Clean up after 60s to prevent memory leak
+  setTimeout(() => recentlyUsedCodes.delete(code), 60000);
+
+  console.log("[AUTH CALLBACK] Processing code:", code.substring(0, 8) + "...");
 
   try {
     // Step 1: Exchange the authorization code for an access token
@@ -1047,10 +1059,10 @@ router.get("/cloudbeds/callback", async (req, res) => {
     }
   } catch (error) {
     console.error(
-      "[BREADCRUMB FAIL] A critical error occurred in OAuth callback:",
-      error
+      "[AUTH CALLBACK] Critical error in OAuth callback:", error.message
     );
-    res.status(500).send("An internal server error occurred.");
+    // Redirect to app with error instead of showing raw 500
+    res.redirect("/app/?error=cloudbeds_auth_failed");
   }
 });
 
