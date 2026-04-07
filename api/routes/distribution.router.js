@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAdminApi } = require("../utils/middleware");
 const db = require("../utils/db");
+const notifications = require("../utils/notification.service");
 
 // All distribution/CRM endpoints are admin-only
 router.use(requireAdminApi);
@@ -97,6 +98,14 @@ router.post("/tasks", async (req, res) => {
         INSERT INTO crm_task_comments (task_id, author, body, type)
         VALUES ($1, $2, $3, 'activity')
       `, [rows[0].id, created_by || 'System', 'Created this task']);
+
+      // Enrich with hotel name for notification
+      const enriched = { ...rows[0] };
+      if (enriched.hotel_id) {
+        const h = (await db.query('SELECT property_name FROM hotels WHERE hotel_id = $1', [enriched.hotel_id])).rows[0];
+        enriched.hotel_name = h?.property_name || null;
+      }
+      notifications.notifyTaskCreated(enriched, created_by).catch(() => {});
     }
 
     res.status(201).json(rows[0]);
@@ -161,6 +170,19 @@ router.patch("/tasks/:id", async (req, res) => {
       `, [id, updatedBy, `Priority changed from ${old.priority} to ${fields.priority}`]);
     }
 
+    // Send notifications (fire-and-forget)
+    const updated = rows[0];
+    if (updated.hotel_id) {
+      const h = (await db.query('SELECT property_name FROM hotels WHERE hotel_id = $1', [updated.hotel_id])).rows[0];
+      updated.hotel_name = h?.property_name || null;
+    }
+    if (fields.assignee && fields.assignee !== old.assignee) {
+      notifications.notifyTaskAssigned(updated, old.assignee, updatedBy).catch(() => {});
+    }
+    if (fields.status && fields.status !== old.status) {
+      notifications.notifyStatusChanged(updated, old.status, updatedBy).catch(() => {});
+    }
+
     res.json(rows[0]);
   } catch (error) {
     console.error("PATCH /tasks/:id error:", error);
@@ -204,6 +226,19 @@ router.post("/tasks/:id/comments", async (req, res) => {
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `, [req.params.id, author || 'System', body, type || 'comment']);
+
+    // Notify on user comments (not system activity)
+    if ((type || 'comment') === 'comment') {
+      const task = (await db.query(`
+        SELECT t.*, h.property_name AS hotel_name
+        FROM crm_tasks t LEFT JOIN hotels h ON t.hotel_id = h.hotel_id
+        WHERE t.id = $1
+      `, [req.params.id])).rows[0];
+      if (task) {
+        notifications.notifyCommentAdded(task, author || 'System', body).catch(() => {});
+      }
+    }
+
     res.status(201).json(rows[0]);
   } catch (error) {
     console.error("POST /tasks/:id/comments error:", error);
@@ -326,7 +361,12 @@ router.post("/channels", async (req, res) => {
     const { name, slug, agreement_type, tier, integration_type, commission_pct, contract_expiry, notes, channel_type, payment_method } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required." });
 
-    const channelSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let channelSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    // Ensure unique slug — append random suffix if collision
+    const existing = await db.query("SELECT 1 FROM distribution_channels WHERE slug = $1", [channelSlug]);
+    if (existing.rows.length > 0) {
+      channelSlug = channelSlug + '-' + Date.now().toString(36).slice(-4);
+    }
     const { rows } = await db.query(`
       INSERT INTO distribution_channels (name, slug, agreement_type, tier, integration_type, commission_pct, contract_expiry, notes, channel_type, payment_method)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -336,6 +376,9 @@ router.post("/channels", async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (error) {
     console.error("POST /channels error:", error);
+    if (error.code === '23505') {
+      return res.status(409).json({ error: "A channel with this name already exists." });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -543,6 +586,150 @@ router.patch("/grid", async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error("PATCH /grid error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// CHANNEL PRICING (Waterfall defaults + hotel overrides)
+// ═══════════════════════════════════════════
+
+// GET /pricing — all channel pricing defaults with their channel meta + override counts
+router.get("/pricing", async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT
+        dc.id AS channel_id, dc.name, dc.slug,
+        dc.agreement_type, dc.channel_type, dc.commission_pct, dc.payment_method,
+        dc.contract_expiry, dc.notes,
+        dcp.steps,
+        COALESCE(ov.override_count, 0) AS override_count
+      FROM distribution_channels dc
+      LEFT JOIN distribution_channel_pricing dcp ON dcp.channel_id = dc.id
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS override_count FROM distribution_hotel_pricing_overrides WHERE channel_id = dc.id
+      ) ov ON true
+      WHERE dcp.steps IS NOT NULL
+      ORDER BY dc.name ASC
+    `);
+
+    // Also fetch primary contact per channel
+    for (const ch of rows) {
+      const contact = (await db.query(
+        "SELECT name, email FROM distribution_channel_contacts WHERE channel_id = $1 ORDER BY id LIMIT 1",
+        [ch.channel_id]
+      )).rows[0];
+      ch.primary_contact = contact?.name || null;
+      ch.contact_email = contact?.email || null;
+    }
+
+    res.json(rows);
+  } catch (error) {
+    console.error("GET /pricing error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /pricing/:channelId — single channel pricing with all hotel overrides
+router.get("/pricing/:channelId", async (req, res) => {
+  try {
+    const { channelId } = req.params;
+
+    const channel = (await db.query(`
+      SELECT dc.*, dcp.steps
+      FROM distribution_channels dc
+      LEFT JOIN distribution_channel_pricing dcp ON dcp.channel_id = dc.id
+      WHERE dc.id = $1
+    `, [channelId])).rows[0];
+
+    if (!channel) return res.status(404).json({ error: "Channel not found." });
+
+    // Get primary contact
+    const contact = (await db.query(
+      "SELECT name, email FROM distribution_channel_contacts WHERE channel_id = $1 ORDER BY id LIMIT 1",
+      [channelId]
+    )).rows[0];
+    channel.primary_contact = contact?.name || null;
+    channel.contact_email = contact?.email || null;
+
+    // Get all hotel overrides for this channel
+    const { rows: overrides } = await db.query(`
+      SELECT dhpo.hotel_id, h.property_name AS hotel_name, dhpo.overrides
+      FROM distribution_hotel_pricing_overrides dhpo
+      JOIN hotels h ON h.hotel_id = dhpo.hotel_id
+      WHERE dhpo.channel_id = $1
+      ORDER BY h.property_name ASC
+    `, [channelId]);
+
+    // Get all managed hotels
+    const { rows: hotels } = await db.query(`
+      SELECT hotel_id, property_name AS hotel_name FROM hotels
+      WHERE is_rockenue_managed = true AND (is_disconnected IS NULL OR is_disconnected = false)
+      ORDER BY property_name ASC
+    `);
+
+    res.json({ channel, overrides, hotels });
+  } catch (error) {
+    console.error("GET /pricing/:channelId error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /pricing/:channelId — update channel pricing defaults (waterfall steps)
+router.patch("/pricing/:channelId", async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const { steps } = req.body;
+    if (!steps) return res.status(400).json({ error: "steps is required." });
+
+    const { rows } = await db.query(`
+      INSERT INTO distribution_channel_pricing (channel_id, steps, updated_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (channel_id)
+      DO UPDATE SET steps = $2, updated_at = NOW()
+      RETURNING *
+    `, [channelId, JSON.stringify(steps)]);
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("PATCH /pricing/:channelId error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /pricing/:channelId/override/:hotelId — set or update hotel override
+router.put("/pricing/:channelId/override/:hotelId", async (req, res) => {
+  try {
+    const { channelId, hotelId } = req.params;
+    const { overrides } = req.body;
+    if (!overrides) return res.status(400).json({ error: "overrides is required." });
+
+    const { rows } = await db.query(`
+      INSERT INTO distribution_hotel_pricing_overrides (hotel_id, channel_id, overrides, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (hotel_id, channel_id)
+      DO UPDATE SET overrides = $3, updated_at = NOW()
+      RETURNING *
+    `, [hotelId, channelId, JSON.stringify(overrides)]);
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("PUT /pricing override error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /pricing/:channelId/override/:hotelId — remove hotel override (revert to default)
+router.delete("/pricing/:channelId/override/:hotelId", async (req, res) => {
+  try {
+    const { channelId, hotelId } = req.params;
+    await db.query(
+      "DELETE FROM distribution_hotel_pricing_overrides WHERE hotel_id = $1 AND channel_id = $2",
+      [hotelId, channelId]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /pricing override error:", error);
     res.status(500).json({ error: error.message });
   }
 });

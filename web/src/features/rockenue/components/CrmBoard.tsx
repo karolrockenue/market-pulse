@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Circle,
   Filter,
-  MoreHorizontal,
   Calendar,
   MessageSquare,
   Paperclip,
@@ -19,29 +18,34 @@ import {
   Tag,
   Flag,
   Eye,
-  GripVertical,
   ArrowRight,
   Send,
-  Link,
-  History,
-  Edit3,
   Globe,
   Loader2,
   ClipboardList,
+  Trash2,
+  Upload,
+  Repeat,
+  Zap,
+  Users,
+  BarChart3,
+  CheckSquare,
+  Link2,
+  FileText,
 } from "lucide-react";
 import { useCrmTasks } from "../hooks/useCrmTasks";
 import {
   fetchComments,
   addComment,
-  fetchSubtasks,
-  addSubtask,
-  updateSubtask,
   fetchTeam,
 } from "../api/distribution.api";
+import { format, differenceInCalendarDays, addDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
 import type {
   CrmTask,
   CrmTaskComment,
-  CrmTaskSubtask,
   Priority,
   TaskStatus,
   TaskCategory,
@@ -68,11 +72,11 @@ const OTA_CHANNELS_LIST = [
 ];
 
 // ── Config ──
-const PRIORITY_CFG: Record<Priority, { color: string; label: string }> = {
-  urgent: { color: RED, label: "Urgent" },
-  high: { color: AMBER, label: "High" },
-  medium: { color: BLUE, label: "Medium" },
-  low: { color: TEXT_DIM, label: "Low" },
+const PRIORITY_CFG: Record<Priority, { color: string; label: string; order: number }> = {
+  urgent: { color: RED, label: "Urgent", order: 0 },
+  high: { color: AMBER, label: "High", order: 1 },
+  medium: { color: BLUE, label: "Medium", order: 2 },
+  low: { color: TEXT_DIM, label: "Low", order: 3 },
 };
 
 const STATUS_COLUMNS: { key: TaskStatus; label: string; color: string }[] = [
@@ -108,8 +112,22 @@ type TeamDisplay = ReturnType<typeof buildTeamDisplay>;
 const TeamContext = createContext<TeamDisplay>([]);
 function useTeam() { return useContext(TeamContext); }
 
-// ── View mode ──
-type ViewMode = "board" | "hotel" | "user";
+// ── View modes ──
+type ViewMode = "board" | "hotel" | "user" | "timeline" | "my_work";
+
+// ── Mock data stores (mockup stage — local state only) ──
+type Automation = { id: string; name: string; trigger: string; action: string; enabled: boolean };
+type TaskDependency = { taskId: number; type: "blocks" | "blocked_by"; linkedTaskId: number };
+type TaskWatcher = { taskId: number; name: string };
+type TaskAttachment = { taskId: number; name: string; size: string; uploadedBy: string; uploadedAt: string };
+const DEFAULT_WIP_LIMITS: Record<TaskStatus, number> = { todo: 0, in_progress: 8, review: 5, done: 0 };
+
+const MOCK_AUTOMATIONS: Automation[] = [
+  { id: "a1", name: "Auto-assign reviewer", trigger: "When status changes to Review", action: "Set assignee to Karol", enabled: true },
+  { id: "a2", name: "Notify on overdue", trigger: "When task becomes overdue", action: "Send email to assignee + Karol", enabled: true },
+  { id: "a3", name: "Close stale tasks", trigger: "When task in Done for 14 days", action: "Archive task", enabled: false },
+  { id: "a4", name: "Escalate urgent", trigger: "When urgent task has no update for 24h", action: "Send Slack notification to #ops", enabled: true },
+];
 
 interface CrmBoardProps {
   initialFilter?: { hotel_id?: number; channel_id?: number } | null;
@@ -132,9 +150,96 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<Priority | "all">("all");
   const [showNewTask, setShowNewTask] = useState(false);
+  const [newTaskDefaultStatus, setNewTaskDefaultStatus] = useState<TaskStatus | null>(null);
   const [expandedHotel, setExpandedHotel] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [showAutomations, setShowAutomations] = useState(false);
+
+  // ── WIP limits ──
+  const [wipLimits, setWipLimits] = useState<Record<TaskStatus, number>>(DEFAULT_WIP_LIMITS);
+
+  // ── Bulk selection ──
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+
+  // ── Context menu ──
+  const [contextMenu, setContextMenu] = useState<{ taskId: number; x: number; y: number } | null>(null);
+
+  // ── Mock stores (mockup — no backend) ──
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
+  const [watchers, setWatchers] = useState<TaskWatcher[]>([]);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [automations, setAutomations] = useState<Automation[]>(MOCK_AUTOMATIONS);
+
+  // ── Drag-and-drop state ──
+  const [dragTaskId, setDragTaskId] = useState<number | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
+
+  const handleDragStart = useCallback((taskId: number, e: React.DragEvent) => {
+    setDragTaskId(taskId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(taskId));
+    if (e.currentTarget instanceof HTMLElement) {
+      requestAnimationFrame(() => { (e.currentTarget as HTMLElement).style.opacity = "0.4"; });
+    }
+  }, []);
+
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    setDragTaskId(null);
+    setDragOverCol(null);
+    if (e.currentTarget instanceof HTMLElement) e.currentTarget.style.opacity = "1";
+  }, []);
+
+  const handleColumnDragOver = useCallback((status: TaskStatus, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverCol(status);
+  }, []);
+
+  const handleColumnDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null);
+  }, []);
+
+  const handleColumnDrop = useCallback((status: TaskStatus, e: React.DragEvent) => {
+    e.preventDefault();
+    const taskId = Number(e.dataTransfer.getData("text/plain"));
+    setDragTaskId(null);
+    setDragOverCol(null);
+    if (!taskId) return;
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.status === status) return;
+    updateTask(taskId, { status });
+  }, [tasks, updateTask]);
+
+  // ── Bulk actions ──
+  function toggleBulkSelect(id: number) {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkUpdate(data: Record<string, unknown>) {
+    for (const id of selectedTaskIds) {
+      await updateTask(id, data);
+    }
+    setSelectedTaskIds(new Set());
+    setBulkMode(false);
+  }
+
+  // ── Context menu handlers ──
+  function handleContextMenu(taskId: number, e: React.MouseEvent) {
+    e.preventDefault();
+    setContextMenu({ taskId, x: e.clientX, y: e.clientY });
+  }
+
+  useEffect(() => {
+    const handler = () => setContextMenu(null);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, []);
 
   const selectedTask = useMemo(() => tasks.find((t) => t.id === selectedTaskId) || null, [tasks, selectedTaskId]);
 
@@ -148,7 +253,6 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
     });
   }, [tasks, search, categoryFilter, assigneeFilter, priorityFilter]);
 
-  // Derive unique hotel names from tasks for the "By Hotel" view
   const hotelNames = useMemo(() => {
     const names = new Set<string>();
     tasks.forEach((t) => { if (t.hotel_name) names.add(t.hotel_name); });
@@ -156,6 +260,16 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
   }, [tasks]);
 
   const todayStr = new Date().toISOString().split("T")[0];
+
+  // ── Due date tier ──
+  function dueDateTier(task: CrmTask): "overdue" | "today" | "this_week" | "normal" | "none" {
+    if (!task.due_date || task.status === "done") return "none";
+    const diff = differenceInCalendarDays(new Date(task.due_date + "T00:00:00"), new Date());
+    if (diff < 0) return "overdue";
+    if (diff === 0) return "today";
+    if (diff <= 7) return "this_week";
+    return "normal";
+  }
 
   if (loading) {
     return (
@@ -186,13 +300,29 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
               <p style={{ color: TEXT_MID, fontSize: 12, margin: 0 }}>Task management & operations</p>
             </div>
           </div>
-          <button onClick={() => setShowNewTask(true)} style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 8,
-            border: "none", background: BLUE, color: "#000",
-            fontSize: 13, fontWeight: 600, cursor: "pointer",
-          }}>
-            <Plus size={14} /> New Task
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setShowAutomations(true)} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8,
+              border: `1px solid ${BORDER}`, background: INPUT_BG, color: TEXT_MID,
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}>
+              <Zap size={13} /> Automations
+            </button>
+            <button onClick={() => { setBulkMode(!bulkMode); setSelectedTaskIds(new Set()); }} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8,
+              border: `1px solid ${bulkMode ? BLUE + "40" : BORDER}`, background: bulkMode ? `${BLUE}10` : INPUT_BG,
+              color: bulkMode ? BLUE : TEXT_MID, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}>
+              <CheckSquare size={13} /> Bulk
+            </button>
+            <button onClick={() => { setShowNewTask(true); setNewTaskDefaultStatus(null); }} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 8,
+              border: "none", background: BLUE, color: "#000",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}>
+              <Plus size={14} /> New Task
+            </button>
+          </div>
         </div>
       </div>
 
@@ -220,13 +350,53 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
         </div>
       )}
 
+      {/* ── Bulk action bar ── */}
+      {bulkMode && selectedTaskIds.size > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", marginBottom: 16,
+          background: `${BLUE}08`, border: `1px solid ${BLUE}25`, borderRadius: 8,
+        }}>
+          <span style={{ color: BLUE, fontSize: 12, fontWeight: 600 }}>{selectedTaskIds.size} selected</span>
+          <div style={{ width: 1, height: 20, background: BORDER }} />
+          <span style={{ color: TEXT_DIM, fontSize: 11 }}>Move to:</span>
+          {STATUS_COLUMNS.map((s) => (
+            <button key={s.key} onClick={() => bulkUpdate({ status: s.key })} style={{
+              padding: "4px 10px", borderRadius: 5, border: `1px solid ${s.color}30`,
+              background: `${s.color}10`, color: s.color, fontSize: 11, fontWeight: 600, cursor: "pointer",
+            }}>{s.label}</button>
+          ))}
+          <div style={{ width: 1, height: 20, background: BORDER }} />
+          <span style={{ color: TEXT_DIM, fontSize: 11 }}>Assign:</span>
+          {teamMembers.slice(0, 4).map((m) => (
+            <button key={m.name} onClick={() => bulkUpdate({ assignee: m.name })} style={{
+              padding: "4px 10px", borderRadius: 5, border: `1px solid ${BORDER}`,
+              background: INPUT_BG, color: TEXT_MID, fontSize: 11, cursor: "pointer",
+            }}>{m.name}</button>
+          ))}
+          <div style={{ width: 1, height: 20, background: BORDER }} />
+          <span style={{ color: TEXT_DIM, fontSize: 11 }}>Priority:</span>
+          {(Object.entries(PRIORITY_CFG) as [Priority, typeof PRIORITY_CFG["urgent"]][]).map(([k, v]) => (
+            <button key={k} onClick={() => bulkUpdate({ priority: k })} style={{
+              padding: "4px 10px", borderRadius: 5, border: `1px solid ${v.color}30`,
+              background: `${v.color}10`, color: v.color, fontSize: 11, fontWeight: 600, cursor: "pointer",
+            }}>{v.label}</button>
+          ))}
+          <button onClick={() => { setSelectedTaskIds(new Set()); setBulkMode(false); }} style={{
+            marginLeft: "auto", padding: "4px 10px", borderRadius: 5, border: `1px solid ${BORDER}`,
+            background: INPUT_BG, color: TEXT_DIM, fontSize: 11, cursor: "pointer",
+          }}>Cancel</button>
+        </div>
+      )}
+
       {/* ── Toolbar ── */}
       <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ display: "flex", background: INPUT_BG, borderRadius: 8, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
           {([
             { key: "board" as ViewMode, label: "Board", icon: <LayoutIcon /> },
+            { key: "timeline" as ViewMode, label: "Timeline", icon: <BarChart3 size={12} /> },
+            { key: "my_work" as ViewMode, label: "My Work", icon: <User size={12} /> },
             { key: "hotel" as ViewMode, label: "By Hotel", icon: <Building2 size={12} /> },
-            { key: "user" as ViewMode, label: "By Person", icon: <User size={12} /> },
+            { key: "user" as ViewMode, label: "By Person", icon: <Users size={12} /> },
           ]).map((v) => (
             <button key={v.key} onClick={() => setViewMode(v.key)} style={{
               display: "flex", alignItems: "center", gap: 5, padding: "7px 14px",
@@ -267,119 +437,59 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
         </select>
       </div>
 
-      {/* ── Board View (Kanban) ── */}
+      {/* ═════════════════════════════════════════════ */}
+      {/* BOARD VIEW (Kanban)                           */}
+      {/* ═════════════════════════════════════════════ */}
       {viewMode === "board" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, alignItems: "start" }}>
-          {STATUS_COLUMNS.map((col) => {
-            const colTasks = filteredTasks.filter((t) => t.status === col.key);
-            return (
-              <div key={col.key}>
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "18px 16px", marginBottom: 12, borderRadius: 10,
-                  background: `${col.color}08`, border: `1px solid ${col.color}20`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color }} />
-                    <span style={{ color: TEXT, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.01em" }}>{col.label}</span>
-                  </div>
-                  <span style={{ color: col.color, fontSize: 13, fontWeight: 700, background: `${col.color}15`, padding: "4px 12px", borderRadius: 10 }}>
-                    {colTasks.length}
-                  </span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {colTasks.map((task) => <TaskCard key={task.id} task={task} onClick={() => setSelectedTaskId(task.id)} />)}
-                  {colTasks.length === 0 && (
-                    <div style={{ padding: "40px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12, border: `1px dashed ${BORDER}`, borderRadius: 8 }}>
-                      No tasks
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <KanbanBoard
+          tasks={filteredTasks}
+          allTasks={tasks}
+          wipLimits={wipLimits}
+          dragTaskId={dragTaskId}
+          dragOverCol={dragOverCol}
+          bulkMode={bulkMode}
+          selectedTaskIds={selectedTaskIds}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onColumnDragOver={handleColumnDragOver}
+          onColumnDragLeave={handleColumnDragLeave}
+          onColumnDrop={handleColumnDrop}
+          onTaskClick={(id) => setSelectedTaskId(id)}
+          onTaskContext={handleContextMenu}
+          onToggleBulk={toggleBulkSelect}
+          onQuickAdd={(status) => { setNewTaskDefaultStatus(status); setShowNewTask(true); }}
+          dueDateTier={dueDateTier}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* TIMELINE VIEW (Gantt-style)                 */}
+      {/* ═══════════════════════════════════════════ */}
+      {viewMode === "timeline" && (
+        <TimelineView tasks={filteredTasks} todayStr={todayStr} onTaskClick={(id) => setSelectedTaskId(id)} />
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* MY WORK VIEW — personal dashboard            */}
+      {/* ═══════════════════════════════════════════ */}
+      {viewMode === "my_work" && (
+        <MyWorkView
+          tasks={filteredTasks}
+          todayStr={todayStr}
+          onTaskClick={(id) => setSelectedTaskId(id)}
+          dueDateTier={dueDateTier}
+        />
       )}
 
       {/* ── Hotel View ── */}
       {viewMode === "hotel" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{
-            display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
-            padding: "10px 16px", backgroundColor: "#222222", borderRadius: "8px 8px 0 0",
-            border: `1px solid ${BORDER}`, borderBottom: "none",
-          }}>
-            {["Property", "Task", "Category", "Priority", "Assignee", "Due Date"].map((h) => (
-              <span key={h} style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>{h}</span>
-            ))}
-          </div>
-          {hotelNames.map((hotel) => {
-            const hotelTasks = filteredTasks.filter((t) => t.hotel_name === hotel && t.status !== "done");
-            if (hotelTasks.length === 0) return null;
-            const isExpanded = expandedHotel === hotel;
-            return (
-              <div key={hotel} style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, borderBottom: "none" }}>
-                <div onClick={() => setExpandedHotel(isExpanded ? null : hotel)}
-                  style={{ display: "grid", gridTemplateColumns: "260px 1fr 100px", padding: "12px 16px", cursor: "pointer", transition: "background 0.12s", alignItems: "center" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.025)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <ChevronDown size={14} style={{ color: TEXT_DIM, transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-                    <Building2 size={14} style={{ color: BLUE }} />
-                    <span style={{ color: TEXT, fontSize: 13, fontWeight: 600 }}>{hotel}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {Object.entries(CATEGORY_CFG).map(([cat, cfg]) => {
-                      const count = hotelTasks.filter((t) => t.category === cat).length;
-                      if (!count) return null;
-                      return <span key={cat} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cfg.color}15`, color: cfg.color, fontWeight: 500 }}>{cfg.label} {count}</span>;
-                    })}
-                  </div>
-                  <span style={{ color: TEXT_DIM, fontSize: 12, textAlign: "right" }}>{hotelTasks.length} task{hotelTasks.length !== 1 ? "s" : ""}</span>
-                </div>
-                {isExpanded && hotelTasks.map((task, i) => {
-                  const pCfg = PRIORITY_CFG[task.priority];
-                  const cCfg = CATEGORY_CFG[task.category];
-                  const isOverdue = task.due_date ? task.due_date < todayStr : false;
-                  return (
-                    <div key={task.id} onClick={() => setSelectedTaskId(task.id)} style={{
-                      display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
-                      padding: "10px 16px 10px 52px", alignItems: "center",
-                      borderTop: `1px solid ${BORDER}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
-                      transition: "background 0.12s", cursor: "pointer",
-                    }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.03)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)")}>
-                      <span style={{ color: TEXT_DIM, fontSize: 11 }}>CRM-{task.id}</span>
-                      <div>
-                        <span style={{ color: TEXT, fontSize: 12, fontWeight: 500 }}>{task.title}</span>
-                        {task.tags.length > 0 && (
-                          <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
-                            {task.tags.slice(0, 2).map((tag) => <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: BORDER, color: TEXT_DIM }}>{tag}</span>)}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cCfg.color}15`, color: cCfg.color, fontWeight: 500, width: "fit-content" }}>{cCfg.label}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color }} />
-                        <span style={{ color: pCfg.color, fontSize: 11 }}>{pCfg.label}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Avatar name={task.assignee || "?"} size={20} />
-                        <span style={{ color: TEXT_MID, fontSize: 11 }}>{task.assignee || "Unassigned"}</span>
-                      </div>
-                      <span style={{ color: isOverdue ? RED : TEXT_DIM, fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
-                        {isOverdue && <AlertTriangle size={10} />}
-                        {task.due_date ? formatDate(task.due_date) : "—"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-          <div style={{ borderBottom: `1px solid ${BORDER}`, borderRadius: "0 0 8px 8px" }} />
-        </div>
+        <HotelView
+          tasks={filteredTasks}
+          todayStr={todayStr}
+          expandedHotel={expandedHotel}
+          setExpandedHotel={setExpandedHotel}
+          onTaskClick={(id) => setSelectedTaskId(id)}
+        />
       )}
 
       {/* ── User View ── */}
@@ -422,16 +532,13 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
                       ))}
                     </div>
                     {memberTasks
-                      .sort((a, b) => {
-                        const po: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-                        return po[a.priority] - po[b.priority] || (a.due_date || "").localeCompare(b.due_date || "");
-                      })
+                      .sort((a, b) => PRIORITY_CFG[a.priority].order - PRIORITY_CFG[b.priority].order || (a.due_date || "").localeCompare(b.due_date || ""))
                       .map((task, i) => {
                         const pCfg = PRIORITY_CFG[task.priority];
                         const cCfg = CATEGORY_CFG[task.category];
                         const isOverdue = task.due_date ? task.due_date < todayStr : false;
                         const sCfg = STATUS_COLUMNS.find((s) => s.key === task.status)!;
-                        const hotelDisplay = task.hotel_name || "—";
+                        const hotelDisplay = task.hotel_name || "\u2014";
                         return (
                           <div key={task.id} onClick={() => setSelectedTaskId(task.id)} style={{
                             display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px",
@@ -462,7 +569,7 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
                             </div>
                             <span style={{ color: isOverdue ? RED : TEXT_DIM, fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
                               {isOverdue && <AlertTriangle size={10} />}
-                              {task.due_date ? formatDate(task.due_date) : "—"}
+                              {task.due_date ? formatDate(task.due_date) : "\u2014"}
                             </span>
                           </div>
                         );
@@ -478,31 +585,803 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* TASK DETAIL PANEL — Jira-style slide-out    */}
-      {/* ═══════════════════════════════════════════ */}
-      {selectedTask && (
-        <TaskDetailPanel
-          task={selectedTask}
-          onClose={() => setSelectedTaskId(null)}
+      {/* ── Right-click context menu ── */}
+      {contextMenu && (
+        <ContextMenuPopup
+          x={contextMenu.x}
+          y={contextMenu.y}
+          task={tasks.find((t) => t.id === contextMenu.taskId)!}
           onUpdateTask={updateTask}
-          onRefresh={refresh}
+          onDeleteTask={deleteTask}
+          onClose={() => setContextMenu(null)}
         />
       )}
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* CREATE TASK — Jira/Monday-style             */}
-      {/* ═══════════════════════════════════════════ */}
-      {showNewTask && (
-        <CreateTaskPanel
-          onClose={() => setShowNewTask(false)}
-          onCreateTask={createTask}
-          hotelNames={hotelNames}
+      {/* ── Task Detail Panel ── */}
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          allTasks={tasks}
+          onClose={() => setSelectedTaskId(null)}
+          onUpdateTask={updateTask}
+          onDeleteTask={deleteTask}
+          onRefresh={refresh}
+          dependencies={dependencies}
+          setDependencies={setDependencies}
+          watchers={watchers}
+          setWatchers={setWatchers}
+          attachments={attachments}
+          setAttachments={setAttachments}
+          onNavigateTask={(id) => setSelectedTaskId(id)}
         />
       )}
+
+      {/* ── Create Task Panel ── */}
+      {showNewTask && (
+        <CreateTaskPanel
+          onClose={() => { setShowNewTask(false); setNewTaskDefaultStatus(null); }}
+          onCreateTask={createTask}
+          hotelNames={hotelNames}
+          defaultStatus={newTaskDefaultStatus}
+        />
+      )}
+
+      {/* ── Automations Panel ── */}
+      {showAutomations && (
+        <AutomationsPanel
+          automations={automations}
+          setAutomations={setAutomations}
+          onClose={() => setShowAutomations(false)}
+        />
+      )}
+
       </div>
     </div>
     </TeamContext.Provider>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+// KANBAN BOARD (reusable for swimlanes)
+// ═══════════════════════════════════════════════════
+
+function KanbanBoard({
+  tasks, allTasks, wipLimits, dragTaskId, dragOverCol,
+  bulkMode, selectedTaskIds,
+  onDragStart, onDragEnd, onColumnDragOver, onColumnDragLeave, onColumnDrop,
+  onTaskClick, onTaskContext, onToggleBulk, onQuickAdd, dueDateTier, compact,
+}: {
+  tasks: CrmTask[];
+  allTasks: CrmTask[];
+  wipLimits: Record<TaskStatus, number>;
+  dragTaskId: number | null;
+  dragOverCol: TaskStatus | null;
+  bulkMode: boolean;
+  selectedTaskIds: Set<number>;
+  onDragStart: (id: number, e: React.DragEvent) => void;
+  onDragEnd: (e: React.DragEvent) => void;
+  onColumnDragOver: (status: TaskStatus, e: React.DragEvent) => void;
+  onColumnDragLeave: (e: React.DragEvent) => void;
+  onColumnDrop: (status: TaskStatus, e: React.DragEvent) => void;
+  onTaskClick: (id: number) => void;
+  onTaskContext: (id: number, e: React.MouseEvent) => void;
+  onToggleBulk: (id: number) => void;
+  onQuickAdd: (status: TaskStatus) => void;
+  dueDateTier: (task: CrmTask) => string;
+  compact?: boolean;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, alignItems: "start" }}>
+      {STATUS_COLUMNS.map((col) => {
+        const colTasks = tasks.filter((t) => t.status === col.key);
+        const isDropTarget = dragTaskId !== null && dragOverCol === col.key;
+        const draggedTask = dragTaskId ? allTasks.find((t) => t.id === dragTaskId) : null;
+        const isDragSource = draggedTask?.status === col.key;
+        const wipLimit = wipLimits[col.key];
+        const isOverWip = wipLimit > 0 && colTasks.length > wipLimit;
+        return (
+          <div
+            key={col.key}
+            onDragOver={(e) => onColumnDragOver(col.key, e)}
+            onDragLeave={onColumnDragLeave}
+            onDrop={(e) => onColumnDrop(col.key, e)}
+            style={{
+              borderRadius: 12,
+              padding: isDropTarget && !isDragSource ? 4 : 0,
+              border: isDropTarget && !isDragSource ? `2px dashed ${col.color}60` : "2px dashed transparent",
+              background: isDropTarget && !isDragSource ? `${col.color}08` : "transparent",
+              transition: "all 0.15s ease",
+              minHeight: dragTaskId ? 120 : undefined,
+            }}
+          >
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: compact ? "12px 12px" : "18px 16px", marginBottom: compact ? 8 : 12, borderRadius: 10,
+              background: `${col.color}08`, border: `1px solid ${isOverWip ? RED + "50" : col.color + "20"}`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color }} />
+                <span style={{ color: TEXT, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.01em" }}>{col.label}</span>
+                {wipLimit > 0 && (
+                  <span style={{
+                    fontSize: 10, padding: "1px 6px", borderRadius: 4,
+                    background: isOverWip ? `${RED}15` : `${TEXT_DIM}15`,
+                    color: isOverWip ? RED : TEXT_DIM, fontWeight: 600,
+                  }}>
+                    {colTasks.length}/{wipLimit}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: col.color, fontSize: 13, fontWeight: 700, background: `${col.color}15`, padding: "4px 12px", borderRadius: 10 }}>
+                  {colTasks.length}
+                </span>
+                <button onClick={() => onQuickAdd(col.key)} style={{
+                  width: 24, height: 24, borderRadius: 6, border: `1px solid ${BORDER}`,
+                  background: "transparent", color: TEXT_DIM, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `${col.color}15`; e.currentTarget.style.color = col.color; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = TEXT_DIM; }}
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {colTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onClick={() => onTaskClick(task.id)}
+                  onContextMenu={(e) => onTaskContext(task.id, e)}
+                  onDragStart={(e) => onDragStart(task.id, e)}
+                  onDragEnd={onDragEnd}
+                  isDragging={dragTaskId === task.id}
+                  bulkMode={bulkMode}
+                  bulkSelected={selectedTaskIds.has(task.id)}
+                  onToggleBulk={() => onToggleBulk(task.id)}
+                  dueTier={dueDateTier(task)}
+                />
+              ))}
+              {colTasks.length === 0 && (
+                <div style={{
+                  padding: isDropTarget && !isDragSource ? "28px 16px" : "40px 16px",
+                  textAlign: "center", color: isDropTarget ? col.color : TEXT_DIM, fontSize: 12,
+                  border: `1px dashed ${isDropTarget ? col.color + "40" : BORDER}`, borderRadius: 8,
+                  transition: "all 0.15s",
+                }}>
+                  {isDropTarget ? "Drop here" : "No tasks"}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+// HOTEL VIEW (grouped by management group + portfolio)
+// ═══════════════════════════════════════════════════
+
+function HotelView({
+  tasks, todayStr, expandedHotel, setExpandedHotel, onTaskClick,
+}: {
+  tasks: CrmTask[];
+  todayStr: string;
+  expandedHotel: string | null;
+  setExpandedHotel: (h: string | null) => void;
+  onTaskClick: (id: number) => void;
+}) {
+  // Fetch hotels to get management_group info
+  const [hotelGroups, setHotelGroups] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    fetch("/api/hotels").then(r => r.json()).then(data => {
+      const map: Record<string, string | null> = {};
+      for (const h of data) {
+        if (h.property_name) map[h.property_name] = h.management_group || null;
+      }
+      setHotelGroups(map);
+    }).catch(console.error);
+  }, []);
+
+  const activeTasks = tasks.filter((t) => t.status !== "done");
+
+  // Group tasks into sections: portfolio-wide (no hotel), per management group, individual hotels
+  const portfolioTasks = activeTasks.filter((t) => !t.hotel_name);
+
+  // Build management group -> hotels map
+  const mgmtGroups = useMemo(() => {
+    const groups: Record<string, Set<string>> = {};
+    for (const [hotel, group] of Object.entries(hotelGroups)) {
+      if (group) {
+        if (!groups[group]) groups[group] = new Set();
+        groups[group].add(hotel);
+      }
+    }
+    return groups;
+  }, [hotelGroups]);
+
+  // Find tasks assigned to a management group (task has a hotel that belongs to a group)
+  // Group the individual hotels under their management group headers
+  type Section = { key: string; label: string; icon: "portfolio" | "group" | "hotel"; color: string; tasks: CrmTask[] };
+
+  const sections = useMemo(() => {
+    const result: Section[] = [];
+
+    // 1. Entire Portfolio (tasks with no hotel assigned)
+    if (portfolioTasks.length > 0) {
+      result.push({ key: "__portfolio__", label: "Entire Portfolio", icon: "portfolio", color: AMBER, tasks: portfolioTasks });
+    }
+
+    // 2. Management groups (as parent sections containing hotel sub-rows)
+    const hotelsSeen = new Set<string>();
+    for (const [groupName, groupHotels] of Object.entries(mgmtGroups).sort(([a], [b]) => a.localeCompare(b))) {
+      const groupTasks = activeTasks.filter((t) => t.hotel_name && groupHotels.has(t.hotel_name));
+      if (groupTasks.length > 0) {
+        result.push({ key: `__group__${groupName}`, label: groupName, icon: "group", color: PURPLE, tasks: groupTasks });
+        groupHotels.forEach((h) => hotelsSeen.add(h));
+      }
+    }
+
+    // 3. Individual hotels not in any group
+    const ungroupedHotels = new Set<string>();
+    activeTasks.forEach((t) => { if (t.hotel_name && !hotelsSeen.has(t.hotel_name)) ungroupedHotels.add(t.hotel_name); });
+    for (const hotel of Array.from(ungroupedHotels).sort()) {
+      const hotelTasks = activeTasks.filter((t) => t.hotel_name === hotel);
+      if (hotelTasks.length > 0) {
+        result.push({ key: hotel, label: hotel, icon: "hotel", color: BLUE, tasks: hotelTasks });
+      }
+    }
+
+    return result;
+  }, [activeTasks, portfolioTasks, mgmtGroups]);
+
+  function renderTaskRow(task: CrmTask, i: number) {
+    const pCfg = PRIORITY_CFG[task.priority];
+    const cCfg = CATEGORY_CFG[task.category];
+    const isOverdue = task.due_date ? task.due_date < todayStr : false;
+    return (
+      <div key={task.id} onClick={() => onTaskClick(task.id)} style={{
+        display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
+        padding: "10px 16px 10px 52px", alignItems: "center",
+        borderTop: `1px solid ${BORDER}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+        transition: "background 0.12s", cursor: "pointer",
+      }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.03)")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)")}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: TEXT_DIM, fontSize: 11 }}>CRM-{task.id}</span>
+          {task.hotel_name && <span style={{ color: TEXT_DIM, fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${BLUE}10`, border: `1px solid ${BLUE}15` }}>{task.hotel_name.length > 22 ? task.hotel_name.slice(0, 22) + "\u2026" : task.hotel_name}</span>}
+        </div>
+        <div>
+          <span style={{ color: TEXT, fontSize: 12, fontWeight: 500 }}>{task.title}</span>
+          {task.tags.length > 0 && (
+            <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
+              {task.tags.slice(0, 2).map((tag) => <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: BORDER, color: TEXT_DIM }}>{tag}</span>)}
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cCfg.color}15`, color: cCfg.color, fontWeight: 500, width: "fit-content" }}>{cCfg.label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color }} />
+          <span style={{ color: pCfg.color, fontSize: 11 }}>{pCfg.label}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Avatar name={task.assignee || "?"} size={20} />
+          <span style={{ color: TEXT_MID, fontSize: 11 }}>{task.assignee || "Unassigned"}</span>
+        </div>
+        <span style={{ color: isOverdue ? RED : TEXT_DIM, fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+          {isOverdue && <AlertTriangle size={10} />}
+          {task.due_date ? formatDate(task.due_date) : "\u2014"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{
+        display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
+        padding: "10px 16px", backgroundColor: "#222222", borderRadius: "8px 8px 0 0",
+        border: `1px solid ${BORDER}`, borderBottom: "none",
+      }}>
+        {["Scope", "Task", "Category", "Priority", "Assignee", "Due Date"].map((h) => (
+          <span key={h} style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>{h}</span>
+        ))}
+      </div>
+
+      {sections.map((section) => {
+        const isExpanded = expandedHotel === section.key;
+        const iconEl = section.icon === "portfolio"
+          ? <Globe size={14} style={{ color: section.color }} />
+          : section.icon === "group"
+            ? <Users size={14} style={{ color: section.color }} />
+            : <Building2 size={14} style={{ color: section.color }} />;
+
+        return (
+          <div key={section.key} style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, borderBottom: "none" }}>
+            <div onClick={() => setExpandedHotel(isExpanded ? null : section.key)}
+              style={{ display: "grid", gridTemplateColumns: "260px 1fr 100px", padding: "12px 16px", cursor: "pointer", transition: "background 0.12s", alignItems: "center" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.025)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <ChevronDown size={14} style={{ color: TEXT_DIM, transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                {iconEl}
+                <span style={{ color: TEXT, fontSize: 13, fontWeight: 600 }}>{section.label}</span>
+                {section.icon !== "hotel" && (
+                  <span style={{
+                    fontSize: 9, padding: "1px 8px", borderRadius: 10,
+                    background: `${section.color}15`, color: section.color, fontWeight: 600,
+                    textTransform: "uppercase", letterSpacing: "0.03em",
+                  }}>
+                    {section.icon === "portfolio" ? "Portfolio" : "Group"}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {Object.entries(CATEGORY_CFG).map(([cat, cfg]) => {
+                  const count = section.tasks.filter((t) => t.category === cat).length;
+                  if (!count) return null;
+                  return <span key={cat} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cfg.color}15`, color: cfg.color, fontWeight: 500 }}>{cfg.label} {count}</span>;
+                })}
+              </div>
+              <span style={{ color: TEXT_DIM, fontSize: 12, textAlign: "right" }}>
+                {section.tasks.length} task{section.tasks.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {isExpanded && section.tasks.map((task, i) => renderTaskRow(task, i))}
+          </div>
+        );
+      })}
+
+      {sections.length === 0 && (
+        <div style={{ padding: "40px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12, backgroundColor: CARD_BG, border: `1px solid ${BORDER}` }}>
+          No active tasks
+        </div>
+      )}
+      <div style={{ borderBottom: `1px solid ${BORDER}`, borderRadius: "0 0 8px 8px" }} />
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+// CONTEXT MENU (right-click)
+// ═══════════════════════════════════════════════════
+
+function ContextMenuPopup({
+  x, y, task, onUpdateTask, onDeleteTask, onClose,
+}: {
+  x: number; y: number;
+  task: CrmTask;
+  onUpdateTask: (id: number, data: Record<string, unknown>) => Promise<CrmTask>;
+  onDeleteTask: (id: number) => Promise<void>;
+  onClose: () => void;
+}) {
+  const team = useTeam();
+
+  function item(label: string, icon: React.ReactNode, action: () => void, color?: string) {
+    return (
+      <button onClick={(e) => { e.stopPropagation(); action(); onClose(); }} style={{
+        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 12px",
+        background: "transparent", border: "none", cursor: "pointer", color: color || TEXT_MID,
+        fontSize: 12, textAlign: "left", transition: "background 0.1s",
+      }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.05)")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      >
+        {icon} {label}
+      </button>
+    );
+  }
+
+  function divider() {
+    return <div style={{ height: 1, background: BORDER, margin: "4px 0" }} />;
+  }
+
+  return (
+    <div style={{
+      position: "fixed", left: x, top: y, zIndex: 999,
+      background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.6)", padding: "6px 0", minWidth: 200,
+    }}>
+      <div style={{ padding: "6px 12px 8px", color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        CRM-{task.id}
+      </div>
+      {divider()}
+
+      <div style={{ padding: "4px 12px 2px", color: TEXT_DIM, fontSize: 10, fontWeight: 600 }}>Move to</div>
+      {STATUS_COLUMNS.filter((s) => s.key !== task.status).map((s) => (
+        item(s.label, <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color }} />, () => onUpdateTask(task.id, { status: s.key }), s.color)
+      ))}
+
+      {divider()}
+
+      <div style={{ padding: "4px 12px 2px", color: TEXT_DIM, fontSize: 10, fontWeight: 600 }}>Priority</div>
+      {(Object.entries(PRIORITY_CFG) as [Priority, typeof PRIORITY_CFG["urgent"]][])
+        .filter(([k]) => k !== task.priority)
+        .map(([k, v]) => item(v.label, <div style={{ width: 8, height: 8, borderRadius: "50%", background: v.color }} />, () => onUpdateTask(task.id, { priority: k }), v.color))
+      }
+
+      {divider()}
+
+      <div style={{ padding: "4px 12px 2px", color: TEXT_DIM, fontSize: 10, fontWeight: 600 }}>Assign to</div>
+      {team.filter((m) => m.name !== task.assignee).slice(0, 5).map((m) => (
+        item(m.name, <Avatar name={m.name} size={16} />, () => onUpdateTask(task.id, { assignee: m.name }))
+      ))}
+
+      {divider()}
+      {item("Delete", <Trash2 size={13} />, () => onDeleteTask(task.id), RED)}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+// TIMELINE VIEW (Gantt-style)
+// ═══════════════════════════════════════════════════
+
+function TimelineView({
+  tasks, todayStr, onTaskClick,
+}: {
+  tasks: CrmTask[];
+  todayStr: string;
+  onTaskClick: (id: number) => void;
+}) {
+  const today = new Date();
+  const start = startOfWeek(today, { weekStartsOn: 1 });
+  const days = eachDayOfInterval({ start, end: addDays(start, 27) }); // 4 weeks
+  const tasksWithDates = tasks.filter((t) => t.due_date && t.status !== "done")
+    .sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""));
+
+  return (
+    <div style={{ background: CARD_BG, borderRadius: 10, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
+      {/* Header — dates */}
+      <div style={{ display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`, borderBottom: `1px solid ${BORDER}` }}>
+        <div style={{ padding: "10px 16px", background: "#222222" }}>
+          <span style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>Task</span>
+        </div>
+        {days.map((d) => {
+          const ds = format(d, "yyyy-MM-dd");
+          const isToday = ds === todayStr;
+          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          return (
+            <div key={ds} style={{
+              padding: "6px 2px", textAlign: "center", background: isToday ? `${BLUE}10` : isWeekend ? "rgba(255,255,255,0.015)" : "#222222",
+              borderLeft: `1px solid ${BORDER}`, borderBottom: isToday ? `2px solid ${BLUE}` : "none",
+            }}>
+              <div style={{ color: isToday ? BLUE : TEXT_DIM, fontSize: 9, fontWeight: 600 }}>{format(d, "EEE")}</div>
+              <div style={{ color: isToday ? BLUE : TEXT_MID, fontSize: 11, fontWeight: isToday ? 700 : 400 }}>{format(d, "d")}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Rows */}
+      {tasksWithDates.length === 0 && (
+        <div style={{ padding: "40px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12 }}>
+          No tasks with due dates in this period
+        </div>
+      )}
+      {tasksWithDates.map((task, i) => {
+        const pCfg = PRIORITY_CFG[task.priority];
+        const dueDateObj = new Date(task.due_date! + "T00:00:00");
+        const createdDateObj = new Date(task.created_at + "T00:00:00");
+        const startCol = Math.max(0, differenceInCalendarDays(createdDateObj, start));
+        const endCol = differenceInCalendarDays(dueDateObj, start);
+        const isOverdue = task.due_date! < todayStr;
+
+        return (
+          <div key={task.id} onClick={() => onTaskClick(task.id)} style={{
+            display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`,
+            borderTop: i > 0 ? `1px solid ${BORDER}` : "none",
+            cursor: "pointer", transition: "background 0.12s",
+          }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.02)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderRight: `1px solid ${BORDER}` }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color, flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: TEXT, fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
+                <div style={{ color: TEXT_DIM, fontSize: 10 }}>{task.assignee || "Unassigned"}</div>
+              </div>
+            </div>
+            {days.map((d, di) => {
+              const ds = format(d, "yyyy-MM-dd");
+              const isInRange = di >= Math.max(0, startCol) && di <= endCol;
+              const isStart = di === Math.max(0, startCol) && startCol >= 0;
+              const isEnd = di === endCol;
+              const isDueDay = ds === task.due_date;
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+
+              return (
+                <div key={ds} style={{
+                  borderLeft: `1px solid ${BORDER}`,
+                  background: isWeekend ? "rgba(255,255,255,0.01)" : "transparent",
+                  position: "relative", padding: "4px 1px", display: "flex", alignItems: "center",
+                }}>
+                  {isInRange && (
+                    <div style={{
+                      height: 22, width: "100%",
+                      background: isOverdue ? `${RED}20` : `${pCfg.color}20`,
+                      borderRadius: isStart && isEnd ? 4 : isStart ? "4px 0 0 4px" : isEnd ? "0 4px 4px 0" : 0,
+                      border: isDueDay ? `1px solid ${isOverdue ? RED : pCfg.color}40` : "none",
+                    }} />
+                  )}
+                  {isDueDay && (
+                    <div style={{
+                      position: "absolute", right: 2, top: "50%", transform: "translateY(-50%)",
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: isOverdue ? RED : pCfg.color,
+                    }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+// MY WORK VIEW — personal dashboard
+// ═══════════════════════════════════════════════════
+
+function MyWorkView({
+  tasks, todayStr, onTaskClick, dueDateTier,
+}: {
+  tasks: CrmTask[];
+  todayStr: string;
+  onTaskClick: (id: number) => void;
+  dueDateTier: (task: CrmTask) => string;
+}) {
+  // Hardcoded to "Karol" for now — would come from auth context
+  const myName = "Karol";
+  const myTasks = tasks.filter((t) => t.assignee === myName && t.status !== "done");
+  const overdue = myTasks.filter((t) => dueDateTier(t) === "overdue");
+  const dueToday = myTasks.filter((t) => dueDateTier(t) === "today");
+  const dueThisWeek = myTasks.filter((t) => dueDateTier(t) === "this_week");
+  const upcoming = myTasks.filter((t) => !["overdue", "today", "this_week"].includes(dueDateTier(t)));
+  const watching = tasks.filter((t) => t.assignee !== myName && t.status !== "done").slice(0, 5);
+
+  function renderSection(title: string, items: CrmTask[], color: string, icon: React.ReactNode) {
+    if (items.length === 0) return null;
+    return (
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          {icon}
+          <span style={{ color, fontSize: 13, fontWeight: 600 }}>{title}</span>
+          <span style={{ color: TEXT_DIM, fontSize: 11 }}>({items.length})</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {items.map((task) => {
+            const pCfg = PRIORITY_CFG[task.priority];
+            const sCfg = STATUS_COLUMNS.find((s) => s.key === task.status)!;
+            return (
+              <div key={task.id} onClick={() => onTaskClick(task.id)} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+                background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`,
+                borderLeft: `3px solid ${pCfg.color}`, cursor: "pointer", transition: "all 0.12s",
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${BLUE}30`; e.currentTarget.style.boxShadow = "0 2px 8px rgba(57,189,248,0.06)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderLeftColor = pCfg.color; }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: sCfg.color, flexShrink: 0 }} />
+                <span style={{ color: TEXT, fontSize: 12, fontWeight: 500, flex: 1 }}>{task.title}</span>
+                <span style={{ color: TEXT_DIM, fontSize: 10 }}>{task.hotel_name || "\u2014"}</span>
+                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 4, background: `${pCfg.color}12`, color: pCfg.color, fontWeight: 600 }}>{pCfg.label}</span>
+                <span style={{ color: TEXT_DIM, fontSize: 10 }}>{task.due_date ? formatDate(task.due_date) : "\u2014"}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Summary cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+        {[
+          { label: "My Open Tasks", value: myTasks.length, color: BLUE },
+          { label: "Overdue", value: overdue.length, color: RED },
+          { label: "Due Today", value: dueToday.length, color: AMBER },
+          { label: "Due This Week", value: dueThisWeek.length, color: PURPLE },
+        ].map((card) => (
+          <div key={card.label} style={{
+            padding: "18px 20px", background: CARD_BG, borderRadius: 10, border: `1px solid ${BORDER}`,
+          }}>
+            <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>{card.label}</div>
+            <div style={{ color: card.value > 0 ? card.color : TEXT_DIM, fontSize: 28, fontWeight: 700 }}>{card.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {renderSection("Overdue", overdue, RED, <AlertTriangle size={14} style={{ color: RED }} />)}
+      {renderSection("Due Today", dueToday, AMBER, <Clock size={14} style={{ color: AMBER }} />)}
+      {renderSection("Due This Week", dueThisWeek, PURPLE, <Calendar size={14} style={{ color: PURPLE }} />)}
+      {renderSection("Upcoming", upcoming, BLUE, <ArrowRight size={14} style={{ color: BLUE }} />)}
+
+      {myTasks.length === 0 && (
+        <div style={{ padding: "60px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 14 }}>
+          No open tasks assigned to you. Nice!
+        </div>
+      )}
+
+      {/* Watching section */}
+      {watching.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Eye size={14} style={{ color: TEXT_DIM }} />
+            <span style={{ color: TEXT_DIM, fontSize: 13, fontWeight: 600 }}>Watching</span>
+            <span style={{ color: TEXT_DIM, fontSize: 11 }}>(tasks assigned to others)</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {watching.map((task) => (
+              <div key={task.id} onClick={() => onTaskClick(task.id)} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "8px 16px",
+                background: "transparent", borderRadius: 6, border: `1px solid ${BORDER}`,
+                cursor: "pointer", transition: "background 0.12s", opacity: 0.7,
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(57,189,248,0.02)"; e.currentTarget.style.opacity = "1"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.opacity = "0.7"; }}
+              >
+                <Avatar name={task.assignee || "?"} size={20} />
+                <span style={{ color: TEXT_MID, fontSize: 11, width: 80 }}>{task.assignee}</span>
+                <span style={{ color: TEXT, fontSize: 12, flex: 1 }}>{task.title}</span>
+                <span style={{ color: TEXT_DIM, fontSize: 10 }}>{task.due_date ? formatDate(task.due_date) : "\u2014"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════
+// AUTOMATIONS PANEL
+// ═══════════════════════════════════════════════════
+
+function AutomationsPanel({
+  automations, setAutomations, onClose,
+}: {
+  automations: Automation[];
+  setAutomations: (a: Automation[]) => void;
+  onClose: () => void;
+}) {
+  const [showNewRule, setShowNewRule] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newTrigger, setNewTrigger] = useState("When status changes to Done");
+  const [newAction, setNewAction] = useState("Send email to assignee");
+
+  const triggers = [
+    "When status changes to Done",
+    "When status changes to Review",
+    "When status changes to In Progress",
+    "When task becomes overdue",
+    "When urgent task has no update for 24h",
+    "When task is created",
+    "When priority changes to Urgent",
+  ];
+
+  const actions = [
+    "Send email to assignee",
+    "Send email to assignee + Karol",
+    "Set assignee to Karol",
+    "Set assignee to Maya",
+    "Send Slack notification to #ops",
+    "Archive task",
+    "Set priority to Urgent",
+    "Move to Review column",
+  ];
+
+  function toggleEnabled(id: string) {
+    setAutomations(automations.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a));
+  }
+
+  function deleteAutomation(id: string) {
+    setAutomations(automations.filter((a) => a.id !== id));
+  }
+
+  function addAutomation() {
+    if (!newName.trim()) return;
+    setAutomations([...automations, {
+      id: `a${Date.now()}`,
+      name: newName.trim(),
+      trigger: newTrigger,
+      action: newAction,
+      enabled: true,
+    }]);
+    setNewName("");
+    setShowNewRule(false);
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50 }} />
+      <div style={{
+        position: "fixed", top: 0, right: 0, bottom: 0, width: 560,
+        background: BG_PAGE, borderLeft: `1px solid ${BORDER}`, zIndex: 51,
+        display: "flex", flexDirection: "column", boxShadow: "-8px 0 40px rgba(0,0,0,0.4)",
+        animation: "slideInRight 0.2s ease-out",
+      }}>
+        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <Zap size={18} style={{ color: AMBER }} />
+          <span style={{ color: TEXT, fontSize: 16, fontWeight: 600, flex: 1 }}>Automations</span>
+          <button onClick={() => setShowNewRule(!showNewRule)} style={{
+            display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 6,
+            border: "none", background: BLUE, color: "#000", fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}>
+            <Plus size={13} /> New Rule
+          </button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+          {showNewRule && (
+            <div style={{ marginBottom: 20, padding: 16, background: CARD_BG, borderRadius: 10, border: `1px solid ${BLUE}30` }}>
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Rule name..."
+                style={{ width: "100%", padding: "8px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 13, outline: "none", marginBottom: 12 }} />
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Trigger</div>
+                  <select value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }}>
+                    {triggers.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Action</div>
+                  <select value={newAction} onChange={(e) => setNewAction(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }}>
+                    {actions.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button onClick={() => setShowNewRule(false)} style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${BORDER}`, background: INPUT_BG, color: TEXT_MID, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                <button onClick={addAutomation} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: BLUE, color: "#000", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add Rule</button>
+              </div>
+            </div>
+          )}
+
+          {automations.length === 0 && <div style={{ padding: "40px 0", textAlign: "center", color: TEXT_DIM, fontSize: 13 }}>No automation rules yet</div>}
+
+          {automations.map((a) => (
+            <div key={a.id} style={{
+              display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", marginBottom: 8,
+              background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`, opacity: a.enabled ? 1 : 0.5,
+            }}>
+              <Zap size={16} style={{ color: a.enabled ? AMBER : TEXT_DIM, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: TEXT, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{a.name}</div>
+                <div style={{ color: TEXT_DIM, fontSize: 11 }}>{a.trigger} &rarr; {a.action}</div>
+              </div>
+              <ToggleSwitch on={a.enabled} onToggle={() => toggleEnabled(a.id)} />
+              <button onClick={() => deleteAutomation(a.id)} style={{
+                background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4,
+              }}><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+    </>
   );
 }
 
@@ -512,15 +1391,23 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
 // ═══════════════════════════════════════════════════
 
 function TaskDetailPanel({
-  task,
-  onClose,
-  onUpdateTask,
-  onRefresh,
+  task, allTasks, onClose, onUpdateTask, onDeleteTask, onRefresh,
+  dependencies, setDependencies, watchers, setWatchers,
+  attachments, setAttachments, onNavigateTask,
 }: {
   task: CrmTask;
+  allTasks: CrmTask[];
   onClose: () => void;
   onUpdateTask: (id: number, data: Record<string, unknown>) => Promise<CrmTask>;
+  onDeleteTask: (id: number) => Promise<void>;
   onRefresh: () => Promise<void>;
+  dependencies: TaskDependency[];
+  setDependencies: (d: TaskDependency[]) => void;
+  watchers: TaskWatcher[];
+  setWatchers: (w: TaskWatcher[]) => void;
+  attachments: TaskAttachment[];
+  setAttachments: (a: TaskAttachment[]) => void;
+  onNavigateTask: (id: number) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"details" | "activity">("details");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -532,29 +1419,29 @@ function TaskDetailPanel({
   const todayStr = new Date().toISOString().split("T")[0];
   const isOverdue = task.status !== "done" && task.due_date ? task.due_date < todayStr : false;
 
-  // Comments & activity from API
   const [comments, setComments] = useState<CrmTaskComment[]>([]);
-  const [subtasks, setSubtasks] = useState<CrmTaskSubtask[]>([]);
   const [commentText, setCommentText] = useState("");
-  const [newSubtaskText, setNewSubtaskText] = useState("");
   const [loadingComments, setLoadingComments] = useState(true);
-  const [loadingSubtasks, setLoadingSubtasks] = useState(true);
 
-  // Fetch comments and subtasks on mount
+  // Local states for features
+  const [newDepInput, setNewDepInput] = useState("");
+  const [newDepType, setNewDepType] = useState<"blocks" | "blocked_by">("blocks");
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+
+  const taskDeps = dependencies.filter((d) => d.taskId === task.id);
+  const taskWatchers = watchers.filter((w) => w.taskId === task.id);
+  const taskAttachments = attachments.filter((a) => a.taskId === task.id);
+
   useEffect(() => {
     setLoadingComments(true);
     fetchComments(task.id).then((c) => { setComments(c); setLoadingComments(false); }).catch(() => setLoadingComments(false));
   }, [task.id]);
 
-  useEffect(() => {
-    setLoadingSubtasks(true);
-    fetchSubtasks(task.id).then((s) => { setSubtasks(s); setLoadingSubtasks(false); }).catch(() => setLoadingSubtasks(false));
-  }, [task.id]);
-
   const detailComments = useMemo(() => comments.filter((c) => c.type === "comment"), [comments]);
   const activityItems = useMemo(() => comments.filter((c) => c.type === "activity"), [comments]);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -562,7 +1449,20 @@ function TaskDetailPanel({
   }, [onClose]);
 
   async function handleStatusChange(newStatus: TaskStatus) {
+    setShowStatusPicker(false);
     await onUpdateTask(task.id, { status: newStatus, updated_by: "Karol" });
+    await onRefresh();
+  }
+
+  async function handlePriorityChange(newPriority: Priority) {
+    setShowPriorityPicker(false);
+    await onUpdateTask(task.id, { priority: newPriority, updated_by: "Karol" });
+    await onRefresh();
+  }
+
+  async function handleAssigneeChange(name: string) {
+    setShowAssigneePicker(false);
+    await onUpdateTask(task.id, { assignee: name, updated_by: "Karol" });
     await onRefresh();
   }
 
@@ -575,41 +1475,64 @@ function TaskDetailPanel({
     await onRefresh();
   }
 
-  async function handleToggleSubtask(st: CrmTaskSubtask) {
-    await updateSubtask(st.id, { done: !st.done });
-    const s = await fetchSubtasks(task.id);
-    setSubtasks(s);
-    await onRefresh();
+  function addDependency() {
+    const linkedId = parseInt(newDepInput);
+    if (!linkedId || !allTasks.find((t) => t.id === linkedId) || linkedId === task.id) return;
+    setDependencies([...dependencies, { taskId: task.id, type: newDepType, linkedTaskId: linkedId }]);
+    setNewDepInput("");
   }
 
-  async function handleAddSubtask() {
-    if (!newSubtaskText.trim()) return;
-    await addSubtask(task.id, { text: newSubtaskText.trim() });
-    setNewSubtaskText("");
-    const s = await fetchSubtasks(task.id);
-    setSubtasks(s);
-    await onRefresh();
+  function removeDependency(idx: number) {
+    const taskSpecificDeps = dependencies.filter((d) => d.taskId === task.id);
+    const toRemove = taskSpecificDeps[idx];
+    if (toRemove) setDependencies(dependencies.filter((d) => d !== toRemove));
   }
 
-  const subtaskDone = subtasks.filter((s) => s.done).length;
-  const subtaskTotal = subtasks.length;
+  function addWatcher(name: string) {
+    if (taskWatchers.find((w) => w.name === name)) return;
+    setWatchers([...watchers, { taskId: task.id, name }]);
+  }
+
+  function removeWatcher(name: string) {
+    setWatchers(watchers.filter((w) => !(w.taskId === task.id && w.name === name)));
+  }
+
+  function addAttachment() {
+    setAttachments([...attachments, {
+      taskId: task.id,
+      name: `document_${Date.now().toString(36)}.pdf`,
+      size: `${Math.floor(Math.random() * 900 + 100)}KB`,
+      uploadedBy: "Karol",
+      uploadedAt: todayStr,
+    }]);
+  }
+
+  function removeAttachment(name: string) {
+    setAttachments(attachments.filter((a) => !(a.taskId === task.id && a.name === name)));
+  }
 
   return (
     <>
-      {/* Backdrop */}
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50, transition: "opacity 0.2s" }} />
 
-      {/* Panel */}
       <div ref={panelRef} style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: 680,
+        position: "fixed", top: 0, right: 0, bottom: 0, width: 720,
         background: BG_PAGE, borderLeft: `1px solid ${BORDER}`, zIndex: 51,
         display: "flex", flexDirection: "column", boxShadow: "-8px 0 40px rgba(0,0,0,0.4)",
         animation: "slideInRight 0.2s ease-out",
       }}>
         {/* Header */}
-        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={{ padding: "14px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: "monospace", fontWeight: 600 }}>CRM-{task.id}</span>
           <div style={{ flex: 1 }} />
+          <button onClick={async () => { await onDeleteTask(task.id); onClose(); }} style={{
+            background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4, borderRadius: 4,
+          }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = RED; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_DIM; }}
+          >
+            <Trash2 size={16} />
+          </button>
           <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4, borderRadius: 4 }}
             onMouseEnter={(e) => (e.currentTarget.style.background = `${BORDER}`)}
             onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
@@ -618,47 +1541,118 @@ function TaskDetailPanel({
         </div>
 
         {/* Scrollable Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
 
           {/* Title */}
-          <h2 style={{ color: TEXT, fontSize: 20, fontWeight: 600, margin: "0 0 20px 0", lineHeight: 1.35 }}>{task.title}</h2>
+          <h2 style={{ color: TEXT, fontSize: 18, fontWeight: 600, margin: "0 0 18px 0", lineHeight: 1.35 }}>{task.title}</h2>
 
-          {/* Status bar — inline fields like Jira */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 28 }}>
+          {/* Status bar */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
             {/* Status */}
             <DetailField label="Status">
-              <select
-                value={task.status}
-                onChange={(e) => handleStatusChange(e.target.value as TaskStatus)}
-                style={{
-                  padding: "5px 12px", borderRadius: 6, background: `${sCfg.color}12`,
-                  border: `1px solid ${sCfg.color}30`, color: sCfg.color,
-                  fontSize: 12, fontWeight: 600, cursor: "pointer", outline: "none",
-                  appearance: "auto",
-                }}
-              >
-                {STATUS_COLUMNS.map((s) => (
-                  <option key={s.key} value={s.key}>{s.label}</option>
-                ))}
-              </select>
-            </DetailField>
-
-            {/* Priority */}
-            <DetailField label="Priority">
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 6, background: `${pCfg.color}12`, border: `1px solid ${pCfg.color}30` }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: pCfg.color }} />
-                <span style={{ color: pCfg.color, fontSize: 12, fontWeight: 600 }}>{pCfg.label}</span>
+              <div style={{ position: "relative" }}>
+                <button onClick={() => setShowStatusPicker(!showStatusPicker)} style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px",
+                  borderRadius: 6, background: `${sCfg.color}12`, border: `1px solid ${sCfg.color}30`,
+                  cursor: "pointer", transition: "all 0.15s",
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: sCfg.color }} />
+                  <span style={{ color: sCfg.color, fontSize: 12, fontWeight: 600 }}>{sCfg.label}</span>
+                  <ChevronDown size={11} style={{ color: sCfg.color }} />
+                </button>
+                {showStatusPicker && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 100,
+                    background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", padding: "4px 0", minWidth: 160,
+                  }}>
+                    {STATUS_COLUMNS.map((s) => (
+                      <button key={s.key} onClick={() => handleStatusChange(s.key)} style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 12px",
+                        background: s.key === task.status ? `${s.color}10` : "transparent",
+                        border: "none", cursor: "pointer", color: s.color, fontSize: 12, fontWeight: 600,
+                      }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = `${s.color}10`)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = s.key === task.status ? `${s.color}10` : "transparent")}
+                      >
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: s.color }} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </DetailField>
 
-            {/* Assignee */}
+            {/* Priority — editable dropdown */}
+            <DetailField label="Priority">
+              <div style={{ position: "relative" }}>
+                <button onClick={() => setShowPriorityPicker(!showPriorityPicker)} style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px",
+                  borderRadius: 6, background: `${pCfg.color}12`, border: `1px solid ${pCfg.color}30`,
+                  cursor: "pointer", transition: "all 0.15s",
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: pCfg.color }} />
+                  <span style={{ color: pCfg.color, fontSize: 12, fontWeight: 600 }}>{pCfg.label}</span>
+                  <ChevronDown size={11} style={{ color: pCfg.color }} />
+                </button>
+                {showPriorityPicker && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 100,
+                    background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", padding: "4px 0", minWidth: 140,
+                  }}>
+                    {(Object.entries(PRIORITY_CFG) as [Priority, typeof PRIORITY_CFG["urgent"]][]).map(([k, v]) => (
+                      <button key={k} onClick={() => handlePriorityChange(k)} style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 12px",
+                        background: k === task.priority ? `${v.color}10` : "transparent",
+                        border: "none", cursor: "pointer", color: v.color, fontSize: 12, fontWeight: 600,
+                      }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = `${v.color}10`)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = k === task.priority ? `${v.color}10` : "transparent")}
+                      >
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: v.color }} />
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </DetailField>
+
+            {/* Assignee — editable */}
             <DetailField label="Assignee">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Avatar name={task.assignee || "?"} size={26} />
-                <div>
-                  <div style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>{task.assignee || "Unassigned"}</div>
-                  {member && <div style={{ color: TEXT_DIM, fontSize: 10 }}>{member.role}</div>}
-                </div>
+              <div style={{ position: "relative" }}>
+                <button onClick={() => setShowAssigneePicker(!showAssigneePicker)} style={{
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px",
+                  borderRadius: 6, background: `${member?.color || BLUE}12`, border: `1px solid ${member?.color || BLUE}30`,
+                  cursor: "pointer", transition: "all 0.15s",
+                }}>
+                  <Avatar name={task.assignee || "?"} size={20} />
+                  <span style={{ color: member?.color || TEXT, fontSize: 12, fontWeight: 600 }}>{task.assignee || "Unassigned"}</span>
+                  <ChevronDown size={11} style={{ color: member?.color || TEXT_DIM }} />
+                </button>
+                {showAssigneePicker && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 100,
+                    background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", padding: "4px 0", minWidth: 180,
+                  }}>
+                    {team.map((m) => (
+                      <button key={m.name} onClick={() => handleAssigneeChange(m.name)} style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 12px",
+                        background: m.name === task.assignee ? `${m.color}10` : "transparent",
+                        border: "none", cursor: "pointer",
+                      }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = `${m.color}10`)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = m.name === task.assignee ? `${m.color}10` : "transparent")}
+                      >
+                        <Avatar name={m.name} size={22} />
+                        <span style={{ color: TEXT, fontSize: 12 }}>{m.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </DetailField>
 
@@ -677,7 +1671,7 @@ function TaskDetailPanel({
             <DetailField label="Property">
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Building2 size={13} style={{ color: BLUE }} />
-                <span style={{ color: TEXT, fontSize: 12 }}>{task.hotel_name || "—"}</span>
+                <span style={{ color: TEXT, fontSize: 12 }}>{task.hotel_name || "\u2014"}</span>
               </div>
             </DetailField>
 
@@ -687,9 +1681,50 @@ function TaskDetailPanel({
             </DetailField>
           </div>
 
+          {/* Watchers */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <Eye size={11} /> Watchers
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {taskWatchers.map((w) => (
+                <div key={w.name} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px 3px 4px", borderRadius: 6, background: INPUT_BG, border: `1px solid ${BORDER}` }}>
+                  <Avatar name={w.name} size={18} />
+                  <span style={{ color: TEXT_MID, fontSize: 11 }}>{w.name}</span>
+                  <button onClick={() => removeWatcher(w.name)} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 0, lineHeight: 1 }}><X size={10} /></button>
+                </div>
+              ))}
+              <div style={{ position: "relative" }}>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button style={{
+                      width: 24, height: 24, borderRadius: 6, border: `1px dashed ${BORDER}`,
+                      background: "transparent", color: TEXT_DIM, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}><Plus size={12} /></button>
+                  </PopoverTrigger>
+                  <PopoverContent style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 160 }} align="start">
+                    {team.filter((m) => !taskWatchers.find((w) => w.name === m.name)).map((m) => (
+                      <button key={m.name} onClick={() => addWatcher(m.name)} style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 12px",
+                        background: "transparent", border: "none", cursor: "pointer",
+                      }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.05)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <Avatar name={m.name} size={18} />
+                        <span style={{ color: TEXT_MID, fontSize: 11 }}>{m.name}</span>
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+
           {/* Tags */}
           {task.tags.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
               <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Tags</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {task.tags.map((tag) => (
@@ -725,98 +1760,74 @@ function TaskDetailPanel({
                     color: TEXT_MID, fontSize: 13, lineHeight: 1.65, padding: "14px 16px",
                     background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`,
                     whiteSpace: "pre-wrap",
-                  }}>
-                    {task.description}
-                  </div>
+                  }}>{task.description}</div>
                 </div>
               )}
 
-              {/* Subtasks */}
-              {!loadingSubtasks && subtaskTotal > 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      Subtasks
+              {/* Dependencies */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Link2 size={11} /> Dependencies
+                </div>
+                {taskDeps.map((dep, idx) => {
+                  const linked = allTasks.find((t) => t.id === dep.linkedTaskId);
+                  return (
+                    <div key={idx} style={{
+                      display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginBottom: 4,
+                      background: CARD_BG, borderRadius: 6, border: `1px solid ${BORDER}`,
+                    }}>
+                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 3, background: dep.type === "blocks" ? `${RED}15` : `${AMBER}15`, color: dep.type === "blocks" ? RED : AMBER, fontWeight: 600 }}>
+                        {dep.type === "blocks" ? "BLOCKS" : "BLOCKED BY"}
+                      </span>
+                      <span onClick={() => { if (linked) onNavigateTask(linked.id); }} style={{ color: BLUE, fontSize: 12, cursor: "pointer" }}>
+                        CRM-{dep.linkedTaskId}
+                      </span>
+                      <span style={{ color: TEXT_MID, fontSize: 11, flex: 1 }}>{linked?.title || "Unknown task"}</span>
+                      <button onClick={() => removeDependency(idx)} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 2 }}><X size={12} /></button>
                     </div>
-                    <span style={{ color: TEXT_DIM, fontSize: 11 }}>{subtaskDone}/{subtaskTotal}</span>
-                  </div>
-                  {/* Progress bar */}
-                  <div style={{ height: 4, background: BORDER, borderRadius: 2, marginBottom: 12, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(subtaskDone / subtaskTotal) * 100}%`, background: subtaskDone === subtaskTotal ? GREEN : BLUE, borderRadius: 2, transition: "width 0.3s" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {subtasks.map((st) => (
-                      <div key={st.id} onClick={() => handleToggleSubtask(st)} style={{
-                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                        borderRadius: 6, cursor: "pointer", transition: "background 0.12s",
-                      }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.025)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                        <div style={{
-                          width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                          border: st.done ? `2px solid ${GREEN}` : `2px solid ${TEXT_DIM}`,
-                          background: st.done ? `${GREEN}15` : "transparent",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                          {st.done && <CheckCircle2 size={12} style={{ color: GREEN }} />}
-                        </div>
-                        <span style={{ color: st.done ? TEXT_DIM : TEXT, fontSize: 12, textDecoration: st.done ? "line-through" : "none" }}>{st.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Add subtask */}
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <input
-                      value={newSubtaskText}
-                      onChange={(e) => setNewSubtaskText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleAddSubtask(); }}
-                      placeholder="Add subtask..."
-                      style={{
-                        flex: 1, padding: "6px 10px", background: INPUT_BG,
-                        border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none",
-                      }}
-                    />
-                    <button onClick={handleAddSubtask} style={{
-                      padding: "6px 12px", borderRadius: 6, border: "none",
-                      background: `${BLUE}15`, color: BLUE, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                    }}>Add</button>
-                  </div>
+                  );
+                })}
+                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                  <select value={newDepType} onChange={(e) => setNewDepType(e.target.value as any)}
+                    style={{ padding: "5px 8px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 5, color: TEXT, fontSize: 11, outline: "none" }}>
+                    <option value="blocks">Blocks</option>
+                    <option value="blocked_by">Blocked by</option>
+                  </select>
+                  <input value={newDepInput} onChange={(e) => setNewDepInput(e.target.value)} placeholder="Task ID..." type="number"
+                    style={{ width: 80, padding: "5px 8px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 5, color: TEXT, fontSize: 11, outline: "none" }} />
+                  <button onClick={addDependency} style={{ padding: "5px 10px", borderRadius: 5, border: "none", background: `${BLUE}15`, color: BLUE, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Link</button>
                 </div>
-              )}
+              </div>
 
-              {/* Add subtask when none exist */}
-              {!loadingSubtasks && subtaskTotal === 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Subtasks</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      value={newSubtaskText}
-                      onChange={(e) => setNewSubtaskText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleAddSubtask(); }}
-                      placeholder="Add subtask..."
-                      style={{
-                        flex: 1, padding: "6px 10px", background: INPUT_BG,
-                        border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none",
-                      }}
-                    />
-                    <button onClick={handleAddSubtask} style={{
-                      padding: "6px 12px", borderRadius: 6, border: "none",
-                      background: `${BLUE}15`, color: BLUE, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                    }}>Add</button>
-                  </div>
+              {/* Attachments */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Paperclip size={11} /> Attachments
                 </div>
-              )}
-
-              {/* Attachments count (default 0, not tracked in DB yet) */}
-              {false && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Attachments</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}` }}>
-                    <Paperclip size={14} style={{ color: TEXT_DIM }} />
-                    <span style={{ color: TEXT_MID, fontSize: 12 }}>0 files attached</span>
+                {taskAttachments.map((a) => (
+                  <div key={a.name} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", marginBottom: 4,
+                    background: CARD_BG, borderRadius: 6, border: `1px solid ${BORDER}`,
+                  }}>
+                    <FileText size={14} style={{ color: BLUE, flexShrink: 0 }} />
+                    <span style={{ color: TEXT, fontSize: 12, flex: 1 }}>{a.name}</span>
+                    <span style={{ color: TEXT_DIM, fontSize: 10 }}>{a.size}</span>
+                    <span style={{ color: TEXT_DIM, fontSize: 10 }}>{a.uploadedBy}</span>
+                    <button onClick={() => removeAttachment(a.name)} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 2 }}><X size={12} /></button>
                   </div>
-                </div>
-              )}
+                ))}
+                <button onClick={addAttachment} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", width: "100%",
+                  background: "transparent", border: `1px dashed ${BORDER}`, borderRadius: 8,
+                  color: TEXT_DIM, fontSize: 12, cursor: "pointer", transition: "all 0.12s",
+                  justifyContent: "center",
+                }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.color = BLUE; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.color = TEXT_DIM; }}
+                >
+                  <Upload size={13} /> Attach file (mockup)
+                </button>
+              </div>
 
               {/* Comments in Details tab */}
               {detailComments.length > 0 && (
@@ -832,15 +1843,12 @@ function TaskDetailPanel({
                       <div style={{
                         padding: "10px 14px", background: CARD_BG, borderRadius: 8,
                         border: `1px solid ${BORDER}`, color: TEXT_MID, fontSize: 12, lineHeight: 1.55,
-                      }}>
-                        {c.body}
-                      </div>
+                      }}>{c.body}</div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Dates */}
               <div style={{ display: "flex", gap: 24, color: TEXT_DIM, fontSize: 11 }}>
                 <span>Created {formatDateLong(task.created_at)}</span>
               </div>
@@ -850,13 +1858,11 @@ function TaskDetailPanel({
           {/* Activity Tab */}
           {activeTab === "activity" && (
             <div>
-              {/* Comment box */}
               <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
                 <Avatar name="Karol" size={28} />
                 <div style={{ flex: 1, position: "relative" }}>
                   <input
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
+                    value={commentText} onChange={(e) => setCommentText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") handleSubmitComment(); }}
                     placeholder="Write a comment..."
                     style={{
@@ -867,30 +1873,22 @@ function TaskDetailPanel({
                   <button onClick={handleSubmitComment} style={{
                     position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", color: BLUE, cursor: "pointer", padding: 4,
-                  }}>
-                    <Send size={14} />
-                  </button>
+                  }}><Send size={14} /></button>
                 </div>
               </div>
 
-              {/* Activity feed */}
               <div style={{ position: "relative", paddingLeft: 20 }}>
-                {/* Timeline line */}
                 <div style={{ position: "absolute", left: 13, top: 0, bottom: 0, width: 1, background: BORDER }} />
-
                 {activityItems.slice().reverse().map((item) => {
                   const isComment = item.body.startsWith("commented:");
                   return (
                     <div key={item.id} style={{ position: "relative", paddingLeft: 24, marginBottom: isComment ? 16 : 10 }}>
-                      {/* Timeline dot */}
                       <div style={{
                         position: "absolute", left: -1, top: isComment ? 6 : 3,
                         width: 8, height: 8, borderRadius: "50%",
                         background: isComment ? BLUE : TEXT_DIM, border: `2px solid ${BG_PAGE}`,
                       }} />
-
                       {isComment ? (
-                        /* Comment bubble */
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                             <Avatar name={item.author} size={22} />
@@ -900,12 +1898,9 @@ function TaskDetailPanel({
                           <div style={{
                             padding: "10px 14px", background: CARD_BG, borderRadius: 8,
                             border: `1px solid ${BORDER}`, color: TEXT_MID, fontSize: 12, lineHeight: 1.55,
-                          }}>
-                            {item.body.replace(/^commented:\s*/, "")}
-                          </div>
+                          }}>{item.body.replace(/^commented:\s*/, "")}</div>
                         </div>
                       ) : (
-                        /* System event */
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                           <Avatar name={item.author} size={18} />
                           <span style={{ color: TEXT_MID, fontSize: 11 }}>
@@ -917,7 +1912,6 @@ function TaskDetailPanel({
                     </div>
                   );
                 })}
-
                 {activityItems.length === 0 && !loadingComments && (
                   <div style={{ padding: "20px 0", color: TEXT_DIM, fontSize: 12, textAlign: "center" }}>No activity yet</div>
                 )}
@@ -927,13 +1921,7 @@ function TaskDetailPanel({
         </div>
       </div>
 
-      {/* Slide-in animation */}
-      <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
+      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </>
   );
 }
@@ -946,13 +1934,12 @@ function TaskDetailPanel({
 type NewPriority = "normal" | "urgent";
 
 function CreateTaskPanel({
-  onClose,
-  onCreateTask,
-  hotelNames,
+  onClose, onCreateTask, hotelNames, defaultStatus,
 }: {
   onClose: () => void;
   onCreateTask: (data: Record<string, unknown>) => Promise<CrmTask>;
   hotelNames: string[];
+  defaultStatus: TaskStatus | null;
 }) {
   const teamMembers = useTeam();
   useEffect(() => {
@@ -961,79 +1948,103 @@ function CreateTaskPanel({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const [allHotels, setAllHotels] = useState<{ hotel_id: number; property_name: string; management_group: string | null }[]>([]);
+  useEffect(() => {
+    fetch("/api/hotels").then(r => r.json()).then(data => {
+      const managed = data.filter((h: any) => h.is_rockenue_managed && !h.is_disconnected);
+      setAllHotels(managed.map((h: any) => ({ hotel_id: h.hotel_id, property_name: h.property_name, management_group: h.management_group })));
+    }).catch(console.error);
+  }, []);
+
+  const allHotelNames = useMemo(() => allHotels.map(h => h.property_name).sort(), [allHotels]);
+
+  const propertyGroups = useMemo(() => {
+    const groups: { label: string; hotels: string[] }[] = [
+      { label: "All Properties", hotels: allHotelNames },
+    ];
+    const groupMap: Record<string, string[]> = {};
+    for (const h of allHotels) {
+      if (h.management_group) {
+        if (!groupMap[h.management_group]) groupMap[h.management_group] = [];
+        groupMap[h.management_group].push(h.property_name);
+      }
+    }
+    for (const [name, hotels] of Object.entries(groupMap).sort(([a], [b]) => a.localeCompare(b))) {
+      if (hotels.length > 1) groups.push({ label: name, hotels });
+    }
+    return groups;
+  }, [allHotels, allHotelNames]);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selAssignee, setSelAssignee] = useState<string>("");
   const [selPriority, setSelPriority] = useState<NewPriority>("normal");
   const [selCategory, setSelCategory] = useState<TaskCategory>("distribution");
-  const [selChannel, setSelChannel] = useState<string>("");
-  const [selectedHotel, setSelectedHotel] = useState<string>("");
+  const [selChannels, setSelChannels] = useState<string[]>([]);
+  const [selectedHotels, setSelectedHotels] = useState<string[]>([]);
   const [showPropertyPicker, setShowPropertyPicker] = useState(false);
   const [propertySearch, setPropertySearch] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showChannelPicker, setShowChannelPicker] = useState(false);
+  const [channelSearch, setChannelSearch] = useState("");
   const [dueDate, setDueDate] = useState<string>("");
-  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [notifyAssignee, setNotifyAssignee] = useState(true);
   const [reminder, setReminder] = useState<"none" | "morning" | "day_before">("morning");
   const [escalate, setEscalate] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurFreq, setRecurFreq] = useState<"daily" | "weekly" | "biweekly" | "monthly">("weekly");
   const [creating, setCreating] = useState(false);
+  const [selStatus, setSelStatus] = useState<TaskStatus>(defaultStatus || "todo");
 
   const propertyRef = useRef<HTMLDivElement>(null);
-  const dateRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (propertyRef.current && !propertyRef.current.contains(e.target as Node)) setShowPropertyPicker(false);
-      if (dateRef.current && !dateRef.current.contains(e.target as Node)) setShowDatePicker(false);
+      if (channelRef.current && !channelRef.current.contains(e.target as Node)) setShowChannelPicker(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const propertyLabel = selectedHotel || "Select property...";
-
-  // Calendar helpers
-  const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const DAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-
-  function getCalendarDays(year: number, month: number) {
-    const firstDay = new Date(year, month, 1).getDay();
-    const offset = firstDay === 0 ? 6 : firstDay - 1;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < offset; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    return cells;
+  function toggleHotel(h: string) { setSelectedHotels((prev) => prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]); }
+  function toggleGroup(hotels: string[]) {
+    const available = hotels.filter((h) => allHotelNames.includes(h));
+    const allSelected = available.every((h) => selectedHotels.includes(h));
+    setSelectedHotels(allSelected ? (prev) => prev.filter((h) => !available.includes(h)) : (prev) => [...new Set([...prev, ...available])]);
   }
-
-  function selectDate(day: number) {
-    const m = String(calMonth.month + 1).padStart(2, "0");
-    const d = String(day).padStart(2, "0");
-    setDueDate(`${calMonth.year}-${m}-${d}`);
-    setShowDatePicker(false);
+  function isGroupFullySelected(hotels: string[]) {
+    const available = hotels.filter((h) => allHotelNames.includes(h));
+    return available.length > 0 && available.every((h) => selectedHotels.includes(h));
   }
-
-  function formatDisplayDate(d: string) {
-    if (!d) return "";
-    const date = new Date(d + "T00:00:00");
-    return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  function isGroupPartiallySelected(hotels: string[]) {
+    const available = hotels.filter((h) => allHotelNames.includes(h));
+    return available.some((h) => selectedHotels.includes(h)) && !available.every((h) => selectedHotels.includes(h));
   }
+  function toggleChannel(ch: string) { setSelChannels((prev) => prev.includes(ch) ? prev.filter((x) => x !== ch) : [...prev, ch]); }
+
+  const propertyLabel = selectedHotels.length === 0 ? "Select properties..." : selectedHotels.length === 1 ? selectedHotels[0] : `${selectedHotels.length} properties selected`;
+  const channelLabel = selChannels.length === 0 ? "Select channels..." : selChannels.length === 1 ? selChannels[0] : `${selChannels.length} channels`;
 
   async function handleCreate() {
     if (!title.trim()) return;
     setCreating(true);
     try {
-      await onCreateTask({
-        title: title.trim(),
-        description: description.trim() || null,
-        assignee: selAssignee || null,
-        priority: selPriority === "urgent" ? "urgent" : "medium",
-        category: selCategory,
-        due_date: dueDate || null,
-        tags: selChannel ? [selChannel] : [],
-        created_by: "Karol",
-      });
+      const hotels = selectedHotels.length > 0 ? selectedHotels : [""];
+      for (const hotel of hotels) {
+        await onCreateTask({
+          title: title.trim(),
+          description: description.trim() || null,
+          assignee: selAssignee || null,
+          priority: selPriority === "urgent" ? "urgent" : "medium",
+          status: selStatus,
+          category: selCategory,
+          due_date: dueDate || null,
+          tags: selChannels.length > 0 ? selChannels : [],
+          hotel: hotel || null,
+          created_by: "Karol",
+        });
+      }
       onClose();
     } catch (err) {
       console.error("Failed to create task", err);
@@ -1042,10 +2053,8 @@ function CreateTaskPanel({
     }
   }
 
-  const calDays = getCalendarDays(calMonth.year, calMonth.month);
-  const todayStr = new Date().toISOString().split("T")[0];
-
-  const filteredHotels = hotelNames.filter((h) => !propertySearch || h.toLowerCase().includes(propertySearch.toLowerCase()));
+  const filteredHotels = allHotelNames.filter((h) => !propertySearch || h.toLowerCase().includes(propertySearch.toLowerCase()));
+  const filteredChannels = OTA_CHANNELS_LIST.filter((ch) => !channelSearch || ch.toLowerCase().includes(channelSearch.toLowerCase()));
 
   return (
     <>
@@ -1057,7 +2066,6 @@ function CreateTaskPanel({
         boxShadow: "0 0 20px rgba(57,189,248,0.08), -8px 0 40px rgba(0,0,0,0.4)",
         animation: "slideInRight 0.2s ease-out",
       }}>
-        {/* Header */}
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 4, background: BLUE, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1075,27 +2083,33 @@ function CreateTaskPanel({
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-
-          {/* Title */}
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs to be done?"
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs to be done?"
             style={{
               width: "100%", padding: "10px 12px", background: INPUT_BG,
-              border: `1px solid ${BORDER}`, borderRadius: 4,
+              border: `1px solid ${BORDER}`, borderRadius: 6,
               color: TEXT, fontSize: 18, fontWeight: 600, outline: "none",
               marginBottom: 24, lineHeight: 1.4,
               fontFamily: "system-ui, -apple-system, sans-serif",
-            }}
-          />
+            }} />
 
-          {/* Fields card */}
-          <div style={{ marginBottom: 24, background: BG_PAGE, borderRadius: 4, border: `1px solid ${BORDER}`, padding: "4px 16px" }}>
+          <div style={{ marginBottom: 24, background: BG_PAGE, borderRadius: 8, border: `1px solid ${BORDER}`, padding: "4px 16px" }}>
 
-            {/* Assignee */}
+            {/* Status — when quick-adding from column */}
+            <InlineField label="Status" icon={<Circle size={14} />}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {STATUS_COLUMNS.map((s) => (
+                  <button key={s.key} onClick={() => setSelStatus(s.key)} style={{
+                    padding: "6px 14px", borderRadius: 6,
+                    border: `1px solid ${selStatus === s.key ? `${s.color}40` : BORDER}`,
+                    background: selStatus === s.key ? `${s.color}10` : "transparent",
+                    color: selStatus === s.key ? s.color : TEXT_DIM,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                  }}>{s.label}</button>
+                ))}
+              </div>
+            </InlineField>
+
             <InlineField label="Assignee" icon={<User size={14} />}>
               <div style={{ display: "flex", gap: 6 }}>
                 {teamMembers.map((m) => (
@@ -1112,7 +2126,6 @@ function CreateTaskPanel({
               </div>
             </InlineField>
 
-            {/* Priority — Normal / Urgent */}
             <InlineField label="Priority" icon={<Flag size={14} />}>
               <div style={{ display: "flex", gap: 6 }}>
                 {([
@@ -1124,7 +2137,6 @@ function CreateTaskPanel({
                     background: selPriority === p.key ? `${p.color}12` : "transparent",
                     color: selPriority === p.key ? p.color : TEXT_DIM,
                     fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                    transition: "all 0.15s",
                   }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: selPriority === p.key ? p.color : TEXT_DIM }} />
                     {p.label}
@@ -1133,63 +2145,74 @@ function CreateTaskPanel({
               </div>
             </InlineField>
 
-            {/* Property — dropdown from hotel names */}
             <InlineField label="Property" icon={<Building2 size={14} />}>
               <div ref={propertyRef} style={{ position: "relative" }}>
                 <button onClick={() => setShowPropertyPicker(!showPropertyPicker)} style={{
                   padding: "10px 12px", background: INPUT_BG, border: `1px solid ${showPropertyPicker ? BLUE : BORDER}`,
-                  borderRadius: 4, color: selectedHotel ? TEXT : TEXT_DIM, fontSize: 13, cursor: "pointer",
+                  borderRadius: 4, color: selectedHotels.length > 0 ? TEXT : TEXT_DIM, fontSize: 13, cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 8, minWidth: 240, transition: "border-color 0.15s",
                   justifyContent: "space-between", fontFamily: "system-ui, -apple-system, sans-serif",
                 }}>
                   <span>{propertyLabel}</span>
                   <ChevronDown size={14} style={{ color: TEXT_DIM, transition: "transform 0.15s", transform: showPropertyPicker ? "rotate(180deg)" : "none" }} />
                 </button>
-
                 {showPropertyPicker && (
                   <div style={{
                     position: "absolute", top: "100%", left: 0, marginTop: 6, zIndex: 100,
                     background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 10,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", width: 340, maxHeight: 380, display: "flex", flexDirection: "column",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", width: 340, maxHeight: 440, display: "flex", flexDirection: "column",
                   }}>
-                    {/* Search */}
                     <div style={{ padding: "10px 12px", borderBottom: `1px solid ${BORDER}` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: INPUT_BG, borderRadius: 6, border: `1px solid ${BORDER}` }}>
                         <Search size={13} style={{ color: TEXT_DIM, flexShrink: 0 }} />
-                        <input value={propertySearch} onChange={(e) => setPropertySearch(e.target.value)} placeholder="Search properties..." style={{
-                          flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none",
-                        }} />
+                        <input value={propertySearch} onChange={(e) => setPropertySearch(e.target.value)} placeholder="Search properties..." style={{ flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none" }} />
                       </div>
                     </div>
-
                     <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
-                      {/* Individual hotels */}
-                      {filteredHotels.map((h) => (
-                        <PickerItem key={h} label={h} checked={selectedHotel === h} onClick={() => { setSelectedHotel(h); setShowPropertyPicker(false); }} />
+                      {!propertySearch && propertyGroups.map((g) => (
+                        <PickerItem key={g.label} label={g.label} bold checked={isGroupFullySelected(g.hotels)} partial={isGroupPartiallySelected(g.hotels)} onClick={() => toggleGroup(g.hotels)} />
                       ))}
-
-                      {filteredHotels.length === 0 && (
-                        <div style={{ padding: "16px 14px", color: TEXT_DIM, fontSize: 12, textAlign: "center" }}>No matches</div>
-                      )}
+                      {!propertySearch && <div style={{ height: 1, background: BORDER, margin: "6px 14px" }} />}
+                      {filteredHotels.map((h) => <PickerItem key={h} label={h} checked={selectedHotels.includes(h)} onClick={() => toggleHotel(h)} />)}
+                      {filteredHotels.length === 0 && <div style={{ padding: "16px 14px", color: TEXT_DIM, fontSize: 12, textAlign: "center" }}>No matches</div>}
                     </div>
                   </div>
                 )}
               </div>
             </InlineField>
 
-            {/* Channel */}
             <InlineField label="Channel" icon={<Globe size={14} />}>
-              <select value={selChannel} onChange={(e) => setSelChannel(e.target.value)} style={{
-                padding: "10px 12px", background: INPUT_BG, border: `1px solid ${BORDER}`,
-                borderRadius: 4, color: selChannel ? TEXT : TEXT_DIM, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 200,
-                fontFamily: "system-ui, -apple-system, sans-serif",
-              }}>
-                <option value="">None</option>
-                {OTA_CHANNELS_LIST.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
-              </select>
+              <div ref={channelRef} style={{ position: "relative" }}>
+                <button onClick={() => setShowChannelPicker(!showChannelPicker)} style={{
+                  padding: "10px 12px", background: INPUT_BG, border: `1px solid ${showChannelPicker ? BLUE : BORDER}`,
+                  borderRadius: 4, color: selChannels.length > 0 ? TEXT : TEXT_DIM, fontSize: 13, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8, minWidth: 240, transition: "border-color 0.15s",
+                  justifyContent: "space-between", fontFamily: "system-ui, -apple-system, sans-serif",
+                }}>
+                  <span>{channelLabel}</span>
+                  <ChevronDown size={14} style={{ color: TEXT_DIM, transition: "transform 0.15s", transform: showChannelPicker ? "rotate(180deg)" : "none" }} />
+                </button>
+                {showChannelPicker && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, marginTop: 6, zIndex: 100,
+                    background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 10,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", width: 300, maxHeight: 340, display: "flex", flexDirection: "column",
+                  }}>
+                    <div style={{ padding: "10px 12px", borderBottom: `1px solid ${BORDER}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: INPUT_BG, borderRadius: 6, border: `1px solid ${BORDER}` }}>
+                        <Search size={13} style={{ color: TEXT_DIM, flexShrink: 0 }} />
+                        <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder="Search channels..." style={{ flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none" }} />
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
+                      {filteredChannels.map((ch) => <PickerItem key={ch} label={ch} checked={selChannels.includes(ch)} onClick={() => toggleChannel(ch)} />)}
+                      {filteredChannels.length === 0 && <div style={{ padding: "16px 14px", color: TEXT_DIM, fontSize: 12, textAlign: "center" }}>No matches</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
             </InlineField>
 
-            {/* Category */}
             <InlineField label="Category" icon={<Tag size={14} />}>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {(Object.entries(CATEGORY_CFG) as [TaskCategory, { color: string; label: string }][]).map(([key, cfg]) => (
@@ -1198,83 +2221,44 @@ function CreateTaskPanel({
                     background: selCategory === key ? `${cfg.color}10` : "transparent",
                     color: selCategory === key ? cfg.color : TEXT_DIM,
                     fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-                  }}>
-                    {cfg.label}
-                  </button>
+                  }}>{cfg.label}</button>
                 ))}
               </div>
             </InlineField>
 
-            {/* Due Date — custom calendar */}
             <InlineField label="Due Date" icon={<Calendar size={14} />}>
-              <div ref={dateRef} style={{ position: "relative" }}>
-                <button onClick={() => setShowDatePicker(!showDatePicker)} style={{
-                  padding: "10px 12px", background: INPUT_BG, border: `1px solid ${showDatePicker ? BLUE : BORDER}`,
-                  borderRadius: 4, color: dueDate ? TEXT : TEXT_DIM, fontSize: 13, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 8, minWidth: 200, transition: "border-color 0.15s",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                }}>
-                  <Calendar size={14} style={{ color: TEXT_DIM }} />
-                  <span>{dueDate ? formatDisplayDate(dueDate) : "Select date..."}</span>
-                </button>
-
-                {showDatePicker && (
-                  <div style={{
-                    position: "absolute", top: "100%", left: 0, marginTop: 6, zIndex: 100,
-                    background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 12,
-                    padding: 16, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", width: 280,
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-start text-left h-9" style={{
+                    backgroundColor: INPUT_BG, border: `1px solid ${BORDER}`,
+                    color: dueDate ? TEXT : TEXT_DIM, fontSize: 13, minWidth: 200, borderRadius: 6,
+                    fontFamily: "system-ui, -apple-system, sans-serif",
                   }}>
-                    {/* Month nav */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                      <button onClick={() => setCalMonth((p) => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 })}
-                        style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4, borderRadius: 4 }}>
-                        <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} />
-                      </button>
-                      <span style={{ color: TEXT, fontSize: 13, fontWeight: 600 }}>{MONTH_NAMES[calMonth.month]} {calMonth.year}</span>
-                      <button onClick={() => setCalMonth((p) => p.month === 11 ? { year: p.year + 1, month: 0 } : { ...p, month: p.month + 1 })}
-                        style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4, borderRadius: 4 }}>
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
+                    <Calendar size={14} style={{ marginRight: 8, color: TEXT_DIM }} />
+                    {dueDate ? format(new Date(dueDate + "T00:00:00"), "dd MMM yyyy") : "Select date..."}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}` }}>
+                  <ShadcnCalendar mode="single" selected={dueDate ? new Date(dueDate + "T00:00:00") : undefined}
+                    onSelect={(d) => d && setDueDate(format(d, "yyyy-MM-dd"))} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </InlineField>
 
-                    {/* Day labels */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
-                      {DAY_LABELS.map((d) => (
-                        <div key={d} style={{ textAlign: "center", color: TEXT_DIM, fontSize: 10, fontWeight: 600, padding: "4px 0" }}>{d}</div>
-                      ))}
-                    </div>
-
-                    {/* Day grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
-                      {calDays.map((day, i) => {
-                        if (day === null) return <div key={`e${i}`} />;
-                        const dateStr = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                        const isSelected = dateStr === dueDate;
-                        const isToday = dateStr === todayStr;
-                        return (
-                          <button key={i} onClick={() => selectDate(day)} style={{
-                            width: 34, height: 34, borderRadius: "50%", border: isToday && !isSelected ? `1px solid ${BLUE}40` : "none",
-                            background: isSelected ? BLUE : "transparent",
-                            color: isSelected ? "#0d0d0d" : isToday ? BLUE : TEXT,
-                            fontSize: 12, fontWeight: isSelected || isToday ? 600 : 400,
-                            cursor: "pointer", transition: "all 0.15s",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                          }}
-                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#2a2a2a"; }}
-                            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
-                          >
-                            {day}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Today shortcut */}
-                    <button onClick={() => selectDate(new Date().getDate())} style={{
-                      marginTop: 10, background: "none", border: "none", color: BLUE,
-                      fontSize: 11, fontWeight: 600, cursor: "pointer", textTransform: "uppercase",
-                      letterSpacing: "0.03em", padding: "4px 0",
-                    }}>Today</button>
+            {/* Recurring toggle */}
+            <InlineField label="Recurring" icon={<Repeat size={14} />}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <ToggleSwitch on={isRecurring} onToggle={() => setIsRecurring(!isRecurring)} />
+                {isRecurring && (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {(["daily", "weekly", "biweekly", "monthly"] as const).map((f) => (
+                      <button key={f} onClick={() => setRecurFreq(f)} style={{
+                        padding: "5px 11px", borderRadius: 5, border: `1px solid ${recurFreq === f ? `${BLUE}40` : BORDER}`,
+                        background: recurFreq === f ? `${BLUE}10` : "transparent",
+                        color: recurFreq === f ? BLUE : TEXT_DIM,
+                        fontSize: 11, fontWeight: 600, cursor: "pointer", textTransform: "capitalize",
+                      }}>{f}</button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1284,25 +2268,18 @@ function CreateTaskPanel({
           {/* Description */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ color: TEXT_MID, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 8 }}>Description</div>
-            <textarea
-              rows={5}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add details..."
+            <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Add details..."
               style={{
                 width: "100%", padding: "10px 12px", background: INPUT_BG,
-                border: `1px solid ${BORDER}`, borderRadius: 4, color: TEXT, fontSize: 13,
+                border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13,
                 outline: "none", resize: "vertical", lineHeight: 1.6,
                 fontFamily: "system-ui, -apple-system, sans-serif",
-              }}
-            />
+              }} />
           </div>
 
           {/* Notifications */}
-          <div style={{ background: BG_PAGE, borderRadius: 4, border: `1px solid ${BORDER}`, padding: "16px" }}>
+          <div style={{ background: BG_PAGE, borderRadius: 8, border: `1px solid ${BORDER}`, padding: "16px" }}>
             <div style={{ color: BLUE, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 14 }}>Notifications</div>
-
-            {/* Notify assignee */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div>
                 <div style={{ color: TEXT, fontSize: 13, fontWeight: 500 }}>Notify assignee</div>
@@ -1310,10 +2287,7 @@ function CreateTaskPanel({
               </div>
               <ToggleSwitch on={notifyAssignee} onToggle={() => setNotifyAssignee(!notifyAssignee)} />
             </div>
-
             <div style={{ height: 1, background: BORDER, marginBottom: 14 }} />
-
-            {/* Smart reminder */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div>
                 <div style={{ color: TEXT, fontSize: 13, fontWeight: 500 }}>Remind before due</div>
@@ -1329,15 +2303,12 @@ function CreateTaskPanel({
                     padding: "5px 11px", borderRadius: 5, border: `1px solid ${reminder === r.key ? `${BLUE}40` : BORDER}`,
                     background: reminder === r.key ? `${BLUE}10` : "transparent",
                     color: reminder === r.key ? BLUE : TEXT_DIM,
-                    fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                    fontSize: 11, fontWeight: 600, cursor: "pointer",
                   }}>{r.label}</button>
                 ))}
               </div>
             </div>
-
             <div style={{ height: 1, background: BORDER, marginBottom: 14 }} />
-
-            {/* Escalation */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <div style={{ color: TEXT, fontSize: 13, fontWeight: 500 }}>Escalate if overdue</div>
@@ -1348,21 +2319,20 @@ function CreateTaskPanel({
           </div>
         </div>
 
-        {/* Footer */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "24px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <button onClick={onClose} style={{
-            height: 40, padding: "0 20px", borderRadius: 4, border: `1px solid ${BORDER}`,
+            height: 40, padding: "0 20px", borderRadius: 6, border: `1px solid ${BORDER}`,
             background: INPUT_BG, color: TEXT, fontSize: 13, cursor: "pointer",
-            fontFamily: "system-ui, -apple-system, sans-serif", transition: "all 0.2s",
+            fontFamily: "system-ui, -apple-system, sans-serif",
           }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${BLUE}40`; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER; }}
           >Cancel</button>
           <button onClick={handleCreate} disabled={creating} style={{
-            height: 40, padding: "0 24px", borderRadius: 4, border: "none",
+            height: 40, padding: "0 24px", borderRadius: 6, border: "none",
             background: BLUE, color: "#0a0a0a",
             fontSize: 13, fontWeight: 600, cursor: creating ? "wait" : "pointer",
-            fontFamily: "system-ui, -apple-system, sans-serif", transition: "background 0.2s",
+            fontFamily: "system-ui, -apple-system, sans-serif",
             opacity: creating ? 0.7 : 1,
           }}
             onMouseEnter={(e) => { if (!creating) e.currentTarget.style.background = "#29ADEE"; }}
@@ -1371,55 +2341,8 @@ function CreateTaskPanel({
         </div>
       </div>
 
-      <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
+      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </>
-  );
-}
-
-// ── Property picker item ──
-function PickerItem({ label, checked, partial, bold, onClick }: { label: string; checked: boolean; partial?: boolean; bold?: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 14px",
-      background: "transparent", border: "none", cursor: "pointer", transition: "background 0.12s",
-      textAlign: "left",
-    }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.05)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-    >
-      <div style={{
-        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-        border: `1.5px solid ${checked ? BLUE : partial ? BLUE : "#444"}`,
-        background: checked ? BLUE : "transparent",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        transition: "all 0.15s",
-      }}>
-        {checked && <CheckCircle2 size={10} style={{ color: "#0d0d0d" }} />}
-        {partial && !checked && <div style={{ width: 8, height: 2, borderRadius: 1, background: BLUE }} />}
-      </div>
-      <span style={{ color: checked ? TEXT : TEXT_MID, fontSize: 12, fontWeight: bold ? 600 : 400 }}>{label}</span>
-    </button>
-  );
-}
-
-// ── Toggle switch ──
-function ToggleSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button onClick={onToggle} style={{
-      width: 38, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
-      background: on ? BLUE : "#3f3f46", transition: "background 0.2s", position: "relative", flexShrink: 0,
-    }}>
-      <div style={{
-        width: 16, height: 16, borderRadius: "50%", background: "#fff",
-        position: "absolute", top: 3,
-        left: on ? 19 : 3, transition: "left 0.2s",
-      }} />
-    </button>
   );
 }
 
@@ -1428,23 +2351,54 @@ function ToggleSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 // SHARED COMPONENTS
 // ═══════════════════════════════════════════════════
 
-function TaskCard({ task, onClick }: { task: CrmTask; onClick: () => void }) {
+function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDragging, bulkMode, bulkSelected, onToggleBulk, dueTier }: {
+  task: CrmTask;
+  onClick: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  isDragging?: boolean;
+  bulkMode: boolean;
+  bulkSelected: boolean;
+  onToggleBulk: () => void;
+  dueTier: string;
+}) {
   const pCfg = PRIORITY_CFG[task.priority];
   const cCfg = CATEGORY_CFG[task.category];
-  const todayStr = new Date().toISOString().split("T")[0];
-  const isOverdue = task.status !== "done" && task.due_date ? task.due_date < todayStr : false;
   const hotelDisplay = task.hotel_name || "\u2014";
+  const dueDateColor = dueTier === "overdue" ? RED : dueTier === "today" ? AMBER : dueTier === "this_week" ? PURPLE : TEXT_DIM;
+  const dueDateLabel = dueTier === "overdue" ? "Overdue" : dueTier === "today" ? "Due today" : dueTier === "this_week" ? "This week" : "";
 
   return (
-    <div onClick={onClick} style={{
-      backgroundColor: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`,
-      padding: "12px 14px", cursor: "pointer", transition: "all 0.15s",
-      borderLeft: `3px solid ${pCfg.color}`,
-    }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${BLUE}30`; e.currentTarget.style.boxShadow = `0 2px 12px rgba(57,189,248,0.08)`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderLeftColor = pCfg.color; }}>
+    <div
+      draggable={!bulkMode}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={(e) => { if (bulkMode) { e.stopPropagation(); onToggleBulk(); } else onClick(); }}
+      onContextMenu={onContextMenu}
+      style={{
+        backgroundColor: bulkSelected ? `${BLUE}08` : CARD_BG,
+        borderRadius: 8, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
+        padding: "12px 14px", cursor: bulkMode ? "pointer" : "grab", transition: "all 0.15s",
+        borderLeft: `3px solid ${pCfg.color}`,
+        opacity: isDragging ? 0.4 : 1,
+      }}
+      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.borderColor = `${BLUE}30`; e.currentTarget.style.boxShadow = `0 2px 12px rgba(57,189,248,0.08)`; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderLeftColor = pCfg.color; }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ color: TEXT_DIM, fontSize: 10, fontFamily: "monospace" }}>CRM-{task.id}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {bulkMode && (
+            <div style={{
+              width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+              border: `1.5px solid ${bulkSelected ? BLUE : "#444"}`,
+              background: bulkSelected ? BLUE : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {bulkSelected && <CheckCircle2 size={10} style={{ color: "#0d0d0d" }} />}
+            </div>
+          )}
+          <span style={{ color: TEXT_DIM, fontSize: 10, fontFamily: "monospace" }}>CRM-{task.id}</span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color }} />
           <span style={{ color: pCfg.color, fontSize: 9, fontWeight: 600, textTransform: "uppercase" }}>{pCfg.label}</span>
@@ -1476,10 +2430,10 @@ function TaskCard({ task, onClick }: { task: CrmTask; onClick: () => void }) {
         </div>
       </div>
       <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-        {isOverdue && <AlertTriangle size={9} style={{ color: RED }} />}
-        <Clock size={9} style={{ color: isOverdue ? RED : TEXT_DIM }} />
-        <span style={{ color: isOverdue ? RED : TEXT_DIM, fontSize: 10, fontWeight: isOverdue ? 600 : 400 }}>
-          {isOverdue ? "Overdue \u2014 " : ""}{task.due_date ? formatDate(task.due_date) : "\u2014"}
+        {dueTier === "overdue" && <AlertTriangle size={9} style={{ color: RED }} />}
+        <Clock size={9} style={{ color: dueDateColor }} />
+        <span style={{ color: dueDateColor, fontSize: 10, fontWeight: dueTier === "overdue" || dueTier === "today" ? 600 : 400 }}>
+          {dueDateLabel ? `${dueDateLabel} \u2014 ` : ""}{task.due_date ? formatDate(task.due_date) : "\u2014"}
         </span>
       </div>
     </div>
@@ -1497,9 +2451,7 @@ function Avatar({ name, size = 24 }: { name: string; size?: number }) {
       background: `${color}15`, border: `1px solid ${color}30`,
       display: "flex", alignItems: "center", justifyContent: "center",
       color, fontSize: size * 0.38, fontWeight: 700,
-    }}>
-      {initials}
-    </div>
+    }}>{initials}</div>
   );
 }
 
@@ -1514,16 +2466,50 @@ function DetailField({ label, children }: { label: string; children: React.React
 
 function InlineField({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 0, padding: "12px 0",
-      borderBottom: `1px solid ${BORDER}`,
-    }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "12px 0", borderBottom: `1px solid ${BORDER}` }}>
       <div style={{ width: 130, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         <span style={{ color: TEXT_DIM }}>{icon}</span>
         <span style={{ color: TEXT_MID, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", fontFamily: "system-ui, -apple-system, sans-serif" }}>{label}</span>
       </div>
       <div style={{ flex: 1 }}>{children}</div>
     </div>
+  );
+}
+
+function PickerItem({ label, checked, partial, bold, onClick }: { label: string; checked: boolean; partial?: boolean; bold?: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 14px",
+      background: "transparent", border: "none", cursor: "pointer", transition: "background 0.12s", textAlign: "left",
+    }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.05)")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      <div style={{
+        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+        border: `1.5px solid ${checked ? BLUE : partial ? BLUE : "#444"}`,
+        background: checked ? BLUE : "transparent",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {checked && <CheckCircle2 size={10} style={{ color: "#0d0d0d" }} />}
+        {partial && !checked && <div style={{ width: 8, height: 2, borderRadius: 1, background: BLUE }} />}
+      </div>
+      <span style={{ color: checked ? TEXT : TEXT_MID, fontSize: 12, fontWeight: bold ? 600 : 400 }}>{label}</span>
+    </button>
+  );
+}
+
+function ToggleSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} style={{
+      width: 38, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+      background: on ? BLUE : "#3f3f46", transition: "background 0.2s", position: "relative", flexShrink: 0,
+    }}>
+      <div style={{
+        width: 16, height: 16, borderRadius: "50%", background: "#fff",
+        position: "absolute", top: 3, left: on ? 19 : 3, transition: "left 0.2s",
+      }} />
+    </button>
   );
 }
 
