@@ -619,7 +619,21 @@ async function getAccessToken(propertyId) {
     );
   }
 
-  // Return the new access token.
+  // Step 3: Persist the new refresh_token (Cloudbeds rotates on each use).
+  if (tokenData.refresh_token) {
+    await pgPool.query(
+      `UPDATE user_properties
+       SET pms_credentials = jsonb_set(
+         COALESCE(pms_credentials, '{}'::jsonb),
+         '{refresh_token}',
+         to_jsonb($1::text)
+       )
+       WHERE property_id = $2
+       AND pms_credentials->>'refresh_token' IS NOT NULL`,
+      [tokenData.refresh_token, propertyId],
+    );
+  }
+
   return tokenData.access_token;
 }
 

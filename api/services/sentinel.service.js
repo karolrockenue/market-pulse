@@ -421,15 +421,6 @@ async function previewCalendar({
     liveRatesList = liveRatesRes.roomRateDetailed;
   }
 
-  // [DEBUG] Temporary — remove after investigating 318304
-  if (String(hotelId) === '318304') {
-    console.log(`[DEBUG 318304] baseRoomTypeId=${baseRoomTypeId}, pmsPropertyId=${pmsPropertyId}`);
-    console.log(`[DEBUG 318304] liveRatesList.length=${liveRatesList.length}`);
-    if (liveRatesList.length > 0) console.log(`[DEBUG 318304] sample:`, JSON.stringify(liveRatesList[0]));
-    else console.log(`[DEBUG 318304] liveRatesRes:`, JSON.stringify(liveRatesRes)?.substring(0, 500));
-    console.log(`[DEBUG 318304] rate_id_map:`, JSON.stringify(config.rate_id_map));
-  }
-
   // [CRITICAL FIX] Target the correct Rate Plan ID
   // Prevents "Net Rate" or "Package Rate" ingestion (The Death Spiral Fix).
   const targetRateId = config.rate_id_map?.[baseRoomTypeId];
