@@ -10,7 +10,6 @@ import {
   Filter,
   Calendar,
   MessageSquare,
-  Paperclip,
   ChevronDown,
   ChevronRight,
   Building2,
@@ -24,14 +23,12 @@ import {
   Loader2,
   ClipboardList,
   Trash2,
-  Upload,
   Repeat,
   Zap,
   Users,
   BarChart3,
   CheckSquare,
   Link2,
-  FileText,
 } from "lucide-react";
 import { useCrmTasks } from "../hooks/useCrmTasks";
 import {
@@ -119,7 +116,6 @@ type ViewMode = "board" | "hotel" | "user" | "timeline" | "my_work";
 type Automation = { id: string; name: string; trigger: string; action: string; enabled: boolean };
 type TaskDependency = { taskId: number; type: "blocks" | "blocked_by"; linkedTaskId: number };
 type TaskWatcher = { taskId: number; name: string };
-type TaskAttachment = { taskId: number; name: string; size: string; uploadedBy: string; uploadedAt: string };
 const DEFAULT_WIP_LIMITS: Record<TaskStatus, number> = { todo: 0, in_progress: 8, review: 5, done: 0 };
 
 const MOCK_AUTOMATIONS: Automation[] = [
@@ -169,7 +165,6 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
   // ── Mock stores (mockup — no backend) ──
   const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
   const [watchers, setWatchers] = useState<TaskWatcher[]>([]);
-  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [automations, setAutomations] = useState<Automation[]>(MOCK_AUTOMATIONS);
 
   // ── Drag-and-drop state ──
@@ -625,8 +620,6 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
           setDependencies={setDependencies}
           watchers={watchers}
           setWatchers={setWatchers}
-          attachments={attachments}
-          setAttachments={setAttachments}
           onNavigateTask={(id) => setSelectedTaskId(id)}
         />
       )}
@@ -1408,7 +1401,7 @@ function AutomationsPanel({
 function TaskDetailPanel({
   task, allTasks, onClose, onUpdateTask, onDeleteTask, onRefresh,
   dependencies, setDependencies, watchers, setWatchers,
-  attachments, setAttachments, onNavigateTask,
+  onNavigateTask,
 }: {
   task: CrmTask;
   allTasks: CrmTask[];
@@ -1420,8 +1413,6 @@ function TaskDetailPanel({
   setDependencies: (d: TaskDependency[]) => void;
   watchers: TaskWatcher[];
   setWatchers: (w: TaskWatcher[]) => void;
-  attachments: TaskAttachment[];
-  setAttachments: (a: TaskAttachment[]) => void;
   onNavigateTask: (id: number) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"details" | "activity">("details");
@@ -1447,7 +1438,6 @@ function TaskDetailPanel({
 
   const taskDeps = dependencies.filter((d) => d.taskId === task.id);
   const taskWatchers = watchers.filter((w) => w.taskId === task.id);
-  const taskAttachments = attachments.filter((a) => a.taskId === task.id);
 
   useEffect(() => {
     setLoadingComments(true);
@@ -1510,20 +1500,6 @@ function TaskDetailPanel({
 
   function removeWatcher(name: string) {
     setWatchers(watchers.filter((w) => !(w.taskId === task.id && w.name === name)));
-  }
-
-  function addAttachment() {
-    setAttachments([...attachments, {
-      taskId: task.id,
-      name: `document_${Date.now().toString(36)}.pdf`,
-      size: `${Math.floor(Math.random() * 900 + 100)}KB`,
-      uploadedBy: "Karol",
-      uploadedAt: todayStr,
-    }]);
-  }
-
-  function removeAttachment(name: string) {
-    setAttachments(attachments.filter((a) => !(a.taskId === task.id && a.name === name)));
   }
 
   return (
@@ -1819,55 +1795,44 @@ function TaskDetailPanel({
                 </div>
               </div>
 
-              {/* Attachments */}
+              {/* Comments */}
               <div style={{ marginBottom: 24 }}>
-                <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Paperclip size={11} /> Attachments
+                <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Comments</div>
+
+                {/* Comment input */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  <Avatar name="Karol" size={28} />
+                  <div style={{ flex: 1, position: "relative" }}>
+                    <input
+                      value={commentText} onChange={(e) => setCommentText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSubmitComment(); }}
+                      placeholder="Write a comment..."
+                      style={{
+                        width: "100%", padding: "10px 42px 10px 14px", background: CARD_BG,
+                        border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 12, outline: "none",
+                      }}
+                    />
+                    <button onClick={handleSubmitComment} style={{
+                      position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                      background: "none", border: "none", color: BLUE, cursor: "pointer", padding: 4,
+                    }}><Send size={14} /></button>
+                  </div>
                 </div>
-                {taskAttachments.map((a) => (
-                  <div key={a.name} style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", marginBottom: 4,
-                    background: CARD_BG, borderRadius: 6, border: `1px solid ${BORDER}`,
-                  }}>
-                    <FileText size={14} style={{ color: BLUE, flexShrink: 0 }} />
-                    <span style={{ color: TEXT, fontSize: 12, flex: 1 }}>{a.name}</span>
-                    <span style={{ color: TEXT_DIM, fontSize: 10 }}>{a.size}</span>
-                    <span style={{ color: TEXT_DIM, fontSize: 10 }}>{a.uploadedBy}</span>
-                    <button onClick={() => removeAttachment(a.name)} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 2 }}><X size={12} /></button>
+
+                {detailComments.map((c) => (
+                  <div key={c.id} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <Avatar name={c.author} size={22} />
+                      <span style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>{c.author}</span>
+                      <span style={{ color: TEXT_DIM, fontSize: 10 }}>{c.created_at}</span>
+                    </div>
+                    <div style={{
+                      padding: "10px 14px", background: CARD_BG, borderRadius: 8,
+                      border: `1px solid ${BORDER}`, color: TEXT_MID, fontSize: 12, lineHeight: 1.55,
+                    }}>{c.body}</div>
                   </div>
                 ))}
-                <button onClick={addAttachment} style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", width: "100%",
-                  background: "transparent", border: `1px dashed ${BORDER}`, borderRadius: 8,
-                  color: TEXT_DIM, fontSize: 12, cursor: "pointer", transition: "all 0.12s",
-                  justifyContent: "center",
-                }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.color = BLUE; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.color = TEXT_DIM; }}
-                >
-                  <Upload size={13} /> Attach file (mockup)
-                </button>
               </div>
-
-              {/* Comments in Details tab */}
-              {detailComments.length > 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Comments</div>
-                  {detailComments.map((c) => (
-                    <div key={c.id} style={{ marginBottom: 12 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                        <Avatar name={c.author} size={22} />
-                        <span style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>{c.author}</span>
-                        <span style={{ color: TEXT_DIM, fontSize: 10 }}>{c.created_at}</span>
-                      </div>
-                      <div style={{
-                        padding: "10px 14px", background: CARD_BG, borderRadius: 8,
-                        border: `1px solid ${BORDER}`, color: TEXT_MID, fontSize: 12, lineHeight: 1.55,
-                      }}>{c.body}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               <div style={{ display: "flex", gap: 24, color: TEXT_DIM, fontSize: 11 }}>
                 <span>Created {formatDateLong(task.created_at)}</span>

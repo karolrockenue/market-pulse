@@ -188,12 +188,9 @@ async function notifyStatusChanged(task, oldStatus, updatedBy) {
 }
 
 /**
- * Comment added — notify assignee + Slack
+ * Comment added — email assignee only (no Slack)
  */
 async function notifyCommentAdded(task, author, commentBody) {
-  const event = `💬 *${author}* commented`;
-
-  // Email assignee if someone else commented
   if (task.assignee && task.assignee !== author) {
     const email = await lookupEmail(task.assignee);
     if (email) {
@@ -212,11 +209,6 @@ async function notifyCommentAdded(task, author, commentBody) {
       );
     }
   }
-
-  sendSlack(
-    `💬 ${author} commented on: ${task.title}`,
-    slackTaskBlock(task, event)
-  );
 }
 
 /**
