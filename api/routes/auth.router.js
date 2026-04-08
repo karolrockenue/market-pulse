@@ -950,22 +950,73 @@ router.get("/cloudbeds/callback", async (req, res) => {
 
       // /api/routes/auth.router.js
 
-      // Credentials-only mode: skip all Cloudbeds API calls (hotel details, tax sync,
-      // total rooms). Just match properties to existing hotels and save credentials.
       const newlySyncedInternalIds = [];
 
-      console.log(`[AUTH CALLBACK] Processing ${userProperties.length} properties (credentials-only mode)`);
+      console.log(`[AUTH CALLBACK] Processing ${userProperties.length} properties (full mode)`);
       for (const property of userProperties) {
-        // Look up existing hotel by pms_property_id OR hotel_id — no API calls
+        // Check if this property already exists as a hotel
         const existingHotel = await client.query(
           `SELECT hotel_id FROM hotels WHERE pms_property_id = $1 OR ($1 ~ '^[0-9]{1,10}$' AND hotel_id = ($1)::integer) LIMIT 1`,
           [String(property.property_id)]
         );
-        const internalHotelId = existingHotel.rows[0]?.hotel_id;
-        console.log(`[AUTH CALLBACK] Property ${property.property_id} → hotel_id ${internalHotelId || 'NOT FOUND'}`);
+        const isExistingHotel = existingHotel.rows.length > 0;
+
+        let internalHotelId;
+
+        if (isExistingHotel) {
+          // Existing hotel — credentials-only, skip API calls
+          internalHotelId = existingHotel.rows[0].hotel_id;
+          console.log(`[AUTH CALLBACK] Property ${property.property_id} → existing hotel_id ${internalHotelId} (credentials-only)`);
+        } else {
+          // New hotel — full sync: hotel details, tax info, total rooms
+          console.log(`[AUTH CALLBACK] Property ${property.property_id} → NEW hotel, running full sync`);
+
+          internalHotelId = await cloudbedsAdapter.syncHotelDetailsToDb(
+            access_token,
+            property.property_id,
+            client
+          );
+
+          await cloudbedsAdapter.syncHotelTaxInfoToDb(
+            access_token,
+            property.property_id,
+            client
+          );
+
+          // Sync total_rooms from PMS
+          try {
+            const { credentials, pms_type, pms_property_id } =
+              await getCredentialsForHotel(internalHotelId);
+
+            const apiResponse = await getRoomTypesFromPMS(
+              internalHotelId,
+              pms_type,
+              credentials,
+              pms_property_id
+            );
+
+            if (apiResponse && Array.isArray(apiResponse.data)) {
+              const totalRooms = apiResponse.data.reduce((sum, roomType) => {
+                const roomName = roomType.roomTypeName || roomType.Name || "";
+                if (roomName.toLowerCase().includes("virtual")) return sum;
+                return sum + (roomType.roomTypeUnits || roomType.RoomTypeUnits || 0);
+              }, 0);
+
+              if (totalRooms > 0) {
+                await client.query(
+                  "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+                  [totalRooms, internalHotelId]
+                );
+                console.log(`[AUTH CALLBACK] Set total_rooms to ${totalRooms} for new hotel ${internalHotelId}`);
+              }
+            }
+          } catch (roomError) {
+            console.error(`[AUTH CALLBACK] Failed to sync total_rooms for hotel ${internalHotelId}: ${roomError.message}`);
+          }
+        }
 
         if (!internalHotelId) {
-          console.log(`[AUTH CALLBACK] Property ${property.property_id} not found in hotels table — skipping.`);
+          console.warn(`[AUTH CALLBACK] Skipping property link for ${property.property_id} — no hotel_id resolved.`);
           continue;
         }
 
@@ -1028,10 +1079,54 @@ router.get("/cloudbeds/callback", async (req, res) => {
           );
         }
 
-        // 2. Sync + backfill skipped for re-auth (existing hotels already have data).
-        console.log(`[AUTH CALLBACK] Re-auth flow — skipping sync/backfill for ${newlySyncedInternalIds.length} existing hotels.`);
+        // 2. Trigger sync + backfill only for genuinely NEW hotels (no existing data).
+        // Fire-and-forget — don't block the redirect.
+        for (const hotelId of newlySyncedInternalIds) {
+          pgPool.query(
+            "SELECT 1 FROM daily_metrics_snapshots WHERE hotel_id = $1 LIMIT 1",
+            [hotelId]
+          ).then((hasData) => {
+            if (hasData.rows.length > 0) {
+              console.log(`[AUTH CALLBACK] Hotel ${hotelId} already has data — skipping sync/backfill.`);
+              return;
+            }
 
-        // 3. Redirect the user (this logic is unchanged)
+            const syncUrl = `${baseUrl}/api/admin/initial-sync`;
+            const internalSecret = process.env.INTERNAL_API_SECRET;
+            if (!internalSecret) {
+              console.error(`[AUTH CALLBACK] INTERNAL_API_SECRET not set. Skipping sync for ${hotelId}.`);
+              return;
+            }
+
+            fetch(syncUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${internalSecret}` },
+              body: JSON.stringify({ propertyId: hotelId }),
+            })
+              .then((syncRes) => {
+                if (syncRes.ok) console.log(`[AUTH CALLBACK] Sync triggered for new hotel ${hotelId}.`);
+                else console.error(`[AUTH CALLBACK] Sync failed for hotel ${hotelId}. Status: ${syncRes.status}`);
+              })
+              .catch((err) => console.error(`[AUTH CALLBACK] Sync fetch error for hotel ${hotelId}:`, err.message));
+
+            try {
+              const { spawn } = require("child_process");
+              const child = spawn("node", ["scripts/backfill-reservations.js", String(hotelId), "14"], {
+                cwd: require("path").resolve(__dirname, "../.."),
+                detached: true,
+                stdio: "ignore",
+              });
+              child.unref();
+              console.log(`[AUTH CALLBACK] Reservation backfill spawned for new hotel ${hotelId}`);
+            } catch (bfErr) {
+              console.error(`[AUTH CALLBACK] Backfill spawn error for hotel ${hotelId}:`, bfErr.message);
+            }
+          }).catch((err) => {
+            console.error(`[AUTH CALLBACK] Sync/backfill error for hotel ${hotelId}:`, err.message);
+          });
+        }
+
+        // 3. Redirect the user
         const primaryNewPropertyId = newlySyncedInternalIds[0];
         if (primaryNewPropertyId) {
           res.redirect(
