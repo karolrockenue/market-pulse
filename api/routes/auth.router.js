@@ -203,7 +203,7 @@ router.post("/login", async (req, res) => {
     }
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date(Date.now() + 15 * 60 * 1000);
+    const expires_at = new Date(Date.now() + 30 * 60 * 1000);
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
       [token, user.user_id, expires_at]
@@ -267,11 +267,78 @@ router.get("/magic-link-callback", async (req, res) => {
     );
 
     if (tokenResult.rows.length === 0) {
-      return res
-        .status(400)
-        .send(
-          "Login link is invalid, has expired, or has already been used. Please request a new one."
-        );
+      return res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Link Expired</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { text-align: center; max-width: 420px; padding: 2rem; }
+            h1 { color: #f9fafb; font-size: 1.5rem; margin-bottom: 0.75rem; }
+            p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem; }
+            a { display: inline-block; padding: 0.75rem 1.5rem; background: #2563eb; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 500; }
+            a:hover { background: #1d4ed8; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Login link expired</h1>
+            <p>This link is invalid, has expired, or has already been used.</p>
+            <a href="/login">Request a new link</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Show a click-through page — do NOT consume the token on GET.
+    // This prevents email security scanners from burning the token.
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Market Pulse – Log In</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+          .container { text-align: center; max-width: 420px; padding: 2rem; }
+          h1 { color: #f9fafb; font-size: 1.5rem; margin-bottom: 0.75rem; }
+          p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem; }
+          button { padding: 0.75rem 2rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; }
+          button:hover { background: #1d4ed8; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Welcome to Market Pulse</h1>
+          <p>Click below to log in.</p>
+          <form method="POST" action="/api/auth/magic-link-callback">
+            <input type="hidden" name="token" value="${token}" />
+            <button type="submit">Log me in</button>
+          </form>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Error during magic link callback:", error);
+    res.status(500).send("An internal server error occurred.");
+  }
+});
+
+router.post("/magic-link-callback", async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).send("Invalid or missing login token.");
+  }
+  try {
+    const tokenResult = await pgPool.query(
+      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW() AND used_at IS NULL",
+      [token]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res.redirect("/api/auth/magic-link-callback?token=" + encodeURIComponent(token));
     }
     const loginToken = tokenResult.rows[0];
 
@@ -299,40 +366,33 @@ router.get("/magic-link-callback", async (req, res) => {
       req.session.userId = user.cloudbeds_user_id;
       req.session.role = user.role;
 
-      // api/routes/auth.router.js
-
-      // api/routes/auth.router.js
-
       req.session.save((saveErr) => {
         if (saveErr) {
           console.error("[CRITICAL] Session save failed:", saveErr);
           return res.status(500).send("An error occurred during login.");
         }
 
-        // --- THE FIX: Proactively clear the HOST-ONLY cookie by NOT specifying a domain. ---
         res.clearCookie("connect.sid", { path: "/" });
 
         res.status(200).send(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>Logging in...</title>
-                        <style>
-                            body { font-family: sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                            .container { text-align: center; }
-                        </style>
-                        <script>
-                            window.location.href = '/app/';
-                        </script>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <h1>Login Successful</h1>
-                            <p>Redirecting you to the dashboard...</p>
-                        </div>
-                    </body>
-                    </html>
-                `);
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Logging in...</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+              .container { text-align: center; }
+            </style>
+            <script>window.location.href = '/app/';</script>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Login Successful</h1>
+              <p>Redirecting you to the dashboard...</p>
+            </div>
+          </body>
+          </html>
+        `);
       });
     });
   } catch (error) {

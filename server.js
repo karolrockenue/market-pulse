@@ -51,6 +51,7 @@ const distributionRoutes = require("./api/routes/distribution.router.js"); // Di
 // --- EXPRESS APP INITIALIZATION ---
 const app = express();
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: false }));
 app.set("trust proxy", 1);
 
 // --- REQUEST LOGGING ---
