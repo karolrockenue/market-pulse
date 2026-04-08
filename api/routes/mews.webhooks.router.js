@@ -37,14 +37,19 @@ async function getHotelByEnterpriseId(enterpriseId) {
 
 // ─── Helper: Fetch reservation details from Mews ───────────────────
 
-async function fetchReservationDetails(credentials, reservationId) {
+async function fetchReservationDetails(credentials, reservationId, serviceId) {
+  const payload = {
+    ReservationIds: [reservationId],
+    Limitation: { Count: 1 },
+  };
+  if (serviceId) {
+    payload.ServiceIds = [serviceId];
+  }
+
   const response = await mewsAdapter._callMewsApi(
     "reservations/getAll/2023-06-06",
     credentials,
-    {
-      ReservationIds: [reservationId],
-      Limitation: { Count: 1 },
-    },
+    payload,
   );
 
   if (!response.Reservations || response.Reservations.length === 0) {
@@ -168,10 +173,12 @@ router.post("/", async (req, res) => {
     }
 
     try {
-      // 5a. Fetch full reservation details
+      // 5a. Fetch full reservation details (scoped to onboarded service)
+      const expectedServiceId = pms_credentials?.serviceId;
       const reservation = await fetchReservationDetails(
         credentials,
         reservationId,
+        expectedServiceId,
       );
 
       if (!reservation) {
@@ -209,7 +216,10 @@ router.post("/", async (req, res) => {
         continue;
       }
 
-      // 5c. Calculate room nights
+      // 5c. Service filter — already enforced at API level in fetchReservationDetails.
+      // If the reservation came back, it belongs to the correct service.
+
+      // 5d. Calculate room nights
       const startDate = new Date(checkIn);
       const endDate = new Date(checkOut);
       const diffTime = Math.abs(endDate - startDate);

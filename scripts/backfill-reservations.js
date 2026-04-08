@@ -181,6 +181,7 @@ async function backfillMews(hotelId, hotel, days) {
   let cursor = null;
 
   do {
+    const serviceId = hotel.pms_credentials?.serviceId;
     const payload = {
       CreatedUtc: {
         StartUtc: from.toISOString(),
@@ -188,6 +189,9 @@ async function backfillMews(hotelId, hotel, days) {
       },
       Limitation: { Count: 1000, Cursor: cursor },
     };
+    if (serviceId) {
+      payload.ServiceIds = [serviceId];
+    }
 
     const response = await mewsAdapter._callMewsApi(
       'reservations/getAll/2023-06-06',
