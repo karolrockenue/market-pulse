@@ -9,7 +9,7 @@ function getMagicLinkEmailHTML(userFirstName = "there", magicLinkUrl) {
   const bodyText = `
     Hello ${userFirstName},<br><br>
     Click the button below to securely log in to your dashboard.<br><br>
-    <span style="font-size: 13px; color: #888;">This link is valid for 15 minutes. If you did not request this login, you can safely ignore this email.</span>
+    <span style="font-size: 13px; color: #888;">This link is valid for 30 minutes. If you did not request this login, you can safely ignore this email.</span>
   `;
   return getMarketPulseEmailHTML(headline, bodyText, magicLinkUrl, "Log In");
 }
@@ -51,7 +51,7 @@ const getStandardReportEmailHTML = (reportName, reportPeriod, startDate, endDate
 };
 // [ADD THIS NEW FUNCTION]
 
-// This is our new, light-themed, reusable wrapper for all emails.
+// Branded Accent wrapper — dark navy header, light content, modern footer.
 function getMarketPulseEmailHTML(headline, bodyText, buttonLink, buttonText) {
   const appUrl = process.env.BASE_URL || "https://www.market-pulse.io";
   const finalButtonLink = buttonLink || appUrl;
@@ -61,27 +61,27 @@ function getMarketPulseEmailHTML(headline, bodyText, buttonLink, buttonText) {
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f7; color: #333;">
       <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
-          <td align="center" style="padding: 20px 0;">
-            <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px 8px 0 0;">
+          <td align="center" style="padding: 32px 0;">
+            <table border="0" cellpadding="0" cellspacing="0" width="600" style="border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+              <!-- Dark header -->
               <tr>
-                <td align="left" style="padding: 24px 30px;">
-                  <span style="font-size: 20px; font-weight: 600; letter-spacing: 0.5px; color: #111;">( MARKET PULSE )</span>
+                <td style="background: #0f172a; padding: 20px 36px;">
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%"><tr>
+                    <td><span style="font-size: 15px; font-weight: 600; letter-spacing: 1px; color: #ffffff;">( MARKET PULSE )</span></td>
+                  </tr></table>
                 </td>
               </tr>
-            </table>
-            
-            <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-bottom: 1px solid #e0e0e0;">
+              <!-- Content -->
               <tr>
-                <td align="left" style="padding: 20px 30px;">
-                  <h1 style="font-size: 24px; font-weight: 600; color: #111; margin-top: 0;">${headline}</h1>
-                  <p style="font-size: 16px; line-height: 1.6; color: #333;">
+                <td style="padding: 32px 36px;">
+                  <h1 style="font-size: 18px; font-weight: 600; color: #1e293b; margin: 0 0 20px;">${headline}</h1>
+                  <div style="font-size: 14px; line-height: 1.6; color: #475569;">
                     ${bodyText}
-                  </p>
-                  
-                  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding-top: 20px;">
+                  </div>
+                  <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 28px;">
                     <tr>
-                      <td align="left">
-                        <a href="${finalButtonLink}" target="_blank" style="font-size: 16px; font-weight: 500; color: #ffffff; background-color: #111; text-decoration: none; padding: 14px 24px; border-radius: 6px; display: inline-block;">
+                      <td>
+                        <a href="${finalButtonLink}" target="_blank" style="font-size: 14px; font-weight: 600; color: #ffffff; background: #0f172a; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
                           ${finalButtonText}
                         </a>
                       </td>
@@ -89,13 +89,11 @@ function getMarketPulseEmailHTML(headline, bodyText, buttonLink, buttonText) {
                   </table>
                 </td>
               </tr>
-            </table>
-            
-            <table border="0" cellpadding="0" cellspacing="0" width="600">
+              <!-- Footer -->
               <tr>
-                <td align="center" style="padding: 24px 30px;">
-                  <p style="font-size: 12px; color: #888; margin: 0;">
-                    &copy; ${new Date().getFullYear()} Market Pulse. All rights reserved.
+                <td style="padding: 20px 36px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                  <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+                    &copy; ${new Date().getFullYear()} Market Pulse
                   </p>
                 </td>
               </tr>

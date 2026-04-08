@@ -271,22 +271,28 @@ router.get("/magic-link-callback", async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Link Expired</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-            .container { text-align: center; max-width: 420px; padding: 2rem; }
-            h1 { color: #f9fafb; font-size: 1.5rem; margin-bottom: 0.75rem; }
-            p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem; }
-            a { display: inline-block; padding: 0.75rem 1.5rem; background: #2563eb; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 500; }
-            a:hover { background: #1d4ed8; }
-          </style>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Link Expired — Market Pulse</title>
         </head>
-        <body>
-          <div class="container">
-            <h1>Login link expired</h1>
-            <p>This link is invalid, has expired, or has already been used.</p>
-            <a href="/login">Request a new link</a>
-          </div>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f4f7;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr><td align="center" style="padding: 60px 0;">
+              <table border="0" cellpadding="0" cellspacing="0" width="480" style="border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+                <tr><td style="background: #0f172a; padding: 20px 36px;">
+                  <span style="font-size: 15px; font-weight: 600; letter-spacing: 1px; color: #ffffff;">( MARKET PULSE )</span>
+                </td></tr>
+                <tr><td style="padding: 40px 36px; text-align: center;">
+                  <h1 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0 0 12px;">Login link expired</h1>
+                  <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin: 0 0 28px;">This link is invalid, has expired, or has already been used.</p>
+                  <a href="/login" style="font-size: 14px; font-weight: 600; color: #ffffff; background: #0f172a; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">Request a new link</a>
+                </td></tr>
+                <tr><td style="padding: 20px 36px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                  <p style="font-size: 11px; color: #94a3b8; margin: 0;">&copy; 2026 Market Pulse</p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
         </body>
         </html>
       `);
@@ -298,25 +304,31 @@ router.get("/magic-link-callback", async (req, res) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Market Pulse – Log In</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-          .container { text-align: center; max-width: 420px; padding: 2rem; }
-          h1 { color: #f9fafb; font-size: 1.5rem; margin-bottom: 0.75rem; }
-          p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem; }
-          button { padding: 0.75rem 2rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; }
-          button:hover { background: #1d4ed8; }
-        </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Log In — Market Pulse</title>
       </head>
-      <body>
-        <div class="container">
-          <h1>Welcome to Market Pulse</h1>
-          <p>Click below to log in.</p>
-          <form method="POST" action="/api/auth/magic-link-callback">
-            <input type="hidden" name="token" value="${token}" />
-            <button type="submit">Log me in</button>
-          </form>
-        </div>
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f4f7;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+          <tr><td align="center" style="padding: 60px 0;">
+            <table border="0" cellpadding="0" cellspacing="0" width="480" style="border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+              <tr><td style="background: #0f172a; padding: 20px 36px;">
+                <span style="font-size: 15px; font-weight: 600; letter-spacing: 1px; color: #ffffff;">( MARKET PULSE )</span>
+              </td></tr>
+              <tr><td style="padding: 40px 36px; text-align: center;">
+                <h1 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0 0 12px;">Welcome back</h1>
+                <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin: 0 0 28px;">Click below to securely log in to your dashboard.</p>
+                <form method="POST" action="/api/auth/magic-link-callback">
+                  <input type="hidden" name="token" value="${token}" />
+                  <button type="submit" style="font-size: 14px; font-weight: 600; color: #ffffff; background: #0f172a; border: none; padding: 12px 28px; border-radius: 8px; cursor: pointer; display: inline-block;">Log me in</button>
+                </form>
+              </td></tr>
+              <tr><td style="padding: 20px 36px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <p style="font-size: 11px; color: #94a3b8; margin: 0;">&copy; 2026 Market Pulse</p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
       </body>
       </html>
     `);
@@ -378,18 +390,24 @@ router.post("/magic-link-callback", async (req, res) => {
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Logging in...</title>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #111827; color: #d1d5db; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-              .container { text-align: center; }
-            </style>
+            <meta charset="UTF-8">
+            <title>Logging in — Market Pulse</title>
             <script>window.location.href = '/app/';</script>
           </head>
-          <body>
-            <div class="container">
-              <h1>Login Successful</h1>
-              <p>Redirecting you to the dashboard...</p>
-            </div>
+          <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f4f7;">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr><td align="center" style="padding: 60px 0;">
+                <table border="0" cellpadding="0" cellspacing="0" width="480" style="border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+                  <tr><td style="background: #0f172a; padding: 20px 36px;">
+                    <span style="font-size: 15px; font-weight: 600; letter-spacing: 1px; color: #ffffff;">( MARKET PULSE )</span>
+                  </td></tr>
+                  <tr><td style="padding: 40px 36px; text-align: center;">
+                    <h1 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0 0 12px;">Login Successful</h1>
+                    <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin: 0;">Redirecting you to the dashboard...</p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
           </body>
           </html>
         `);
