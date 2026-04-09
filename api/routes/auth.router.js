@@ -384,7 +384,8 @@ router.post("/magic-link-callback", async (req, res) => {
           return res.status(500).send("An error occurred during login.");
         }
 
-        res.clearCookie("connect.sid", { path: "/" });
+        // NOTE: removed clearCookie("connect.sid") that was destroying
+        // the session we just created, causing redirect to login page.
 
         res.status(200).send(`
           <!DOCTYPE html>
