@@ -76,6 +76,7 @@ router.get("/mine", requireUserApi, async (req, res) => {
     }
 
     const result = await pool.query(query, params);
+    console.log(`[DEBUG /mine] userId=${req.session.userId} role=${userRole} params=${JSON.stringify(params)} resultCount=${result.rows.length}`);
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching my properties:", error);
