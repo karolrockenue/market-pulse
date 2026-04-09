@@ -6,7 +6,7 @@
  */
 const express = require("express");
 const router = express.Router();
-const { requireAdminApi } = require("../utils/middleware"); // [MODIFIED] Allow Admin access
+const { requireAdminApi, requireUserApi, requireRatesAccess } = require("../utils/middleware");
 const sentinelAdapter = require("../adapters/sentinel.adapter.js");
 const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js"); // [Added for Export Feature]
 const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
@@ -90,7 +90,7 @@ router.all("/process-queue", async (req, res) => {
 // =============================================================================
 // 2. HOTEL USER ENDPOINTS (Scoped Access - before admin middleware)
 // =============================================================================
-const { requireHotelRateAccess, requireUserApi } = require("../utils/middleware");
+const { requireHotelRateAccess } = require("../utils/middleware");
 
 // GET /api/sentinel/hotel-rates/:hotelId - Rate calendar for hotel user
 router.get("/hotel-rates/:hotelId", requireUserApi, requireHotelRateAccess, async (req, res) => {
@@ -221,8 +221,23 @@ router.post("/hotel-unlock", requireUserApi, requireHotelRateAccess, async (req,
 
 // =============================================================================
 // 3. ADMIN MIDDLEWARE (Protects all routes below this line)
+// Routes in RATES_VIEW_PATHS are also accessible to users with can_view_rates.
 // =============================================================================
-router.use(requireAdminApi);
+const RATES_VIEW_PATHS = new Set([
+  "/preview-rate",
+  "/pms-property-ids",
+  "/predictions",
+  "/pace-curves",
+  "/min-rates",
+]);
+
+router.use(async (req, res, next) => {
+  const basePath = "/" + req.path.split("/")[1];
+  if (RATES_VIEW_PATHS.has(basePath)) {
+    return requireUserApi(req, res, () => requireRatesAccess(req, res, next));
+  }
+  return requireAdminApi(req, res, next);
+});
 // ... existing imports ...
 // [REPLACEMENT] Full "Export Reservations" Route
 // Helper to prevent API Bans (Rate Limiter)

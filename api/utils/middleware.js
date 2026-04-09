@@ -249,6 +249,55 @@ async function requireHotelRateAccess(req, res, next) {
   return res.status(403).json({ error: "Access denied" });
 }
 
+/**
+ * Middleware: requireRatesAccess
+ * Allows admin/super_admin unconditionally.
+ * For owner/user roles, checks can_view_rates flag on the user record
+ * AND verifies property access via user_properties (when hotelId is present).
+ */
+async function requireRatesAccess(req, res, next) {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+
+  const role = req.session.role;
+
+  if (role === "admin" || role === "super_admin") {
+    return next();
+  }
+
+  if (role === "owner" || role === "user") {
+    try {
+      const userCheck = await pgPool.query(
+        "SELECT can_view_rates FROM users WHERE cloudbeds_user_id = $1",
+        [req.session.userId],
+      );
+
+      if (!userCheck.rows.length || !userCheck.rows[0].can_view_rates) {
+        return res.status(403).json({ error: "Rate viewing not enabled for this account." });
+      }
+
+      const hotelId = req.body.hotelId || req.params.hotelId;
+      if (hotelId) {
+        const access = await pgPool.query(
+          "SELECT 1 FROM user_properties WHERE (user_id = $1 OR user_id = $2::text) AND property_id = $3",
+          [req.user.cloudbedsId, req.user.internalId, hotelId],
+        );
+        if (access.rows.length === 0) {
+          return res.status(403).json({ error: "Access denied to this property." });
+        }
+      }
+
+      return next();
+    } catch (error) {
+      console.error("Error in requireRatesAccess middleware:", error);
+      return res.status(500).json({ error: "Internal server error." });
+    }
+  }
+
+  return res.status(403).json({ error: "Access denied" });
+}
+
 module.exports = {
   requireUserApi,
   requireAdminApi, // Export the new permissive middleware
@@ -257,4 +306,5 @@ module.exports = {
   requireAccountOwner,
   requireManagePermission,
   requireHotelRateAccess,
+  requireRatesAccess,
 };

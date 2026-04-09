@@ -7,7 +7,8 @@ const hotelService = require("../services/hotel.service");
 const {
   requireAdminApi,
   requireSuperAdminOnly,
-  requireUserApi
+  requireUserApi,
+  requireRatesAccess
 } = require("../utils/middleware");
 
 /**
@@ -245,10 +246,31 @@ router.post("/delete", requireAdminApi, async (req, res) => {
 // Replaces rockenue.router.js portfolio endpoints
 // =============================================================================
 
-router.get("/assets", requireSuperAdminOnly, async (req, res) => {
+router.get("/assets", requireUserApi, async (req, res) => {
+  const role = req.session.role;
   try {
-    const assets = await hotelService.getRockenuePortfolio();
-    res.json(assets);
+    const allAssets = await hotelService.getRockenuePortfolio();
+
+    // Super admins see everything
+    if (role === "super_admin" || role === "admin") {
+      return res.json(allAssets);
+    }
+
+    // Rate-view users see only their linked hotels
+    const userCheck = await pool.query(
+      "SELECT can_view_rates FROM users WHERE cloudbeds_user_id = $1",
+      [req.session.userId]
+    );
+    if (!userCheck.rows.length || !userCheck.rows[0].can_view_rates) {
+      return res.status(403).json({ error: "Access denied." });
+    }
+
+    const { rows } = await pool.query(
+      "SELECT property_id FROM user_properties WHERE user_id = $1 OR user_id = $2::text",
+      [req.user.cloudbedsId, req.user.internalId]
+    );
+    const allowedIds = new Set(rows.map(r => r.property_id));
+    res.json(allAssets.filter(a => allowedIds.has(a.market_pulse_hotel_id)));
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
   }
