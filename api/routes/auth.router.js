@@ -262,7 +262,7 @@ router.get("/magic-link-callback", async (req, res) => {
   }
   try {
     const tokenResult = await pgPool.query(
-      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW() AND used_at IS NULL",
+      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
     );
 
@@ -344,8 +344,11 @@ router.post("/magic-link-callback", async (req, res) => {
     return res.status(400).send("Invalid or missing login token.");
   }
   try {
+    // Allow token reuse within validity window — corporate email scanners
+    // (Mimecast, Proofpoint, MS Defender) can submit forms and consume
+    // single-use tokens before the real user clicks.
     const tokenResult = await pgPool.query(
-      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW() AND used_at IS NULL",
+      "SELECT * FROM magic_login_tokens WHERE token = $1 AND expires_at > NOW()",
       [token]
     );
 
