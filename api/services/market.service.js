@@ -271,29 +271,126 @@ class MarketService {
    * --- FORWARD VIEW (From planning.router.js) ---
    * Get the *latest full scrape* for the next 90 days.
    */
+  static async getMarketBaseline(citySlug) {
+    const slug = slugify(citySlug);
+    const { rows } = await db.query(`
+      SELECT
+        PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY weighted_avg_price) AS wap_p5,
+        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY weighted_avg_price) AS wap_p25,
+        PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY weighted_avg_price) AS wap_p50,
+        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY weighted_avg_price) AS wap_p75,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY weighted_avg_price) AS wap_p95,
+        PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY total_results) AS supply_p5,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY total_results) AS supply_p95,
+        MIN(weighted_avg_price) AS wap_floor,
+        MAX(weighted_avg_price) AS wap_ceil
+      FROM market_availability_snapshots
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND weighted_avg_price IS NOT NULL
+    `, [slug]);
+    if (!rows.length) return null;
+    const r = rows[0];
+    return {
+      wapMin: parseFloat(r.wap_p5), wapMax: parseFloat(r.wap_p95),
+      wapP25: parseFloat(r.wap_p25), wapP50: parseFloat(r.wap_p50), wapP75: parseFloat(r.wap_p75),
+      wapFloor: parseFloat(r.wap_floor), wapCeil: parseFloat(r.wap_ceil),
+      supplyMin: parseFloat(r.supply_p5), supplyMax: parseFloat(r.supply_p95),
+    };
+  }
+
+  /**
+   * Compute segment WAP (2-4★) from histogram by trimming 5★ from top and 1★ from bottom.
+   */
+  static _calcSegmentWap(histogram, minPrice, maxPrice, starRating) {
+    if (!histogram?.length || !starRating) return null;
+
+    const s5 = parseInt(starRating["5 stars"] || 0);
+    const s1 = parseInt(starRating["1 star"] || 0);
+    const totalRated = s1
+      + parseInt(starRating["2 stars"] || 0)
+      + parseInt(starRating["3 stars"] || 0)
+      + parseInt(starRating["4 stars"] || 0)
+      + s5;
+
+    if (totalRated === 0) return null;
+
+    const trimTopPct = s5 / totalRated;
+    const trimBotPct = s1 / totalRated;
+
+    const bucketWidth = (maxPrice - minPrice) / histogram.length;
+    const buckets = histogram.map((val, i) => ({
+      mid: minPrice + (i + 0.5) * bucketWidth,
+      count: typeof val === "object" ? parseInt(val.count || 0) : parseInt(val || 0),
+    }));
+
+    const totalCount = buckets.reduce((s, b) => s + b.count, 0);
+    if (totalCount === 0) return null;
+
+    // Trim bottom (1★)
+    let toTrimBot = Math.round(totalCount * trimBotPct);
+    for (let i = 0; i < buckets.length && toTrimBot > 0; i++) {
+      const remove = Math.min(buckets[i].count, toTrimBot);
+      buckets[i].count -= remove;
+      toTrimBot -= remove;
+    }
+
+    // Trim top (5★)
+    let toTrimTop = Math.round(totalCount * trimTopPct);
+    for (let i = buckets.length - 1; i >= 0 && toTrimTop > 0; i--) {
+      const remove = Math.min(buckets[i].count, toTrimTop);
+      buckets[i].count -= remove;
+      toTrimTop -= remove;
+    }
+
+    let sumPxC = 0, sumC = 0;
+    for (const b of buckets) { sumPxC += b.mid * b.count; sumC += b.count; }
+    return sumC > 0 ? Math.round((sumPxC / sumC) * 100) / 100 : null;
+  }
+
   static async getForwardView(city) {
-    // 1. Force slug format (handles "Las Vegas" -> "las-vegas")
     const citySlug = slugify(city);
 
     const sql = `
       SELECT DISTINCT ON (checkin_date)
         checkin_date,
         total_results,
-        weighted_avg_price, 
-        -- Fallback: If hotel_count is null, use total_results (supply)
+        weighted_avg_price,
+        facet_star_rating,
+        facet_price_histogram,
+        min_price_anchor,
+        max_price_anchor,
         COALESCE(hotel_count, total_results) as hotel_count
       FROM market_availability_snapshots
       WHERE
         LOWER(city_slug) = LOWER($1)
         AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
       ORDER BY
-        checkin_date ASC, 
+        checkin_date ASC,
         scraped_at DESC;
     `;
 
     const { rows } = await db.query(sql, [citySlug]);
-    let processedRows = calculatePriceIndex(rows);
+
+    // Compute segment WAP per row, then strip heavy fields before returning
+    let processedRows = rows.map((row) => {
+      const segmentWap = MarketService._calcSegmentWap(
+        row.facet_price_histogram,
+        parseFloat(row.min_price_anchor),
+        parseFloat(row.max_price_anchor),
+        row.facet_star_rating
+      );
+      return {
+        checkin_date: row.checkin_date,
+        total_results: row.total_results,
+        weighted_avg_price: row.weighted_avg_price,
+        hotel_count: row.hotel_count,
+        segment_wap: segmentWap,
+      };
+    });
+
+    processedRows = calculatePriceIndex(processedRows);
     processedRows = calculateMarketDemand(processedRows);
+
     return processedRows;
   }
 
@@ -964,6 +1061,234 @@ SELECT
     `;
     const { rows } = await db.query(sql, [citySlug]);
     return rows;
+  }
+
+  // ── PredictHQ Events ──
+
+  static async getPredictHQEvents(citySlug) {
+    const PREDICTHQ_TOKEN = process.env.PREDICTHQ_ACCESS_TOKEN;
+    if (!PREDICTHQ_TOKEN) throw new Error("PREDICTHQ_ACCESS_TOKEN not configured");
+
+    const CACHE_TTL_HOURS = 24;
+    const slug = slugify(citySlug);
+
+    // Check cache
+    const cached = await db.query(
+      `SELECT place_id, events, fetched_at FROM predicthq_events WHERE city_slug = $1`,
+      [slug]
+    );
+    if (cached.rows.length > 0) {
+      const age = (Date.now() - new Date(cached.rows[0].fetched_at).getTime()) / 3600000;
+      if (age < CACHE_TTL_HOURS) {
+        return { citySlug: slug, events: cached.rows[0].events, fetchedAt: cached.rows[0].fetched_at, source: "cache" };
+      }
+    }
+
+    // Resolve place ID (use cached if available)
+    let placeId = cached.rows[0]?.place_id || null;
+    if (!placeId) {
+      const headers = { Authorization: `Bearer ${PREDICTHQ_TOKEN}`, Accept: "application/json" };
+      // Map city slug to a country for more accurate lookup
+      const cityName = slug.replace(/-/g, " ");
+      const placeRes = await fetch(
+        `https://api.predicthq.com/v1/places/?q=${encodeURIComponent(cityName)}&type=locality&limit=1`,
+        { headers }
+      );
+      if (!placeRes.ok) throw new Error(`PredictHQ Places API error: ${placeRes.status}`);
+      const placeData = await placeRes.json();
+      if (!placeData.results?.length) throw new Error(`No PredictHQ place found for "${cityName}"`);
+      placeId = placeData.results[0].id;
+    }
+
+    // Fetch events for next 180 days to cover mockup date ranges
+    const today = new Date().toISOString().slice(0, 10);
+    const end = new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10);
+    const headers = { Authorization: `Bearer ${PREDICTHQ_TOKEN}`, Accept: "application/json" };
+
+    // Look up city coordinates from the Places API result for radius search
+    const placeLookup = await fetch(
+      `https://api.predicthq.com/v1/places/?id=${placeId}&limit=1`,
+      { headers }
+    );
+    const placeInfo = placeLookup.ok ? await placeLookup.json() : { results: [] };
+    const coords = placeInfo.results?.[0]?.location; // [lng, lat]
+    const withinParam = coords ? `30km@${coords[1]},${coords[0]}` : null;
+
+    // Use radius search (catches suburbs like Wimbledon) with place.scope fallback
+    const locationParam = withinParam ? { within: withinParam } : { "place.scope": placeId };
+
+    // Fetch in two tiers to get both major and notable events within API limits
+    const baseParams = {
+      ...locationParam,
+      "active.gte": today,
+      "active.lte": end,
+      category: "concerts,festivals,sports,conferences,expos,performing-arts",
+      sort: "-rank",
+      limit: "50",
+    };
+
+    // Tier 0: Blockbusters (rank >= 88) — guarantees Wimbledon, Pride, mega concerts
+    const params0 = new URLSearchParams({ ...baseParams, "rank.gte": "88" });
+    const res0 = await fetch(`https://api.predicthq.com/v1/events/?${params0}`, { headers });
+    const data0 = res0.ok ? await res0.json() : { results: [] };
+
+    // Tier 1: Major events (rank 80-87)
+    const params1 = new URLSearchParams({ ...baseParams, "rank.gte": "80", "rank.lte": "87" });
+    const res1 = await fetch(`https://api.predicthq.com/v1/events/?${params1}`, { headers });
+    const data1 = res1.ok ? await res1.json() : { results: [] };
+
+    // Tier 2: Notable events (rank 65-79) to fill in the mid-tier
+    const params2 = new URLSearchParams({ ...baseParams, "rank.gte": "65", "rank.lte": "79" });
+    const res2 = await fetch(`https://api.predicthq.com/v1/events/?${params2}`, { headers });
+    const data2 = res2.ok ? await res2.json() : { results: [] };
+
+    const allResults = [...(data0.results || []), ...(data1.results || []), ...(data2.results || [])];
+
+    // Deduplicate by event ID
+    const seen = new Set();
+    const deduped = allResults.filter((e) => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
+
+    // Map to lean format
+    const events = deduped.map((e) => {
+      const localRank = e.local_rank || 0;
+      const tier = localRank >= 90 ? "Extreme" : localRank >= 75 ? "High" : "Medium";
+      return {
+        id: e.id,
+        title: e.title,
+        category: e.category,
+        start: e.start?.slice(0, 10) || e.start_local?.slice(0, 10) || null,
+        end: e.end?.slice(0, 10) || e.end_local?.slice(0, 10) || null,
+        rank: e.rank,
+        localRank: localRank,
+        attendance: e.phq_attendance || null,
+        accommodationSpend: e.predicted_event_spend_industries?.accommodation || null,
+        tier,
+      };
+    });
+
+    // Upsert cache
+    await db.query(
+      `INSERT INTO predicthq_events (city_slug, place_id, events, fetched_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (city_slug) DO UPDATE SET place_id = $2, events = $3, fetched_at = NOW()`,
+      [slug, placeId, JSON.stringify(events)]
+    );
+
+    return { citySlug: slug, events, fetchedAt: new Date().toISOString(), source: "predicthq" };
+  }
+
+  /**
+   * Booking behavior analytics derived from the reservations table.
+   * Returns lead-time distribution buckets and length-of-stay buckets.
+   * hotelIds: array of integer hotel IDs to aggregate across.
+   */
+  static async getBookingBehavior(hotelIds) {
+    if (!hotelIds?.length) return { leadTimeBuckets: [], losBuckets: [], avgLeadTime: 0, avgLos: 0, totalBookings: 0 };
+
+    const result = await db.query(
+      `SELECT
+         check_in::date - booking_date::date AS lead_time,
+         nights
+       FROM reservations
+       WHERE hotel_id = ANY($1::int[])
+         AND status != 'canceled'
+         AND booking_date >= CURRENT_DATE - INTERVAL '90 days'
+         AND check_in IS NOT NULL
+         AND booking_date IS NOT NULL`,
+      [hotelIds]
+    );
+
+    const rows = result.rows;
+    if (!rows.length) return { leadTimeBuckets: [], losBuckets: [], avgLeadTime: 0, avgLos: 0, totalBookings: 0 };
+
+    // Lead time buckets
+    const ltBuckets = [
+      { label: "0–7d", min: 0, max: 7, count: 0 },
+      { label: "8–14d", min: 8, max: 14, count: 0 },
+      { label: "15–30d", min: 15, max: 30, count: 0 },
+      { label: "31–60d", min: 31, max: 60, count: 0 },
+      { label: "60d+", min: 61, max: Infinity, count: 0 },
+    ];
+
+    // LOS buckets
+    const losBkts = [
+      { label: "1 night", min: 1, max: 1, count: 0 },
+      { label: "2 nights", min: 2, max: 2, count: 0 },
+      { label: "3 nights", min: 3, max: 3, count: 0 },
+      { label: "4+ nights", min: 4, max: Infinity, count: 0 },
+    ];
+
+    let totalLt = 0;
+    let totalLos = 0;
+
+    for (const row of rows) {
+      const lt = parseInt(row.lead_time) || 0;
+      const nights = parseInt(row.nights) || 1;
+      totalLt += lt;
+      totalLos += nights;
+
+      for (const b of ltBuckets) {
+        if (lt >= b.min && lt <= b.max) { b.count++; break; }
+      }
+      for (const b of losBkts) {
+        if (nights >= b.min && nights <= b.max) { b.count++; break; }
+      }
+    }
+
+    const total = rows.length;
+    const ltColors = ["#ef4444", "#f97316", "#f59e0b", "#39BDF8", "#3b82f6"];
+    const losColors = ["#39BDF8", "#f59e0b", "#f97316", "#8b5cf6"];
+
+    return {
+      leadTimeBuckets: ltBuckets.map((b, i) => ({
+        label: b.label,
+        value: Math.round((b.count / total) * 100),
+        count: b.count,
+        color: ltColors[i],
+      })),
+      losBuckets: losBkts.map((b, i) => ({
+        label: b.label,
+        value: Math.round((b.count / total) * 100),
+        count: b.count,
+        color: losColors[i],
+      })),
+      avgLeadTime: Math.round(totalLt / total),
+      avgLos: Math.round((totalLos / total) * 10) / 10,
+      totalBookings: total,
+    };
+  }
+
+  /**
+   * Forward occupancy (on-the-books) per stay_date for the next 90 days.
+   * hotelIds: array of integer hotel IDs to aggregate across.
+   */
+  static async getHotelOtb(hotelIds) {
+    if (!hotelIds?.length) return [];
+
+    const result = await db.query(
+      `SELECT
+         stay_date,
+         SUM(rooms_sold) AS rooms_sold,
+         SUM(capacity_count) AS capacity
+       FROM daily_metrics_snapshots
+       WHERE hotel_id = ANY($1::int[])
+         AND stay_date >= CURRENT_DATE
+         AND stay_date < CURRENT_DATE + 90
+       GROUP BY stay_date
+       ORDER BY stay_date`,
+      [hotelIds]
+    );
+
+    return result.rows.map((r) => ({
+      date: r.stay_date,
+      occupancy: r.capacity > 0 ? Math.round((r.rooms_sold / r.capacity) * 100) : 0,
+      roomsSold: parseInt(r.rooms_sold) || 0,
+      capacity: parseInt(r.capacity) || 0,
+    }));
   }
 }
 

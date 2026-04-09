@@ -30,6 +30,38 @@ function priorityEmoji(priority) {
   return map[priority] || '⚪';
 }
 
+function priorityBadgeColor(priority) {
+  const map = { urgent: '#ef4444', high: '#f97316', medium: '#3b82f6', low: '#94a3b8' };
+  return map[priority] || '#94a3b8';
+}
+
+function priorityBadge(priority) {
+  const color = priorityBadgeColor(priority);
+  const label = (priority || 'low').charAt(0).toUpperCase() + (priority || 'low').slice(1);
+  return `<span style="display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: ${color}; padding: 4px 12px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px;">${label}</span>`;
+}
+
+function metaRow(label, value) {
+  return `<span style="color: #94a3b8;">${label}</span><br><span style="font-weight: 500; color: #334155;">${value}</span>`;
+}
+
+function taskCard(task, extra) {
+  const hotel = task.hotel_name || 'No property';
+  const due = task.due_date || 'No date set';
+  return `
+    <div style="height: 1px; background: #e2e8f0; margin: 16px 0 20px;"></div>
+    <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin: 0 0 16px; line-height: 1.4;">CRM-${task.id}: ${task.title}</p>
+    <table border="0" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #475569; margin-bottom: 16px;">
+      <tr>
+        <td style="padding: 0 24px 6px 0;">${metaRow('Property', hotel)}</td>
+        <td style="padding: 0 24px 6px 0;">${metaRow('Priority', priorityBadge(task.priority))}</td>
+        <td style="padding: 0 0 6px 0;">${metaRow('Due', due)}</td>
+      </tr>
+    </table>
+    ${extra || ''}
+  `;
+}
+
 function statusLabel(status) {
   const map = { todo: 'To Do', in_progress: 'In Progress', review: 'Review', done: 'Done' };
   return map[status] || status;
@@ -40,7 +72,7 @@ function statusLabel(status) {
 async function sendTaskEmail(to, subject, headline, bodyText) {
   if (!to || !process.env.SENDGRID_API_KEY) return;
   try {
-    const html = getMarketPulseEmailHTML(headline, bodyText, APP_URL, 'Open CRM');
+    const html = getMarketPulseEmailHTML(headline, bodyText, `${APP_URL}?view=crm`, 'Open CRM');
     await sendEmail({ to, subject, html });
   } catch (err) {
     logger.error({ err, to, subject }, 'notification: email send failed');
@@ -100,21 +132,16 @@ async function notifyTaskCreated(task, createdBy) {
   if (task.assignee && task.assignee !== createdBy) {
     const email = await lookupEmail(task.assignee);
     if (email) {
-      const hotel = task.hotel_name || 'No property';
+      const desc = task.description
+        ? `<p style="font-size: 13px; color: #64748b; line-height: 1.6; margin: 0;">${task.description.slice(0, 200)}${task.description.length > 200 ? '...' : ''}</p>`
+        : '';
       await sendTaskEmail(
         email,
         `New task assigned: ${task.title}`,
-        'New Task Assigned to You',
+        'Task Assigned to You',
         `
-          Hi ${task.assignee},<br><br>
-          <strong>${createdBy || 'Someone'}</strong> created a task and assigned it to you:<br><br>
-          <strong style="font-size: 18px;">${task.title}</strong><br><br>
-          <table style="font-size: 14px; color: #555;">
-            <tr><td style="padding: 4px 16px 4px 0; font-weight: 600;">Property</td><td>${hotel}</td></tr>
-            <tr><td style="padding: 4px 16px 4px 0; font-weight: 600;">Priority</td><td>${task.priority}</td></tr>
-            <tr><td style="padding: 4px 16px 4px 0; font-weight: 600;">Due</td><td>${task.due_date || 'No date set'}</td></tr>
-          </table>
-          ${task.description ? `<br><em style="color: #888;">${task.description.slice(0, 200)}${task.description.length > 200 ? '...' : ''}</em>` : ''}
+          <p style="font-size: 13px; color: #64748b; margin: 0;">from ${createdBy || 'System'}</p>
+          ${taskCard(task, desc)}
         `
       );
     }
@@ -142,10 +169,8 @@ async function notifyTaskAssigned(task, oldAssignee, updatedBy) {
         `Task assigned to you: ${task.title}`,
         'Task Assigned to You',
         `
-          Hi ${task.assignee},<br><br>
-          <strong>${updatedBy}</strong> assigned you a task:<br><br>
-          <strong style="font-size: 18px;">CRM-${task.id}: ${task.title}</strong><br>
-          <span style="color: #888;">Property: ${task.hotel_name || 'None'} &middot; Priority: ${task.priority} &middot; Due: ${task.due_date || 'No date'}</span>
+          <p style="font-size: 13px; color: #64748b; margin: 0;">from ${updatedBy}${oldAssignee ? ` (was ${oldAssignee})` : ''}</p>
+          ${taskCard(task)}
         `
       );
     }
@@ -167,15 +192,18 @@ async function notifyStatusChanged(task, oldStatus, updatedBy) {
   if (task.assignee && task.assignee !== updatedBy) {
     const email = await lookupEmail(task.assignee);
     if (email) {
+      const statusChange = `
+        <div style="display: inline-block; font-size: 14px; color: #475569; background: #f1f5f9; padding: 8px 16px; border-radius: 8px; margin-top: 4px;">
+          ${statusLabel(oldStatus)} &rarr; <strong style="color: #0f172a;">${statusLabel(task.status)}</strong>
+        </div>
+      `;
       await sendTaskEmail(
         email,
         `Task status updated: ${task.title}`,
         'Task Status Changed',
         `
-          Hi ${task.assignee},<br><br>
-          <strong>${updatedBy}</strong> changed the status of your task:<br><br>
-          <strong style="font-size: 18px;">CRM-${task.id}: ${task.title}</strong><br><br>
-          <span style="font-size: 16px;">${statusLabel(oldStatus)} → <strong>${statusLabel(task.status)}</strong></span>
+          <p style="font-size: 13px; color: #64748b; margin: 0;">by ${updatedBy}</p>
+          ${taskCard(task, statusChange)}
         `
       );
     }
@@ -194,17 +222,18 @@ async function notifyCommentAdded(task, author, commentBody) {
   if (task.assignee && task.assignee !== author) {
     const email = await lookupEmail(task.assignee);
     if (email) {
+      const comment = `
+        <div style="padding: 14px 18px; background: #f8fafc; border-radius: 8px; border-left: 3px solid #0f172a; color: #334155; font-size: 13px; line-height: 1.6; margin-top: 4px;">
+          ${commentBody.slice(0, 500)}${commentBody.length > 500 ? '...' : ''}
+        </div>
+      `;
       await sendTaskEmail(
         email,
         `New comment on: ${task.title}`,
-        'New Comment on Your Task',
+        'New Comment',
         `
-          Hi ${task.assignee},<br><br>
-          <strong>${author}</strong> commented on your task:<br><br>
-          <strong>CRM-${task.id}: ${task.title}</strong><br><br>
-          <div style="padding: 12px 16px; background: #f5f5f5; border-radius: 6px; border-left: 3px solid #39BDF8; color: #333; font-size: 14px; line-height: 1.6;">
-            ${commentBody.slice(0, 500)}${commentBody.length > 500 ? '...' : ''}
-          </div>
+          <p style="font-size: 13px; color: #64748b; margin: 0;">from ${author}</p>
+          ${taskCard(task, comment)}
         `
       );
     }
@@ -218,16 +247,14 @@ async function notifyTaskOverdue(task) {
   if (!task.assignee) return;
   const email = await lookupEmail(task.assignee);
   if (email) {
+    const overdueBadge = `
+      <div style="display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #ef4444; padding: 4px 12px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">Overdue</div>
+    `;
     await sendTaskEmail(
       email,
       `Overdue: ${task.title}`,
       'Task Overdue',
-      `
-        Hi ${task.assignee},<br><br>
-        Your task is now <strong style="color: #ef4444;">overdue</strong>:<br><br>
-        <strong style="font-size: 18px;">CRM-${task.id}: ${task.title}</strong><br>
-        <span style="color: #888;">Due date was: ${task.due_date}</span>
-      `
+      `${taskCard(task, overdueBadge)}`
     );
   }
 

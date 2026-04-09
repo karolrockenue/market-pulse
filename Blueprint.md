@@ -1844,5 +1844,77 @@ Key quirks: Must handle cookie consent popup (#onetrust-accept-btn-handler) and 
 
 The calculate_wap SQL function was overwritten with a version expecting [{count: N}] objects instead of the actual simple number array [4, 17, ...]. This broke the generated column. Fix: replaced function + "touched" a dependent column to force recalculation. If WAP goes NULL again, check the function source first.
 
+12.4 Segment WAP (2-4★ Hotel Market WAP) — Added April 2026
+
+The stored `weighted_avg_price` column averages ALL properties on Booking.com (hostels, apartments, 5-star luxury). This inflates WAP by £20-50 vs the actual mid-market competitive set. The Demand Radar page uses a segment-filtered WAP instead.
+
+Method: `MarketService._calcSegmentWap(histogram, minPrice, maxPrice, starRating)` in market.service.js.
+
+Algorithm:
+1. Read `facet_star_rating` JSONB to get star distribution for the scrape date.
+2. Calculate 5★ as % of total rated properties → trim that % from the TOP of the price histogram.
+3. Calculate 1★ as % → trim that % from the BOTTOM.
+4. Recalculate WAP from the remaining histogram buckets (effectively 2-4★ segment).
+
+The trim is proportional and per-date — on high-demand days when luxury properties list more aggressively, a larger share gets trimmed. This adapts to market shape automatically.
+
+Result: returned as `segment_wap` from `getForwardView()`. The Demand Radar page uses it for all pricing displays. Other pages (DemandPace, Market Profile) still use the raw `weighted_avg_price`.
+
+Rule for AI: When building new market pricing features, prefer `segment_wap` over `weighted_avg_price` for user-facing metrics. The raw WAP is useful for full-market analysis but misleading for hotel revenue management.
+
+13.0 DEMAND RADAR (Market Intelligence Page)
+
+13.1 Purpose
+
+90-day forward market intelligence page. Pure market sentiment — no hotel-specific data. Shows demand, pricing, events, supply dynamics, and booking behavior. Accessible via Sentinel > Demand Radar in TopNav.
+
+13.2 Architecture
+
+Frontend: `web/src/features/sentinel/components/DemandRadar/DemandRadarView.tsx`
+
+Props: `allHotels` (hotel list for ID extraction), `selectedProperty` (from TopNav, used to derive city slug).
+
+Data flow:
+1. City derived from `selectedProperty.city` (falls back to "london").
+2. Fetches `/api/market/forward-view?city=X` for market data (demand, WAP, segment WAP, supply).
+3. Fetches `/api/market/pace?city=X&period=7` for 7-day pace deltas.
+4. Fetches `/api/market/events?citySlug=X` for PredictHQ events.
+5. Fetches `/api/market/booking-behavior?hotelIds=X` for lead time + LOS from reservations table.
+6. All dates parsed with `Date.UTC()` and formatted with `timeZone: "UTC"` to prevent timezone drift.
+
+13.3 Sections
+
+1. Outlook Banner — market trajectory (strengthening/softening/stable) with demand + price trajectory numbers.
+2. KPI Strip — avg demand, avg WAP (segment), avg supply, high demand days, peak/trough dates.
+3. Signals — rising demand flat price, compression events, low demand warnings.
+4. Demand Chart — 300px bar chart with demand bars (color-coded by intensity), 7d trend line, event labels above, event background columns.
+5. WAP Chart — 260px area chart showing segment WAP (2-4★), 7d trend, subtle spike colouring on P75+/P90+ dates.
+6. AI Market Brief — 3 auto-generated insight cards (trajectory, events, compression).
+7. Booking Behavior — lead time distribution + LOS from real reservation data. Falls back to mock if no bookings.
+8. Booking Window Analysis — demand/WAP/supply by lead-time zone (Urgent/Tactical/Strategic/Horizon).
+9. Day-of-Week Patterns — demand + WAP by DOW.
+10. Divergence Scatter — demand vs segment WAP scatter plot.
+11. Pace Charts (3x) — 7-day demand/price/supply change.
+12. Supply Dynamics — total available properties over 90 days.
+13. Date Scanner — expandable date-by-date table.
+
+13.4 PredictHQ Integration
+
+Cache table: `predicthq_events` (city_slug PK, place_id, events JSONB, fetched_at). 24h TTL.
+
+Service: `MarketService.getPredictHQEvents(citySlug)` — 3 rank-tier queries (88+, 80-87, 65-79), `within=30km@lat,lng` radius search, deduplicates, maps to lean format. Uses `e.start` (UTC) not `e.start_local`.
+
+Route: `GET /api/market/events?citySlug=london`
+
+Env var: `PREDICTHQ_ACCESS_TOKEN`
+
+Free tier: 50 results per query, 3 queries = ~150 events. Starter plan ($75-150/mo) removes cap.
+
+13.5 Booking Behavior Endpoint
+
+Service: `MarketService.getBookingBehavior(hotelIds)` — queries `reservations` table for last 90 days, computes lead time buckets (0-7d, 8-14d, 15-30d, 31-60d, 60d+) and LOS buckets (1, 2, 3, 4+ nights).
+
+Route: `GET /api/market/booking-behavior?hotelIds=1,2,3`
+
 End of Blueprint.
 Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.

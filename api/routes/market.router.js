@@ -167,6 +167,18 @@ router.get("/accommodation-map", requireUserApi, async (req, res) => {
   }
 });
 
+router.get("/events", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.query;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+    const data = await MarketService.getPredictHQEvents(citySlug);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /events:", error);
+    res.status(500).json({ error: "Failed to fetch event data." });
+  }
+});
+
 router.get("/airbnb-availability", requireUserApi, async (req, res) => {
   try {
     const { citySlug } = req.query;
@@ -187,6 +199,34 @@ router.get("/airbnb-availability", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error("Error in /airbnb-availability:", error);
     res.status(500).json({ error: "Failed to fetch Airbnb availability data." });
+  }
+});
+
+router.get("/airbnb-scrape-history", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.query;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+
+    const { rows } = await pool.query(
+      `SELECT
+         scraped_at::date AS scrape_date,
+         MIN(scraped_at) AS started_at,
+         MAX(scraped_at) AS finished_at,
+         COUNT(DISTINCT checkin_date) AS dates_scraped,
+         ROUND(AVG(total_listings)) AS avg_listings,
+         ROUND(AVG(avg_price), 2) AS avg_price
+       FROM airbnb_availability_snapshots
+       WHERE city_slug = $1
+       GROUP BY scraped_at::date
+       ORDER BY scrape_date DESC
+       LIMIT 7`,
+      [citySlug]
+    );
+
+    res.json({ citySlug, scrapes: rows });
+  } catch (error) {
+    console.error("Error in /airbnb-scrape-history:", error);
+    res.status(500).json({ error: "Failed to fetch scrape history." });
   }
 });
 
@@ -241,7 +281,48 @@ router.get("/neighbourhood-supply", requireUserApi, async (req, res) => {
   }
 });
 
-// --- 4. MARKET PROFILE (City-level analytics) ---
+router.get("/market-baseline", requireUserApi, async (req, res) => {
+  try {
+    const city = req.query.city || "london";
+    const data = await MarketService.getMarketBaseline(city);
+    res.json(data || {});
+  } catch (error) {
+    console.error("Error in /market-baseline:", error);
+    res.status(500).json({ error: "Failed to fetch market baseline." });
+  }
+});
+
+// --- 4. DEMAND RADAR (Booking behavior + Hotel OTB) ---
+
+router.get("/booking-behavior", requireUserApi, async (req, res) => {
+  try {
+    const hotelIds = req.query.hotelIds;
+    if (!hotelIds) return res.status(400).json({ error: "hotelIds required (comma-separated)." });
+    const ids = hotelIds.split(",").map((id) => parseInt(id)).filter((id) => !isNaN(id));
+    if (!ids.length) return res.status(400).json({ error: "No valid hotelIds." });
+    const data = await MarketService.getBookingBehavior(ids);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /booking-behavior:", error);
+    res.status(500).json({ error: "Failed to fetch booking behavior." });
+  }
+});
+
+router.get("/hotel-otb", requireUserApi, async (req, res) => {
+  try {
+    const hotelIds = req.query.hotelIds;
+    if (!hotelIds) return res.status(400).json({ error: "hotelIds required (comma-separated)." });
+    const ids = hotelIds.split(",").map((id) => parseInt(id)).filter((id) => !isNaN(id));
+    if (!ids.length) return res.status(400).json({ error: "No valid hotelIds." });
+    const data = await MarketService.getHotelOtb(ids);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /hotel-otb:", error);
+    res.status(500).json({ error: "Failed to fetch hotel OTB data." });
+  }
+});
+
+// --- 5. MARKET PROFILE (City-level analytics) ---
 
 router.get('/profile/overview', requireAdminApi, async (req, res) => {
   try {

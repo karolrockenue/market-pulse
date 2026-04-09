@@ -39,9 +39,10 @@ const useAllHotels = () => {
 interface SentinelHubProps {
   activeView: string;
   onNavigate: (view: string) => void;
+  selectedProperty?: any;
 }
 
-export function SentinelHub({ activeView, onNavigate }: SentinelHubProps) {
+export function SentinelHub({ activeView, onNavigate, selectedProperty }: SentinelHubProps) {
   const { hotels, loading } = useAllHotels();
 
   if (loading) {
@@ -60,7 +61,7 @@ export function SentinelHub({ activeView, onNavigate }: SentinelHubProps) {
         {activeView === "sentinel" && <ControlPanelView allHotels={hotels} />}
         {activeView === "shadowfax" && <ShadowfaxView />}
         {activeView === "riskOverview" && <PortfolioRiskOverview />}
-        {activeView === "demandRadar" && <DemandRadarView allHotels={hotels} />}
+        {activeView === "demandRadar" && <DemandRadarView allHotels={hotels} selectedProperty={selectedProperty} />}
 
       </div>
     </div>

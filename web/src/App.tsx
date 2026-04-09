@@ -369,8 +369,9 @@ export default function App() {
             email: session.email || "email@placeholder.com",
             role: session.role || "user",
           });
+          const urlView = new URLSearchParams(window.location.search).get("view");
           const lastView = sessionStorage.getItem("marketPulseActiveView");
-          setActiveView(lastView || "dashboard");
+          setActiveView(urlView || lastView || "dashboard");
         } else {
           setActiveView("landing");
         }
@@ -786,6 +787,7 @@ export default function App() {
             <SentinelHub
               activeView={activeView}
               onNavigate={handleViewChange}
+              selectedProperty={selectedPropertyDetails}
             />
           )}
 
@@ -793,7 +795,10 @@ export default function App() {
           {(activeView === "rockenueDashboard" ||
             activeView === "distribution" ||
             activeView === "crm" ||
-            activeView === "channelPricing") && (
+            activeView === "channelPricing" ||
+            activeView === "rockenueWeb" ||
+            activeView === "rockenueWebV2" ||
+            activeView === "rockenueWebV3") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
