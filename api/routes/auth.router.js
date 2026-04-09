@@ -375,7 +375,7 @@ router.post("/magic-link-callback", async (req, res) => {
         return res.status(500).send("An error occurred during login.");
       }
 
-      req.session.userId = user.cloudbeds_user_id;
+      req.session.userId = user.cloudbeds_user_id || `invited-${user.user_id}`;
       req.session.role = user.role;
 
       req.session.save((saveErr) => {
@@ -383,9 +383,6 @@ router.post("/magic-link-callback", async (req, res) => {
           console.error("[CRITICAL] Session save failed:", saveErr);
           return res.status(500).send("An error occurred during login.");
         }
-
-        // NOTE: removed clearCookie("connect.sid") that was destroying
-        // the session we just created, causing redirect to login page.
 
         res.status(200).send(`
           <!DOCTYPE html>
