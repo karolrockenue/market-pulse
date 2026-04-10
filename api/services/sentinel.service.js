@@ -877,6 +877,10 @@ async function recalculateRates(hotelId, startDate, endDate) {
 
     calendar.forEach((day) => {
       if (!day.finalRate || day.finalRate <= 0) return;
+      // [FREEZE] Skip frozen days entirely. Without this, recalculateRates
+      // would re-push the snapshotted live PMS rate, which races with manual
+      // PMS edits that land between snapshot and queue execution.
+      if (day.isFrozen) return;
       let finalRate = parseFloat(day.finalRate);
 
       if (!isBase && diffRule) {
