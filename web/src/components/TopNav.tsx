@@ -17,6 +17,7 @@ import {
   Building2,
   ClipboardList,
   Radar,
+  MonitorSmartphone,
 } from "lucide-react";
 import {
   Select,
@@ -55,6 +56,9 @@ interface TopNavProps {
     email: string;
     role: string;
   } | null;
+  // When true, hide every nav item except the Investor View entry and
+  // relabel it. Used for restricted Archanes-only users.
+  isArchanesOnly?: boolean;
 }
 
 export function TopNav({
@@ -66,6 +70,7 @@ export function TopNav({
   lastUpdatedAt,
   cityName,
   userInfo,
+  isArchanesOnly = false,
 }: TopNavProps) {
   const getInitials = () => {
     if (userInfo) {
@@ -152,6 +157,7 @@ export function TopNav({
         { label: "Demand Radar", value: "demandRadar", icon: Radar },
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
         { label: "Deck", value: "deck", icon: Presentation },
+        { label: "Deck V2", value: "deckV2", icon: Presentation },
         { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
       ],
     },
@@ -166,20 +172,31 @@ export function TopNav({
         { label: "Distribution", value: "distribution", icon: Globe },
         { label: "CRM", value: "crm", icon: ClipboardList },
         { label: "Channel Pricing", value: "channelPricing", icon: DollarSign },
+        { label: "Web V1 — Bands + Splits", value: "rockenueWebV1", icon: MonitorSmartphone },
+        { label: "Web V1.1 — Hero: Brand logo", value: "rockenueWebV1_1", icon: MonitorSmartphone },
+        { label: "Web V1.2 — Hero: London dots", value: "rockenueWebV1_2", icon: MonitorSmartphone },
+        { label: "Web V1.3 — Hero: 1,100+ rooms", value: "rockenueWebV1_3", icon: MonitorSmartphone },
+        { label: "Web V1.4 — Hero: 4 stats vertical", value: "rockenueWebV1_4", icon: MonitorSmartphone },
+        { label: "Web V1.7 — Tile playground (15)", value: "rockenueWebV1_7", icon: MonitorSmartphone },
       ],
     },
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },
   ];
 
-  const navItems = allNavItems.filter((item: any) => {
-    if (item.isSuperAdminOnly) {
-      return userInfo?.role === "super_admin";
-    }
-    if (item.isAdmin) {
-      return userInfo?.role === "super_admin" || userInfo?.role === "admin";
-    }
-    return true;
-  });
+  // Archanes-only users see exactly one item: "Investor View" → demand-pace.
+  const navItems = isArchanesOnly
+    ? allNavItems
+        .filter((item: any) => item.value === "demand-pace")
+        .map((item: any) => ({ ...item, label: "Investor View", icon: BarChart3 }))
+    : allNavItems.filter((item: any) => {
+        if (item.isSuperAdminOnly) {
+          return userInfo?.role === "super_admin";
+        }
+        if (item.isAdmin) {
+          return userInfo?.role === "super_admin" || userInfo?.role === "admin";
+        }
+        return true;
+      });
 
   const showPropertySelector = activeView !== "landing";
 
@@ -305,6 +322,8 @@ export function TopNav({
                       border: `1px solid ${BORDER_DARK}`,
                       color: WHITE,
                       padding: "4px",
+                      maxHeight: "70vh",
+                      overflowY: "auto",
                     }}
                   >
                     <DropdownMenuLabel

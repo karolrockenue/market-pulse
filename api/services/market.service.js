@@ -1290,6 +1290,520 @@ SELECT
       capacity: parseInt(r.capacity) || 0,
     }));
   }
+
+  /**
+   * --- AIRBNB INVESTOR VIEW (Archanes only, but slug-agnostic) ---
+   * Aggregates everything the investor-facing page needs from
+   * airbnb_availability_snapshots into one payload. Five SQL queries fan out
+   * in parallel; the bulk of the slicing (mix, beds, ratings, concentration,
+   * top-10) happens in JS off the registry result so we only round-trip once
+   * for the per-property data.
+   */
+  static async getAirbnbInvestorView(citySlug) {
+    const ARCHANES_CENTER = { lat: 35.2352, lng: 25.1594 };
+
+    // ---- 1. Tracking + KPIs (single small query) ----
+    // Note: scraped listings have NULL ids — Airbnb doesn't expose propertyId
+    // in this payload. We identify unique properties by the natural key
+    // (name + type + beds + lat + lng), matching the existing /airbnb-registry.
+    const trackingQuery = db.query(
+      `WITH all_listings AS (
+         SELECT (l->>'price')::numeric AS price
+         FROM airbnb_availability_snapshots s,
+              jsonb_array_elements(s.listings) l
+         WHERE s.city_slug = $1
+           AND l->>'price' IS NOT NULL
+           AND (l->>'price')::numeric > 0
+       ),
+       unique_props AS (
+         SELECT DISTINCT
+           l->>'name' AS name,
+           l->>'type' AS type,
+           l->>'beds' AS beds,
+           (l->>'lat')::numeric AS lat,
+           (l->>'lng')::numeric AS lng
+         FROM airbnb_availability_snapshots s,
+              jsonb_array_elements(s.listings) l
+         WHERE s.city_slug = $1
+       ),
+       latest_snap AS (
+         SELECT *
+         FROM airbnb_availability_snapshots
+         WHERE city_slug = $1
+           AND scraped_at::date = (
+             SELECT MAX(scraped_at::date)
+             FROM airbnb_availability_snapshots
+             WHERE city_slug = $1
+           )
+       )
+       SELECT
+         (SELECT MIN(scraped_at::date) FROM airbnb_availability_snapshots WHERE city_slug = $1) AS first_scrape,
+         (SELECT MAX(scraped_at::date) FROM airbnb_availability_snapshots WHERE city_slug = $1) AS last_scrape,
+         (SELECT COUNT(DISTINCT scraped_at::date) FROM airbnb_availability_snapshots WHERE city_slug = $1) AS total_scrapes,
+         (SELECT COUNT(*) FROM unique_props) AS unique_properties,
+         (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price) FROM all_listings) AS median_price_all_time,
+         (SELECT AVG(avg_price) FROM latest_snap) AS forward_avg_price_latest,
+         (SELECT AVG(total_listings) FROM latest_snap) AS avg_listings_latest`,
+      [citySlug]
+    );
+
+    // ---- 2. Demand calendar (latest scrape, forward window) ----
+    // scrape_unique_properties is the same on every row from a given scrape;
+    // exposing it here lets us compute per-date occupancy as
+    // 1 − total_listings / scrape_unique_properties.
+    const calendarQuery = db.query(
+      `SELECT
+         checkin_date,
+         total_listings,
+         avg_price,
+         median_price,
+         scrape_unique_properties
+       FROM airbnb_availability_snapshots
+       WHERE city_slug = $1
+         AND scraped_at::date = (
+           SELECT MAX(scraped_at::date)
+           FROM airbnb_availability_snapshots
+           WHERE city_slug = $1
+         )
+       ORDER BY checkin_date ASC`,
+      [citySlug]
+    );
+
+    // ---- 3. Day-of-week aggregation (latest scrape) ----
+    const dowQuery = db.query(
+      `SELECT
+         EXTRACT(DOW FROM checkin_date)::int AS dow,
+         AVG(avg_price)::numeric AS avg_price,
+         AVG(total_listings)::numeric AS avg_listings,
+         COUNT(*)::int AS sample_size
+       FROM airbnb_availability_snapshots
+       WHERE city_slug = $1
+         AND scraped_at::date = (
+           SELECT MAX(scraped_at::date)
+           FROM airbnb_availability_snapshots
+           WHERE city_slug = $1
+         )
+       GROUP BY EXTRACT(DOW FROM checkin_date)
+       ORDER BY dow`,
+      [citySlug]
+    );
+
+    // ---- 4. Price ladder (deciles from per-property avg) ----
+    // Per-property aggregation uses the natural key — listings have NULL ids.
+    const ladderQuery = db.query(
+      `WITH registry AS (
+         SELECT
+           AVG((listing->>'price')::numeric) AS avg_price
+         FROM airbnb_availability_snapshots s,
+              jsonb_array_elements(s.listings) listing
+         WHERE s.city_slug = $1
+           AND (listing->>'price') IS NOT NULL
+           AND (listing->>'price')::numeric > 0
+         GROUP BY listing->>'name', listing->>'type', listing->>'beds',
+                  listing->>'location',
+                  (listing->>'lat')::numeric, (listing->>'lng')::numeric
+       )
+       SELECT
+         percentile_cont(0.10) WITHIN GROUP (ORDER BY avg_price)::numeric AS p10,
+         percentile_cont(0.25) WITHIN GROUP (ORDER BY avg_price)::numeric AS p25,
+         percentile_cont(0.50) WITHIN GROUP (ORDER BY avg_price)::numeric AS p50,
+         percentile_cont(0.75) WITHIN GROUP (ORDER BY avg_price)::numeric AS p75,
+         percentile_cont(0.90) WITHIN GROUP (ORDER BY avg_price)::numeric AS p90,
+         COUNT(*)::int AS sample_size
+       FROM registry`,
+      [citySlug]
+    );
+
+    // ---- 5. Full property registry (one trip → JS slices the rest) ----
+    // Identity = name + type + beds + location + lat + lng (no id, see note above).
+    const registryQuery = db.query(
+      `SELECT
+         listing->>'name' AS name,
+         listing->>'type' AS type,
+         listing->>'beds' AS beds,
+         listing->>'location' AS location,
+         (listing->>'lat')::numeric AS lat,
+         (listing->>'lng')::numeric AS lng,
+         MAX((listing->>'rating')::numeric) AS rating,
+         MAX((listing->>'reviews')::int) AS reviews,
+         ROUND(AVG((listing->>'price')::numeric), 2) AS avg_price,
+         MIN((listing->>'price')::numeric) AS min_price,
+         MAX((listing->>'price')::numeric) AS max_price,
+         COUNT(DISTINCT s.scraped_at::date)::int AS times_seen,
+         MIN(s.scraped_at::date) AS first_seen,
+         MAX(s.scraped_at::date) AS last_seen
+       FROM airbnb_availability_snapshots s,
+            jsonb_array_elements(s.listings) AS listing
+       WHERE s.city_slug = $1
+         AND (listing->>'price') IS NOT NULL
+         AND (listing->>'price')::numeric > 0
+       GROUP BY listing->>'name', listing->>'type',
+                listing->>'beds', listing->>'location',
+                (listing->>'lat')::numeric, (listing->>'lng')::numeric
+       ORDER BY avg_price DESC`,
+      [citySlug]
+    );
+
+    const [
+      trackingResult,
+      calendarResult,
+      dowResult,
+      ladderResult,
+      registryResult,
+    ] = await Promise.all([
+      trackingQuery,
+      calendarQuery,
+      dowQuery,
+      ladderQuery,
+      registryQuery,
+    ]);
+
+    const tracking = trackingResult.rows[0] || {};
+
+    // Empty-state short circuit — return a stable shape
+    if (!tracking.first_scrape || registryResult.rows.length === 0) {
+      return {
+        citySlug,
+        tracking: {
+          firstScrape: null,
+          lastScrape: null,
+          totalScrapes: 0,
+          uniqueProperties: 0,
+        },
+        kpis: {
+          uniqueProperties: 0,
+          medianNightlyRate: null,
+          forwardAvgRate: null,
+          avgListingsPerNight: null,
+        },
+        demandCalendar: [],
+        forwardAdrCurve: [],
+        dowPremium: [],
+        priceLadder: null,
+        priceLadderByBeds: [],
+        occupancyAnalysis: null,
+        registry: [],
+        propertyMix: [],
+        bedsDistribution: [],
+        ratingHistogram: [],
+        concentration: null,
+        topTen: [],
+        caveats: {
+          source: "Airbnb only",
+          daysOfHistory: 0,
+          notes: [
+            "No data yet for this city.",
+            "Single-source signal — no STR or Booking.com cross-check.",
+          ],
+        },
+      };
+    }
+
+    // ---- Demand calendar: attach per-date occupancy proxy ----
+    // occupancyPct = 1 − listings_for_date / scrape_unique_properties
+    // This is the cleanest per-date demand signal we can derive — it
+    // compares each forward date's available listings against the full
+    // pool of properties seen during the same scrape.
+    const demandCalendar = calendarResult.rows.map((r) => {
+      const listings = Number(r.total_listings) || 0;
+      const scrapeUnique = Number(r.scrape_unique_properties) || 0;
+      const occupancyPct = scrapeUnique > 0
+        ? Math.max(0, Math.min(100, Math.round((1 - listings / scrapeUnique) * 100)))
+        : null;
+      return {
+        date: r.checkin_date,
+        listings,
+        scrapeUniqueProperties: scrapeUnique,
+        avgPrice: r.avg_price !== null ? Number(r.avg_price) : null,
+        medianPrice: r.median_price !== null ? Number(r.median_price) : null,
+        occupancyPct,
+      };
+    });
+
+    // ---- Forward ADR curve: same source, lighter shape ----
+    const forwardAdrCurve = demandCalendar.map((d) => ({
+      date: d.date,
+      avgPrice: d.avgPrice,
+      medianPrice: d.medianPrice,
+    }));
+
+    // ---- Day-of-week premium: midweek (Mon-Thu = dow 1..4) baseline ----
+    const dowRows = dowResult.rows.map((r) => ({
+      dow: Number(r.dow),
+      avgPrice: r.avg_price !== null ? Number(r.avg_price) : null,
+      avgListings: r.avg_listings !== null ? Number(r.avg_listings) : null,
+      sampleSize: Number(r.sample_size) || 0,
+    }));
+    const midweek = dowRows.filter((d) => d.dow >= 1 && d.dow <= 4 && d.avgPrice);
+    const midweekBaseline = midweek.length
+      ? midweek.reduce((s, d) => s + d.avgPrice, 0) / midweek.length
+      : null;
+    const dowLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dowPremium = dowRows.map((d) => ({
+      dow: d.dow,
+      label: dowLabels[d.dow],
+      avgPrice: d.avgPrice,
+      premiumPct: midweekBaseline && d.avgPrice
+        ? Math.round(((d.avgPrice / midweekBaseline) - 1) * 1000) / 10
+        : null,
+    }));
+
+    // ---- Price ladder ----
+    const ladderRow = ladderResult.rows[0] || {};
+    const priceLadder = ladderRow.sample_size
+      ? {
+          p10: Number(ladderRow.p10),
+          p25: Number(ladderRow.p25),
+          p50: Number(ladderRow.p50),
+          p75: Number(ladderRow.p75),
+          p90: Number(ladderRow.p90),
+          sampleSize: Number(ladderRow.sample_size),
+        }
+      : null;
+
+    // ---- Registry: normalise once, slice many times ----
+    // Synthesise a stable id from the natural key since scraped listings
+    // don't carry one.
+    const registry = registryResult.rows.map((r, idx) => {
+      const lat = r.lat !== null ? Number(r.lat) : null;
+      const lng = r.lng !== null ? Number(r.lng) : null;
+      let distanceKm = null;
+      if (lat !== null && lng !== null) {
+        const dlat = (lat - ARCHANES_CENTER.lat) * 111;
+        const dlng = (lng - ARCHANES_CENTER.lng) * 111 * Math.cos((ARCHANES_CENTER.lat * Math.PI) / 180);
+        distanceKm = Math.round(Math.sqrt(dlat * dlat + dlng * dlng) * 100) / 100;
+      }
+      const propertyId = `p_${idx}_${(r.name || "").substring(0, 24).replace(/\s+/g, "_")}`;
+      return {
+        propertyId,
+        name: r.name,
+        type: r.type,
+        beds: r.beds,
+        location: r.location,
+        lat,
+        lng,
+        rating: r.rating !== null ? Number(r.rating) : null,
+        reviews: r.reviews !== null ? Number(r.reviews) : 0,
+        avgPrice: Number(r.avg_price),
+        minPrice: Number(r.min_price),
+        maxPrice: Number(r.max_price),
+        timesSeen: Number(r.times_seen),
+        firstSeen: r.first_seen,
+        lastSeen: r.last_seen,
+        distanceKm,
+      };
+    });
+
+    // ---- Property mix donut ----
+    const mixCounts = {};
+    for (const p of registry) {
+      const t = (p.type || "Other").trim() || "Other";
+      mixCounts[t] = (mixCounts[t] || 0) + 1;
+    }
+    const propertyMix = Object.entries(mixCounts)
+      .map(([type, count]) => ({
+        type,
+        count,
+        pct: Math.round((count / registry.length) * 1000) / 10,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // ---- Beds distribution: parse "1 bedroom, 2 beds" → bedroom bucket ----
+    const bedBuckets = { "Studio": 0, "1 BR": 0, "2 BR": 0, "3 BR": 0, "4+ BR": 0, "Unknown": 0 };
+    for (const p of registry) {
+      const beds = (p.beds || "").toLowerCase();
+      let bucket = "Unknown";
+      if (/studio/.test(beds)) bucket = "Studio";
+      else {
+        const match = beds.match(/(\d+)\s*bedroom/);
+        if (match) {
+          const n = parseInt(match[1]);
+          if (n === 1) bucket = "1 BR";
+          else if (n === 2) bucket = "2 BR";
+          else if (n === 3) bucket = "3 BR";
+          else if (n >= 4) bucket = "4+ BR";
+        }
+      }
+      bedBuckets[bucket]++;
+    }
+    const bedsDistribution = Object.entries(bedBuckets)
+      .filter(([, count]) => count > 0)
+      .map(([bucket, count]) => ({ bucket, count }));
+
+    // ---- Rating histogram: 0.1-wide buckets from 4.0 to 5.0 ----
+    const ratingBuckets = {};
+    const bucketKeys = ["<4.0", "4.0-4.1", "4.1-4.2", "4.2-4.3", "4.3-4.4", "4.4-4.5", "4.5-4.6", "4.6-4.7", "4.7-4.8", "4.8-4.9", "4.9-5.0", "Unrated"];
+    for (const k of bucketKeys) ratingBuckets[k] = 0;
+    for (const p of registry) {
+      if (p.rating === null || isNaN(p.rating)) {
+        ratingBuckets["Unrated"]++;
+      } else if (p.rating < 4.0) {
+        ratingBuckets["<4.0"]++;
+      } else if (p.rating >= 5.0) {
+        ratingBuckets["4.9-5.0"]++;
+      } else {
+        const i = Math.floor((p.rating - 4.0) * 10);
+        ratingBuckets[bucketKeys[1 + i]]++;
+      }
+    }
+    const ratingHistogram = bucketKeys.map((bucket) => ({
+      bucket,
+      count: ratingBuckets[bucket],
+    }));
+
+    // ---- Concentration card ----
+    const totalTimesSeen = registry.reduce((s, p) => s + p.timesSeen, 0);
+    const top5Frequent = [...registry]
+      .sort((a, b) => b.timesSeen - a.timesSeen)
+      .slice(0, 5);
+    const top5Share = totalTimesSeen > 0
+      ? Math.round((top5Frequent.reduce((s, p) => s + p.timesSeen, 0) / totalTimesSeen) * 1000) / 10
+      : 0;
+    const within1km = registry.filter((p) => p.distanceKm !== null && p.distanceKm <= 1).length;
+    const maxRate = registry.length ? Math.max(...registry.map((p) => p.maxPrice)) : 0;
+
+    const concentration = {
+      top5SharePct: top5Share,
+      top5Frequent: top5Frequent.map((p) => ({
+        propertyId: p.propertyId,
+        name: p.name,
+        timesSeen: p.timesSeen,
+      })),
+      propertiesWithin1km: within1km,
+      maxNightlyRate: maxRate,
+      totalProperties: registry.length,
+    };
+
+    // ---- Price ladder by bed configuration ----
+    const bedBucketize = (s) => {
+      if (!s) return "Unknown";
+      const lower = String(s).toLowerCase();
+      if (/studio/.test(lower)) return "Studio";
+      const m = lower.match(/(\d+)\s*bedroom/);
+      if (!m) return "Unknown";
+      const n = parseInt(m[1]);
+      if (n === 1) return "1 BR";
+      if (n === 2) return "2 BR";
+      if (n === 3) return "3 BR";
+      return "4+ BR";
+    };
+    const percentile = (arr, q) => {
+      if (!arr.length) return null;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const idx = Math.floor(sorted.length * q);
+      return sorted[Math.min(idx, sorted.length - 1)];
+    };
+    const bedPriceBuckets = {};
+    for (const p of registry) {
+      const k = bedBucketize(p.beds);
+      if (!bedPriceBuckets[k]) bedPriceBuckets[k] = [];
+      bedPriceBuckets[k].push(p.avgPrice);
+    }
+    const bedOrder = ["Studio", "1 BR", "2 BR", "3 BR", "4+ BR", "Unknown"];
+    const priceLadderByBeds = bedOrder
+      .filter((k) => bedPriceBuckets[k] && bedPriceBuckets[k].length > 0)
+      .map((k) => ({
+        bucket: k,
+        sampleSize: bedPriceBuckets[k].length,
+        p10: Math.round(percentile(bedPriceBuckets[k], 0.10)),
+        p25: Math.round(percentile(bedPriceBuckets[k], 0.25)),
+        p50: Math.round(percentile(bedPriceBuckets[k], 0.50)),
+        p75: Math.round(percentile(bedPriceBuckets[k], 0.75)),
+        p90: Math.round(percentile(bedPriceBuckets[k], 0.90)),
+      }));
+
+    // ---- Occupancy proxy from per-property visibility ratios ----
+    // For each unique property, visibility = timesSeen / totalScrapes.
+    // Estimated occupancy = 1 − avg visibility. Biased high by Airbnb's
+    // ~90-result page cap; will tighten once the scraper grabs more pages.
+    const totalScrapes = Number(tracking.total_scrapes) || 0;
+    const visibilityBuckets = { "0–20%": 0, "20–40%": 0, "40–60%": 0, "60–80%": 0, "80–100%": 0 };
+    let visibilitySum = 0;
+    for (const p of registry) {
+      const ratio = totalScrapes > 0 ? Math.min(1, p.timesSeen / totalScrapes) : 0;
+      visibilitySum += ratio;
+      if (ratio <= 0.2) visibilityBuckets["0–20%"]++;
+      else if (ratio <= 0.4) visibilityBuckets["20–40%"]++;
+      else if (ratio <= 0.6) visibilityBuckets["40–60%"]++;
+      else if (ratio <= 0.8) visibilityBuckets["60–80%"]++;
+      else visibilityBuckets["80–100%"]++;
+    }
+    const avgVisibility = registry.length > 0 ? visibilitySum / registry.length : 0;
+    const occupancyAnalysis = {
+      estimatedOccupancyPct: Math.round((1 - avgVisibility) * 100),
+      avgVisibilityPct: Math.round(avgVisibility * 100),
+      totalScrapes,
+      sampleSize: registry.length,
+      visibilityHistogram: Object.entries(visibilityBuckets).map(([bucket, count]) => ({ bucket, count })),
+    };
+
+    // ---- Top 10 trophy properties (already sorted by avg_price DESC) ----
+    const topTen = registry.slice(0, 10).map((p) => ({
+      propertyId: p.propertyId,
+      name: p.name,
+      type: p.type,
+      beds: p.beds,
+      rating: p.rating,
+      reviews: p.reviews,
+      avgPrice: p.avgPrice,
+      minPrice: p.minPrice,
+      maxPrice: p.maxPrice,
+      timesSeen: p.timesSeen,
+      distanceKm: p.distanceKm,
+    }));
+
+    // ---- Days of history (for badges) ----
+    const firstScrapeDate = new Date(tracking.first_scrape);
+    const lastScrapeDate = new Date(tracking.last_scrape);
+    const daysOfHistory = Math.max(
+      1,
+      Math.round((lastScrapeDate - firstScrapeDate) / (1000 * 60 * 60 * 24)) + 1
+    );
+
+    return {
+      citySlug,
+      tracking: {
+        firstScrape: tracking.first_scrape,
+        lastScrape: tracking.last_scrape,
+        totalScrapes: Number(tracking.total_scrapes) || 0,
+        uniqueProperties: Number(tracking.unique_properties) || 0,
+        daysOfHistory,
+      },
+      kpis: {
+        uniqueProperties: Number(tracking.unique_properties) || 0,
+        medianNightlyRate: tracking.median_price_all_time !== null
+          ? Math.round(Number(tracking.median_price_all_time) * 100) / 100
+          : null,
+        forwardAvgRate: tracking.forward_avg_price_latest !== null
+          ? Math.round(Number(tracking.forward_avg_price_latest) * 100) / 100
+          : null,
+        avgListingsPerNight: tracking.avg_listings_latest !== null
+          ? Math.round(Number(tracking.avg_listings_latest))
+          : null,
+      },
+      demandCalendar,
+      forwardAdrCurve,
+      dowPremium,
+      priceLadder,
+      priceLadderByBeds,
+      occupancyAnalysis,
+      registry,
+      propertyMix,
+      bedsDistribution,
+      ratingHistogram,
+      concentration,
+      topTen,
+      caveats: {
+        source: "Airbnb only",
+        daysOfHistory,
+        notes: [
+          "Single-source signal — no STR or Booking.com cross-check.",
+          "Demand pressure is a supply-burn-down proxy, not metered occupancy.",
+          "Property coordinates are Airbnb-fuzzed (±200m).",
+        ],
+      },
+    };
+  }
 }
 
 module.exports = MarketService;

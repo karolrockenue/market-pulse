@@ -269,6 +269,21 @@ router.get("/airbnb-registry", requireUserApi, async (req, res) => {
   }
 });
 
+// Investor-facing aggregator (currently used by the Archanes view).
+// Returns the entire dashboard payload in one call.
+router.get("/airbnb-investor/:citySlug", requireUserApi, async (req, res) => {
+  try {
+    const { citySlug } = req.params;
+    if (!citySlug) return res.status(400).json({ error: "citySlug is required." });
+
+    const data = await MarketService.getAirbnbInvestorView(citySlug);
+    res.json(data);
+  } catch (error) {
+    console.error("Error in /airbnb-investor:", error);
+    res.status(500).json({ error: "Failed to fetch Airbnb investor view." });
+  }
+});
+
 router.get("/neighbourhood-supply", requireUserApi, async (req, res) => {
   try {
     const { citySlug } = req.query;

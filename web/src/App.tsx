@@ -34,9 +34,12 @@ import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/
 
 import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
+import { DeckV2 } from "./components/DeckV2";
 import { ShreejiDeck } from "./components/ShreejiDeck";
 import { MarketProfile } from "./components/MarketProfile";
 import { MarketVeil } from "./components/MarketVeil";
+import { ArchanesInvestorView } from "./features/market-intel/components/ArchanesInvestorView";
+import { NoHotelConnected } from "./components/NoHotelConnected";
 // [NEW] Import the legal page components
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { SupportPage } from "./components/SupportPage"; // [NEW] Import the new support page
@@ -57,6 +60,11 @@ interface Property {
   property_id: number;
   property_name: string;
 }
+
+// Hotel record that backs the Archanes Investor View. Users whose only
+// linked property is this hotel are restricted to the Investor View and
+// shown a "no hotel connected" overlay everywhere else.
+const ARCHANES_HOTEL_ID = 318330;
 
 export default function App() {
   // --- STATE DECLARATIONS ---
@@ -99,6 +107,30 @@ export default function App() {
 
   const [showPropertySetup, setShowPropertySetup] = useState(false); // [MODIFIED] Default to false
   const [marketHotelCount, setMarketHotelCount] = useState<number>(0);
+
+  // Detect "Archanes-only" users: regular role + exactly one linked property
+  // == the Archanes hotel. They're routed to the Investor View on load and
+  // see a "no hotel connected" overlay anywhere else.
+  const isArchanesOnly = useMemo(() => {
+    if (!userInfo) return false;
+    if (userInfo.role === "super_admin" || userInfo.role === "admin") return false;
+    if (properties.length !== 1) return false;
+    return properties[0].property_id === ARCHANES_HOTEL_ID;
+  }, [userInfo, properties]);
+
+  // Auto-route Archanes-only users to the Investor View. Runs whenever the
+  // detection flips on or the active view changes underneath them.
+  useEffect(() => {
+    if (!isArchanesOnly) return;
+    if (!activeView) return;
+    // Allow legal pages, the landing page, and the investor view itself
+    // to render naturally. Anything else gets bounced.
+    const allowed = ["demand-pace", "landing", "privacy", "terms"];
+    if (!allowed.includes(activeView)) {
+      setActiveView("demand-pace");
+      sessionStorage.setItem("marketPulseActiveView", "demand-pace");
+    }
+  }, [isArchanesOnly, activeView]);
 
   useEffect(() => {
     const fetchHotelDetails = async () => {
@@ -600,6 +632,12 @@ export default function App() {
     );
   }
 
+  if (activeView === "deckV2") {
+    return (
+      <DeckV2 onBack={() => setActiveView(previousView || "dashboard")} />
+    );
+  }
+
   if (activeView === "shreejiDeck") {
     return (
       <ShreejiDeck onBack={() => setActiveView(previousView || "dashboard")} />
@@ -641,9 +679,18 @@ export default function App() {
             lastUpdatedAt={lastUpdatedAt}
             cityName={selectedPropertyDetails?.city}
             userInfo={userInfo}
+            isArchanesOnly={isArchanesOnly}
           />
           {/* Landing View block is now removed and handled above */}
 
+          {/* Archanes-only users get a "no hotel connected" overlay anywhere
+              other than the Investor View itself. The auto-route effect
+              normally preempts this, but the wrap covers the brief gap
+              between activeView change and the next render. */}
+          {isArchanesOnly && activeView !== "demand-pace" ? (
+            <NoHotelConnected onBackToInvestor={() => setActiveView("demand-pace")} />
+          ) : (
+          <>
           {activeView === "dashboard" && (
             <DashboardHub
               propertyId={
@@ -712,7 +759,18 @@ export default function App() {
           {/* [NEW] Render the Demand & Pace page */}
           {activeView === "demand-pace" &&
             (selectedPropertyDetails ? (
-              marketHotelCount < 5 && selectedPropertyDetails.city !== "archanes" ? (
+              selectedPropertyDetails.city === "archanes" ? (
+                <ArchanesInvestorView
+                  citySlug="archanes"
+                  currencySymbol={
+                    currencyCode === "GBP"
+                      ? "£"
+                      : currencyCode === "USD"
+                        ? "$"
+                        : "€"
+                  }
+                />
+              ) : marketHotelCount < 5 ? (
                 <MarketVeil
                   cityName={selectedPropertyDetails.city}
                   currentCount={marketHotelCount}
@@ -796,13 +854,18 @@ export default function App() {
             activeView === "distribution" ||
             activeView === "crm" ||
             activeView === "channelPricing" ||
-            activeView === "rockenueWeb" ||
-            activeView === "rockenueWebV2" ||
-            activeView === "rockenueWebV3") && (
+            activeView === "rockenueWebV1" ||
+            activeView === "rockenueWebV1_1" ||
+            activeView === "rockenueWebV1_2" ||
+            activeView === "rockenueWebV1_3" ||
+            activeView === "rockenueWebV1_4" ||
+            activeView === "rockenueWebV1_7") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
             />
+          )}
+          </>
           )}
 
           {/* ManageCompSetModal moved to AdminHub */}

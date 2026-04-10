@@ -8,12 +8,36 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 // ---------------------------------------------------------------------------
 // City configs
 // ---------------------------------------------------------------------------
+//
+// IMPORTANT: Airbnb caps any single search at ~270 results. A loose query
+// like "Archanes--Greece" pulls listings from a wide regional radius
+// (Heraklion, coastal villas, etc.) and silently truncates at 270 — making
+// per-date count meaningless because it always reads ~270.
+//
+// Fix: pass an explicit lat/lng bounding box so Airbnb only searches within
+// that geographic window. For Archanes, 10 km radius returns ~157 listings
+// (well under cap) AND only includes properties actually in the
+// Archanes-area competitive set. We also apply a post-parse distance filter
+// as a belt-and-braces safety net.
+//
+// To compute a bbox for a new city: dLat = radiusKm / 111;
+// dLng = radiusKm / (111 * cos(lat * π/180)). Then sw = (lat-dLat, lng-dLng),
+// ne = (lat+dLat, lng+dLng).
 const CITY_CONFIGS = {
   archanes: {
     name: "Archanes, Crete",
     slug: "archanes",
     currency: "EUR",
     query: "Archanes--Greece",
+    center: { lat: 35.2352, lng: 25.1594 },
+    radiusKm: 10,
+    bbox: {
+      swLat: "35.14511",
+      neLat: "35.32529",
+      swLng: "25.04910",
+      neLng: "25.26970",
+      zoom: 13,
+    },
   },
 };
 
@@ -29,7 +53,23 @@ async function fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, cursor) {
     "refinement_paths[]": "/homes",
     date_picker_type: "calendar",
     tab_id: "home_tab",
+    // Force the response currency. Without this, Airbnb infers currency from
+    // the requesting IP — e.g. a Polish IP returns złoty, US returns USD —
+    // and the parser stores those raw values as if they were EUR. Always
+    // pin to the city's configured currency.
+    currency: cityConfig.currency || "EUR",
   });
+
+  // If a bbox is configured, force Airbnb to search only inside that geographic
+  // window — otherwise the loose query name is interpreted as a wide region.
+  if (cityConfig.bbox) {
+    params.set("ne_lat", cityConfig.bbox.neLat);
+    params.set("ne_lng", cityConfig.bbox.neLng);
+    params.set("sw_lat", cityConfig.bbox.swLat);
+    params.set("sw_lng", cityConfig.bbox.swLng);
+    params.set("search_by_map", "true");
+    params.set("zoom", String(cityConfig.bbox.zoom));
+  }
 
   if (cursor) {
     params.set("cursor", cursor);
@@ -44,6 +84,9 @@ async function fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, cursor) {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
       "Accept-Encoding": "identity",
+      // Belt-and-braces: also pin currency via cookie in case the query
+      // param alone doesn't override an IP-based session preference.
+      Cookie: `currency=${cityConfig.currency || "EUR"}`,
     },
     timeout: 30000,
   });
@@ -91,27 +134,34 @@ function parseListings(pageData) {
       for (const item of items) {
         try {
           // --- PRICE: extract nightly rate ---
+          // Description formats observed:
+          //   "2 nights x 455.21 zł"            (PLN, no symbol prefix)
+          //   "2 nights x € 78.00"              (EUR, symbol+space prefix)
+          //   "1 night x €105.30"               (EUR, no space)
+          // Strip the currency symbol then grab the first decimal number.
           let pricePerNight = null;
           const priceDetails = item.structuredDisplayPrice?.explanationData?.priceDetails;
           if (priceDetails) {
             for (const group of priceDetails) {
               for (const line of group.items || []) {
                 const desc = line.description || "";
-                // Match "2 nights x 200 zł" or "1 night x 473.63 zł"
-                const nightlyMatch = desc.match(/night[s]?\s*x\s*([\d,.]+)/i);
-                if (nightlyMatch) {
-                  pricePerNight = parseFloat(nightlyMatch[1].replace(/,/g, ""));
+                if (!/night/i.test(desc)) continue;
+                // Find the first number after "night(s) x"
+                const afterX = desc.split(/x/i).pop() || "";
+                const numMatch = afterX.match(/([\d][\d,.]*)/);
+                if (numMatch) {
+                  pricePerNight = parseFloat(numMatch[1].replace(/,/g, ""));
                   break;
                 }
               }
               if (pricePerNight) break;
             }
           }
-          // Fallback: total ÷ 2 nights
+          // Fallback: read primary line, divide total by 2 nights.
           if (!pricePerNight) {
             const label = item.structuredDisplayPrice?.primaryLine?.discountedPrice
               || item.structuredDisplayPrice?.primaryLine?.price || "";
-            const totalMatch = label.match(/([\d,.]+)/);
+            const totalMatch = label.match(/([\d][\d,.]*)/);
             if (totalMatch) {
               pricePerNight = parseFloat(totalMatch[1].replace(/,/g, "")) / 2;
             }
@@ -175,7 +225,9 @@ async function scrapeDate(cityConfig, checkinDate, checkoutDate) {
   let allListings = [];
   let cursor = null;
   let page = 0;
-  const MAX_PAGES = 5;
+  // 30 pages × ~18 results = enough to fully exhaust Airbnb's per-query
+  // ceiling (~270). With a tight bbox the response is well under the cap.
+  const MAX_PAGES = 30;
 
   do {
     page++;
@@ -189,7 +241,28 @@ async function scrapeDate(cityConfig, checkinDate, checkoutDate) {
     if (cursor) await delay(2000);
   } while (cursor && page < MAX_PAGES);
 
-  const listings = allListings;
+  // Belt-and-braces distance filter: even with the bbox, Airbnb sometimes
+  // returns properties slightly outside the box. Drop anything beyond the
+  // configured radius from the city centre. Listings without coordinates
+  // are kept (we can't measure them, and dropping them would silently lose
+  // data). When tweaking the radius, also tweak the bbox above.
+  let listings = allListings;
+  if (cityConfig.center && cityConfig.radiusKm) {
+    const before = listings.length;
+    listings = listings.filter((l) => {
+      if (l.lat == null || l.lng == null) return true;
+      const dLat = (l.lat - cityConfig.center.lat) * 111;
+      const dLng =
+        (l.lng - cityConfig.center.lng) *
+        111 *
+        Math.cos((cityConfig.center.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng) <= cityConfig.radiusKm;
+    });
+    const dropped = before - listings.length;
+    if (dropped > 0) {
+      console.log(`  Distance filter: dropped ${dropped} of ${before} listings outside ${cityConfig.radiusKm} km`);
+    }
+  }
 
   // Calculate aggregates
   const prices = listings
@@ -220,6 +293,33 @@ async function scrapeDate(cityConfig, checkinDate, checkoutDate) {
 // ---------------------------------------------------------------------------
 // DB insert
 // ---------------------------------------------------------------------------
+
+// After all 90 dates are saved, count unique properties seen across the
+// entire scrape (union over the 90 forward dates) and stamp that count on
+// every row from today's scrape. Enables per-date occupancy proxy.
+async function setScrapeUniqueCount(citySlug) {
+  const result = await pgPool.query(
+    `WITH scrape_props AS (
+       SELECT DISTINCT
+         listing->>'name' AS name,
+         listing->>'type' AS type,
+         listing->>'beds' AS beds,
+         (listing->>'lat')::numeric AS lat,
+         (listing->>'lng')::numeric AS lng
+       FROM airbnb_availability_snapshots s,
+            jsonb_array_elements(s.listings) AS listing
+       WHERE s.city_slug = $1
+         AND s.scraped_at::date = CURRENT_DATE
+     )
+     UPDATE airbnb_availability_snapshots
+     SET scrape_unique_properties = (SELECT COUNT(*) FROM scrape_props)
+     WHERE city_slug = $1
+       AND scraped_at::date = CURRENT_DATE
+     RETURNING (SELECT COUNT(*) FROM scrape_props) AS unique_count`,
+    [citySlug]
+  );
+  return result.rows[0]?.unique_count || 0;
+}
 
 async function saveSnapshot(citySlug, checkinDate, data) {
   const query = `
@@ -418,6 +518,14 @@ async function main() {
     console.log(
       `\nDone: ${stats.successes}/${stats.totalDays} dates, ${stats.totalListingsFound} total listings.`
     );
+    // Stamp scrape_unique_properties on every row from today's scrape now that
+    // the full 90-day window is in the table. Powers the per-date occupancy proxy.
+    try {
+      const uniqueCount = await setScrapeUniqueCount(city.slug);
+      console.log(`Unique properties across full scrape: ${uniqueCount}`);
+    } catch (e) {
+      console.error("setScrapeUniqueCount error:", e.message);
+    }
     try {
       await sendSummaryEmail(stats, startTime);
     } catch (e) {
