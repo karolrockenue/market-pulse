@@ -9,6 +9,41 @@ const pricingEngine = require("./sentinel.pricing.engine");
 const sentinelAdapter = require("../adapters/sentinel.adapter"); // Needed for live rate lookup
 const pmsRegistry = require("../adapters/pmsRegistry"); // [MEWS] PMS-aware adapter routing
 /**
+ * [ENGINE] Fetch Daily Max Rates as ISO date map (YYYY-MM-DD keys).
+ * Used by previewCalendar / recalculateRates so that
+ * sentinel.pricing.engine.applyGuardrails can find the per-day cap.
+ *
+ * Distinct from getDailyMaxRates below, which returns the legacy
+ * "monthIdx-day" shorthand for the Control Panel UI dialog.
+ *
+ * Bug history: previously the engine consumed the month-day map,
+ * which made the daily cap silently invisible (the engine looked up
+ * by ISO date and never matched), so every cap fell through to the
+ * global guardrail_max — see Durrant House 2026-04-10 incident.
+ */
+async function getDailyMaxRatesIsoMap(hotelId, startDate, endDate) {
+  const query = `
+    SELECT to_char(stay_date, 'YYYY-MM-DD') AS date, max_price
+    FROM sentinel_daily_max_rates
+    WHERE hotel_id = $1
+    ${startDate ? "AND stay_date >= $2" : ""}
+    ${endDate ? "AND stay_date <= $3" : ""}
+  `;
+  const params = [hotelId];
+  if (startDate) params.push(startDate);
+  if (endDate) params.push(endDate);
+
+  const { rows } = await db.query(query, params);
+
+  const map = {};
+  rows.forEach((r) => {
+    const v = parseFloat(r.max_price);
+    if (!isNaN(v) && v > 0) map[r.date] = v;
+  });
+  return map;
+}
+
+/**
  * [FIXED] Fetch Daily Max Rates
  * Translates DB Date ('2025-01-01') -> Frontend Key ('0-1')
  */
@@ -348,13 +383,15 @@ async function previewCalendar({
   endDate,
 }) {
   // 1. Fetch Config, Asset Settings, AND Daily Max/Min Rates (SQL)
+  // [FIX 2026-04-10] Use ISO-keyed daily-max map so applyGuardrails can find
+  // it. The previous month-day map was silently invisible to the engine.
   const [config, assetRes, dailyMaxRates, dailyMinRates] = await Promise.all([
     getHotelConfig(hotelId),
     db.query(
       `SELECT * FROM rockenue_managed_assets WHERE market_pulse_hotel_id = $1`,
       [hotelId],
     ),
-    getDailyMaxRates(hotelId, startDate, endDate),
+    getDailyMaxRatesIsoMap(hotelId, startDate, endDate),
     getDailyMinRates(hotelId, startDate, endDate),
   ]);
 

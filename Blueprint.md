@@ -682,7 +682,12 @@ Max Rate
 
 EffectiveRate = min(EffectiveRate, MaxRate)
 
-These guardrails apply after differential calculations.
+MaxRate is resolved per-day with the following priority:
+
+1. Daily max override (sentinel_daily_max_rates) — if a per-day ceiling exists, it wins.
+2. Global max (sentinel_configurations → guardrail_max) — fallback default.
+
+**Caps apply to the BASE room only.** Once the base is set (and clamped to Min/Max), derived room rates are computed via differentials and **are allowed to exceed the daily max**. This is intentional — it preserves the price hierarchy between room types (e.g. Jacuzzi at base × 1.65 must remain meaningfully above Double). The daily ceiling is a cap on the base, not a hotel-wide ceiling on every room. The historical phrasing "guardrails apply after differential calculations" is wrong and was the source of the 2026-04-10 Durrant House incident — see §4.5.
 
 3.4 Freeze Windows
 
@@ -898,6 +903,12 @@ is_manual_override (Boolean)
 
 updated_at
 
+**ENGINE TRAP — read this before touching the engine path.**
+
+The DB stores `stay_date` as a real date. The in-memory `daily_max_rates` map that flows into `sentinel.pricing.engine.applyGuardrails` MUST be keyed by ISO date string (`'YYYY-MM-DD'`) — that is what `applyGuardrails` looks up. There is a legacy reader, `sentinelService.getDailyMaxRates`, that returns a `'monthIdx-day'` shorthand (e.g. `'6-15'` for July 15) which exists for the Control Panel UI dialog only. Never feed that map to the engine — the lookup will silently miss every date and the daily cap will fall through to the global `guardrail_max`. Use `sentinelService.getDailyMaxRatesIsoMap` for the engine path.
+
+**Known incident — Durrant House 2026-04-10.** A newly onboarded Cloudbeds property (hotel 318344) was briefly placed on autopilot during onboarding. The hourly DGX cycle suggested base rates that would have been clamped to ~£286 by the 2026-07-15 daily ceiling. Instead, `previewCalendar` was injecting the month-day map into `config.daily_max_rates` and `applyGuardrails` was looking up by ISO date — every lookup missed, every cap fell back to the global £400 `guardrail_max`. With `+65%` Jacuzzi differentials applied on top, derived rooms went out to Cloudbeds at £660 = £400 × 1.65. Fixed by introducing `getDailyMaxRatesIsoMap` and using it inside `previewCalendar`. Also exposed several latent issues to address in follow-ups: `saveDailyMaxRates` still hardcodes year=2025 (creates trash rows), `POST /api/sentinel/overrides` does not capture `changedBy`, and there is no operational guardrail blocking autopilot from being enabled before daily max rates exist for the year ahead — that is the single change that would have prevented this incident regardless of code bugs.
+
 4.6 sentinel_daily_min_rates
 
 Stores granular daily price floors (per-day min rate overrides).
@@ -1033,6 +1044,46 @@ hotel_budgets
 rockenue_managed_assets (calculator settings, multipliers, Genius %, etc.)
 
 Helpers: magic_login_tokens, user_sessions, etc.
+
+4.8b User Access & Permissions Model
+
+Users Table Key Fields:
+
+user_id (PK, integer) — internal ID.
+
+cloudbeds_user_id (varchar) — session identifier. For invited users: "invited-{hash}". For Cloudbeds OAuth users: numeric Cloudbeds ID. For Mews manual users: "mews-{id}-{hash}" or "manual_{name}".
+
+role — super_admin | admin | owner | user. Controls which API middleware gates pass.
+
+can_view_rates (boolean, default false) — enables My Rates page access for non-admin users. Added April 2026.
+
+User Properties Table (user_properties):
+
+Links users to hotels. user_id column stores the cloudbeds_user_id string (NOT the integer user_id).
+
+The /api/hotels/mine endpoint checks: up.user_id = cloudbeds_user_id OR up.user_id = internal_user_id::text.
+
+CRITICAL: If a user has zero rows in user_properties, they see zero hotels on the dashboard. There is no fallback.
+
+Access Granting Flow:
+
+Invitation (auth.router.js /accept-invitation): Creates user + one user_properties row for the property_id on the invitation.
+
+Grant Access (users.router.js /link-property): Inserts user_properties row using cloudbeds_user_id (not integer user_id).
+
+When granting access to multiple hotels, each hotel needs its own user_properties row.
+
+My Rates Access (can_view_rates):
+
+The My Rates page (HotelRateWindow) requires both: (a) user_properties rows for each hotel, AND (b) can_view_rates = true on the users record.
+
+Sentinel endpoints (/api/sentinel/*) are behind a blanket requireAdminApi middleware. A router.use() bypass at line 225 of sentinel.router.js intercepts specific read-only paths (preview-rate, pms-property-ids, predictions, pace-curves, min-rates) and allows users with can_view_rates through via requireRatesAccess middleware.
+
+/api/hotels/assets is also gated — rate-view users only see assets for their linked hotels.
+
+To enable a user for My Rates: UPDATE users SET can_view_rates = true WHERE user_id = {id};
+
+Known Issue (April 2026): Many invited users created before April 2026 had zero user_properties rows — their property links were either never created or lost. This was discovered when investigating why Ilkin (ilkin@vilenza.com) could not see hotels. The fix was manual INSERT into user_properties for affected users.
 
 4.9 sentinel_ai_predictions
 
