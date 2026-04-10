@@ -34,7 +34,6 @@ import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/
 
 import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
-import { DeckV2 } from "./components/DeckV2";
 import { ShreejiDeck } from "./components/ShreejiDeck";
 import { MarketProfile } from "./components/MarketProfile";
 import { MarketVeil } from "./components/MarketVeil";
@@ -629,12 +628,6 @@ export default function App() {
   if (activeView === "deck") {
     return (
       <Deck onBack={() => setActiveView(previousView || "dashboard")} />
-    );
-  }
-
-  if (activeView === "deckV2") {
-    return (
-      <DeckV2 onBack={() => setActiveView(previousView || "dashboard")} />
     );
   }
 
