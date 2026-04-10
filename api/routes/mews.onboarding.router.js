@@ -245,8 +245,7 @@ router.post("/onboard", async (req, res) => {
     await client.query(
       `INSERT INTO rockenue_managed_assets (
         market_pulse_hotel_id, asset_name, city, total_rooms, management_group, monthly_fee
-      ) VALUES ($1, $2, $3, $4, $5, 0.00)
-      ON CONFLICT (market_pulse_hotel_id) DO NOTHING`,
+      ) VALUES ($1, $2, $3, $4, $5, 0.00)`,
       [
         String(hotelId),
         details.propertyName,
