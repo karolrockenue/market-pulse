@@ -21,7 +21,6 @@ import {
   ComposedChart,
   Area,
   Line,
-  BarChart,
   Bar,
   Cell,
   ReferenceLine,
@@ -55,12 +54,6 @@ const tipStyle = {
   contentStyle: { backgroundColor: "rgba(26,26,26,0.95)", border: `1px solid ${MP.border}`, borderRadius: "6px", padding: "10px 14px" },
   labelStyle: { color: MP.textSec, fontSize: "11px", marginBottom: "4px" },
   itemStyle: { fontSize: "12px", color: MP.text, padding: "1px 0" },
-};
-
-// ── Deterministic pseudo-random (fallback mock) ──
-const rand = (seed: number, min: number, max: number) => {
-  const x = Math.sin(seed * 9301 + 49297) * 49297;
-  return min + (x - Math.floor(x)) * (max - min);
 };
 
 // Build day objects from raw API data
@@ -132,11 +125,10 @@ const ZONES = [
 interface DemandRadarProps { allHotels: any[]; selectedProperty?: any }
 
 export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProps) {
-  // Use the city of the hotel selected in TopNav
+  const cityName = selectedProperty?.city || "";
   const citySlug = useMemo(() => {
-    const city = selectedProperty?.city;
-    return city ? city.toLowerCase().replace(/\s+/g, "-") : "london";
-  }, [selectedProperty]);
+    return cityName ? cityName.toLowerCase().replace(/\s+/g, "-") : "";
+  }, [cityName]);
 
   // Collect integer hotel IDs for portfolio-level queries
   // Admin endpoint returns hotel_id AS property_id
@@ -149,12 +141,17 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
 
   const curr = "\u00A3";
 
-  // Fetch real market data
   const [baseDays, setBaseDays] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [dataSource, setDataSource] = useState<"live" | "mock">("mock");
+  const [dataSource, setDataSource] = useState<"live" | "none">("none");
 
   useEffect(() => {
+    if (!citySlug) {
+      setIsLoading(false);
+      setDataSource("none");
+      setBaseDays([]);
+      return;
+    }
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -173,38 +170,9 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
         setBaseDays(buildDaysFromApi(marketData, paceData));
         setDataSource("live");
       } catch (err) {
-        console.warn("Demand Radar: falling back to mock data", err);
-        setDataSource("mock");
-        // Mock fallback — generate synthetic data
-        const days: any[] = [];
-        const base = new Date(); base.setHours(0, 0, 0, 0);
-        for (let i = 0; i < 90; i++) {
-          const d = new Date(base); d.setDate(base.getDate() + i);
-          const dow = d.getDay();
-          let dem = 44 + (i / 90) * 16;
-          if (dow === 5) dem += 17; if (dow === 6) dem += 24; if (dow === 0) dem += 7;
-          const demand = Math.min(99, Math.max(8, Math.round(dem + rand(i, -7, 7))));
-          const wap = Math.round(118 + (demand - 44) * 1.9 + rand(i + 100, -10, 10));
-          const supply = Math.round(3850 - (demand - 44) * 9 + rand(i + 200, -120, 120));
-          days.push({
-            i, d, dow, dateStr: d.toISOString().slice(0, 10),
-            label: d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
-            shortLabel: d.toLocaleDateString("en-GB", { day: "numeric", month: "short", weekday: "short" }),
-            dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
-            monthLabel: d.toLocaleDateString("en-GB", { month: "short" }),
-            dayNum: d.getDate(),
-            xLabel: i % 14 === 0 ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "",
-            weekNum: Math.floor(i / 7), demand, wap, supply, mpss: 0,
-            wapDelta: Math.round(rand(i + 400, -18, 18)),
-            supplyPctDelta: Math.round(rand(i + 500, -5, 5) * 10) / 10,
-            demandDelta: Math.round(rand(i + 600, -8, 8)),
-            divergence: 0, event: null,
-          });
-        }
-        setBaseDays(days.map((day, i, arr) => {
-          const win = arr.slice(Math.max(0, i - 6), i + 1);
-          return { ...day, demandMa: Math.round(win.reduce((s, d) => s + d.demand, 0) / win.length), wapMa: Math.round(win.reduce((s, d) => s + d.wap, 0) / win.length) };
-        }));
+        console.warn("Demand Radar: no data for", citySlug, err);
+        setDataSource("none");
+        setBaseDays([]);
       } finally {
         setIsLoading(false);
       }
@@ -212,9 +180,19 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
     fetchData();
   }, [citySlug]);
 
-  // Fetch real events from PredictHQ via backend
+  // 30-day pace for banner headline (strategic view)
+  const [pace30, setPace30] = useState<any[]>([]);
+  useEffect(() => {
+    if (!citySlug) { setPace30([]); return; }
+    fetch(`/api/market/pace?city=${citySlug}&period=30`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setPace30(data || []))
+      .catch(() => setPace30([]));
+  }, [citySlug]);
+
   const [phqEvents, setPhqEvents] = useState<any[]>([]);
   useEffect(() => {
+    if (!citySlug) { setPhqEvents([]); return; }
     fetch(`/api/market/events?citySlug=${citySlug}`)
       .then((r) => r.ok ? r.json() : { events: [] })
       .then((data) => setPhqEvents(data.events || []))
@@ -291,14 +269,15 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
     const segWapP75 = pct(0.75);
     const segWapP90 = pct(0.90);
 
-    const early = days.slice(0, 21);
-    const late = days.slice(-21);
-    const earlyDemand = Math.round(early.reduce((s, d) => s + d.demand, 0) / early.length);
-    const lateDemand = Math.round(late.reduce((s, d) => s + d.demand, 0) / late.length);
-    const earlyWap = Math.round(early.reduce((s, d) => s + d.segmentWap, 0) / early.length);
-    const lateWap = Math.round(late.reduce((s, d) => s + d.segmentWap, 0) / late.length);
-    const demandTrajectory = lateDemand - earlyDemand;
-    const wapTrajectory = lateWap - earlyWap;
+    // 30-day momentum: avg delta across all forward dates (now vs 30 days ago)
+    let demandMomentum = 0;
+    let wapMomentum = 0;
+    if (pace30.length > 0) {
+      const validD = pace30.filter((p: any) => p.market_demand_score_delta != null);
+      const validW = pace30.filter((p: any) => p.wap_delta != null);
+      demandMomentum = validD.length > 0 ? Math.round(validD.reduce((s: number, p: any) => s + p.market_demand_score_delta, 0) / validD.length) : 0;
+      wapMomentum = validW.length > 0 ? Math.round(validW.reduce((s: number, p: any) => s + p.wap_delta, 0) / validW.length) : 0;
+    }
 
     const highDemand = days.filter((d) => d.demand >= 70).length;
     const lowDemand = days.filter((d) => d.demand < 30).length;
@@ -310,7 +289,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
     const peak = sorted[0];
     const trough = sorted[sorted.length - 1];
 
-    const regime = demandTrajectory > 5 ? "strengthening" : demandTrajectory < -5 ? "softening" : "stable";
+    const regime = demandMomentum > 3 ? "strengthening" : demandMomentum < -3 ? "softening" : "stable";
 
     // Day-of-week averages
     const dowAvg = Array.from({ length: 7 }, (_, dow) => {
@@ -360,8 +339,8 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
     const avgLos = bookingBehavior?.avgLos ?? 1.9;
     const bookingDataLive = !!bookingBehavior?.totalBookings;
 
-    return { avgDemand, avgWap, avgSupply, segWapP75, segWapP90, demandTrajectory, wapTrajectory, highDemand, lowDemand, risingDemandFlatPrice, compressed, peak, trough, regime, dowAvg, zones, eventDays, leadTimeBuckets, losBuckets, avgLeadTime, avgLos, bookingDataLive };
-  }, [days, bookingBehavior]);
+    return { avgDemand, avgWap, avgSupply, segWapP75, segWapP90, demandMomentum, wapMomentum, highDemand, lowDemand, risingDemandFlatPrice, compressed, peak, trough, regime, dowAvg, zones, eventDays, leadTimeBuckets, losBuckets, avgLeadTime, avgLos, bookingDataLive };
+  }, [days, bookingBehavior, pace30]);
 
   // Scatter data for divergence plot
 
@@ -375,12 +354,52 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
     ? { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.3)", icon: MP.red, text: "#fca5a5", Icon: TrendingDown }
     : { bg: "rgba(234,179,8,0.08)", border: "rgba(234,179,8,0.3)", icon: MP.amber, text: "#fde047", Icon: Minus };
 
-  if (isLoading || baseDays.length === 0) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: MP.bg }}>
         <div style={{ textAlign: "center" }}>
           <Activity className="w-8 h-8 animate-spin" style={{ color: MP.accent, margin: "0 auto 12px" }} />
           <p style={{ color: MP.textSec, fontSize: "13px" }}>Loading market data…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataSource === "none" || baseDays.length === 0) {
+    const displayCity = cityName
+      ? cityName.charAt(0).toUpperCase() + cityName.slice(1)
+      : "this market";
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: MP.bg, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(57,189,248,0.01), transparent, rgba(57,189,248,0.01))", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)", backgroundSize: "64px 64px", pointerEvents: "none" }} />
+        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "80vh", padding: "48px 24px", textAlign: "center" }}>
+          <div style={{ width: "80px", height: "80px", borderRadius: "16px", backgroundColor: "rgba(57,189,248,0.08)", border: "1px solid rgba(57,189,248,0.15)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+            <Activity size={36} color={MP.accent} strokeWidth={1.5} />
+          </div>
+          <h2 style={{ color: MP.text, fontSize: "20px", fontWeight: 600, marginBottom: "8px" }}>
+            Demand Radar not available for {displayCity}
+          </h2>
+          <p style={{ color: MP.textMuted, fontSize: "14px", maxWidth: "460px", lineHeight: "1.6", marginBottom: "32px" }}>
+            Market intelligence requires a minimum of 5 properties in a city and active Booking.com
+            scrape coverage. {displayCity} does not have enough data yet.
+          </p>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "32px" }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ width: "40px", height: "40px", borderRadius: "8px", backgroundColor: "rgba(42,42,42,0.5)", border: "1px solid #2a2a2a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <BarChart3 size={18} color="#4a4a48" strokeWidth={1.5} />
+              </div>
+            ))}
+          </div>
+          <div style={{ backgroundColor: "rgba(57,189,248,0.05)", border: "1px solid rgba(57,189,248,0.15)", borderRadius: "8px", padding: "16px 24px", maxWidth: "400px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <Layers size={16} color={MP.accent} />
+              <span style={{ color: MP.text, fontSize: "13px", fontWeight: 600 }}>Currently active markets</span>
+            </div>
+            <p style={{ color: MP.textSec, fontSize: "12px", lineHeight: "1.5", margin: 0 }}>
+              London and Las Vegas have full Demand Radar coverage. Select a property in one of these cities to view forward market intelligence.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -400,7 +419,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
           <span style={{ fontSize: "10px", color: MP.accent, backgroundColor: "rgba(57,189,248,0.1)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2</span>
         </div>
         <p style={{ color: MP.textSec, margin: "0 0 20px", fontSize: "13px" }}>
-          90-day forward market intelligence{dataSource === "live" ? ` for ${citySlug}` : ""} {dataSource === "live" ? "• Live Booking.com data" : "• Mock data"}
+          90-day forward market intelligence for {cityName || citySlug} • Live Booking.com data
         </p>
 
         {/* ── OUTLOOK BANNER ── */}
@@ -422,16 +441,20 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "28px", fontWeight: 600, color: bannerCfg.text, lineHeight: 1 }}>
-              {stats.demandTrajectory > 0 ? "+" : ""}{stats.demandTrajectory}pp
+              {stats.demandMomentum > 0 ? "+" : ""}{stats.demandMomentum}pp
             </div>
-            <div style={{ fontSize: "10px", color: MP.textMuted, marginTop: "2px" }}>demand trajectory</div>
+            <div style={{ fontSize: "12px", color: MP.textSec, marginTop: "4px" }}>
+              demand vs 30 days ago
+            </div>
           </div>
           <div style={{ width: "1px", height: "40px", backgroundColor: MP.border, margin: "0 4px" }} />
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "28px", fontWeight: 600, color: stats.wapTrajectory > 0 ? MP.green : stats.wapTrajectory < 0 ? MP.red : MP.textSec, lineHeight: 1 }}>
-              {stats.wapTrajectory > 0 ? "+" : ""}{curr}{stats.wapTrajectory}
+            <div style={{ fontSize: "28px", fontWeight: 600, color: stats.wapMomentum > 0 ? MP.green : stats.wapMomentum < 0 ? MP.red : MP.textSec, lineHeight: 1 }}>
+              {stats.wapMomentum > 0 ? "+" : ""}{curr}{stats.wapMomentum}
             </div>
-            <div style={{ fontSize: "10px", color: MP.textMuted, marginTop: "2px" }}>price trajectory</div>
+            <div style={{ fontSize: "12px", color: MP.textSec, marginTop: "4px" }}>
+              avg rate vs 30 days ago
+            </div>
           </div>
         </div>
 
@@ -542,7 +565,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
         {/* ══════════════════════════════════════════════════════════════════
             CENTREPIECE — PRICING (2-4★ Segment WAP)
             ══════════════════════════════════════════════════════════════════ */}
-        <div style={{ backgroundColor: MP.card, borderRadius: "0 0 8px 8px", border: `1px solid ${MP.border}`, borderTop: "none", marginBottom: "24px" }}>
+        <div style={{ backgroundColor: MP.card, borderLeft: `1px solid ${MP.border}`, borderRight: `1px solid ${MP.border}`, borderBottom: `1px solid ${MP.border}`, borderTop: "none" }}>
           <div style={{ padding: "12px 20px 4px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${MP.border}` }}>
             <div>
               <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>MARKET PRICING</div>
@@ -595,6 +618,62 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════
+            CENTREPIECE — 7-DAY CHANGE (attached to WAP above)
+            ══════════════════════════════════════════════════════════════════ */}
+        <div style={{ backgroundColor: MP.card, borderRadius: "0 0 8px 8px", border: `1px solid ${MP.border}`, borderTop: "none", marginBottom: "24px" }}>
+          <div style={{ padding: "12px 20px 4px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${MP.border}` }}>
+            <div>
+              <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>7-DAY CHANGE</div>
+              <h3 style={{ color: MP.text, fontSize: "15px", fontWeight: 600, margin: 0 }}>Recent Pickup</h3>
+              <p style={{ color: MP.textSec, fontSize: "11px", margin: "2px 0 0" }}>How demand and price shifted vs the same dates 7 days ago</p>
+            </div>
+            <div style={{ display: "flex", gap: "16px", fontSize: "11px", alignItems: "center" }}>
+              <Leg color={MP.green} label="Demand up" />
+              <Leg color={MP.red} label="Demand down" />
+              <Leg color={MP.amber} label="Price change" dashed />
+            </div>
+          </div>
+          <div style={{ padding: "0 20px 16px" }}>
+            <div style={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={days} margin={{ top: 6, right: 10, left: -15, bottom: 20 }} syncId="dr">
+                  <CartesianGrid {...gridStroke} vertical={false} />
+                  <XAxis dataKey="xLabel" {...axisStyle} interval={6} />
+                  <YAxis {...axisStyle} width={50} />
+                  <ReferenceLine y={0} stroke={MP.textMuted} strokeOpacity={0.4} strokeWidth={1} />
+                  <Tooltip {...tipStyle} cursor={{ stroke: MP.accent, strokeOpacity: 0.15, strokeWidth: 1 }}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0]?.payload;
+                      if (!d) return null;
+                      const dd = d.demandDelta || 0;
+                      const wd = d.wapDelta || 0;
+                      const sd = d.supplyPctDelta || 0;
+                      return (
+                        <div style={{ ...tipStyle.contentStyle, padding: "10px 14px" }}>
+                          <div style={{ ...tipStyle.labelStyle as any, fontWeight: 600 }}>{d.shortLabel}</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px", fontSize: "12px" }}>
+                            <span style={{ color: MP.textMuted }}>Demand</span>
+                            <span style={{ color: dd >= 0 ? MP.green : MP.red, textAlign: "right" }}>{dd > 0 ? "+" : ""}{dd}pp</span>
+                            <span style={{ color: MP.textMuted }}>Price</span>
+                            <span style={{ color: wd >= 0 ? MP.green : MP.red, textAlign: "right" }}>{wd > 0 ? "+" : ""}{curr}{wd}</span>
+                            <span style={{ color: MP.textMuted }}>Supply</span>
+                            <span style={{ color: sd > 0 ? MP.accent : sd < 0 ? MP.purple : MP.textMuted, textAlign: "right" }}>{sd > 0 ? "+" : ""}{sd}%</span>
+                          </div>
+                        </div>
+                      );
+                    }} />
+                  <Bar dataKey="demandDelta" name="Demand change" radius={[3, 3, 0, 0]} maxBarSize={10}>
+                    {days.map((d, i) => <Cell key={i} fill={d.demandDelta >= 0 ? MP.green : MP.red} fillOpacity={0.6} />)}
+                  </Bar>
+                  <Line type="monotone" dataKey="wapDelta" name="Price change" stroke={MP.amber} strokeWidth={2} dot={false} strokeDasharray="5 3" strokeOpacity={0.8} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════
             AI MARKET BRIEF (Lighthouse-style smart summaries)
             ══════════════════════════════════════════════════════════════════ */}
         <Card label="AI MARKET BRIEF" title="What's Happening & Why"
@@ -605,7 +684,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
                 icon: <TrendingUp className="w-4 h-4" />,
                 color: stats.regime === "strengthening" ? MP.green : stats.regime === "softening" ? MP.red : MP.amber,
                 title: `Market is ${stats.regime}`,
-                body: `Demand shifted ${stats.demandTrajectory > 0 ? "+" : ""}${stats.demandTrajectory}pp from early to late window. WAP moved ${stats.wapTrajectory > 0 ? "+" : ""}${curr}${stats.wapTrajectory}. ${stats.regime === "strengthening" ? "Rates have room to follow demand higher." : stats.regime === "softening" ? "Consider defending occupancy over rate." : "Hold current positioning."}`,
+                body: `Demand is ${stats.demandMomentum > 0 ? "+" : ""}${stats.demandMomentum}pp vs 30 days ago. Avg rates moved ${stats.wapMomentum > 0 ? "+" : ""}${curr}${stats.wapMomentum}. ${stats.regime === "strengthening" ? "Rates have room to follow demand higher." : stats.regime === "softening" ? "Consider defending occupancy over rate." : "Hold current positioning."}`,
               },
               {
                 icon: <CalendarDays className="w-4 h-4" />,
@@ -764,114 +843,66 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════
-            SECTION 4: DEMAND-PRICE DIVERGENCE (Scatter)
+            SECTION 4: PRICING OPPORTUNITY MAP
             ══════════════════════════════════════════════════════════════════ */}
-        <Card label="DIVERGENCE ANALYSIS" title="Demand vs Price Positioning"
-          subtitle="Each dot is a future date. Bottom-right = high demand, low price (opportunity). Top-left = low demand, high price (risk)."
-          legend={<><Leg color={MP.green} label="Opportunity zone" /> <Leg color={MP.red} label="Risk zone" /></>}>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 10, right: 20, left: -5, bottom: 20 }}>
-                <CartesianGrid {...gridStroke} />
-                <XAxis type="number" dataKey="x" name="Demand" domain={[0, 100]}
-                  {...axisStyle} tickFormatter={(v) => `${v}%`}
-                  label={{ value: "Market Demand %", position: "insideBottom", offset: -10, style: { fill: MP.textMuted, fontSize: 10 } }} />
-                <YAxis type="number" dataKey="y" name="WAP"
-                  {...axisStyle} width={50} tickFormatter={(v) => `${curr}${v}`}
-                  label={{ value: "WAP", angle: -90, position: "insideLeft", offset: 15, style: { fill: MP.textMuted, fontSize: 10 } }} />
-                <ZAxis type="number" dataKey="divergence" range={[30, 200]} />
-                <Tooltip {...tipStyle} cursor={{ strokeDasharray: "3 3" }}
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (
-                      <div style={{ ...tipStyle.contentStyle, padding: "10px 14px" }}>
-                        <div style={{ ...tipStyle.labelStyle as any }}>{d.label}</div>
-                        <div style={{ fontSize: "12px", color: MP.text }}>Demand: {d.x}%</div>
-                        <div style={{ fontSize: "12px", color: MP.text }}>WAP: {curr}{d.y}</div>
-                        {d.divergence > 15 && <div style={{ fontSize: "11px", color: MP.green, marginTop: "4px" }}>Revenue opportunity</div>}
-                      </div>
-                    );
-                  }} />
-                {/* Quadrant reference lines */}
-                <ReferenceLine x={50} stroke={MP.border} strokeDasharray="4 4" />
-                <ReferenceLine y={stats.avgWap} stroke={MP.border} strokeDasharray="4 4" />
-                <Scatter data={scatterData} fillOpacity={0.7}>
-                  {scatterData.map((d, i) => (
-                    <Cell key={i} fill={d.x > 60 && d.y < stats.avgWap ? MP.green : d.x < 40 && d.y > stats.avgWap ? MP.red : MP.accent} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Quadrant labels */}
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 50px 0 40px" }}>
-            <div style={{ fontSize: "10px", color: MP.red, opacity: 0.6 }}>Low demand, high price</div>
-            <div style={{ fontSize: "10px", color: MP.green, opacity: 0.6 }}>High demand, below avg price</div>
+        <Card label="PRICING OPPORTUNITY MAP" title="Where is the market mispriced?"
+          subtitle="Each dot is a check-in date over the next 90 days, plotted by how busy the market is (→) vs how expensive it is (↑)."
+          legend={<><Leg color={MP.green} label="Under-priced (push rates up)" /> <Leg color={MP.red} label="Over-priced (risk of low pickup)" /> <Leg color={MP.accent} label="Fairly priced" /></>}>
+          <div style={{ position: "relative" }}>
+            <div style={{ position: "absolute", top: 12, left: 55, zIndex: 5, pointerEvents: "none" }}>
+              <div style={{ fontSize: "10px", color: MP.red, opacity: 0.7, fontWeight: 600, letterSpacing: "0.03em" }}>OVERPRICED</div>
+              <div style={{ fontSize: "9px", color: MP.textMuted, maxWidth: 120, lineHeight: 1.3, marginTop: 2 }}>High prices but low demand — rooms may sit empty</div>
+            </div>
+            <div style={{ position: "absolute", top: 12, right: 25, zIndex: 5, pointerEvents: "none", textAlign: "right" }}>
+              <div style={{ fontSize: "10px", color: MP.amber, opacity: 0.7, fontWeight: 600, letterSpacing: "0.03em" }}>PEAK DATES</div>
+              <div style={{ fontSize: "9px", color: MP.textMuted, maxWidth: 120, lineHeight: 1.3, marginTop: 2 }}>High demand, high prices — market is yielding correctly</div>
+            </div>
+            <div style={{ height: 340 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 10, right: 20, left: 0, bottom: 30 }}>
+                  <CartesianGrid {...gridStroke} />
+                  <XAxis type="number" dataKey="x" name="Demand" domain={[0, 100]}
+                    {...axisStyle} tickFormatter={(v) => `${v}%`}
+                    label={{ value: "← Quiet market                    Busy market →", position: "insideBottom", offset: -14, style: { fill: MP.textMuted, fontSize: 10 } }} />
+                  <YAxis type="number" dataKey="y" name="WAP"
+                    {...axisStyle} width={55} tickFormatter={(v) => `${curr}${v}`} />
+                  <ZAxis type="number" dataKey="divergence" range={[40, 180]} />
+                  <Tooltip {...tipStyle} cursor={{ strokeDasharray: "3 3" }}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      const zone = d.x > 60 && d.y < stats.avgWap ? "opportunity" : d.x < 40 && d.y > stats.avgWap ? "risk" : d.x > 60 && d.y >= stats.avgWap ? "peak" : "quiet";
+                      const zoneLabel = { opportunity: "Under-priced — push rates", risk: "Over-priced — watch pickup", peak: "Peak pricing — hold", quiet: "Off-peak — expected" } as const;
+                      const zoneColor = { opportunity: MP.green, risk: MP.red, peak: MP.amber, quiet: MP.textMuted } as const;
+                      return (
+                        <div style={{ ...tipStyle.contentStyle, padding: "10px 14px" }}>
+                          <div style={{ ...tipStyle.labelStyle as any, fontWeight: 600 }}>{d.label}</div>
+                          <div style={{ fontSize: "12px", color: MP.text }}>Market demand: {d.x}%</div>
+                          <div style={{ fontSize: "12px", color: MP.text }}>Avg nightly rate: {curr}{d.y}</div>
+                          <div style={{ fontSize: "11px", color: zoneColor[zone], marginTop: "6px", fontWeight: 500 }}>{zoneLabel[zone]}</div>
+                        </div>
+                      );
+                    }} />
+                  <ReferenceLine x={50} stroke={MP.border} strokeDasharray="4 4" />
+                  <ReferenceLine y={stats.avgWap} stroke={MP.border} strokeDasharray="4 4" />
+                  <Scatter data={scatterData} fillOpacity={0.75}>
+                    {scatterData.map((d, i) => (
+                      <Cell key={i} fill={d.x > 60 && d.y < stats.avgWap ? MP.green : d.x < 40 && d.y > stats.avgWap ? MP.red : d.x > 60 && d.y >= stats.avgWap ? MP.amber : `${MP.accent}66`} />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "0 55px 0 55px" }}>
+              <div style={{ fontSize: "10px", color: MP.textMuted, opacity: 0.7 }}>
+                <span style={{ fontWeight: 600 }}>QUIET DATES</span> — low demand, low prices
+              </div>
+              <div style={{ fontSize: "10px", color: MP.green, opacity: 0.7, textAlign: "right" }}>
+                <span style={{ fontWeight: 600 }}>OPPORTUNITY</span> — high demand, prices haven't caught up
+              </div>
+            </div>
           </div>
         </Card>
-
-        {/* ══════════════════════════════════════════════════════════════════
-            SECTION 5: PACE CHARTS (3-up)
-            ══════════════════════════════════════════════════════════════════ */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-          <Card label="7-DAY PACE" title="Demand Change" subtitle="How demand shifted vs 7 days ago">
-            <div style={{ height: 170 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={days} margin={{ top: 10, right: 5, left: -20, bottom: 20 }} syncId="dr">
-                  <CartesianGrid {...gridStroke} vertical={false} />
-                  <XAxis dataKey="xLabel" {...axisStyle} interval={6} />
-                  <YAxis {...axisStyle} width={30} />
-                  <ReferenceLine y={0} stroke={MP.textMuted} strokeOpacity={0.3} />
-                  <Tooltip {...tipStyle} cursor={{ fill: "rgba(57,189,248,0.04)" }}
-                    labelFormatter={(_l, p) => p?.[0]?.payload?.shortLabel || _l}
-                    formatter={(v: number) => [`${v > 0 ? "+" : ""}${v}pp`, "Demand \u0394"]} />
-                  <Bar dataKey="demandDelta" radius={[2, 2, 0, 0]} maxBarSize={10}>
-                    {days.map((d, i) => <Cell key={i} fill={d.demandDelta >= 0 ? MP.green : MP.red} fillOpacity={0.6} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          <Card label="7-DAY PACE" title="Price Change" subtitle="WAP movement vs 7 days ago">
-            <div style={{ height: 170 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={days} margin={{ top: 10, right: 5, left: -20, bottom: 20 }} syncId="dr">
-                  <CartesianGrid {...gridStroke} vertical={false} />
-                  <XAxis dataKey="xLabel" {...axisStyle} interval={6} />
-                  <YAxis {...axisStyle} width={35} tickFormatter={(v) => `${curr}${v}`} />
-                  <ReferenceLine y={0} stroke={MP.textMuted} strokeOpacity={0.3} />
-                  <Tooltip {...tipStyle} cursor={{ fill: "rgba(57,189,248,0.04)" }}
-                    labelFormatter={(_l, p) => p?.[0]?.payload?.shortLabel || _l}
-                    formatter={(v: number) => [`${v > 0 ? "+" : ""}${curr}${v}`, "WAP \u0394"]} />
-                  <Bar dataKey="wapDelta" radius={[2, 2, 0, 0]} maxBarSize={10}>
-                    {days.map((d, i) => <Cell key={i} fill={d.wapDelta >= 0 ? MP.green : MP.red} fillOpacity={0.6} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          <Card label="7-DAY PACE" title="Supply Change" subtitle="Properties available vs 7 days ago">
-            <div style={{ height: 170 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={days} margin={{ top: 10, right: 5, left: -20, bottom: 20 }} syncId="dr">
-                  <CartesianGrid {...gridStroke} vertical={false} />
-                  <XAxis dataKey="xLabel" {...axisStyle} interval={6} />
-                  <YAxis {...axisStyle} width={30} tickFormatter={(v) => `${v}%`} />
-                  <ReferenceLine y={0} stroke={MP.textMuted} strokeOpacity={0.3} />
-                  <Tooltip {...tipStyle} cursor={{ fill: "rgba(57,189,248,0.04)" }}
-                    labelFormatter={(_l, p) => p?.[0]?.payload?.shortLabel || _l}
-                    formatter={(v: number) => [`${v > 0 ? "+" : ""}${v}%`, "Supply \u0394"]} />
-                  <Bar dataKey="supplyPctDelta" radius={[2, 2, 0, 0]} maxBarSize={10}>
-                    {days.map((d, i) => <Cell key={i} fill={d.supplyPctDelta >= 0 ? MP.accent : MP.purple} fillOpacity={0.6} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </div>
 
         {/* ══════════════════════════════════════════════════════════════════
             SECTION 6: SUPPLY DYNAMICS
@@ -905,7 +936,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
         <DateScanner days={days} curr={curr} />
 
         <div style={{ textAlign: "center", color: MP.textMuted, fontSize: "12px", paddingBottom: "16px" }}>
-          {dataSource === "live" ? `Live data for ${citySlug} • Scraped daily from Booking.com • Events from PredictHQ` : "Mock data for design review"}
+          Live data for {cityName || citySlug} • Scraped daily from Booking.com • Events from PredictHQ
         </div>
       </div>
     </div>

@@ -128,10 +128,11 @@ const MOCK_AUTOMATIONS: Automation[] = [
 interface CrmBoardProps {
   initialFilter?: { hotel_id?: number; channel_id?: number } | null;
   onClearFilter?: () => void;
+  userName: string;
 }
 
-export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
-  const { tasks, loading, createTask, updateTask, deleteTask, refresh } = useCrmTasks(
+export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardProps) {
+  const { tasks, loading, createTask, createTasksBulk, updateTask, deleteTask, refresh } = useCrmTasks(
     initialFilter ? { hotel_id: initialFilter.hotel_id, channel_id: initialFilter.channel_id } : undefined
   );
 
@@ -488,6 +489,7 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
           todayStr={todayStr}
           onTaskClick={(id) => setSelectedTaskId(id)}
           dueDateTier={dueDateTier}
+          userName={userName}
         />
       )}
 
@@ -621,6 +623,7 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
           watchers={watchers}
           setWatchers={setWatchers}
           onNavigateTask={(id) => setSelectedTaskId(id)}
+          userName={userName}
         />
       )}
 
@@ -629,8 +632,10 @@ export function CrmBoard({ initialFilter, onClearFilter }: CrmBoardProps) {
         <CreateTaskPanel
           onClose={() => { setShowNewTask(false); setNewTaskDefaultStatus(null); }}
           onCreateTask={createTask}
+          onCreateBulk={createTasksBulk}
           hotelNames={hotelNames}
           defaultStatus={newTaskDefaultStatus}
+          userName={userName}
         />
       )}
 
@@ -1146,15 +1151,15 @@ function TimelineView({
 // ═══════════════════════════════════════════════════
 
 function MyWorkView({
-  tasks, todayStr, onTaskClick, dueDateTier,
+  tasks, todayStr, onTaskClick, dueDateTier, userName,
 }: {
   tasks: CrmTask[];
   todayStr: string;
   onTaskClick: (id: number) => void;
   dueDateTier: (task: CrmTask) => string;
+  userName: string;
 }) {
-  // Hardcoded to "Karol" for now — would come from auth context
-  const myName = "Karol";
+  const myName = userName;
   const myTasks = tasks.filter((t) => t.assignee === myName && t.status !== "done");
   const overdue = myTasks.filter((t) => dueDateTier(t) === "overdue");
   const dueToday = myTasks.filter((t) => dueDateTier(t) === "today");
@@ -1401,7 +1406,7 @@ function AutomationsPanel({
 function TaskDetailPanel({
   task, allTasks, onClose, onUpdateTask, onDeleteTask, onRefresh,
   dependencies, setDependencies, watchers, setWatchers,
-  onNavigateTask,
+  onNavigateTask, userName,
 }: {
   task: CrmTask;
   allTasks: CrmTask[];
@@ -1414,6 +1419,7 @@ function TaskDetailPanel({
   watchers: TaskWatcher[];
   setWatchers: (w: TaskWatcher[]) => void;
   onNavigateTask: (id: number) => void;
+  userName: string;
 }) {
   const [activeTab, setActiveTab] = useState<"details" | "activity">("details");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -1455,25 +1461,25 @@ function TaskDetailPanel({
 
   async function handleStatusChange(newStatus: TaskStatus) {
     setShowStatusPicker(false);
-    await onUpdateTask(task.id, { status: newStatus, updated_by: "Karol" });
+    await onUpdateTask(task.id, { status: newStatus, updated_by: userName });
     await onRefresh();
   }
 
   async function handlePriorityChange(newPriority: Priority) {
     setShowPriorityPicker(false);
-    await onUpdateTask(task.id, { priority: newPriority, updated_by: "Karol" });
+    await onUpdateTask(task.id, { priority: newPriority, updated_by: userName });
     await onRefresh();
   }
 
   async function handleAssigneeChange(name: string) {
     setShowAssigneePicker(false);
-    await onUpdateTask(task.id, { assignee: name, updated_by: "Karol" });
+    await onUpdateTask(task.id, { assignee: name, updated_by: userName });
     await onRefresh();
   }
 
   async function handleSubmitComment() {
     if (!commentText.trim()) return;
-    await addComment(task.id, { author: "Karol", body: commentText.trim(), type: "comment" });
+    await addComment(task.id, { author: userName, body: commentText.trim(), type: "comment" });
     setCommentText("");
     const c = await fetchComments(task.id);
     setComments(c);
@@ -1801,7 +1807,7 @@ function TaskDetailPanel({
 
                 {/* Comment input */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-                  <Avatar name="Karol" size={28} />
+                  <Avatar name={userName} size={28} />
                   <div style={{ flex: 1, position: "relative" }}>
                     <input
                       value={commentText} onChange={(e) => setCommentText(e.target.value)}
@@ -1844,7 +1850,7 @@ function TaskDetailPanel({
           {activeTab === "activity" && (
             <div>
               <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-                <Avatar name="Karol" size={28} />
+                <Avatar name={userName} size={28} />
                 <div style={{ flex: 1, position: "relative" }}>
                   <input
                     value={commentText} onChange={(e) => setCommentText(e.target.value)}
@@ -1919,12 +1925,14 @@ function TaskDetailPanel({
 type NewPriority = "normal" | "urgent";
 
 function CreateTaskPanel({
-  onClose, onCreateTask, hotelNames, defaultStatus,
+  onClose, onCreateTask, onCreateBulk, hotelNames, defaultStatus, userName,
 }: {
   onClose: () => void;
   onCreateTask: (data: Record<string, unknown>) => Promise<CrmTask>;
+  onCreateBulk: (tasks: Record<string, unknown>[]) => Promise<unknown>;
   hotelNames: string[];
   defaultStatus: TaskStatus | null;
+  userName: string;
 }) {
   const teamMembers = useTeam();
   useEffect(() => {
@@ -1980,6 +1988,7 @@ function CreateTaskPanel({
   const [creating, setCreating] = useState(false);
   const [titleError, setTitleError] = useState(false);
   const [selStatus, setSelStatus] = useState<TaskStatus>(defaultStatus || "todo");
+  const [splitByChannel, setSplitByChannel] = useState(false);
 
   const propertyRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<HTMLDivElement>(null);
@@ -2021,23 +2030,35 @@ function CreateTaskPanel({
     }
     setCreating(true);
     try {
-      // Resolve selected hotel names to IDs
       const hotelIds = selectedHotels
         .map((name) => allHotels.find((h) => h.property_name === name)?.hotel_id)
         .filter((id): id is number => id != null);
 
-      await onCreateTask({
-        title: title.trim(),
+      const basePayload = {
         description: description.trim() || null,
         assignee: selAssignee || null,
         priority: selPriority === "urgent" ? "urgent" : "medium",
         status: selStatus,
         category: selCategory,
         due_date: dueDate || null,
-        tags: selChannels.length > 0 ? selChannels : [],
         hotel_ids: hotelIds.length > 0 ? hotelIds : undefined,
-        created_by: "Karol",
-      } as any);
+        created_by: userName,
+      };
+
+      if (splitByChannel && selChannels.length > 1) {
+        const tasks = selChannels.map((ch) => ({
+          ...basePayload,
+          title: `${title.trim()} — ${ch}`,
+          tags: [ch],
+        }));
+        await onCreateBulk(tasks);
+      } else {
+        await onCreateTask({
+          ...basePayload,
+          title: title.trim(),
+          tags: selChannels.length > 0 ? selChannels : [],
+        } as any);
+      }
       onClose();
     } catch (err) {
       console.error("Failed to create task", err);
@@ -2165,7 +2186,7 @@ function CreateTaskPanel({
                     <div style={{ padding: "10px 12px", borderBottom: `1px solid ${BORDER}` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: INPUT_BG, borderRadius: 6, border: `1px solid ${BORDER}` }}>
                         <Search size={13} style={{ color: TEXT_DIM, flexShrink: 0 }} />
-                        <input value={propertySearch} onChange={(e) => setPropertySearch(e.target.value)} placeholder="Search properties..." style={{ flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none" }} />
+                        <input autoFocus value={propertySearch} onChange={(e) => setPropertySearch(e.target.value)} placeholder="Search properties..." style={{ flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none" }} />
                       </div>
                     </div>
                     <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
@@ -2201,7 +2222,7 @@ function CreateTaskPanel({
                     <div style={{ padding: "10px 12px", borderBottom: `1px solid ${BORDER}` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: INPUT_BG, borderRadius: 6, border: `1px solid ${BORDER}` }}>
                         <Search size={13} style={{ color: TEXT_DIM, flexShrink: 0 }} />
-                        <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder="Search channels..." style={{ flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none" }} />
+                        <input autoFocus value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder="Search channels..." style={{ flex: 1, background: "transparent", border: "none", color: TEXT, fontSize: 12, outline: "none" }} />
                       </div>
                     </div>
                     <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
@@ -2212,6 +2233,17 @@ function CreateTaskPanel({
                 )}
               </div>
             </InlineField>
+
+            {selChannels.length > 1 && (
+              <InlineField label="" icon={<ClipboardList size={14} />}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
+                  <span style={{ color: TEXT, fontSize: 12, fontWeight: 500 }}>
+                    Create <span style={{ color: BLUE, fontWeight: 700 }}>{selChannels.length} separate tasks</span> <span style={{ color: TEXT_DIM }}>(1 per channel)</span>
+                  </span>
+                  <ToggleSwitch on={splitByChannel} onToggle={() => setSplitByChannel(!splitByChannel)} />
+                </div>
+              </InlineField>
+            )}
 
             <InlineField label="Category" icon={<Tag size={14} />}>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -2337,7 +2369,7 @@ function CreateTaskPanel({
           }}
             onMouseEnter={(e) => { if (!creating) e.currentTarget.style.background = "#29ADEE"; }}
             onMouseLeave={(e) => { if (!creating) e.currentTarget.style.background = BLUE; }}
-          >{creating ? "Creating..." : "Create"}</button>
+          >{creating ? "Creating..." : (splitByChannel && selChannels.length > 1) ? `Create ${selChannels.length} Tasks` : "Create"}</button>
         </div>
       </div>
 
@@ -2381,64 +2413,56 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
       onContextMenu={onContextMenu}
       style={{
         backgroundColor: bulkSelected ? `${BLUE}08` : CARD_BG,
-        borderRadius: 8, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
-        padding: "12px 14px", cursor: bulkMode ? "pointer" : "grab", transition: "all 0.15s",
-        borderLeft: `3px solid ${pCfg.color}`,
+        borderRadius: 6, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
+        padding: "8px 10px", cursor: bulkMode ? "pointer" : "grab", transition: "all 0.15s",
+        borderLeft: `3px solid ${cCfg.color}`,
         opacity: isDragging ? 0.4 : 1,
       }}
       onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.borderColor = `${BLUE}30`; e.currentTarget.style.boxShadow = `0 2px 12px rgba(57,189,248,0.08)`; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderLeftColor = pCfg.color; }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderLeftColor = cCfg.color; }}>
+      {/* Row 1: ID + priority dot | assignee + badges */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           {bulkMode && (
             <div style={{
-              width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
               border: `1.5px solid ${bulkSelected ? BLUE : "#444"}`,
               background: bulkSelected ? BLUE : "transparent",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {bulkSelected && <CheckCircle2 size={10} style={{ color: "#0d0d0d" }} />}
+              {bulkSelected && <CheckCircle2 size={8} style={{ color: "#0d0d0d" }} />}
             </div>
           )}
-          <span style={{ color: TEXT_DIM, fontSize: 10, fontFamily: "monospace" }}>CRM-{task.id}</span>
+          <span style={{ color: TEXT_DIM, fontSize: 9, fontFamily: "monospace" }}>CRM-{task.id}</span>
+          <div style={{ width: 5, height: 5, borderRadius: "50%", background: pCfg.color, flexShrink: 0 }} title={pCfg.label} />
+          {dueTier === "overdue" && <span style={{ color: RED, fontSize: 8, fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 2 }}><AlertTriangle size={8} /> Overdue</span>}
+          {dueTier === "today" && <span style={{ color: AMBER, fontSize: 8, fontWeight: 600, textTransform: "uppercase" }}>Today</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color }} />
-          <span style={{ color: pCfg.color, fontSize: 9, fontWeight: 600, textTransform: "uppercase" }}>{pCfg.label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {task.subtask_total > 0 && <span style={{ color: task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM, fontSize: 9, display: "flex", alignItems: "center", gap: 2 }}><CheckCircle2 size={8} /> {task.subtask_done}/{task.subtask_total}</span>}
+          {task.comment_count > 0 && <span style={{ color: TEXT_DIM, fontSize: 9, display: "flex", alignItems: "center", gap: 2 }}><MessageSquare size={8} /> {task.comment_count}</span>}
+          <span style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>{task.assignee || "—"}</span>
+          <Avatar name={task.assignee || "?"} size={24} />
         </div>
       </div>
-      <div style={{ color: TEXT, fontSize: 12, fontWeight: 500, lineHeight: 1.45, marginBottom: 8 }}>{task.title}</div>
-      {task.tags.length > 0 && (
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-          {task.tags.slice(0, 3).map((tag) => (
-            <span key={tag} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: INPUT_BG, color: TEXT_DIM, border: `1px solid ${BORDER}` }}>{tag}</span>
-          ))}
+      {/* Row 2: Title */}
+      <div style={{ color: TEXT, fontSize: 12, fontWeight: 500, lineHeight: 1.4, marginBottom: 4 }}>{task.title}</div>
+      {/* Row 3: Properties */}
+      {hotelDisplay !== "\u2014" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+          <Building2 size={9} style={{ color: TEXT_DIM, flexShrink: 0 }} />
+          <span style={{ color: TEXT_MID, fontSize: 10, fontWeight: 500 }}>{hotelDisplay}</span>
         </div>
       )}
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 8 }}>
-        <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 4, background: `${cCfg.color}12`, color: cCfg.color, fontWeight: 600 }}>{cCfg.label}</span>
-        {task.channel_name && <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: INPUT_BG, color: TEXT_MID, border: `1px solid ${BORDER}` }}>{task.channel_name}</span>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Avatar name={task.assignee || "?"} size={20} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <span style={{ color: TEXT_MID, fontSize: 10, fontWeight: 500 }}>{task.assignee || "Unassigned"}</span>
-            <span style={{ color: TEXT_DIM, fontSize: 9 }}>{hotelDisplay.length > 20 ? hotelDisplay.slice(0, 20) + "\u2026" : hotelDisplay}</span>
-          </div>
+      {/* Row 4: Channel tags */}
+      {task.tags.length > 0 && (
+        <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 2 }}>
+          {task.tags.slice(0, 4).map((tag) => (
+            <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: INPUT_BG, color: TEXT_DIM, border: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>{tag}</span>
+          ))}
+          {task.tags.length > 4 && <span style={{ fontSize: 9, color: TEXT_DIM }}>+{task.tags.length - 4}</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {task.subtask_total > 0 && <span style={{ color: task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM, fontSize: 10, display: "flex", alignItems: "center", gap: 2 }}><CheckCircle2 size={9} /> {task.subtask_done}/{task.subtask_total}</span>}
-          {task.comment_count > 0 && <span style={{ color: TEXT_DIM, fontSize: 10, display: "flex", alignItems: "center", gap: 2 }}><MessageSquare size={9} /> {task.comment_count}</span>}
-        </div>
-      </div>
-      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-        {dueTier === "overdue" && <AlertTriangle size={9} style={{ color: RED }} />}
-        <Clock size={9} style={{ color: dueDateColor }} />
-        <span style={{ color: dueDateColor, fontSize: 10, fontWeight: dueTier === "overdue" || dueTier === "today" ? 600 : 400 }}>
-          {dueDateLabel ? `${dueDateLabel} \u2014 ` : ""}{task.due_date ? formatDate(task.due_date) : "\u2014"}
-        </span>
-      </div>
+      )}
     </div>
   );
 }

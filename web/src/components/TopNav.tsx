@@ -1,3 +1,4 @@
+import { useState as useStateProp } from "react";
 import {
   BarChart3,
   LayoutDashboard,
@@ -18,14 +19,11 @@ import {
   ClipboardList,
   Radar,
   MonitorSmartphone,
+  Palette,
+  Check,
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "./ui/command";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +57,121 @@ interface TopNavProps {
   // When true, hide every nav item except the Investor View entry and
   // relabel it. Used for restricted Archanes-only users.
   isArchanesOnly?: boolean;
+}
+
+const BORDER_CLR = "#2a2a2a";
+
+function PropertyCombobox({
+  property,
+  onPropertyChange,
+  properties,
+}: {
+  property: string;
+  onPropertyChange: (value: string) => void;
+  properties: Property[];
+}) {
+  const [open, setOpen] = useStateProp(false);
+
+  const selectedLabel =
+    property === "ALL"
+      ? "All Properties (Portfolio)"
+      : properties.find((p) => p.property_id.toString() === property)?.property_name ?? "Select property";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          role="combobox"
+          aria-expanded={open}
+          style={{
+            width: 268,
+            height: 36,
+            backgroundColor: "#2C2C2C",
+            border: `1px solid ${BORDER_CLR}`,
+            borderRadius: 6,
+            color: "#e5e5e5",
+            paddingLeft: 12,
+            paddingRight: 12,
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selectedLabel}
+          </span>
+          <ChevronDown size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        style={{
+          width: 268,
+          padding: 0,
+          backgroundColor: "#1a1a1a",
+          borderColor: BORDER_CLR,
+        }}
+      >
+        <Command
+          style={{ backgroundColor: "transparent" }}
+          filter={(value, search) => {
+            if (value === "all") {
+              return "all properties portfolio".includes(search.toLowerCase()) ? 1 : 0;
+            }
+            const prop = properties.find((p) => p.property_id.toString() === value);
+            return prop?.property_name.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+          }}
+        >
+          <CommandInput
+            placeholder="Search hotels..."
+            style={{ color: "#e5e5e5", fontSize: 13 }}
+          />
+          <CommandList>
+            <CommandEmpty style={{ color: "#6b7280" }}>No hotel found.</CommandEmpty>
+            {properties.length > 1 && (
+              <CommandItem
+                value="all"
+                onSelect={() => { onPropertyChange("ALL"); setOpen(false); }}
+                style={{
+                  color: "#e5e5e5",
+                  fontWeight: 600,
+                  borderBottom: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 4,
+                  marginBottom: 2,
+                }}
+              >
+                <Check size={14} style={{ opacity: property === "ALL" ? 1 : 0, marginRight: 6 }} />
+                All Properties (Portfolio)
+              </CommandItem>
+            )}
+            {properties.map((prop) => (
+              <CommandItem
+                key={prop.property_id}
+                value={prop.property_id.toString()}
+                onSelect={(val) => { onPropertyChange(val); setOpen(false); }}
+                style={{ color: "#e5e5e5", borderRadius: 4 }}
+              >
+                <Check
+                  size={14}
+                  style={{
+                    opacity: property === prop.property_id.toString() ? 1 : 0,
+                    marginRight: 6,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {prop.property_name}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function TopNav({
@@ -141,7 +254,6 @@ export function TopNav({
       isAdmin: false,
     },
     { label: "Reports", value: "reports", icon: FileText, isAdmin: false },
-    { label: "Settings", value: "settings", icon: Settings, isAdmin: false },
     { label: "My Rates", value: "hotelRates", icon: DollarSign, isAdmin: false },
     {
       label: "Sentinel",
@@ -156,9 +268,6 @@ export function TopNav({
         { label: "Shadowfax", value: "shadowfax", icon: Tag },
         { label: "Demand Radar", value: "demandRadar", icon: Radar },
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
-        { label: "Deck", value: "deck", icon: Presentation },
-        { label: "Deck V2", value: "deckV2", icon: Presentation },
-        { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
       ],
     },
     {
@@ -168,19 +277,34 @@ export function TopNav({
       isDropdown: true,
       isAdmin: true,
       items: [
-        { label: "Dashboard", value: "rockenueDashboard", icon: LayoutDashboard },
-        { label: "Distribution", value: "distribution", icon: Globe },
         { label: "CRM", value: "crm", icon: ClipboardList },
+        { label: "Distribution", value: "distribution", icon: Globe },
         { label: "Channel Pricing", value: "channelPricing", icon: DollarSign },
-        { label: "Web V1 — Bands + Splits", value: "rockenueWebV1", icon: MonitorSmartphone },
-        { label: "Web V1.1 — Hero: Brand logo", value: "rockenueWebV1_1", icon: MonitorSmartphone },
-        { label: "Web V1.2 — Hero: London dots", value: "rockenueWebV1_2", icon: MonitorSmartphone },
-        { label: "Web V1.3 — Hero: 1,100+ rooms", value: "rockenueWebV1_3", icon: MonitorSmartphone },
-        { label: "Web V1.4 — Hero: 4 stats vertical", value: "rockenueWebV1_4", icon: MonitorSmartphone },
-        { label: "Web V1.7 — Tile playground (15)", value: "rockenueWebV1_7", icon: MonitorSmartphone },
       ],
     },
     { label: "Admin", value: "admin", icon: Zap, isAdmin: true },
+    {
+      label: "Studio",
+      value: "studio-group",
+      icon: Palette,
+      isDropdown: true,
+      isAdmin: true,
+      items: [
+        { label: "MP Dashboard", value: "mpDash3", icon: MonitorSmartphone, sectionLabel: "Market Pulse" },
+        { label: "MP Reports Hub", value: "mpReportsHub", icon: MonitorSmartphone },
+        { label: "MP Demand Radar", value: "mpDemandRadar", icon: MonitorSmartphone },
+        { label: "MP Demand & Pace", value: "mpCompsetIntel", icon: MonitorSmartphone },
+        { label: "MP Compset Intel", value: "mpCompsetView", icon: MonitorSmartphone },
+        { label: "MP My Rates", value: "mpMyRates", icon: MonitorSmartphone },
+        { label: "MP CRM", value: "mpCrmBoard", icon: MonitorSmartphone },
+        { label: "MP Risk Overview", value: "mpRiskOverview", icon: MonitorSmartphone },
+        { label: "MP Control Panel", value: "mpControlPanel", icon: MonitorSmartphone },
+        { label: "Email Signatures", value: "emailSignatures", icon: MonitorSmartphone },
+        { label: "Deck V2", value: "deckV2", icon: Presentation, sectionLabel: "Drafts" },
+        { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },
+        { label: "Canvas", value: "canvas", icon: Palette },
+      ],
+    },
   ];
 
   // Archanes-only users see exactly one item: "Investor View" → demand-pace.
@@ -337,7 +461,18 @@ export function TopNav({
                       {item.items.map((child: any) => {
                         const ChildIcon = child.icon;
                         const isChildActive = activeView === child.value;
-                        return (
+                        return (<>
+                          {child.sectionLabel && (
+                            <>
+                              <DropdownMenuSeparator style={{ backgroundColor: BORDER_DARK }} />
+                              <DropdownMenuLabel
+                                className="px-2 py-1"
+                                style={{ color: GRAY, fontSize: "10px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}
+                              >
+                                {child.sectionLabel}
+                              </DropdownMenuLabel>
+                            </>
+                          )}
                           <DropdownMenuItem
                             key={child.value}
                             onSelect={() => handleNavClick(child.value)}
@@ -360,7 +495,7 @@ export function TopNav({
                             />
                             <span style={{ fontSize: "13px" }}>{child.label}</span>
                           </DropdownMenuItem>
-                        );
+                        </>);
                       })}
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
@@ -400,72 +535,11 @@ export function TopNav({
             >
               Property:
             </div>
-            <Select value={property} onValueChange={onPropertyChange}>
-              <SelectTrigger
-                style={{
-                  width: "268px",
-                  height: "36px",
-                  backgroundColor: "#2C2C2C",
-                  borderColor: BORDER_DARK,
-                  color: WHITE,
-                  paddingLeft: "12px",
-                  paddingRight: "12px",
-                }}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                style={{
-                  width: "268px",
-                  maxWidth: "268px",
-                  minWidth: "268px",
-                  backgroundColor: "#1a1a1a",
-                  borderColor: BORDER_DARK,
-                  color: WHITE,
-                  padding: "4px",
-                }}
-              >
-                {properties.length > 1 && (
-                  <SelectItem
-                    value="ALL"
-                    className="font-semibold border-b border-white/10 mb-1"
-                    style={{
-                      color: WHITE,
-                      borderRadius: "4px",
-                      maxWidth: "260px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    All Properties (Portfolio)
-                  </SelectItem>
-                )}
-                {properties.map((prop) => (
-                  <SelectItem
-                    key={prop.property_id}
-                    value={prop.property_id.toString()}
-                    style={{
-                      color: WHITE,
-                      borderRadius: "4px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "block",
-                        maxWidth: "220px",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        paddingRight: "8px",
-                      }}
-                    >
-                      {prop.property_name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <PropertyCombobox
+              property={property}
+              onPropertyChange={onPropertyChange}
+              properties={properties}
+            />
             <div
               style={{
                 height: "24px",
@@ -476,22 +550,38 @@ export function TopNav({
           </>
         )}
 
-        {/* Last Updated Badge — hidden on narrow screens */}
-        <div
-          className="topnav-timestamp"
-          style={{
-            fontSize: "12px",
-            color: GRAY,
-            backgroundColor: "#2C2C2C",
-            padding: "6px 12px",
-            borderRadius: "4px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {lastUpdatedAt
-            ? `Last updated: ${new Date(lastUpdatedAt).toLocaleString()}`
-            : "Loading update time..."}
-        </div>
+        {/* Live indicator — styled tooltip on hover */}
+        {(() => {
+          const isStale = lastUpdatedAt && (Date.now() - new Date(lastUpdatedAt).getTime()) > 25 * 60 * 60 * 1000;
+          const dotColor = !lastUpdatedAt ? GRAY : isStale ? "#f59e0b" : "#22c55e";
+          const glowColor = isStale ? "rgba(245,158,11,0.5)" : "rgba(34,197,94,0.5)";
+          const tipText = lastUpdatedAt
+            ? `${new Date(lastUpdatedAt).toLocaleString()}${isStale ? " — stale" : ""}`
+            : "Loading...";
+          return (
+            <div className="topnav-live-wrap" style={{ position: "relative", display: "flex", alignItems: "center", cursor: "default" }}>
+              <div style={{
+                width: "8px", height: "8px", borderRadius: "50%",
+                backgroundColor: dotColor,
+                boxShadow: lastUpdatedAt ? `0 0 6px ${glowColor}` : "none",
+                animation: lastUpdatedAt ? "pulse-live 2s ease-in-out infinite" : "none",
+              }} />
+              <div className="topnav-live-tip" style={{
+                position: "absolute", top: "calc(100% + 8px)", right: "-8px",
+                backgroundColor: "#1a1a1a", border: `1px solid ${BORDER_DARK}`, borderRadius: "6px",
+                padding: "6px 10px", whiteSpace: "nowrap", fontSize: "11px", color: WHITE,
+                opacity: 0, pointerEvents: "none", transition: "opacity 0.15s",
+                zIndex: 100,
+              }}>
+                {tipText}
+              </div>
+              <style>{`
+                @keyframes pulse-live { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+                .topnav-live-wrap:hover .topnav-live-tip { opacity: 1 !important; }
+              `}</style>
+            </div>
+          );
+        })()}
 
         {/* Sentinel Notification Bell (Admin Only) */}
         {(userInfo?.role === "admin" || userInfo?.role === "super_admin") && (
@@ -500,6 +590,22 @@ export function TopNav({
             <NotificationBell />
           </div>
         )}
+
+        {/* Settings cog */}
+        <button
+          onClick={() => onViewChange("settings")}
+          title="Settings"
+          className="topnav-cog"
+          style={{
+            width: "36px", height: "36px", borderRadius: "8px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backgroundColor: activeView === "settings" ? "rgba(57,189,248,0.15)" : "transparent",
+            border: "none", cursor: "pointer", padding: 0,
+          }}
+        >
+          <Settings className="w-5 h-5" style={{ color: activeView === "settings" ? BLUE : GRAY }} />
+          <style>{`.topnav-cog:hover { background-color: rgba(57,189,248,0.1) !important; } .topnav-cog:hover svg { color: ${WHITE} !important; }`}</style>
+        </button>
 
         {/* User Profile Dropdown */}
         <DropdownMenu>

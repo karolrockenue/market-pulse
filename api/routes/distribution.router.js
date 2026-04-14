@@ -7,6 +7,27 @@ const notifications = require("../utils/notification.service");
 // All distribution/CRM endpoints are admin-only
 router.use(requireAdminApi);
 
+// ── Grid sync helper: link CRM tasks ↔ distribution grid ──
+async function syncGridFromTask(hotelIds, channelTags, gridStatus) {
+  if (!hotelIds || hotelIds.length === 0 || !channelTags || channelTags.length === 0) return;
+  // Resolve channel names to IDs
+  const { rows: channels } = await db.query(
+    "SELECT id, name FROM distribution_channels WHERE name = ANY($1::text[])",
+    [channelTags]
+  );
+  if (channels.length === 0) return;
+  for (const hId of hotelIds) {
+    for (const ch of channels) {
+      await db.query(`
+        INSERT INTO distribution_hotel_channels (hotel_id, channel_id, status, updated_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (hotel_id, channel_id)
+        DO UPDATE SET status = $3, suspension_reason = NULL, suspended_by = NULL, suspended_at = NULL, updated_at = NOW()
+      `, [hId, ch.id, gridStatus]);
+    }
+  }
+}
+
 // ═══════════════════════════════════════════
 // TEAM MEMBERS
 // ═══════════════════════════════════════════
@@ -85,6 +106,61 @@ router.get("/tasks", async (req, res) => {
   }
 });
 
+// POST /tasks/bulk — create multiple tasks (one per channel, same base fields)
+router.post("/tasks/bulk", async (req, res) => {
+  try {
+    const { tasks: taskList } = req.body;
+    if (!Array.isArray(taskList) || taskList.length === 0) {
+      return res.status(400).json({ error: "tasks array is required." });
+    }
+    if (taskList.length > 20) {
+      return res.status(400).json({ error: "Maximum 20 tasks per batch." });
+    }
+
+    const batchId = `batch-${Date.now()}`;
+    const created = [];
+
+    for (const t of taskList) {
+      if (!t.title) continue;
+      const resolvedHotelIds = t.hotel_ids && t.hotel_ids.length > 0 ? t.hotel_ids : (t.hotel_id ? [t.hotel_id] : []);
+      const primaryHotelId = resolvedHotelIds[0] || null;
+
+      const { rows } = await db.query(`
+        INSERT INTO crm_tasks (title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING *
+      `, [t.title, t.description || null, primaryHotelId, resolvedHotelIds, t.channel_id || null, t.assignee || null, t.priority || 'medium', t.status || 'todo', t.category || 'operations', t.due_date || null, t.tags || [], t.created_by || null]);
+
+      if (rows[0]) {
+        await db.query(`
+          INSERT INTO crm_task_comments (task_id, author, body, type)
+          VALUES ($1, $2, $3, 'activity')
+        `, [rows[0].id, t.created_by || 'System', `Created as part of batch (${taskList.length} tasks, ref: ${batchId})`]);
+
+        const enriched = { ...rows[0] };
+        if (resolvedHotelIds.length > 0) {
+          const hResult = await db.query('SELECT property_name FROM hotels WHERE hotel_id = ANY($1::int[])', [resolvedHotelIds]);
+          enriched.hotel_names = hResult.rows.map(r => r.property_name);
+          enriched.hotel_name = enriched.hotel_names.join(', ');
+        }
+        notifications.notifyTaskCreated(enriched, t.created_by).catch(() => {});
+        created.push(rows[0]);
+
+        // Sync distribution grid: new task with channels → onboarding
+        const cat = rows[0].category;
+        if (resolvedHotelIds.length > 0 && t.tags && t.tags.length > 0 && (cat === 'distribution' || cat === 'onboarding')) {
+          syncGridFromTask(resolvedHotelIds, t.tags, 'onboarding').catch(err => console.error('Grid sync error (bulk):', err));
+        }
+      }
+    }
+
+    res.status(201).json({ created: created.length, tasks: created, batch_id: batchId });
+  } catch (error) {
+    console.error("POST /tasks/bulk error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /tasks — create task
 router.post("/tasks", async (req, res) => {
   try {
@@ -116,6 +192,14 @@ router.post("/tasks", async (req, res) => {
         enriched.hotel_name = enriched.hotel_names.join(', ');
       }
       notifications.notifyTaskCreated(enriched, created_by).catch(() => {});
+    }
+
+    // Sync distribution grid: new task with channels → onboarding
+    if (rows[0] && resolvedHotelIds.length > 0 && tags && tags.length > 0) {
+      const cat = rows[0].category;
+      if (cat === 'distribution' || cat === 'onboarding') {
+        syncGridFromTask(resolvedHotelIds, tags, 'onboarding').catch(err => console.error('Grid sync error (create):', err));
+      }
     }
 
     res.status(201).json(rows[0]);
@@ -195,6 +279,18 @@ router.patch("/tasks/:id", async (req, res) => {
     }
     if (fields.status && fields.status !== old.status) {
       notifications.notifyStatusChanged(updated, old.status, updatedBy).catch(() => {});
+
+      // Sync distribution grid on status transitions
+      const hotelIds = updated.hotel_ids && updated.hotel_ids.length > 0 ? updated.hotel_ids : (updated.hotel_id ? [updated.hotel_id] : []);
+      const taskTags = updated.tags || [];
+      const cat = updated.category;
+      if (hotelIds.length > 0 && taskTags.length > 0 && (cat === 'distribution' || cat === 'onboarding')) {
+        if (fields.status === 'done') {
+          syncGridFromTask(hotelIds, taskTags, 'live').catch(err => console.error('Grid sync error (done):', err));
+        } else if (fields.status === 'todo' || fields.status === 'in_progress' || fields.status === 'review') {
+          syncGridFromTask(hotelIds, taskTags, 'onboarding').catch(err => console.error('Grid sync error (reopen):', err));
+        }
+      }
     }
 
     res.json(rows[0]);

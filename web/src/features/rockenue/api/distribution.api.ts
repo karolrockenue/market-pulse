@@ -41,6 +41,10 @@ export function createTask(data: Partial<CrmTask> & { created_by?: string }): Pr
   return api(`${BASE}/tasks`, { method: "POST", body: JSON.stringify(data) });
 }
 
+export function createTasksBulk(tasks: (Partial<CrmTask> & { created_by?: string })[]): Promise<{ created: number; tasks: CrmTask[]; batch_id: string }> {
+  return api(`${BASE}/tasks/bulk`, { method: "POST", body: JSON.stringify({ tasks }) });
+}
+
 export function updateTask(id: number, data: Record<string, unknown>): Promise<CrmTask> {
   return api(`${BASE}/tasks/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }

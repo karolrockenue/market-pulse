@@ -60,7 +60,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 3002,
     open: true,
     // Proxy API requests to the Vercel deployment to avoid CORS issues during local development.
     // Proxy API requests to the local backend server to avoid CORS issues during development.

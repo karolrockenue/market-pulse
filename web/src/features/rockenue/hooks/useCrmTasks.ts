@@ -28,6 +28,12 @@ export function useCrmTasks(initialFilters?: TaskFilters) {
     return task;
   }, [load]);
 
+  const createTasksBulk = useCallback(async (tasks: Parameters<typeof api.createTask>[0][]) => {
+    const result = await api.createTasksBulk(tasks);
+    await load();
+    return result;
+  }, [load]);
+
   const updateTask = useCallback(async (id: number, data: Record<string, unknown>) => {
     // Optimistic update for status changes
     if (data.status) {
@@ -53,5 +59,5 @@ export function useCrmTasks(initialFilters?: TaskFilters) {
     }
   }, [load]);
 
-  return { tasks, loading, error, filters, setFilters, createTask, updateTask, deleteTask, refresh: load };
+  return { tasks, loading, error, filters, setFilters, createTask, createTasksBulk, updateTask, deleteTask, refresh: load };
 }

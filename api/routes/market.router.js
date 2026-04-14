@@ -423,4 +423,16 @@ router.get('/profile/neighbourhoods', requireAdminApi, async (req, res) => {
   }
 });
 
+router.get('/profile/yoy', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileYoy(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/yoy:', err);
+    res.status(500).json({ error: 'Failed to fetch YoY profile.' });
+  }
+});
+
 module.exports = router;
