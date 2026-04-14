@@ -50,8 +50,10 @@
             "recharts": "^2.15.2",
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
+            "topojson-client": "^3.1.0",
             "vaul": "^1.1.2",
             "vite": "6.3.5",
+            "world-atlas": "^2.0.2",
             "xlsx": "^0.18.5"
       },
       "devDependencies": {

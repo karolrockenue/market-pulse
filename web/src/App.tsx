@@ -35,6 +35,7 @@ import { HotelRateWindow } from "./features/sentinel/components/HotelRateWindow/
 import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
 import { ShreejiDeck } from "./components/ShreejiDeck";
+import { DeckV2 } from "./components/DeckV2";
 import { MarketProfile } from "./components/MarketProfile";
 import { MarketVeil } from "./components/MarketVeil";
 import { ArchanesInvestorView } from "./features/market-intel/components/ArchanesInvestorView";
@@ -637,6 +638,12 @@ export default function App() {
     );
   }
 
+  if (activeView === "deckV2") {
+    return (
+      <DeckV2 onBack={() => setActiveView(previousView || "dashboard")} />
+    );
+  }
+
   return (
     activeView && (
       // [MODIFIED] Wrap the entire app content with ActionListProvider (ErrorBoundary moved to main.tsx)
@@ -847,15 +854,25 @@ export default function App() {
             activeView === "distribution" ||
             activeView === "crm" ||
             activeView === "channelPricing" ||
-            activeView === "rockenueWebV1" ||
-            activeView === "rockenueWebV1_1" ||
-            activeView === "rockenueWebV1_2" ||
-            activeView === "rockenueWebV1_3" ||
-            activeView === "rockenueWebV1_4" ||
-            activeView === "rockenueWebV1_7") && (
+            activeView === "emailSignatures" ||
+            activeView === "canvas" ||
+            activeView === "mpConcept" ||
+            activeView === "mpConcept2" ||
+            activeView === "mpDash2" ||
+            activeView === "mpDash3" ||
+            activeView === "mpDash4" ||
+            activeView === "mpReportsHub" ||
+            activeView === "mpDemandRadar" ||
+            activeView === "mpCompsetIntel" ||
+            activeView === "mpCompsetView" ||
+            activeView === "mpMyRates" ||
+            activeView === "mpCrmBoard" ||
+            activeView === "mpRiskOverview" ||
+            activeView === "mpControlPanel") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
+              userName={userInfo?.firstName || "User"}
             />
           )}
           </>

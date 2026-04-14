@@ -1063,6 +1063,404 @@ SELECT
     return rows;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // YoY PERFORMANCE — Connected-hotels DB (not scrape data)
+  //
+  // STATUS (2026-04-11): Dormant. The frontend no longer renders this
+  // layer because our London cohort (~13 hotels after exclusions) is too
+  // small and biased toward budget/economy properties to stand up as a
+  // "London market" YoY signal — investors would reasonably push back.
+  // Route `/api/market/profile/yoy` still exists and still works; the UI
+  // component was removed. Resurrect when either (a) the connected-hotel
+  // footprint grows wide enough to look like a real market sample, or
+  // (b) we build a scrape-sourced YoY from booking.com with 12+ months
+  // of history.
+  //
+  // Like-for-like methodology:
+  //  - Cohort = hotels in the city whose go_live_date is at least 14 months
+  //    before today (so they have data for the trailing-month comparison +
+  //    a 2-month ramp-up buffer on the prior year side).
+  //  - Aggregation = sum-of-totals (Σ revenue / Σ room_nights_sold, etc.),
+  //    which naturally weights by hotel size and avoids average-of-% bias.
+  //  - Hero tiles report a 5-hotel cohort gate; below 5, the endpoint still
+  //    returns real data but the frontend draws a locked overlay.
+  //  - Forward 60-day pace: this year's curve comes from daily_metrics_snapshots;
+  //    prior year's curve is reconstructed from the reservations ledger by
+  //    replaying bookings that existed on (today − 1 year) because
+  //    pacing_snapshots only started collecting in late 2025.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static async getProfileYoy(city) {
+    const citySlug = slugify(city);
+
+    // Hotels intentionally excluded from market YoY aggregation.
+    // These are still counted in `totalConnected` but dropped from every
+    // computed number (hero tiles, monthly bars, pace, contributor list).
+    //
+    //   2400  Astor Victoria — 186 rooms, ~33% of cohort capacity on its
+    //         own and operates near its rate floor, which distorts the
+    //         aggregate ADR trend away from the rest of the cohort.
+    //   230719 Jubilee Victoria — room-type restructuring in Cloudbeds
+    //         wiped historical revenue rows, producing a +66.7% LY/TY
+    //         occupancy jump that isn't a real market signal.
+    //   315428 Vilenza — same room-type restructuring issue; LY capacity
+    //         under-counted produced an impossible 107% LY occupancy and
+    //         a fake +29.7% ADR delta.
+    //   318313 Duke Rooms London — capacity changed between years (10
+    //         rooms → 9), so it's not truly same-store even after the
+    //         90%-of-total-rooms stable-capacity filter lets it through.
+    const EXCLUDED_HOTEL_IDS = new Set([2400, 230719, 315428, 318313]);
+
+    // ── 1. Reporting cohort (frontend gate + display list) ────────────────
+    // Hotels live ≥14 months so they have coverage for current-month / YTD
+    // comparisons. This is the number the frontend uses for the 5-hotel gate
+    // and displays as "N hotels, 12 mo cohort".
+    const cohortSql = `
+      SELECT hotel_id, property_name, total_rooms, go_live_date
+      FROM hotels
+      WHERE LOWER(city) = LOWER($1)
+        AND go_live_date IS NOT NULL
+        AND go_live_date <= CURRENT_DATE - INTERVAL '14 months'
+        AND hotel_id <> ALL($2::int[])
+      ORDER BY property_name
+    `;
+    const totalConnectedSql = `
+      SELECT COUNT(*)::int AS n FROM hotels WHERE LOWER(city) = LOWER($1)
+    `;
+    const excludedIds = Array.from(EXCLUDED_HOTEL_IDS);
+    const [cohortRes, totalRes] = await Promise.all([
+      db.query(cohortSql, [citySlug, excludedIds]),
+      db.query(totalConnectedSql, [citySlug]),
+    ]);
+    const cohortIds = cohortRes.rows.map((r) => r.hotel_id);
+    const cohortHotels = cohortRes.rows.map((r) => ({
+      hotel_id: r.hotel_id,
+      property_name: r.property_name,
+      total_rooms: r.total_rooms,
+      go_live_date: r.go_live_date,
+    }));
+    const cohortSize = cohortIds.length;
+    const totalConnected = totalRes.rows[0]?.n || 0;
+    const asOf = new Date().toISOString().slice(0, 10);
+
+    // If the cohort is empty the frontend will show the locked overlay,
+    // but we still want to return a valid (empty) shape rather than 500.
+    if (cohortSize === 0) {
+      return {
+        cohortSize: 0,
+        totalConnected,
+        asOf,
+        cohortHotels: [],
+        thisMonth: MarketService._emptyBucket(),
+        ytd: MarketService._emptyBucket(),
+        monthly: [],
+        forwardPace: [],
+      };
+    }
+
+    // ── 2. Aggregated same-store sums for an arbitrary date window ─────────
+    // Takes an explicit cohort — the caller decides which hotels qualify for
+    // a particular comparison window, so TY and LY always use the same set.
+    // Uses gross_revenue to match the market-wide ADR/RevPAR convention used
+    // elsewhere in this service (see getMarketTrends & neighbourhood queries).
+    //
+    // `capacity_count >= total_rooms * 0.9` excludes days when a hotel was
+    // ramping inventory, mid-refurb, or otherwise operating below its mature
+    // footprint. Without this, a hotel that had 30 of 60 rooms live in May
+    // 2024 and all 60 live in May 2025 would show a ~2× revenue jump that
+    // has nothing to do with rate or occupancy performance.
+    const aggregateWindow = async (cohort, start, end) => {
+      if (cohort.length === 0) {
+        return { rooms: 0, cap: 0, rev: 0, occ: 0, adr: 0, revpar: 0 };
+      }
+      const sql = `
+        SELECT
+          COALESCE(SUM(dms.rooms_sold), 0)::bigint     AS rooms_sold,
+          COALESCE(SUM(dms.capacity_count), 0)::bigint AS capacity,
+          COALESCE(SUM(dms.gross_revenue), 0)::numeric AS revenue
+        FROM daily_metrics_snapshots dms
+        JOIN hotels h ON h.hotel_id = dms.hotel_id
+        WHERE dms.hotel_id = ANY($1::int[])
+          AND dms.stay_date >= $2::date
+          AND dms.stay_date <= $3::date
+          AND dms.stay_date >= h.go_live_date
+          AND dms.capacity_count >= (h.total_rooms * 0.9)
+      `;
+      const { rows } = await db.query(sql, [cohort, start, end]);
+      const r = rows[0] || {};
+      const rooms = Number(r.rooms_sold) || 0;
+      const cap = Number(r.capacity) || 0;
+      const rev = Number(r.revenue) || 0;
+      return {
+        rooms,
+        cap,
+        rev,
+        occ: cap > 0 ? (rooms / cap) * 100 : 0,
+        adr: rooms > 0 ? rev / rooms : 0,
+        revpar: cap > 0 ? rev / cap : 0,
+      };
+    };
+
+    // ── 2b. Per-hotel breakdown for a window ───────────────────────────────
+    // Returns one row per hotel so the UI can show which properties drive
+    // the aggregate. Applies the same same-store filters as aggregateWindow.
+    const perHotelWindow = async (cohort, start, end) => {
+      if (cohort.length === 0) return new Map();
+      const sql = `
+        SELECT
+          dms.hotel_id,
+          h.property_name,
+          h.total_rooms,
+          COALESCE(SUM(dms.rooms_sold), 0)::bigint     AS rooms_sold,
+          COALESCE(SUM(dms.capacity_count), 0)::bigint AS capacity,
+          COALESCE(SUM(dms.gross_revenue), 0)::numeric AS revenue
+        FROM daily_metrics_snapshots dms
+        JOIN hotels h ON h.hotel_id = dms.hotel_id
+        WHERE dms.hotel_id = ANY($1::int[])
+          AND dms.stay_date >= $2::date
+          AND dms.stay_date <= $3::date
+          AND dms.stay_date >= h.go_live_date
+          AND dms.capacity_count >= (h.total_rooms * 0.9)
+        GROUP BY dms.hotel_id, h.property_name, h.total_rooms
+      `;
+      const { rows } = await db.query(sql, [cohort, start, end]);
+      const m = new Map();
+      for (const r of rows) {
+        const rooms = Number(r.rooms_sold) || 0;
+        const cap = Number(r.capacity) || 0;
+        const rev = Number(r.revenue) || 0;
+        m.set(r.hotel_id, {
+          hotel_id: r.hotel_id,
+          property_name: r.property_name,
+          total_rooms: r.total_rooms,
+          rooms, cap, rev,
+          occ: cap > 0 ? (rooms / cap) * 100 : 0,
+          adr: rooms > 0 ? rev / rooms : 0,
+          revpar: cap > 0 ? rev / cap : 0,
+        });
+      }
+      return m;
+    };
+
+    // ── 3. Per-window cohort: hotels live & mature as of the LY window ─────
+    // Adds a 3-month ramp buffer on top of "live on date X" — a hotel that
+    // went live 10 days before the LY window start almost certainly had
+    // partial inventory during that window, so we exclude it until it's been
+    // live long enough to be a steady state operator. Also drops the
+    // explicitly-excluded hotels so the aggregation stays consistent.
+    const cohortAsOf = async (asOfDate) => {
+      const sql = `
+        SELECT hotel_id FROM hotels
+        WHERE LOWER(city) = LOWER($1)
+          AND go_live_date IS NOT NULL
+          AND go_live_date <= ($2::date - INTERVAL '3 months')
+          AND hotel_id <> ALL($3::int[])
+      `;
+      const { rows } = await db.query(sql, [citySlug, asOfDate, excludedIds]);
+      return rows.map((r) => r.hotel_id);
+    };
+
+    // ── 4. Date helpers ────────────────────────────────────────────────────
+    const today = new Date();
+    const firstOfMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const firstOfMonthLY = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), 1));
+    const yesterday = new Date(today); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayLY = new Date(yesterday); yesterdayLY.setUTCFullYear(yesterdayLY.getUTCFullYear() - 1);
+    const jan1 = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+    const jan1LY = new Date(Date.UTC(today.getUTCFullYear() - 1, 0, 1));
+    const iso = (d) => d.toISOString().slice(0, 10);
+
+    // ── 5. This Month / YTD (compared MTD-to-MTD so April isn't half-empty)─
+    const tmCohort = await cohortAsOf(iso(firstOfMonthLY));
+    const ytdCohort = await cohortAsOf(iso(jan1LY));
+    const [tmTY, tmLY, ytdTY, ytdLY, tmTYPerHotel, tmLYPerHotel] = await Promise.all([
+      aggregateWindow(tmCohort, iso(firstOfMonth), iso(yesterday)),
+      aggregateWindow(tmCohort, iso(firstOfMonthLY), iso(yesterdayLY)),
+      aggregateWindow(ytdCohort, iso(jan1), iso(yesterday)),
+      aggregateWindow(ytdCohort, iso(jan1LY), iso(yesterdayLY)),
+      perHotelWindow(tmCohort, iso(firstOfMonth), iso(yesterday)),
+      perHotelWindow(tmCohort, iso(firstOfMonthLY), iso(yesterdayLY)),
+    ]);
+
+    // Merge TY and LY per-hotel rows into the contributor list the UI
+    // (and anyone inspecting the payload) can use to understand the aggregate.
+    const perHotelContributions = [];
+    for (const hid of tmCohort) {
+      const ty = tmTYPerHotel.get(hid);
+      const ly = tmLYPerHotel.get(hid);
+      if (!ty && !ly) continue;
+      perHotelContributions.push({
+        hotel_id: hid,
+        property_name: (ty || ly).property_name,
+        total_rooms: (ty || ly).total_rooms,
+        ty: ty ? {
+          rooms: ty.rooms, cap: ty.cap, rev: Math.round(ty.rev),
+          occ: Math.round(ty.occ * 10) / 10,
+          adr: Math.round(ty.adr),
+          revpar: Math.round(ty.revpar),
+        } : null,
+        ly: ly ? {
+          rooms: ly.rooms, cap: ly.cap, rev: Math.round(ly.rev),
+          occ: Math.round(ly.occ * 10) / 10,
+          adr: Math.round(ly.adr),
+          revpar: Math.round(ly.revpar),
+        } : null,
+        deltas: ty && ly ? {
+          occ:    MarketService._pctDelta(ty.occ, ly.occ),
+          adr:    MarketService._pctDelta(ty.adr, ly.adr),
+          rev:    MarketService._pctDelta(ty.rev, ly.rev),
+          revpar: MarketService._pctDelta(ty.revpar, ly.revpar),
+        } : null,
+        // Share of the cohort's TY revenue this hotel is responsible for
+        // (lets you see which hotels are weighting the aggregate).
+        revenueShare: ty && tmTY.rev > 0
+          ? Math.round((ty.rev / tmTY.rev) * 1000) / 10
+          : 0,
+      });
+    }
+    perHotelContributions.sort((a, b) => (b.revenueShare || 0) - (a.revenueShare || 0));
+
+    // ── 6. Trailing 12 months — per-month cohort based on each month's LY ──
+    // Earliest month in the trailing window has the strictest eligibility,
+    // so this shrinks as you go further back. That's correct — it's the
+    // price of truly same-store monthly YoY.
+    const monthly = [];
+    for (let i = 11; i >= 0; i--) {
+      const m = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
+      const mEnd = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 0));
+      const mLY = new Date(Date.UTC(m.getUTCFullYear() - 1, m.getUTCMonth(), 1));
+      const mLYEnd = new Date(Date.UTC(mLY.getUTCFullYear(), mLY.getUTCMonth() + 1, 0));
+      const isCurrent = m.getUTCFullYear() === today.getUTCFullYear() && m.getUTCMonth() === today.getUTCMonth();
+      const tyEnd = isCurrent ? yesterday : mEnd;
+      const lyEnd = isCurrent ? yesterdayLY : mLYEnd;
+      // eslint-disable-next-line no-await-in-loop
+      const monthCohort = await cohortAsOf(iso(mLY));
+      // eslint-disable-next-line no-await-in-loop
+      const [ty, ly] = await Promise.all([
+        aggregateWindow(monthCohort, iso(m), iso(tyEnd)),
+        aggregateWindow(monthCohort, iso(mLY), iso(lyEnd)),
+      ]);
+      monthly.push({
+        month: m.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }).replace(" ", " '"),
+        cohortSize:  monthCohort.length,
+        occDelta:    MarketService._pctDelta(ty.occ, ly.occ),
+        adrDelta:    MarketService._pctDelta(ty.adr, ly.adr),
+        revDelta:    MarketService._pctDelta(ty.rev, ly.rev),
+        revparDelta: MarketService._pctDelta(ty.revpar, ly.revpar),
+      });
+    }
+
+    // ── 7. Forward 60-day pace ─────────────────────────────────────────────
+    const pace = await MarketService._getForwardPace(cohortIds, citySlug);
+
+    return {
+      cohortSize,
+      totalConnected,
+      asOf,
+      cohortHotels,
+      thisMonth: MarketService._toBucket(tmTY, tmLY),
+      thisMonthCohort: tmCohort.length,
+      ytd: MarketService._toBucket(ytdTY, ytdLY),
+      ytdCohort: ytdCohort.length,
+      monthly,
+      forwardPace: pace,
+      perHotelContributions,
+    };
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  static _pctDelta(ty, ly) {
+    if (!ly || ly === 0) return 0;
+    return Math.round(((ty - ly) / ly) * 1000) / 10;
+  }
+
+  static _toBucket(ty, ly) {
+    return {
+      occ:    { value: Math.round(ty.occ * 10) / 10,    delta: MarketService._pctDelta(ty.occ, ly.occ) },
+      adr:    { value: Math.round(ty.adr),              delta: MarketService._pctDelta(ty.adr, ly.adr) },
+      rev:    { value: Math.round(ty.rev),              delta: MarketService._pctDelta(ty.rev, ly.rev) },
+      revpar: { value: Math.round(ty.revpar),           delta: MarketService._pctDelta(ty.revpar, ly.revpar) },
+    };
+  }
+
+  static _emptyBucket() {
+    return {
+      occ:    { value: 0, delta: 0 },
+      adr:    { value: 0, delta: 0 },
+      rev:    { value: 0, delta: 0 },
+      revpar: { value: 0, delta: 0 },
+    };
+  }
+
+  static async _getForwardPace(cohortIds, _citySlug) {
+    if (cohortIds.length === 0) return [];
+
+    // This year — current OTB for the next 60 nights. Uses the same stable
+    // capacity filter as the main aggregation so occupancy is comparable.
+    const tySql = `
+      SELECT dms.stay_date,
+             COALESCE(SUM(dms.rooms_sold), 0)::bigint     AS rooms_sold,
+             COALESCE(SUM(dms.capacity_count), 0)::bigint AS capacity
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON h.hotel_id = dms.hotel_id
+      WHERE dms.hotel_id = ANY($1::int[])
+        AND dms.stay_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '59 days'
+        AND dms.capacity_count >= (h.total_rooms * 0.9)
+      GROUP BY dms.stay_date
+      ORDER BY dms.stay_date
+    `;
+
+    // Last year — actualized occupancy for the equivalent 60 nights shifted
+    // back 1 year. This is NOT a point-in-time OTB comparison (the
+    // reservations table is a 90-day rolling window so we can't replay
+    // historical pace), it's "how did last year's equivalent window end up
+    // once everything was booked". Still useful: it tells the investor
+    // whether our current OTB is catching up to, matching, or lagging last
+    // year's actual result.
+    const lySql = `
+      SELECT dms.stay_date,
+             COALESCE(SUM(dms.rooms_sold), 0)::bigint     AS rooms_sold,
+             COALESCE(SUM(dms.capacity_count), 0)::bigint AS capacity
+      FROM daily_metrics_snapshots dms
+      JOIN hotels h ON h.hotel_id = dms.hotel_id
+      WHERE dms.hotel_id = ANY($1::int[])
+        AND dms.stay_date BETWEEN (CURRENT_DATE - INTERVAL '1 year')
+                              AND (CURRENT_DATE - INTERVAL '1 year' + INTERVAL '59 days')
+        AND dms.capacity_count >= (h.total_rooms * 0.9)
+      GROUP BY dms.stay_date
+      ORDER BY dms.stay_date
+    `;
+
+    const [tyRes, lyRes] = await Promise.all([
+      db.query(tySql, [cohortIds]),
+      db.query(lySql, [cohortIds]),
+    ]);
+
+    const isoDate = (d) => (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
+    const tyByDate = new Map(tyRes.rows.map((r) => [isoDate(r.stay_date), r]));
+    const lyByDate = new Map(lyRes.rows.map((r) => [isoDate(r.stay_date), r]));
+
+    // Merge day-by-day. LY rows are keyed by their actual date (a year ago),
+    // so we look them up by constructing the equivalent calendar day.
+    const out = [];
+    for (let i = 0; i < 60; i++) {
+      const tyDate = new Date(); tyDate.setUTCDate(tyDate.getUTCDate() + i);
+      const lyDate = new Date(tyDate); lyDate.setUTCFullYear(lyDate.getUTCFullYear() - 1);
+      const tyRow = tyByDate.get(isoDate(tyDate)) || { rooms_sold: 0, capacity: 0 };
+      const lyRow = lyByDate.get(isoDate(lyDate)) || { rooms_sold: 0, capacity: 0 };
+      const tyOcc = Number(tyRow.capacity) > 0 ? (Number(tyRow.rooms_sold) / Number(tyRow.capacity)) * 100 : 0;
+      const lyOcc = Number(lyRow.capacity) > 0 ? (Number(lyRow.rooms_sold) / Number(lyRow.capacity)) * 100 : 0;
+      out.push({
+        day: i,
+        dateLabel: tyDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+        thisYear: Math.round(tyOcc * 10) / 10,
+        lastYear: Math.round(lyOcc * 10) / 10,
+      });
+    }
+    return out;
+  }
+
   // ── PredictHQ Events ──
 
   static async getPredictHQEvents(citySlug) {

@@ -372,35 +372,40 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
     } else if (pmsType === "mews") {
       console.log(`[Admin Sync] Syncing info for Mews hotel: ${propertyId}`);
 
-      // --- This is the new logic for Mews ---
-      // 1. Get Mews credentials from the database.
-      const credsResult = await client.query(
-        "SELECT pms_credentials FROM user_properties WHERE property_id = $1 LIMIT 1",
+      // Mews credentials live on hotels.pms_credentials (same source the
+      // rest of the system — daily-refresh, sentinel, mewsAdapter — uses).
+      // The shared ClientToken comes from env, not the DB.
+      const hotelCredsRow = await client.query(
+        "SELECT pms_credentials FROM hotels WHERE hotel_id = $1",
         [propertyId]
       );
-      const mewsCredentials = credsResult.rows[0]?.pms_credentials;
-      if (
-        !mewsCredentials ||
-        !mewsCredentials.clientToken ||
-        !mewsCredentials.accessToken
-      ) {
+      const storedMewsCreds = hotelCredsRow.rows[0]?.pms_credentials;
+      if (!storedMewsCreds || !storedMewsCreds.accessToken) {
         throw new Error(
-          `Could not find valid Mews credentials for property ${propertyId}.`
+          `Could not find Mews accessToken on hotels.pms_credentials for property ${propertyId}.`
         );
       }
+      if (!process.env.MEWS_CLIENT_TOKEN) {
+        throw new Error(
+          "MEWS_CLIENT_TOKEN is not set in environment variables."
+        );
+      }
+      const mewsCredentials = {
+        clientToken: process.env.MEWS_CLIENT_TOKEN,
+        accessToken: storedMewsCreds.accessToken,
+        client: "Rockenue MarketPulse 1.0.0",
+      };
 
-      // 2. Call the Mews adapter to get the latest hotel details.
       const hotelDetails = await mewsAdapter.getHotelDetails(mewsCredentials);
 
-      // 3. Construct and run the UPDATE query to save the details to our database.
       const updateQuery = `
         UPDATE hotels
-        SET 
-          property_name = $1, 
-          city = $2, 
-          currency_code = $3, 
-          latitude = $4, 
-          longitude = $5, 
+        SET
+          property_name = $1,
+          city = $2,
+          currency_code = $3,
+          latitude = $4,
+          longitude = $5,
           timezone = $6
         WHERE hotel_id = $7;
       `;
@@ -413,15 +418,12 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
         hotelDetails.timezone,
         propertyId,
       ]);
-      // 4. Look up and save the neighborhood, reusing the same function as Cloudbeds.
+
       if (hotelDetails.latitude && hotelDetails.longitude) {
-        // We can use the cloudbedsAdapter for this because it's a generic coordinate lookup.
         const neighborhood = await cloudbedsAdapter.getNeighborhoodFromCoords(
           hotelDetails.latitude,
           hotelDetails.longitude
         );
-
-        // If a neighborhood was found, save it to the database.
         if (neighborhood) {
           await client.query(
             "UPDATE hotels SET neighborhood = $1 WHERE hotel_id = $2",
@@ -429,11 +431,48 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
           );
         }
       }
+
+      // Mews total_rooms uses getResourceCount (same helper as onboarding).
+      // Best-effort: a failure here must not roll back the hotel-details update.
+      try {
+        const serviceId = storedMewsCreds.serviceId;
+        const timezone = storedMewsCreds.timezone || hotelDetails.timezone;
+        if (!serviceId) {
+          throw new Error(
+            "Missing serviceId on hotels.pms_credentials; cannot compute resource count."
+          );
+        }
+        const mewsTotalRooms = await mewsAdapter.getResourceCount(
+          mewsCredentials,
+          serviceId,
+          timezone
+        );
+        if (mewsTotalRooms > 0) {
+          await client.query(
+            "UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2",
+            [mewsTotalRooms, propertyId]
+          );
+          console.log(
+            `[Admin Sync] Mews: set total_rooms to ${mewsTotalRooms} for hotel ${propertyId}.`
+          );
+        } else {
+          console.warn(
+            `[Admin Sync] Mews: getResourceCount returned 0 for hotel ${propertyId}; leaving total_rooms unchanged.`
+          );
+        }
+      } catch (mewsRoomsErr) {
+        console.error(
+          `[Admin Sync] Mews: failed to update total_rooms for hotel ${propertyId}: ${mewsRoomsErr.message}`
+        );
+      }
     } else {
       // Handle cases where the PMS type is unknown or not supported yet.
       throw new Error(`Sync logic not implemented for PMS type: '${pmsType}'`);
     }
     // --- [NEW] Calculate and save Total Rooms ---
+    // Cloudbeds only — the Mews branch above handles total_rooms inline via
+    // mewsAdapter.getResourceCount, matching the onboarding flow.
+    if (pmsType === "cloudbeds") {
     // We re-use the logic from the backfill endpoint within this transaction.
     console.log(
       `[Admin Sync] Now calculating total rooms for hotel: ${propertyId}`
@@ -497,6 +536,7 @@ router.post("/sync-hotel-info", requireAdminApi, async (req, res) => {
         `[Admin Sync] FAILED to update total_rooms for hotel ${propertyId}: ${roomError.message}`
       );
     }
+    } // end cloudbeds-only total_rooms block
     // --- [END NEW] ---
 
     // If all operations were successful, commit the transaction.

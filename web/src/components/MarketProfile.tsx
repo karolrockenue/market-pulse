@@ -106,17 +106,9 @@ export function MarketProfile() {
   const [seasonal, setSeasonal] = useState<any[]>([]);
   const [absorptionDow, setAbsorptionDow] = useState<any[]>([]);
   const [priceMovement, setPriceMovement] = useState<any[]>([]);
-  const [absorptionDate, setAbsorptionDate] = useState<any[]>([]);
   const [compression, setCompression] = useState<any[]>([]);
   const [neighbourhoods, setNeighbourhoods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Pick a recent Saturday for single-date absorption
-  const targetDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7) + 7); // next Saturday + 1 week
-    return d.toISOString().split("T")[0];
-  }, []);
 
   // ─── Fetch all data in parallel ───
   useEffect(() => {
@@ -127,22 +119,20 @@ export function MarketProfile() {
       fetch(`${base}/seasonal?city=${city}`).then((r) => r.json()),
       fetch(`${base}/absorption-dow?city=${city}`).then((r) => r.json()),
       fetch(`${base}/price-movement?city=${city}`).then((r) => r.json()),
-      fetch(`${base}/absorption-date?city=${city}&date=${targetDate}`).then((r) => r.json()),
       fetch(`${base}/compression?city=${city}`).then((r) => r.json()),
       fetch(`${base}/neighbourhoods?city=${city}`).then((r) => r.json()),
     ])
-      .then(([ov, sea, absDow, pm, absDate, comp, neigh]) => {
+      .then(([ov, sea, absDow, pm, comp, neigh]) => {
         setOverview(ov);
         setSeasonal(Array.isArray(sea) ? sea : []);
         setAbsorptionDow(Array.isArray(absDow) ? absDow : []);
         setPriceMovement(Array.isArray(pm) ? pm : []);
-        setAbsorptionDate(Array.isArray(absDate) ? absDate : []);
         setCompression(Array.isArray(comp) ? comp : []);
         setNeighbourhoods(Array.isArray(neigh) ? neigh : []);
       })
       .catch((err) => console.error("MarketProfile fetch error:", err))
       .finally(() => setLoading(false));
-  }, [city, targetDate]);
+  }, [city]);
 
   // ─── Transform data for charts ───
 
@@ -193,16 +183,6 @@ export function MarketProfile() {
       supply: Number(r.avg_supply),
     })).sort((a, b) => a._sort - b._sort);
   }, [priceMovement]);
-
-  // Single date absorption
-  const absorptionCurve = useMemo(() => {
-    return absorptionDate.map((r) => ({
-      label: `${r.days_out}d`,
-      days: Number(r.days_out),
-      supply: Number(r.total_results),
-      wap: Number(r.weighted_avg_price),
-    })).sort((a, b) => a.days - b.days);
-  }, [absorptionDate]);
 
   // Compression
   const compressionData = useMemo(() => {
@@ -258,7 +238,8 @@ export function MarketProfile() {
           </select>
         </div>
 
-        {/* ─── ROW 1: City KPIs ─── */}
+
+        {/* ─── ROW 1: City KPIs (scrape-sourced market structure) ─── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "12px", marginBottom: "24px" }}>
           {[
             { label: "Total Listed Properties", value: kpis.avg_supply ? Math.round(kpis.avg_supply).toLocaleString() : "--", color: WHITE },
@@ -276,32 +257,8 @@ export function MarketProfile() {
           ))}
         </div>
 
-        {/* ─── ROW 2: Market Composition + Accommodation Map ─── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "16px", marginBottom: "24px" }}>
-          {/* Property types */}
-          <div style={cardPad}>
-            <div style={sectionLabel}>MARKET COMPOSITION</div>
-            <h3 style={sectionTitle}>Property Types</h3>
-            <p style={sectionSub}>{totalProps.toLocaleString()} total listed properties</p>
-            <div style={{ marginTop: "16px" }}>
-              {propertyTypes.map((t) => {
-                const pct = ((t.count / totalProps) * 100).toFixed(1);
-                return (
-                  <div key={t.type} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-                    <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: t.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: "13px", color: GRAY, flex: 1 }}>{t.type}</span>
-                    <span style={{ fontSize: "13px", color: WHITE, fontWeight: 500, width: "50px", textAlign: "right" }}>{t.count}</span>
-                    <div style={{ width: "100px", height: "8px", backgroundColor: INPUT_BG, borderRadius: "4px", overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", backgroundColor: t.color, borderRadius: "4px" }} />
-                    </div>
-                    <span style={{ fontSize: "11px", color: DIM, width: "36px", textAlign: "right" }}>{pct}%</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Accommodation Map */}
+        {/* ─── ROW 2: Accommodation Map (full-width hero) ─── */}
+        <div style={{ marginBottom: "24px" }}>
           <div style={card}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
               <div style={sectionLabel}>ACCOMMODATION SUPPLY</div>
@@ -365,54 +322,7 @@ export function MarketProfile() {
           </div>
         </div>
 
-        {/* ─── ROW 4: Single-Date Absorption + Star Rating Snapshot ─── */}
-        <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: "16px", marginBottom: "24px" }}>
-          <div style={card}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
-              <div style={sectionLabel}>ABSORPTION CURVE</div>
-              <h3 style={sectionTitle}>{new Date(targetDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</h3>
-              <p style={sectionSub}>Supply and pricing from first scrape to arrival</p>
-            </div>
-            <div style={{ padding: "16px 20px", height: "280px" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={absorptionCurve} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="label" stroke="#6b7280" fontSize={9} tickLine={false} interval={Math.max(1, Math.floor(absorptionCurve.length / 15))} />
-                  <YAxis yAxisId="left" stroke="#6b7280" fontSize={10} tickLine={false} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#6b7280" fontSize={10} tickLine={false} unit={curr} />
-                  <Tooltip {...tooltipStyle} />
-                  <Area yAxisId="left" type="monotone" dataKey="supply" stroke={BLUE} strokeWidth={2} fill={BLUE} fillOpacity={0.1} name="Supply" />
-                  <Line yAxisId="right" type="monotone" dataKey="wap" stroke={AMBER} strokeWidth={2} dot={false} name={`WAP (${curr})`} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Star Rating Snapshot (mock data) */}
-          <div style={cardPad}>
-            <div style={sectionLabel}>SUPPLY COMPOSITION</div>
-            <h3 style={sectionTitle}>Star Rating Breakdown</h3>
-            <p style={sectionSub}>Current supply distribution by hotel classification</p>
-            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
-              {MOCK_STAR_RATINGS.map((s) => (
-                <div key={s.label}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-                    <span style={{ fontSize: "13px", color: WHITE }}>{s.label}</span>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
-                      <span style={{ fontSize: "13px", color: WHITE, fontWeight: 500 }}>{s.count.toLocaleString()}</span>
-                      <span style={{ fontSize: "11px", color: DIM }}>{s.pct}%</span>
-                    </div>
-                  </div>
-                  <div style={{ width: "100%", height: "8px", backgroundColor: INPUT_BG, borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${s.pct}%`, height: "100%", backgroundColor: s.color, borderRadius: "4px" }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ─── ROW 4b: Price Distribution Histogram (mock data) ─── */}
+        {/* ─── ROW 4: Price Distribution Histogram (mock data) ─── */}
         <div style={{ marginBottom: "24px" }}>
           <div style={card}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
@@ -496,7 +406,60 @@ export function MarketProfile() {
           </div>
         </div>
 
-        {/* ─── ROW 6: ADR Seasonality Heatmap (mock data — will use daily_metrics_snapshots) ─── */}
+        {/* ─── ROW 6: Market Structure (compact — Property Types + Star Rating) ─── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+          {/* Property types — compact horizontal bars */}
+          <div style={cardPad}>
+            <div style={sectionLabel}>MARKET COMPOSITION</div>
+            <h3 style={sectionTitle}>Property Types</h3>
+            <p style={sectionSub}>{totalProps.toLocaleString()} total listed properties</p>
+            <div style={{ marginTop: "14px" }}>
+              {propertyTypes.length === 0 ? (
+                <div style={{ padding: "18px 0", color: DIM, fontSize: "12px", textAlign: "center" }}>
+                  Insufficient diversity in this market — city-level supply too thin for a meaningful breakdown.
+                </div>
+              ) : propertyTypes.map((t) => {
+                const pct = ((t.count / totalProps) * 100).toFixed(1);
+                return (
+                  <div key={t.type} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: t.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: "12px", color: GRAY, flex: 1 }}>{t.type}</span>
+                    <span style={{ fontSize: "12px", color: WHITE, fontWeight: 500, width: "46px", textAlign: "right" }}>{t.count}</span>
+                    <div style={{ width: "80px", height: "6px", backgroundColor: INPUT_BG, borderRadius: "3px", overflow: "hidden" }}>
+                      <div style={{ width: `${pct}%`, height: "100%", backgroundColor: t.color, borderRadius: "3px" }} />
+                    </div>
+                    <span style={{ fontSize: "10px", color: DIM, width: "32px", textAlign: "right" }}>{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Star Rating Breakdown — compact */}
+          <div style={cardPad}>
+            <div style={sectionLabel}>SUPPLY COMPOSITION</div>
+            <h3 style={sectionTitle}>Star Rating Breakdown</h3>
+            <p style={sectionSub}>Distribution by hotel classification</p>
+            <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              {MOCK_STAR_RATINGS.map((s) => (
+                <div key={s.label}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "12px", color: WHITE }}>{s.label}</span>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
+                      <span style={{ fontSize: "12px", color: WHITE, fontWeight: 500 }}>{s.count.toLocaleString()}</span>
+                      <span style={{ fontSize: "10px", color: DIM }}>{s.pct}%</span>
+                    </div>
+                  </div>
+                  <div style={{ width: "100%", height: "6px", backgroundColor: INPUT_BG, borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ width: `${s.pct}%`, height: "100%", backgroundColor: s.color, borderRadius: "3px" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── ROW 7: ADR Seasonality Heatmap (mock data — will use daily_metrics_snapshots) ─── */}
         <div style={{ marginBottom: "24px" }}>
           <div style={cardPad}>
             <div style={sectionLabel}>SEASONALITY</div>

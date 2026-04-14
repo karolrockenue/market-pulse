@@ -1029,7 +1029,9 @@ created_at
 
 Sentinel reads from / relies on:
 
-hotels (includes is_disconnected BOOLEAN — soft disconnect flag, added April 2026)
+hotels (includes is_disconnected BOOLEAN — soft disconnect flag, added April 2026; locked_years JSONB — see below)
+
+**`hotels.locked_years` is a SOFT lock.** JSONB array of year strings (e.g. `["2024","2025"]`) set by historical import scripts (`scripts/import-daily-history.js`, `scripts/import-monthly-history.js`, `scripts/rescale-shreeji-history.js`) to protect hand-imported historical `daily_metrics_snapshots` from being overwritten on re-sync. Only `initial-sync.js:50` honors it — that path will skip deletion of the listed years. **`webhooks.router.js` and `daily-refresh.js` do NOT check `locked_years`**, so a retroactive Cloudbeds/Mews webhook modification for a stay_date inside a locked year will still mutate the row via the `+= delta` pattern in `webhooks.router.js:278-283`. In practice rare (webhooks fire on new reservations, not retroactive past-date edits), but worth knowing before trusting the lock as absolute. If airtight protection is ever needed, add a `locked_years` guard to the webhook upsert.
 
 users
 

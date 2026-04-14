@@ -30,6 +30,15 @@ interface Listing {
   price: number;
 }
 
+interface ScrapeRecord {
+  scrape_date: string;
+  started_at: string;
+  finished_at: string;
+  dates_scraped: number;
+  avg_listings: number;
+  avg_price: number;
+}
+
 interface RegistryProperty {
   property_id: string;
   name: string;
@@ -67,15 +76,17 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
   const [data, setData] = useState<SnapshotRow[]>([]);
   const [topListings, setTopListings] = useState<Listing[]>([]);
   const [registry, setRegistry] = useState<RegistryProperty[]>([]);
+  const [scrapeHistory, setScrapeHistory] = useState<ScrapeRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [availRes, regRes] = await Promise.all([
+        const [availRes, regRes, histRes] = await Promise.all([
           fetch(`${API_BASE}/api/market/airbnb-availability?citySlug=${citySlug}`, { credentials: "include" }),
           fetch(`${API_BASE}/api/market/airbnb-registry?citySlug=${citySlug}`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/market/airbnb-scrape-history?citySlug=${citySlug}`, { credentials: "include" }),
         ]);
 
         if (!availRes.ok) throw new Error("availability fetch failed");
@@ -109,6 +120,11 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
             });
             setRegistry(props);
           }
+        }
+
+        if (histRes.ok) {
+          const histJson = await histRes.json();
+          if (!cancelled) setScrapeHistory(histJson.scrapes || []);
         }
       } catch (err) {
         console.error("AirbnbAvailability fetch error:", err);
@@ -297,6 +313,70 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
           </table>
         </div>
       )}
+      {/* Scrape History Summary */}
+      {scrapeHistory.length > 0 && (
+        <div style={{ ...cardStyle, marginTop: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <div style={{ color: "#e5e5e5", fontSize: "14px", fontWeight: 600 }}>
+              Scrape History
+            </div>
+            <span style={{ color: "#6b7280", fontSize: "12px" }}>
+              Last scrape: {new Date(scrapeHistory[0].scrape_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Date", "Time (UTC)", "Dates Scraped", "Avg Listings", "Avg Price"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: h === "Date" ? "left" : "right",
+                      color: "#6b7280",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "-0.025em",
+                      padding: "8px 12px",
+                      borderBottom: "1px solid #2a2a2a",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {scrapeHistory.map((s, i) => {
+                const isLatest = i === 0;
+                const start = new Date(s.started_at);
+                const end = new Date(s.finished_at);
+                return (
+                  <tr key={s.scrape_date} style={{ borderBottom: "1px solid rgba(42,42,42,0.5)", backgroundColor: isLatest ? "rgba(57, 189, 248, 0.04)" : "transparent" }}>
+                    <td style={{ color: isLatest ? "#39BDF8" : "#e5e5e5", fontSize: "12px", padding: "8px 12px", fontWeight: isLatest ? 600 : 400 }}>
+                      {new Date(s.scrape_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      {isLatest && <span style={{ color: "#39BDF8", fontSize: "10px", marginLeft: "6px", fontWeight: 400 }}>latest</span>}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 12px", textAlign: "right" }}>
+                      {start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} – {end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 12px", textAlign: "right" }}>
+                      {s.dates_scraped}
+                    </td>
+                    <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 12px", textAlign: "right" }}>
+                      {s.avg_listings}
+                    </td>
+                    <td style={{ color: "#e5e5e5", fontSize: "12px", padding: "8px 12px", textAlign: "right", fontWeight: 600 }}>
+                      {currencySymbol}{Number(s.avg_price).toFixed(0)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Property Registry */}
       {registry.length > 0 && (
         <div style={{ ...cardStyle, marginTop: "16px" }}>
