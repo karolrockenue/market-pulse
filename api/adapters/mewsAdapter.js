@@ -412,11 +412,23 @@ function buildMewsRateIdMap(ratePlans, resourceCategories) {
 /**
  * Fetches daily occupancy metrics for a date range.
  *
+ * Uses services/getAvailability which returns TRUE sellable rooms per day,
+ * accounting for ALL services (Short Stay, Mid Stay, etc.), out-of-order,
+ * and maintenance blocks. Capacity is derived from a single far-future
+ * availability probe (no bookings = all rooms available).
+ *
+ * occupied = capacity − available  (not reservation counting)
+ *
+ * This fixes multi-service properties (e.g. Westbourne Park) where rooms
+ * blocked by a second Mews service were invisible to the old reservation-
+ * counting approach, causing Sentinel to see ~50% when the hotel was 95% full.
+ *
  * @param {object} credentials
  * @param {string} serviceId - Reservable service UUID
  * @param {string} startDate - YYYY-MM-DD
  * @param {string} endDate - YYYY-MM-DD
  * @param {string} timezone - IANA timezone
+ * @param {number} [cachedCapacity] - Pre-probed capacity to skip redundant API call
  * @returns {Promise<Array>} Array of { date, occupied, available }
  */
 async function getOccupancyMetrics(
@@ -425,8 +437,9 @@ async function getOccupancyMetrics(
   startDate,
   endDate,
   timezone,
+  cachedCapacity,
 ) {
-  // 1. Get capacity via availability endpoint
+  // 1. Get true availability for the requested date range
   const firstUtc = toMewsUtc(startDate, timezone);
   const lastUtc = toMewsUtc(endDate, timezone);
   console.log(`[Mews Availability] Service: ${serviceId} | First: ${firstUtc} | Last: ${lastUtc} | TZ: ${timezone}`);
@@ -440,40 +453,31 @@ async function getOccupancyMetrics(
     },
   );
 
-  // 2. Get confirmed reservations
-  let allReservations = [];
-  let cursor = null;
-
-  do {
-    const payload = {
-      ServiceIds: [serviceId],
-      CollidingUtc: {
-        StartUtc: toMewsUtc(startDate, timezone),
-        EndUtc: toMewsUtc(endDate, timezone),
-      },
-      States: ["Confirmed", "Started", "Processed"],
-      Limitation: { Count: 1000, Cursor: cursor },
-    };
-
-    const resData = await _callMewsApi(
-      "reservations/getAll/2023-06-06",
+  // 2. Get physical capacity (skip probe if caller already has it)
+  let totalCapacity = cachedCapacity || 0;
+  if (!totalCapacity) {
+    const capacityProbeDate = "2027-12-01T00:00:00Z";
+    const capacityProbeEnd = "2027-12-02T00:00:00Z";
+    const capacityData = await _callMewsApi(
+      "services/getAvailability",
       credentials,
-      payload,
+      {
+        ServiceId: serviceId,
+        FirstTimeUnitStartUtc: capacityProbeDate,
+        LastTimeUnitStartUtc: capacityProbeEnd,
+      },
     );
 
-    if (resData.Reservations) {
-      allReservations = allReservations.concat(resData.Reservations);
-    }
-    cursor = resData.Cursor || null;
-  } while (cursor);
+    (capacityData.CategoryAvailabilities || []).forEach((cat) => {
+      totalCapacity += cat.Availabilities?.[0] || 0;
+    });
+  }
+  console.log(`[Mews Capacity] Total physical capacity: ${totalCapacity} rooms`);
 
-  // 3. Build daily metrics
+  // 3. Build daily metrics from availability
   const dailyMetrics = {};
   const timeUnits = availabilityData.TimeUnitStartsUtc || [];
 
-  // Calculate total physical capacity from the first time unit (sum of all adjustments + availabilities)
-  // Mews Availabilities = unsold rooms, so total = available + occupied
-  // We'll set available here and fix it after counting reservations
   timeUnits.forEach((utcStr, index) => {
     const date = new Date(utcStr).toISOString().split("T")[0];
     let availableRooms = 0;
@@ -483,28 +487,15 @@ async function getOccupancyMetrics(
       availableRooms += cat.Availabilities?.[index] || 0;
     });
 
-    dailyMetrics[date] = { occupied: 0, available: availableRooms };
-  });
-
-  // 4. Count occupied rooms per day from reservations
-  allReservations.forEach((res) => {
-    const resStart = new Date(res.ScheduledStartUtc);
-    const resEnd = new Date(res.ScheduledEndUtc);
-
-    for (const dateStr in dailyMetrics) {
-      const dayStart = new Date(dateStr);
-      // Reservation occupies a room if day >= start AND day < end
-      if (dayStart >= resStart && dayStart < resEnd) {
-        dailyMetrics[dateStr].occupied += 1;
-      }
-    }
+    // occupied = capacity − truly available (accounts for all services, OOO, blocks)
+    const occupied = Math.max(0, totalCapacity - availableRooms);
+    dailyMetrics[date] = { occupied, capacity: totalCapacity };
   });
 
   return Object.keys(dailyMetrics).map((date) => ({
     date,
     occupied: dailyMetrics[date].occupied,
-    // Total capacity = unsold rooms (from availability) + occupied rooms (from reservations)
-    available: dailyMetrics[date].available + dailyMetrics[date].occupied,
+    available: dailyMetrics[date].capacity,
   }));
 }
 
@@ -581,6 +572,7 @@ async function getRevenueMetrics(credentials, serviceId, startDate, endDate, tim
  * @param {string} startDate - YYYY-MM-DD
  * @param {string} endDate - YYYY-MM-DD
  * @param {string} timezone
+ * @param {number} [cachedCapacity] - Pre-probed capacity to skip redundant API call
  * @returns {Promise<object>} { [date]: { rooms_sold, capacity_count, net_revenue, gross_revenue, occupancy, ... } }
  */
 async function getCombinedMetrics(
@@ -589,9 +581,10 @@ async function getCombinedMetrics(
   startDate,
   endDate,
   timezone,
+  cachedCapacity,
 ) {
   const [occupancy, revenue] = await Promise.all([
-    getOccupancyMetrics(credentials, serviceId, startDate, endDate, timezone),
+    getOccupancyMetrics(credentials, serviceId, startDate, endDate, timezone, cachedCapacity),
     getRevenueMetrics(credentials, serviceId, startDate, endDate, timezone),
   ]);
 
@@ -628,6 +621,28 @@ async function getCombinedMetrics(
   return result;
 }
 
+/**
+ * Probes total physical capacity for a Mews service by querying availability
+ * on a far-future empty date. Returns the total room count.
+ */
+async function probeCapacity(credentials, serviceId) {
+  const capacityData = await _callMewsApi(
+    "services/getAvailability",
+    credentials,
+    {
+      ServiceId: serviceId,
+      FirstTimeUnitStartUtc: "2027-12-01T00:00:00Z",
+      LastTimeUnitStartUtc: "2027-12-02T00:00:00Z",
+    },
+  );
+
+  let total = 0;
+  (capacityData.CategoryAvailabilities || []).forEach((cat) => {
+    total += cat.Availabilities?.[0] || 0;
+  });
+  return total;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════════════
@@ -650,4 +665,5 @@ module.exports = {
   getOccupancyMetrics,
   getRevenueMetrics,
   getCombinedMetrics,
+  probeCapacity,
 };

@@ -110,6 +110,17 @@ module.exports = async (request, response) => {
             );
           }
 
+          // Probe capacity once (avoids redundant API call per chunk)
+          const mewsCapacity = await mewsAdapter.probeCapacity(credentials, serviceId);
+          console.log(`-- Mews capacity for ${property_name}: ${mewsCapacity} rooms --`);
+
+          // Update total_rooms if it drifted (rooms added/removed in Mews)
+          if (mewsCapacity && mewsCapacity !== total_rooms) {
+            await pgPool.query("UPDATE hotels SET total_rooms = $1 WHERE hotel_id = $2", [mewsCapacity, hotel_id]);
+            total_rooms = mewsCapacity;
+            console.log(`-- Updated total_rooms for ${property_name}: ${total_rooms} → ${mewsCapacity} --`);
+          }
+
           const dataMap = {};
           let currentStartDate = new Date();
           currentStartDate.setDate(currentStartDate.getDate() - 14); // 14 days back to recapture
@@ -139,6 +150,7 @@ module.exports = async (request, response) => {
                 startDateStr,
                 endDateStr,
                 tz,
+                mewsCapacity,
               );
               Object.assign(dataMap, chunkData);
             } catch (chunkErr) {
