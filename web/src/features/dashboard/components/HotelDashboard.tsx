@@ -237,8 +237,8 @@ export function HotelDashboard({
         {/* Market Outlook Banner + Forward Demand Chart */}
         <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
           {/* Outlook Banner */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 14, padding: "14px 20px",
+          <div onClick={() => onNavigate("demandRadar")} style={{
+            display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", cursor: "pointer",
             borderBottom: `1px solid ${marketOutlook.status === "strengthening" ? "rgba(52,208,104,0.08)" : marketOutlook.status === "softening" ? "rgba(239,68,68,0.08)" : "rgba(200,166,110,0.08)"}`,
             background: marketOutlook.status === "strengthening" ? "rgba(52,208,104,0.03)" : marketOutlook.status === "softening" ? "rgba(239,68,68,0.03)" : "rgba(200,166,110,0.03)",
           }}>
@@ -271,7 +271,7 @@ export function HotelDashboard({
 
           {/* Demand Chart — Demand Radar style */}
           <button
-            onClick={() => onNavigate("demand-pace")}
+            onClick={() => onNavigate("demandRadar")}
             style={{ width: "100%", background: "transparent", border: 0, padding: "20px", textAlign: "left", cursor: "pointer" }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
