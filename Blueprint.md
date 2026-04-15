@@ -133,7 +133,7 @@ Budgets, compsets, Rockenue assets.
 
 Internal KPIs, YoY, portfolio metrics.
 
-Market & pace data, including Shadowfax-sourced signals.
+Market & pace data.
 
 Hosts the entire UI (including Sentinel screens).
 
@@ -156,8 +156,6 @@ Control Panel – configuration, guardrails, and OTA discount stack (Promo Confi
 Rate Manager – grid with live vs AI vs guardrails, overrides.
 
 Risk Overview – portfolio risk lens inside Sentinel.
-
-Shadowfax View – competitive pricing & scraped context for Sentinel usage.
 
 Connects to PMS via adapters (PMS-siloed architecture):
 
@@ -235,11 +233,13 @@ User actions (overrides) never block on PMS writes.
 
 Producer enqueues jobs; worker processes them and reports via notifications.
 
-DGX / Shadowfax
+DGX
 
-DGX Spark and "Shadowfax 2.0" are future compute/scraper layers.
+DGX Spark is the future compute layer.
 
-Current system references them conceptually; runtime pricing logic is fully handled by Node + adapters + existing SQL.
+Current system references it conceptually; runtime pricing logic is fully handled by Node + adapters + existing SQL.
+
+Shadowfax (Retired — April 2026): The Shadowfax live price scraper has been fully removed. All frontend components (ShadowfaxView, useShadowfax hook), API routes (/shadowfax/properties, /shadowfax/price), backend service methods (getSentinelProperties, checkAssetPrice), scraper.utils.js, navigation items, and type definitions have been deleted. The scraping approach was superseded by Market Codex (automated daily scrapes) and Demand Radar (forward market intelligence).
 
 Mews Integration (Active — March 2026)
 
@@ -314,7 +314,7 @@ Single owner of all KPI / performance / YoY / portfolio / pacing logic.
 
 api/services/market.service.js
 
-Market data, pace, seasonality, Shadowfax-derived metrics.
+Market data, pace, seasonality.
 
 api/services/hotel.service.js
 
@@ -354,7 +354,7 @@ Hotels, budgets, Rockenue assets, management flags, compsets.
 
 api/routes/market.router.js
 
-Market & pace views, Shadowfax helpers.
+Market & pace views.
 
 api/routes/admin.router.js
 
@@ -573,8 +573,6 @@ components/RateManager/OccupancyVisualizer.tsx
 
 components/RiskOverview/PortfolioRiskOverview.tsx
 
-components/Shadowfax/ShadowfaxView.tsx
-
 Hooks:
 
 hooks/usePropertyHub.ts (exports math functions for OTA discount stack — used by useSentinelConfig and useRateGrid)
@@ -582,8 +580,6 @@ hooks/usePropertyHub.ts (exports math functions for OTA discount stack — used 
 hooks/useRateGrid.ts
 
 hooks/useSentinelConfig.ts (also loads rockenue_managed_assets for Promo Config)
-
-hooks/useShadowfax.ts
 
 API layer:
 
@@ -1321,7 +1317,24 @@ Market KPIs & forward view.
 
 Neighborhood & demand segments.
 
-Shadowfax helper calls (scraper-derived or computed market pricing).
+Market intelligence & computed pricing metrics.
+
+Market Profile sub-routes (all requireAdminApi):
+
+GET /profile/overview, /profile/seasonal, /profile/absorption-dow, /profile/price-movement, /profile/compression, /profile/neighbourhoods — existing city-level market structure endpoints.
+
+GET /profile/neighbourhood-intel?city=X — Neighbourhood demand intelligence. Same-date absorption methodology: compares identical checkin_dates at their earliest vs latest scrape observation to eliminate MLOS/manual-listing artefacts. Returns top 20 areas ranked by composite demand score (35% supply depth + 35% absorption rate + 30% rooms absorbed volume). Overlapping Booking.com zones are merged via MERGE_MAP (see below). Booking.com meta-categories (e.g. "Guests' favorite area") are excluded.
+
+GET /profile/neighbourhood-dump?city=X — Raw diagnostic dump of every neighbourhood name Booking.com returns with average property count. Used for debugging area taxonomy and verifying merge map coverage.
+
+Neighbourhood Zone Merge Map (in MarketService.getProfileNeighbourhoodIntel):
+Booking.com returns overlapping neighbourhood facets for the same physical area. The MERGE_MAP consolidates these using MAX supply per bucket (not average — the largest count is the most complete view since the same properties appear under multiple labels):
+- "hyde park" + "bayswater" → "Bayswater & Hyde Park"
+- "west end" + "theatreland" + "oxford street" → "West End & Theatreland"
+- "kensington" + "south kensington" + "kensington and chelsea" → "Kensington & Chelsea"
+- "central london" → excluded (overlaps with everything)
+- "westminster borough" → excluded (overlaps with everything)
+When onboarding a new city, review the neighbourhood-dump output and extend the MERGE_MAP if overlapping zones appear.
 
 /api/admin
 
@@ -1455,7 +1468,6 @@ market-pulse/
 │ │ ├── pdf.utils.js
 │ │ ├── report-templates
 │ │ │ └── shreeji.template.html
-│ │ └── scraper.utils.js
 │ ├── daily-refresh.js
 │ ├── initial-sync.js
 │ ├── migration_001_add_market_metrics.js
@@ -1566,15 +1578,12 @@ market-pulse/
 │ │ │ ├── RateManager
 │ │ │ │ ├── OccupancyVisualizer.tsx
 │ │ │ │ └── RateManagerView.tsx
-│ │ │ ├── RiskOverview
-│ │ │ │ └── PortfolioRiskOverview.tsx
-│ │ │ └── Shadowfax
-│ │ │ └── ShadowfaxView.tsx
+│ │ │ └── RiskOverview
+│ │ │ └── PortfolioRiskOverview.tsx
 │ │ ├── hooks
 │ │ │ ├── usePropertyHub.ts
 │ │ │ ├── useRateGrid.ts
-│ │ │ ├── useSentinelConfig.ts
-│ │ │ └── useShadowfax.ts
+│ │ │ └── useSentinelConfig.ts
 │ ├── settings
 │ │ ├── api
 │ │ │ ├── settings.api.ts
