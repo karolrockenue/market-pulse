@@ -129,31 +129,6 @@ router.get('/history', requireUserApi, async (req, res) => {
   }
 });
 
-// --- 3. SHADOWFAX (Scraper Tools) ---
-// Migrated from scraper.router.js
-
-router.get('/shadowfax/properties', requireAdminApi, async (req, res) => {
-  try {
-    const data = await MarketService.getSentinelProperties();
-    res.json(data);
-  } catch (err) {
-    console.error('Error in /api/market/shadowfax/properties', err);
-    res.status(500).json({ error: 'Failed to fetch properties' });
-  }
-});
-
-router.post('/shadowfax/price', requireAdminApi, async (req, res) => {
-  try {
-    const { hotelId, checkinDate } = req.body;
-    if (!hotelId || !checkinDate) return res.status(400).json({ error: 'Missing parameters.' });
-
-    const data = await MarketService.checkAssetPrice(hotelId, checkinDate);
-    res.json(data);
-  } catch (error) {
-    console.error(`Shadowfax Error: ${error.message}`);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 router.get("/accommodation-map", requireUserApi, async (req, res) => {
   try {
@@ -420,6 +395,30 @@ router.get('/profile/neighbourhoods', requireAdminApi, async (req, res) => {
   } catch (err) {
     console.error('Error in /profile/neighbourhoods:', err);
     res.status(500).json({ error: 'Failed to fetch neighbourhood data.' });
+  }
+});
+
+router.get('/profile/neighbourhood-dump', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getNeighbourhoodDump(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/neighbourhood-dump:', err);
+    res.status(500).json({ error: 'Failed to fetch neighbourhood dump.' });
+  }
+});
+
+router.get('/profile/neighbourhood-intel', requireAdminApi, async (req, res) => {
+  try {
+    const city = req.query.city;
+    if (!city) return res.status(400).json({ error: 'City required.' });
+    const data = await MarketService.getProfileNeighbourhoodIntel(city);
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /profile/neighbourhood-intel:', err);
+    res.status(500).json({ error: 'Failed to fetch neighbourhood intelligence.' });
   }
 });
 

@@ -298,6 +298,8 @@ export function TopNav({
         { label: "MP CRM", value: "mpCrmBoard", icon: MonitorSmartphone },
         { label: "MP Risk Overview", value: "mpRiskOverview", icon: MonitorSmartphone },
         { label: "MP Control Panel", value: "mpControlPanel", icon: MonitorSmartphone },
+        { label: "MP Login", value: "mpLogin", icon: MonitorSmartphone },
+        { label: "MP Login V2", value: "mpLoginV2", icon: MonitorSmartphone },
         { label: "Email Signatures", value: "emailSignatures", icon: MonitorSmartphone },
         { label: "Deck V2", value: "deckV2", icon: Presentation, sectionLabel: "Drafts" },
         { label: "Shreeji Deck", value: "shreejiDeck", icon: Presentation },

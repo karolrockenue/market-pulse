@@ -885,7 +885,9 @@ export default function App() {
             activeView === "mpChannelPricing" ||
             activeView === "mpChannelPricingV2" ||
             activeView === "mpChannelPricingV3" ||
-            activeView === "mpDistribution") && (
+            activeView === "mpDistribution" ||
+            activeView === "mpLogin" ||
+            activeView === "mpLoginV2") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}

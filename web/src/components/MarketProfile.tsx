@@ -280,7 +280,7 @@ export function MarketProfile() {
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
               <div style={sectionLabel}>AREA DEMAND INTELLIGENCE</div>
               <h3 style={sectionTitle}>Search Demand by Neighbourhood</h3>
-              <p style={sectionSub}>Booking absorption as a proxy for search volume — steeper drop = higher converting demand in that area</p>
+              <p style={sectionSub}>Same-date booking absorption across all accommodation types — steeper drop = higher converting search demand</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr" }}>
               {/* Left: Absorption curves */}

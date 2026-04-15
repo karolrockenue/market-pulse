@@ -27,6 +27,8 @@ const MPChannelPricing = lazy(() => import("./components/MPChannelPricing").then
 const MPChannelPricingV2 = lazy(() => import("./components/MPChannelPricingV2").then(m => ({ default: m.MPChannelPricingV2 })));
 const MPChannelPricingV3 = lazy(() => import("./components/MPChannelPricingV3").then(m => ({ default: m.MPChannelPricingV3 })));
 const MPDistribution = lazy(() => import("./components/MPDistribution").then(m => ({ default: m.MPDistribution })));
+const MPLogin = lazy(() => import("./components/MPLogin").then(m => ({ default: m.MPLogin })));
+const MPLoginV2 = lazy(() => import("./components/MPLoginV2").then(m => ({ default: m.MPLoginV2 })));
 
 interface RockenueHubProps {
   activeView: string;
@@ -85,6 +87,8 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "mpChannelPricingV2" && <MPChannelPricingV2 activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpChannelPricingV3" && <MPChannelPricingV3 activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpDistribution" && <MPDistribution activeView={activeView} onNavigate={onNavigate} />}
+          {activeView === "mpLogin" && <MPLogin activeView={activeView} onNavigate={onNavigate} />}
+          {activeView === "mpLoginV2" && <MPLoginV2 activeView={activeView} onNavigate={onNavigate} />}
         </Suspense>
       </div>
     </div>

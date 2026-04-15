@@ -172,7 +172,7 @@ export function AppSidebar({
       }}
     >
       {/* Logo */}
-      <div style={{ padding: "28px 14px 18px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+      <div style={{ padding: "20px 14px 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
         <span style={{ color: "#38C6BA", fontSize: 26, fontWeight: 300, lineHeight: 1 }}>(</span>
         <span style={{ color: R.accent, fontSize: 14, fontWeight: 700, letterSpacing: 1.4 }}>MARKET PULSE</span>
         <span style={{ color: "#C8A66E", fontSize: 26, fontWeight: 300, lineHeight: 1 }}>)</span>
