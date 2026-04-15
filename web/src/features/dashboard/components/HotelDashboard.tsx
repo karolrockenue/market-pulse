@@ -252,10 +252,10 @@ export function HotelDashboard({
                 fontSize: 14, fontWeight: 500,
                 color: marketOutlook.status === "strengthening" ? R.green : marketOutlook.status === "softening" ? R.red : R.gold,
               }}>
-                {isNewHotel ? "System Initializing" : `The 30-day market demand is ${marketOutlook.status}`}
+                {isNewHotel ? "System Initializing" : `The 90-day market demand is ${marketOutlook.status}`}
               </div>
               <div style={{ fontSize: 11, color: R.textDim, marginTop: 2 }}>
-                {isNewHotel ? "Full market intelligence will be available in approximately 24 hours." : "Forward-looking 90-day outlook"}
+                {isNewHotel ? "Full market intelligence will be available in approximately 24 hours." : "Demand vs 30 days ago"}
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -265,7 +265,7 @@ export function HotelDashboard({
               }}>
                 {isNewHotel ? "..." : marketOutlook.metric}
               </div>
-              <div style={{ fontSize: 10, color: R.textDim, marginTop: 3 }}>vs 30 days ago</div>
+              <div style={{ fontSize: 10, color: R.textDim, marginTop: 3 }}>demand vs 30d ago</div>
             </div>
           </div>
 

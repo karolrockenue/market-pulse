@@ -4,11 +4,13 @@ const {
   calculateMarketDemand,
   calculatePace,
 } = require("../utils/market-codex.utils");
-const { getHotelPrice } = require("../utils/scraper.utils.js");
 
 // Helper to ensure city names match DB slugs (e.g. "Las Vegas" -> "las-vegas")
 const slugify = (city) =>
   city ? city.toLowerCase().trim().replace(/\s+/g, "-") : "";
+
+// Cities that use Airbnb scraper instead of Booking.com
+const AIRBNB_CITIES = new Set(["archanes"]);
 
 class MarketService {
   /**
@@ -350,6 +352,10 @@ class MarketService {
   static async getForwardView(city) {
     const citySlug = slugify(city);
 
+    if (AIRBNB_CITIES.has(citySlug)) {
+      return MarketService._getForwardViewAirbnb(citySlug);
+    }
+
     const sql = `
       SELECT DISTINCT ON (checkin_date)
         checkin_date,
@@ -394,165 +400,90 @@ class MarketService {
     return processedRows;
   }
 
+  /** Airbnb-sourced forward view — normalised to same shape as Booking.com */
+  static async _getForwardViewAirbnb(citySlug) {
+    const sql = `
+      SELECT
+        checkin_date,
+        total_listings,
+        avg_price,
+        scrape_unique_properties
+      FROM airbnb_availability_snapshots
+      WHERE city_slug = $1
+        AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+        AND scraped_at::date = (
+          SELECT MAX(scraped_at::date)
+          FROM airbnb_availability_snapshots
+          WHERE city_slug = $1
+        )
+      ORDER BY checkin_date ASC;
+    `;
+
+    const { rows } = await db.query(sql, [citySlug]);
+
+    let processedRows = rows.map((row) => ({
+      checkin_date: row.checkin_date,
+      total_results: row.total_listings,
+      weighted_avg_price: row.avg_price,
+      hotel_count: row.total_listings,
+      segment_wap: row.avg_price,
+      source: "airbnb",
+    }));
+
+    processedRows = calculatePriceIndex(processedRows);
+    processedRows = calculateMarketDemand(processedRows);
+
+    return processedRows;
+  }
+
   /**
    * --- MARKET OUTLOOK (From planning.router.js) ---
    * Originally /market-trend. Using "rolling forecast" logic.
    */
+  /**
+   * Market Outlook — uses the same pace data as Demand Radar so
+   * the dashboard banner and Demand Radar always agree.
+   *
+   * Logic mirrors DemandRadarView.tsx:
+   *   demandMomentum = avg(market_demand_score_delta) across 90-day pace
+   *   wapMomentum    = avg(wap_delta)
+   *   regime: >3pp = strengthening, <-3pp = softening, else stable
+   */
   static async getMarketOutlook(city) {
-    const query = `
-    WITH DateRange AS (
-      -- 1. Find the min/max dates of available scrape data
-      SELECT
-        MIN((scraped_at AT TIME ZONE 'UTC')::date) AS start_date,
-        MAX((scraped_at AT TIME ZONE 'UTC')::date) AS end_date
-      FROM market_availability_snapshots
-      WHERE city_slug = $1
-    ),
-    Config AS (
-      -- 2. Cap the total window at 30 days and get the half-window
-      SELECT
-        end_date,
-        -- Cap at 30 days, or use available days if less
-        LEAST((end_date - start_date + 1), 30) AS total_window_days
-      FROM DateRange
-    ),
-    Periods AS (
-      -- 3. Define the two periods to compare based on the half-window
-      SELECT
-        FLOOR(total_window_days / 2) AS half_window_days,
-        end_date AS recent_period_end,
-        (end_date - (FLOOR(total_window_days / 2) - 1) * INTERVAL '1 day') AS recent_period_start,
-        (end_date - FLOOR(total_window_days / 2) * INTERVAL '1 day') AS past_period_end,
-        (end_date - (FLOOR(total_window_days / 2) * 2 - 1) * INTERVAL '1 day') AS past_period_start
-      FROM Config
-    ),
-    -- 4. [NEW] Calculate the "Past" outlook using the correct rolling 30-day forecast logic
-    Past_Forecast_Snapshots AS (
-      SELECT
-        AVG(total_results) AS avg_30day_supply,
-        AVG(weighted_avg_price) AS avg_30day_wap
-      FROM market_availability_snapshots, Periods p
-      WHERE
-        city_slug = $1
-        AND (scraped_at AT TIME ZONE 'UTC')::date BETWEEN p.past_period_start AND p.past_period_end
-        -- Only look at the next 30 days for each scrape
-        AND checkin_date BETWEEN (scraped_at AT TIME ZONE 'UTC')::date AND ((scraped_at AT TIME ZONE 'UTC')::date + INTERVAL '29 days')
-      GROUP BY
-        (scraped_at AT TIME ZONE 'UTC')::date
-    ),
-    Past_Outlook AS (
-      -- 5. [NEW] Average the daily forecasts from the "Past" period
-      SELECT
-        AVG(avg_30day_supply) AS past_supply,
-        AVG(avg_30day_wap) AS past_wap
-      FROM Past_Forecast_Snapshots
-    ),
-    -- 6. [NEW] Calculate the "Recent" outlook
-    Recent_Forecast_Snapshots AS (
-      SELECT
-        AVG(total_results) AS avg_30day_supply,
-        AVG(weighted_avg_price) AS avg_30day_wap
-      FROM market_availability_snapshots, Periods p
-      WHERE
-        city_slug = $1
-        AND (scraped_at AT TIME ZONE 'UTC')::date BETWEEN p.recent_period_start AND p.recent_period_end
-        AND checkin_date BETWEEN (scraped_at AT TIME ZONE 'UTC')::date AND ((scraped_at AT TIME ZONE 'UTC')::date + INTERVAL '29 days')
-      GROUP BY
-        (scraped_at AT TIME ZONE 'UTC')::date
-    ),
-    Recent_Outlook AS (
-      -- 7. [NEW] Average the daily forecasts from the "Recent" period
-      SELECT
-        AVG(avg_30day_supply) AS recent_supply,
-        AVG(avg_30day_wap) AS recent_wap
-      FROM Recent_Forecast_Snapshots
-    )
-    -- 8. Final Select: Combine all results
-SELECT
-      p.half_window_days,
-      po.past_supply,
-      po.past_wap,
-      ro.recent_supply,
-      ro.recent_wap
-    FROM
-      Periods p,
-      Past_Outlook po,
-      Recent_Outlook ro;
-  `;
+    try {
+      const paceData = await MarketService.getPaceData(city, 30);
 
-    // Force slug format
-    const { rows } = await db.query(query, [slugify(city)]);
+      if (!paceData || paceData.length === 0) {
+        return { status: "stable", metric: "Data Populating" };
+      }
 
-    if (!rows.length || !rows[0].recent_supply) {
+      // Demand momentum (pp change vs 30 days ago)
+      const validD = paceData.filter(p => p.market_demand_score_delta != null);
+      const demandMomentum = validD.length > 0
+        ? Math.round(validD.reduce((s, p) => s + p.market_demand_score_delta, 0) / validD.length)
+        : 0;
+
+      // WAP momentum (£ change vs 30 days ago)
+      const validW = paceData.filter(p => p.wap_delta != null);
+      const wapMomentum = validW.length > 0
+        ? Math.round(validW.reduce((s, p) => s + p.wap_delta, 0) / validW.length)
+        : 0;
+
+      // Same thresholds as DemandRadarView.tsx line 293
+      const status = demandMomentum > 3 ? "strengthening" : demandMomentum < -3 ? "softening" : "stable";
+
+      // Metric string: show demand momentum in pp
+      const metric = `${demandMomentum > 0 ? "+" : ""}${demandMomentum}pp`;
+
       return {
-        status: "stable",
-        metric: "Data Populating",
-        period: "",
+        status,
+        metric,
+        debug: { demandMomentum, wapMomentum, pacePoints: paceData.length },
       };
+    } catch (err) {
+      console.error("[getMarketOutlook] Error:", err.message);
+      return { status: "stable", metric: "..." };
     }
-
-    const data = rows[0];
-    const pastSupply = parseFloat(data.past_supply);
-    const recentSupply = parseFloat(data.recent_supply);
-    const pastWap = parseFloat(data.past_wap);
-    const recentWap = parseFloat(data.recent_wap);
-
-    const supplyDelta = ((recentSupply - pastSupply) / pastSupply) * 100;
-    const wapDelta = ((recentWap - pastWap) / pastWap) * 100;
-
-    // Market Demand is the inverse of Supply change
-    const marketDemandDelta = -supplyDelta;
-
-    let status = "stable";
-    let metric = "";
-    let metric_name = "market demand"; // Default to market demand
-
-    // 1. Primary check: Market Demand (Supply Change)
-    if (marketDemandDelta > 1) {
-      // e.g., Supply *dropped* > 1%
-      status = "strengthening";
-      metric = `+${marketDemandDelta.toFixed(1)}%`;
-      metric_name = "market demand";
-    } else if (marketDemandDelta < -1) {
-      // e.g., Supply *rose* > 1%
-      status = "softening";
-      metric = `${marketDemandDelta.toFixed(1)}%`;
-      metric_name = "market demand";
-    }
-    // 2. Secondary check: Price (if Demand is stable)
-    else if (wapDelta > 1) {
-      status = "strengthening";
-      metric = `+${wapDelta.toFixed(1)}%`;
-      metric_name = "market price";
-    } else if (wapDelta < -1) {
-      status = "softening";
-      metric = `${wapDelta.toFixed(1)}%`;
-      metric_name = "market price";
-    }
-    // 3. Both are stable: Default to showing the Market Demand delta
-    else {
-      status = "stable";
-      metric = `${marketDemandDelta > 0 ? "+" : ""}${marketDemandDelta.toFixed(
-        1
-      )}%`;
-      metric_name = "market demand";
-    }
-
-    return {
-      status,
-      metric,
-      // debug info
-      debug: {
-        marketDemandDelta,
-        supplyDelta,
-        wapDelta,
-        half_window_days: data.half_window_days,
-        pastWap,
-        recentWap,
-        pastSupply,
-        recentSupply,
-      },
-    };
   }
 
   /**
@@ -560,6 +491,10 @@ SELECT
    */
   static async getPaceData(city, period) {
     const citySlug = slugify(city);
+
+    if (AIRBNB_CITIES.has(citySlug)) {
+      return MarketService._getPaceDataAirbnb(citySlug, period);
+    }
 
     // --- Query 1: Get LATEST data for all 90 days ---
     const latestSql = `
@@ -609,6 +544,54 @@ SELECT
     return paceData;
   }
 
+  /** Airbnb-sourced pace data — normalised to same shape */
+  static async _getPaceDataAirbnb(citySlug, period) {
+    const latestSql = `
+      SELECT checkin_date, total_listings, avg_price
+      FROM airbnb_availability_snapshots
+      WHERE city_slug = $1
+        AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+        AND scraped_at::date = (
+          SELECT MAX(scraped_at::date) FROM airbnb_availability_snapshots WHERE city_slug = $1
+        )
+      ORDER BY checkin_date ASC;
+    `;
+
+    const pastSql = `
+      WITH target AS (
+        SELECT MAX(scraped_at::date) AS d
+        FROM airbnb_availability_snapshots
+        WHERE city_slug = $1
+          AND scraped_at::date <= CURRENT_DATE - $2 * INTERVAL '1 day'
+      )
+      SELECT s.checkin_date, s.total_listings, s.avg_price
+      FROM airbnb_availability_snapshots s, target t
+      WHERE s.city_slug = $1
+        AND s.checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+        AND s.scraped_at::date = t.d
+      ORDER BY s.checkin_date ASC;
+    `;
+
+    const [{ rows: latestRaw }, { rows: pastRaw }] = await Promise.all([
+      db.query(latestSql, [citySlug]),
+      db.query(pastSql, [citySlug, period]),
+    ]);
+
+    const normalise = (rows) => rows.map(r => ({
+      checkin_date: r.checkin_date,
+      total_results: r.total_listings,
+      weighted_avg_price: r.avg_price,
+      hotel_count: r.total_listings,
+    }));
+
+    let latest = calculatePriceIndex(normalise(latestRaw));
+    latest = calculateMarketDemand(latest);
+    let past = calculatePriceIndex(normalise(pastRaw));
+    past = calculateMarketDemand(past);
+
+    return calculatePace(latest, past);
+  }
+
   /**
    * --- HISTORY (From planning.router.js) ---
    * Fetches 30-day scrape history for a *single* check-in date.
@@ -636,54 +619,6 @@ SELECT
     return processedRows.reverse();
   }
 
-  /**
-   * --- SENTINEL PROPERTIES (From scraper.router.js) ---
-   * Fetches properties for the Shadowfax tool.
-   */
-  static async getSentinelProperties() {
-    const result = await db.query(
-      `SELECT
-         id AS property_id,
-         asset_name AS property_name,
-         genius_discount_pct
-       FROM rockenue_managed_assets
-       WHERE sentinel_active = true
-       ORDER BY asset_name`
-    );
-    return result.rows;
-  }
-
-  /**
-   * --- CHECK PRICE (From scraper.router.js / Shadowfax) ---
-   * Uses Shadowfax logic hub.
-   */
-  static async checkAssetPrice(hotelId, checkinDate) {
-    const assetQuery = await db.query(
-      "SELECT booking_com_url FROM rockenue_managed_assets WHERE id = $1",
-      [hotelId]
-    );
-
-    const asset = assetQuery.rows[0];
-
-    if (!asset) {
-      throw new Error("Asset not found.");
-    }
-
-    if (!asset.booking_com_url) {
-      throw new Error(
-        "This asset is not configured for price checking. (Missing booking_com_url)"
-      );
-    }
-
-    // Call the Shadowfax "Logic Hub"
-    const price = await getHotelPrice(asset.booking_com_url, checkinDate);
-
-    return {
-      hotelId,
-      checkinDate,
-      price,
-    };
-  }
 
   /**
    * Returns aggregated neighbourhood supply data from the most complete
@@ -1060,7 +995,165 @@ SELECT
       LIMIT 15;
     `;
     const { rows } = await db.query(sql, [citySlug]);
+    return rows.filter(r => !r.neighbourhood.toLowerCase().includes('favo'));
+  }
+
+  // Raw neighbourhood dump — every area name Booking.com returns with avg property count.
+  // Used for debugging / sanity-checking area taxonomy.
+  static async getNeighbourhoodDump(city) {
+    const citySlug = slugify(city);
+    const sql = `
+      SELECT key AS neighbourhood,
+             ROUND(AVG((facet_neighbourhood->>key)::numeric)) AS avg_supply,
+             COUNT(*) AS scrape_rows
+      FROM market_availability_snapshots
+      CROSS JOIN LATERAL jsonb_object_keys(facet_neighbourhood) AS key
+      WHERE LOWER(city_slug) = LOWER($1)
+        AND facet_neighbourhood IS NOT NULL
+        AND checkin_date >= CURRENT_DATE
+        AND (facet_neighbourhood->>key) IS NOT NULL
+        AND (facet_neighbourhood->>key)::numeric > 0
+      GROUP BY key
+      ORDER BY avg_supply DESC
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
     return rows;
+  }
+
+  // Neighbourhood-level hotel demand intelligence.
+  // Same-date methodology: compares the SAME checkin_date at its earliest vs
+  // latest scrape observation — eliminates MLOS/manual-listing artefacts.
+  // Hotel-only: scales neighbourhood counts by hotel_count/total_results ratio.
+  // Curve: intermediate lead-time buckets for dates with rich scrape history.
+  static async getProfileNeighbourhoodIntel(city) {
+    const citySlug = slugify(city);
+
+    // Same-date comparison with lead-time curve and hotel ratio.
+    // qualified_dates: only dates observed at 2+ distinct lead-time buckets,
+    // ensuring we compare the same date across time (not July vs April).
+    const sql = `
+      WITH observations AS (
+        SELECT checkin_date, facet_neighbourhood,
+               (checkin_date - scraped_at::date) AS lead_days,
+               1 AS hotel_ratio
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND facet_neighbourhood IS NOT NULL
+          AND checkin_date >= CURRENT_DATE
+          AND checkin_date <= CURRENT_DATE + 120
+          AND (checkin_date - scraped_at::date) >= 1
+      ),
+      bucketed AS (
+        SELECT checkin_date, facet_neighbourhood, hotel_ratio,
+          CASE
+            WHEN lead_days BETWEEN 75 AND 120 THEN 90
+            WHEN lead_days BETWEEN 50 AND 74  THEN 60
+            WHEN lead_days BETWEEN 22 AND 49  THEN 30
+            WHEN lead_days BETWEEN 10 AND 21  THEN 14
+            WHEN lead_days BETWEEN 4 AND 9    THEN 7
+            WHEN lead_days BETWEEN 1 AND 3    THEN 3
+          END AS bucket
+        FROM observations
+      ),
+      qualified_dates AS (
+        SELECT checkin_date
+        FROM bucketed
+        WHERE bucket IS NOT NULL
+        GROUP BY checkin_date
+        HAVING COUNT(DISTINCT bucket) >= 2
+      )
+      SELECT
+        key AS neighbourhood,
+        b.bucket AS days_out,
+        ROUND(AVG((b.facet_neighbourhood->>key)::numeric * b.hotel_ratio)) AS avg_supply
+      FROM bucketed b
+      JOIN qualified_dates q ON b.checkin_date = q.checkin_date
+      CROSS JOIN LATERAL jsonb_object_keys(b.facet_neighbourhood) AS key
+      WHERE b.bucket IS NOT NULL
+        AND (b.facet_neighbourhood->>key) IS NOT NULL
+        AND (b.facet_neighbourhood->>key)::numeric > 0
+      GROUP BY key, b.bucket
+      HAVING AVG((b.facet_neighbourhood->>key)::numeric) > 30
+      ORDER BY key, b.bucket DESC
+    `;
+    const { rows } = await db.query(sql, [citySlug]);
+
+    // Booking.com overlapping zones → merge into canonical area names.
+    // MAX per bucket (not avg) — overlapping labels describe the same
+    // physical properties; largest count is the most complete view.
+    const MERGE_MAP = {
+      'hyde park':             'Bayswater & Hyde Park',
+      'bayswater':             'Bayswater & Hyde Park',
+      'west end':              'West End & Theatreland',
+      'theatreland':           'West End & Theatreland',
+      'oxford street':         'West End & Theatreland',
+      'kensington':            'Kensington & Chelsea',
+      'south kensington':      'Kensington & Chelsea',
+      'kensington and chelsea':'Kensington & Chelsea',
+      'central london':        null,
+      'westminster borough':   null,
+    };
+
+    const byArea = {};
+    for (const row of rows) {
+      const lc = row.neighbourhood.toLowerCase().trim();
+      if (lc.includes('favo')) continue;
+      const mapped = lc in MERGE_MAP ? MERGE_MAP[lc] : row.neighbourhood;
+      if (mapped === null) continue;
+      if (!byArea[mapped]) byArea[mapped] = {};
+      const bucket = Number(row.days_out);
+      const val = Number(row.avg_supply);
+      byArea[mapped][bucket] = Math.max(byArea[mapped][bucket] || 0, val);
+    }
+
+    const BUCKETS = [90, 60, 30, 14, 7, 3];
+    const rankings = [];
+
+    for (const [area, buckets] of Object.entries(byArea)) {
+      const farBucket = BUCKETS.find(b => buckets[b]);
+      const nearBucket = [...BUCKETS].reverse().find(b => buckets[b]);
+      if (!farBucket || !nearBucket || farBucket === nearBucket) continue;
+      const supplyFar = buckets[farBucket];
+      const supplyNear = buckets[nearBucket];
+      if (!supplyFar) continue;
+
+      const pctAbsorbed = (1 - supplyNear / supplyFar) * 100;
+      const roomsAbsorbed = Math.round(supplyFar - supplyNear);
+
+      const curve = BUCKETS
+        .filter(b => buckets[b] != null)
+        .map(b => ({
+          days_out: b,
+          supply: Math.round(buckets[b]),
+          pct_remaining: Math.round((buckets[b] / supplyFar) * 1000) / 10,
+        }));
+
+      rankings.push({
+        neighbourhood: area,
+        avg_supply: Math.round(supplyFar),
+        supply_near: Math.round(supplyNear),
+        rooms_absorbed: roomsAbsorbed,
+        pct_absorbed: Math.round(pctAbsorbed * 10) / 10,
+        curve,
+      });
+    }
+
+    // Demand score: three factors
+    //  - Supply depth (35%): hotel count = proven, sustained demand
+    //  - Absorption rate (35%): how fast hotels fill up
+    //  - Rooms booked (30%): absolute conversion volume
+    const maxSupply = Math.max(...rankings.map(r => r.avg_supply), 1);
+    const maxPct = Math.max(...rankings.map(r => r.pct_absorbed), 1);
+    const maxRooms = Math.max(...rankings.map(r => Math.abs(r.rooms_absorbed)), 1);
+    for (const r of rankings) {
+      const depthPart = (r.avg_supply / maxSupply) * 35;
+      const ratePart = Math.max(0, (r.pct_absorbed / maxPct) * 35);
+      const volumePart = (r.rooms_absorbed / maxRooms) * 30;
+      r.demand_score = Math.min(100, Math.round(depthPart + ratePart + volumePart));
+    }
+
+    rankings.sort((a, b) => b.demand_score - a.demand_score);
+    return rankings.slice(0, 20);
   }
 
   // ═══════════════════════════════════════════════════════════════════════

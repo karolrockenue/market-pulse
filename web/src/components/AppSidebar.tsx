@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -55,6 +55,8 @@ export function AppSidebar({
   isArchanesOnly = false,
 }: AppSidebarProps) {
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  const [propertySearch, setPropertySearch] = useState("");
+  const propertySearchRef = useRef<HTMLInputElement>(null);
   const [sentinelOpen, setSentinelOpen] = useState(false);
   const [rockenueOpen, setRockenueOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
@@ -179,7 +181,7 @@ export function AppSidebar({
       {/* Property Selector */}
       <div style={{ padding: "0 14px 16px", position: "relative" }}>
         <div
-          onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+          onClick={() => { setPropertyDropdownOpen(!propertyDropdownOpen); if (propertyDropdownOpen) setPropertySearch(""); }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -216,14 +218,37 @@ export function AppSidebar({
               border: `1px solid ${R.border}`,
               borderRadius: 8,
               marginTop: 4,
-              maxHeight: 320,
+              maxHeight: 360,
               overflowY: "auto",
               boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
             }}
           >
-            {properties.length > 1 && (
+            {/* Search input */}
+            {properties.length > 5 && (
+              <div style={{ padding: "8px 10px", borderBottom: `1px solid ${R.sep}`, position: "sticky", top: 0, background: R.heroBg, zIndex: 1 }}>
+                <input
+                  ref={propertySearchRef}
+                  autoFocus
+                  value={propertySearch}
+                  onChange={(e) => setPropertySearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { setPropertyDropdownOpen(false); setPropertySearch(""); }
+                    if (e.key === "Enter") {
+                      const filtered = properties.filter((p) => p.property_name.toLowerCase().includes(propertySearch.toLowerCase()));
+                      if (filtered.length === 1) { onPropertyChange(filtered[0].property_id.toString()); setPropertyDropdownOpen(false); setPropertySearch(""); }
+                    }
+                  }}
+                  placeholder="Type to search..."
+                  style={{
+                    width: "100%", padding: "7px 10px", background: R.sidebar, border: `1px solid ${R.border}`,
+                    borderRadius: 6, color: R.accent, fontSize: 12, outline: "none",
+                  }}
+                />
+              </div>
+            )}
+            {properties.length > 1 && !propertySearch && (
               <div
-                onClick={() => { onPropertyChange("ALL"); setPropertyDropdownOpen(false); }}
+                onClick={() => { onPropertyChange("ALL"); setPropertyDropdownOpen(false); setPropertySearch(""); }}
                 style={{
                   padding: "10px 12px",
                   cursor: "pointer",
@@ -239,12 +264,14 @@ export function AppSidebar({
                 {property === "ALL" && <Check size={12} color={R.warmTeal} />}
               </div>
             )}
-            {properties.map((p) => {
+            {properties
+              .filter((p) => !propertySearch || p.property_name.toLowerCase().includes(propertySearch.toLowerCase()))
+              .map((p) => {
               const isSelected = property === p.property_id.toString();
               return (
                 <div
                   key={p.property_id}
-                  onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); }}
+                  onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); setPropertySearch(""); }}
                   style={{
                     padding: "10px 12px",
                     cursor: "pointer",
@@ -262,6 +289,9 @@ export function AppSidebar({
                 </div>
               );
             })}
+            {propertySearch && properties.filter((p) => p.property_name.toLowerCase().includes(propertySearch.toLowerCase())).length === 0 && (
+              <div style={{ padding: "16px 12px", fontSize: 12, color: R.textDim, textAlign: "center" }}>No properties found</div>
+            )}
           </div>
         )}
       </div>
@@ -303,7 +333,7 @@ export function AppSidebar({
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDash3", "mpReportsHub", "mpDemandRadar", "mpCompsetIntel", "mpCompsetView", "mpMyRates", "mpChannelPricing", "mpChannelPricingV2", "mpChannelPricingV3", "mpDistribution", "mpCrmBoard", "mpRiskOverview", "mpControlPanel", "mpControlPanelV2", "mpAdminHub", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDash3", "mpReportsHub", "mpDemandRadar", "mpCompsetIntel", "mpCompsetView", "mpMyRates", "mpChannelPricing", "mpChannelPricingV2", "mpChannelPricingV3", "mpDistribution", "mpCrmBoard", "mpRiskOverview", "mpControlPanel", "mpControlPanelV2", "mpAdminHub", "mpLogin", "mpLoginV2", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
                 {studioOpen && (
                   <>
                     {navItem("MP Dashboard", "mpDash3", MonitorSmartphone, true)}
@@ -320,6 +350,9 @@ export function AppSidebar({
                     {navItem("MP Control Panel", "mpControlPanel", MonitorSmartphone, true)}
                     {navItem("MP Control Panel V2", "mpControlPanelV2", MonitorSmartphone, true)}
                     {navItem("MP Admin Hub", "mpAdminHub", MonitorSmartphone, true)}
+                    {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
+                    {navItem("MP Login V2", "mpLoginV2", MonitorSmartphone, true)}
+                    {navItem("MP Concepts", "mpLoginConcepts", MonitorSmartphone, true)}
                     {navItem("Deck V2", "deckV2", Presentation, true)}
                     {navItem("Shreeji Deck", "shreejiDeck", Presentation, true)}
                     {navItem("Canvas", "canvas", Palette, true)}
