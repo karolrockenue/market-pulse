@@ -86,7 +86,7 @@ import { PromoConfigSection } from "./PromoConfigSection";
 // --- VISUAL CONSTANTS ---
 
 const tabTriggerStyle: React.CSSProperties = {
-  color: "#9ca3af",
+  color: "#7A8494",
   padding: "0.5rem 1rem",
   fontSize: "0.75rem",
   textTransform: "uppercase",
@@ -99,9 +99,9 @@ const tabTriggerStyle: React.CSSProperties = {
 
 const activeTabTriggerStyle: React.CSSProperties = {
   ...tabTriggerStyle,
-  backgroundColor: "rgba(57, 189, 248, 0.1)",
-  color: "#39BDF8",
-  borderColor: "rgba(57, 189, 248, 0.5)",
+  backgroundColor: "rgba(56, 198, 186, 0.1)",
+  color: "#38C6BA",
+  borderColor: "rgba(56, 198, 186, 0.5)",
 };
 
 const MONTH_ORDER = [
@@ -126,28 +126,28 @@ const getAggressionColor = (level: string) => {
   switch (level) {
     case "low":
       return {
-        bg: "rgba(16,185,129,0.1)",
-        text: "#10b981",
-        border: "rgba(16,185,129,0.3)",
+        bg: "rgba(56,198,186,0.06)",
+        text: "#38C6BA",
+        border: "rgba(56,198,186,0.15)",
       };
     case "medium":
     case "mid":
       return {
-        bg: "rgba(250,255,106,0.1)",
-        text: "#39BDF8",
-        border: "rgba(250,255,106,0.3)",
+        bg: "rgba(200,166,110,0.06)",
+        text: "#C8A66E",
+        border: "rgba(200,166,110,0.15)",
       };
     case "high":
       return {
-        bg: "rgba(239,68,68,0.1)",
+        bg: "rgba(239,68,68,0.06)",
         text: "#ef4444",
-        border: "rgba(239,68,68,0.3)",
+        border: "rgba(239,68,68,0.15)",
       };
     default:
       return {
-        bg: "rgba(156,163,175,0.1)",
-        text: "#9ca3af",
-        border: "rgba(156,163,175,0.3)",
+        bg: "rgba(78,88,104,0.1)",
+        text: "#4E5868",
+        border: "rgba(78,88,104,0.2)",
       };
   }
 };
@@ -590,9 +590,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     <div
       style={{
         minHeight: "100vh",
-        background: "#1d1d1c",
-        position: "relative",
-        overflow: "hidden",
+        background: "#14181D",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
       <style>{`
@@ -606,48 +605,28 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
         }
       `}</style>
 
-      {/* Background Gradients */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to bottom right, rgba(57,189,248,0.05), transparent, rgba(250,255,106,0.05))",
-        }}
-      ></div>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
-      ></div>
 
       <div
         style={{
-          position: "relative",
-          zIndex: 10,
-          padding: "3rem",
-          maxWidth: "1800px",
-          margin: "0 auto",
+          padding: "28px 32px",
         }}
       >
         {/* Header */}
-        <div style={{ marginBottom: "3rem" }}>
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 2.5, textTransform: "uppercase", color: "#C8A66E", marginBottom: 8 }}>SENTINEL</div>
           <h1
             style={{
-              color: "#e5e5e5",
-              fontSize: "1.875rem",
-              letterSpacing: "-0.025em",
-              marginBottom: "0.5rem",
+              color: "#F3F5F7",
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              letterSpacing: "-0.5px",
+              marginBottom: "6px",
             }}
           >
-            Sentinel AI Control Panel
+            AI Control Panel
           </h1>
-          <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
-            Super Admin • PMS Integration & AI Configuration
+          <p style={{ color: "#7A8494", fontSize: "0.8125rem" }}>
+            PMS Integration & AI Configuration
           </p>
         </div>
 
@@ -656,8 +635,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
           <div style={{ marginBottom: "2rem" }}>
             <Card
               style={{
-                backgroundColor: "#1a1a1a",
-                borderColor: "rgba(57, 189, 248, 0.2)",
+                backgroundColor: "#121519",
+                borderColor: "#1E2330",
+                borderRadius: "10px",
               }}
             >
               <CardContent style={{ padding: "1.5rem" }}>
@@ -679,7 +659,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     <div
                       style={{
                         padding: "8px",
-                        backgroundColor: "rgba(57, 189, 248, 0.1)",
+                        backgroundColor: "rgba(56, 198, 186, 0.1)",
                         borderRadius: "8px",
                       }}
                     >
@@ -692,14 +672,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           justifyContent: "center",
                         }}
                       >
-                        <span style={{ color: "#39BDF8", fontWeight: "bold" }}>
+                        <span style={{ color: "#38C6BA", fontWeight: "bold" }}>
                           {activeHotels.length + 1}
                         </span>
                       </div>
                     </div>
                     <h3
                       style={{
-                        color: "#e5e5e5",
+                        color: "#F3F5F7",
                         fontSize: "24px",
                         textTransform: "uppercase",
                         letterSpacing: "-0.025em",
@@ -727,9 +707,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             className="w-full justify-between"
                             style={{
                               justifyContent: "space-between",
-                              backgroundColor: "#0f0f0f",
-                              border: "1px solid rgba(57, 189, 248, 0.3)",
-                              color: "#e5e5e5",
+                              backgroundColor: "#121519",
+                              border: "1px solid rgba(56, 198, 186, 0.3)",
+                              color: "#F3F5F7",
                             }}
                           >
                             {hotelToActivate
@@ -745,19 +725,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           style={{
                             width: "400px",
                             padding: 0,
-                            backgroundColor: "#1a1a1a",
-                            border: "1px solid rgba(57, 189, 248, 0.3)",
+                            backgroundColor: "#121519",
+                            border: "1px solid rgba(56, 198, 186, 0.3)",
                           }}
                           align="start"
                         >
-                          <Command style={{ backgroundColor: "#1a1a1a" }}>
+                          <Command style={{ backgroundColor: "#121519" }}>
                             <CommandInput
                               placeholder="Search..."
-                              className="text-[#e5e5e5]"
+                              className="text-[#F3F5F7]"
                             />
                             <CommandEmpty
                               style={{
-                                color: "#9ca3af",
+                                color: "#7A8494",
                                 padding: "1.5rem 0",
                                 textAlign: "center",
                                 fontSize: "0.875rem",
@@ -767,7 +747,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             </CommandEmpty>
                             <CommandGroup
                               style={{
-                                backgroundColor: "#1a1a1a",
+                                backgroundColor: "#121519",
                                 padding: "0.5rem",
                               }}
                             >
@@ -782,19 +762,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     setIsComboOpen(false);
                                   }}
                                   style={{
-                                    color: "#e5e5e5",
+                                    color: "#F3F5F7",
                                     cursor: "pointer",
                                     borderRadius: "0.25rem",
                                     padding: "0.5rem",
                                   }}
-                                  className="hover:bg-[#161616]"
+                                  className="hover:bg-[#121519]"
                                 >
                                   <Check
                                     style={{
                                       marginRight: "0.5rem",
                                       height: "1rem",
                                       width: "1rem",
-                                      color: "#39BDF8",
+                                      color: "#38C6BA",
                                       opacity:
                                         hotelToActivate ===
                                         String(hotel.hotel_id)
@@ -815,8 +795,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       disabled={!hotelToActivate || isSyncing !== null}
                       className="disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
-                        backgroundColor: "#39BDF8",
-                        color: "#0f0f0f",
+                        backgroundColor: "#38C6BA",
+                        color: "#121519",
                         fontWeight: 500,
                       }}
                       onClick={() => {
@@ -856,19 +836,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
         >
           <DialogContent
             style={{
-              backgroundColor: "#1a1a1a",
-              borderColor: "#2a2a2a",
+              backgroundColor: "#121519",
+              borderColor: "#1E2330",
               maxWidth: "600px",
               maxHeight: "80vh",
             }}
           >
             <DialogHeader>
-              <DialogTitle style={{ color: "#e5e5e5" }}>
+              <DialogTitle style={{ color: "#F3F5F7" }}>
                 Select Rate Plan
               </DialogTitle>
-              <DialogDescription style={{ color: "#9ca3af" }}>
+              <DialogDescription style={{ color: "#7A8494" }}>
                 This property has{" "}
-                <span style={{ color: "#39BDF8", fontWeight: 600 }}>
+                <span style={{ color: "#38C6BA", fontWeight: 600 }}>
                   {ratePlanPicker?.ratePlans.length}
                 </span>{" "}
                 root rate plans. Select the base rate plan Sentinel should use
@@ -882,9 +862,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 value={ratePlanSearch}
                 onChange={(e) => setRatePlanSearch(e.target.value)}
                 style={{
-                  backgroundColor: "#2C2C2C",
-                  borderColor: "#2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: "#1E2330",
+                  borderColor: "#1E2330",
+                  color: "#F3F5F7",
                 }}
               />
             </div>
@@ -919,11 +899,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                         borderRadius: "0.375rem",
                         cursor: "pointer",
                         border: isSelected
-                          ? "1px solid #39BDF8"
-                          : "1px solid #2a2a2a",
+                          ? "1px solid #38C6BA"
+                          : "1px solid #1E2330",
                         backgroundColor: isSelected
-                          ? "rgba(57,189,248,0.08)"
-                          : "#1D1D1C",
+                          ? "rgba(56,198,186,0.08)"
+                          : "#14181D",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
@@ -937,14 +917,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             height: "1rem",
                             borderRadius: "50%",
                             border: isSelected
-                              ? "5px solid #39BDF8"
-                              : "2px solid #6b7280",
+                              ? "5px solid #38C6BA"
+                              : "2px solid #4E5868",
                             flexShrink: 0,
                           }}
                         />
                         <span
                           style={{
-                            color: "#e5e5e5",
+                            color: "#F3F5F7",
                             fontSize: "0.875rem",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -958,8 +938,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                         {isAutoSuggested && (
                           <Badge
                             style={{
-                              backgroundColor: "rgba(57,189,248,0.15)",
-                              color: "#39BDF8",
+                              backgroundColor: "rgba(56,198,186,0.15)",
+                              color: "#38C6BA",
                               fontSize: "0.7rem",
                               padding: "0.125rem 0.5rem",
                             }}
@@ -970,8 +950,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                         {(rp as any).isPublic && (
                           <Badge
                             style={{
-                              backgroundColor: "rgba(16,185,129,0.15)",
-                              color: "#10b981",
+                              backgroundColor: "rgba(56,198,186,0.15)",
+                              color: "#38C6BA",
                               fontSize: "0.7rem",
                               padding: "0.125rem 0.5rem",
                             }}
@@ -994,8 +974,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                   setRatePlanSearch("");
                 }}
                 style={{
-                  borderColor: "#2a2a2a",
-                  color: "#9ca3af",
+                  borderColor: "#1E2330",
+                  color: "#7A8494",
                 }}
               >
                 Cancel
@@ -1015,8 +995,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 }}
                 style={{
                   backgroundColor:
-                    selectedRateId ? "#39BDF8" : "rgba(57,189,248,0.3)",
-                  color: "#0f0f0f",
+                    selectedRateId ? "#38C6BA" : "rgba(56,198,186,0.3)",
+                  color: "#121519",
                   fontWeight: 500,
                 }}
               >
@@ -1033,14 +1013,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
         <div style={{ marginBottom: "2rem" }}>
           <Card
             style={{
-              backgroundColor: "#1a1a1a",
-              borderColor: "rgba(57, 189, 248, 0.2)",
-              boxShadow: "0 0 30px rgba(57,189,248,0.1)",
+              backgroundColor: "#121519",
+              borderColor: "#1E2330",
+              borderRadius: "10px",
             }}
           >
             <CardHeader
               style={{
-                borderBottom: "1px solid rgba(57,189,248,0.1)",
+                borderBottom: "1px solid rgba(255,255,255,0.04)",
                 paddingBottom: "1.5rem",
               }}
             >
@@ -1054,7 +1034,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 <div
                   style={{
                     padding: "0.5rem",
-                    background: "rgba(57,189,248,0.1)",
+                    background: "rgba(56,198,186,0.1)",
                     borderRadius: "0.5rem",
                   }}
                 >
@@ -1062,14 +1042,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     style={{
                       width: "1.5rem",
                       height: "1.5rem",
-                      color: "#39BDF8",
+                      color: "#38C6BA",
                     }}
                   />
                 </div>
                 <div>
                   <CardTitle
                     style={{
-                      color: "#e5e5e5",
+                      color: "#F3F5F7",
                       fontSize: "1.5rem",
                       textTransform: "uppercase",
                       letterSpacing: "-0.025em",
@@ -1078,7 +1058,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     Market Strategy & VITALS
                   </CardTitle>
                   <CardDescription
-                    style={{ color: "#9ca3af", marginTop: "0.25rem" }}
+                    style={{ color: "#7A8494", marginTop: "0.25rem" }}
                   >
                     Global market defaults • Applied to all properties unless
                     overridden
@@ -1094,10 +1074,10 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
               >
                 <TabsList
                   style={{
-                    backgroundColor: "#0f0f0f",
+                    backgroundColor: "#121519",
                     display: "grid",
                     gridTemplateColumns: "repeat(1, 1fr)",
-                    border: "1px solid #2a2a2a",
+                    border: "1px solid #1E2330",
                     height: "auto",
                     padding: "0.25rem",
                     gap: "0.25rem",
@@ -1140,10 +1120,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       >
                         <h3
                           style={{
-                            color: "#e5e5e5",
+                            color: "#C8A66E",
                             textTransform: "uppercase",
-                            letterSpacing: "0.05em",
+                            letterSpacing: "0.12em",
                             fontSize: "0.75rem",
+                            fontWeight: 600,
                           }}
                         >
                           Manual Events
@@ -1153,9 +1134,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           size="sm"
                           onClick={() => setIsAddEventOpen(true)}
                           style={{
-                            backgroundColor: "#0f0f0f",
-                            borderColor: "#2a2a2a",
-                            color: "#e5e5e5",
+                            backgroundColor: "#121519",
+                            borderColor: "#1E2330",
+                            color: "#F3F5F7",
                           }}
                         >
                           <Plus className="w-3 h-3 mr-2" /> Add Event
@@ -1163,26 +1144,26 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       </div>
                       <div
                         style={{
-                          background: "#0f0f0f",
-                          border: "1px solid #2a2a2a",
+                          background: "#121519",
+                          border: "1px solid #1E2330",
                           borderRadius: "0.5rem",
                           overflow: "hidden",
                         }}
                       >
                         <Table>
                           <TableHeader>
-                            <TableRow className="border-[#2a2a2a] hover:bg-transparent">
-                              <TableHead style={{ color: "#9ca3af" }}>
+                            <TableRow className="border-[#1E2330] hover:bg-transparent">
+                              <TableHead style={{ color: "#7A8494" }}>
                                 Date
                               </TableHead>
-                              <TableHead style={{ color: "#9ca3af" }}>
+                              <TableHead style={{ color: "#7A8494" }}>
                                 Event Name
                               </TableHead>
-                              <TableHead style={{ color: "#9ca3af" }}>
+                              <TableHead style={{ color: "#7A8494" }}>
                                 Impact
                               </TableHead>
                               <TableHead
-                                style={{ color: "#9ca3af", textAlign: "right" }}
+                                style={{ color: "#7A8494", textAlign: "right" }}
                               >
                                 Actions
                               </TableHead>
@@ -1198,9 +1179,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
 
                               if (group.maxMult <= 1.5) {
                                 impactLabel = "Medium Demand";
-                                color = "#39BDF8";
-                                bg = "rgba(250, 255, 106, 0.1)";
-                                border = "rgba(250, 255, 106, 0.3)";
+                                color = "#38C6BA";
+                                bg = "rgba(200, 166, 110, 0.1)";
+                                border = "rgba(200, 166, 110, 0.3)";
                               } else if (group.maxMult >= 2.5) {
                                 impactLabel = "Extreme Demand";
                                 color = "#c084fc";
@@ -1212,11 +1193,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 <React.Fragment key={group.name}>
                                   {/* SUMMARY ROW */}
                                   <TableRow
-                                    className="hover:bg-[#161616]"
+                                    className="hover:bg-[#121519]"
                                     style={{
                                       borderBottom: expandedGroups[group.name]
                                         ? "none"
-                                        : "1px solid #2a2a2a",
+                                        : "1px solid #1E2330",
                                       backgroundColor: expandedGroups[
                                         group.name
                                       ]
@@ -1226,7 +1207,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   >
                                     <TableCell
                                       style={{
-                                        color: "#e5e5e5",
+                                        color: "#F3F5F7",
                                         fontWeight: 500,
                                       }}
                                     >
@@ -1236,7 +1217,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     </TableCell>
                                     <TableCell
                                       style={{
-                                        color: "#e5e5e5",
+                                        color: "#F3F5F7",
                                         fontWeight: 500,
                                       }}
                                     >
@@ -1244,7 +1225,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                       {group.count > 1 && (
                                         <span
                                           style={{
-                                            color: "#9ca3af",
+                                            color: "#7A8494",
                                             fontSize: "0.75rem",
                                             marginLeft: "8px",
                                           }}
@@ -1281,7 +1262,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                             onClick={() =>
                                               toggleGroup(group.name)
                                             }
-                                            style={{ color: "#9ca3af" }}
+                                            style={{ color: "#7A8494" }}
                                           >
                                             {expandedGroups[group.name] ? (
                                               <ChevronUp
@@ -1338,9 +1319,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
 
                                         if (eMult <= 1.5) {
                                           eLabel = "Medium Demand";
-                                          eColor = "#39BDF8";
-                                          eBg = "rgba(250, 255, 106, 0.05)";
-                                          eBorder = "rgba(250, 255, 106, 0.2)";
+                                          eColor = "#38C6BA";
+                                          eBg = "rgba(200, 166, 110, 0.05)";
+                                          eBorder = "rgba(200, 166, 110, 0.2)";
                                         } else if (eMult >= 2.5) {
                                           eLabel = "Extreme Demand";
                                           eColor = "#c084fc";
@@ -1359,25 +1340,25 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         return (
                                           <TableRow
                                             key={event.id}
-                                            className="hover:bg-[#161616]"
+                                            className="hover:bg-[#121519]"
                                             style={{
                                               backgroundColor:
                                                 "rgba(0,0,0,0.15)",
                                               borderBottom: isLast
-                                                ? "1px solid #2a2a2a"
+                                                ? "1px solid #1E2330"
                                                 : "none",
                                             }}
                                           >
                                             <TableCell
                                               style={{
-                                                color: "#9ca3af",
+                                                color: "#7A8494",
                                                 paddingLeft: "2rem",
                                               }}
                                             >
                                               └ {formattedDate}
                                             </TableCell>
                                             <TableCell
-                                              style={{ color: "#9ca3af" }}
+                                              style={{ color: "#7A8494" }}
                                             ></TableCell>
                                             <TableCell>
                                               <Badge
@@ -1434,13 +1415,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     >
                       <h3
                         style={{
-                          color: "#9ca3af",
+                          color: "#C8A66E",
                           textTransform: "uppercase",
-                          letterSpacing: "0.05em",
+                          letterSpacing: "0.12em",
                           fontSize: "10px",
+                          fontWeight: 600,
                         }}
                       >
-                        Market Vitals (Read-Only)
+                        Market Vitals
                       </h3>
                       <div
                         style={{
@@ -1451,8 +1433,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       >
                         <div
                           style={{
-                            background: "#0f0f0f",
-                            border: "1px solid #2a2a2a",
+                            background: "#121519",
+                            border: "1px solid #1E2330",
                             borderRadius: "0.25rem",
                             padding: "0.5rem",
                             display: "flex",
@@ -1460,19 +1442,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             gap: "0.5rem",
                           }}
                         >
-                          <span style={{ color: "#9ca3af", fontSize: "10px" }}>
+                          <span style={{ color: "#7A8494", fontSize: "10px" }}>
                             LEAD
                           </span>
                           <span
-                            style={{ color: "#e5e5e5", fontSize: "0.875rem" }}
+                            style={{ color: "#F3F5F7", fontSize: "0.875rem" }}
                           >
                             21d
                           </span>
                         </div>
                         <div
                           style={{
-                            background: "#0f0f0f",
-                            border: "1px solid #2a2a2a",
+                            background: "#121519",
+                            border: "1px solid #1E2330",
                             borderRadius: "0.25rem",
                             padding: "0.5rem",
                             display: "flex",
@@ -1480,19 +1462,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             gap: "0.5rem",
                           }}
                         >
-                          <span style={{ color: "#9ca3af", fontSize: "10px" }}>
+                          <span style={{ color: "#7A8494", fontSize: "10px" }}>
                             LOS
                           </span>
                           <span
-                            style={{ color: "#e5e5e5", fontSize: "0.875rem" }}
+                            style={{ color: "#F3F5F7", fontSize: "0.875rem" }}
                           >
                             2.8n
                           </span>
                         </div>
                         <div
                           style={{
-                            background: "#0f0f0f",
-                            border: "1px solid #2a2a2a",
+                            background: "#121519",
+                            border: "1px solid #1E2330",
                             borderRadius: "0.25rem",
                             padding: "0.5rem",
                             display: "flex",
@@ -1500,11 +1482,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             gap: "0.5rem",
                           }}
                         >
-                          <span style={{ color: "#9ca3af", fontSize: "10px" }}>
+                          <span style={{ color: "#7A8494", fontSize: "10px" }}>
                             PACE
                           </span>
                           <span
-                            style={{ color: "#10b981", fontSize: "0.875rem" }}
+                            style={{ color: "#38C6BA", fontSize: "0.875rem" }}
                           >
                             +4.2%
                           </span>
@@ -1527,8 +1509,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 justifyContent: "center",
                 alignItems: "center",
                 padding: "3rem",
-                background: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                background: "#121519",
+                border: "1px solid #1E2330",
                 borderRadius: "0.5rem",
               }}
             >
@@ -1536,11 +1518,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 style={{
                   width: "1.5rem",
                   height: "1.5rem",
-                  color: "#39BDF8",
+                  color: "#38C6BA",
                   animation: "spin 1s linear infinite",
                 }}
               />
-              <span style={{ color: "#9ca3af", marginLeft: "0.75rem" }}>
+              <span style={{ color: "#7A8494", marginLeft: "0.75rem" }}>
                 Loading Configurations...
               </span>
             </div>
@@ -1603,43 +1585,43 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     key={hotel.hotel_id}
                     value={String(hotel.hotel_id)}
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      borderLeft: `4px solid ${
+                      backgroundColor: "#121519",
+                      borderLeft: `3px solid ${
                         hotel.config?.sentinel_enabled
-                          ? "rgba(16, 185, 129, 0.4)"
-                          : "rgba(250, 255, 106, 0.4)"
+                          ? "#38C6BA"
+                          : "#1E2330"
                       }`,
                       borderRight: `1px solid ${
                         openAccordionItem === String(hotel.hotel_id)
-                          ? "#39BDF8"
-                          : "#2a2a2a"
+                          ? "rgba(255,255,255,0.06)"
+                          : "#1E2330"
                       }`,
                       borderTop: `1px solid ${
                         openAccordionItem === String(hotel.hotel_id)
-                          ? "#39BDF8"
-                          : "#2a2a2a"
+                          ? "rgba(255,255,255,0.06)"
+                          : "#1E2330"
                       }`,
                       borderBottom: `1px solid ${
                         openAccordionItem === String(hotel.hotel_id)
-                          ? "#39BDF8"
-                          : "#2a2a2a"
+                          ? "rgba(255,255,255,0.06)"
+                          : "#1E2330"
                       }`,
-                      borderRadius: "0.5rem",
+                      borderRadius: "10px",
                       overflow: "hidden",
                     }}
                   >
                     <AccordionTrigger
                       style={{
-                        padding: "1.25rem 1.5rem",
-                        backgroundColor: "#141414",
+                        padding: "13px 20px",
+                        backgroundColor: "#121519",
                       }}
                       className="hover:no-underline"
                     >
                       <div
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "1fr 190px 140px 120px auto",
-                          gap: "1.5rem",
+                          gridTemplateColumns: "1fr 120px 130px 80px 80px",
+                          gap: "12px",
                           width: "100%",
                           paddingRight: "1rem",
                           alignItems: "center",
@@ -1649,265 +1631,49 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "1.5rem",
+                            gap: "8px",
                           }}
                         >
-                          <span style={{ color: "#e5e5e5", fontWeight: 500 }}>
-                            {hotel.property_name} ({hotel.hotel_id})
+                          <span style={{ color: "#F3F5F7", fontWeight: 600, fontSize: "13px", letterSpacing: "-0.3px" }}>
+                            {hotel.property_name}
+                          </span>
+                          <span style={{ color: "#4E5868", fontSize: "10px", fontVariantNumeric: "tabular-nums" }}>
+                            #{hotel.hotel_id}
                           </span>
                         </div>
 
-                        <div style={{ marginRight: "50px" }}>
-                          <Badge
-                            variant="outline"
-                            style={
-                              isAutopilot
-                                ? {
-                                    backgroundColor: "rgba(239, 68, 68, 0.15)",
-                                    color: "#ef4444",
-                                    borderColor: "#ef4444",
-                                    whiteSpace: "nowrap",
-                                    fontWeight: "bold",
-                                    boxShadow:
-                                      "0 0 12px rgba(239, 68, 68, 0.4)",
-                                    width: "100%",
-                                    justifyContent: "center",
-                                  }
-                                : {
-                                    backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                    color: "#6b7280",
-                                    borderColor: "rgba(74, 74, 72, 0.3)",
-                                    whiteSpace: "nowrap",
-                                    width: "100%",
-                                    justifyContent: "center",
-                                  }
-                            }
-                          >
-                            {isAutopilot ? "AUTOPILOT ON" : "Autopilot Off"}
-                          </Badge>
+                        <div>
+                          {isAutopilot
+                            ? <span style={{ fontSize: 10, fontWeight: 600, color: "#38C6BA", padding: "3px 10px", borderRadius: 4, background: "rgba(56,198,186,0.10)", border: "1px solid rgba(56,198,186,0.20)" }}>AUTOPILOT</span>
+                            : <span style={{ fontSize: 10, color: "#4E5868" }}>Manual</span>
+                          }
                         </div>
 
-                        <Badge
-                          variant="outline"
-                          style={
-                            strategyMode === "sell_every_room"
-                              ? {
-                                  backgroundColor: "rgba(147, 51, 234, 0.1)",
-                                  color: "#c084fc",
-                                  borderColor: "rgba(147, 51, 234, 0.5)",
-                                  whiteSpace: "nowrap",
-                                  width: "100%",
-                                  justifyContent: "center",
-                                }
-                              : {
-                                  backgroundColor: "rgba(245, 158, 11, 0.1)",
-                                  color: "#fbbf24",
-                                  borderColor: "rgba(245, 158, 11, 0.5)",
-                                  whiteSpace: "nowrap",
-                                  width: "100%",
-                                  justifyContent: "center",
-                                }
-                          }
-                        >
-                          {strategyMode === "sell_every_room"
-                            ? "Sell Every Room"
-                            : "Maintain"}
-                        </Badge>
+                        <span style={{ fontSize: 11, color: strategyMode === "sell_every_room" ? "#C8A66E" : "#7A8494", fontWeight: 500 }}>
+                          {strategyMode === "sell_every_room" ? "Sell Every Room" : "Maintain"}
+                        </span>
 
-                        <Badge
-                          variant="outline"
-                          style={
-                            hotel.config?.sentinel_enabled
-                              ? {
-                                  backgroundColor: "rgba(16, 185, 129, 0.1)",
-                                  color: "#10b981",
-                                  borderColor: "rgba(16, 185, 129, 0.3)",
-                                  whiteSpace: "nowrap",
-                                  width: "100%",
-                                  justifyContent: "center",
-                                }
-                              : {
-                                  backgroundColor: "rgba(250, 255, 106, 0.1)",
-                                  color: "#39BDF8",
-                                  borderColor: "rgba(250, 255, 106, 0.3)",
-                                  whiteSpace: "nowrap",
-                                  width: "100%",
-                                  justifyContent: "center",
-                                }
-                          }
-                        >
-                          Status:{" "}
-                          {hotel.config?.sentinel_enabled ? "Active" : "Paused"}
-                        </Badge>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <div style={{ width: 5, height: 5, borderRadius: 3, background: hotel.config?.sentinel_enabled ? "#34D068" : "#4E5868" }} />
+                          <span style={{ fontSize: 11, color: hotel.config?.sentinel_enabled ? "#B0B8C4" : "#4E5868" }}>
+                            {hotel.config?.sentinel_enabled ? "Active" : "Paused"}
+                          </span>
+                        </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "1.5rem",
-                            borderLeft: "1px solid #2a2a2a",
-                            paddingLeft: "1.5rem",
-                          }}
-                        >
-                          {/* OPTIONALS */}
-                          <div style={{ display: "flex", gap: "0.5rem" }}>
-                            <Badge
-                              variant="outline"
-                              style={
-                                hotel.status?.hasFloorRate
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
-                                      borderColor: "rgba(57, 189, 248, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                      color: "#6b7280",
-                                      borderColor: "rgba(74, 74, 72, 0.3)",
-                                    }
-                              }
-                            >
-                              Last-Min Floor
-                            </Badge>
-
-                            <Badge
-                              variant="outline"
-                              style={
-                                hotel.status?.hasRateFreeze
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(245, 158, 11, 0.1)",
-                                      color: "#f59e0b",
-                                      borderColor: "rgba(245, 158, 11, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(74, 74, 72, 0.1)",
-                                      color: "#6b7280",
-                                      borderColor: "rgba(74, 74, 72, 0.3)",
-                                    }
-                              }
-                            >
-                              Freeze
-                            </Badge>
-                          </div>
-
-                          {/* MUSTS */}
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "0.5rem",
-                              borderLeft: "1px solid #2a2a2a",
-                              paddingLeft: "1.5rem",
-                            }}
-                          >
-                            <Badge
-                              variant="outline"
-                              style={
-                                hasMinRates
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
-                                      borderColor: "rgba(57, 189, 248, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      color: "#ef4444",
-                                      borderColor: "rgba(239, 68, 68, 0.3)",
-                                    }
-                              }
-                            >
-                              MIN
-                            </Badge>
-
-                            <Badge
-                              variant="outline"
-                              style={
-                                hasMaxRates
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
-                                      borderColor: "rgba(57, 189, 248, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      color: "#ef4444",
-                                      borderColor: "rgba(239, 68, 68, 0.3)",
-                                    }
-                              }
-                            >
-                              MAX
-                            </Badge>
-
-                            <Badge
-                              variant="outline"
-                              style={
-                                hasCurves
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
-                                      borderColor: "rgba(57, 189, 248, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      color: "#ef4444",
-                                      borderColor: "rgba(239, 68, 68, 0.3)",
-                                    }
-                              }
-                            >
-                              Curves
-                            </Badge>
-
-                            <Badge
-                              variant="outline"
-                              style={
-                                hasSeasonality
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
-                                      borderColor: "rgba(57, 189, 248, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      color: "#ef4444",
-                                      borderColor: "rgba(239, 68, 68, 0.3)",
-                                    }
-                              }
-                            >
-                              Seasonality
-                            </Badge>
-
-                            <Badge
-                              variant="outline"
-                              style={
-                                hasDifferentials
-                                  ? {
-                                      backgroundColor:
-                                        "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
-                                      borderColor: "rgba(57, 189, 248, 0.3)",
-                                    }
-                                  : {
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      color: "#ef4444",
-                                      borderColor: "rgba(239, 68, 68, 0.3)",
-                                    }
-                              }
-                            >
-                              Differentials
-                            </Badge>
-                          </div>
+                        <div style={{ display: "flex", gap: 3, alignItems: "center", justifyContent: "flex-end" }}>
+                          {[hasMinRates, hasMaxRates, hasCurves, hasSeasonality, hasDifferentials].map((ok, idx) => (
+                            <div key={idx} style={{ width: 5, height: 5, borderRadius: 3, background: ok ? "#38C6BA" : "rgba(78,88,104,0.5)" }} title={["MIN","MAX","Curves","Season","Diffs"][idx]} />
+                          ))}
+                          <span style={{ fontSize: 10, color: isAiReady ? "#38C6BA" : "#4E5868", marginLeft: 3, fontWeight: 600 }}>
+                            {[hasMinRates, hasMaxRates, hasCurves, hasSeasonality, hasDifferentials].filter(Boolean).length}/5
+                          </span>
                         </div>
                       </div>
                     </AccordionTrigger>
 
                     <AccordionContent
                       style={{
-                        backgroundColor: "#141414",
+                        backgroundColor: "#121519",
                         padding: "1.5rem 1rem 1rem 2rem",
                       }}
                     >
@@ -1925,12 +1691,12 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             style={{
                               width: "1.5rem",
                               height: "1.5rem",
-                              color: "#39BDF8",
+                              color: "#38C6BA",
                               animation: "spin 1s linear infinite",
                             }}
                           />
                           <span
-                            style={{ color: "#9ca3af", marginLeft: "0.75rem" }}
+                            style={{ color: "#7A8494", marginLeft: "0.75rem" }}
                           >
                             Loading Configuration...
                           </span>
@@ -1959,15 +1725,15 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 justifyContent: "space-between",
                                 padding: "0 1rem",
                                 height: "60px",
-                                background: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
+                                background: "#121519",
+                                border: "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                               }}
                             >
                               <Label
                                 htmlFor={`sentinel-status-${hotel.hotel_id}`}
                                 style={{
-                                  color: "#e5e5e5",
+                                  color: "#F3F5F7",
                                   fontSize: "0.875rem",
                                 }}
                               >
@@ -2002,14 +1768,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   (formState[hotel.hotel_id]
                                     ?.is_autopilot_enabled ??
                                   hotel.config?.is_autopilot_enabled)
-                                    ? "rgba(16, 185, 129, 0.1)"
-                                    : "#0f0f0f",
+                                    ? "rgba(56, 198, 186, 0.1)"
+                                    : "#121519",
                                 border:
                                   (formState[hotel.hotel_id]
                                     ?.is_autopilot_enabled ??
                                   hotel.config?.is_autopilot_enabled)
-                                    ? "1px solid rgba(16, 185, 129, 0.3)"
-                                    : "1px solid #2a2a2a",
+                                    ? "1px solid rgba(56, 198, 186, 0.3)"
+                                    : "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                                 transition: "all 0.3s ease",
                               }}
@@ -2024,7 +1790,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 <Label
                                   htmlFor={`autopilot-status-${hotel.hotel_id}`}
                                   style={{
-                                    color: "#e5e5e5",
+                                    color: "#F3F5F7",
                                     fontSize: "0.875rem",
                                   }}
                                 >
@@ -2039,16 +1805,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           height: "14px",
                                           color: isAiReady
                                             ? "#ef4444"
-                                            : "#f59e0b",
+                                            : "#C8A66E",
                                         }}
                                       />
                                     </TooltipTrigger>
                                     <TooltipContent
                                       style={{
-                                        backgroundColor: "#1a1a1a",
+                                        backgroundColor: "#121519",
                                         borderColor: isAiReady
                                           ? "#ef4444"
-                                          : "#f59e0b",
+                                          : "#C8A66E",
                                       }}
                                     >
                                       {isAiReady ? (
@@ -2066,7 +1832,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         <div
                                           style={{
                                             fontSize: "11px",
-                                            color: "#f59e0b",
+                                            color: "#C8A66E",
                                           }}
                                         >
                                           <p
@@ -2130,8 +1896,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 justifyContent: "space-between",
                                 padding: "0 1rem",
                                 height: "60px",
-                                background: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
+                                background: "#121519",
+                                border: "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                               }}
                             >
@@ -2144,7 +1910,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               >
                                 <Label
                                   style={{
-                                    color: "#e5e5e5",
+                                    color: "#F3F5F7",
                                     fontSize: "0.875rem",
                                   }}
                                 >
@@ -2157,20 +1923,20 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         style={{
                                           width: "14px",
                                           height: "14px",
-                                          color: "#6b7280",
+                                          color: "#4E5868",
                                         }}
                                       />
                                     </TooltipTrigger>
                                     <TooltipContent
                                       style={{
-                                        backgroundColor: "#1a1a1a",
-                                        borderColor: "#2a2a2a",
+                                        backgroundColor: "#121519",
+                                        borderColor: "#1E2330",
                                       }}
                                     >
                                       <p
                                         style={{
                                           fontSize: "11px",
-                                          color: "#e5e5e5",
+                                          color: "#F3F5F7",
                                         }}
                                       >
                                         Maintain: Optimize for ADR.
@@ -2200,24 +1966,24 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     width: "180px",
                                     height: "32px",
                                     fontSize: "0.75rem",
-                                    backgroundColor: "#1a1a1a",
-                                    borderColor: "#2a2a2a",
-                                    color: "#e5e5e5",
+                                    backgroundColor: "#121519",
+                                    borderColor: "#1E2330",
+                                    color: "#F3F5F7",
                                   }}
                                 >
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent
                                   style={{
-                                    backgroundColor: "#1a1a1a",
-                                    borderColor: "#2a2a2a",
+                                    backgroundColor: "#121519",
+                                    borderColor: "#1E2330",
                                   }}
                                 >
                                   <SelectItem
                                     value="maintain"
-                                    className="focus:bg-[#39BDF8]/20 focus:text-[#39BDF8]"
+                                    className="focus:bg-[#38C6BA]/20 focus:text-[#38C6BA]"
                                     style={{
-                                      color: "#e5e5e5",
+                                      color: "#F3F5F7",
                                       fontSize: "0.8rem",
                                       cursor: "pointer",
                                     }}
@@ -2226,9 +1992,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   </SelectItem>
                                   <SelectItem
                                     value="sell_every_room"
-                                    className="focus:bg-[#39BDF8]/20 focus:text-[#39BDF8]"
+                                    className="focus:bg-[#38C6BA]/20 focus:text-[#38C6BA]"
                                     style={{
-                                      color: "#e5e5e5",
+                                      color: "#F3F5F7",
                                       fontSize: "0.8rem",
                                       cursor: "pointer",
                                     }}
@@ -2247,14 +2013,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 justifyContent: "space-between",
                                 padding: "0 1rem",
                                 height: "60px",
-                                background: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
+                                background: "#121519",
+                                border: "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                               }}
                             >
                               <Label
                                 style={{
-                                  color: "#e5e5e5",
+                                  color: "#F3F5F7",
                                   fontSize: "0.875rem",
                                 }}
                               >
@@ -2310,12 +2076,12 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                       variant="ghost"
                                       size="sm"
                                       style={{
-                                        color: "#39BDF8",
+                                        color: "#38C6BA",
                                         height: "32px",
                                         fontSize: "0.8rem",
                                         pointerEvents: "none", // Let the span handle the click from DialogTrigger
                                       }}
-                                      className="hover:bg-[#39BDF8]/10"
+                                      className="hover:bg-[#38C6BA]/10"
                                     >
                                       <CalendarIcon className="w-4 h-4 mr-2" />
                                       Edit
@@ -2332,8 +2098,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 justifyContent: "space-between",
                                 padding: "0 1rem",
                                 height: "60px",
-                                background: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
+                                background: "#121519",
+                                border: "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                               }}
                             >
@@ -2346,7 +2112,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               >
                                 <Label
                                   style={{
-                                    color: "#e5e5e5",
+                                    color: "#F3F5F7",
                                     fontSize: "0.875rem",
                                   }}
                                 >
@@ -2359,20 +2125,20 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         style={{
                                           width: "14px",
                                           height: "14px",
-                                          color: "#6b7280",
+                                          color: "#4E5868",
                                         }}
                                       />
                                     </TooltipTrigger>
                                     <TooltipContent
                                       style={{
-                                        backgroundColor: "#1a1a1a",
-                                        borderColor: "#2a2a2a",
+                                        backgroundColor: "#121519",
+                                        borderColor: "#1E2330",
                                       }}
                                     >
                                       <p
                                         style={{
                                           fontSize: "11px",
-                                          color: "#e5e5e5",
+                                          color: "#F3F5F7",
                                         }}
                                       >
                                         Stop AI from changing rates for the next
@@ -2400,11 +2166,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     )
                                   }
                                   style={{
-                                    backgroundColor: "#161616",
+                                    backgroundColor: "#121519",
                                     textAlign: "center",
                                     paddingRight: "20px",
                                   }}
-                                  className="border-[#2a2a2a] text-[#e5e5e5] h-8 text-sm"
+                                  className="border-[#1E2330] text-[#F3F5F7] h-8 text-sm"
                                 />
                                 <span
                                   style={{
@@ -2412,7 +2178,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     right: "8px",
                                     top: "50%",
                                     transform: "translateY(-50%)",
-                                    color: "#6b7280",
+                                    color: "#4E5868",
                                     fontSize: "10px",
                                     pointerEvents: "none",
                                   }}
@@ -2420,7 +2186,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               </div>
                             </div>
                           </div>
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* [MOVED] Seasonality Strategy */}
                           <div
                             style={{
@@ -2431,18 +2197,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           >
                             <h3
                               style={{
-                                color: "#e5e5e5",
+                                color: "#C8A66E",
                                 textTransform: "uppercase",
-                                letterSpacing: "0.05em",
+                                letterSpacing: "0.12em",
                                 fontSize: "0.75rem",
+                                fontWeight: 600,
                               }}
                             >
                               Seasonality Strategy
                             </h3>
                             <div
                               style={{
-                                background: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
+                                background: "#121519",
+                                border: "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                                 padding: "1rem",
                               }}
@@ -2539,7 +2306,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   justifyContent: "center",
                                   gap: "1.5rem",
                                   paddingTop: "0.75rem",
-                                  borderTop: "1px solid #2a2a2a",
+                                  borderTop: "1px solid #1E2330",
                                 }}
                               >
                                 <div
@@ -2554,16 +2321,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                       width: "0.75rem",
                                       height: "0.75rem",
                                       borderRadius: "50%",
-                                      background: "#10b981",
+                                      background: "#38C6BA",
                                     }}
                                   />
                                   <span
                                     style={{
-                                      color: "#9ca3af",
+                                      color: "#4E5868",
                                       fontSize: "0.75rem",
                                     }}
                                   >
-                                    Low Aggression
+                                    Low (Pressure)
                                   </span>
                                 </div>
                                 <div
@@ -2578,16 +2345,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                       width: "0.75rem",
                                       height: "0.75rem",
                                       borderRadius: "50%",
-                                      background: "#39BDF8",
+                                      background: "#C8A66E",
                                     }}
                                   />
                                   <span
                                     style={{
-                                      color: "#9ca3af",
+                                      color: "#4E5868",
                                       fontSize: "0.75rem",
                                     }}
                                   >
-                                    Medium Aggression
+                                    Mid (Guide)
                                   </span>
                                 </div>
                                 <div
@@ -2607,17 +2374,17 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   />
                                   <span
                                     style={{
-                                      color: "#9ca3af",
+                                      color: "#7A8494",
                                       fontSize: "0.75rem",
                                     }}
                                   >
-                                    High Aggression
+                                    High (Trap)
                                   </span>
                                 </div>
                               </div>
                             </div>
                           </div>
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* 2. Last-Minute Floor */}
                           {/* 2. Last-Minute Floor */}
                           <div
@@ -2637,7 +2404,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               <div>
                                 <h3
                                   style={{
-                                    color: "#e5e5e5",
+                                    color: "#F3F5F7",
                                     textTransform: "uppercase",
                                     letterSpacing: "0.05em",
                                     fontSize: "0.75rem",
@@ -2647,7 +2414,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 </h3>
                                 <p
                                   style={{
-                                    color: "#9ca3af",
+                                    color: "#7A8494",
                                     fontSize: "10px",
                                     marginTop: "0.125rem",
                                   }}
@@ -2675,8 +2442,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               ?.enabled && (
                               <div
                                 style={{
-                                  background: "#0f0f0f",
-                                  border: "1px solid rgba(249,115,22,0.3)",
+                                  background: "#121519",
+                                  border: "1px solid rgba(56,198,186,0.3)",
                                   borderRadius: "0.5rem",
                                   padding: "1rem",
                                   display: "flex",
@@ -2700,7 +2467,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   >
                                     <Label
                                       style={{
-                                        color: "#9ca3af",
+                                        color: "#7A8494",
                                         fontSize: "0.75rem",
                                         textTransform: "uppercase",
                                         letterSpacing: "0.05em",
@@ -2715,7 +2482,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           left: "0.75rem",
                                           top: "50%",
                                           transform: "translateY(-50%)",
-                                          color: "#9ca3af",
+                                          color: "#7A8494",
                                           fontSize: "0.875rem",
                                         }}
                                       >
@@ -2734,8 +2501,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                             e.target.value,
                                           )
                                         }
-                                        style={{ backgroundColor: "#1a1a1a" }}
-                                        className="border-[#2a2a2a] text-[#e5e5e5] pl-7 h-9 text-sm"
+                                        style={{ backgroundColor: "#121519" }}
+                                        className="border-[#1E2330] text-[#F3F5F7] pl-7 h-9 text-sm"
                                       />
                                     </div>
                                   </div>
@@ -2748,7 +2515,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   >
                                     <Label
                                       style={{
-                                        color: "#9ca3af",
+                                        color: "#7A8494",
                                         fontSize: "0.75rem",
                                         textTransform: "uppercase",
                                         letterSpacing: "0.05em",
@@ -2770,8 +2537,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                             e.target.value,
                                           )
                                         }
-                                        style={{ backgroundColor: "#1a1a1a" }}
-                                        className="border-[#2a2a2a] text-[#e5e5e5] pr-12 h-9 text-sm"
+                                        style={{ backgroundColor: "#121519" }}
+                                        className="border-[#1E2330] text-[#F3F5F7] pr-12 h-9 text-sm"
                                       />
                                       <span
                                         style={{
@@ -2779,7 +2546,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           right: "0.75rem",
                                           top: "50%",
                                           transform: "translateY(-50%)",
-                                          color: "#9ca3af",
+                                          color: "#7A8494",
                                           fontSize: "0.75rem",
                                         }}
                                       >
@@ -2798,7 +2565,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 >
                                   <Label
                                     style={{
-                                      color: "#9ca3af",
+                                      color: "#7A8494",
                                       fontSize: "0.75rem",
                                       textTransform: "uppercase",
                                       letterSpacing: "0.05em",
@@ -2840,14 +2607,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                             fontSize: "0.75rem",
                                             transition: "all 0.2s",
                                             border: isActive
-                                              ? "2px solid rgba(249,115,22,0.5)"
-                                              : "2px solid #2a2a2a",
+                                              ? "2px solid rgba(56,198,186,0.5)"
+                                              : "2px solid #1E2330",
                                             background: isActive
-                                              ? "rgba(249,115,22,0.2)"
-                                              : "#1a1a1a",
+                                              ? "rgba(56,198,186,0.2)"
+                                              : "#121519",
                                             color: isActive
-                                              ? "#f97316"
-                                              : "#9ca3af",
+                                              ? "#38C6BA"
+                                              : "#7A8494",
                                             cursor: "pointer",
                                           }}
                                         >
@@ -2860,7 +2627,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               </div>
                             )}
                           </div>
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* 3. Room Differentials */}
                           <div
                             style={{
@@ -2887,7 +2654,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             >
                               <h3
                                 style={{
-                                  color: "#e5e5e5",
+                                  color: "#F3F5F7",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                   fontSize: "0.75rem",
@@ -2900,7 +2667,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   style={{
                                     width: "1rem",
                                     height: "1rem",
-                                    color: "#9ca3af",
+                                    color: "#7A8494",
                                   }}
                                 />
                               ) : (
@@ -2908,7 +2675,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   style={{
                                     width: "1rem",
                                     height: "1rem",
-                                    color: "#9ca3af",
+                                    color: "#7A8494",
                                   }}
                                 />
                               )}
@@ -2927,8 +2694,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               <div style={{ overflow: "hidden" }}>
                                 <div
                                   style={{
-                                    background: "#0f0f0f",
-                                    border: "1px solid #2a2a2a",
+                                    background: "#121519",
+                                    border: "1px solid #1E2330",
                                     borderRadius: "0.5rem",
                                     padding: "0.5rem",
                                     display: "flex",
@@ -2963,8 +2730,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           justifyContent: "space-between",
                                           gap: "0.5rem",
                                           padding: "0.375rem",
-                                          background: "#1a1a1a",
-                                          border: "1px solid #2a2a2a",
+                                          background: "#121519",
+                                          border: "1px solid #1E2330",
                                           borderRadius: "0.25rem",
                                           minHeight: "48px", // Fix height consistency
                                         }}
@@ -3005,8 +2772,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                               <RadioGroupItem
                                                 value={room.roomTypeID}
                                                 style={{
-                                                  borderColor: "#39BDF8",
-                                                  color: "#39BDF8",
+                                                  borderColor: "#38C6BA",
+                                                  color: "#38C6BA",
                                                   height: "0.75rem",
                                                   width: "0.75rem",
                                                 }}
@@ -3015,7 +2782,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                           </RadioGroup>
                                           <Label
                                             style={{
-                                              color: "#e5e5e5",
+                                              color: "#F3F5F7",
                                               fontSize: "0.75rem",
                                               whiteSpace: "nowrap",
                                             }}
@@ -3027,10 +2794,10 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                               variant="outline"
                                               style={{
                                                 backgroundColor:
-                                                  "rgba(57, 189, 248, 0.1)",
-                                                color: "#39BDF8",
+                                                  "rgba(56, 198, 186, 0.1)",
+                                                color: "#38C6BA",
                                                 borderColor:
-                                                  "rgba(57, 189, 248, 0.3)",
+                                                  "rgba(56, 198, 186, 0.3)",
                                                 fontSize: "10px",
                                                 padding: "0 0.375rem",
                                               }}
@@ -3062,27 +2829,27 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                               <SelectTrigger
                                                 style={{
                                                   width: "6rem",
-                                                  backgroundColor: "#0f0f0f",
+                                                  backgroundColor: "#121519",
                                                 }}
-                                                className="h-9 border-[#2a2a2a] text-[#e5e5e5] text-sm"
+                                                className="h-9 border-[#1E2330] text-[#F3F5F7] text-sm"
                                               >
                                                 <SelectValue />
                                               </SelectTrigger>
                                               <SelectContent
                                                 style={{
-                                                  backgroundColor: "#1a1a1a",
-                                                  borderColor: "#2a2a2a",
+                                                  backgroundColor: "#121519",
+                                                  borderColor: "#1E2330",
                                                 }}
                                               >
                                                 <SelectItem
                                                   value="+"
-                                                  className="text-[#e5e5e5]"
+                                                  className="text-[#F3F5F7]"
                                                 >
                                                   +
                                                 </SelectItem>
                                                 <SelectItem
                                                   value="-"
-                                                  className="text-[#e5e5e5]"
+                                                  className="text-[#F3F5F7]"
                                                 >
                                                   -
                                                 </SelectItem>
@@ -3107,9 +2874,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                                   )
                                                 }
                                                 style={{
-                                                  backgroundColor: "#0f0f0f",
+                                                  backgroundColor: "#121519",
                                                 }}
-                                                className="border-[#2a2a2a] text-[#e5e5e5] pr-5 h-9 text-sm"
+                                                className="border-[#1E2330] text-[#F3F5F7] pr-5 h-9 text-sm"
                                               />
                                               <span
                                                 style={{
@@ -3117,7 +2884,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                                   right: "0.375rem",
                                                   top: "50%",
                                                   transform: "translateY(-50%)",
-                                                  color: "#9ca3af",
+                                                  color: "#7A8494",
                                                   fontSize: "10px",
                                                 }}
                                               >
@@ -3133,7 +2900,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               </div>
                             </div>
                           </div>
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
 
                           {/* Pace Curves Section */}
                           <div
@@ -3153,7 +2920,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               <div>
                                 <h3
                                   style={{
-                                    color: "#e5e5e5",
+                                    color: "#F3F5F7",
                                     textTransform: "uppercase",
                                     letterSpacing: "0.05em",
                                     fontSize: "0.75rem",
@@ -3163,7 +2930,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 </h3>
                                 <p
                                   style={{
-                                    color: "#9ca3af",
+                                    color: "#7A8494",
                                     fontSize: "10px",
                                     marginTop: "0.125rem",
                                   }}
@@ -3190,16 +2957,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     variant="outline"
                                     size="sm"
                                     style={{
-                                      backgroundColor: "#0f0f0f",
+                                      backgroundColor: "#121519",
                                       borderColor: hasCurvesByHotelId[
                                         String(hotel.hotel_id)
                                       ]
-                                        ? "#2a2a2a"
+                                        ? "#1E2330"
                                         : "rgba(239, 68, 68, 0.3)",
                                       color: hasCurvesByHotelId[
                                         String(hotel.hotel_id)
                                       ]
-                                        ? "#e5e5e5"
+                                        ? "#F3F5F7"
                                         : "#ef4444",
                                     }}
                                   >
@@ -3212,7 +2979,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             </div>
                           </div>
 
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* 5. Monthly Min Rates */}
                           <div
                             style={{
@@ -3223,18 +2990,19 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           >
                             <h3
                               style={{
-                                color: "#e5e5e5",
+                                color: "#C8A66E",
                                 textTransform: "uppercase",
-                                letterSpacing: "0.05em",
+                                letterSpacing: "0.12em",
                                 fontSize: "0.75rem",
+                                fontWeight: 600,
                               }}
                             >
                               Monthly Min Rates
                             </h3>
                             <div
                               style={{
-                                background: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
+                                background: "#121519",
+                                border: "1px solid #1E2330",
                                 borderRadius: "0.5rem",
                                 padding: "1rem",
                               }}
@@ -3258,7 +3026,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   >
                                     <span
                                       style={{
-                                        color: "#9ca3af",
+                                        color: "#7A8494",
                                         fontSize: "9px",
                                         textTransform: "uppercase",
                                       }}
@@ -3279,9 +3047,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         )
                                       }
                                       style={{
-                                        backgroundColor: "#1a1a1a",
-                                        borderColor: "#2a2a2a",
-                                        color: "#e5e5e5",
+                                        backgroundColor: "#121519",
+                                        borderColor: "#1E2330",
+                                        color: "#F3F5F7",
                                         fontSize: "10px",
                                         textAlign: "center",
                                         height: "1.75rem",
@@ -3294,7 +3062,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                             </div>
                           </div>
 
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* 5b. Yearly Visualization (Corridor) */}
                           <div style={{ marginTop: "0.5rem" }}>
                             <YearlyRatesVisualization
@@ -3321,7 +3089,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               }
                             />
                           </div>
-                          <div style={{ borderTop: "1px solid #2a2a2a" }}></div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* 6. Admin Controls */}
                           <div
                             style={{
@@ -3333,10 +3101,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           >
                             <h3
                               style={{
-                                color: "#9ca3af",
+                                color: "#C8A66E",
                                 textTransform: "uppercase",
-                                letterSpacing: "0.05em",
+                                letterSpacing: "0.12em",
                                 fontSize: "0.75rem",
+                                fontWeight: 600,
                               }}
                             >
                               Admin Controls
@@ -3345,9 +3114,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                               <Button
                                 variant="outline"
                                 style={{
-                                  backgroundColor: "#161616",
-                                  borderColor: "rgba(57, 189, 248, 0.5)",
-                                  color: "#39BDF8",
+                                  backgroundColor: "#121519",
+                                  borderColor: "rgba(56, 198, 186, 0.5)",
+                                  color: "#38C6BA",
                                 }}
                                 onClick={() =>
                                   activateHotel(
@@ -3371,9 +3140,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   isRepushing === String(hotel.hotel_id)
                                 }
                                 style={{
-                                  backgroundColor: "rgba(250, 255, 106, 0.1)",
-                                  borderColor: "rgba(250, 255, 106, 0.5)",
-                                  color: "#39BDF8",
+                                  backgroundColor: "rgba(200, 166, 110, 0.1)",
+                                  borderColor: "rgba(200, 166, 110, 0.5)",
+                                  color: "#38C6BA",
                                 }}
                               >
                                 {isRepushing === String(hotel.hotel_id) && (
@@ -3435,10 +3204,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           >
                             <Button
                               style={{
-                                backgroundColor: "#39BDF8",
-                                color: "#0f0f0f",
-                                minWidth: "160px", // 🟢 FIX: Reserves space for the spinner
-                                transition: "all 0.2s", // Smooths any other state changes
+                                background: "linear-gradient(135deg, #38C6BA 0%, #C8A66E 100%)",
+                                color: "#0F1215",
+                                minWidth: "160px",
+                                transition: "all 0.2s",
+                                border: "none",
                               }}
                               onClick={(e) => {
                                 e.preventDefault();
@@ -3479,33 +3249,33 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
         </div>
 
         {/* 4. PMS WEBHOOK MANAGEMENT (Restored Mock) */}
-        <Card style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}>
+        <Card style={{ backgroundColor: "#121519", borderColor: "#1E2330", borderRadius: "10px" }}>
           <CardHeader>
-            <CardTitle style={{ color: "#e5e5e5", fontSize: "1.25rem" }}>
+            <CardTitle style={{ color: "#F3F5F7", fontSize: "0.875rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em" }}>
               PMS Webhook Management
             </CardTitle>
-            <CardDescription style={{ color: "#9ca3af" }}>
+            <CardDescription style={{ color: "#7A8494" }}>
               Monitor and manage PMS webhook integration status
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div
               style={{
-                border: "1px solid #2a2a2a",
+                border: "1px solid #1E2330",
                 borderRadius: "0.5rem",
                 overflow: "hidden",
               }}
             >
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#2a2a2a] hover:bg-transparent">
-                    <TableHead style={{ color: "#9ca3af" }}>
+                  <TableRow className="border-[#1E2330] hover:bg-transparent">
+                    <TableHead style={{ color: "#7A8494" }}>
                       Property Name
                     </TableHead>
-                    <TableHead style={{ color: "#9ca3af" }}>
+                    <TableHead style={{ color: "#7A8494" }}>
                       Webhook Status
                     </TableHead>
-                    <TableHead style={{ color: "#9ca3af", textAlign: "right" }}>
+                    <TableHead style={{ color: "#7A8494", textAlign: "right" }}>
                       Actions
                     </TableHead>
                   </TableRow>
@@ -3514,9 +3284,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                   {webhooks.map((webhook) => (
                     <TableRow
                       key={webhook.id}
-                      className="border-[#2a2a2a] hover:bg-[#161616]"
+                      className="border-[#1E2330] hover:bg-[#121519]"
                     >
-                      <TableCell style={{ color: "#e5e5e5" }}>
+                      <TableCell style={{ color: "#F3F5F7" }}>
                         {webhook.propertyName}
                       </TableCell>
                       <TableCell>
@@ -3524,9 +3294,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           <Badge
                             variant="outline"
                             style={{
-                              backgroundColor: "rgba(16, 185, 129, 0.1)",
-                              color: "#10b981",
-                              borderColor: "rgba(16, 185, 129, 0.3)",
+                              backgroundColor: "rgba(56, 198, 186, 0.1)",
+                              color: "#38C6BA",
+                              borderColor: "rgba(56, 198, 186, 0.3)",
                             }}
                           >
                             Active
@@ -3555,16 +3325,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            style={{ color: "#39BDF8" }}
-                            className="hover:text-[#29ADEE] hover:bg-[#39BDF8]/10"
+                            style={{ color: "#38C6BA" }}
+                            className="hover:text-[#2DB8AD] hover:bg-[#38C6BA]/10"
                           >
                             Register
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            style={{ color: "#39BDF8" }}
-                            className="hover:text-[#39BDF8]/80 hover:bg-[#39BDF8]/10"
+                            style={{ color: "#38C6BA" }}
+                            className="hover:text-[#38C6BA]/80 hover:bg-[#38C6BA]/10"
                           >
                             Test
                           </Button>
@@ -3583,16 +3353,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
       <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
         <DialogContent
           style={{
-            backgroundColor: "#1a1a1a",
-            borderColor: "#2a2a2a",
+            backgroundColor: "#121519",
+            borderColor: "#1E2330",
             maxWidth: "600px",
           }}
         >
           <DialogHeader>
-            <DialogTitle style={{ color: "#e5e5e5" }}>
+            <DialogTitle style={{ color: "#F3F5F7" }}>
               Add Event Range
             </DialogTitle>
-            <DialogDescription style={{ color: "#9ca3af" }}>
+            <DialogDescription style={{ color: "#7A8494" }}>
               Define the dates, base impact, and tweak specific peak days below.
             </DialogDescription>
           </DialogHeader>
@@ -3610,7 +3380,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
               <div>
                 <Label
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "0.75rem",
                     marginBottom: "4px",
                     display: "block",
@@ -3624,9 +3394,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       variant="outline"
                       className="justify-start text-left h-9 w-full"
                       style={{
-                        backgroundColor: "#0f0f0f",
-                        border: "1px solid #2a2a2a",
-                        color: "#e5e5e5",
+                        backgroundColor: "#121519",
+                        border: "1px solid #1E2330",
+                        color: "#F3F5F7",
                         fontSize: "13px",
                       }}
                     >
@@ -3640,8 +3410,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     className="w-auto p-0"
                     align="start"
                     style={{
-                      backgroundColor: "#1a1a18",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: "#121519",
+                      border: "1px solid #1E2330",
                     }}
                   >
                     <Calendar
@@ -3662,7 +3432,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
               <div>
                 <Label
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "0.75rem",
                     marginBottom: "4px",
                     display: "block",
@@ -3676,9 +3446,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                       variant="outline"
                       className="justify-start text-left h-9 w-full"
                       style={{
-                        backgroundColor: "#0f0f0f",
-                        border: "1px solid #2a2a2a",
-                        color: "#e5e5e5",
+                        backgroundColor: "#121519",
+                        border: "1px solid #1E2330",
+                        color: "#F3F5F7",
                         fontSize: "13px",
                       }}
                     >
@@ -3692,8 +3462,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                     className="w-auto p-0"
                     align="start"
                     style={{
-                      backgroundColor: "#1a1a18",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: "#121519",
+                      border: "1px solid #1E2330",
                     }}
                   >
                     <Calendar
@@ -3724,7 +3494,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
               <div>
                 <Label
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "0.75rem",
                     marginBottom: "4px",
                     display: "block",
@@ -3737,16 +3507,16 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                   value={newEventName}
                   onChange={(e) => setNewEventName(e.target.value)}
                   style={{
-                    backgroundColor: "#0f0f0f",
-                    borderColor: "#2a2a2a",
-                    color: "#e5e5e5",
+                    backgroundColor: "#121519",
+                    borderColor: "#1E2330",
+                    color: "#F3F5F7",
                   }}
                 />
               </div>
               <div>
                 <Label
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "0.75rem",
                     marginBottom: "4px",
                     display: "block",
@@ -3760,20 +3530,20 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                 >
                   <SelectTrigger
                     style={{
-                      backgroundColor: "#0f0f0f",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: "#121519",
+                      borderColor: "#1E2330",
+                      color: "#F3F5F7",
                     }}
                   >
                     <SelectValue placeholder="Select Impact" />
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: "#121519",
+                      borderColor: "#1E2330",
                     }}
                   >
-                    <SelectItem value="1.50" style={{ color: "#39BDF8" }}>
+                    <SelectItem value="1.50" style={{ color: "#38C6BA" }}>
                       Medium (1.5x)
                     </SelectItem>
                     <SelectItem value="2.00" style={{ color: "#ef4444" }}>
@@ -3792,7 +3562,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
               <div style={{ marginTop: "0.5rem" }}>
                 <Label
                   style={{
-                    color: "#e5e5e5",
+                    color: "#F3F5F7",
                     fontSize: "0.75rem",
                     marginBottom: "8px",
                     display: "block",
@@ -3804,9 +3574,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                   style={{
                     maxHeight: "220px",
                     overflowY: "auto",
-                    border: "1px solid #2a2a2a",
+                    border: "1px solid #1E2330",
                     borderRadius: "0.5rem",
-                    background: "#0f0f0f",
+                    background: "#121519",
                   }}
                 >
                   {generatedEvents.map((ev, index) => (
@@ -3819,11 +3589,11 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                         padding: "0.5rem 1rem",
                         borderBottom:
                           index < generatedEvents.length - 1
-                            ? "1px solid #2a2a2a"
+                            ? "1px solid #1E2330"
                             : "none",
                       }}
                     >
-                      <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
+                      <span style={{ color: "#7A8494", fontSize: "0.875rem" }}>
                         {ev.date}
                       </span>
                       <Select
@@ -3840,9 +3610,9 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                           style={{
                             width: "140px",
                             height: "28px",
-                            backgroundColor: "#1a1a1a",
-                            borderColor: "#2a2a2a",
-                            color: "#e5e5e5",
+                            backgroundColor: "#121519",
+                            borderColor: "#1E2330",
+                            color: "#F3F5F7",
                             fontSize: "0.75rem",
                           }}
                         >
@@ -3850,13 +3620,13 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                         </SelectTrigger>
                         <SelectContent
                           style={{
-                            backgroundColor: "#1a1a1a",
-                            borderColor: "#2a2a2a",
+                            backgroundColor: "#121519",
+                            borderColor: "#1E2330",
                           }}
                         >
                           <SelectItem
                             value="1.50"
-                            style={{ color: "#39BDF8", fontSize: "0.75rem" }}
+                            style={{ color: "#38C6BA", fontSize: "0.75rem" }}
                           >
                             Medium
                           </SelectItem>
@@ -3884,7 +3654,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
             <Button
               onClick={handleAddEvent}
               disabled={generatedEvents.length === 0}
-              style={{ backgroundColor: "#39BDF8", color: "#0f0f0f" }}
+              style={{ backgroundColor: "#38C6BA", color: "#121519" }}
             >
               Save{" "}
               {generatedEvents.length > 0

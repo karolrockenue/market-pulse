@@ -1,5 +1,6 @@
 // Import React hooks for state and side effects
 import { useState, useEffect, useMemo } from "react";
+import { R } from "../styles/tokens";
 import { AirbnbAvailability } from "./AirbnbAvailability";
 import {
   MapPin,
@@ -379,19 +380,19 @@ export function DemandPace({
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100vh",
-          background: "#1d1d1c",
-          color: "#e5e5e5",
+          background: R.bg,
+          color: R.accent,
           padding: "24px",
         }}
       >
         <Database
           className="w-8 h-8 animate-pulse mb-4"
-          style={{ color: "#39BDF8", stroke: "#39BDF8" }}
+          style={{ color: R.warmTeal, stroke: R.warmTeal }}
         />
-        <h2 className="text-xl font-light" style={{ color: "#e5e5e5" }}>
+        <h2 className="text-xl font-light" style={{ color: R.accent }}>
           Loading Demand Data
         </h2>
-        <p className="text-[#6b7280] text-sm mt-2">
+        <p className="text-[#4E5868] text-sm mt-2">
           Fetching and processing 90-day forecast data...
         </p>
       </div>
@@ -408,21 +409,21 @@ export function DemandPace({
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100vh",
-          background: "#1d1d1c",
-          color: "#e5e5e5",
+          background: R.bg,
+          color: R.accent,
           padding: "24px",
           textAlign: "center",
         }}
       >
         <TrendingDown className="w-8 h-8 text-[#ef4444] mb-4" />
         <h2 className="text-xl text-[#ef4444]">Failed to Load Data</h2>
-        <p className="text-[#9ca3af]">
+        <p className="text-[#7A8494]">
           There was an error fetching the planning data:
         </p>
         <code
           style={{
             background: "#1a1a18",
-            border: "1px solid #2a2a2a",
+            border: `1px solid ${R.border}`,
             padding: "8px 12px",
             borderRadius: "4px",
             marginTop: "12px",
@@ -437,38 +438,8 @@ export function DemandPace({
 
   // --- Main Component Render ---
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#1d1d1c",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Animated background gradient */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(57, 189, 248, 0.01))",
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Grid overlay */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          pointerEvents: "none",
-        }}
-      />
-
-      <div style={{ position: "relative", zIndex: 10, padding: "24px" }}>
+    <div style={{ flex: 1, background: R.bg, color: R.accent }}>
+      <div style={{ padding: "24px 28px" }}>
         {/* Page Header */}
         <div style={{ marginBottom: "24px" }}>
           <div
@@ -480,11 +451,11 @@ export function DemandPace({
             }}
           >
             <Calendar
-              style={{ width: "24px", height: "24px", color: "#39BDF8" }}
+              style={{ width: "24px", height: "24px", color: R.warmTeal }}
             />
             <h1
               style={{
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "24px",
                 lineHeight: "32px",
                 margin: 0,
@@ -493,7 +464,7 @@ export function DemandPace({
               Demand {citySlug ? citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, " ") : ""}
             </h1>
           </div>
-          <p style={{ color: "#9ca3af", margin: 0 }}>
+          <p style={{ color: R.textMid, margin: 0 }}>
             90-day forward market planning and channel management • Real-time
             market intelligence
           </p>
@@ -505,23 +476,23 @@ export function DemandPace({
               display: "inline-flex",
               alignItems: "center",
               gap: "8px",
-              backgroundColor: "#2C2C2C",
-              border: "1px solid #2a2a2a",
+              backgroundColor: R.card,
+              border: `1px solid ${R.border}`,
               borderRadius: "9999px",
               padding: "8px 16px",
             }}
           >
             <MapPin
-              style={{ width: "16px", height: "16px", color: "#39BDF8" }}
+              style={{ width: "16px", height: "16px", color: R.warmTeal }}
             />
-            <span style={{ color: "#e5e5e5", fontSize: "14px" }}>
+            <span style={{ color: R.accent, fontSize: "14px" }}>
               {citySlug.charAt(0).toUpperCase() + citySlug.slice(1)} Market
             </span>
-            <span style={{ color: "#6b7280", fontSize: "12px" }}>•</span>
+            <span style={{ color: R.textDim, fontSize: "12px" }}>•</span>
             <Database
-              style={{ width: "12px", height: "12px", color: "#6b7280" }}
+              style={{ width: "12px", height: "12px", color: R.textDim }}
             />
-            <span style={{ color: "#6b7280", fontSize: "12px" }}>
+            <span style={{ color: R.textDim, fontSize: "12px" }}>
               Live Channel Data
             </span>
           </div>
@@ -539,9 +510,9 @@ export function DemandPace({
           {/* 90-Day Market Analytics Section */}
           <div
             style={{
-              backgroundColor: "#1A1A1A",
+              backgroundColor: R.darkBand,
               borderRadius: "8px",
-              border: "1px solid #2a2a2a",
+              border: `1px solid ${R.border}`,
               padding: "20px",
             }}
           >
@@ -557,7 +528,7 @@ export function DemandPace({
               <div>
                 <h2
                   style={{
-                    color: "#e5e5e5",
+                    color: R.accent,
                     fontSize: "18px",
                     lineHeight: "28px",
                     marginBottom: "4px",
@@ -566,7 +537,7 @@ export function DemandPace({
                 >
                   90-Day Market Analytics
                 </h2>
-                <p style={{ color: "#9ca3af", fontSize: "12px", margin: 0 }}>
+                <p style={{ color: R.textMid, fontSize: "12px", margin: 0 }}>
                   Comprehensive market intelligence with synchronized data
                   visualization
                 </p>
@@ -574,32 +545,32 @@ export function DemandPace({
               <div
                 style={{ display: "flex", alignItems: "center", gap: "8px" }}
               >
-                <span style={{ color: "#9ca3af", fontSize: "12px" }}>
+                <span style={{ color: R.textMid, fontSize: "12px" }}>
                   Pace Period:
                 </span>
                 <Select
                   value={paceAnalysisPeriod}
                   onValueChange={setPaceAnalysisPeriod}
                 >
-                  <SelectTrigger className="w-[120px] h-8 bg-[#1d1d1c] border-[#2a2a2a] text-[#e5e5e5]">
+                  <SelectTrigger className="w-[120px] h-8 bg-[#14181D] border-[#1E2330] text-[#F3F5F7]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1d1d1c] border-[#2a2a2a]">
+                  <SelectContent className="bg-[#14181D] border-[#1E2330]">
                     <SelectItem
                       value="1"
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
+                      className="text-[#F3F5F7] focus:bg-[#2C2C2C] focus:text-[#38C6BA]"
                     >
                       1 Day
                     </SelectItem>
                     <SelectItem
                       value="3"
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
+                      className="text-[#F3F5F7] focus:bg-[#2C2C2C] focus:text-[#38C6BA]"
                     >
                       3 Days
                     </SelectItem>
                     <SelectItem
                       value="7"
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
+                      className="text-[#F3F5F7] focus:bg-[#2C2C2C] focus:text-[#38C6BA]"
                     >
                       7 Days
                     </SelectItem>
@@ -611,26 +582,26 @@ export function DemandPace({
             {/* Charts Container */}
             <div
               style={{
-                backgroundColor: "#1d1d1c",
+                backgroundColor: R.bg,
                 borderRadius: "8px",
-                border: "1px solid #2a2a2a",
+                border: `1px solid ${R.border}`,
               }}
             >
               {/* Chart 1: Market Demand / Supply Landscape */}
               <div
                 style={{
                   padding: "20px",
-                  borderBottom: "1px solid #2a2a2a",
-                  backgroundColor: "#1d1d1c",
+                  borderBottom: `1px solid ${R.border}`,
+                  backgroundColor: R.bg,
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
                   <h3
-                    style={{ color: "#e5e5e5", marginBottom: "2px", margin: 0 }}
+                    style={{ color: R.accent, marginBottom: "2px", margin: 0 }}
                   >
                     Market Supply Landscape
                   </h3>
-                  <p style={{ color: "#9ca3af", fontSize: "12px", margin: 0 }}>
+                  <p style={{ color: R.textMid, fontSize: "12px", margin: 0 }}>
                     Available room inventory across competitive market
                   </p>
                 </div>
@@ -643,35 +614,35 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a2a"
+                        stroke={R.border}
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         interval={6}
                       />
                       <YAxis
                         yAxisId="left"
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         width={45}
                         domain={[0, 100]}
                       />
                       <YAxis
                         yAxisId="right"
                         orientation="right"
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         width={45}
                         domain={[0, "auto"]}
                       />
@@ -685,12 +656,12 @@ export function DemandPace({
                         }}
                         contentStyle={{
                           backgroundColor: "rgba(26, 26, 26, 0.95)",
-                          border: "1px solid #2a2a2a",
+                          border: `1px solid ${R.border}`,
                           borderRadius: "4px",
                           padding: "8px",
                         }}
-                        labelStyle={{ color: "#9ca3af", fontSize: "10px" }}
-                        itemStyle={{ fontSize: "11px", color: "#e5e5e5" }}
+                        labelStyle={{ color: R.textMid, fontSize: "10px" }}
+                        itemStyle={{ fontSize: "11px", color: R.accent }}
                       />
                       <Area
                         yAxisId="right"
@@ -735,17 +706,17 @@ export function DemandPace({
               <div
                 style={{
                   padding: "20px",
-                  borderBottom: "1px solid #2a2a2a",
-                  backgroundColor: "#1d1d1c",
+                  borderBottom: `1px solid ${R.border}`,
+                  backgroundColor: R.bg,
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
                   <h3
-                    style={{ color: "#e5e5e5", marginBottom: "2px", margin: 0 }}
+                    style={{ color: R.accent, marginBottom: "2px", margin: 0 }}
                   >
                     Price Index Analysis
                   </h3>
-                  <p style={{ color: "#9ca3af", fontSize: "12px", margin: 0 }}>
+                  <p style={{ color: R.textMid, fontSize: "12px", margin: 0 }}>
                     Market pricing trends and rate positioning
                   </p>
                 </div>
@@ -758,29 +729,29 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a2a"
+                        stroke={R.border}
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         interval={6}
                       />
                       <YAxis
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         width={45}
                         domain={[0, 100]}
                       />
                       <Tooltip
-                        cursor={{ stroke: "#39BDF8", strokeWidth: 2 }}
+                        cursor={{ stroke: R.warmTeal, strokeWidth: 2 }}
                         labelFormatter={(label, payload) => {
                           if (payload && payload.length) {
                             return payload[0].payload.fullDate;
@@ -790,12 +761,12 @@ export function DemandPace({
                         formatter={(value) => Math.round(value as number)}
                         contentStyle={{
                           backgroundColor: "rgba(26, 26, 26, 0.95)",
-                          border: "1px solid #2a2a2a",
+                          border: `1px solid ${R.border}`,
                           borderRadius: "4px",
                           padding: "8px",
                         }}
-                        labelStyle={{ color: "#9ca3af", fontSize: "10px" }}
-                        itemStyle={{ fontSize: "11px", color: "#e5e5e5" }}
+                        labelStyle={{ color: R.textMid, fontSize: "10px" }}
+                        itemStyle={{ fontSize: "11px", color: R.accent }}
                       />
                       <Line
                         type="monotone"
@@ -829,17 +800,17 @@ export function DemandPace({
               <div
                 style={{
                   padding: "20px",
-                  borderBottom: "1px solid #2a2a2a",
-                  backgroundColor: "#1d1d1c",
+                  borderBottom: `1px solid ${R.border}`,
+                  backgroundColor: R.bg,
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
                   <h3
-                    style={{ color: "#e5e5e5", marginBottom: "2px", margin: 0 }}
+                    style={{ color: R.accent, marginBottom: "2px", margin: 0 }}
                   >
                     {paceAnalysisPeriod} Day Price Change
                   </h3>
-                  <p style={{ color: "#9ca3af", fontSize: "12px", margin: 0 }}>
+                  <p style={{ color: R.textMid, fontSize: "12px", margin: 0 }}>
                     Price fluctuations vs. {paceAnalysisPeriod} days ago
                   </p>
                 </div>
@@ -852,30 +823,30 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a2a"
+                        stroke={R.border}
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         interval={6}
                       />
                       <YAxis
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         width={45}
                         label={{
                           value: `Price Change (${currencySymbol})`,
                           angle: -90,
                           position: "insideLeft",
-                          fill: "#6b7280",
+                          fill: R.textDim,
                           fontSize: 10,
                         }}
                       />
@@ -889,12 +860,12 @@ export function DemandPace({
                         }}
                         contentStyle={{
                           backgroundColor: "rgba(26, 26, 26, 0.95)",
-                          border: "1px solid #2a2a2a",
+                          border: `1px solid ${R.border}`,
                           borderRadius: "4px",
                           padding: "8px",
                         }}
-                        labelStyle={{ color: "#9ca3af", fontSize: "10px" }}
-                        itemStyle={{ fontSize: "11px", color: "#e5e5e5" }}
+                        labelStyle={{ color: R.textMid, fontSize: "10px" }}
+                        itemStyle={{ fontSize: "11px", color: R.accent }}
                       />
                       <Bar
                         dataKey="priceChange"
@@ -920,16 +891,16 @@ export function DemandPace({
               <div
                 style={{
                   padding: "20px",
-                  backgroundColor: "#1d1d1c",
+                  backgroundColor: R.bg,
                 }}
               >
                 <div style={{ marginBottom: "12px" }}>
                   <h3
-                    style={{ color: "#e5e5e5", marginBottom: "2px", margin: 0 }}
+                    style={{ color: R.accent, marginBottom: "2px", margin: 0 }}
                   >
                     {paceAnalysisPeriod} Day Supply Change
                   </h3>
-                  <p style={{ color: "#9ca3af", fontSize: "12px", margin: 0 }}>
+                  <p style={{ color: R.textMid, fontSize: "12px", margin: 0 }}>
                     Change in market room supply vs. {paceAnalysisPeriod} days
                     ago
                   </p>
@@ -943,30 +914,30 @@ export function DemandPace({
                     >
                       <CartesianGrid
                         strokeDasharray="0"
-                        stroke="#2a2a2a"
+                        stroke={R.border}
                         opacity={0.5}
                         vertical={true}
                         horizontal={true}
                       />
                       <XAxis
                         dataKey="xAxisLabel"
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         interval={6}
                       />
                       <YAxis
-                        stroke="#2a2a2a"
-                        tick={{ fill: "#6b7280", fontSize: 10 }}
-                        tickLine={{ stroke: "#2a2a2a" }}
-                        axisLine={{ stroke: "#2a2a2a" }}
+                        stroke={R.border}
+                        tick={{ fill: R.textDim, fontSize: 10 }}
+                        tickLine={{ stroke: R.border }}
+                        axisLine={{ stroke: R.border }}
                         width={45}
                         label={{
                           value: "Supply Change (%)",
                           angle: -90,
                           position: "insideLeft",
-                          fill: "#6b7280",
+                          fill: R.textDim,
                           fontSize: 10,
                         }}
                       />
@@ -981,12 +952,12 @@ export function DemandPace({
                         formatter={(value) => [`${value}%`, "Supply Change"]}
                         contentStyle={{
                           backgroundColor: "rgba(26, 26, 26, 0.95)",
-                          border: "1px solid #2a2a2a",
+                          border: `1px solid ${R.border}`,
                           borderRadius: "4px",
                           padding: "8px",
                         }}
-                        labelStyle={{ color: "#9ca3af", fontSize: "10px" }}
-                        itemStyle={{ fontSize: "11px", color: "#e5e5e5" }}
+                        labelStyle={{ color: R.textMid, fontSize: "10px" }}
+                        itemStyle={{ fontSize: "11px", color: R.accent }}
                       />
                       <Bar
                         dataKey="supplyChange"
@@ -1021,7 +992,7 @@ export function DemandPace({
           <div
             style={{
               textAlign: "center",
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "12px",
               paddingBottom: "16px",
             }}

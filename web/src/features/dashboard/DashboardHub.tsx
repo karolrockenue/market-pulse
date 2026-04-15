@@ -20,7 +20,7 @@ function SingleHotelView({
 }) {
   const { data, isLoading } = useDashboardData(propertyId, city);
   return (
-    <HotelDashboard onNavigate={onNavigate} data={data} isLoading={isLoading} />
+    <HotelDashboard onNavigate={onNavigate} data={data} isLoading={isLoading} citySlug={city ? city.toLowerCase().replace(/\s+/g, "-") : undefined} />
   );
 }
 

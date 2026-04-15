@@ -51,7 +51,7 @@ export const MarketIntelHub = ({
             padding: "24px",
           }}
         >
-          <div className="w-8 h-8 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
+          <div className="w-8 h-8 border-4 border-[#38C6BA] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
           <h2 className="text-xl">Loading Property Details...</h2>
           <p className="text-[#9ca3af]">
             Fetching city and room count for this property.

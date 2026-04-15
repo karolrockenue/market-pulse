@@ -1,17 +1,16 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Bell, Search, Lock, ArrowDown, Check } from "lucide-react";
-import { MPSidebar } from "./MPSidebar";
+import { ChevronDown, Bell, Search } from "lucide-react";
 
 // ── MP My Rates — Rockenue style mockup ──
+// Horizontal rate grid. Visual hierarchy from real Rate Manager.
 
 interface MPMyRatesProps { activeView: string; onNavigate: (view: string) => void; }
 
 const R = {
-  bg: "#14181D", surface: "#121519", recessed: "#0C0E12",
-  border: "#1E2330", sep: "rgba(255,255,255,0.04)", accent: "#F3F5F7",
+  bg: "#14181D", card: "#121519", cardRaised: "#1C2228", border: "#1E2330", sep: "rgba(255,255,255,0.04)", accent: "#F3F5F7",
   text: "#B0B8C4", textMid: "#7A8494", textDim: "#4E5868",
-  blue: "#39BDF8", gold: "#C8A66E", green: "#34D068", red: "#ef4444",
-  amber: "#f59e0b",
+  teal: "#39BDF8", warmTeal: "#38C6BA", gold: "#C8A66E",
+  darkBand: "#0C0E12", green: "#34D068", red: "#ef4444",
 };
 
 const fmt = (v: number) => `£${v}`;
@@ -26,130 +25,224 @@ export function MPMyRates({ activeView, onNavigate }: MPMyRatesProps) {
     const isFrozen = i < 2;
     const occ = Math.min(96, Math.round(62 + (isWknd ? 18 : 0) + Math.sin(i * 0.3) * 8));
     const adr = Math.round(128 + (isWknd ? 30 : 0) + Math.sin(i * 0.25) * 12);
+    const curveTarget = Math.round(55 + (isWknd ? 15 : 0) + Math.sin(i * 0.2) * 5);
+    const delta = occ - curveTarget;
     const minRate = Math.round(95 + (isWknd ? 15 : 0));
+    const floorRate = Math.round(minRate * 0.85);
     const liveRate = Math.round(135 + (isWknd ? 28 : 0) + Math.sin(i * 0.4) * 10);
     const aiRate = Math.round(142 + (isWknd ? 32 : 0) + Math.sin(i * 0.3) * 14);
     const sellRate = Math.round(liveRate * 0.82);
     const hasOverride = [5, 12, 18, 22].includes(i);
     const aiApplied = [7, 8, 14, 15, 20, 21].includes(i);
+    const curve = occ > 80 ? "Peak" : occ > 65 ? "Mid" : "Low";
     return {
-      i, dow, isFrozen, occ, adr, minRate, liveRate, aiRate, sellRate, hasOverride, aiApplied,
+      i, dow, isWknd, isFrozen, occ, adr, curveTarget, delta, minRate, floorRate, liveRate, aiRate, sellRate,
+      hasOverride, aiApplied, curve,
       dayName: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dow],
       dayNum: d.getDate(),
       monthLabel: d.toLocaleDateString("en-GB", { month: "short" }),
-      status: isFrozen ? "FROZEN" : aiApplied ? "SENTINEL" : hasOverride ? "PENDING" : "SYNC" as string,
+      source: isFrozen ? "Frozen" : aiApplied ? "Sentinel" : hasOverride ? "Override" : "Sync",
     };
   }), []);
 
-  const statusColor = (s: string) => s === "SENTINEL" ? R.blue : s === "FROZEN" ? R.amber : s === "PENDING" ? R.amber : R.textDim;
-  const occColor = (v: number) => v >= 80 ? R.green : v >= 60 ? R.amber : R.red;
-
-  // Row definitions
-  const rows: { key: string; label: string; section?: string }[] = [
-    { key: "status", label: "Rate Source" },
-    { key: "occ", label: "Occupancy %" },
-    { key: "adr", label: "ADR" },
-    { key: "spacer1", label: "", section: "spacer" },
-    { key: "min", label: "Min Rate" },
-    { key: "live", label: "Live PMS Rate" },
-    { key: "sell", label: "Current Sell Rate" },
-    { key: "spacer2", label: "", section: "spacer" },
+  // Row definitions with visual sections
+  type RowDef = { key: string; label: string; section: "info" | "guardrails" | "ai" | "editable" | "divider" };
+  const rows: RowDef[] = [
+    { key: "source", label: "AI Status", section: "info" },
+    { key: "occ", label: "Occupancy", section: "info" },
+    { key: "adr", label: "ADR", section: "info" },
+    { key: "curve", label: "Curve", section: "info" },
+    { key: "delta", label: "Delta", section: "info" },
+    { key: "div1", label: "", section: "divider" },
+    { key: "min", label: "Min Rate", section: "guardrails" },
+    { key: "floor", label: "Floor (LMF)", section: "guardrails" },
+    { key: "live", label: "Live PMS Rate", section: "guardrails" },
+    { key: "sell", label: "Current Sell Rate", section: "guardrails" },
+    { key: "div2", label: "", section: "divider" },
     { key: "ai", label: "Sentinel AI Rate", section: "ai" },
-    { key: "spacer3", label: "", section: "spacer" },
+    { key: "div3", label: "", section: "divider" },
     { key: "override", label: "PMS Override", section: "editable" },
     { key: "target", label: "Target Sell Rate", section: "editable" },
   ];
 
-  const ROW_H = 42;
-  const LABEL_W = 200;
-  const COL_W = 84;
-
-  const cellVal = (row: typeof rows[0], day: typeof days[0]) => {
-    switch (row.key) {
-      case "status": return day.status;
+  const cellVal = (key: string, day: typeof days[0]) => {
+    switch (key) {
+      case "source": return day.source;
       case "occ": return `${day.occ}%`;
       case "adr": return fmt(day.adr);
+      case "curve": return day.curve;
+      case "delta": return `${day.delta > 0 ? "+" : ""}${day.delta}`;
       case "min": return fmt(day.minRate);
+      case "floor": return fmt(day.floorRate);
       case "live": return fmt(day.liveRate);
       case "sell": return fmt(day.sellRate);
       case "ai": return fmt(day.aiRate);
-      case "override": return day.hasOverride ? fmt(day.liveRate + 8) : "\u2014";
-      case "target": return day.hasOverride ? fmt(Math.round((day.liveRate + 8) * 0.82)) : "\u2014";
+      case "override": return day.hasOverride ? fmt(day.liveRate + 8) : "—";
+      case "target": return day.hasOverride ? fmt(Math.round((day.liveRate + 8) * 0.82)) : "—";
       default: return "";
     }
   };
 
-  const cellColor = (row: typeof rows[0], day: typeof days[0]) => {
-    switch (row.key) {
-      case "status": return statusColor(day.status);
-      case "occ": return occColor(day.occ);
-      case "sell": return R.green;
-      case "ai": return day.aiApplied ? R.green : R.blue;
-      case "override": return day.hasOverride ? R.accent : R.textDim;
-      case "target": return day.hasOverride ? R.accent : R.textDim;
+  const cellColor = (key: string, day: typeof days[0]) => {
+    switch (key) {
+      case "source":
+        return day.source === "Sentinel" ? R.teal : day.source === "Frozen" ? R.gold : day.source === "Override" ? R.gold : R.textDim;
+      case "occ": return day.occ >= 80 ? R.warmTeal : day.occ >= 60 ? R.text : R.gold;
+      case "curve": return day.curve === "Peak" ? R.warmTeal : day.curve === "Mid" ? R.text : R.gold;
+      case "delta": return day.delta > 0 ? R.green : day.delta < -10 ? R.red : R.text;
+      case "floor": return R.textMid;
+      case "sell": return R.warmTeal;
+      case "ai": return day.aiApplied ? R.teal : R.textMid;
+      case "override": return day.hasOverride ? R.warmTeal : R.textDim;
+      case "target": return day.hasOverride ? R.warmTeal : R.textDim;
       default: return R.text;
     }
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", display: "flex" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+  const COL_W = 96;
+  const LABEL_W = 180;
+  const ROW_H = 44;
 
-        {/* Header */}
-        <div style={{ padding: "24px 40px 0" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
-              <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: -0.8 }}>My Rates</h1>
-              <span style={{ fontSize: 13, color: R.textDim }}>View and manage your daily room rates</span>
+  return (
+    <div style={{ height: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {/* Top bar */}
+        <div style={{ padding: "14px 32px", borderBottom: `1px solid ${R.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}>
+              <span style={{ fontSize: 13, color: R.accent, fontWeight: 500 }}>Vilenza Hotel</span>
+              <ChevronDown size={14} color={R.textMid} />
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <Search size={15} color={R.textDim} style={{ cursor: "pointer" }} />
-              <Bell size={15} color={R.textDim} style={{ cursor: "pointer" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}>
+              <span style={{ fontSize: 12, color: R.textMid }}>14 Apr – 13 May</span>
+              <ChevronDown size={12} color={R.textMid} />
             </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}>
+              <span style={{ fontSize: 12, color: R.textMid }}>30 nights</span>
+              <ChevronDown size={12} color={R.textMid} />
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <button style={{
+              background: "transparent", color: R.textMid, border: `1px solid ${R.border}`, borderRadius: 6,
+              padding: "6px 16px", fontSize: 12, fontWeight: 500, cursor: "pointer",
+            }}>
+              2 changes pending
+            </button>
+            <button style={{
+              background: R.teal, color: R.darkBand, border: "none", borderRadius: 6,
+              padding: "6px 20px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}>
+              Submit
+            </button>
+            <Bell size={16} color={R.textMid} />
           </div>
         </div>
 
-        {/* Controls Card */}
-        <div style={{ padding: "16px 40px 20px" }}>
-          <div style={{ background: R.surface, border: `1px solid ${R.border}`, borderRadius: 10, padding: "20px 24px", display: "flex", alignItems: "flex-end", gap: 16 }}>
-            {[
-              { label: "Hotel", value: "Vilenza Hotel" },
-              { label: "Start Date", value: "14 Apr 2026" },
-              { label: "Nights", value: "30" },
-              { label: "Compare", value: "vs Yesterday" },
-            ].map(ctrl => (
-              <div key={ctrl.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 11, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>{ctrl.label}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.bg, border: `1px solid ${R.border}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", minWidth: 120 }}>
-                  <span style={{ fontSize: 13, color: R.accent }}>{ctrl.value}</span>
-                  <ChevronDown size={12} color={R.textDim} />
-                </div>
+        {/* Header */}
+        <div style={{ padding: "20px 32px 12px", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 2, color: R.gold, textTransform: "uppercase", marginBottom: 6 }}>Pricing</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: R.accent, margin: 0, letterSpacing: -0.5 }}>My Rates</h1>
+        </div>
+
+        {/* Flowcast */}
+        <div style={{ margin: "0 32px 20px", background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${R.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 6, height: 6, borderRadius: 3, background: R.teal }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: R.accent, textTransform: "uppercase", letterSpacing: "0.05em" }}>Flowcast</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 10, color: R.textDim, background: "rgba(52,208,104,0.1)", border: "1px solid rgba(52,208,104,0.3)", padding: "2px 8px", borderRadius: 4, fontWeight: 600, color: R.green }}>Pickup: +14</span>
+              <span style={{ fontSize: 10, color: R.textDim, background: "rgba(78,88,104,0.1)", border: "1px solid rgba(78,88,104,0.3)", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>30D AVG: 74%</span>
+              <span style={{ fontSize: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", padding: "2px 8px", borderRadius: 4, fontWeight: 600, color: R.red }}>Min Rate Days: 3</span>
+              <div style={{ display: "flex", background: "#0C0E12", borderRadius: 4, padding: 2, border: `1px solid ${R.border}` }}>
+                {["90D", "180D", "365D"].map((label, i) => (
+                  <button key={label} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 2, border: "none", cursor: "pointer", background: i === 0 ? R.border : "transparent", color: i === 0 ? R.accent : R.textDim, fontWeight: i === 0 ? 600 : 400 }}>{label}</button>
+                ))}
               </div>
-            ))}
-            <button style={{ background: R.blue, color: R.recessed, border: "none", borderRadius: 6, padding: "9px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-              Load Rates
-            </button>
-            <div style={{ flex: 1 }} />
-            <button style={{ background: "transparent", color: R.textMid, border: `1px solid ${R.border}`, borderRadius: 6, padding: "8px 18px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>
-              2 changes pending
-            </button>
+            </div>
+          </div>
+          {/* Chart area */}
+          <div style={{ padding: 20 }}>
+            <div style={{ position: "relative", height: 180, background: "#0C0E12", borderRadius: 4, border: `1px solid ${R.border}`, overflow: "hidden" }}>
+              {/* Y-axis left (occupancy) */}
+              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 40, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "8px 0 24px" }}>
+                {[100, 75, 50, 25].map(v => (
+                  <div key={v} style={{ textAlign: "right", paddingRight: 6 }}>
+                    <span style={{ fontSize: 9, color: "rgba(57,189,248,0.6)", fontFamily: "monospace" }}>{v}%</span>
+                  </div>
+                ))}
+              </div>
+              {/* Y-axis right (rate) */}
+              <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 44, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "8px 0 24px" }}>
+                {["£280", "£210", "£140", "£70"].map(v => (
+                  <div key={v} style={{ textAlign: "left", paddingLeft: 6 }}>
+                    <span style={{ fontSize: 9, color: "rgba(200,166,110,0.6)", fontFamily: "monospace" }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Bars */}
+              <div style={{ position: "absolute", left: 40, right: 44, top: 8, bottom: 24, display: "flex", alignItems: "flex-end", gap: 2 }}>
+                {days.map(day => {
+                  const barH = Math.min(day.occ, 100);
+                  const pickupH = Math.round(Math.random() * 12);
+                  const hasPickup = day.i % 3 === 0;
+                  return (
+                    <div key={day.i} style={{ flex: 1, height: "100%", position: "relative", display: "flex", alignItems: "flex-end" }}>
+                      <div style={{ width: "100%", height: `${barH}%`, background: R.border, position: "relative" }}>
+                        {hasPickup && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${pickupH}%`, background: R.teal }} />}
+                      </div>
+                      {/* PMS rate dot */}
+                      <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: 3, background: "white", border: "1px solid #0C0E12", bottom: `${Math.round(40 + Math.sin(day.i * 0.3) * 20)}%`, zIndex: 10 }} />
+                      {/* AI rate dot */}
+                      {day.i % 2 === 0 && <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: 3, background: R.teal, border: "1px solid #0C0E12", bottom: `${Math.round(45 + Math.sin(day.i * 0.25) * 22)}%`, zIndex: 5 }} />}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* X-axis */}
+              <div style={{ position: "absolute", left: 40, right: 44, bottom: 0, height: 20, display: "flex", alignItems: "center", borderTop: `1px solid ${R.border}` }}>
+                {days.filter((_, i) => i % 7 === 0).map(day => (
+                  <div key={day.i} style={{ flex: 7, textAlign: "center" }}>
+                    <span style={{ fontSize: 9, color: R.textDim }}>{day.dayNum} {day.monthLabel}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Legend */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginTop: 12, borderTop: `1px solid ${R.border}`, paddingTop: 12 }}>
+              {[
+                { type: "box", color: R.border, label: "Occupancy" },
+                { type: "box", color: R.teal, label: "Pickup" },
+                { type: "dot", color: "white", label: "PMS Rate" },
+                { type: "dot", color: R.teal, label: "Sentinel AI Rate" },
+                { type: "line", color: R.red, label: "Min Rate" },
+              ].map(item => (
+                <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {item.type === "box" && <div style={{ width: 10, height: 10, background: item.color, borderRadius: 2 }} />}
+                  {item.type === "dot" && <div style={{ width: 6, height: 6, background: item.color, borderRadius: 3, border: `1px solid ${R.border}` }} />}
+                  {item.type === "line" && <div style={{ width: 12, height: 2, background: item.color }} />}
+                  <span style={{ fontSize: 11, color: R.textMid, textTransform: "uppercase" }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Rate Grid */}
-        <div style={{ flex: 1, overflow: "hidden", margin: "0 40px 20px", background: R.surface, border: `1px solid ${R.border}`, borderRadius: 10 }}>
+        <div style={{ flex: 1, overflow: "hidden", margin: "0 32px 20px", background: R.card, border: `1px solid ${R.border}`, borderRadius: 8 }}>
           <div style={{ overflow: "auto", height: "100%" }}>
             <table style={{ borderCollapse: "collapse", minWidth: "fit-content" }}>
-              {/* Date Header Row */}
+              {/* Date header */}
               <thead>
                 <tr>
                   <th style={{
-                    position: "sticky", left: 0, zIndex: 20, background: R.surface,
-                    width: LABEL_W, minWidth: LABEL_W, borderRight: `1px solid ${R.border}`, borderBottom: `1px solid ${R.border}`,
-                    padding: "0 20px", textAlign: "left", height: 64,
+                    position: "sticky", left: 0, zIndex: 10, background: R.card,
+                    width: LABEL_W, minWidth: LABEL_W, borderRight: `1px solid ${R.border}`,
+                    borderBottom: `1px solid ${R.border}`, padding: "0 20px", textAlign: "left", height: 64,
                   }}>
-                    <span style={{ fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 1 }}>Metric</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase" }}>Metric</span>
                   </th>
                   {days.map(day => (
                     <th
@@ -158,15 +251,13 @@ export function MPMyRates({ activeView, onNavigate }: MPMyRatesProps) {
                       onMouseLeave={() => setHoveredCol(null)}
                       style={{
                         width: COL_W, minWidth: COL_W, borderBottom: `1px solid ${R.border}`,
-                        padding: "8px 0", textAlign: "center", verticalAlign: "bottom", height: 64,
-                        background: hoveredCol === day.i ? `${R.blue}06` : day.isFrozen ? `${R.amber}04` : "transparent",
-                        position: "relative",
+                        padding: "10px 0", textAlign: "center", verticalAlign: "bottom", height: 64,
+                        background: hoveredCol === day.i ? "rgba(57,189,248,0.04)" : "transparent",
                       }}
                     >
                       <div style={{ fontSize: 9, color: R.textDim }}>{day.monthLabel}</div>
-                      <div style={{ fontSize: 9, color: day.dow === 0 || day.dow === 6 ? R.blue : R.textDim, marginTop: 1 }}>{day.dayName}</div>
+                      <div style={{ fontSize: 9, color: day.isWknd ? R.warmTeal : R.textDim, marginTop: 1 }}>{day.dayName}</div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: R.accent, marginTop: 2 }}>{day.dayNum}</div>
-                      {day.isFrozen && <Lock size={8} color={R.amber} style={{ position: "absolute", top: 6, right: 6 }} />}
                     </th>
                   ))}
                 </tr>
@@ -174,44 +265,48 @@ export function MPMyRates({ activeView, onNavigate }: MPMyRatesProps) {
 
               <tbody>
                 {rows.map((row) => {
-                  if (row.section === "spacer") {
+                  // Divider row
+                  if (row.section === "divider") {
                     return (
                       <tr key={row.key}>
-                        <td style={{ position: "sticky", left: 0, zIndex: 10, background: R.surface, borderRight: `1px solid ${R.border}`, height: 8 }} />
+                        <td style={{ position: "sticky", left: 0, zIndex: 10, background: R.card, borderRight: `1px solid ${R.border}`, height: 10 }} />
                         {days.map(day => (
-                          <td key={day.i} style={{
-                            height: 8,
-                            background: hoveredCol === day.i ? `${R.blue}06` : day.isFrozen ? `${R.amber}04` : "transparent",
-                          }}
-                            onMouseEnter={() => setHoveredCol(day.i)}
-                            onMouseLeave={() => setHoveredCol(null)}
-                          />
+                          <td key={day.i} style={{ height: 10, background: hoveredCol === day.i ? "rgba(57,189,248,0.04)" : "transparent" }}
+                            onMouseEnter={() => setHoveredCol(day.i)} onMouseLeave={() => setHoveredCol(null)} />
                         ))}
                       </tr>
                     );
                   }
 
+                  // Section-specific styling
                   const isAi = row.section === "ai";
                   const isEditable = row.section === "editable";
-                  const labelColor = isAi ? R.blue : isEditable ? R.blue : R.textMid;
-                  const labelWeight = isAi || isEditable ? 600 : 400;
-                  const rowBgBase = isAi ? `${R.blue}06` : isEditable ? `${R.blue}04` : "transparent";
+                  const isSource = row.key === "source";
+
+                  // Label styling — only editable rows are bold
+                  const labelColor = isEditable ? R.warmTeal : isAi ? R.teal : R.textMid;
+                  const labelWeight = isEditable ? 600 : 400;
+
+                  // Row left border for emphasis
+                  const leftBorder = isEditable ? `3px solid ${R.warmTeal}` : isAi ? `3px solid ${R.teal}` : "3px solid transparent";
+
+                  // Row background tint
+                  const rowBg = isEditable ? "rgba(56,198,186,0.03)" : isAi ? "rgba(57,189,248,0.03)" : "transparent";
 
                   return (
                     <tr key={row.key}>
                       <td style={{
-                        position: "sticky", left: 0, zIndex: 10, background: R.surface,
+                        position: "sticky", left: 0, zIndex: 10, background: R.card,
                         borderRight: `1px solid ${R.border}`, borderBottom: `1px solid ${R.sep}`,
+                        borderLeft: leftBorder,
                         padding: "0 20px", height: ROW_H, fontSize: 13, color: labelColor, fontWeight: labelWeight,
-                        borderTop: isAi ? `1px solid ${R.blue}15` : "none",
                       }}>
                         {row.label}
                       </td>
                       {days.map(day => {
-                        const val = cellVal(row, day);
-                        const color = cellColor(row, day);
-                        const isStatus = row.key === "status";
-                        const colBg = hoveredCol === day.i ? `${R.blue}06` : day.isFrozen ? `${R.amber}04` : rowBgBase;
+                        const val = cellVal(row.key, day);
+                        const color = cellColor(row.key, day);
+                        const colHover = hoveredCol === day.i ? "rgba(57,189,248,0.04)" : "transparent";
 
                         return (
                           <td
@@ -221,27 +316,30 @@ export function MPMyRates({ activeView, onNavigate }: MPMyRatesProps) {
                             style={{
                               width: COL_W, minWidth: COL_W, height: ROW_H,
                               borderBottom: `1px solid ${R.sep}`,
-                              borderTop: isAi ? `1px solid ${R.blue}15` : "none",
                               textAlign: "center", verticalAlign: "middle",
-                              fontSize: isStatus ? 9 : 13,
-                              fontWeight: isStatus ? 700 : isAi ? 600 : 400,
-                              fontFamily: isStatus ? "inherit" : "monospace",
-                              letterSpacing: isStatus ? 0.5 : 0,
-                              textTransform: isStatus ? "uppercase" as const : "none" as const,
-                              color,
-                              background: colBg,
-                              cursor: (isAi && !day.isFrozen && !day.aiApplied) || isEditable ? "pointer" : "default",
                               padding: "0 4px",
+                              background: `${rowBg}`,
+                              // Layer hover on top
+                              ...(hoveredCol === day.i ? { background: `rgba(57,189,248,0.04)` } : {}),
                             }}
                           >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
-                              {val}
-                              {isAi && day.aiApplied && <Check size={10} color={R.green} />}
-                              {isAi && hoveredCol === day.i && !day.isFrozen && !day.aiApplied && <ArrowDown size={10} color={R.blue} />}
-                              {isEditable && day.hasOverride && row.key === "override" && (
-                                <div style={{ width: 4, height: 4, borderRadius: 2, background: R.amber, flexShrink: 0 }} />
-                              )}
-                            </div>
+                            {isSource ? (
+                              <span style={{
+                                fontSize: 9, fontWeight: 600, letterSpacing: 0.3,
+                                color, textTransform: "uppercase",
+                              }}>
+                                {val}
+                              </span>
+                            ) : (
+                              <span style={{
+                                fontSize: 13,
+                                fontWeight: isEditable ? 600 : 400,
+                                color,
+                                fontVariantNumeric: "tabular-nums",
+                              }}>
+                                {val}
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -252,25 +350,6 @@ export function MPMyRates({ activeView, onNavigate }: MPMyRatesProps) {
             </table>
           </div>
         </div>
-
-        {/* Footer */}
-        <div style={{ padding: "0 40px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: R.textDim }}>Scroll horizontally to view more dates. Click any blue cell to edit.</span>
-          <div style={{ display: "flex", gap: 16, fontSize: 10 }}>
-            {[
-              { label: "AI Active", color: R.blue },
-              { label: "Frozen", color: R.amber },
-              { label: "Applied", color: R.green },
-              { label: "Override", color: R.amber },
-            ].map(l => (
-              <span key={l.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 6, height: 6, borderRadius: 1, background: l.color }} />
-                <span style={{ color: R.textDim }}>{l.label}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

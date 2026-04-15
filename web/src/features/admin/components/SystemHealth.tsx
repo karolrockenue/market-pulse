@@ -104,11 +104,11 @@ export function SystemHealth({
         return (
           <Loader2
             className="w-4 h-4 animate-spin"
-            style={{ color: "#39BDF8" }}
+            style={{ color: "#7BAFD4" }}
           />
         );
       case "connected":
-        return <CheckCircle className="w-4 h-4 text-[#10b981]" />;
+        return <CheckCircle className="w-4 h-4 text-[#7BAFD4]" />;
       case "error":
         return <XCircle className="w-4 h-4 text-[#ef4444]" />;
       default:
@@ -118,7 +118,7 @@ export function SystemHealth({
               width: "16px",
               height: "16px",
               borderRadius: "50%",
-              backgroundColor: "#2a2a2a",
+              backgroundColor: "#1E2330",
             }}
           />
         );
@@ -128,22 +128,22 @@ export function SystemHealth({
   return (
     <div
       style={{
-        backgroundColor: "#1a1a1a",
-        border: "1px solid #2a2a2a",
+        backgroundColor: "#121519",
+        border: "1px solid #1E2330",
         borderRadius: "0.25rem",
       }}
     >
       <div
         style={{
           padding: "16px 20px",
-          borderBottom: "1px solid #2a2a2a",
+          borderBottom: "1px solid #1E2330",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Activity className="w-4 h-4" style={{ color: "#39BDF8" }} />
+          <Activity className="w-4 h-4" style={{ color: "#7BAFD4" }} />
           <h2
             style={{
-              color: "#e5e5e5",
+              color: "#F3F5F7",
               fontSize: "12px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -166,8 +166,8 @@ export function SystemHealth({
           {/* Database Test */}
           <div
             style={{
-              backgroundColor: "#1A1A1A",
-              border: "1px solid #2a2a2a",
+              backgroundColor: "#121519",
+              border: "1px solid #1E2330",
               borderRadius: "0.25rem",
               padding: "16px",
             }}
@@ -185,16 +185,16 @@ export function SystemHealth({
                   width: "32px",
                   height: "32px",
                   borderRadius: "0.25rem",
-                  backgroundColor: "rgba(57, 189, 248, 0.1)",
-                  border: "1px solid rgba(57, 189, 248, 0.3)",
+                  backgroundColor: "rgba(56, 198, 186, 0.1)",
+                  border: "1px solid rgba(56, 198, 186, 0.3)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Database className="w-4 h-4" style={{ color: "#39BDF8" }} />
+                <Database className="w-4 h-4" style={{ color: "#7BAFD4" }} />
               </div>
-              <span style={{ color: "#e5e5e5", fontSize: "12px" }}>
+              <span style={{ color: "#F3F5F7", fontSize: "12px" }}>
                 Database Connection
               </span>
             </div>
@@ -207,7 +207,7 @@ export function SystemHealth({
               }}
             >
               <StatusIcon status={dbStatus} />
-              <span style={{ color: "#9ca3af", fontSize: "12px" }}>
+              <span style={{ color: "#7A8494", fontSize: "12px" }}>
                 {dbStatus === "idle" && "Not tested"}
                 {dbStatus === "testing" && "Testing..."}
                 {dbStatus === "connected" && "Connected"}
@@ -220,8 +220,8 @@ export function SystemHealth({
               style={{
                 width: "100%",
                 height: "32px",
-                backgroundColor: "#39BDF8",
-                color: "#0f0f0f",
+                backgroundColor: "#38C6BA",
+                color: "#121519",
                 fontSize: "12px",
                 opacity: dbStatus === "testing" ? 0.5 : 1,
               }}
@@ -234,8 +234,8 @@ export function SystemHealth({
           {/* Cloudbeds Auth Test */}
           <div
             style={{
-              backgroundColor: "#1A1A1A",
-              border: "1px solid #2a2a2a",
+              backgroundColor: "#121519",
+              border: "1px solid #1E2330",
               borderRadius: "0.25rem",
               padding: "16px",
             }}
@@ -253,16 +253,16 @@ export function SystemHealth({
                   width: "32px",
                   height: "32px",
                   borderRadius: "0.25rem",
-                  backgroundColor: "rgba(57, 189, 248, 0.1)",
-                  border: "1px solid rgba(57, 189, 248, 0.3)",
+                  backgroundColor: "rgba(56, 198, 186, 0.1)",
+                  border: "1px solid rgba(56, 198, 186, 0.3)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Cloud className="w-4 h-4" style={{ color: "#39BDF8" }} />
+                <Cloud className="w-4 h-4" style={{ color: "#7BAFD4" }} />
               </div>
-              <span style={{ color: "#e5e5e5", fontSize: "12px" }}>
+              <span style={{ color: "#F3F5F7", fontSize: "12px" }}>
                 Cloudbeds Auth
               </span>
             </div>
@@ -275,7 +275,7 @@ export function SystemHealth({
               }}
             >
               <StatusIcon status={cloudbedsStatus} />
-              <span style={{ color: "#9ca3af", fontSize: "12px" }}>
+              <span style={{ color: "#7A8494", fontSize: "12px" }}>
                 {cloudbedsStatus === "idle" && "Not tested"}
                 {cloudbedsStatus === "testing" && "Testing..."}
                 {cloudbedsStatus === "connected" && "Authenticated"}
@@ -288,8 +288,8 @@ export function SystemHealth({
               style={{
                 width: "100%",
                 height: "32px",
-                backgroundColor: "#39BDF8",
-                color: "#0f0f0f",
+                backgroundColor: "#38C6BA",
+                color: "#121519",
                 fontSize: "12px",
                 opacity: cloudbedsStatus === "testing" ? 0.5 : 1,
               }}
@@ -302,8 +302,8 @@ export function SystemHealth({
           {/* Data Freshness */}
           <div
             style={{
-              backgroundColor: "#1A1A1A",
-              border: "1px solid #2a2a2a",
+              backgroundColor: "#121519",
+              border: "1px solid #1E2330",
               borderRadius: "0.25rem",
               padding: "16px",
             }}
@@ -321,23 +321,23 @@ export function SystemHealth({
                   width: "32px",
                   height: "32px",
                   borderRadius: "0.25rem",
-                  backgroundColor: "rgba(57, 189, 248, 0.1)",
-                  border: "1px solid rgba(57, 189, 248, 0.3)",
+                  backgroundColor: "rgba(56, 198, 186, 0.1)",
+                  border: "1px solid rgba(56, 198, 186, 0.3)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <RefreshCw className="w-4 h-4" style={{ color: "#39BDF8" }} />
+                <RefreshCw className="w-4 h-4" style={{ color: "#7BAFD4" }} />
               </div>
-              <span style={{ color: "#e5e5e5", fontSize: "12px" }}>
+              <span style={{ color: "#F3F5F7", fontSize: "12px" }}>
                 Data Freshness
               </span>
             </div>
             <div style={{ marginBottom: "16px" }}>
               <div
                 style={{
-                  color: "#9ca3af",
+                  color: "#7A8494",
                   fontSize: "12px",
                   marginBottom: "4px",
                   textTransform: "uppercase",
@@ -348,7 +348,7 @@ export function SystemHealth({
               </div>
               <div
                 style={{
-                  color: "#39BDF8",
+                  color: "#7BAFD4",
                   fontSize: "12px",
                   fontFamily: "monospace",
                 }}
@@ -364,8 +364,8 @@ export function SystemHealth({
               style={{
                 width: "100%",
                 height: "32px",
-                backgroundColor: "#39BDF8",
-                color: "#0f0f0f",
+                backgroundColor: "#38C6BA",
+                color: "#121519",
                 fontSize: "12px",
                 opacity: isRefreshing ? 0.5 : 1,
               }}

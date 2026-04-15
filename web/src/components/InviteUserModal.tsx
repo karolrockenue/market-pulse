@@ -75,7 +75,7 @@ export function InviteUserModal({
           {
             "--color-ring": "rgba(57, 189, 248, 0.5)",
             "--color-accent": "rgba(57, 189, 248, 0.1)",
-            "--color-accent-foreground": "#39BDF8",
+            "--color-accent-foreground": "#38C6BA",
           } as React.CSSProperties
         }
       >
@@ -110,12 +110,12 @@ export function InviteUserModal({
                 }}
               >
                 <UserPlus
-                  style={{ width: "20px", height: "20px", color: "#39BDF8" }}
+                  style={{ width: "20px", height: "20px", color: "#38C6BA" }}
                 />
               </div>
               <DialogTitle
                 style={{
-                  color: "#39BDF8",
+                  color: "#38C6BA",
                   fontSize: "18px",
                   textTransform: "uppercase",
                   letterSpacing: "-0.025em",
@@ -196,7 +196,7 @@ export function InviteUserModal({
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor =
                           "rgba(57, 189, 248, 0.1)";
-                        e.currentTarget.style.color = "#39BDF8";
+                        e.currentTarget.style.color = "#38C6BA";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = "transparent";
@@ -388,7 +388,7 @@ export function InviteUserModal({
                 backgroundColor:
                   !propertyId || !firstName || !lastName || !email
                     ? "#2a2a2a"
-                    : "#39BDF8",
+                    : "#38C6BA",
                 color:
                   !propertyId || !firstName || !lastName || !email
                     ? "#6b7280"
@@ -426,7 +426,7 @@ export function InviteUserModal({
                   email &&
                   !isLoading
                 ) {
-                  e.currentTarget.style.backgroundColor = "#39BDF8";
+                  e.currentTarget.style.backgroundColor = "#38C6BA";
                 }
               }}
             >

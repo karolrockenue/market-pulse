@@ -106,8 +106,8 @@ export function ManageCompSetModal({
     >
       <div
         style={{
-          backgroundColor: "#1a1a1a",
-          border: "1px solid #2a2a2a",
+          backgroundColor: "#121519",
+          border: "1px solid #1E2330",
           borderRadius: "12px",
           width: "480px",
           maxHeight: "80vh",
@@ -121,7 +121,7 @@ export function ManageCompSetModal({
         <div
           style={{
             padding: "20px 24px 16px",
-            borderBottom: "1px solid #2a2a2a",
+            borderBottom: "1px solid #1E2330",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
@@ -130,7 +130,7 @@ export function ManageCompSetModal({
           <div>
             <h2
               style={{
-                color: "#e5e5e5",
+                color: "#F3F5F7",
                 fontSize: "16px",
                 fontWeight: 600,
                 margin: 0,
@@ -140,7 +140,7 @@ export function ManageCompSetModal({
             </h2>
             <p
               style={{
-                color: "#9ca3af",
+                color: "#7A8494",
                 fontSize: "12px",
                 margin: "4px 0 0",
               }}
@@ -154,7 +154,7 @@ export function ManageCompSetModal({
             style={{
               background: "none",
               border: "none",
-              color: "#9ca3af",
+              color: "#7A8494",
               cursor: "pointer",
               padding: "4px",
             }}
@@ -164,18 +164,18 @@ export function ManageCompSetModal({
         </div>
 
         {/* Search */}
-        <div style={{ padding: "12px 24px", borderBottom: "1px solid #2a2a2a" }}>
+        <div style={{ padding: "12px 24px", borderBottom: "1px solid #1E2330" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              backgroundColor: "#2C2C2C",
+              backgroundColor: "#1E2330",
               borderRadius: "6px",
               padding: "8px 12px",
             }}
           >
-            <Search size={14} style={{ color: "#6b7280" }} />
+            <Search size={14} style={{ color: "#4E5868" }} />
             <input
               type="text"
               placeholder="Search hotels..."
@@ -185,7 +185,7 @@ export function ManageCompSetModal({
                 background: "none",
                 border: "none",
                 outline: "none",
-                color: "#e5e5e5",
+                color: "#F3F5F7",
                 fontSize: "13px",
                 width: "100%",
               }}
@@ -204,7 +204,7 @@ export function ManageCompSetModal({
           {loading ? (
             <p
               style={{
-                color: "#9ca3af",
+                color: "#7A8494",
                 fontSize: "13px",
                 textAlign: "center",
                 padding: "24px",
@@ -228,7 +228,7 @@ export function ManageCompSetModal({
                     borderRadius: "6px",
                     border: "none",
                     background: isSelected
-                      ? "rgba(57, 189, 248, 0.08)"
+                      ? "rgba(56, 198, 186, 0.08)"
                       : "transparent",
                     cursor: "pointer",
                     textAlign: "left",
@@ -240,21 +240,21 @@ export function ManageCompSetModal({
                       height: "18px",
                       borderRadius: "4px",
                       border: isSelected
-                        ? "1.5px solid #39BDF8"
-                        : "1.5px solid #6b7280",
-                      backgroundColor: isSelected ? "#39BDF8" : "transparent",
+                        ? "1.5px solid #7BAFD4"
+                        : "1.5px solid #4E5868",
+                      backgroundColor: isSelected ? "#7BAFD4" : "transparent",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
                     }}
                   >
-                    {isSelected && <Check size={12} style={{ color: "#1a1a1a" }} />}
+                    {isSelected && <Check size={12} style={{ color: "#121519" }} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        color: "#e5e5e5",
+                        color: "#F3F5F7",
                         fontSize: "13px",
                         fontWeight: 500,
                         whiteSpace: "nowrap",
@@ -264,7 +264,7 @@ export function ManageCompSetModal({
                     >
                       {hotel.property_name}
                     </div>
-                    <div style={{ color: "#6b7280", fontSize: "11px" }}>
+                    <div style={{ color: "#4E5868", fontSize: "11px" }}>
                       {hotel.category || "Uncategorised"} · {hotel.city || "—"}
                     </div>
                   </div>
@@ -275,7 +275,7 @@ export function ManageCompSetModal({
           {!loading && filtered.length === 0 && (
             <p
               style={{
-                color: "#6b7280",
+                color: "#4E5868",
                 fontSize: "13px",
                 textAlign: "center",
                 padding: "24px",
@@ -290,7 +290,7 @@ export function ManageCompSetModal({
         <div
           style={{
             padding: "16px 24px",
-            borderTop: "1px solid #2a2a2a",
+            borderTop: "1px solid #1E2330",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -301,7 +301,7 @@ export function ManageCompSetModal({
             style={{
               background: "none",
               border: "none",
-              color: "#9ca3af",
+              color: "#7A8494",
               fontSize: "12px",
               cursor: "pointer",
               padding: "6px 0",
@@ -315,9 +315,9 @@ export function ManageCompSetModal({
               style={{
                 padding: "8px 16px",
                 borderRadius: "6px",
-                border: "1px solid #2a2a2a",
+                border: "1px solid #1E2330",
                 backgroundColor: "transparent",
-                color: "#e5e5e5",
+                color: "#F3F5F7",
                 fontSize: "13px",
                 cursor: "pointer",
               }}
@@ -331,8 +331,8 @@ export function ManageCompSetModal({
                 padding: "8px 16px",
                 borderRadius: "6px",
                 border: "none",
-                backgroundColor: "#39BDF8",
-                color: "#1a1a1a",
+                backgroundColor: "#7BAFD4",
+                color: "#121519",
                 fontSize: "13px",
                 fontWeight: 600,
                 cursor: saving ? "not-allowed" : "pointer",

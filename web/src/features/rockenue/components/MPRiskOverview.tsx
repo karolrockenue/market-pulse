@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { AlertTriangle, AlertCircle, Activity, Target, TrendingDown, TrendingUp, Building2, Bell, Search } from "lucide-react";
 import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from "recharts";
-import { MPSidebar } from "./MPSidebar";
 
 // ── MP Risk Overview — Rockenue style mockup ──
 
@@ -70,7 +69,6 @@ export function MPRiskOverview({ activeView, onNavigate }: MPRiskOverviewProps) 
 
   return (
     <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", display: "flex" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
       <div style={{ flex: 1, overflow: "auto" }}>
 
         {/* Header */}

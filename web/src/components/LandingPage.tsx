@@ -25,7 +25,7 @@ interface LandingPageProps {
 }
 
 // Color constants matching TopNav + Dashboard
-const BLUE = "#39BDF8";
+const BLUE = "#38C6BA";
 const WHITE = "#e5e5e5";
 const GRAY = "#9ca3af";
 const DIM = "#6b7280";

@@ -38,7 +38,7 @@ export function MarketVeil({
           marginBottom: "24px",
         }}
       >
-        <Building2 size={36} color="#39BDF8" strokeWidth={1.5} />
+        <Building2 size={36} color="#38C6BA" strokeWidth={1.5} />
       </div>
 
       <h2
@@ -102,7 +102,7 @@ export function MarketVeil({
           >
             <Building2
               size={18}
-              color={i < currentCount ? "#39BDF8" : "#4a4a48"}
+              color={i < currentCount ? "#38C6BA" : "#4a4a48"}
               strokeWidth={1.5}
             />
           </div>
@@ -126,7 +126,7 @@ export function MarketVeil({
             marginBottom: "8px",
           }}
         >
-          <Users size={16} color="#39BDF8" />
+          <Users size={16} color="#38C6BA" />
           <span style={{ color: "#e5e5e5", fontSize: "13px", fontWeight: 600 }}>
             Help grow your market
           </span>

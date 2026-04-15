@@ -1,0 +1,382 @@
+import { useState } from "react";
+import {
+  LayoutDashboard,
+  FileText,
+  BarChart3,
+  Trophy,
+  DollarSign,
+  Zap,
+  Shield,
+  TerminalSquare,
+  Radar,
+  Settings,
+  LogOut,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  Building2,
+  ClipboardList,
+  Globe,
+  Palette,
+  MonitorSmartphone,
+  Presentation,
+} from "lucide-react";
+import { R } from "../styles/tokens";
+
+interface Property {
+  property_id: number;
+  property_name: string;
+}
+
+interface AppSidebarProps {
+  activeView: string;
+  onViewChange: (view: string) => void;
+  property: string;
+  onPropertyChange: (property: string) => void;
+  properties: Property[];
+  userInfo: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  } | null;
+  cityName?: string;
+  isArchanesOnly?: boolean;
+}
+
+export function AppSidebar({
+  activeView,
+  onViewChange,
+  property,
+  onPropertyChange,
+  properties,
+  userInfo,
+  cityName,
+  isArchanesOnly = false,
+}: AppSidebarProps) {
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  const [sentinelOpen, setSentinelOpen] = useState(false);
+  const [rockenueOpen, setRockenueOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+
+  const isAdmin = userInfo?.role === "super_admin" || userInfo?.role === "admin";
+
+  const getInitials = () => {
+    if (!userInfo) return "..";
+    return `${(userInfo.firstName || "").charAt(0)}${(userInfo.lastName || "").charAt(0)}`.toUpperCase();
+  };
+
+  const selectedPropertyName =
+    property === "ALL"
+      ? "All Properties"
+      : properties.find((p) => p.property_id.toString() === property)?.property_name ?? "Select property";
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      window.location.reload();
+    }
+  };
+
+  const handleNav = (view: string) => {
+    const singlePropertyViews = [
+      "reports", "settings", "hotelRates", "sentinel",
+      "sentinel-group", "riskOverview", "rateManager",
+      "competitive-intel", "demandRadar",
+    ];
+    if (property === "ALL" && singlePropertyViews.includes(view)) {
+      if (properties.length > 0) {
+        onPropertyChange(properties[0].property_id.toString());
+        onViewChange(view);
+      }
+    } else {
+      onViewChange(view);
+    }
+  };
+
+  const navItem = (label: string, value: string, Icon: any, indent = false) => {
+    const isActive = activeView === value;
+    return (
+      <div
+        key={value}
+        onClick={() => handleNav(value)}
+        style={{
+          padding: indent ? "8px 20px 8px 36px" : "10px 20px",
+          fontSize: indent ? 12 : 13,
+          cursor: "pointer",
+          fontWeight: isActive ? 600 : 400,
+          color: isActive ? R.accent : R.textDim,
+          background: isActive ? `${R.warmTeal}08` : "transparent",
+          borderLeft: isActive ? `2px solid ${R.warmTeal}` : "2px solid transparent",
+          transition: "all 0.15s",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <Icon size={indent ? 13 : 15} style={{ opacity: isActive ? 1 : 0.5, flexShrink: 0 }} />
+        {label}
+      </div>
+    );
+  };
+
+  const sectionToggle = (label: string, Icon: any, open: boolean, setOpen: (v: boolean) => void, activeValues: string[]) => {
+    const isActive = activeValues.includes(activeView);
+    return (
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          padding: "10px 20px",
+          fontSize: 13,
+          cursor: "pointer",
+          fontWeight: isActive ? 600 : 400,
+          color: isActive ? R.accent : R.textDim,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          transition: "all 0.15s",
+          borderLeft: isActive && !open ? `2px solid ${R.warmTeal}` : "2px solid transparent",
+          background: isActive && !open ? `${R.warmTeal}08` : "transparent",
+        }}
+      >
+        <Icon size={15} style={{ opacity: isActive ? 1 : 0.5, flexShrink: 0 }} />
+        <span style={{ flex: 1 }}>{label}</span>
+        <ChevronRight size={12} style={{ opacity: 0.4, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
+      </div>
+    );
+  };
+
+  const demandLabel = cityName
+    ? `Demand ${cityName.charAt(0).toUpperCase() + cityName.slice(1).replace(/-/g, " ")}`
+    : "Demand & Pace";
+
+  return (
+    <div
+      style={{
+        width: 220,
+        background: R.sidebar,
+        borderRight: `1px solid ${R.border}`,
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+        height: "100vh",
+        position: "sticky",
+        top: 0,
+        overflowY: "auto",
+        overflowX: "hidden",
+      }}
+    >
+      {/* Logo */}
+      <div style={{ padding: "28px 14px 18px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <span style={{ color: "#38C6BA", fontSize: 26, fontWeight: 300, lineHeight: 1 }}>(</span>
+        <span style={{ color: R.accent, fontSize: 14, fontWeight: 700, letterSpacing: 1.4 }}>MARKET PULSE</span>
+        <span style={{ color: "#C8A66E", fontSize: 26, fontWeight: 300, lineHeight: 1 }}>)</span>
+      </div>
+
+      {/* Property Selector */}
+      <div style={{ padding: "0 14px 16px", position: "relative" }}>
+        <div
+          onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 12px",
+            background: R.heroBg,
+            border: `1px solid ${propertyDropdownOpen ? R.warmTeal + "40" : R.border}`,
+            borderRadius: 8,
+            cursor: "pointer",
+            transition: "border-color 0.15s",
+          }}
+        >
+          <div style={{ overflow: "hidden" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: R.accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {selectedPropertyName}
+            </div>
+          </div>
+          <ChevronDown
+            size={14}
+            color={R.textDim}
+            style={{ transform: propertyDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}
+          />
+        </div>
+
+        {propertyDropdownOpen && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 14,
+              right: 14,
+              zIndex: 50,
+              background: R.heroBg,
+              border: `1px solid ${R.border}`,
+              borderRadius: 8,
+              marginTop: 4,
+              maxHeight: 320,
+              overflowY: "auto",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            }}
+          >
+            {properties.length > 1 && (
+              <div
+                onClick={() => { onPropertyChange("ALL"); setPropertyDropdownOpen(false); }}
+                style={{
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: property === "ALL" ? `${R.warmTeal}08` : "transparent",
+                  borderBottom: `1px solid ${R.sep}`,
+                  fontWeight: 600,
+                }}
+              >
+                <div style={{ fontSize: 12, color: R.accent }}>All Properties (Portfolio)</div>
+                {property === "ALL" && <Check size={12} color={R.warmTeal} />}
+              </div>
+            )}
+            {properties.map((p) => {
+              const isSelected = property === p.property_id.toString();
+              return (
+                <div
+                  key={p.property_id}
+                  onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); }}
+                  style={{
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: isSelected ? `${R.warmTeal}08` : "transparent",
+                    borderBottom: `1px solid rgba(255,255,255,0.03)`,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: isSelected ? R.accent : R.text, fontWeight: isSelected ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.property_name}
+                  </div>
+                  {isSelected && <Check size={12} color={R.warmTeal} />}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <div style={{ borderTop: `1px solid ${R.border}`, paddingTop: 8, flex: 1 }}>
+        {isArchanesOnly ? (
+          navItem("Investor View", "demand-pace", BarChart3)
+        ) : (
+          <>
+            {navItem("Dashboard", "dashboard", LayoutDashboard)}
+            {navItem("Demand Radar", "demandRadar", Radar)}
+            {navItem("Compset Intel", "competitive-intel", Trophy)}
+            {navItem("Reports", "reports", FileText)}
+            {navItem("My Rates", "hotelRates", DollarSign)}
+
+            {isAdmin && (
+              <>
+                <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
+
+                {sectionToggle("Sentinel", Zap, sentinelOpen, setSentinelOpen, ["riskOverview", "sentinel", "rateManager", "marketProfile"])}
+                {sentinelOpen && (
+                  <>
+                    {navItem("Risk Overview", "riskOverview", Shield, true)}
+                    {navItem("Control Panel", "sentinel", TerminalSquare, true)}
+                    {navItem("Rate Manager", "rateManager", DollarSign, true)}
+                    {navItem("Market Profile", "marketProfile", BarChart3, true)}
+                  </>
+                )}
+
+                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["crm", "distribution", "channelPricing"])}
+                {rockenueOpen && (
+                  <>
+                    {navItem("CRM", "crm", ClipboardList, true)}
+                    {navItem("Distribution", "distribution", Globe, true)}
+                    {navItem("Channel Pricing", "channelPricing", DollarSign, true)}
+                  </>
+                )}
+
+                {navItem("Admin", "admin", Zap)}
+
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDash3", "mpReportsHub", "mpDemandRadar", "mpCompsetIntel", "mpCompsetView", "mpMyRates", "mpChannelPricing", "mpChannelPricingV2", "mpChannelPricingV3", "mpDistribution", "mpCrmBoard", "mpRiskOverview", "mpControlPanel", "mpControlPanelV2", "mpAdminHub", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
+                {studioOpen && (
+                  <>
+                    {navItem("MP Dashboard", "mpDash3", MonitorSmartphone, true)}
+                    {navItem("MP Reports", "mpReportsHub", MonitorSmartphone, true)}
+                    {navItem("MP Demand Radar", "mpDemandRadar", MonitorSmartphone, true)}
+                    {navItem("MP Compset", "mpCompsetView", MonitorSmartphone, true)}
+                    {navItem("MP Compset V2", "mpCompsetViewV2", MonitorSmartphone, true)}
+                    {navItem("MP My Rates", "mpMyRates", MonitorSmartphone, true)}
+                    {navItem("MP Channel Pricing", "mpChannelPricing", MonitorSmartphone, true)}
+                    {navItem("MP Channel Pricing V2", "mpChannelPricingV2", MonitorSmartphone,  true)}
+                    {navItem("MP Channel Pricing V3", "mpChannelPricingV3", MonitorSmartphone, true)}
+                    {navItem("MP Distribution", "mpDistribution", MonitorSmartphone, true)}
+                    {navItem("MP CRM", "mpCrmBoard", MonitorSmartphone, true)}
+                    {navItem("MP Control Panel", "mpControlPanel", MonitorSmartphone, true)}
+                    {navItem("MP Control Panel V2", "mpControlPanelV2", MonitorSmartphone, true)}
+                    {navItem("MP Admin Hub", "mpAdminHub", MonitorSmartphone, true)}
+                    {navItem("Deck V2", "deckV2", Presentation, true)}
+                    {navItem("Shreeji Deck", "shreejiDeck", Presentation, true)}
+                    {navItem("Canvas", "canvas", Palette, true)}
+                  </>
+                )}
+              </>
+            )}
+
+            <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
+            {navItem("Settings", "settings", Settings)}
+          </>
+        )}
+      </div>
+
+      {/* User + Logout */}
+      <div style={{ borderTop: `1px solid ${R.border}`, padding: "12px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              background: R.warmTeal,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              fontWeight: 700,
+              color: R.sidebar,
+              flexShrink: 0,
+            }}
+          >
+            {getInitials()}
+          </div>
+          <div style={{ overflow: "hidden" }}>
+            <div style={{ fontSize: 12, color: R.accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : "..."}
+            </div>
+            <div style={{ fontSize: 10, color: R.textDim }}>{userInfo?.role || ""}</div>
+          </div>
+        </div>
+        <div
+          onClick={handleLogout}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11,
+            color: R.textDim,
+            cursor: "pointer",
+            padding: "6px 0",
+          }}
+        >
+          <LogOut size={12} />
+          Sign Out
+        </div>
+      </div>
+    </div>
+  );
+}

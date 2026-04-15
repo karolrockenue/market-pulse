@@ -95,14 +95,14 @@ return (
         <div className="mb-8">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-[#9ca3af] hover:text-[#39BDF8] transition-colors mb-6"
+            className="flex items-center gap-2 text-[#9ca3af] hover:text-[#38C6BA] transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back</span>
           </button>
 
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-1 h-8 bg-[#39BDF8]" />
+            <div className="w-1 h-8 bg-[#38C6BA]" />
             <h1 className="text-[#e5e5e5] tracking-wide">Support Center</h1>
           </div>
           <p className="text-[#9ca3af] ml-4">
@@ -134,13 +134,13 @@ return (
                             onClick={() => setRequestType(type.value)}
                             className={`p-4 rounded-lg border-2 transition-all ${
                               requestType === type.value
-                                ? 'border-[#39BDF8] bg-[#39BDF8]/5'
+                                ? 'border-[#38C6BA] bg-[#38C6BA]/5'
                                 : 'border-[#2C2C2C] bg-[#1d1d1c] hover:border-[#2a2a2a]'
                             }`}
                           >
                             <Icon
                               className={`w-6 h-6 mx-auto mb-2 ${
-                                requestType === type.value ? 'text-[#39BDF8]' : 'text-[#9ca3af]'
+                                requestType === type.value ? 'text-[#38C6BA]' : 'text-[#9ca3af]'
                               }`}
                             />
                             <div
@@ -246,7 +246,7 @@ return (
 {/* Submit Button */}
 <Button
   type="submit"
-  className="w-full bg-[#39BDF8] text-[#1d1d1c] hover:bg-[#f0f055] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+  className="w-full bg-[#38C6BA] text-[#1d1d1c] hover:bg-[#f0f055] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
   disabled={isSubmitting} // [NEW] Disable button while submitting
 >
   {isSubmitting ? (
@@ -269,7 +269,7 @@ return (
             {/* Direct Contact */}
             <Card className="bg-[#1a1a18] border-[#2C2C2C] p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Mail className="w-5 h-5 text-[#39BDF8]" />
+                <Mail className="w-5 h-5 text-[#38C6BA]" />
                 <h3 className="text-[#e5e5e5]">Direct Contact</h3>
               </div>
               <p className="text-[#9ca3af] text-sm mb-4">
@@ -280,7 +280,7 @@ return (
                   <div className="text-xs text-[#6b7280] mb-1">Email Support</div>
                   <a
                     href="mailto:support@market-pulse.io"
-                    className="text-[#39BDF8] hover:text-[#f0f055] transition-colors text-sm"
+                    className="text-[#38C6BA] hover:text-[#f0f055] transition-colors text-sm"
                   >
                    support@market-pulse.io
                   </a>
@@ -294,19 +294,19 @@ return (
               <h3 className="text-[#e5e5e5] mb-3">Response Time</h3>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#39BDF8] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#38C6BA] mt-1.5" />
                   <span className="text-[#9ca3af]">
                     <span className="text-[#e5e5e5]">General inquiries:</span> Within 24 hours
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#39BDF8] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#38C6BA] mt-1.5" />
                   <span className="text-[#9ca3af]">
                     <span className="text-[#e5e5e5]">Feature requests:</span> 2-3 business days
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#39BDF8] mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#38C6BA] mt-1.5" />
                   <span className="text-[#9ca3af]">
                     <span className="text-[#e5e5e5]">PMS integrations:</span> 3-5 business days
                   </span>

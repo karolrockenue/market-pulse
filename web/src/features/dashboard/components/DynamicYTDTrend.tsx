@@ -1,4 +1,5 @@
 import { TrendingUp, ExternalLink } from "lucide-react";
+import { R } from "../../../styles/tokens";
 
 // [NEW] Interfaces for data handling
 interface MetricValues {
@@ -90,9 +91,9 @@ export function DynamicYTDTrend({
     <div
       onClick={onNavigate ? () => onNavigate("reports") : undefined}
       style={{
-        backgroundColor: "#1a1a1a",
-        borderRadius: "8px",
-        border: "1px solid #2a2a2a",
+        backgroundColor: R.darkBand,
+        borderRadius: "10px",
+        border: `1px solid ${R.border}`,
         padding: "24px",
         width: "100%",
         textAlign: "left",
@@ -100,11 +101,11 @@ export function DynamicYTDTrend({
         cursor: onNavigate ? "pointer" : "default",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(57, 189, 248, 0.5)";
-        e.currentTarget.style.boxShadow = "0 0 20px rgba(57, 189, 248, 0.15)";
+        e.currentTarget.style.borderColor = `${R.warmTeal}50`;
+        e.currentTarget.style.boxShadow = `0 0 20px ${R.warmTeal}15`;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "#2a2a2a";
+        e.currentTarget.style.borderColor = R.border;
         e.currentTarget.style.boxShadow = "none";
       }}
     >
@@ -131,14 +132,14 @@ export function DynamicYTDTrend({
             }}
           >
             <TrendingUp
-              style={{ width: "20px", height: "20px", color: "#39BDF8" }}
+              style={{ width: "20px", height: "20px", color: "#38C6BA" }}
             />
           </div>
           <div>
-            <div style={{ color: "#e5e5e5", marginBottom: "4px" }}>
+            <div style={{ color: R.accent, marginBottom: "4px" }}>
               Annual Performance - All Metrics
             </div>
-            <div style={{ color: "#6b7280", fontSize: "12px" }}>
+            <div style={{ color: R.textDim, fontSize: "12px" }}>
               ADR, Occupancy & Revenue comparison ({multiMetricData.length}{" "}
               {multiMetricData.length === 1 ? "month" : "months"})
             </div>
@@ -155,7 +156,7 @@ export function DynamicYTDTrend({
           >
             <span
               style={{
-                color: "#39BDF8",
+                color: R.warmTeal,
                 fontSize: "12px",
                 opacity: 0,
                 transition: "opacity 0.3s",
@@ -167,7 +168,7 @@ export function DynamicYTDTrend({
               style={{
                 width: "16px",
                 height: "16px",
-                color: "#6b7280",
+                color: R.textDim,
                 transition: "all 0.3s",
               }}
             />
@@ -178,10 +179,10 @@ export function DynamicYTDTrend({
       {/* Table */}
       <div
         style={{
-          backgroundColor: "#1a1a1a",
+          backgroundColor: R.darkBand,
           borderRadius: "8px",
           overflow: "hidden",
-          border: "1px solid #2a2a2a",
+          border: `1px solid ${R.border}`,
           position: "relative",
         }}
       >
@@ -215,8 +216,8 @@ export function DynamicYTDTrend({
             gridTemplateColumns: GRID_TEMPLATE,
             gap: "8px",
             padding: "8px 16px",
-            borderBottom: "1px solid rgba(42, 42, 42, 0.5)",
-            backgroundColor: "#1D1D1C",
+            borderBottom: `1px solid ${R.sep}`,
+            backgroundColor: R.heroBg,
             position: "relative",
             zIndex: 10,
           }}
@@ -225,7 +226,7 @@ export function DynamicYTDTrend({
           <div
             style={{
               gridColumn: "span 3",
-              color: "#39BDF8",
+              color: R.warmTeal,
               fontSize: "11px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -237,7 +238,7 @@ export function DynamicYTDTrend({
           <div
             style={{
               gridColumn: "span 3",
-              color: "#39BDF8",
+              color: R.warmTeal,
               fontSize: "11px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -251,7 +252,7 @@ export function DynamicYTDTrend({
           <div
             style={{
               gridColumn: "span 2",
-              color: "#39BDF8",
+              color: R.warmTeal,
               fontSize: "11px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -271,15 +272,15 @@ export function DynamicYTDTrend({
             gridTemplateColumns: GRID_TEMPLATE,
             gap: "8px",
             padding: "12px 16px",
-            borderBottom: "1px solid #2a2a2a",
-            backgroundColor: "#1D1D1C",
+            borderBottom: "1px solid #1E2330",
+            backgroundColor: R.heroBg,
             position: "relative",
             zIndex: 10,
           }}
         >
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -290,7 +291,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -302,7 +303,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -314,7 +315,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -326,7 +327,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -340,7 +341,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -352,7 +353,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -364,7 +365,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -378,7 +379,7 @@ export function DynamicYTDTrend({
           </div>
           <div
             style={{
-              color: "#6b7280",
+              color: R.textDim,
               fontSize: "10px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -411,12 +412,12 @@ export function DynamicYTDTrend({
                   backgroundColor: row.isMTD
                     ? "rgba(57, 189, 248, 0.1)"
                     : "transparent",
-                  borderLeft: row.isMTD ? "2px solid #39BDF8" : "none",
-                  borderTop: index > 0 ? "1px solid #2a2a2a" : "none",
+                  borderLeft: row.isMTD ? "2px solid #38C6BA" : "none",
+                  borderTop: index > 0 ? "1px solid #1E2330" : "none",
                 }}
                 onMouseEnter={(e) => {
                   if (!row.isMTD) {
-                    e.currentTarget.style.backgroundColor = "#141414";
+                    e.currentTarget.style.backgroundColor = R.heroBg;
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -434,7 +435,7 @@ export function DynamicYTDTrend({
                     paddingRight: "12px",
                   }}
                 >
-                  <span style={{ color: "#e5e5e5", fontSize: "12px" }}>
+                  <span style={{ color: R.accent, fontSize: "12px" }}>
                     {row.month}
                   </span>
                   {row.isMTD && (
@@ -444,7 +445,7 @@ export function DynamicYTDTrend({
                         borderRadius: "4px",
                         fontSize: "10px",
                         backgroundColor: "rgba(57, 189, 248, 0.2)",
-                        color: "#39BDF8",
+                        color: R.warmTeal,
                         border: "1px solid rgba(57, 189, 248, 0.3)",
                       }}
                     >
@@ -457,7 +458,7 @@ export function DynamicYTDTrend({
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#9ca3af",
+                    color: R.textMid,
                     fontSize: "12px",
                     paddingRight: "12px",
                   }}
@@ -467,7 +468,7 @@ export function DynamicYTDTrend({
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#9ca3af",
+                    color: R.textMid,
                     fontSize: "12px",
                     paddingRight: "12px",
                   }}
@@ -477,7 +478,7 @@ export function DynamicYTDTrend({
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#9ca3af",
+                    color: R.textMid,
                     fontSize: "12px",
                     paddingRight: "12px",
                   }}
@@ -489,7 +490,7 @@ export function DynamicYTDTrend({
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#e5e5e5",
+                    color: R.accent,
                     fontSize: "12px",
                     paddingRight: "12px",
                     borderLeft: "1px solid rgba(57, 189, 248, 0.2)",
@@ -501,7 +502,7 @@ export function DynamicYTDTrend({
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#e5e5e5",
+                    color: R.accent,
                     fontSize: "12px",
                     paddingRight: "12px",
                   }}
@@ -511,7 +512,7 @@ export function DynamicYTDTrend({
                 <div
                   style={{
                     textAlign: "center",
-                    color: "#e5e5e5",
+                    color: R.accent,
                     fontSize: "12px",
                     paddingRight: "12px",
                   }}
@@ -539,9 +540,9 @@ export function DynamicYTDTrend({
                       fontSize: "10px",
                       backgroundColor:
                         revPct >= 0
-                          ? "rgba(16, 185, 129, 0.2)"
+                          ? "rgba(52, 208, 104, 0.2)"
                           : "rgba(239, 68, 68, 0.2)",
-                      color: revPct >= 0 ? "#10b981" : "#ef4444",
+                      color: revPct >= 0 ? R.green : "#ef4444",
                     }}
                   >
                     {formatVariance(revPct)}
@@ -566,9 +567,9 @@ export function DynamicYTDTrend({
                       fontSize: "10px",
                       backgroundColor:
                         revDiff >= 0
-                          ? "rgba(16, 185, 129, 0.2)"
+                          ? "rgba(52, 208, 104, 0.2)"
                           : "rgba(239, 68, 68, 0.2)",
-                      color: revDiff >= 0 ? "#10b981" : "#ef4444",
+                      color: revDiff >= 0 ? R.green : "#ef4444",
                     }}
                   >
                     {formatValue(revDiff, "revenue", true)}
@@ -585,7 +586,7 @@ export function DynamicYTDTrend({
               gridTemplateColumns: GRID_TEMPLATE,
               gap: "8px",
               padding: "14px 16px",
-              backgroundColor: "#1D1D1C",
+              backgroundColor: R.heroBg,
               borderTop: "2px solid rgba(57, 189, 248, 0.3)",
               position: "relative",
               zIndex: 10,
@@ -599,7 +600,7 @@ export function DynamicYTDTrend({
                 paddingRight: "12px",
               }}
             >
-              <span style={{ color: "#39BDF8", fontSize: "12px" }}>
+              <span style={{ color: R.warmTeal, fontSize: "12px" }}>
                 Annual Total
               </span>
             </div>
@@ -608,7 +609,7 @@ export function DynamicYTDTrend({
             <div
               style={{
                 textAlign: "center",
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "12px",
                 paddingRight: "12px",
               }}
@@ -626,7 +627,7 @@ export function DynamicYTDTrend({
             <div
               style={{
                 textAlign: "center",
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "12px",
                 paddingRight: "12px",
               }}
@@ -649,7 +650,7 @@ export function DynamicYTDTrend({
             <div
               style={{
                 textAlign: "center",
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "12px",
                 paddingRight: "12px",
               }}
@@ -667,7 +668,7 @@ export function DynamicYTDTrend({
             <div
               style={{
                 textAlign: "center",
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "12px",
                 paddingRight: "12px",
                 borderLeft: "1px solid rgba(57, 189, 248, 0.2)",
@@ -687,7 +688,7 @@ export function DynamicYTDTrend({
             <div
               style={{
                 textAlign: "center",
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "12px",
                 paddingRight: "12px",
               }}
@@ -710,7 +711,7 @@ export function DynamicYTDTrend({
             <div
               style={{
                 textAlign: "center",
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "12px",
                 paddingRight: "12px",
               }}
@@ -755,7 +756,7 @@ export function DynamicYTDTrend({
                       ? ((totalTY - totalLY) / totalLY) * 100
                       : 0;
                     return v >= 0
-                      ? "rgba(16, 185, 129, 0.2)"
+                      ? "rgba(52, 208, 104, 0.2)"
                       : "rgba(239, 68, 68, 0.2)";
                   })(),
                   color: (() => {
@@ -767,7 +768,7 @@ export function DynamicYTDTrend({
                       (sum, row) => sum + row.revenue.thisYear,
                       0
                     );
-                    return totalTY - totalLY >= 0 ? "#10b981" : "#ef4444";
+                    return totalTY - totalLY >= 0 ? R.green : "#ef4444";
                   })(),
                 }}
               >
@@ -812,7 +813,7 @@ export function DynamicYTDTrend({
                       0
                     );
                     return totalTY - totalLY >= 0
-                      ? "rgba(16, 185, 129, 0.2)"
+                      ? "rgba(52, 208, 104, 0.2)"
                       : "rgba(239, 68, 68, 0.2)";
                   })(),
                   color: (() => {
@@ -824,7 +825,7 @@ export function DynamicYTDTrend({
                       (sum, row) => sum + row.revenue.thisYear,
                       0
                     );
-                    return totalTY - totalLY >= 0 ? "#10b981" : "#ef4444";
+                    return totalTY - totalLY >= 0 ? R.green : "#ef4444";
                   })(),
                 }}
               >

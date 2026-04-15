@@ -4,7 +4,6 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Area, Line, Bar, Cell,
   CartesianGrid, BarChart,
 } from "recharts";
-import { MPSidebar } from "./MPSidebar";
 
 // ── MP Demand & Pace (Compset Intel) — Rockenue style mockup ──
 
@@ -72,8 +71,7 @@ export function MPCompsetIntel({ activeView, onNavigate }: MPCompsetIntelProps) 
   const avgDemand = Math.round(data.reduce((s, d) => s + d.demand, 0) / data.length);
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
+    <div style={{ background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ flex: 1, overflow: "auto" }}>
         {/* Top bar */}
         <div style={{ padding: "14px 32px", borderBottom: `1px solid ${R.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -104,8 +104,8 @@ export function OccupancyVisualizer({
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <div
           style={{
-            backgroundColor: "#1a1a1a",
-            border: "1px solid #2a2a2a",
+            backgroundColor: "#121519",
+            border: "1px solid #1E2330",
             borderRadius: "0.5rem",
             overflow: "hidden",
           }}
@@ -114,8 +114,8 @@ export function OccupancyVisualizer({
           <CollapsibleTrigger
             style={{
               width: "100%",
-              borderBottom: "1px solid #2a2a2a",
-              padding: "1rem",
+              borderBottom: "1px solid rgba(255,255,255,0.04)",
+              padding: "14px 20px",
               cursor: "pointer",
               background: "transparent",
               display: "flex",
@@ -130,7 +130,7 @@ export function OccupancyVisualizer({
                 style={{
                   width: "1rem",
                   height: "1rem",
-                  color: "#39BDF8",
+                  color: "#38C6BA",
                   transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
                   transition: "transform 0.2s",
                 }}
@@ -140,12 +140,12 @@ export function OccupancyVisualizer({
                   width: "0.375rem",
                   height: "0.375rem",
                   borderRadius: "9999px",
-                  backgroundColor: "#39BDF8",
+                  backgroundColor: "#38C6BA",
                 }}
               ></div>
               <span
                 style={{
-                  color: "#e5e5e5",
+                  color: "#F3F5F7",
                   fontSize: "0.875rem",
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
@@ -170,19 +170,19 @@ export function OccupancyVisualizer({
                       ? "rgba(16, 185, 129, 0.1)"
                       : stats.totalPickup < 0
                       ? "rgba(239, 68, 68, 0.1)"
-                      : "rgba(74, 74, 72, 0.1)",
+                      : "rgba(78, 88, 104, 0.1)",
                   color:
                     stats.totalPickup > 0
-                      ? "#10b981"
+                      ? "#34D068"
                       : stats.totalPickup < 0
                       ? "#ef4444"
-                      : "#6b7280",
+                      : "#4E5868",
                   borderColor:
                     stats.totalPickup > 0
                       ? "rgba(16, 185, 129, 0.3)"
                       : stats.totalPickup < 0
                       ? "rgba(239, 68, 68, 0.3)"
-                      : "rgba(74, 74, 72, 0.3)",
+                      : "rgba(78, 88, 104, 0.3)",
                 }}
               >
                 Pickup: {stats.totalPickup > 0 ? "+" : ""}
@@ -191,9 +191,9 @@ export function OccupancyVisualizer({
               <Badge
                 variant="outline"
                 style={{
-                  backgroundColor: "rgba(74, 74, 72, 0.1)",
-                  color: "#6b7280",
-                  borderColor: "rgba(74, 74, 72, 0.3)",
+                  backgroundColor: "rgba(78, 88, 104, 0.1)",
+                  color: "#4E5868",
+                  borderColor: "rgba(78, 88, 104, 0.3)",
                 }}
               >
                 30D AVG: {stats.avgOcc30}%
@@ -213,10 +213,10 @@ export function OccupancyVisualizer({
               <div
                 style={{
                   display: "flex",
-                  backgroundColor: "#0f0f0f",
+                  backgroundColor: "#0C0E12",
                   borderRadius: "4px",
                   padding: "2px",
-                  border: "1px solid #2a2a2a",
+                  border: "1px solid #1E2330",
                 }}
               >
                 <button
@@ -231,8 +231,8 @@ export function OccupancyVisualizer({
                     border: "none",
                     cursor: "pointer",
                     backgroundColor:
-                      viewMode === "90" ? "#2a2a2a" : "transparent",
-                    color: viewMode === "90" ? "#e5e5e5" : "#6b7280",
+                      viewMode === "90" ? "#1E2330" : "transparent",
+                    color: viewMode === "90" ? "#F3F5F7" : "#4E5868",
                     fontWeight: viewMode === "90" ? "bold" : "normal",
                   }}
                 >
@@ -250,8 +250,8 @@ export function OccupancyVisualizer({
                     border: "none",
                     cursor: "pointer",
                     backgroundColor:
-                      viewMode === "180" ? "#2a2a2a" : "transparent",
-                    color: viewMode === "180" ? "#e5e5e5" : "#6b7280",
+                      viewMode === "180" ? "#1E2330" : "transparent",
+                    color: viewMode === "180" ? "#F3F5F7" : "#4E5868",
                     fontWeight: viewMode === "180" ? "bold" : "normal",
                   }}
                 >
@@ -269,8 +269,8 @@ export function OccupancyVisualizer({
                     border: "none",
                     cursor: "pointer",
                     backgroundColor:
-                      viewMode === "365" ? "#2a2a2a" : "transparent",
-                    color: viewMode === "365" ? "#e5e5e5" : "#6b7280",
+                      viewMode === "365" ? "#1E2330" : "transparent",
+                    color: viewMode === "365" ? "#F3F5F7" : "#4E5868",
                     fontWeight: viewMode === "365" ? "bold" : "normal",
                   }}
                 >
@@ -281,14 +281,14 @@ export function OccupancyVisualizer({
           </CollapsibleTrigger>
 
           <CollapsibleContent>
-            <div style={{ padding: "1.5rem" }}>
+            <div style={{ padding: "20px" }}>
               <div
                 style={{
                   position: "relative",
-                  height: "14rem",
-                  backgroundColor: "#141410",
+                  height: "180px",
+                  backgroundColor: "#0C0E12",
                   borderRadius: "0.25rem",
-                  border: "1px solid rgba(250, 255, 106, 0.15)",
+                  border: "1px solid #1E2330",
                   overflow: "hidden",
                 }}
               >
@@ -320,7 +320,7 @@ export function OccupancyVisualizer({
                       <span
                         style={{
                           fontSize: "10px",
-                          color: "rgba(57, 189, 248, 0.6)",
+                          color: "rgba(200, 166, 110, 0.6)",
                           fontFamily: "monospace",
                         }}
                       >
@@ -366,7 +366,7 @@ export function OccupancyVisualizer({
                         <span
                           style={{
                             fontSize: "10px",
-                            color: "rgba(250, 255, 106, 0.6)",
+                            color: "rgba(200, 166, 110, 0.6)",
                             fontFamily: "monospace",
                           }}
                         >
@@ -387,7 +387,7 @@ export function OccupancyVisualizer({
                     height: "1.5rem",
                     display: "flex",
                     alignItems: "center",
-                    borderTop: "1px solid #2a2a2a",
+                    borderTop: "1px solid #1E2330",
                   }}
                 >
                   {chartData.map((day, idx) => {
@@ -413,7 +413,7 @@ export function OccupancyVisualizer({
                               top: "4px",
                               fontSize: "10px",
                               fontWeight: "bold",
-                              color: "#e5e5e5",
+                              color: "#F3F5F7",
                               whiteSpace: "nowrap",
                               paddingLeft: "2px",
                             }}
@@ -428,7 +428,7 @@ export function OccupancyVisualizer({
                               position: "absolute",
                               top: "4px",
                               fontSize: "9px",
-                              color: "#6b7280",
+                              color: "#4E5868",
                             }}
                           >
                             {day.date.getDate()}
@@ -440,8 +440,8 @@ export function OccupancyVisualizer({
                             width: "1px",
                             height: isFirstOfMonth ? "6px" : "3px",
                             backgroundColor: isFirstOfMonth
-                              ? "#e5e5e5"
-                              : "#2a2a2a",
+                              ? "#F3F5F7"
+                              : "#1E2330",
                             marginTop: "0px",
                           }}
                         ></div>
@@ -492,7 +492,7 @@ export function OccupancyVisualizer({
                               <div
                                 style={{
                                   width: "100%",
-                                  backgroundColor: "#2a2a2a",
+                                  backgroundColor: "#1E2330",
                                   height: `${Math.min(day.occupancy, 100)}%`,
                                   transition: "all 0.2s",
                                   boxShadow: isHovered
@@ -510,7 +510,7 @@ export function OccupancyVisualizer({
                                       top: 0,
                                       left: 0,
                                       right: 0,
-                                      backgroundColor: "#39BDF8",
+                                      backgroundColor: "#38C6BA",
                                       height: `${relativeHeight}%`,
                                       transition: "all 0.2s",
                                       opacity: 1,
@@ -537,21 +537,21 @@ export function OccupancyVisualizer({
                           </TooltipTrigger>
                           <TooltipContent
                             style={{
-                              backgroundColor: "#1d1d1c",
-                              borderColor: "#3a3a3a",
-                              color: "#e5e5e5",
+                              backgroundColor: "#121519",
+                              borderColor: "#1E2330",
+                              color: "#F3F5F7",
                             }}
                           >
                             <div style={{ fontSize: "0.75rem" }}>
                               <div
                                 style={{
-                                  color: "#9ca3af",
+                                  color: "#7A8494",
                                   marginBottom: "0.25rem",
                                 }}
                               >
                                 {format(day.date, "EEE, MMM do")}
                               </div>
-                              <div style={{ color: "#39BDF8" }}>
+                              <div style={{ color: "#38C6BA" }}>
                                 {Math.round(day.occupancy)}% occupied
                               </div>
                               <div style={{ color: "white" }}>
@@ -559,7 +559,7 @@ export function OccupancyVisualizer({
                               </div>
                               {/* [NEW] AI Rate Tooltip */}
                               {day.sentinelRate > 0 && (
-                                <div style={{ color: "#39BDF8" }}>
+                                <div style={{ color: "#38C6BA" }}>
                                   Sentinel Rate: £{day.sentinelRate}
                                 </div>
                               )}
@@ -570,7 +570,7 @@ export function OccupancyVisualizer({
                                 <div
                                   style={{
                                     color:
-                                      day.pickup > 0 ? "#10b981" : "#ef4444",
+                                      day.pickup > 0 ? "#34D068" : "#ef4444",
                                     marginTop: "4px",
                                     fontWeight: 600,
                                   }}
@@ -636,8 +636,8 @@ export function OccupancyVisualizer({
                               left: "50%",
                               transform: "translateX(-50%)",
                               borderRadius: "9999px",
-                              backgroundColor: "#39BDF8",
-                              border: "1px solid #141410",
+                              backgroundColor: "#38C6BA",
+                              border: "1px solid #0C0E12",
                               width: "0.375rem",
                               height: "0.375rem",
                               bottom: `${sentinelHeight}%`,
@@ -655,7 +655,7 @@ export function OccupancyVisualizer({
                               transform: "translateX(-50%)",
                               borderRadius: "9999px",
                               backgroundColor: "white",
-                              border: "1px solid #141410",
+                              border: "1px solid #0C0E12",
                               width: "0.375rem",
                               height: "0.375rem",
                               bottom: `${pmsHeight}%`,
@@ -714,10 +714,10 @@ export function OccupancyVisualizer({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "1.5rem",
-                  marginTop: "1rem",
-                  borderTop: "1px solid #2a2a2a",
-                  paddingTop: "1rem",
+                  gap: "20px",
+                  marginTop: "12px",
+                  borderTop: "1px solid #1E2330",
+                  paddingTop: "12px",
                 }}
               >
                 <div
@@ -731,14 +731,14 @@ export function OccupancyVisualizer({
                     style={{
                       width: "0.75rem",
                       height: "0.75rem",
-                      backgroundColor: "#2a2a2a",
+                      backgroundColor: "#1E2330",
                       borderRadius: "2px",
                     }}
                   ></div>
                   <span
                     style={{
                       fontSize: "11px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                       textTransform: "uppercase",
                     }}
                   >
@@ -756,14 +756,14 @@ export function OccupancyVisualizer({
                     style={{
                       width: "0.75rem",
                       height: "0.75rem",
-                      backgroundColor: "#39BDF8",
+                      backgroundColor: "#38C6BA",
                       borderRadius: "2px",
                     }}
                   ></div>
                   <span
                     style={{
                       fontSize: "11px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                       textTransform: "uppercase",
                     }}
                   >
@@ -783,14 +783,14 @@ export function OccupancyVisualizer({
                       height: "0.5rem",
                       backgroundColor: "white",
                       borderRadius: "50%",
-                      border: "1px solid #2a2a2a",
+                      border: "1px solid #1E2330",
                     }}
                   ></div>
 
                   <span
                     style={{
                       fontSize: "11px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                       textTransform: "uppercase",
                     }}
                   >
@@ -808,15 +808,15 @@ export function OccupancyVisualizer({
                     style={{
                       width: "0.5rem",
                       height: "0.5rem",
-                      backgroundColor: "#39BDF8",
+                      backgroundColor: "#38C6BA",
                       borderRadius: "50%",
-                      border: "1px solid #2a2a2a",
+                      border: "1px solid #1E2330",
                     }}
                   ></div>
                   <span
                     style={{
                       fontSize: "11px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                       textTransform: "uppercase",
                     }}
                   >
@@ -840,7 +840,7 @@ export function OccupancyVisualizer({
                   <span
                     style={{
                       fontSize: "11px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                       textTransform: "uppercase",
                     }}
                   >

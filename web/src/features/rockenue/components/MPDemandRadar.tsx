@@ -4,7 +4,6 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Area, Line, Bar, Cell,
   ReferenceLine, CartesianGrid, ScatterChart, Scatter, ZAxis,
 } from "recharts";
-import { MPSidebar } from "./MPSidebar";
 
 // ── MP Demand Radar — Rockenue style mockup ──
 
@@ -115,8 +114,7 @@ export function MPDemandRadar({ activeView, onNavigate }: MPDemandRadarProps) {
   });
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
+    <div style={{ background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ flex: 1, overflow: "auto" }}>
         {/* Top bar */}
         <div style={{ padding: "14px 32px", borderBottom: `1px solid ${R.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

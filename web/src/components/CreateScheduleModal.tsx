@@ -104,7 +104,7 @@ const sectionHeaderStyle: CSSProperties = {
 };
 
 const sectionTitleStyle: CSSProperties = {
-  color: "#39BDF8",
+  color: "#38C6BA",
   fontSize: "11px",
   letterSpacing: "-0.025em",
   textTransform: "uppercase",
@@ -209,8 +209,8 @@ export function CreateScheduleModal({
     width: "16px",
     height: "16px",
     borderRadius: "3px",
-    border: `1px solid ${checked ? "#39BDF8" : "#2a2a2a"}`,
-    backgroundColor: checked ? "#39BDF8" : "transparent",
+    border: `1px solid ${checked ? "#38C6BA" : "#2a2a2a"}`,
+    backgroundColor: checked ? "#38C6BA" : "transparent",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
@@ -330,7 +330,7 @@ export function CreateScheduleModal({
                   style={{
                     width: "40px",
                     height: "40px",
-                    background: "#39BDF8",
+                    background: "#38C6BA",
                     borderRadius: "4px",
                     display: "flex",
                     alignItems: "center",
@@ -396,7 +396,7 @@ export function CreateScheduleModal({
                         placeholder="e.g., Weekly Performance Summary"
                         style={inputStyle}
                         onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#39BDF8")
+                          (e.currentTarget.style.borderColor = "#38C6BA")
                         }
                         onBlur={(e) =>
                           (e.currentTarget.style.borderColor = "#2a2a2a")
@@ -471,7 +471,7 @@ export function CreateScheduleModal({
                           onChange={(e) => setTimeOfDay(e.target.value)}
                           style={inputStyle}
                           onFocus={(e) =>
-                            (e.currentTarget.style.borderColor = "#39BDF8")
+                            (e.currentTarget.style.borderColor = "#38C6BA")
                           }
                           onBlur={(e) =>
                             (e.currentTarget.style.borderColor = "#2a2a2a")
@@ -523,7 +523,7 @@ export function CreateScheduleModal({
                         placeholder="manager@hotel.com, owner@hotel.com"
                         style={inputStyle}
                         onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#39BDF8")
+                          (e.currentTarget.style.borderColor = "#38C6BA")
                         }
                         onBlur={(e) =>
                           (e.currentTarget.style.borderColor = "#2a2a2a")
@@ -561,7 +561,7 @@ export function CreateScheduleModal({
                             transition: "border-color 0.2s",
                           }}
                           onMouseEnter={(e) =>
-                            (e.currentTarget.style.borderColor = "#39BDF8")
+                            (e.currentTarget.style.borderColor = "#38C6BA")
                           }
                           onMouseLeave={(e) =>
                             (e.currentTarget.style.borderColor = "#2a2a2a")
@@ -627,7 +627,7 @@ export function CreateScheduleModal({
                             transition: "border-color 0.2s",
                           }}
                           onMouseEnter={(e) =>
-                            (e.currentTarget.style.borderColor = "#39BDF8")
+                            (e.currentTarget.style.borderColor = "#38C6BA")
                           }
                           onMouseLeave={(e) =>
                             (e.currentTarget.style.borderColor = "#2a2a2a")
@@ -699,7 +699,7 @@ export function CreateScheduleModal({
                   style={{
                     background: "#0a0a0a",
                     borderRadius: "4px",
-                    border: "1px solid #39BDF8",
+                    border: "1px solid #38C6BA",
                     position: "sticky",
                     top: 0,
                   }}
@@ -808,7 +808,7 @@ export function CreateScheduleModal({
                         style={{
                           width: "14px",
                           height: "14px",
-                          color: "#39BDF8",
+                          color: "#38C6BA",
                         }}
                       />
                       <h4
@@ -844,7 +844,7 @@ export function CreateScheduleModal({
                           style={{
                             width: "12px",
                             height: "12px",
-                            color: "#39BDF8",
+                            color: "#38C6BA",
                             flexShrink: 0,
                             marginTop: "2px",
                           }}
@@ -862,7 +862,7 @@ export function CreateScheduleModal({
                           style={{
                             width: "12px",
                             height: "12px",
-                            color: "#39BDF8",
+                            color: "#38C6BA",
                             flexShrink: 0,
                             marginTop: "2px",
                           }}
@@ -880,7 +880,7 @@ export function CreateScheduleModal({
                           style={{
                             width: "12px",
                             height: "12px",
-                            color: "#39BDF8",
+                            color: "#38C6BA",
                             flexShrink: 0,
                             marginTop: "2px",
                           }}
@@ -925,14 +925,14 @@ export function CreateScheduleModal({
                 onClick={handleSave}
                 style={{
                   ...buttonBase,
-                  backgroundColor: "#39BDF8",
+                  backgroundColor: "#38C6BA",
                   color: "#0a0a0a",
                 }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor = "#29ADEE")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#39BDF8")
+                  (e.currentTarget.style.backgroundColor = "#38C6BA")
                 }
               >
                 <Zap style={{ width: "16px", height: "16px" }} />

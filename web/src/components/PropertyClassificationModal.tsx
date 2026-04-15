@@ -109,7 +109,7 @@ export function PropertyClassificationModal({
                     style={{
                       padding: '20px 12px',
                       borderRadius: '8px',
-                      border: isSelected ? '2px solid #39BDF8' : '1px solid #2a2a2a',
+                      border: isSelected ? '2px solid #38C6BA' : '1px solid #2a2a2a',
                       backgroundColor: isSelected ? 'rgba(57, 189, 248, 0.08)' : '#1a1a1a',
                       cursor: 'pointer',
                       transition: 'all 0.15s',
@@ -125,13 +125,13 @@ export function PropertyClassificationModal({
                       <Icon style={{
                         width: '32px',
                         height: '32px',
-                        color: isSelected ? '#39BDF8' : '#6b7280',
+                        color: isSelected ? '#38C6BA' : '#6b7280',
                       }} />
                       <div>
                         <div style={{
                           fontSize: '13px',
                           fontWeight: 600,
-                          color: isSelected ? '#39BDF8' : '#e5e5e5',
+                          color: isSelected ? '#38C6BA' : '#e5e5e5',
                           marginBottom: '4px',
                         }}>
                           {tier.name}
@@ -195,7 +195,7 @@ export function PropertyClassificationModal({
               borderRadius: '6px',
               border: 'none',
               cursor: selectedTier ? 'pointer' : 'not-allowed',
-              backgroundColor: selectedTier ? '#39BDF8' : '#2a2a2a',
+              backgroundColor: selectedTier ? '#38C6BA' : '#2a2a2a',
               color: selectedTier ? '#0d0d0d' : '#6b7280',
             }}
           >

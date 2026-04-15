@@ -149,7 +149,7 @@ export function NotificationBell() {
             <button
               onClick={markAllAsRead}
               className="text-xs hover:underline"
-              style={{ color: '#39BDF8' }}
+              style={{ color: '#38C6BA' }}
             >
               Mark all read
             </button>

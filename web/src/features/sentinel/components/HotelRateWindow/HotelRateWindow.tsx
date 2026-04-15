@@ -8,8 +8,6 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  TrendingUp,
-  Activity,
   Info,
   Target,
   ArrowDown,
@@ -38,10 +36,9 @@ import { getPmsPropertyIds } from "../../api/sentinel.api";
 const styles: { [key: string]: React.CSSProperties } = {
   page: {
     minHeight: "100vh",
-    backgroundColor: "#1d1d1c",
+    backgroundColor: "#14181D",
     position: "relative",
-    overflow: "hidden",
-    color: "#e5e5e5",
+    color: "#F3F5F7",
   },
   container: {
     position: "relative",
@@ -53,17 +50,17 @@ const styles: { [key: string]: React.CSSProperties } = {
   // Header
   header: { marginBottom: "24px" },
   title: {
-    color: "#e5e5e5",
+    color: "#F3F5F7",
     fontSize: "24px",
     letterSpacing: "-0.025em",
     marginBottom: "4px",
   },
-  subtitle: { color: "#9ca3af", fontSize: "12px" },
+  subtitle: { color: "#7A8494", fontSize: "12px" },
 
   // Controls Card
   card: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
+    backgroundColor: "#121519",
+    border: "1px solid #1E2330",
     borderRadius: "8px",
     marginBottom: "24px",
     padding: "20px",
@@ -77,7 +74,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   flexRow: { display: "flex", alignItems: "flex-end", gap: "16px" },
   formGroup: { display: "flex", flexDirection: "column", gap: "8px" },
   label: {
-    color: "#9ca3af",
+    color: "#7A8494",
     fontSize: "12px",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
@@ -85,20 +82,22 @@ const styles: { [key: string]: React.CSSProperties } = {
 
   // Visibility & Action Section
   gridSection: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#121519",
     borderRadius: "8px",
-    border: "1px solid #2a2a2a",
-    padding: "16px",
+    border: "1px solid #1E2330",
+    padding: "0",
     marginBottom: "24px",
+    overflow: "hidden",
   },
 
   // Visibility Inner Box
   rowVisibilityContainer: {
-    marginBottom: "16px",
-    padding: "12px",
-    backgroundColor: "#1A1A1A",
-    border: "1px solid #2a2a2a",
-    borderRadius: "8px",
+    marginBottom: "0",
+    padding: "10px 16px",
+    backgroundColor: "#121519",
+    border: "none",
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: "0",
   },
   rowVisibilityInner: {
     display: "flex",
@@ -108,7 +107,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   rowVisibilityLeft: { display: "flex", alignItems: "center", gap: "24px" },
   rowVisibilityLabel: {
     fontSize: "12px",
-    color: "#6b7280",
+    color: "#4E5868",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
   },
@@ -117,10 +116,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   // Grid Container
   gridContainer: {
     position: "relative",
-    minHeight: "400px",
-    backgroundColor: "#1a1a1a",
-    borderRadius: "8px",
-    border: "1px solid #2a2a2a",
+    minHeight: "auto",
+    backgroundColor: "#121519",
+    borderRadius: "0",
+    border: "none",
     overflow: "hidden",
   },
   tableWrapper: { overflowX: "auto", paddingBottom: "4px" },
@@ -130,52 +129,51 @@ const styles: { [key: string]: React.CSSProperties } = {
     position: "sticky",
     left: 0,
     zIndex: 20,
-    backgroundColor: "#1A1A1A",
-    borderRight: "1px solid #2a2a2a",
-    borderBottom: "1px solid #2a2a2a",
-    width: "240px",
+    backgroundColor: "#121519",
+    borderRight: "1px solid #1E2330",
+    borderBottom: "1px solid #1E2330",
+    width: "180px",
     textAlign: "left",
-    padding: "12px 16px",
-    color: "#9ca3af",
+    padding: "0 20px",
+    height: 64,
+    color: "#7A8494",
   },
   tdSticky: {
     position: "sticky",
     left: 0,
     zIndex: 10,
-    backgroundColor: "#1A1A1A",
-    borderRight: "1px solid #2a2a2a",
-    borderBottom: "1px solid #2a2a2a",
-    padding: "12px 16px",
-    width: "240px",
-    color: "#e5e5e5",
+    backgroundColor: "#121519",
+    borderRight: "1px solid #1E2330",
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
+    padding: "0 20px",
+    width: "180px",
+    height: "44px",
+    color: "#F3F5F7",
     fontSize: "13px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
   },
 
   // Inputs & Footer
   input: {
     width: "100%",
-    backgroundColor: "#0f0f0f",
-    border: "1px solid #2a2a2a",
-    color: "#e5e5e5",
+    backgroundColor: "#0C0E12",
+    border: "1px solid #1E2330",
+    color: "#F3F5F7",
     textAlign: "center",
     fontSize: "13px",
-    fontFamily: "monospace",
+    fontVariantNumeric: "tabular-nums",
     height: "28px",
     borderRadius: "4px",
     outline: "none",
   },
   footer: {
     padding: "12px",
-    backgroundColor: "#1A1A1A",
-    borderTop: "1px solid #2a2a2a",
+    backgroundColor: "#121519",
+    borderTop: "1px solid rgba(255,255,255,0.04)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    color: "#6b7280",
+    color: "#4E5868",
     fontSize: "12px",
   },
 };
@@ -341,7 +339,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
   }, [visibleData]);
 
   const getColBg = (date: string) => {
-    if (hoveredColumn === date) return "rgba(57,189,248,0.05)";
+    if (hoveredColumn === date) return "rgba(57,189,248,0.04)";
     if (amberDates.has(date)) return "rgba(245, 158, 11, 0.06)";
     return "transparent";
   };
@@ -448,8 +446,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     border: "none",
     cursor: "pointer",
     transition: "all 0.2s",
-    backgroundColor: isHidden ? "#2a2a2a" : "rgba(57, 189, 248, 0.1)",
-    color: isHidden ? "#6b7280" : "#39BDF8",
+    backgroundColor: isHidden ? "#1E2330" : "rgba(57, 189, 248, 0.1)",
+    color: isHidden ? "#4E5868" : "#38C6BA",
   });
 
   // --- RENDER ---
@@ -457,28 +455,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     <div style={styles.page}>
       <style>{`
         ::-webkit-scrollbar { height: 8px; width: 8px; }
-        ::-webkit-scrollbar-track { background: #1a1a1a; border-top: 1px solid #2a2a2a; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #39BDF8; }
+        ::-webkit-scrollbar-track { background: #121519; border-top: 1px solid #1E2330; }
+        ::-webkit-scrollbar-thumb { background: #1E2330; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #38C6BA; }
       `}</style>
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.05), transparent, rgba(250, 255, 106, 0.05))",
-        }}
-      ></div>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
-      ></div>
 
       <div style={styles.container}>
         {/* Header */}
@@ -509,9 +489,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       width: "280px",
                       minWidth: "280px",
                       height: "40px",
-                      backgroundColor: "#0d0d0d",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: "#0C0E12",
+                      borderColor: "#1E2330",
+                      color: "#F3F5F7",
                       fontSize: "13px",
                       padding: "10px 12px",
                     }}
@@ -523,11 +503,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       width: "280px",
                       maxWidth: "280px",
                       minWidth: "280px",
-                      backgroundColor: "#141414",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: "#121519",
+                      borderColor: "#1E2330",
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      color: "#e5e5e5",
+                      color: "#F3F5F7",
                       padding: "4px",
                     }}
                   >
@@ -545,7 +525,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           <SelectItem
                             key={c.hotel_id}
                             value={String(c.hotel_id)}
-                            style={{ color: "#e5e5e5", borderRadius: "4px" }}
+                            style={{ color: "#F3F5F7", borderRadius: "4px" }}
                           >
                             <span
                               style={{
@@ -584,9 +564,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                     style={{
                       width: "180px",
                       height: "40px",
-                      backgroundColor: "#0d0d0d",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: "#0C0E12",
+                      borderColor: "#1E2330",
+                      color: "#F3F5F7",
                       fontSize: "13px",
                       padding: "10px 12px",
                     }}
@@ -595,11 +575,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#141414",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: "#121519",
+                      borderColor: "#1E2330",
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      color: "#e5e5e5",
+                      color: "#F3F5F7",
                     }}
                   >
                     <SelectItem value="30">30 Nights</SelectItem>
@@ -623,9 +603,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                     style={{
                       width: "180px",
                       height: "40px",
-                      backgroundColor: "#0d0d0d",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: "#0C0E12",
+                      borderColor: "#1E2330",
+                      color: "#F3F5F7",
                       fontSize: "13px",
                       padding: "10px 12px",
                     }}
@@ -634,11 +614,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#141414",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: "#121519",
+                      borderColor: "#1E2330",
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      color: "#e5e5e5",
+                      color: "#F3F5F7",
                     }}
                   >
                     <SelectItem value="1">Yesterday</SelectItem>
@@ -653,7 +633,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
               <Button
                 onClick={handleLoad}
                 disabled={isLoading || !selectedHotelId}
-                style={{ backgroundColor: "#39BDF8", color: "#1d1d1c" }}
+                style={{ backgroundColor: "#38C6BA", color: "#14181D" }}
                 className="h-9 text-sm font-semibold"
               >
                 {isLoading ? (
@@ -695,7 +675,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  marginBottom: "16px",
+                  padding: "10px 16px",
+                  borderBottom: "1px solid rgba(255,255,255,0.04)",
                 }}
               >
                 {/* Visibility Toolbar */}
@@ -812,7 +793,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                   disabled={
                     isSubmitting || Object.keys(pendingOverrides).length === 0
                   }
-                  style={{ backgroundColor: "#39BDF8", color: "#1d1d1c" }}
+                  style={{ backgroundColor: "#38C6BA", color: "#14181D" }}
                   className="h-9 text-sm"
                 >
                   {isSubmitting ? (
@@ -832,12 +813,14 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       width: "100%",
                       borderCollapse: "collapse",
                       tableLayout: "fixed",
-                      minWidth: `${240 + visibleData.length * 84}px`,
+                      minWidth: `${180 + visibleData.length * 96}px`,
                     }}
                   >
                     <thead>
                       <tr>
-                        <th style={styles.thSticky}>METRIC</th>
+                        <th style={styles.thSticky}>
+                          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: "#4E5868", textTransform: "uppercase" }}>Metric</span>
+                        </th>
                         {visibleData.map((day) => (
                           <th
                             key={day.date}
@@ -846,35 +829,36 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             style={{
                               backgroundColor:
                                 hoveredColumn === day.date
-                                  ? "rgba(58, 58, 53, 0.3)"
+                                  ? "rgba(57,189,248,0.04)"
                                   : amberDates.has(day.date)
                                     ? "rgba(245, 158, 11, 0.08)"
-                                    : "#1A1A1A",
-                              borderBottom: "1px solid #2a2a2a",
-                              borderRight: "1px solid #2a2a2a",
+                                    : "transparent",
+                              borderBottom: "1px solid #1E2330",
                               textAlign: "center",
-                              padding: "12px 8px",
-                              minWidth: "84px",
+                              padding: "10px 0",
+                              minWidth: "96px",
+                              height: 64,
+                              verticalAlign: "bottom",
                               cursor: "pointer",
                             }}
                           >
                             <div
                               style={{
-                                color: "#6b7280",
-                                fontSize: "10px",
+                                color: "#4E5868",
+                                fontSize: "9px",
                                 textTransform: "uppercase",
-                                marginBottom: "4px",
                               }}
                             >
                               {day.month}
                             </div>
-                            <div style={{ color: "#e5e5e5", fontSize: "12px" }}>
+                            <div style={{ color: (() => { const d = new Date(day.date); const dow = d.getDay(); return (dow === 0 || dow === 6) ? "#38C6BA" : "#4E5868"; })(), fontSize: "9px", marginTop: 1 }}>
                               {day.dayOfWeek}
                             </div>
                             <div
                               style={{
-                                color: "#9ca3af",
-                                fontSize: "12px",
+                                color: "#F3F5F7",
+                                fontSize: "15px",
+                                fontWeight: 600,
                                 marginTop: "2px",
                               }}
                             >
@@ -894,7 +878,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   color={
                                     pendingOverrides[day.date]
                                       ? "#f59e0b"
-                                      : "#9ca3af"
+                                      : "#7A8494"
                                   }
                                 />
                               </div>
@@ -907,14 +891,13 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       {/* 1. AI Status Row */}
                       <tr
                         style={{
-                          borderBottom: "1px solid #2a2a2a",
-                          backgroundColor: "rgba(26, 26, 26, 0.2)",
+                          borderBottom: "1px solid rgba(255,255,255,0.04)",
                         }}
                       >
-                        <td style={styles.tdSticky}>AI Status</td>
+                        <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>AI Status</td>
                         {visibleData.map((day) => {
                           let text = "SENTINEL",
-                            color = "#39BDF8";
+                            color = "#38C6BA";
 
                           const currentSource = (
                             day.source || ""
@@ -928,7 +911,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               ? "SENTINEL"
                               : "PENDING";
                             color = aiApprovedPending.has(day.date)
-                              ? "#39BDF8"
+                              ? "#38C6BA"
                               : "#f59e0b";
                           } else if (
                             currentSource === "SENTINEL" ||
@@ -936,25 +919,29 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             currentSource === "AI_SUGGESTED"
                           ) {
                             text = "SENTINEL";
-                            color = "#39BDF8";
+                            color = "#38C6BA";
                           } else if (currentSource === "SYNC") {
                             text = "SYNC";
-                            color = "#6b7280";
+                            color = "#4E5868";
                           } else if (
                             savedOverrides[day.date] ||
                             currentSource === "MANUAL"
                           ) {
                             text = "MANUAL";
-                            color = "#9ca3af";
+                            color = "#7A8494";
                           }
                           return (
                             <td
                               key={day.date}
+                              onMouseEnter={() => setHoveredColumn(day.date)}
+                              onMouseLeave={() => setHoveredColumn(null)}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
-                                padding: "12px 8px",
-                                width: "84px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                width: "96px",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -964,7 +951,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   color,
                                   fontSize: "9px",
                                   fontWeight: 600,
-                                  fontFamily: "monospace",
+                                  letterSpacing: 0.3,
+                                  textTransform: "uppercase",
                                 }}
                               >
                                 {text}
@@ -987,40 +975,24 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
 
                       {/* 2. Metrics Rows */}
                       {!hiddenRows.has("adr") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <TrendingUp size={16} color="#9ca3af" /> ADR{" "}
-                              <button
-                                onClick={() => toggleRow("adr")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            ADR
                           </td>
                           {visibleData.map((day) => (
                             <td
                               key={day.date}
+                              onMouseEnter={() => setHoveredColumn(day.date)}
+                              onMouseLeave={() => setHoveredColumn(null)}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
-                                color: "#e5e5e5",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                color: "#B0B8C4",
+                                fontSize: "13px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 backgroundColor:
                                   getColBg(day.date),
                                 opacity: day.isFrozen ? 0.4 : 1,
@@ -1032,47 +1004,31 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         </tr>
                       )}
                       {!hiddenRows.has("occupancy") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <Activity size={16} color="#9ca3af" /> Occupancy{" "}
-                              <button
-                                onClick={() => toggleRow("occupancy")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            Occupancy
                           </td>
                           {visibleData.map((day) => (
                             <td
                               key={day.date}
+                              onMouseEnter={() => setHoveredColumn(day.date)}
+                              onMouseLeave={() => setHoveredColumn(null)}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
                                 fontSize: "13px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 backgroundColor:
                                   getColBg(day.date),
                                 color:
                                   day.occupancy > 80
-                                    ? "#10b981"
+                                    ? "#38C6BA"
                                     : day.occupancy > 60
-                                      ? "#facc15"
-                                      : "#ef4444",
+                                      ? "#B0B8C4"
+                                      : "#C8A66E",
                               }}
                             >
                               {Math.round(day.occupancy)}%
@@ -1081,35 +1037,19 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         </tr>
                       )}
 
-                      {/* Spacer between metrics and pricing sections */}
-                      <tr style={{ height: "8px" }}>
-                        <td colSpan={visibleData.length + 1} style={{ borderBottom: "1px solid #2a2a2a" }}></td>
+                      {/* Divider: info → guardrails */}
+                      <tr>
+                        <td style={{ ...styles.tdSticky, height: 10, borderBottom: "none", padding: 0 }} />
+                        {visibleData.map((day) => (
+                          <td key={day.date} style={{ height: 10, backgroundColor: getColBg(day.date) }}
+                            onMouseEnter={() => setHoveredColumn(day.date)} onMouseLeave={() => setHoveredColumn(null)} />
+                        ))}
                       </tr>
 
                       {!hiddenRows.has("minRate") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={{ ...styles.tdSticky, color: "#f59e0b" }}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              Min Rate{" "}
-                              <button
-                                onClick={() => toggleRow("minRate")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            Min Rate
                           </td>
                           {visibleData.map((day) => {
                             const isBelowMonthly = day.isDailyMinOverride && day.guardrailMin < day.monthlyMinDefault;
@@ -1118,12 +1058,13 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 key={day.date}
                                 onClick={() => !day.isFrozen && setEditingMinCell(day.date)}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
                                   textAlign: "center",
-                                  color: isBelowMonthly ? "#ef4444" : "#6b7280",
-                                  fontSize: "12px",
-                                  padding: "12px 8px",
-                                  fontFamily: "monospace",
+                                  color: isBelowMonthly ? "#ef4444" : "#7A8494",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
+                                  fontVariantNumeric: "tabular-nums",
                                   cursor: day.isFrozen ? "not-allowed" : "pointer",
                                   backgroundColor:
                                     editingMinCell === day.date
@@ -1131,7 +1072,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                       : isBelowMonthly
                                         ? "rgba(239, 68, 68, 0.15)"
                                         : getColBg(day.date),
-                                  borderBottom: isBelowMonthly ? "2px solid #ef4444" : undefined,
+                                  borderBottom: isBelowMonthly ? "2px solid #ef4444" : "1px solid rgba(255,255,255,0.04)",
                                 }}
                                 title={isBelowMonthly ? `Monthly default: £${Math.round(day.monthlyMinDefault)}` : undefined}
                               >
@@ -1154,7 +1095,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                         if (v < day.monthlyMinDefault) {
                                           toast.warning(
                                             `Min rate set to £${Math.round(v)} — below monthly default of £${Math.round(day.monthlyMinDefault)}. Make sure you know what you're doing.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                            { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }
                                       } else if (e.target.value === "" && selectedHotelId) {
@@ -1177,40 +1118,22 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         </tr>
                       )}
                       {!hiddenRows.has("floorRate") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              Floor Rate{" "}
-                              <button
-                                onClick={() => toggleRow("floorRate")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            Floor (LMF)
                           </td>
                           {visibleData.map((day) => (
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
-                                color: "#f97316",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                color: "#7A8494",
+                                fontSize: "13px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -1225,40 +1148,22 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
 
 
                       {!hiddenRows.has("pmsRates") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              Live PMS Rate{" "}
-                              <button
-                                onClick={() => toggleRow("pmsRates")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            Live PMS Rate
                           </td>
                           {visibleData.map((day) => (
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
-                                color: "#e5e5e5",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                color: "#F3F5F7",
+                                fontSize: "13px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -1273,31 +1178,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
 
                       {/* 3. Calculations */}
                       {!hiddenRows.has("sellRate") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#10b981" }}>
-                                Current Sell Rate
-                              </span>{" "}
-                              <button
-                                onClick={() => toggleRow("sellRate")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            Current Sell Rate
                           </td>
                           {visibleData.map((day) => {
                             let c = 0;
@@ -1314,13 +1197,15 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               <td
                                 key={day.date}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
                                   textAlign: "center",
-                                  fontSize: "12px",
-                                  padding: "12px 8px",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
                                   fontWeight: "bold",
-                                  fontFamily: "monospace",
-                                  color: c > 0 ? "#10b981" : "#4a4a48",
+                                  fontVariantNumeric: "tabular-nums",
+                                  borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                  color: c > 0 ? "#38C6BA" : "#4E5868",
                                   backgroundColor: getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                 }}
@@ -1332,18 +1217,28 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         </tr>
                       )}
 
+                      {/* Divider: guardrails → ai */}
+                      <tr>
+                        <td style={{ ...styles.tdSticky, height: 10, borderBottom: "none", padding: 0 }} />
+                        {visibleData.map((day) => (
+                          <td key={day.date} style={{ height: 10, backgroundColor: getColBg(day.date) }}
+                            onMouseEnter={() => setHoveredColumn(day.date)} onMouseLeave={() => setHoveredColumn(null)} />
+                        ))}
+                      </tr>
+
                       {/* Sentinel Row (Blue) - Interactive Ghost Mode */}
                       <tr
                         style={{
-                          borderBottom: "2px solid rgba(57, 189, 248, 0.4)",
-                          backgroundColor: "rgba(57, 189, 248, 0.02)",
+                          borderBottom: "1px solid rgba(255,255,255,0.04)",
+                          backgroundColor: "rgba(57, 189, 248, 0.03)",
                         }}
                       >
                         <td
                           style={{
                             ...styles.tdSticky,
-                            backgroundColor: "#1A1A1A",
-                            padding: "16px",
+                            backgroundColor: "#121519",
+                            padding: "0 20px",
+                            borderLeft: "3px solid #38C6BA",
                           }}
                         >
                           <span style={{ fontWeight: 600 }}>
@@ -1366,23 +1261,24 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               onMouseEnter={() => setHoveredAiCell(day.date)}
                               onMouseLeave={() => setHoveredAiCell(null)}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
-                                padding: "16px 8px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
                                 position: "relative",
                                 color: isApplied
-                                  ? "#10b981"
+                                  ? "#38C6BA"
                                   : pred
-                                    ? "#39BDF8"
-                                    : "#4a4a48",
-                                fontSize: "14px",
+                                    ? "#38C6BA"
+                                    : "#7A8494",
+                                fontSize: "13px",
                                 fontWeight: 600,
+                                fontVariantNumeric: "tabular-nums",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 transition: "all 0.2s",
                                 cursor:
                                   pred && !day.isFrozen ? "pointer" : "default",
-                                backgroundColor: isApplied
-                                  ? "rgba(16, 185, 129, 0.05)"
-                                  : hoveredColumn === day.date
+                                backgroundColor: hoveredColumn === day.date
                                     ? "rgba(57,189,248,0.1)"
                                     : amberDates.has(day.date)
                                       ? "rgba(245, 158, 11, 0.06)"
@@ -1419,7 +1315,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     style={{
                                       position: "absolute",
                                       bottom: "2px",
-                                      backgroundColor: "#39BDF8",
+                                      backgroundColor: "#38C6BA",
                                       borderRadius: "50%",
                                       width: "16px",
                                       height: "16px",
@@ -1433,7 +1329,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   >
                                     <ArrowDown
                                       size={10}
-                                      color="#1d1d1c"
+                                      color="#14181D"
                                       strokeWidth={3}
                                     />
                                   </div>
@@ -1444,73 +1340,32 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                         })}
                       </tr>
 
-                      {/* === YOUR RATE CONTROLS — editable zone === */}
+                      {/* Divider: ai → editable */}
                       <tr>
-                        <td
-                          colSpan={visibleData.length + 1}
-                          style={{
-                            padding: "6px 16px",
-                            backgroundColor: "#141414",
-                            borderBottom: "none",
-                          }}
-                        >
-                          <span style={{
-                            fontSize: "10px",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.1em",
-                            color: "#39BDF8",
-                            fontWeight: 600,
-                          }}>
-                            Your Rate Controls
-                          </span>
-                          <span style={{
-                            fontSize: "10px",
-                            color: "#6b7280",
-                            marginLeft: "8px",
-                          }}>
-                            — click any cell to edit
-                          </span>
-                        </td>
+                        <td style={{ ...styles.tdSticky, height: 10, borderBottom: "none", padding: 0 }} />
+                        {visibleData.map((day) => (
+                          <td key={day.date} style={{ height: 10, backgroundColor: getColBg(day.date) }}
+                            onMouseEnter={() => setHoveredColumn(day.date)} onMouseLeave={() => setHoveredColumn(null)} />
+                        ))}
                       </tr>
 
                       {!hiddenRows.has("effectiveRate") && (
                         <tr
                           style={{
-                            borderTop: "3px solid #39BDF8",
-                            borderLeft: "3px solid #39BDF8",
-                            borderBottom: "1px solid rgba(57, 189, 248, 0.15)",
-                            backgroundColor: "rgba(57, 189, 248, 0.03)",
+                            borderBottom: "1px solid rgba(255,255,255,0.04)",
+                            backgroundColor: "rgba(56,198,186,0.03)",
                           }}
                         >
                           <td
                             style={{
                               ...styles.tdSticky,
-                              backgroundColor: "#1c2127",
+                              backgroundColor: "#121519",
+                              borderLeft: "3px solid #38C6BA",
                             }}
                           >
-                            <div
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span style={{ color: "#e5e5e5", fontWeight: 600 }}>
-                                Target Sell Rate
-                              </span>{" "}
-                              <button
-                                onClick={() => toggleRow("effectiveRate")}
-                                style={{
-                                  marginLeft: "auto",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Eye size={14} color="#6b7280" />
-                              </button>
-                            </div>
+                            <span style={{ color: "#38C6BA", fontWeight: 600 }}>
+                              Target Sell Rate
+                            </span>
                           </td>
                           {visibleData.map((day) => {
                             const overrideVal =
@@ -1536,17 +1391,19 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     setEditingEffectiveCell(day.date);
                                 }}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
                                   textAlign: "center",
-                                  fontSize: "12px",
-                                  padding: "12px 8px",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
                                   fontWeight: "bold",
-                                  fontFamily: "monospace",
+                                  fontVariantNumeric: "tabular-nums",
+                                  borderBottom: "1px solid rgba(255,255,255,0.04)",
                                   color:
-                                    effectiveVal > 0 ? "#e5e5e5" : "#4a4a48",
+                                    effectiveVal > 0 ? "#38C6BA" : "#4E5868",
                                   backgroundColor:
                                     editingEffectiveCell === day.date
-                                      ? "rgba(57, 189, 248, 0.05)"
+                                      ? "rgba(57, 189, 248, 0.04)"
                                       : getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                   cursor: day.isFrozen
@@ -1559,11 +1416,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     autoFocus
                                     style={{
                                       ...styles.input,
-                                      color: "#e5e5e5",
+                                      color: "#F3F5F7",
                                       fontWeight: "bold",
                                       backgroundColor:
                                         "rgba(57, 189, 248, 0.1)",
-                                      border: "1px solid #39BDF8",
+                                      border: "1px solid #38C6BA",
                                     }}
                                     defaultValue={
                                       effectiveVal > 0
@@ -1594,7 +1451,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                           saveMinRate(selectedHotelId, day.date, roundedOverride);
                                           toast.warning(
                                             `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                            { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }
                                         setOverride(
@@ -1625,17 +1482,16 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                       {/* 4. PMS Override Input */}
                       <tr
                         style={{
-                          borderBottom: "3px solid #39BDF8",
-                          borderLeft: "3px solid #39BDF8",
-                          backgroundColor: "rgba(57, 189, 248, 0.03)",
+                          borderBottom: "1px solid rgba(255,255,255,0.04)",
+                          backgroundColor: "rgba(56,198,186,0.03)",
                         }}
                       >
                         <td style={{
                           ...styles.tdSticky,
-                          backgroundColor: "#1c2127",
+                          backgroundColor: "#121519",
+                          borderLeft: "3px solid #38C6BA",
                         }}>
-                          <span style={{ color: "#e5e5e5", fontWeight: 600 }}>PMS Override</span>
-                          <span style={{ color: "#6b7280", fontSize: "10px", marginLeft: "6px" }}>base rate</span>
+                          <span style={{ color: "#38C6BA", fontWeight: 600 }}>PMS Override</span>
                         </td>
                         {visibleData.map((day) => {
                           const savedVal = savedOverrides[day.date];
@@ -1651,9 +1507,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 !day.isFrozen && setEditingCell(day.date)
                               }
                               style={{
-                                borderRight: "1px solid #2a2a2a",
                                 textAlign: "center",
-                                padding: "12px 8px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 cursor: day.isFrozen
                                   ? "not-allowed"
                                   : "pointer",
@@ -1663,7 +1521,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     : isPending
                                       ? "rgba(250, 255, 106, 0.06)"
                                       : hasAny
-                                        ? "rgba(229, 229, 229, 0.03)"
+                                        ? "rgba(243, 245, 247, 0.03)"
                                         : "transparent",
                                 opacity: day.isFrozen ? 0.5 : 1,
                               }}
@@ -1687,7 +1545,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                         saveMinRate(selectedHotelId, day.date, v);
                                         toast.warning(
                                           `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
-                                          { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                          { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                         );
                                       }
                                       setOverride(day.date, v);
@@ -1715,7 +1573,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                           saveMinRate(selectedHotelId, day.date, v);
                                           toast.warning(
                                             `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                            { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }
                                         setOverride(day.date, v);
@@ -1742,9 +1600,9 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               ) : (
                                 <span
                                   style={{
-                                    color: isPending ? "#f59e0b" : "#e5e5e5",
-                                    fontWeight: isPending ? "bold" : "normal",
-                                    fontFamily: "monospace",
+                                    color: isPending ? "#f59e0b" : "#38C6BA",
+                                    fontWeight: isPending ? "bold" : 600,
+                                    fontVariantNumeric: "tabular-nums",
                                     fontSize: "13px",
                                   }}
                                 >
@@ -1775,13 +1633,13 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
           <div
             style={{
               height: "400px",
-              border: "1px dashed #2a2a2a",
+              border: "1px dashed #1E2330",
               borderRadius: "8px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              color: "#6b7280",
+              color: "#4E5868",
             }}
           >
             <Zap className="w-12 h-12 mb-4 opacity-20" />

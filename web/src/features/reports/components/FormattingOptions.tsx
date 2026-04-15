@@ -1,4 +1,5 @@
 import { CSSProperties } from "react";
+import { R } from "../../../styles/tokens";
 
 interface FormattingOptionsProps {
   displayTotals: boolean;
@@ -49,7 +50,7 @@ export function FormattingOptions({
     <div>
       <span
         style={{
-          color: "#6b7280",
+          color: R.textDim,
           fontSize: "11px",
           textTransform: "uppercase",
           letterSpacing: "-0.025em",
@@ -83,7 +84,7 @@ export function FormattingOptions({
               <span
                 style={{
                   fontSize: "13px",
-                  color: active ? "#e5e5e5" : "#6b7280",
+                  color: active ? R.accent : R.textDim,
                   letterSpacing: "-0.01em",
                   transition: "color 0.15s ease",
                 }}
@@ -114,7 +115,7 @@ export function FormattingOptions({
                       position: "absolute",
                       top: "3px",
                       left: active ? "21px" : "3px",
-                      backgroundColor: active ? "#39BDF8" : "#6b7280",
+                      backgroundColor: active ? "#38C6BA" : R.textDim,
                       transition:
                         "left 0.15s ease, background-color 0.15s ease",
                     } as CSSProperties
@@ -155,8 +156,8 @@ export function FormattingOptions({
                       width: "14px",
                       height: "14px",
                       borderRadius: "50%",
-                      border: `2px solid ${active ? "#39BDF8" : "#333"}`,
-                      backgroundColor: active ? "#39BDF8" : "transparent",
+                      border: `2px solid ${active ? "#38C6BA" : R.border}`,
+                      backgroundColor: active ? "#38C6BA" : "transparent",
                       transition: "all 0.15s ease",
                       flexShrink: 0,
                       display: "flex",
@@ -171,7 +172,7 @@ export function FormattingOptions({
                         width: "6px",
                         height: "6px",
                         borderRadius: "50%",
-                        backgroundColor: "#1a1a1a",
+                        backgroundColor: R.darkBand,
                       }}
                     />
                   )}

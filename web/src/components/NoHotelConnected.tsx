@@ -31,7 +31,7 @@ export function NoHotelConnected({ onBackToInvestor }: NoHotelConnectedProps) {
           marginBottom: "28px",
         }}
       >
-        <Lock size={36} color="#39BDF8" strokeWidth={1.5} />
+        <Lock size={36} color="#38C6BA" strokeWidth={1.5} />
       </div>
 
       <h2
@@ -80,7 +80,7 @@ export function NoHotelConnected({ onBackToInvestor }: NoHotelConnectedProps) {
           gap: "10px",
           padding: "12px 22px",
           borderRadius: "8px",
-          background: "#39BDF8",
+          background: "#38C6BA",
           color: "#0a0a0a",
           fontSize: "13px",
           fontWeight: 600,
@@ -119,7 +119,7 @@ export function NoHotelConnected({ onBackToInvestor }: NoHotelConnectedProps) {
         reach{" "}
         <a
           href="mailto:hello@market-pulse.io"
-          style={{ color: "#39BDF8", textDecoration: "none" }}
+          style={{ color: "#38C6BA", textDecoration: "none" }}
         >
           hello@market-pulse.io
         </a>

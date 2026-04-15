@@ -108,7 +108,7 @@ class GlobalErrorBoundary extends Component<
             onClick={() => window.location.reload()}
             style={{
               padding: "10px 20px",
-              background: "#39BDF8",
+              background: "#38C6BA",
               color: "black",
               border: "none",
               borderRadius: "4px",

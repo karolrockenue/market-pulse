@@ -12,7 +12,7 @@ interface ShreejiDeckProps {
 export function ShreejiDeck({ onBack }: ShreejiDeckProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const BLUE = "#39BDF8";
+  const BLUE = "#38C6BA";
   const WHITE = "#e5e5e5";
   const GRAY = "#9ca3af";
   const DIM = "#6b7280";

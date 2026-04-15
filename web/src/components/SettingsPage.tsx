@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, CSSProperties } from "react";
+import { R } from "../styles/tokens";
 import {
   User,
   Users,
@@ -23,27 +24,27 @@ interface SettingsPageProps {
 
 // Shared styles
 const card: CSSProperties = {
-  backgroundColor: "rgb(26, 26, 26)",
+  backgroundColor: R.darkBand,
   borderRadius: "8px",
-  border: "1px solid #2a2a2a",
+  border: `1px solid ${R.border}`,
   padding: "20px",
 };
-const sectionTitle: CSSProperties = { color: "#e5e5e5", fontSize: "14px", fontWeight: 600, marginBottom: "4px" };
-const sectionSub: CSSProperties = { color: "#6b7280", fontSize: "11px" };
-const labelStyle: CSSProperties = { color: "#6b7280", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: "6px" };
+const sectionTitle: CSSProperties = { color: R.accent, fontSize: "14px", fontWeight: 600, marginBottom: "4px" };
+const sectionSub: CSSProperties = { color: R.textDim, fontSize: "11px" };
+const labelStyle: CSSProperties = { color: R.textDim, fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: "6px" };
 const inputStyle: CSSProperties = {
   width: "100%",
   height: "36px",
-  backgroundColor: "#0d0d0d",
-  border: "1px solid #2a2a2a",
+  backgroundColor: R.sidebar,
+  border: `1px solid ${R.sep}`,
   borderRadius: "4px",
-  color: "#e5e5e5",
+  color: R.accent,
   fontSize: "13px",
   padding: "0 12px",
   outline: "none",
 };
-const thCell: CSSProperties = { color: "#6b7280", fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", fontWeight: 600 };
-const tdCell: CSSProperties = { color: "#e5e5e5", fontSize: "12px", display: "flex", alignItems: "center" };
+const thCell: CSSProperties = { color: R.textDim, fontSize: "10px", textTransform: "uppercase", letterSpacing: "-0.025em", fontWeight: 600 };
+const tdCell: CSSProperties = { color: R.accent, fontSize: "12px", display: "flex", alignItems: "center" };
 const badge = (color: string): CSSProperties => ({
   display: "inline-flex",
   alignItems: "center",
@@ -58,8 +59,8 @@ const badge = (color: string): CSSProperties => ({
 const btnPrimary: CSSProperties = {
   height: "34px",
   padding: "0 14px",
-  backgroundColor: "#39BDF8",
-  color: "#1d1d1c",
+  backgroundColor: R.warmTeal,
+  color: R.bg,
   border: "none",
   borderRadius: "4px",
   fontSize: "12px",
@@ -71,9 +72,9 @@ const btnPrimary: CSSProperties = {
 };
 const btnSecondary: CSSProperties = {
   ...btnPrimary,
-  backgroundColor: "#0d0d0d",
-  color: "#e5e5e5",
-  border: "1px solid #2a2a2a",
+  backgroundColor: R.sidebar,
+  color: R.accent,
+  border: `1px solid ${R.sep}`,
 };
 
 export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }: SettingsPageProps) {
@@ -141,22 +142,19 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
 
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#1d1d1c", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(57, 189, 248, 0.01))" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
-
-      <div style={{ position: "relative", zIndex: 10, padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div style={{ flex: 1, background: R.bg, color: R.accent }}>
+      <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: "24px" }}>
         {/* Header */}
         <div>
-          <div style={{ color: "#e5e5e5", fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>Settings</div>
-          <div style={{ color: "#9ca3af", fontSize: "12px" }}>Profile, team, and properties configuration</div>
+          <div style={{ color: R.accent, fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>Settings</div>
+          <div style={{ color: R.textMid, fontSize: "12px" }}>Profile, team, and properties configuration</div>
         </div>
 
         {/* ── Profile ── */}
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <User style={{ width: "16px", height: "16px", color: "#39BDF8" }} />
+              <User style={{ width: "16px", height: "16px", color: R.warmTeal }} />
               <div>
                 <div style={sectionTitle}>Profile</div>
                 <div style={sectionSub}>Personal information and account details</div>
@@ -170,7 +168,7 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
             )}
           </div>
           {profileLoading ? (
-            <div style={{ color: "#6b7280", fontSize: "12px", padding: "12px 0" }}>Loading...</div>
+            <div style={{ color: R.textDim, fontSize: "12px", padding: "12px 0" }}>Loading...</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.5fr auto", gap: "16px", alignItems: "end" }}>
               <div>
@@ -183,11 +181,11 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
               </div>
               <div>
                 <div style={labelStyle}>Email</div>
-                <input style={{ ...inputStyle, color: "#6b7280", cursor: "not-allowed" }} value={email} disabled />
+                <input style={{ ...inputStyle, color: R.textDim, cursor: "not-allowed" }} value={email} disabled />
               </div>
               <div>
                 <div style={labelStyle}>Role</div>
-                <span style={badge("#39BDF8")}>{userRole || "User"}</span>
+                <span style={badge(R.warmTeal)}>{userRole || "User"}</span>
               </div>
             </div>
           )}
@@ -197,7 +195,7 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Users style={{ width: "16px", height: "16px", color: "#39BDF8" }} />
+              <Users style={{ width: "16px", height: "16px", color: R.warmTeal }} />
               <div>
                 <div style={sectionTitle}>Team ({teamMembers.length})</div>
                 <div style={sectionSub}>Manage user roles and access</div>
@@ -214,24 +212,24 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
           </div>
 
           {/* Team table */}
-          <div style={{ borderRadius: "4px", border: "1px solid #2a2a2a", overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 100px 80px 80px", gap: "8px", padding: "10px 16px", backgroundColor: "#1d1d1c", borderBottom: "1px solid #2a2a2a" }}>
+          <div style={{ borderRadius: "4px", border: `1px solid ${R.border}`, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 100px 80px 80px", gap: "8px", padding: "10px 16px", backgroundColor: R.bg, borderBottom: `1px solid ${R.sep}` }}>
               {["Name", "Email", "Role", "Status", ""].map((h) => <div key={h} style={thCell}>{h}</div>)}
             </div>
             {isLoadingTeam ? (
-              <div style={{ padding: "16px", color: "#6b7280", fontSize: "12px", textAlign: "center" }}>Loading...</div>
+              <div style={{ padding: "16px", color: R.textDim, fontSize: "12px", textAlign: "center" }}>Loading...</div>
             ) : teamMembers.length === 0 ? (
-              <div style={{ padding: "16px", color: "#6b7280", fontSize: "12px", textAlign: "center" }}>No members</div>
+              <div style={{ padding: "16px", color: R.textDim, fontSize: "12px", textAlign: "center" }}>No members</div>
             ) : teamMembers.map((user, i) => (
               <div
                 key={user.user_id || i}
-                style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 100px 80px 80px", gap: "8px", padding: "10px 16px", borderTop: i > 0 ? "1px solid #2a2a2a" : "none", transition: "background-color 0.15s" }}
+                style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 100px 80px 80px", gap: "8px", padding: "10px 16px", borderTop: i > 0 ? `1px solid ${R.sep}` : "none", transition: "background-color 0.15s" }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(57,189,248,0.04)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               >
                 <div style={tdCell}>{user.first_name} {user.last_name}</div>
-                <div style={{ ...tdCell, color: "#9ca3af" }}>{user.email}</div>
-                <div style={tdCell}><span style={badge("#39BDF8")}>{user.role}</span></div>
+                <div style={{ ...tdCell, color: R.textMid }}>{user.email}</div>
+                <div style={tdCell}><span style={badge(R.warmTeal)}>{user.role}</span></div>
                 <div style={tdCell}><span style={badge("#10b981")}>Active</span></div>
                 <div style={tdCell}>
                   <button
@@ -252,7 +250,7 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Building2 style={{ width: "16px", height: "16px", color: "#39BDF8" }} />
+              <Building2 style={{ width: "16px", height: "16px", color: R.warmTeal }} />
               <div>
                 <div style={sectionTitle}>Properties ({properties.length})</div>
                 <div style={sectionSub}>Connected properties and sync status</div>
@@ -260,22 +258,22 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
             </div>
           </div>
 
-          <div style={{ borderRadius: "4px", border: "1px solid #2a2a2a", overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 120px 150px 90px 100px", gap: "8px", padding: "10px 16px", backgroundColor: "#1d1d1c", borderBottom: "1px solid #2a2a2a" }}>
+          <div style={{ borderRadius: "4px", border: `1px solid ${R.border}`, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 120px 150px 90px 100px", gap: "8px", padding: "10px 16px", backgroundColor: R.bg, borderBottom: `1px solid ${R.sep}` }}>
               {["Property", "ID", "Last Sync", "Status", ""].map((h) => <div key={h} style={thCell}>{h}</div>)}
             </div>
             {propsLoading ? (
-              <div style={{ padding: "16px", color: "#6b7280", fontSize: "12px", textAlign: "center" }}>Loading...</div>
+              <div style={{ padding: "16px", color: R.textDim, fontSize: "12px", textAlign: "center" }}>Loading...</div>
             ) : properties.map((p, i) => (
               <div
                 key={p.property_id}
-                style={{ display: "grid", gridTemplateColumns: "1.5fr 120px 150px 90px 100px", gap: "8px", padding: "10px 16px", borderTop: i > 0 ? "1px solid #2a2a2a" : "none", transition: "background-color 0.15s" }}
+                style={{ display: "grid", gridTemplateColumns: "1.5fr 120px 150px 90px 100px", gap: "8px", padding: "10px 16px", borderTop: i > 0 ? `1px solid ${R.sep}` : "none", transition: "background-color 0.15s" }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(57,189,248,0.04)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               >
                 <div style={{ ...tdCell, opacity: p.is_disconnected ? 0.5 : 1 }}>{p.property_name}</div>
-                <div style={{ ...tdCell, color: "#9ca3af", fontFamily: "monospace", fontSize: "11px" }}>{p.property_id}</div>
-                <div style={{ ...tdCell, color: "#9ca3af" }}>Just now</div>
+                <div style={{ ...tdCell, color: R.textMid, fontFamily: "monospace", fontSize: "11px" }}>{p.property_id}</div>
+                <div style={{ ...tdCell, color: R.textMid }}>Just now</div>
                 <div style={tdCell}>
                   <span style={badge(p.is_disconnected ? "#f59e0b" : "#10b981")}>
                     {p.is_disconnected ? "Disconnected" : "Active"}
@@ -321,7 +319,7 @@ export function SettingsPage({ hotelId, userRole, onInviteUser, onGrantAccess }:
                 <Unplug style={{ width: "16px", height: "16px", color: "#ef4444" }} />
                 <div style={{ ...sectionTitle, color: "#ef4444" }}>Disconnect {disconnectTarget.name}?</div>
               </div>
-              <p style={{ color: "#9ca3af", fontSize: "12px", lineHeight: "1.5", marginBottom: "20px" }}>
+              <p style={{ color: R.textMid, fontSize: "12px", lineHeight: "1.5", marginBottom: "20px" }}>
                 This hotel will be hidden from dashboards, reports, and pricing. All data is preserved and you can reconnect at any time.
               </p>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>

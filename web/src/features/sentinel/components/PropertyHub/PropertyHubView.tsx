@@ -109,19 +109,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     alignItems: "center",
     justifyContent: "center",
   },
-  toolIconWrapperShadowfax: {
-    backgroundImage: "linear-gradient(to bottom right, #39BDF8, #29ADEE)",
-  },
   toolIconWrapperCalc: {
     backgroundImage: "linear-gradient(to bottom right, #6b7280, #4b5563)",
   },
   toolIcon: { width: "1.25rem", height: "1.25rem", color: "#0f0f0f" },
   cardTitle: { color: "#e5e5e5", fontSize: "1.125rem", lineHeight: "1.75rem" },
-  cardDescShadowfax: {
-    color: "#39BDF8",
-    fontSize: "0.75rem",
-    lineHeight: "1rem",
-  },
   cardDescCalc: { color: "#6b7280", fontSize: "0.75rem", lineHeight: "1rem" },
   cardP: { color: "#9ca3af", fontSize: "0.875rem", lineHeight: "1.25rem" },
   cardPDisabled: {
@@ -165,7 +157,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#e5e5e5",
   },
   hotelCell: { display: "flex", alignItems: "center", gap: "0.5rem" },
-  hotelIcon: { width: "1rem", height: "1rem", color: "#39BDF8", flexShrink: 0 },
+  hotelIcon: { width: "1rem", height: "1rem", color: "#38C6BA", flexShrink: 0 },
   hotelName: { color: "#e5e5e5" },
   inputBase: {
     backgroundColor: "#0f0f0f",
@@ -223,7 +215,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   loaderIcon: {
     width: "2rem",
     height: "2rem",
-    color: "#39BDF8",
+    color: "#38C6BA",
     animation: "spin 1s linear infinite",
   },
   loaderText: { marginLeft: "0.75rem", color: "#9ca3af" },
@@ -237,7 +229,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     paddingBottom: "24px",
   },
   columnTitle: {
-    color: "#39BDF8",
+    color: "#38C6BA",
     fontSize: "14px",
     marginBottom: "16px",
     display: "flex",
@@ -415,36 +407,6 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
         <div style={styles.toolsSection}>
           <h2 style={styles.h2}>Tools</h2>
           <div style={styles.toolsGrid}>
-            <Card
-              style={styles.card}
-              className="hover:border-[#39BDF8]/50 transition-colors"
-              onClick={() => onNavigate("shadowfax")}
-            >
-              <CardHeader>
-                <div style={styles.cardHeader}>
-                  <div style={styles.cardHeaderContent}>
-                    <div
-                      style={{
-                        ...styles.toolIconWrapperBase,
-                        ...styles.toolIconWrapperShadowfax,
-                      }}
-                    >
-                      <Wind style={styles.toolIcon} />
-                    </div>
-                    <div>
-                      <CardTitle style={styles.cardTitle}>Shadowfax</CardTitle>
-                      <CardDescription style={styles.cardDescShadowfax}>
-                        Live Price Checker
-                      </CardDescription>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p style={styles.cardP}>Run on-demand, live price scrapes.</p>
-              </CardContent>
-            </Card>
-
             <Card style={styles.cardDisabled}>
               <CardHeader>
                 <div style={styles.cardHeader}>
@@ -470,7 +432,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                   </div>
                   <Badge
                     variant="outline"
-                    className="bg-[#39BDF8]/10 text-[#39BDF8] border-[#39BDF8]/30"
+                    className="bg-[#38C6BA]/10 text-[#38C6BA] border-[#38C6BA]/30"
                   >
                     Coming Soon
                   </Badge>
@@ -637,7 +599,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                     }}
                                     autoFocus
                                     style={styles.inputBase}
-                                    className="focus:border-[#39BDF8]/50"
+                                    className="focus:border-[#38C6BA]/50"
                                     placeholder="https://booking.com/..."
                                   />
                                 ) : (
@@ -704,7 +666,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                     badgeStyle = {
                                       backgroundColor:
                                         "rgba(57, 189, 248, 0.1)",
-                                      color: "#39BDF8",
+                                      color: "#38C6BA",
                                       border:
                                         "1px solid rgba(57, 189, 248, 0.3)",
                                     };
@@ -720,7 +682,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                     badgeStyle = {
                                       backgroundColor:
                                         "rgba(250, 255, 106, 0.1)",
-                                      color: "#39BDF8",
+                                      color: "#38C6BA",
                                       border:
                                         "1px solid rgba(250, 255, 106, 0.3)",
                                     };
@@ -753,7 +715,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                   size="sm"
                                   onClick={() => toggleAsset(asset.id)}
                                   style={styles.manageButton}
-                                  className="hover:bg-[#1a1a1a] hover:text-[#39BDF8] hover:border-[#39BDF8]"
+                                  className="hover:bg-[#1a1a1a] hover:text-[#38C6BA] hover:border-[#38C6BA]"
                                 >
                                   {isExpanded ? (
                                     <ChevronUp className="w-4 h-4 mr-1" />
@@ -787,7 +749,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                       }}
                                     >
                                       <h3 style={styles.columnTitle}>
-                                        <span style={{ color: "#39BDF8" }}>
+                                        <span style={{ color: "#38C6BA" }}>
                                           ●
                                         </span>{" "}
                                         Rules
@@ -1324,7 +1286,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                       }}
                                     >
                                       <h3 style={styles.columnTitle}>
-                                        <span style={{ color: "#39BDF8" }}>
+                                        <span style={{ color: "#38C6BA" }}>
                                           ●
                                         </span>{" "}
                                         Simulator
@@ -1400,7 +1362,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                                 transform: "translateY(-50%)",
                                                 width: "12px",
                                                 height: "12px",
-                                                color: "#39BDF8",
+                                                color: "#38C6BA",
                                               }}
                                             />
                                             <Input
@@ -1445,7 +1407,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                                 transform: "translateY(-50%)",
                                                 width: "12px",
                                                 height: "12px",
-                                                color: "#39BDF8",
+                                                color: "#38C6BA",
                                               }}
                                             />
                                             <Input
@@ -1540,7 +1502,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                                 rate: currentRate,
                                                 indent: 0,
                                                 isBold: true,
-                                                color: "#39BDF8",
+                                                color: "#38C6BA",
                                               });
                                             }
 
@@ -1749,7 +1711,7 @@ export function PropertyHubView({ onNavigate }: PropertyHubViewProps) {
                                         saveAssetSettings(asset.id)
                                       }
                                       style={{
-                                        backgroundColor: "#39BDF8",
+                                        backgroundColor: "#38C6BA",
                                         color: "#0f0f0f",
                                       }}
                                     >

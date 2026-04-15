@@ -231,8 +231,8 @@ export function HotelManagementTable({
   return (
     <div
       style={{
-        backgroundColor: "#1a1a1a",
-        border: "1px solid #2a2a2a",
+        backgroundColor: "#121519",
+        border: "1px solid #1E2330",
         borderRadius: "0.25rem",
         overflow: "hidden",
       }}
@@ -240,14 +240,14 @@ export function HotelManagementTable({
       <div
         style={{
           padding: "16px 24px",
-          borderBottom: "1px solid #2a2a2a",
+          borderBottom: "1px solid #1E2330",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Building2 className="w-4 h-4" style={{ color: "#39BDF8" }} />
+          <Building2 className="w-4 h-4" style={{ color: "#7BAFD4" }} />
           <h2
             style={{
-              color: "#e5e5e5",
+              color: "#F3F5F7",
               fontSize: "12px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -257,7 +257,7 @@ export function HotelManagementTable({
             Hotel Management
           </h2>
         </div>
-        <p style={{ color: "#9ca3af", fontSize: "12px", marginTop: "4px" }}>
+        <p style={{ color: "#7A8494", fontSize: "12px", marginTop: "4px" }}>
           Manage Rockenue properties and assignment to management groups
         </p>
       </div>
@@ -267,8 +267,8 @@ export function HotelManagementTable({
           <thead>
             <tr
               style={{
-                borderBottom: "1px solid #2a2a2a",
-                backgroundColor: "#0f0f0f",
+                borderBottom: "1px solid #1E2330",
+                backgroundColor: "#121519",
               }}
             >
               {[
@@ -287,7 +287,7 @@ export function HotelManagementTable({
                   style={{
                     padding: "12px 24px",
                     textAlign: "left",
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "12px",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -302,12 +302,12 @@ export function HotelManagementTable({
             {hotels.map((hotel) => (
               <tr
                 key={hotel.hotel_id}
-                style={{ borderBottom: "1px solid #2a2a2a" }}
+                style={{ borderBottom: "1px solid #1E2330" }}
               >
                 <td
                   style={{
                     padding: "16px 24px",
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "14px",
                   }}
                 >
@@ -316,7 +316,7 @@ export function HotelManagementTable({
                 <td
                   style={{
                     padding: "16px 24px",
-                    color: "#e5e5e5",
+                    color: "#F3F5F7",
                     fontSize: "14px",
                   }}
                 >
@@ -325,7 +325,7 @@ export function HotelManagementTable({
                 <td
                   style={{
                     padding: "16px 24px",
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "14px",
                   }}
                 >
@@ -334,7 +334,7 @@ export function HotelManagementTable({
                 <td
                   style={{
                     padding: "16px 24px",
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "14px",
                   }}
                 >
@@ -344,9 +344,9 @@ export function HotelManagementTable({
                   <Badge
                     variant="outline"
                     style={{
-                      backgroundColor: hotel.is_disconnected ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)",
-                      color: hotel.is_disconnected ? "#f59e0b" : "#10b981",
-                      borderColor: hotel.is_disconnected ? "rgba(245,158,11,0.3)" : "rgba(16,185,129,0.3)",
+                      backgroundColor: hotel.is_disconnected ? "rgba(245,158,11,0.15)" : "rgba(56,198,186,0.15)",
+                      color: hotel.is_disconnected ? "#C8A66E" : "#7BAFD4",
+                      borderColor: hotel.is_disconnected ? "rgba(245,158,11,0.3)" : "rgba(56,198,186,0.3)",
                       fontSize: "10px",
                     }}
                   >
@@ -364,9 +364,9 @@ export function HotelManagementTable({
                       style={{
                         width: "128px",
                         height: "32px",
-                        backgroundColor: "#0f0f0f",
-                        borderColor: "#2a2a2a",
-                        color: "#e5e5e5",
+                        backgroundColor: "#121519",
+                        borderColor: "#1E2330",
+                        color: "#F3F5F7",
                         fontSize: "12px",
                       }}
                     >
@@ -374,9 +374,9 @@ export function HotelManagementTable({
                     </SelectTrigger>
                     <SelectContent
                       style={{
-                        backgroundColor: "#1a1a1a",
-                        borderColor: "#2a2a2a",
-                        color: "#e5e5e5",
+                        backgroundColor: "#121519",
+                        borderColor: "#1E2330",
+                        color: "#F3F5F7",
                       }}
                     >
                       {validCategories.map((cat) => (
@@ -404,13 +404,13 @@ export function HotelManagementTable({
                           isChecked
                         );
                       }}
-                      className="data-[state=checked]:bg-[#39BDF8] data-[state=unchecked]:bg-[#2a2a2a]"
+                      className="data-[state=checked]:bg-[#7BAFD4] data-[state=unchecked]:bg-[#1E2330]"
                     />
                     <span
                       style={{
                         fontSize: "12px",
                         color: hotel.is_rockenue_managed
-                          ? "#39BDF8"
+                          ? "#7BAFD4"
                           : "#666666",
                       }}
                     >
@@ -447,9 +447,9 @@ export function HotelManagementTable({
                         height: "28px",
                         padding: "0 8px",
                         fontSize: "12px",
-                        color: "#e5e5e5",
+                        color: "#F3F5F7",
                       }}
-                      className="hover:bg-[#39BDF8]/10 hover:text-[#39BDF8]"
+                      className="hover:bg-[#7BAFD4]/10 hover:text-[#7BAFD4]"
                     >
                       <Users className="w-3 h-3 mr-1" />
                       Comp Set
@@ -461,9 +461,9 @@ export function HotelManagementTable({
                         height: "28px",
                         padding: "0 8px",
                         fontSize: "12px",
-                        color: "#e5e5e5",
+                        color: "#F3F5F7",
                       }}
-                      className="hover:bg-[#39BDF8]/10 hover:text-[#39BDF8]"
+                      className="hover:bg-[#7BAFD4]/10 hover:text-[#7BAFD4]"
                       onClick={() => handleSyncInfo(hotel.hotel_id)}
                       disabled={syncingHotelId === hotel.hotel_id}
                     >
@@ -485,9 +485,9 @@ export function HotelManagementTable({
                         height: "28px",
                         padding: "0 8px",
                         fontSize: "12px",
-                        color: "#e5e5e5",
+                        color: "#F3F5F7",
                       }}
-                      className="hover:bg-[#39BDF8]/10 hover:text-[#39BDF8]"
+                      className="hover:bg-[#7BAFD4]/10 hover:text-[#7BAFD4]"
                       onClick={() => handleFullSync(hotel.hotel_id)}
                       disabled={
                         syncingHotelId === hotel.hotel_id ||
@@ -512,9 +512,9 @@ export function HotelManagementTable({
                         height: "28px",
                         padding: "0 8px",
                         fontSize: "12px",
-                        color: "#10b981",
+                        color: "#7BAFD4",
                       }}
-                      className="hover:bg-[#10b981]/10 hover:text-[#10b981]"
+                      className="hover:bg-[#7BAFD4]/10 hover:text-[#7BAFD4]"
                       onClick={() => handleRefreshData(hotel.hotel_id)}
                       disabled={refreshingHotelId === hotel.hotel_id}
                     >
@@ -620,7 +620,7 @@ function GroupCombobox({
             backgroundColor: "rgba(0,0,0,0.4)", // bg-black/40
             borderColor: "rgba(255,255,255,0.1)", // border-white/10
             fontSize: "12px", // text-xs
-            color: disabled ? "#666666" : "#e5e5e5",
+            color: disabled ? "#666666" : "#F3F5F7",
             opacity: disabled ? 0.5 : 1,
             cursor: disabled ? "not-allowed" : "pointer",
           }}
@@ -633,7 +633,7 @@ function GroupCombobox({
               // The text color class is defined in index.css and works.
               className="text-[#d4d4a0] text-xs"
               style={{
-                backgroundColor: "rgba(58, 58, 53, 0.4)", // This is bg-[#2a2a2a]/40
+                backgroundColor: "rgba(58, 58, 53, 0.4)", // This is bg-[#1E2330]/40
                 borderColor: "#4a4a45", // This is border-[#4a4a45]
               }}
             >
@@ -661,7 +661,7 @@ function GroupCombobox({
             value={searchValue}
             onValueChange={setSearchValue}
             style={{
-              color: "#e5e5e5",
+              color: "#F3F5F7",
               borderColor: "rgba(255,255,255,0.1)",
             }}
           />
@@ -682,7 +682,7 @@ function GroupCombobox({
                   <button
                     onClick={handleCreate}
                     style={{
-                      color: "#39BDF8",
+                      color: "#7BAFD4",
                       fontSize: "12px",
                       display: "flex",
                       alignItems: "center",
@@ -722,7 +722,7 @@ function GroupCombobox({
                     value={group}
                     onSelect={() => handleSelect(group)}
                     style={{
-                      color: "#e5e5e5",
+                      color: "#F3F5F7",
                       cursor: "pointer",
                       // Note: CommandItem manages its own hover state class internally,
                       // usually via data-[selected=true]. We rely on standard shadcn here for hover.
@@ -731,11 +731,11 @@ function GroupCombobox({
                     <Check
                       className={`mr-2 h-4 w-4 ${
                         value === group
-                          ? "text-[#39BDF8] opacity-100"
+                          ? "text-[#7BAFD4] opacity-100"
                           : "opacity-0"
                       }`}
                     />
-                    <Building2 className="w-3 h-3 mr-2 text-[#39BDF8]" />
+                    <Building2 className="w-3 h-3 mr-2 text-[#7BAFD4]" />
                     {group}
                   </CommandItem>
                 ))}
@@ -748,7 +748,7 @@ function GroupCombobox({
               >
                 <CommandItem
                   onSelect={handleCreate}
-                  style={{ color: "#39BDF8", cursor: "pointer" }}
+                  style={{ color: "#7BAFD4", cursor: "pointer" }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Create new: "{searchValue}"

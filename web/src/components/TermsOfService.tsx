@@ -16,7 +16,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
           <Button
             onClick={onBack}
             variant="ghost"
-            className="text-[#9ca3af] hover:text-[#39BDF8] hover:bg-transparent"
+            className="text-[#9ca3af] hover:text-[#38C6BA] hover:bg-transparent"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -32,7 +32,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Title Section */}
         <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-full text-[#39BDF8] text-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#38C6BA]/10 border border-[#38C6BA]/30 rounded-full text-[#38C6BA] text-sm mb-6">
             <FileText className="w-4 h-4" />
             <span>Legal Agreement</span>
           </div>
@@ -74,8 +74,8 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
               Management System (PMS) on a <strong>read-only basis</strong>.
             </p>
 
-            <div className="bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-lg p-4 mt-4">
-              <p className="text-[#39BDF8]">
+            <div className="bg-[#38C6BA]/10 border border-[#38C6BA]/30 rounded-lg p-4 mt-4">
+              <p className="text-[#38C6BA]">
                 <strong>Fees and Changes to Service</strong>
               </p>
               <p className="text-[#e5e5e5] mt-2">
@@ -128,7 +128,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
             
             <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="text-lg text-[#39BDF8] mb-2">Your Property Data</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">Your Property Data</h3>
                 <p>
                   You retain all ownership rights to your hotel's performance data. By using Market Pulse, you 
                   grant us a limited license to process this data solely to provide our services.
@@ -137,7 +137,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
 
               <div>
                 {/* [MERGE] This entire section is replaced with the critical 'commercial rights' clause from the old file */}
-                <h3 className="text-lg text-[#39BDF8] mb-2">License to Your Data</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">License to Your Data</h3>
                 <p>
                   To operate and improve the Service, you grant us a worldwide,
                   perpetual, irrevocable, royalty-free license to use, host,
@@ -210,7 +210,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
             
             <div className="bg-[#2C2C2C] border border-[#2a2a2a] rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="text-lg text-[#39BDF8] mb-2">"AS IS" Basis</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">"AS IS" Basis</h3>
                 <p>
                   {/* [MERGE] Using old file's text */}
                   The Service is provided on an "AS IS" and "AS AVAILABLE" basis.
@@ -280,7 +280,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
                 <p>
                   {/* [MERGE] Using support@ email */}
                   Before filing a formal claim, please contact us at{' '}
-                  <a href="mailto:support@market-pulse.io" className="text-[#39BDF8] hover:underline">
+                  <a href="mailto:support@market-pulse.io" className="text-[#38C6BA] hover:underline">
                     support@market-pulse.io
                   </a>{' '}
                   to attempt to resolve the dispute informally.
@@ -317,7 +317,7 @@ export function TermsOfService({ onBack }: TermsOfServiceProps) {
 
           {/* Acknowledgment */}
           <section className="space-y-4">
-            <div className="bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-lg p-6">
+            <div className="bg-[#38C6BA]/10 border border-[#38C6BA]/30 rounded-lg p-6">
               <p className="text-[#e5e5e5]">
                 BY CREATING AN ACCOUNT OR USING MARKET PULSE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, 
                 AND AGREE TO BE BOUND BY THESE TERMS OF SERVICE.

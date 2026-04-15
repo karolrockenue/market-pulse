@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { TrendingUp, ChevronDown, Bell, Search } from "lucide-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { MPSidebar } from "./MPSidebar";
 
 // ── MP Dashboard v3: Layered depth — full element set from Market Pulse ──
 
@@ -99,7 +98,6 @@ export function MPDash3({ activeView, onNavigate }: MPDash3Props) {
 
   return (
     <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, sans-serif", display: "flex" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
       <div style={{ flex: 1, overflow: "auto" }}>
         {/* Top bar */}
         <div style={{ padding: "14px 28px", borderBottom: `1px solid ${R.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

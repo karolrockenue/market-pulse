@@ -329,14 +329,14 @@ export function CloudbedsAPIExplorer({
   return (
     <div
       style={{
-        backgroundColor: "#1a1a1a",
-        border: "1px solid #2a2a2a",
+        backgroundColor: "#121519",
+        border: "1px solid #1E2330",
         borderRadius: "0.5rem",
         overflow: "hidden",
       }}
     >
       {/* Header with Property Selection */}
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #2a2a2a" }}>
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid #1E2330" }}>
         <div
           style={{
             display: "flex",
@@ -354,12 +354,12 @@ export function CloudbedsAPIExplorer({
                 marginBottom: "8px",
               }}
             >
-              <Code className="w-5 h-5" style={{ color: "#39BDF8" }} />
-              <h2 style={{ color: "#e5e5e5", fontSize: "1.25rem", margin: 0 }}>
+              <Code className="w-5 h-5" style={{ color: "#7BAFD4" }} />
+              <h2 style={{ color: "#F3F5F7", fontSize: "1.25rem", margin: 0 }}>
                 Cloudbeds API Explorer
               </h2>
             </div>
-            <p style={{ color: "#9ca3af", fontSize: "14px", margin: 0 }}>
+            <p style={{ color: "#7A8494", fontSize: "14px", margin: 0 }}>
               Test and debug Cloudbeds API calls using stored property
               credentials
             </p>
@@ -367,7 +367,7 @@ export function CloudbedsAPIExplorer({
           <div style={{ width: "320px" }}>
             <label
               style={{
-                color: "#9ca3af",
+                color: "#7A8494",
                 fontSize: "12px",
                 marginBottom: "8px",
                 display: "flex",
@@ -384,14 +384,14 @@ export function CloudbedsAPIExplorer({
                   <TooltipTrigger asChild>
                     <Info
                       className="w-3.5 h-3.5"
-                      style={{ color: "#6b7280", cursor: "help" }}
+                      style={{ color: "#4E5868", cursor: "help" }}
                     />
                   </TooltipTrigger>
                   <TooltipContent
                     style={{
-                      backgroundColor: "#0f0f0f",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: "#121519",
+                      borderColor: "#1E2330",
+                      color: "#F3F5F7",
                       maxWidth: "320px",
                     }}
                   >
@@ -405,9 +405,9 @@ export function CloudbedsAPIExplorer({
             </label>
             <div
               style={{
-                backgroundColor: "#1A1A1A",
-                border: "1px solid #2a2a2a",
-                color: "#e5e5e5",
+                backgroundColor: "#121519",
+                border: "1px solid #1E2330",
+                color: "#F3F5F7",
                 height: "40px",
                 display: "flex",
                 alignItems: "center",
@@ -425,7 +425,7 @@ export function CloudbedsAPIExplorer({
       </div>
 
       <Tabs defaultValue="insights" style={{ width: "100%" }}>
-        <div style={{ padding: "0 24px", borderBottom: "1px solid #2a2a2a" }}>
+        <div style={{ padding: "0 24px", borderBottom: "1px solid #1E2330" }}>
           <TabsList
             style={{
               backgroundColor: "transparent",
@@ -435,16 +435,16 @@ export function CloudbedsAPIExplorer({
           >
             <TabsTrigger
               value="insights"
-              style={{ borderRadius: 0, padding: "0 24px", color: "#9ca3af" }}
-              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#39BDF8] data-[state=active]:text-[#39BDF8]"
+              style={{ borderRadius: 0, padding: "0 24px", color: "#7A8494" }}
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#7BAFD4] data-[state=active]:text-[#7BAFD4]"
             >
               <BarChart3 className="w-4 h-4 mr-2" />
               Insights API
             </TabsTrigger>
             <TabsTrigger
               value="general"
-              style={{ borderRadius: 0, padding: "0 24px", color: "#9ca3af" }}
-              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#39BDF8] data-[state=active]:text-[#39BDF8]"
+              style={{ borderRadius: 0, padding: "0 24px", color: "#7A8494" }}
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-[#7BAFD4] data-[state=active]:text-[#7BAFD4]"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               General API
@@ -468,10 +468,10 @@ export function CloudbedsAPIExplorer({
               {/* Step 1: Select Dataset */}
               <div
                 style={{
-                  backgroundColor: "#0f0f0f",
+                  backgroundColor: "#121519",
                   borderRadius: "0.5rem",
                   padding: "16px",
-                  border: "1px solid #2a2a2a",
+                  border: "1px solid #1E2330",
                 }}
               >
                 <div
@@ -487,8 +487,8 @@ export function CloudbedsAPIExplorer({
                       width: "24px",
                       height: "24px",
                       borderRadius: "50%",
-                      backgroundColor: "#39BDF8",
-                      color: "#0f0f0f",
+                      backgroundColor: "#7BAFD4",
+                      color: "#121519",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -498,7 +498,7 @@ export function CloudbedsAPIExplorer({
                   >
                     1
                   </div>
-                  <h3 style={{ color: "#e5e5e5", margin: 0 }}>
+                  <h3 style={{ color: "#F3F5F7", margin: 0 }}>
                     Select Dataset
                   </h3>
                   <TooltipProvider>
@@ -507,7 +507,7 @@ export function CloudbedsAPIExplorer({
                         <Info
                           className="w-4 h-4"
                           style={{
-                            color: "#6b7280",
+                            color: "#4E5868",
                             cursor: "help",
                             marginLeft: "auto",
                           }}
@@ -515,9 +515,9 @@ export function CloudbedsAPIExplorer({
                       </TooltipTrigger>
                       <TooltipContent
                         style={{
-                          backgroundColor: "#1d1d1c",
-                          borderColor: "#2a2a2a",
-                          color: "#e5e5e5",
+                          backgroundColor: "#14181D",
+                          borderColor: "#1E2330",
+                          color: "#F3F5F7",
                           maxWidth: "320px",
                         }}
                       >
@@ -554,11 +554,11 @@ export function CloudbedsAPIExplorer({
                         cursor: "pointer",
                         transition: "all 0.2s",
                         borderColor:
-                          datasetId === ds.id ? "#39BDF8" : "#2a2a2a",
+                          datasetId === ds.id ? "#7BAFD4" : "#1E2330",
                         backgroundColor:
                           datasetId === ds.id
-                            ? "rgba(57, 189, 248, 0.1)"
-                            : "#1A1A1A",
+                            ? "rgba(56, 198, 186, 0.1)"
+                            : "#121519",
                       }}
                       className="hover:border-[#4a4a45]"
                     >
@@ -578,7 +578,7 @@ export function CloudbedsAPIExplorer({
                             }}
                           >
                             <span
-                              style={{ color: "#e5e5e5", fontSize: "14px" }}
+                              style={{ color: "#F3F5F7", fontSize: "14px" }}
                             >
                               {ds.name}
                             </span>
@@ -586,8 +586,8 @@ export function CloudbedsAPIExplorer({
                               variant="outline"
                               style={{
                                 fontSize: "10px",
-                                borderColor: "#2a2a2a",
-                                color: "#9ca3af",
+                                borderColor: "#1E2330",
+                                color: "#7A8494",
                               }}
                             >
                               ID: {ds.id}
@@ -595,7 +595,7 @@ export function CloudbedsAPIExplorer({
                           </div>
                           <p
                             style={{
-                              color: "#9ca3af",
+                              color: "#7A8494",
                               fontSize: "12px",
                               marginTop: "4px",
                               margin: 0,
@@ -607,7 +607,7 @@ export function CloudbedsAPIExplorer({
                         {datasetId === ds.id && (
                           <CheckCircle2
                             className="w-4 h-4"
-                            style={{ color: "#39BDF8", flexShrink: 0 }}
+                            style={{ color: "#7BAFD4", flexShrink: 0 }}
                           />
                         )}
                       </div>
@@ -621,8 +621,8 @@ export function CloudbedsAPIExplorer({
                   style={{
                     width: "100%",
                     marginTop: "16px",
-                    backgroundColor: "#2a2a2a",
-                    color: "#e5e5e5",
+                    backgroundColor: "#1E2330",
+                    color: "#F3F5F7",
                     borderColor: "#4a4a45",
                   }}
                   variant="outline"
@@ -646,10 +646,10 @@ export function CloudbedsAPIExplorer({
               {structureLoaded && (
                 <div
                   style={{
-                    backgroundColor: "#1d1d1c",
+                    backgroundColor: "#14181D",
                     borderRadius: "0.5rem",
                     padding: "16px",
-                    border: "1px solid #2a2a2a",
+                    border: "1px solid #1E2330",
                   }}
                 >
                   <div
@@ -665,8 +665,8 @@ export function CloudbedsAPIExplorer({
                         width: "24px",
                         height: "24px",
                         borderRadius: "50%",
-                        backgroundColor: "#39BDF8",
-                        color: "#0f0f0f",
+                        backgroundColor: "#7BAFD4",
+                        color: "#121519",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -676,7 +676,7 @@ export function CloudbedsAPIExplorer({
                     >
                       2
                     </div>
-                    <h3 style={{ color: "#e5e5e5", margin: 0 }}>
+                    <h3 style={{ color: "#F3F5F7", margin: 0 }}>
                       Configure Parameters
                     </h3>
                   </div>
@@ -698,7 +698,7 @@ export function CloudbedsAPIExplorer({
                       <div>
                         <label
                           style={{
-                            color: "#9ca3af",
+                            color: "#7A8494",
                             fontSize: "12px",
                             marginBottom: "6px",
                             display: "flex",
@@ -715,9 +715,9 @@ export function CloudbedsAPIExplorer({
                               variant="outline"
                               className="justify-start text-left h-9"
                               style={{
-                                backgroundColor: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
-                                color: "#e5e5e5",
+                                backgroundColor: "#121519",
+                                border: "1px solid #1E2330",
+                                color: "#F3F5F7",
                                 fontSize: "13px",
                               }}
                             >
@@ -725,7 +725,7 @@ export function CloudbedsAPIExplorer({
                               {startDate ? format(new Date(startDate), "dd MMM yyyy") : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                          <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #1E2330" }}>
                             <CalendarWidget mode="single" selected={startDate ? new Date(startDate) : undefined} onSelect={(d) => d && setStartDate(format(d, "yyyy-MM-dd"))} initialFocus />
                           </PopoverContent>
                         </Popover>
@@ -733,7 +733,7 @@ export function CloudbedsAPIExplorer({
                       <div>
                         <label
                           style={{
-                            color: "#9ca3af",
+                            color: "#7A8494",
                             fontSize: "12px",
                             marginBottom: "6px",
                             display: "flex",
@@ -750,9 +750,9 @@ export function CloudbedsAPIExplorer({
                               variant="outline"
                               className="justify-start text-left h-9"
                               style={{
-                                backgroundColor: "#0f0f0f",
-                                border: "1px solid #2a2a2a",
-                                color: "#e5e5e5",
+                                backgroundColor: "#121519",
+                                border: "1px solid #1E2330",
+                                color: "#F3F5F7",
                                 fontSize: "13px",
                               }}
                             >
@@ -760,7 +760,7 @@ export function CloudbedsAPIExplorer({
                               {endDate ? format(new Date(endDate), "dd MMM yyyy") : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                          <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #1E2330" }}>
                             <CalendarWidget mode="single" selected={endDate ? new Date(endDate) : undefined} onSelect={(d) => d && setEndDate(format(d, "yyyy-MM-dd"))} initialFocus />
                           </PopoverContent>
                         </Popover>
@@ -770,7 +770,7 @@ export function CloudbedsAPIExplorer({
                     <div>
                       <label
                         style={{
-                          color: "#9ca3af",
+                          color: "#7A8494",
                           fontSize: "12px",
                           marginBottom: "6px",
                           display: "flex",
@@ -784,14 +784,14 @@ export function CloudbedsAPIExplorer({
                             <TooltipTrigger asChild>
                               <Info
                                 className="w-3.5 h-3.5"
-                                style={{ color: "#6b7280", cursor: "help" }}
+                                style={{ color: "#4E5868", cursor: "help" }}
                               />
                             </TooltipTrigger>
                             <TooltipContent
                               style={{
-                                backgroundColor: "#1d1d1c",
-                                borderColor: "#2a2a2a",
-                                color: "#e5e5e5",
+                                backgroundColor: "#14181D",
+                                borderColor: "#1E2330",
+                                color: "#F3F5F7",
                                 maxWidth: "320px",
                               }}
                             >
@@ -805,12 +805,12 @@ export function CloudbedsAPIExplorer({
                       </label>
                       <div
                         style={{
-                          backgroundColor: "#2C2C2C",
+                          backgroundColor: "#1E2330",
                           borderRadius: "0.25rem",
                           padding: "10px",
                           maxHeight: "128px",
                           overflowY: "auto",
-                          border: "1px solid #2a2a2a",
+                          border: "1px solid #1E2330",
                           display: "flex",
                           flexDirection: "column",
                           gap: "6px",
@@ -835,23 +835,23 @@ export function CloudbedsAPIExplorer({
                               }
                               style={{
                                 marginTop: "2px",
-                                accentColor: "#39BDF8",
+                                accentColor: "#7BAFD4",
                               }}
                             />
                             <div style={{ flex: 1 }}>
                               <span
                                 style={{
-                                  color: "#e5e5e5",
+                                  color: "#F3F5F7",
                                   fontSize: "14px",
                                   transition: "color 0.2s",
                                 }}
-                                className="group-hover:text-[#39BDF8]"
+                                className="group-hover:text-[#7BAFD4]"
                               >
                                 {dimension.label}
                               </span>
                               <p
                                 style={{
-                                  color: "#6b7280",
+                                  color: "#4E5868",
                                   fontSize: "12px",
                                   margin: 0,
                                 }}
@@ -871,10 +871,10 @@ export function CloudbedsAPIExplorer({
               {structureLoaded && (
                 <div
                   style={{
-                    backgroundColor: "#1d1d1c",
+                    backgroundColor: "#14181D",
                     borderRadius: "0.5rem",
                     padding: "16px",
-                    border: "1px solid #2a2a2a",
+                    border: "1px solid #1E2330",
                   }}
                 >
                   <div
@@ -890,8 +890,8 @@ export function CloudbedsAPIExplorer({
                         width: "24px",
                         height: "24px",
                         borderRadius: "50%",
-                        backgroundColor: "#39BDF8",
-                        color: "#0f0f0f",
+                        backgroundColor: "#7BAFD4",
+                        color: "#121519",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -901,7 +901,7 @@ export function CloudbedsAPIExplorer({
                     >
                       3
                     </div>
-                    <h3 style={{ color: "#e5e5e5", margin: 0 }}>
+                    <h3 style={{ color: "#F3F5F7", margin: 0 }}>
                       Select Metrics
                     </h3>
                     <Badge
@@ -909,8 +909,8 @@ export function CloudbedsAPIExplorer({
                       style={{
                         marginLeft: "auto",
                         fontSize: "10px",
-                        borderColor: "#2a2a2a",
-                        color: "#9ca3af",
+                        borderColor: "#1E2330",
+                        color: "#7A8494",
                       }}
                     >
                       {selectedMetrics.length} selected
@@ -919,12 +919,12 @@ export function CloudbedsAPIExplorer({
 
                   <div
                     style={{
-                      backgroundColor: "#2C2C2C",
+                      backgroundColor: "#1E2330",
                       borderRadius: "0.25rem",
                       padding: "10px",
                       maxHeight: "224px",
                       overflowY: "auto",
-                      border: "1px solid #2a2a2a",
+                      border: "1px solid #1E2330",
                       display: "flex",
                       flexDirection: "column",
                       gap: "6px",
@@ -945,7 +945,7 @@ export function CloudbedsAPIExplorer({
                           type="checkbox"
                           checked={selectedMetrics.includes(metric.column)}
                           onChange={() => handleMetricToggle(metric.column)}
-                          style={{ marginTop: "2px", accentColor: "#39BDF8" }}
+                          style={{ marginTop: "2px", accentColor: "#7BAFD4" }}
                         />
                         <div style={{ flex: 1 }}>
                           <div
@@ -957,11 +957,11 @@ export function CloudbedsAPIExplorer({
                           >
                             <span
                               style={{
-                                color: "#e5e5e5",
+                                color: "#F3F5F7",
                                 fontSize: "14px",
                                 transition: "color 0.2s",
                               }}
-                              className="group-hover:text-[#39BDF8]"
+                              className="group-hover:text-[#7BAFD4]"
                             >
                               {metric.label}
                             </span>
@@ -969,14 +969,14 @@ export function CloudbedsAPIExplorer({
                               variant="outline"
                               style={{
                                 fontSize: "10px",
-                                borderColor: "#2a2a2a",
-                                color: "#6b7280",
+                                borderColor: "#1E2330",
+                                color: "#4E5868",
                               }}
                             >
                               {metric.type}
                             </Badge>
                           </div>
-                          <code style={{ color: "#9ca3af", fontSize: "12px" }}>
+                          <code style={{ color: "#7A8494", fontSize: "12px" }}>
                             {metric.name}
                           </code>
                         </div>
@@ -990,10 +990,10 @@ export function CloudbedsAPIExplorer({
               {structureLoaded && (
                 <div
                   style={{
-                    backgroundColor: "#1d1d1c",
+                    backgroundColor: "#14181D",
                     borderRadius: "0.5rem",
                     padding: "16px",
-                    border: "1px solid #2a2a2a",
+                    border: "1px solid #1E2330",
                   }}
                 >
                   <div
@@ -1009,8 +1009,8 @@ export function CloudbedsAPIExplorer({
                         width: "24px",
                         height: "24px",
                         borderRadius: "50%",
-                        backgroundColor: "#39BDF8",
-                        color: "#0f0f0f",
+                        backgroundColor: "#7BAFD4",
+                        color: "#121519",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1020,7 +1020,7 @@ export function CloudbedsAPIExplorer({
                     >
                       4
                     </div>
-                    <h3 style={{ color: "#e5e5e5", margin: 0 }}>
+                    <h3 style={{ color: "#F3F5F7", margin: 0 }}>
                       Execute Query
                     </h3>
                   </div>
@@ -1030,8 +1030,8 @@ export function CloudbedsAPIExplorer({
                     disabled={selectedMetrics.length === 0}
                     style={{
                       width: "100%",
-                      backgroundColor: "#39BDF8",
-                      color: "#0f0f0f",
+                      backgroundColor: "#7BAFD4",
+                      color: "#121519",
                     }}
                     className="hover:bg-[#29ADEE]"
                   >
@@ -1054,7 +1054,7 @@ export function CloudbedsAPIExplorer({
               >
                 <label
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "12px",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -1074,9 +1074,9 @@ export function CloudbedsAPIExplorer({
                     style={{
                       height: "28px",
                       padding: "0 8px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                     }}
-                    className="hover:text-[#39BDF8] hover:bg-[#2a2a2a]"
+                    className="hover:text-[#7BAFD4] hover:bg-[#1E2330]"
                   >
                     {copied ? (
                       <>
@@ -1096,9 +1096,9 @@ export function CloudbedsAPIExplorer({
                 value={apiResponse}
                 readOnly
                 style={{
-                  backgroundColor: "#1d1d1c",
-                  borderColor: "#2a2a2a",
-                  color: "#10b981",
+                  backgroundColor: "#14181D",
+                  borderColor: "#1E2330",
+                  color: "#7BAFD4",
                   fontFamily: "monospace",
                   fontSize: "12px",
                   minHeight: "600px",
@@ -1129,12 +1129,12 @@ export function CloudbedsAPIExplorer({
                   backgroundColor: "#0F0F0F",
                   borderRadius: "0.5rem",
                   padding: "16px",
-                  border: "1px solid #2a2a2a",
+                  border: "1px solid #1E2330",
                 }}
               >
                 <h3
                   style={{
-                    color: "#e5e5e5",
+                    color: "#F3F5F7",
                     marginBottom: "12px",
                     display: "flex",
                     alignItems: "center",
@@ -1142,12 +1142,12 @@ export function CloudbedsAPIExplorer({
                     margin: 0,
                   }}
                 >
-                  <Sparkles className="w-4 h-4" style={{ color: "#39BDF8" }} />
+                  <Sparkles className="w-4 h-4" style={{ color: "#7BAFD4" }} />
                   Quick Endpoint Tests
                 </h3>
                 <p
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "12px",
                     marginBottom: "16px",
                     marginTop: "4px",
@@ -1174,10 +1174,10 @@ export function CloudbedsAPIExplorer({
                           marginBottom: "8px",
                         }}
                       >
-                        <category.icon className="w-4 h-4 text-[#9ca3af]" />
+                        <category.icon className="w-4 h-4 text-[#7A8494]" />
                         <h4
                           style={{
-                            color: "#9ca3af",
+                            color: "#7A8494",
                             fontSize: "12px",
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
@@ -1202,19 +1202,19 @@ export function CloudbedsAPIExplorer({
                             variant="outline"
                             style={{
                               width: "100%",
-                              backgroundColor: "#1A1A1A",
-                              borderColor: "#2a2a2a",
-                              color: "#e5e5e5",
+                              backgroundColor: "#121519",
+                              borderColor: "#1E2330",
+                              color: "#F3F5F7",
                               justifyContent: "flex-start",
                               height: "auto",
                               padding: "12px",
                             }}
-                            className="group hover:bg-[#2a2a2a] hover:border-[#39BDF8]"
+                            className="group hover:bg-[#1E2330] hover:border-[#7BAFD4]"
                           >
                             {loadingEndpoint === endpoint ? (
-                              <Loader2 className="w-4 h-4 mr-2.5 flex-shrink-0 animate-spin text-[#39BDF8]" />
+                              <Loader2 className="w-4 h-4 mr-2.5 flex-shrink-0 animate-spin text-[#7BAFD4]" />
                             ) : (
-                              <Play className="w-4 h-4 mr-2.5 flex-shrink-0 text-[#9ca3af] group-hover:text-[#39BDF8] transition-colors" />
+                              <Play className="w-4 h-4 mr-2.5 flex-shrink-0 text-[#7A8494] group-hover:text-[#7BAFD4] transition-colors" />
                             )}
                             <span style={{ fontSize: "14px" }}>{endpoint}</span>
                           </Button>
@@ -1238,7 +1238,7 @@ export function CloudbedsAPIExplorer({
               >
                 <label
                   style={{
-                    color: "#9ca3af",
+                    color: "#7A8494",
                     fontSize: "12px",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -1258,9 +1258,9 @@ export function CloudbedsAPIExplorer({
                     style={{
                       height: "28px",
                       padding: "0 8px",
-                      color: "#9ca3af",
+                      color: "#7A8494",
                     }}
-                    className="hover:text-[#39BDF8] hover:bg-[#2a2a2a]"
+                    className="hover:text-[#7BAFD4] hover:bg-[#1E2330]"
                   >
                     {copied ? (
                       <>
@@ -1280,9 +1280,9 @@ export function CloudbedsAPIExplorer({
                 value={apiResponse}
                 readOnly
                 style={{
-                  backgroundColor: "#1d1d1c",
-                  borderColor: "#2a2a2a",
-                  color: "#10b981",
+                  backgroundColor: "#14181D",
+                  borderColor: "#1E2330",
+                  color: "#7BAFD4",
                   fontFamily: "monospace",
                   fontSize: "12px",
                   minHeight: "600px",

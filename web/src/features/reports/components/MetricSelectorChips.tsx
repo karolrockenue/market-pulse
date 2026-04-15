@@ -1,4 +1,5 @@
 import { CSSProperties } from "react";
+import { R } from "../../../styles/tokens";
 
 /**
  * Variant A — "Round Slide Toggle"
@@ -29,7 +30,7 @@ export function MetricSelectorChips({
     <div>
       <span
         style={{
-          color: "#6b7280",
+          color: R.textDim,
           fontSize: "11px",
           textTransform: "uppercase",
           letterSpacing: "-0.025em",
@@ -63,7 +64,7 @@ export function MetricSelectorChips({
               <span
                 style={{
                   fontSize: "13px",
-                  color: active ? "#e5e5e5" : "#6b7280",
+                  color: active ? R.accent : R.textDim,
                   letterSpacing: "-0.01em",
                   transition: "color 0.15s ease",
                 }}
@@ -94,7 +95,7 @@ export function MetricSelectorChips({
                       position: "absolute",
                       top: "3px",
                       left: active ? "21px" : "3px",
-                      backgroundColor: active ? "#39BDF8" : "#6b7280",
+                      backgroundColor: active ? "#38C6BA" : R.textDim,
                       transition:
                         "left 0.15s ease, background-color 0.15s ease",
                     } as CSSProperties

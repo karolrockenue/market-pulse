@@ -219,7 +219,7 @@ export function PromoConfigSection({
                 <div>
                   <Label style={{ color: "#6b7280", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "3px" }}>Target Sell</Label>
                   <div style={{ position: "relative" }}>
-                    <PoundSterling style={{ position: "absolute", left: "8px", top: "50%", transform: "translateY(-50%)", width: "10px", height: "10px", color: "#39BDF8" }} />
+                    <PoundSterling style={{ position: "absolute", left: "8px", top: "50%", transform: "translateY(-50%)", width: "10px", height: "10px", color: "#38C6BA" }} />
                     <Input
                       type="number"
                       value={Math.round(calcState.targetSellRate)}
@@ -232,7 +232,7 @@ export function PromoConfigSection({
                 <div>
                   <Label style={{ color: "#6b7280", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "3px" }}>PMS Rate</Label>
                   <div style={{ position: "relative" }}>
-                    <PoundSterling style={{ position: "absolute", left: "8px", top: "50%", transform: "translateY(-50%)", width: "10px", height: "10px", color: "#39BDF8" }} />
+                    <PoundSterling style={{ position: "absolute", left: "8px", top: "50%", transform: "translateY(-50%)", width: "10px", height: "10px", color: "#38C6BA" }} />
                     <Input
                       type="number"
                       value={Math.round(calcState.pmsRate)}
@@ -253,7 +253,7 @@ export function PromoConfigSection({
                   steps.push({ label: `Base × ${calcState.multiplier}`, rate: r, indent: 0 });
 
                   if (calcState.nonRefundableActive) { r *= (1 - Number(calcState.nonRefundablePercent) / 100); steps.push({ label: `Non-Ref -${calcState.nonRefundablePercent}%`, rate: r, indent: 0 }); }
-                  if (calcState.taxType === "exclusive" && calcState.taxPercent > 0) { r *= (1 + Number(calcState.taxPercent) / 100); steps.push({ label: `Tax +${calcState.taxPercent}%`, rate: r, indent: 0, color: "#39BDF8" }); }
+                  if (calcState.taxType === "exclusive" && calcState.taxPercent > 0) { r *= (1 + Number(calcState.taxPercent) / 100); steps.push({ label: `Tax +${calcState.taxPercent}%`, rate: r, indent: 0, color: "#38C6BA" }); }
 
                   const gPct = Number(geniusDiscount);
                   if (gPct > 0) { r *= (1 - gPct / 100); steps.push({ label: `Genius -${gPct}%`, rate: r, indent: 1 }); }
@@ -294,7 +294,7 @@ export function PromoConfigSection({
 
           {/* Save */}
           <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "0.75rem" }}>
-            <Button onClick={() => savePromoConfig(hotelId, localGenius)} style={{ backgroundColor: "#39BDF8", color: "#0f0f0f", minWidth: "160px" }}>
+            <Button onClick={() => savePromoConfig(hotelId, localGenius)} style={{ backgroundColor: "#38C6BA", color: "#0f0f0f", minWidth: "160px" }}>
               Save Promo Config
             </Button>
           </div>

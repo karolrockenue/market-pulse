@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { R } from "../../../styles/tokens";
 import { Card } from "../../../components/ui/card";
 import {
   Select,
@@ -336,43 +337,14 @@ export function ShreejiReport({
   // --- [START OF JSX] ---
   return (
     <div
-      className="p-6 space-y-6"
-      style={{ position: "relative", minHeight: "100vh" }}
+      className="space-y-6"
+      style={{ flex: 1, background: R.bg, color: R.accent, padding: "24px 28px" }}
     >
-      {/* --- [NEW] Fixed Background Design --- */}
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          backgroundColor: "#1d1d1c",
-          zIndex: 0,
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(250, 255, 106, 0.01))",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-            backgroundSize: "64px 64px",
-          }}
-        />
-      </div>
-      {/* --- Page Content Wrapper (Sits above background) --- */}
-      <div style={{ position: "relative", zIndex: 10 }}>
+      <div>
         {/* Page Header (existing) */}
         <div>
           <h1 className="text-white text-2xl mb-2">Shreeji Report</h1>
-          <p className="text-[#9ca3af] text-sm">
+          <p className="text-[#7A8494] text-sm">
             Generate and schedule daily financial reports for property
             management
           </p>
@@ -382,39 +354,39 @@ export function ShreejiReport({
         <Card
           className="p-6"
           style={{
-            backgroundColor: "#1a1a1a",
-            border: "1px solid #2a2a2a",
+            backgroundColor: R.darkBand,
+            border: `1px solid ${R.border}`,
             borderRadius: "0.5rem",
           }}
         >
           <div className="grid grid-cols-4 gap-4 items-end">
             {/* Select Hotel */}
             <div className="space-y-2">
-              <label className="text-[#6b7280] text-xs uppercase tracking-tight font-medium mb-1.5 block">
+              <label className="text-[#4E5868] text-xs uppercase tracking-tight font-medium mb-1.5 block">
                 Select Hotel
               </label>
               <Select value={selectedHotel} onValueChange={setSelectedHotel}>
                 <SelectTrigger
                   className="h-10"
                   style={{
-                    backgroundColor: "#141414",
-                    border: "1px solid #2a2a2a",
-                    color: "#e5e5e5",
+                    backgroundColor: R.heroBg,
+                    border: `1px solid ${R.border}`,
+                    color: R.accent,
                   }}
                 >
                   <SelectValue placeholder="Choose a hotel" />
                 </SelectTrigger>
                 <SelectContent
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
+                    backgroundColor: R.darkBand,
+                    border: `1px solid ${R.border}`,
                   }}
                 >
                   {hotels.length === 0 && (
                     <SelectItem
                       value="loading"
                       disabled
-                      className="text-[#9ca3af]"
+                      className="text-[#7A8494]"
                     >
                       Loading hotels...
                     </SelectItem>
@@ -423,7 +395,7 @@ export function ShreejiReport({
                     <SelectItem
                       key={hotel.hotel_id}
                       value={hotel.hotel_id}
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
+                      className="text-[#F3F5F7] focus:bg-[#1C2228] focus:text-[#38C6BA]"
                     >
                       {hotel.property_name}
                     </SelectItem>
@@ -436,7 +408,7 @@ export function ShreejiReport({
             <div className="space-y-2">
               <label
                 className="text-xs uppercase tracking-tight font-medium mb-1.5 block"
-                style={{ color: "#6b7280" }}
+                style={{ color: R.textDim }}
               >
                 Report Date
               </label>
@@ -446,9 +418,9 @@ export function ShreejiReport({
                     variant="outline"
                     className="w-full justify-start text-left h-10"
                     style={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.heroBg,
+                      border: `1px solid ${R.border}`,
+                      color: R.accent,
                     }}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -461,8 +433,8 @@ export function ShreejiReport({
                   className="w-auto p-0"
                   align="start"
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
+                    backgroundColor: R.darkBand,
+                    border: `1px solid ${R.border}`,
                   }}
                 >
                   <Calendar
@@ -473,7 +445,7 @@ export function ShreejiReport({
                       setDatePickerOpen(false);
                     }}
                     initialFocus
-                    style={{ backgroundColor: "#1a1a1a", color: "#e5e5e5" }}
+                    style={{ backgroundColor: R.darkBand, color: R.accent }}
                   />
                 </PopoverContent>
               </Popover>
@@ -486,8 +458,8 @@ export function ShreejiReport({
                 disabled={isLoading}
                 className="font-medium h-10"
                 style={{
-                  backgroundColor: "#39BDF8",
-                  color: "#1a1a1a",
+                  backgroundColor: "#38C6BA",
+                  color: R.darkBand,
                   border: "none",
                 }}
               >
@@ -499,8 +471,8 @@ export function ShreejiReport({
                 disabled={isSaving}
                 className="font-medium h-10"
                 style={{
-                  backgroundColor: "#39BDF8",
-                  color: "#1a1a1a",
+                  backgroundColor: "#38C6BA",
+                  color: R.darkBand,
                   border: "none",
                 }}
               >
@@ -517,21 +489,21 @@ export function ShreejiReport({
 
         {/* --- [NEW] Report Schedules Section --- */}
         <div className="space-y-4">
-          <h2 className="text-[#e5e5e5] text-lg font-semibold tracking-tight">
+          <h2 className="text-[#F3F5F7] text-lg font-semibold tracking-tight">
             Report Schedules
           </h2>
 
           {/* Create New Schedule Form */}
           <Card
             className="p-6"
-            style={{ backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a" }}
+            style={{ backgroundColor: R.darkBand, border: `1px solid ${R.border}` }}
           >
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
               {/* Report Name */}
               <div className="space-y-2 md:col-span-2">
                 <label
                   className="text-xs uppercase tracking-tight font-medium mb-1.5 block"
-                  style={{ color: "#6b7280" }}
+                  style={{ color: R.textDim }}
                 >
                   Report Name
                 </label>
@@ -541,9 +513,9 @@ export function ShreejiReport({
                   onChange={(e) => setScheduleName(e.target.value)}
                   className="h-10"
                   style={{
-                    backgroundColor: "#141414",
-                    border: "1px solid #2a2a2a",
-                    color: "#e5e5e5",
+                    backgroundColor: R.heroBg,
+                    border: `1px solid ${R.border}`,
+                    color: R.accent,
                   }}
                 />
               </div>
@@ -552,7 +524,7 @@ export function ShreejiReport({
               <div className="space-y-2">
                 <label
                   className="text-xs uppercase tracking-tight font-medium mb-1.5 block"
-                  style={{ color: "#6b7280" }}
+                  style={{ color: R.textDim }}
                 >
                   Hotel
                 </label>
@@ -563,24 +535,24 @@ export function ShreejiReport({
                   <SelectTrigger
                     className="h-10"
                     style={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.heroBg,
+                      border: `1px solid ${R.border}`,
+                      color: R.accent,
                     }}
                   >
                     <SelectValue placeholder="Choose hotel" />
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: R.darkBand,
+                      border: `1px solid ${R.border}`,
                     }}
                   >
                     {hotels.map((hotel) => (
                       <SelectItem
                         key={hotel.hotel_id}
                         value={hotel.hotel_id}
-                        className="text-[#e5e5e5] focus:bg-[#2C2C2C] focus:text-[#39BDF8]"
+                        className="text-[#F3F5F7] focus:bg-[#1C2228] focus:text-[#38C6BA]"
                       >
                         {hotel.property_name}
                       </SelectItem>
@@ -593,7 +565,7 @@ export function ShreejiReport({
               <div className="space-y-2">
                 <label
                   className="text-xs uppercase tracking-tight font-medium mb-1.5 block"
-                  style={{ color: "#6b7280" }}
+                  style={{ color: R.textDim }}
                 >
                   Time (UTC)
                 </label>
@@ -601,149 +573,149 @@ export function ShreejiReport({
                   <SelectTrigger
                     className="h-10"
                     style={{
-                      backgroundColor: "#141414",
-                      border: "1px solid #2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.heroBg,
+                      border: `1px solid ${R.border}`,
+                      color: R.accent,
                     }}
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: R.darkBand,
+                      border: `1px solid ${R.border}`,
                     }}
                   >
                     <SelectItem
                       value="14:05"
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C]"
+                      className="text-[#F3F5F7] focus:bg-[#1C2228]"
                     >
                       14:05
                     </SelectItem>
                     <SelectItem
                       value="14:10"
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C]"
+                      className="text-[#F3F5F7] focus:bg-[#1C2228]"
                     >
                       14:10
                     </SelectItem>
                     <SelectItem
                       value="08:00"
-                      className="text-[#e5e5e5] focus:bg-[#2C2C2C]"
+                      className="text-[#F3F5F7] focus:bg-[#1C2228]"
                     >
                       08:00
                     </SelectItem>
                     {/* --- ADD THESE TEMPORARY LINES FOR TESTING --- */}
                     <SelectItem
                       value="06:30"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       06:30 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:35"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       06:35 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:40"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       06:40 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:45"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       06:45 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:50"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       06:50 (Test)
                     </SelectItem>
                     <SelectItem
                       value="06:55"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       06:55 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:00"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:00 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:05"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:05 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:10"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:10 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:15"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:15 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:20"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:20 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:25"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:25 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:30"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:30 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:35"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:35 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:40"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:40 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:45"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:45 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:50"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:50 (Test)
                     </SelectItem>
                     <SelectItem
                       value="07:55"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       07:55 (Test)
                     </SelectItem>
                     <SelectItem
                       value="08:00"
-                      className="text-[#39BDF8] focus:bg-[#2C2C2C]"
+                      className="text-[#38C6BA] focus:bg-[#1C2228]"
                     >
                       08:00 (Test)
                     </SelectItem>
@@ -760,8 +732,8 @@ export function ShreejiReport({
                 disabled={isSaving}
                 className="font-medium h-10"
                 style={{
-                  backgroundColor: "#39BDF8",
-                  color: "#1a1a1a",
+                  backgroundColor: "#38C6BA",
+                  color: R.darkBand,
                   border: "none",
                 }}
               >
@@ -777,7 +749,7 @@ export function ShreejiReport({
               <div className="space-y-2 md:col-span-5">
                 <label
                   className="text-xs uppercase tracking-tight font-medium mb-1.5 block"
-                  style={{ color: "#6b7280" }}
+                  style={{ color: R.textDim }}
                 >
                   Recipient Emails
                 </label>
@@ -787,9 +759,9 @@ export function ShreejiReport({
                   onChange={(e) => setScheduleRecipients(e.target.value)}
                   className="h-10"
                   style={{
-                    backgroundColor: "#141414",
-                    border: "1px solid #2a2a2a",
-                    color: "#e5e5e5",
+                    backgroundColor: R.heroBg,
+                    border: `1px solid ${R.border}`,
+                    color: R.accent,
                   }}
                 />
               </div>
@@ -798,21 +770,21 @@ export function ShreejiReport({
 
           {/* Existing Schedules Table */}
           <Card
-            style={{ backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a" }}
+            style={{ backgroundColor: R.darkBand, border: `1px solid ${R.border}` }}
           >
             <Table>
               <TableHeader>
-                <TableRow className="border-[#2a2a2a] hover:bg-transparent bg-[#1a1a1a]">
+                <TableRow className="border-[#1E2330] hover:bg-transparent bg-[#121519]">
                   <TableHead
-                    className="text-[#9ca3af]"
+                    className="text-[#7A8494]"
                     style={{ paddingLeft: "24px" }}
                   >
                     Report Name
                   </TableHead>
-                  <TableHead className="text-[#9ca3af]">Hotel</TableHead>
-                  <TableHead className="text-[#9ca3af]">Recipients</TableHead>
-                  <TableHead className="text-[#9ca3af]">Schedule</TableHead>
-                  <TableHead className="text-[#9ca3af] text-right">
+                  <TableHead className="text-[#7A8494]">Hotel</TableHead>
+                  <TableHead className="text-[#7A8494]">Recipients</TableHead>
+                  <TableHead className="text-[#7A8494]">Schedule</TableHead>
+                  <TableHead className="text-[#7A8494] text-right">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -822,7 +794,7 @@ export function ShreejiReport({
                   <TableRow className="border-0">
                     <TableCell
                       colSpan={5}
-                      className="text-center text-[#9ca3af]"
+                      className="text-center text-[#7A8494]"
                     >
                       <Loader2 className="h-4 w-4 animate-spin inline-block mr-2" />
                       Loading schedules...
@@ -833,7 +805,7 @@ export function ShreejiReport({
                   <TableRow className="border-0">
                     <TableCell
                       colSpan={5}
-                      className="text-center text-[#9ca3af]"
+                      className="text-center text-[#7A8494]"
                     >
                       No schedules found.
                     </TableCell>
@@ -843,23 +815,23 @@ export function ShreejiReport({
                   scheduledReports.map((report) => (
                     <TableRow
                       key={report.id}
-                      className="border-[#2a2a2a] hover:bg-[#2a2a2a]/30 transition-colors"
+                      className="border-[#1E2330] hover:bg-[#1E2330]/30 transition-colors"
                     >
                       <TableCell
-                        className="text-[#e5e5e5]"
+                        className="text-[#F3F5F7]"
                         style={{ paddingLeft: "24px" }}
                       >
                         {report.report_name}
                       </TableCell>
-                      <TableCell className="text-[#e5e5e5]">
+                      <TableCell className="text-[#F3F5F7]">
                         {getHotelName(report.property_id)}
                       </TableCell>
-                      <TableCell className="text-[#9ca3af] text-xs">
+                      <TableCell className="text-[#7A8494] text-xs">
                         {report.recipients}
                       </TableCell>
-                      <TableCell className="text-[#e5e5e5]">
+                      <TableCell className="text-[#F3F5F7]">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-[#9ca3af]" />
+                          <Clock className="h-4 w-4 text-[#7A8494]" />
                           {formatScheduleText(report)}
                         </div>
                       </TableCell>
@@ -868,7 +840,7 @@ export function ShreejiReport({
                           variant="ghost"
                           size="sm"
                           onClick={() => onDeleteSchedule(report.id)}
-                          className="text-[#9ca3af] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
+                          className="text-[#7A8494] hover:text-[#ef4444] hover:bg-[#ef4444]/10"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -888,18 +860,18 @@ export function ShreejiReport({
             <Card
               className="p-12 text-center"
               style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                backgroundColor: R.darkBand,
+                border: `1px solid ${R.border}`,
               }}
             >
               <div className="max-w-md mx-auto">
-                <div className="w-16 h-16 bg-[#39BDF8]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="w-8 h-8 text-[#39BDF8]" />
+                <div className="w-16 h-16 bg-[#38C6BA]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-[#38C6BA]" />
                 </div>
-                <h3 className="text-[#e5e5e5] text-lg mb-2">
+                <h3 className="text-[#F3F5F7] text-lg mb-2">
                   No Report Generated
                 </h3>
-                <p className="text-[#9ca3af] text-sm">
+                <p className="text-[#7A8494] text-sm">
                   Please select a hotel and date to preview the report
                 </p>
               </div>
@@ -911,13 +883,13 @@ export function ShreejiReport({
             <Card
               className="p-12 text-center"
               style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
+                backgroundColor: R.darkBand,
+                border: `1px solid ${R.border}`,
               }}
             >
               <div className="max-w-md mx-auto">
-                <Loader2 className="w-12 h-12 text-[#39BDF8] animate-spin mx-auto mb-4" />
-                <p className="text-[#9ca3af] text-sm">Generating report...</p>
+                <Loader2 className="w-12 h-12 text-[#38C6BA] animate-spin mx-auto mb-4" />
+                <p className="text-[#7A8494] text-sm">Generating report...</p>
               </div>
             </Card>
           )}
@@ -930,7 +902,7 @@ export function ShreejiReport({
                 <h2 className="text-white text-3xl mb-1">
                   {reportData.hotelName} - DAILY CHART
                 </h2>
-                <p className="text-[#9ca3af] text-lg">
+                <p className="text-[#7A8494] text-lg">
                   {formatDate(reportData.date).dayName}{" "}
                   {formatDate(reportData.date).formatted}
                 </p>
@@ -940,59 +912,59 @@ export function ShreejiReport({
               <Card
                 className="p-6"
                 style={{
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
+                  backgroundColor: R.darkBand,
+                  border: `1px solid ${R.border}`,
                 }}
               >
                 <div className="grid grid-cols-7 gap-4">
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">Vacant</div>
-                    <div className="text-[#e5e5e5] text-2xl">
+                    <div className="text-[#7A8494] text-xs mb-1">Vacant</div>
+                    <div className="text-[#F3F5F7] text-2xl">
                       {reportData.summary.vacant}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">Blocked</div>
+                    <div className="text-[#7A8494] text-xs mb-1">Blocked</div>
                     <div
                       className={`text-2xl ${
                         reportData.summary.blocked > 0
                           ? "text-[#ef4444]"
-                          : "text-[#e5e5e5]"
+                          : "text-[#F3F5F7]"
                       }`}
                     >
                       {reportData.summary.blocked}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">Sold</div>
-                    <div className="text-[#e5e5e5] text-2xl">
+                    <div className="text-[#7A8494] text-xs mb-1">Sold</div>
+                    <div className="text-[#F3F5F7] text-2xl">
                       {reportData.summary.sold}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">Occupancy</div>
+                    <div className="text-[#7A8494] text-xs mb-1">Occupancy</div>
                     {/* [FIX] Add toFixed(2) for occupancy in summary bar */}
-                    <div className="text-[#e5e5e5] text-2xl">
+                    <div className="text-[#F3F5F7] text-2xl">
                       {reportData.summary.occupancy.toFixed(2)}%
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">RevPAR</div>
-                    <div className="text-[#e5e5e5] text-2xl">
+                    <div className="text-[#7A8494] text-xs mb-1">RevPAR</div>
+                    <div className="text-[#F3F5F7] text-2xl">
                       {formatCurrency(reportData.summary.revpar)}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">ADR</div>
-                    <div className="text-[#e5e5e5] text-2xl">
+                    <div className="text-[#7A8494] text-xs mb-1">ADR</div>
+                    <div className="text-[#F3F5F7] text-2xl">
                       {formatCurrency(reportData.summary.adr)}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[#9ca3af] text-xs mb-1">
+                    <div className="text-[#7A8494] text-xs mb-1">
                       Day Revenue
                     </div>
-                    <div className="text-[#39BDF8] text-2xl">
+                    <div className="text-[#38C6BA] text-2xl">
                       {formatCurrency(reportData.summary.dayRevenue)}
                     </div>
                   </div>
@@ -1001,22 +973,22 @@ export function ShreejiReport({
 
               {/* Data Tabs (existing) */}
               <Tabs defaultValue="guests" className="w-full">
-                <TabsList className="bg-[#141414] border border-[#2a2a2a] p-1">
+                <TabsList className="bg-[#111519] border border-[#1E2330] p-1">
                   <TabsTrigger
                     value="guests"
-                    className="data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-[#39BDF8] text-[#6b7280] hover:text-[#e5e5e5] transition-colors"
+                    className="data-[state=active]:bg-[#121519] data-[state=active]:text-[#38C6BA] text-[#4E5868] hover:text-[#F3F5F7] transition-colors"
                   >
                     In-House Guests
                   </TabsTrigger>
                   <TabsTrigger
                     value="takings"
-                    className="data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-[#39BDF8] text-[#6b7280] hover:text-[#e5e5e5] transition-colors"
+                    className="data-[state=active]:bg-[#121519] data-[state=active]:text-[#38C6BA] text-[#4E5868] hover:text-[#F3F5F7] transition-colors"
                   >
                     Daily Takings
                   </TabsTrigger>
                   <TabsTrigger
                     value="blocked"
-                    className="data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-[#39BDF8] text-[#6b7280] hover:text-[#e5e5e5] transition-colors"
+                    className="data-[state=active]:bg-[#121519] data-[state=active]:text-[#38C6BA] text-[#4E5868] hover:text-[#F3F5F7] transition-colors"
                   >
                     Blocked Rooms
                   </TabsTrigger>
@@ -1026,39 +998,39 @@ export function ShreejiReport({
                 <TabsContent value="guests" className="mt-4">
                   <Card
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: R.darkBand,
+                      border: `1px solid ${R.border}`,
                     }}
                   >
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-[#2a2a2a] hover:bg-transparent bg-[#1a1a1a]">
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                          <TableRow className="border-[#1E2330] hover:bg-transparent bg-[#121519]">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               Room
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               Pax
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               Guest Name
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               Total Rate
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               {" "}
                               Arrival
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               {" "}
                               Departure
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               {" "}
                               Outstanding
                             </TableHead>
-                            <TableHead className="text-[#6b7280] text-xs uppercase tracking-wider font-medium">
+                            <TableHead className="text-[#4E5868] text-xs uppercase tracking-wider font-medium">
                               {" "}
                               Agency
                             </TableHead>
@@ -1068,24 +1040,24 @@ export function ShreejiReport({
                           {reportData.inHouseGuests.map((guest, idx) => (
                             <TableRow
                               key={idx}
-                              className="border-[#2a2a2a] hover:bg-[#2a2a2a]/30 transition-colors"
+                              className="border-[#1E2330] hover:bg-[#1E2330]/30 transition-colors"
                             >
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {guest.room}
                               </TableCell>
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {guest.pax}
                               </TableCell>
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {guest.guestName}
                               </TableCell>
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {formatCurrency(guest.totalRate)}
                               </TableCell>
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {guest.arrival}
                               </TableCell>
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {guest.departure}
                               </TableCell>
                               {/* [FIX] More robust outstanding logic */}
@@ -1093,7 +1065,7 @@ export function ShreejiReport({
                                 className={
                                   parseFloat(String(guest.outstanding)) > 0
                                     ? "text-[#ef4444]"
-                                    : "text-[#e5e5e5]"
+                                    : "text-[#F3F5F7]"
                                 }
                               >
                                 {parseFloat(String(guest.outstanding)) > 0
@@ -1102,7 +1074,7 @@ export function ShreejiReport({
                                   ? formatCurrency(0)
                                   : "—"}
                               </TableCell>
-                              <TableCell className="text-[#e5e5e5]">
+                              <TableCell className="text-[#F3F5F7]">
                                 {guest.agency}
                               </TableCell>
                             </TableRow>
@@ -1118,16 +1090,16 @@ export function ShreejiReport({
                   <Card
                     className="p-6"
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: R.darkBand,
+                      border: `1px solid ${R.border}`,
                     }}
                   >
                     <div className="max-w-md">
-                      <div className="mb-6 pb-4 border-b border-[#2a2a2a]">
-                        <div className="text-[#9ca3af] text-sm mb-1">
+                      <div className="mb-6 pb-4 border-b border-[#1E2330]">
+                        <div className="text-[#7A8494] text-sm mb-1">
                           Total Taken
                         </div>
-                        <div className="text-[#39BDF8] text-3xl">
+                        <div className="text-[#38C6BA] text-3xl">
                           {formatCurrency(
                             getTotalTakings(reportData.dailyTakings)
                           )}
@@ -1141,17 +1113,17 @@ export function ShreejiReport({
                                 key={method}
                                 className="flex justify-between items-center"
                               >
-                                <span className="text-[#9ca3af] capitalize">
+                                <span className="text-[#7A8494] capitalize">
                                   {method.replace(/_/g, " ")}
                                 </span>
-                                <span className="text-[#e5e5e5]">
+                                <span className="text-[#F3F5F7]">
                                   {formatCurrency(amount)}
                                 </span>
                               </div>
                             )
                           )
                         ) : (
-                          <p className="text-[#9ca3af] text-sm">
+                          <p className="text-[#7A8494] text-sm">
                             No takings data for this day.
                           </p>
                         )}
@@ -1165,8 +1137,8 @@ export function ShreejiReport({
                   <Card
                     className="p-6"
                     style={{
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #2a2a2a",
+                      backgroundColor: R.darkBand,
+                      border: `1px solid ${R.border}`,
                     }}
                   >
                     {reportData.blockedRooms.length > 0 ? (
@@ -1174,16 +1146,16 @@ export function ShreejiReport({
                         {reportData.blockedRooms.map((room, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center gap-3 py-2 px-3 bg-[#141414] rounded border border-[#2a2a2a]"
+                            className="flex items-center gap-3 py-2 px-3 bg-[#111519] rounded border border-[#1E2330]"
                           >
                             <div className="w-2 h-2 rounded-full bg-[#ef4444]"></div>
-                            <span className="text-[#e5e5e5]">{room}</span>
+                            <span className="text-[#F3F5F7]">{room}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-[#9ca3af]">
+                        <p className="text-[#7A8494]">
                           No blocked rooms for this date
                         </p>
                       </div>

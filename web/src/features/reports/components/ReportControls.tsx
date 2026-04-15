@@ -1,6 +1,7 @@
 // web/src/features/reports/components/ReportControls.tsx
 
 import { Play, Loader2, CalendarIcon } from 'lucide-react';
+import { R } from "../../../styles/tokens";
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -44,15 +45,15 @@ export function ReportControls({
 
   // Inline styles from OldReportTable.tsx
   const containerStyle = {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: R.darkBand,
     borderRadius: '8px',
-    border: '1px solid #2a2a2a',
+    border: `1px solid ${R.border}`,
     padding: '20px',
     marginBottom: '20px'
   };
 
   const labelStyle = {
-    color: '#6b7280',
+    color: R.textDim,
     fontSize: '12px',
     marginBottom: '8px',
     display: 'block',
@@ -63,8 +64,8 @@ export function ReportControls({
   const inputStyle = {
     width: '100%',
     backgroundColor: '#0a0a0a',
-    border: '1px solid #2a2a2a',
-    color: '#e5e5e5',
+    border: `1px solid ${R.border}`,
+    color: R.accent,
     fontSize: '14px',
     height: '36px',
     borderRadius: '6px',
@@ -73,7 +74,7 @@ export function ReportControls({
   };
 
   const buttonStyle = {
-    backgroundColor: isLoading ? 'rgba(57, 189, 248, 0.7)' : '#39BDF8', // Blue button
+    backgroundColor: isLoading ? 'rgba(57, 189, 248, 0.7)' : R.warmTeal, // Blue button
     color: '#0a0a0a',
     height: '36px',
     padding: '0 24px',
@@ -95,7 +96,7 @@ export function ReportControls({
   return (
     <div style={containerStyle}>
       <h3 style={{
-        color: '#e5e5e5',
+        color: R.accent,
         textTransform: 'uppercase',
         letterSpacing: '-0.025em',
         marginBottom: '16px',
@@ -132,9 +133,9 @@ export function ReportControls({
                 variant="outline"
                 className="w-full justify-start text-left h-9"
                 style={{
-                  backgroundColor: "#0f0f0f",
-                  border: "1px solid #2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: R.sidebar,
+                  border: `1px solid ${R.border}`,
+                  color: R.accent,
                   fontSize: "13px",
                 }}
               >
@@ -147,7 +148,7 @@ export function ReportControls({
               align="start"
               style={{
                 backgroundColor: "#1a1a18",
-                border: "1px solid #2a2a2a",
+                border: `1px solid ${R.border}`,
               }}
             >
               <Calendar
@@ -169,9 +170,9 @@ export function ReportControls({
                 variant="outline"
                 className="w-full justify-start text-left h-9"
                 style={{
-                  backgroundColor: "#0f0f0f",
-                  border: "1px solid #2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: R.sidebar,
+                  border: `1px solid ${R.border}`,
+                  color: R.accent,
                   fontSize: "13px",
                 }}
               >
@@ -184,7 +185,7 @@ export function ReportControls({
               align="start"
               style={{
                 backgroundColor: "#1a1a18",
-                border: "1px solid #2a2a2a",
+                border: `1px solid ${R.border}`,
               }}
             >
               <Calendar

@@ -1,5 +1,6 @@
 import { useState, useEffect, CSSProperties } from "react";
-import { ArrowLeft, Calendar, ChevronDown, Loader2 } from "lucide-react";
+import { R } from "../../../styles/tokens";
+import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
 
 interface BookingsReportProps {
   hotelId: string;
@@ -41,23 +42,23 @@ const formatDate = (iso: string): string => {
 
 const sourceColor = (source: string): string => {
   switch (source) {
-    case "Booking.com": return "#39BDF8";
-    case "Direct": return "#10b981";
-    case "Expedia": return "#f59e0b";
-    case "Hotels.com": return "#8b5cf6";
-    case "Agoda": return "#ef4444";
-    default: return "#9ca3af";
+    case "Booking.com": return R.warmTeal;
+    case "Direct": return R.green;
+    case "Expedia": return R.gold;
+    case "Hotels.com": return R.warmTeal;
+    case "Agoda": return R.red;
+    default: return R.textMid;
   }
 };
 
 const statusColor = (status: string): string => {
-  if (!status) return "#9ca3af";
+  if (!status) return R.textMid;
   const s = status.toLowerCase();
-  if (s === "confirmed" || s === "started") return "#9ca3af";
-  if (s === "checked in" || s === "checked_in") return "#10b981";
-  if (s === "checked out" || s === "checked_out" || s === "processed") return "#6b7280";
-  if (s === "cancelled" || s === "canceled") return "#ef4444";
-  return "#9ca3af";
+  if (s === "confirmed" || s === "started") return R.textMid;
+  if (s === "checked in" || s === "checked_in") return R.green;
+  if (s === "checked out" || s === "checked_out" || s === "processed") return R.textDim;
+  if (s === "cancelled" || s === "canceled") return R.red;
+  return R.textMid;
 };
 
 // --- COMPONENT ---
@@ -98,287 +99,296 @@ export function BookingsReport({ hotelId, currencySymbol, onBack }: BookingsRepo
   const summaryGridCols = "1.4fr 0.7fr 0.9fr 0.7fr 0.9fr";
   const detailGridCols = "1.4fr 1fr 0.7fr 0.7fr 0.5fr 0.8fr 0.7fr 0.7fr";
 
-  const s: Record<string, CSSProperties> = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "#1d1d1c",
-      position: "relative",
-      overflow: "hidden",
-    },
-    bgGradient: {
-      position: "absolute",
-      inset: "0",
-      background: "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(57, 189, 248, 0.01))",
-    },
-    bgGrid: {
-      position: "absolute",
-      inset: "0",
-      backgroundImage: "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-      backgroundSize: "64px 64px",
-    },
-    content: {
-      position: "relative",
-      zIndex: 10,
-      padding: "24px",
-    },
-    backBtn: {
-      background: "none",
-      border: "none",
-      color: "#6b7280",
-      fontSize: "12px",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-      marginBottom: "8px",
-      padding: 0,
-    },
-    heading: {
-      color: "white",
-      fontSize: "24px",
-      lineHeight: "32px",
-      margin: 0,
-      marginBottom: "4px",
-      fontWeight: 400,
-    },
-    subtitle: {
-      color: "#9ca3af",
-      fontSize: "14px",
-      lineHeight: "20px",
-      margin: 0,
-    },
-    card: {
-      backgroundColor: "#1a1a1a",
-      borderRadius: "8px",
-      border: "1px solid #2a2a2a",
-      padding: "20px",
-    },
-    sectionHeader: {
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      marginBottom: "16px",
-      paddingBottom: "12px",
-      borderBottom: "1px solid #2a2a2a",
-    },
-    iconBadge: {
-      width: "32px",
-      height: "32px",
-      borderRadius: "6px",
-      backgroundColor: "rgba(57, 189, 248, 0.15)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    sectionTitle: {
-      color: "#e5e5e5",
-      fontSize: "14px",
-      textTransform: "uppercase",
-      letterSpacing: "-0.025em",
-    },
-    sectionSubtitle: {
-      color: "#6b7280",
-      fontSize: "11px",
-      marginTop: "2px",
-    },
-    headerCell: {
-      color: "#6b7280",
-      fontSize: "9px",
-      textTransform: "uppercase",
-      letterSpacing: "-0.025em",
-      padding: "6px 10px",
-    },
-    cell: {
-      padding: "10px 10px",
-      fontSize: "12px",
-      color: "#e5e5e5",
-    },
-  };
-
   return (
-    <div style={s.page}>
-      <div style={s.bgGradient} />
-      <div style={s.bgGrid} />
-
-      <div style={s.content}>
+    <div style={{ flex: 1, background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+      <div style={{ padding: "32px" }}>
         {/* Header */}
-        <div style={{ marginBottom: "24px" }}>
-          <button style={s.backBtn} onClick={onBack}>
+        <div style={{ marginBottom: 28 }}>
+          <button
+            onClick={onBack}
+            style={{
+              background: "none",
+              border: "none",
+              color: R.textDim,
+              fontSize: "12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              marginBottom: "12px",
+              padding: 0,
+              textTransform: "uppercase",
+              letterSpacing: "-0.025em",
+              transition: "color 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = R.warmTeal)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = R.textDim)}
+          >
             <ArrowLeft style={{ width: "14px", height: "14px" }} />
             Back to Reports
           </button>
-          <h1 style={s.heading}>Bookings Report</h1>
-          <p style={s.subtitle}>Last 14 days — click a day to expand individual bookings</p>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 2, color: R.gold, textTransform: "uppercase", marginBottom: 8 }}>
+            Reports
+          </div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: R.accent, margin: "0 0 6px", letterSpacing: -0.5 }}>
+            Bookings Report
+          </h1>
+          <p style={{ fontSize: 13, color: R.textMid, margin: 0 }}>
+            Last 14 days — click a day to expand individual bookings
+          </p>
         </div>
 
-        <div style={s.card}>
-          <div style={s.sectionHeader}>
-            <div style={s.iconBadge}>
-              <Calendar style={{ width: "16px", height: "16px", color: "#39BDF8" }} />
-            </div>
-            <div>
-              <div style={s.sectionTitle}>Daily Bookings</div>
-              <div style={s.sectionSubtitle}>Last 14 days</div>
-            </div>
+        {/* Main card */}
+        <div style={{
+          backgroundColor: R.darkBand,
+          borderRadius: 8,
+          border: `1px solid ${R.border}`,
+          overflow: "hidden",
+        }}>
+          {/* Card header */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "16px 20px",
+            borderBottom: `1px solid ${R.sep}`,
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: 3, background: R.warmTeal }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: R.accent, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Daily Bookings
+            </span>
+            <span style={{ fontSize: 11, color: R.textDim, marginLeft: 4 }}>Last 14 days</span>
           </div>
 
           {/* Loading state */}
           {loading && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0", gap: "8px" }}>
-              <Loader2 style={{ width: "16px", height: "16px", color: "#39BDF8", animation: "spin 1s linear infinite" }} />
-              <span style={{ color: "#6b7280", fontSize: "12px" }}>Loading bookings...</span>
+              <Loader2 style={{ width: "16px", height: "16px", color: R.warmTeal, animation: "spin 1s linear infinite" }} />
+              <span style={{ color: R.textDim, fontSize: "12px" }}>Loading bookings...</span>
             </div>
           )}
 
           {/* Error state */}
           {error && !loading && (
             <div style={{ padding: "32px 0", textAlign: "center" }}>
-              <div style={{ color: "#ef4444", fontSize: "12px", marginBottom: "4px" }}>Failed to load bookings</div>
-              <div style={{ color: "#6b7280", fontSize: "11px" }}>{error}</div>
+              <div style={{ color: R.red, fontSize: "12px", marginBottom: "4px" }}>Failed to load bookings</div>
+              <div style={{ color: R.textDim, fontSize: "11px" }}>{error}</div>
             </div>
           )}
 
           {/* Empty state */}
           {!loading && !error && days.length === 0 && (
             <div style={{ padding: "48px 0", textAlign: "center" }}>
-              <div style={{ color: "#6b7280", fontSize: "13px" }}>No bookings found in the last 14 days</div>
-              <div style={{ color: "#4b5563", fontSize: "11px", marginTop: "4px" }}>Bookings will appear here as they come in via webhooks</div>
+              <div style={{ color: R.textDim, fontSize: "13px" }}>No bookings found in the last 14 days</div>
+              <div style={{ color: R.textDim, fontSize: "11px", marginTop: "4px" }}>Bookings will appear here as they come in via webhooks</div>
             </div>
           )}
 
           {/* Table */}
           {!loading && !error && days.length > 0 && (
-            <>
+            <div style={{ padding: "12px 16px 16px" }}>
               {/* Table header */}
-              <div style={{ display: "grid", gridTemplateColumns: summaryGridCols, backgroundColor: "#141414", borderRadius: "4px", marginBottom: "4px" }}>
-                <div style={s.headerCell}>Date</div>
-                <div style={s.headerCell}>Bookings</div>
-                <div style={s.headerCell}>Room Nights</div>
-                <div style={s.headerCell}>ADR</div>
-                <div style={s.headerCell}>Revenue</div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: summaryGridCols,
+                backgroundColor: R.sidebar,
+                borderRadius: "6px 6px 0 0",
+                border: `1px solid ${R.border}`,
+                borderBottom: "none",
+              }}>
+                <div style={headerCellStyle}>Date</div>
+                <div style={headerCellStyle}>Bookings</div>
+                <div style={headerCellStyle}>Room Nights</div>
+                <div style={headerCellStyle}>ADR</div>
+                <div style={headerCellStyle}>Revenue</div>
               </div>
 
               {/* Day rows + accordion */}
-              {days.map((day, i) => {
-                const isExpanded = expandedDay === day.dateKey;
+              <div style={{
+                border: `1px solid ${R.border}`,
+                borderTop: `1px solid ${R.border}`,
+                borderRadius: "0 0 6px 6px",
+                overflow: "hidden",
+              }}>
+                {days.map((day, i) => {
+                  const isExpanded = expandedDay === day.dateKey;
+                  const isLast = i === days.length - 1;
 
-                return (
-                  <div key={day.dateKey}>
-                    {/* Summary row */}
-                    <div
-                      onClick={() => toggleDay(day.dateKey)}
-                      onMouseEnter={() => setHoveredRow(i)}
-                      onMouseLeave={() => setHoveredRow(null)}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: summaryGridCols,
-                        backgroundColor: day.isToday
-                          ? "rgba(57, 189, 248, 0.08)"
-                          : isExpanded
-                            ? "#141414"
+                  return (
+                    <div key={day.dateKey}>
+                      {/* Summary row */}
+                      <div
+                        onClick={() => toggleDay(day.dateKey)}
+                        onMouseEnter={() => setHoveredRow(i)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: summaryGridCols,
+                          backgroundColor: day.isToday
+                            ? "rgba(56, 198, 186, 0.06)"
                             : hoveredRow === i
-                              ? "#141414"
-                              : "#1D1D1C",
-                        borderRadius: isExpanded ? "4px 4px 0 0" : "4px",
-                        marginBottom: isExpanded ? "0" : "2px",
-                        transition: "background-color 0.15s",
-                        cursor: "pointer",
-                        ...(day.isToday ? { border: "1px solid rgba(57, 189, 248, 0.2)" } : {}),
-                      }}
-                    >
-                      <div style={{ ...s.cell, color: day.isToday ? "#39BDF8" : "#e5e5e5", display: "flex", alignItems: "center", gap: "8px" }}>
-                        <ChevronDown style={{
-                          width: "14px",
-                          height: "14px",
-                          color: "#6b7280",
-                          transition: "transform 0.2s",
-                          transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
-                          flexShrink: 0,
-                        }} />
-                        {day.dateStr}
-                      </div>
-                      <div style={s.cell}>{day.bookings}</div>
-                      <div style={s.cell}>{day.roomNights}</div>
-                      <div style={s.cell}>{currencySymbol}{day.adr}</div>
-                      <div style={{ ...s.cell, color: "#39BDF8" }}>{currencySymbol}{day.revenue.toLocaleString()}</div>
-                    </div>
-
-                    {/* Accordion: booking details */}
-                    {isExpanded && (
-                      <div style={{
-                        backgroundColor: "#1D1D1C",
-                        borderRadius: "0 0 4px 4px",
-                        marginBottom: "2px",
-                        padding: "10px 4px 12px",
-                      }}>
-                        {/* Inner table card */}
+                              ? "rgba(57, 189, 248, 0.04)"
+                              : "transparent",
+                          borderBottom: isLast && !isExpanded ? "none" : `1px solid ${R.sep}`,
+                          transition: "background-color 0.15s",
+                          cursor: "pointer",
+                          ...(day.isToday ? { borderLeft: `3px solid ${R.warmTeal}` } : { borderLeft: "3px solid transparent" }),
+                        }}
+                      >
                         <div style={{
-                          backgroundColor: "#111111",
-                          borderRadius: "6px",
-                          border: "1px solid #2a2a2a",
-                          overflow: "hidden",
+                          ...cellStyle,
+                          color: day.isToday ? R.warmTeal : R.accent,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
                         }}>
-                          {/* Detail header */}
-                          <div style={{ display: "grid", gridTemplateColumns: detailGridCols, backgroundColor: "#0f0f0f", borderBottom: "1px solid #2a2a2a", padding: "0 12px" }}>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Guest Name</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Room Type</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Source</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Arrival</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Departure</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Nights</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Avg Rate</div>
-                            <div style={{ ...s.headerCell, padding: "8px 10px" }}>Total</div>
-                          </div>
-
-                          {/* Detail rows */}
-                          {day.details.map((b: BookingDetail, bIdx: number) => (
-                            <div
-                              key={b.id}
-                              onMouseEnter={() => setHoveredBooking(b.id)}
-                              onMouseLeave={() => setHoveredBooking(null)}
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: detailGridCols,
-                                padding: "0 12px",
-                                backgroundColor: hoveredBooking === b.id ? "rgba(57, 189, 248, 0.04)" : "transparent",
-                                transition: "background-color 0.15s",
-                                borderBottom: bIdx < day.details.length - 1 ? "1px solid #1a1a1a" : "none",
-                              }}
-                            >
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px" }}>
-                                <div>{b.guestName || "—"}</div>
-                                <div style={{ color: statusColor(b.status), fontSize: "9px", textTransform: "uppercase", marginTop: "1px" }}>{b.status || "—"}</div>
-                              </div>
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px", color: "#9ca3af", display: "flex", alignItems: "center" }}>{b.roomType || "—"}</div>
-                              <div style={{ ...s.cell, padding: "8px 10px", display: "flex", alignItems: "center" }}>
-                                <span style={{
-                                  color: sourceColor(b.source),
-                                  fontSize: "10px",
-                                  backgroundColor: `${sourceColor(b.source)}15`,
-                                  padding: "3px 8px",
-                                  borderRadius: "4px",
-                                  whiteSpace: "nowrap",
-                                }}>
-                                  {b.source || "—"}
-                                </span>
-                              </div>
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px", display: "flex", alignItems: "center" }}>{formatDate(b.checkIn)}</div>
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px", color: "#9ca3af", display: "flex", alignItems: "center" }}>{formatDate(b.checkOut)}</div>
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px", color: "#9ca3af", display: "flex", alignItems: "center" }}>{b.nights}</div>
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px", color: "#9ca3af", display: "flex", alignItems: "center" }}>{currencySymbol}{b.avgNightlyRate}</div>
-                              <div style={{ ...s.cell, padding: "8px 10px", fontSize: "11px", color: "#39BDF8", fontWeight: 500, display: "flex", alignItems: "center" }}>{currencySymbol}{b.totalRate}</div>
-                            </div>
-                          ))}
+                          <ChevronDown style={{
+                            width: 14,
+                            height: 14,
+                            color: R.textDim,
+                            transition: "transform 0.2s",
+                            transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                            flexShrink: 0,
+                          }} />
+                          {day.dateStr}
+                        </div>
+                        <div style={cellStyle}>{day.bookings}</div>
+                        <div style={cellStyle}>{day.roomNights}</div>
+                        <div style={{ ...cellStyle, fontVariantNumeric: "tabular-nums" }}>
+                          {currencySymbol}{day.adr}
+                        </div>
+                        <div style={{ ...cellStyle, color: R.warmTeal, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                          {currencySymbol}{day.revenue.toLocaleString()}
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </>
+
+                      {/* Accordion: booking details */}
+                      {isExpanded && (
+                        <div style={{
+                          backgroundColor: "rgba(12, 14, 18, 0.5)",
+                          borderBottom: isLast ? "none" : `1px solid ${R.sep}`,
+                          padding: "12px 16px 14px",
+                        }}>
+                          {/* Inner detail table */}
+                          <div style={{
+                            backgroundColor: R.sidebar,
+                            borderRadius: 6,
+                            border: `1px solid ${R.border}`,
+                            overflow: "hidden",
+                          }}>
+                            {/* Detail header */}
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: detailGridCols,
+                              borderBottom: `1px solid ${R.border}`,
+                              padding: "0 12px",
+                            }}>
+                              <div style={detailHeaderStyle}>Guest Name</div>
+                              <div style={detailHeaderStyle}>Room Type</div>
+                              <div style={detailHeaderStyle}>Source</div>
+                              <div style={detailHeaderStyle}>Arrival</div>
+                              <div style={detailHeaderStyle}>Departure</div>
+                              <div style={detailHeaderStyle}>Nights</div>
+                              <div style={detailHeaderStyle}>Avg Rate</div>
+                              <div style={detailHeaderStyle}>Total</div>
+                            </div>
+
+                            {/* Detail rows */}
+                            {day.details.map((b: BookingDetail, bIdx: number) => (
+                              <div
+                                key={b.id}
+                                onMouseEnter={() => setHoveredBooking(b.id)}
+                                onMouseLeave={() => setHoveredBooking(null)}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: detailGridCols,
+                                  padding: "0 12px",
+                                  backgroundColor: hoveredBooking === b.id ? "rgba(57, 189, 248, 0.04)" : "transparent",
+                                  transition: "background-color 0.15s",
+                                  borderBottom: bIdx < day.details.length - 1 ? `1px solid ${R.sep}` : "none",
+                                }}
+                              >
+                                <div style={{ ...detailCellStyle }}>
+                                  <div style={{ color: R.accent, fontSize: 11 }}>{b.guestName || "—"}</div>
+                                  <div style={{ color: statusColor(b.status), fontSize: 9, textTransform: "uppercase", marginTop: 1, letterSpacing: 0.3 }}>
+                                    {b.status || "—"}
+                                  </div>
+                                </div>
+                                <div style={{ ...detailCellStyle, color: R.textMid, display: "flex", alignItems: "center" }}>
+                                  {b.roomType || "—"}
+                                </div>
+                                <div style={{ ...detailCellStyle, display: "flex", alignItems: "center" }}>
+                                  <span style={{
+                                    color: sourceColor(b.source),
+                                    fontSize: 10,
+                                    backgroundColor: `${sourceColor(b.source)}15`,
+                                    padding: "3px 8px",
+                                    borderRadius: 4,
+                                    whiteSpace: "nowrap",
+                                  }}>
+                                    {b.source || "—"}
+                                  </span>
+                                </div>
+                                <div style={{ ...detailCellStyle, display: "flex", alignItems: "center" }}>
+                                  {formatDate(b.checkIn)}
+                                </div>
+                                <div style={{ ...detailCellStyle, color: R.textMid, display: "flex", alignItems: "center" }}>
+                                  {formatDate(b.checkOut)}
+                                </div>
+                                <div style={{ ...detailCellStyle, color: R.textMid, display: "flex", alignItems: "center" }}>
+                                  {b.nights}
+                                </div>
+                                <div style={{ ...detailCellStyle, color: R.textMid, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center" }}>
+                                  {currencySymbol}{b.avgNightlyRate}
+                                </div>
+                                <div style={{ ...detailCellStyle, color: R.warmTeal, fontWeight: 500, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center" }}>
+                                  {currencySymbol}{b.totalRate}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>
     </div>
   );
 }
+
+// --- SHARED STYLES ---
+
+const headerCellStyle: CSSProperties = {
+  color: R.textDim,
+  fontSize: 9,
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+  padding: "8px 10px",
+  fontWeight: 600,
+};
+
+const cellStyle: CSSProperties = {
+  padding: "10px 10px",
+  fontSize: 12,
+  color: R.accent,
+};
+
+const detailHeaderStyle: CSSProperties = {
+  color: R.textDim,
+  fontSize: 9,
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+  padding: "8px 10px",
+  fontWeight: 600,
+};
+
+const detailCellStyle: CSSProperties = {
+  padding: "8px 10px",
+  fontSize: 11,
+  color: R.accent,
+};

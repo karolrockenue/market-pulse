@@ -12,10 +12,10 @@ import { toast } from "sonner";
 // Components
 import { ControlPanelView } from "./components/ControlPanel/ControlPanelView";
 import { RateManagerView } from "./components/RateManager/RateManagerView";
-import { ShadowfaxView } from "./components/Shadowfax/ShadowfaxView";
 // PropertyHub merged into ControlPanel as PromoConfigSection
 import { PortfolioRiskOverview } from "./components/RiskOverview/PortfolioRiskOverview";
 import { DemandRadarView } from "./components/DemandRadar/DemandRadarView";
+import { ArchanesInvestorView } from "../market-intel/components/ArchanesInvestorView";
 
 
 // Admin Hook logic (simplified here to avoid circular dependency on Admin feature)
@@ -48,7 +48,7 @@ export function SentinelHub({ activeView, onNavigate, selectedProperty }: Sentin
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1d1d1c] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#39BDF8] animate-spin" />
+        <Loader2 className="w-8 h-8 text-[#38C6BA] animate-spin" />
       </div>
     );
   }
@@ -59,9 +59,13 @@ export function SentinelHub({ activeView, onNavigate, selectedProperty }: Sentin
       <div className="flex-1 relative">
         {activeView === "rateManager" && <RateManagerView allHotels={hotels} />}
         {activeView === "sentinel" && <ControlPanelView allHotels={hotels} />}
-        {activeView === "shadowfax" && <ShadowfaxView />}
+
         {activeView === "riskOverview" && <PortfolioRiskOverview />}
-        {activeView === "demandRadar" && <DemandRadarView allHotels={hotels} selectedProperty={selectedProperty} />}
+        {activeView === "demandRadar" && (
+          selectedProperty?.city?.toLowerCase() === "archanes"
+            ? <ArchanesInvestorView citySlug="archanes" currencySymbol="€" />
+            : <DemandRadarView allHotels={hotels} selectedProperty={selectedProperty} />
+        )}
 
       </div>
     </div>

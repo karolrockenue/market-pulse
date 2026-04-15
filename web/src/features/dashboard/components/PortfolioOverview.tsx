@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, CSSProperties } from "react";
+import { R } from "../../../styles/tokens";
 import {
   AlertTriangle,
   AlertCircle,
@@ -42,42 +43,42 @@ import {
 const getOccupancyStyle = (value: number): CSSProperties => {
   if (value >= 100)
     return {
-      backgroundColor: "rgba(168, 85, 247, 0.2)",
-      border: "1px solid rgba(168, 85, 247, 0.3)",
+      backgroundColor: "rgba(168, 85, 247, 0.06)",
+      border: "1px solid rgba(168, 85, 247, 0.12)",
     }; // Overbooked
   if (value >= 80)
     return {
-      backgroundColor: "rgba(16, 185, 129, 0.2)",
-      border: "1px solid rgba(16, 185, 129, 0.3)",
+      backgroundColor: "rgba(56, 198, 186, 0.06)",
+      border: "1px solid rgba(56, 198, 186, 0.12)",
     }; // Excellent
   if (value >= 70)
     return {
-      backgroundColor: "rgba(57, 189, 248, 0.1)",
-      border: "1px solid rgba(57, 189, 248, 0.2)",
+      backgroundColor: "rgba(56, 198, 186, 0.04)",
+      border: "1px solid rgba(56, 198, 186, 0.08)",
     }; // Good
   if (value >= 50)
     return {
-      backgroundColor: "rgba(249, 115, 22, 0.15)",
-      border: "1px solid rgba(249, 115, 22, 0.25)",
+      backgroundColor: "rgba(200, 166, 110, 0.05)",
+      border: "1px solid rgba(200, 166, 110, 0.10)",
     }; // Fair
   if (value >= 40)
     return {
-      backgroundColor: "rgba(234, 88, 12, 0.2)",
-      border: "1px solid rgba(234, 88, 12, 0.3)",
+      backgroundColor: "rgba(200, 166, 110, 0.07)",
+      border: "1px solid rgba(200, 166, 110, 0.12)",
     }; // Warning
   return {
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-    border: "1px solid rgba(239, 68, 68, 0.3)",
+    backgroundColor: "rgba(239, 68, 68, 0.06)",
+    border: "1px solid rgba(239, 68, 68, 0.12)",
   }; // Critical
 };
 
 const getOccupancyTextColor = (value: number): string => {
-  if (value >= 100) return "#c084fc";
-  if (value >= 80) return "#6ee7b7";
-  if (value >= 70) return "#39BDF8";
-  if (value >= 50) return "#fb923c";
-  if (value >= 40) return "#f97316";
-  return "#f87171";
+  if (value >= 100) return R.warmTeal;
+  if (value >= 80) return R.warmTeal;
+  if (value >= 70) return R.text;
+  if (value >= 50) return R.gold;
+  if (value >= 40) return R.gold;
+  return R.red;
 };
 // NEW: Relative Heatmap for ADR (Red -> Orange -> Blue -> Green matching Occupancy)
 const getRelativeAdrStyle = (
@@ -88,36 +89,32 @@ const getRelativeAdrStyle = (
   if (max === min)
     return {
       backgroundColor: "transparent",
-      border: "1px solid #2a2a2a",
+      border: `1px solid ${R.border}`,
     };
 
   const intensity = (value - min) / (max - min);
 
   if (intensity < 0.25) {
-    // Red (Lowest 25% - Critical)
     return {
-      backgroundColor: "rgba(239, 68, 68, 0.2)",
-      border: "1px solid rgba(239, 68, 68, 0.3)",
+      backgroundColor: "rgba(239, 68, 68, 0.05)",
+      border: "1px solid rgba(239, 68, 68, 0.10)",
     };
   }
   if (intensity < 0.5) {
-    // Orange (Low-Mid - Fair)
     return {
-      backgroundColor: "rgba(249, 115, 22, 0.15)",
-      border: "1px solid rgba(249, 115, 22, 0.25)",
+      backgroundColor: "rgba(200, 166, 110, 0.05)",
+      border: "1px solid rgba(200, 166, 110, 0.10)",
     };
   }
   if (intensity < 0.75) {
-    // Blue (High-Mid - Good)
     return {
-      backgroundColor: "rgba(57, 189, 248, 0.1)",
-      border: "1px solid rgba(57, 189, 248, 0.2)",
+      backgroundColor: "rgba(56, 198, 186, 0.04)",
+      border: "1px solid rgba(56, 198, 186, 0.08)",
     };
   }
-  // Green (Top 25% - Excellent)
   return {
-    backgroundColor: "rgba(16, 185, 129, 0.2)",
-    border: "1px solid rgba(16, 185, 129, 0.3)",
+    backgroundColor: "rgba(56, 198, 186, 0.06)",
+    border: "1px solid rgba(56, 198, 186, 0.12)",
   };
 };
 
@@ -126,13 +123,13 @@ const getRelativeAdrTextColor = (
   min: number,
   max: number
 ): string => {
-  if (max === min) return "#e5e5e5";
+  if (max === min) return R.accent;
   const intensity = (value - min) / (max - min);
 
-  if (intensity < 0.25) return "#f87171"; // Red
-  if (intensity < 0.5) return "#fb923c"; // Orange
-  if (intensity < 0.75) return "#39BDF8"; // Blue
-  return "#6ee7b7"; // Green
+  if (intensity < 0.25) return R.red;
+  if (intensity < 0.5) return R.gold;
+  if (intensity < 0.75) return R.text;
+  return R.warmTeal;
 };
 
 const detectAnomalies = (matrixData: any[]) => {
@@ -269,9 +266,9 @@ export function PortfolioOverview() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1d1c]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14181D]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-[#39BDF8]" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#38C6BA]" />
           <p className="text-sm text-gray-400">Aggregating Portfolio Data...</p>
         </div>
       </div>
@@ -280,7 +277,7 @@ export function PortfolioOverview() {
 
   if (error) {
     return (
-      <div className="p-8 text-red-500 bg-[#1d1d1c] h-screen">{error}</div>
+      <div className="p-8 text-red-500 bg-[#14181D] h-screen">{error}</div>
     );
   }
 
@@ -350,7 +347,7 @@ export function PortfolioOverview() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#1d1d1c",
+        background: R.bg,
         position: "relative",
         overflow: "hidden",
       }}
@@ -361,7 +358,7 @@ export function PortfolioOverview() {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(135deg, rgba(57, 189, 248, 0.01) 0%, transparent 50%, rgba(57, 189, 248, 0.01) 100%)",
+            "linear-gradient(135deg, rgba(56, 198, 186, 0.01) 0%, transparent 50%, rgba(56, 198, 186, 0.01) 100%)",
         }}
       />
       <div
@@ -369,7 +366,7 @@ export function PortfolioOverview() {
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
+            "linear-gradient(rgba(56, 198, 186, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(56, 198, 186, 0.03) 1px, transparent 1px)",
           backgroundSize: "64px 64px",
         }}
       />
@@ -388,9 +385,9 @@ export function PortfolioOverview() {
             <div
               key={index}
               style={{
-                backgroundColor: "rgb(26, 26, 26)",
+                backgroundColor: R.darkBand,
                 borderRadius: "8px",
-                border: "1px solid #2a2a2a",
+                border: `1px solid ${R.border}`,
                 padding: "16px",
               }}
             >
@@ -405,7 +402,7 @@ export function PortfolioOverview() {
                 <div>
                   <div
                     style={{
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "18px",
                       textTransform: "uppercase",
                       letterSpacing: "-0.025em",
@@ -416,7 +413,7 @@ export function PortfolioOverview() {
                   </div>
                   <div
                     style={{
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "11px",
                       textTransform: "uppercase",
                       letterSpacing: "-0.025em",
@@ -434,23 +431,23 @@ export function PortfolioOverview() {
                     gap: "4px",
                     backgroundColor:
                       period.trend === "up"
-                        ? "rgba(16, 185, 129, 0.1)"
+                        ? "rgba(56, 198, 186, 0.1)"
                         : "rgba(239, 68, 68, 0.1)",
                     border: `1px solid ${
                       period.trend === "up"
-                        ? "rgba(16, 185, 129, 0.3)"
+                        ? "rgba(56, 198, 186, 0.3)"
                         : "rgba(239, 68, 68, 0.3)"
                     }`,
                   }}
                 >
                   {period.trend === "up" ? (
-                    <TrendingUp size={12} color="#10b981" />
+                    <TrendingUp size={12} color={R.warmTeal} />
                   ) : (
                     <TrendingDown size={12} color="#ef4444" />
                   )}
                   <span
                     style={{
-                      color: period.trend === "up" ? "#10b981" : "#ef4444",
+                      color: period.trend === "up" ? R.warmTeal : "#ef4444",
                       fontSize: "12px",
                     }}
                   >
@@ -468,12 +465,12 @@ export function PortfolioOverview() {
                     gap: "12px",
                   }}
                 >
-                  <div style={{ color: "#39BDF8", fontSize: "32px" }}>
+                  <div style={{ color: R.warmTeal, fontSize: "32px" }}>
                     £{Math.round(period.revenue).toLocaleString()}
                   </div>
                   <div
                     style={{
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "12px",
                       marginBottom: "6px",
                       textTransform: "uppercase",
@@ -485,7 +482,7 @@ export function PortfolioOverview() {
                 </div>
                 <div
                   style={{
-                    color: "#6b7280",
+                    color: R.textDim,
                     fontSize: "12px",
                     textTransform: "uppercase",
                     letterSpacing: "-0.025em",
@@ -502,8 +499,8 @@ export function PortfolioOverview() {
         <div
           style={{
             marginBottom: "1rem",
-            backgroundColor: "#1a1a1a",
-            border: "1px solid #2a2a2a",
+            backgroundColor: R.darkBand,
+            border: `1px solid ${R.border}`,
             borderRadius: "0.25rem",
             padding: "1rem",
           }}
@@ -531,12 +528,12 @@ export function PortfolioOverview() {
                       fontSize: "0.75rem",
                       textTransform: "capitalize",
                       backgroundColor:
-                        matrixMetric === m ? "#2a2a2a" : "#1a1a1a",
-                      color: matrixMetric === m ? "#e5e5e5" : "#6b7280",
+                        matrixMetric === m ? R.border : R.darkBand,
+                      color: matrixMetric === m ? "#F3F5F7" : "#4E5868",
                       border:
                         matrixMetric === m
-                          ? "1px solid #2a2a2a"
-                          : "1px solid #2a2a2a",
+                          ? "1px solid #1E2330"
+                          : "1px solid #1E2330",
                     }}
                   >
                     {m === "available"
@@ -560,9 +557,9 @@ export function PortfolioOverview() {
                 <SelectTrigger
                   style={{
                     width: "200px",
-                    backgroundColor: "#1d1d1c",
-                    borderColor: "#2a2a2a",
-                    color: "#e5e5e5",
+                    backgroundColor: R.bg,
+                    borderColor: R.border,
+                    color: R.accent,
                     height: "2.25rem",
                   }}
                 >
@@ -579,13 +576,13 @@ export function PortfolioOverview() {
                 </SelectTrigger>
                 <SelectContent
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
+                    backgroundColor: R.darkBand,
+                    border: `1px solid ${R.border}`,
                   }}
                 >
                   <SelectItem
                     value="all"
-                    className="text-gray-200 focus:bg-[#2a2a2a]"
+                    className="text-gray-200 focus:bg-[#1E2330]"
                   >
                     All Groups
                   </SelectItem>
@@ -593,7 +590,7 @@ export function PortfolioOverview() {
                     <SelectItem
                       key={g}
                       value={g}
-                      className="text-gray-200 focus:bg-[#2a2a2a]"
+                      className="text-gray-200 focus:bg-[#1E2330]"
                     >
                       {g}
                     </SelectItem>
@@ -608,9 +605,9 @@ export function PortfolioOverview() {
                     style={{
                       width: "220px",
                       justifyContent: "space-between",
-                      backgroundColor: "#1d1d1c",
-                      border: "1px solid #2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.bg,
+                      border: `1px solid ${R.border}`,
+                      color: R.accent,
                       height: "2.25rem",
                       padding: "0 0.75rem",
                       borderRadius: "0.25rem",
@@ -640,16 +637,16 @@ export function PortfolioOverview() {
                 </PopoverTrigger>
                 <PopoverContent
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
+                    backgroundColor: R.darkBand,
+                    border: `1px solid ${R.border}`,
                   }}
                   className="w-[300px] p-0"
                 >
-                  <Command style={{ backgroundColor: "#1a1a1a" }}>
+                  <Command style={{ backgroundColor: R.darkBand }}>
                     <CommandInput
                       placeholder="Search hotels..."
                       className="text-gray-200"
-                      style={{ backgroundColor: "#1a1a1a" }}
+                      style={{ backgroundColor: R.darkBand }}
                     />
                     <CommandList>
                       <CommandEmpty className="text-gray-400 py-2 text-center">
@@ -657,7 +654,7 @@ export function PortfolioOverview() {
                       </CommandEmpty>
                       <CommandGroup>
                         <CommandItem
-                          className="text-gray-200 aria-selected:bg-[#2a2a2a]"
+                          className="text-gray-200 aria-selected:bg-[#1E2330]"
                           onSelect={() => {
                             setSelectedHotel("all");
                             setHotelSearchOpen(false);
@@ -675,7 +672,7 @@ export function PortfolioOverview() {
                         {processedHotels.map((h) => (
                           <CommandItem
                             key={h.id}
-                            className="text-gray-200 aria-selected:bg-[#2a2a2a]"
+                            className="text-gray-200 aria-selected:bg-[#1E2330]"
                             onSelect={() => {
                               setSelectedHotel(h.name);
                               setHotelSearchOpen(false);
@@ -706,11 +703,11 @@ export function PortfolioOverview() {
                   fontSize: "0.75rem",
                   backgroundColor: sortByRisk
                     ? "rgba(239, 68, 68, 0.2)"
-                    : "#1a1a1a",
-                  color: sortByRisk ? "#ef4444" : "#6b7280",
+                    : R.darkBand,
+                  color: sortByRisk ? "#ef4444" : "#4E5868",
                   border: sortByRisk
                     ? "1px solid rgba(239, 68, 68, 0.3)"
-                    : "1px solid #2a2a2a",
+                    : "1px solid #1E2330",
                 }}
               >
                 {sortByRisk ? "Showing Highest Risk" : "Sort by Risk"}
@@ -722,8 +719,8 @@ export function PortfolioOverview() {
         {/* 3. THE MATRIX */}
         <div
           style={{
-            backgroundColor: "#1a1a1a",
-            border: "1px solid #2a2a2a",
+            backgroundColor: R.darkBand,
+            border: `1px solid ${R.border}`,
             borderRadius: "0.25rem",
             overflow: "hidden",
             marginBottom: "2.5rem",
@@ -738,8 +735,8 @@ export function PortfolioOverview() {
                   position: "sticky",
                   top: 0,
                   zIndex: 10,
-                  backgroundColor: "#1a1a1a",
-                  borderBottom: "1px solid #2a2a2a",
+                  backgroundColor: R.darkBand,
+                  borderBottom: `1px solid ${R.border}`,
                 }}
               >
                 <div
@@ -747,8 +744,8 @@ export function PortfolioOverview() {
                     position: "sticky",
                     left: 0,
                     zIndex: 20,
-                    backgroundColor: "#1a1a1a",
-                    borderRight: "1px solid #2a2a2a",
+                    backgroundColor: R.darkBand,
+                    borderRight: "1px solid #1E2330",
                     width: "256px",
                     flexShrink: 0,
                     padding: "0.75rem 1rem",
@@ -756,7 +753,7 @@ export function PortfolioOverview() {
                 >
                   <div
                     style={{
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "0.75rem",
                       textTransform: "uppercase",
                     }}
@@ -774,17 +771,17 @@ export function PortfolioOverview() {
                         padding: "0.75rem 0.5rem",
                         textAlign: "center",
                         backgroundColor:
-                          i === 0 ? "rgba(57, 189, 248, 0.05)" : "transparent",
+                          i === 0 ? "rgba(56, 198, 186, 0.05)" : "transparent",
                         borderLeft:
                           i === 0
-                            ? "1px solid rgba(57, 189, 248, 0.3)"
+                            ? "1px solid rgba(56, 198, 186, 0.3)"
                             : "none",
                       }}
                     >
                       <div
                         style={{
                           fontSize: "10px",
-                          color: i === 0 ? "#39BDF8" : "#6b7280",
+                          color: i === 0 ? "#38C6BA" : "#4E5868",
                         }}
                       >
                         {date.toLocaleDateString("en-US", { weekday: "short" })}
@@ -792,7 +789,7 @@ export function PortfolioOverview() {
                       <div
                         style={{
                           fontSize: "0.75rem",
-                          color: i === 0 ? "#39BDF8" : "#6b7280",
+                          color: i === 0 ? "#38C6BA" : "#4E5868",
                         }}
                       >
                         {date.toLocaleDateString("en-US", {
@@ -820,7 +817,7 @@ export function PortfolioOverview() {
                       key={hotel.id}
                       style={{
                         display: "flex",
-                        borderBottom: "1px solid #2a2a2a",
+                        borderBottom: `1px solid ${R.border}`,
                       }}
                     >
                       <div
@@ -828,8 +825,8 @@ export function PortfolioOverview() {
                           position: "sticky",
                           left: 0,
                           zIndex: 10,
-                          backgroundColor: "#1a1a1a",
-                          borderRight: "1px solid #2a2a2a",
+                          backgroundColor: R.darkBand,
+                          borderRight: "1px solid #1E2330",
                           width: "256px",
                           flexShrink: 0,
                           padding: "0.5rem 1rem",
@@ -843,7 +840,7 @@ export function PortfolioOverview() {
                           }}
                         >
                           <div
-                            style={{ color: "#e5e5e5", fontSize: "0.75rem" }}
+                            style={{ color: R.accent, fontSize: "0.75rem" }}
                           >
                             {hotel.name}
                           </div>
@@ -853,7 +850,7 @@ export function PortfolioOverview() {
                           {hotel.riskLevel === "moderate" && (
                             <AlertTriangle
                               size={16}
-                              className="text-amber-500"
+                              style={{ color: R.gold }}
                             />
                           )}
                         </div>
@@ -880,8 +877,8 @@ export function PortfolioOverview() {
                             style = getRelativeAdrStyle(value, minAdr, maxAdr); // FIX: Row-relative
                           } else {
                             style = {
-                              backgroundColor: "#1a1a1a",
-                              border: "1px solid #2a2a2a",
+                              backgroundColor: R.darkBand,
+                              border: `1px solid ${R.border}`,
                             };
                           }
 
@@ -890,7 +887,7 @@ export function PortfolioOverview() {
                               ? getOccupancyTextColor(value)
                               : matrixMetric === "adr"
                               ? getRelativeAdrTextColor(value, minAdr, maxAdr)
-                              : "#e5e5e5";
+                              : R.accent;
                           const anomaly = anomalies.find((a) => a.day === idx);
 
                           return (
@@ -904,11 +901,11 @@ export function PortfolioOverview() {
                                 position: "relative",
                                 backgroundColor:
                                   idx === 0
-                                    ? "rgba(57, 189, 248, 0.05)"
+                                    ? "rgba(56, 198, 186, 0.05)"
                                     : "transparent",
                                 borderLeft:
                                   idx === 0
-                                    ? "1px solid rgba(57, 189, 248, 0.3)"
+                                    ? "1px solid rgba(56, 198, 186, 0.3)"
                                     : "none",
                               }}
                             >
@@ -942,7 +939,7 @@ export function PortfolioOverview() {
                                     {anomaly.type === "persistent" && (
                                       <AlertTriangle
                                         size={12}
-                                        className="text-amber-500"
+                                        style={{ color: R.gold }}
                                       />
                                     )}
                                   </div>
@@ -977,8 +974,8 @@ export function PortfolioOverview() {
               <div
                 key={hotel.id}
                 style={{
-                  background: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
+                  background: R.darkBand,
+                  border: `1px solid ${R.border}`,
                   borderRadius: "0.5rem",
                   overflow: "hidden",
                 }}
@@ -986,39 +983,39 @@ export function PortfolioOverview() {
                 <div
                   style={{
                     padding: "1rem 1.5rem",
-                    background: "#1d1d1c",
-                    borderBottom: "1px solid #2a2a2a",
+                    background: R.bg,
+                    borderBottom: `1px solid ${R.border}`,
                     display: "flex",
                     justifyContent: "space-between",
                   }}
                 >
                   <div
                     style={{
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "0.875rem",
                       textTransform: "uppercase",
                     }}
                   >
                     {hotel.name}
                   </div>
-                  <div style={{ color: "#9ca3af", fontSize: "0.75rem" }}>
+                  <div style={{ color: R.textMid, fontSize: "0.75rem" }}>
                     {hotel.totalRooms} rooms • {hotel.group}
                   </div>
                 </div>
 
-                <div style={{ background: "#1a1a1a" }}>
+                <div style={{ background: R.darkBand }}>
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1.2fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
                       gap: "0.5rem",
                       padding: "0.75rem 1rem",
-                      borderBottom: "1px solid #2a2a2a",
+                      borderBottom: `1px solid ${R.border}`,
                     }}
                   >
                     <div
                       style={{
-                        color: "#9ca3af",
+                        color: R.textMid,
                         fontSize: "10px",
                         textTransform: "uppercase",
                       }}
@@ -1027,7 +1024,7 @@ export function PortfolioOverview() {
                     </div>
                     <div
                       style={{
-                        color: "#9ca3af",
+                        color: R.textMid,
                         fontSize: "10px",
                         textTransform: "uppercase",
                         textAlign: "right",
@@ -1038,7 +1035,7 @@ export function PortfolioOverview() {
                     <div></div>
                     <div
                       style={{
-                        color: "#39BDF8",
+                        color: R.warmTeal,
                         fontSize: "10px",
                         textTransform: "uppercase",
                         textAlign: "right",
@@ -1048,7 +1045,7 @@ export function PortfolioOverview() {
                     </div>
                     <div
                       style={{
-                        color: "#39BDF8",
+                        color: R.warmTeal,
                         fontSize: "10px",
                         textTransform: "uppercase",
                         textAlign: "right",
@@ -1058,7 +1055,7 @@ export function PortfolioOverview() {
                     </div>
                     <div
                       style={{
-                        color: "#39BDF8",
+                        color: R.warmTeal,
                         fontSize: "10px",
                         textTransform: "uppercase",
                         textAlign: "right",
@@ -1068,7 +1065,7 @@ export function PortfolioOverview() {
                     </div>
                     <div
                       style={{
-                        color: "#9ca3af",
+                        color: R.textMid,
                         fontSize: "10px",
                         textTransform: "uppercase",
                         textAlign: "right",
@@ -1119,15 +1116,15 @@ export function PortfolioOverview() {
                             "1.2fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
                           gap: "0.5rem",
                           padding: "0.75rem 1rem",
-                          borderBottom: "1px solid #2a2a2a",
+                          borderBottom: `1px solid ${R.border}`,
                           background: isCurrent
-                            ? "rgba(57, 189, 248, 0.02)"
+                            ? "rgba(56, 198, 186, 0.02)"
                             : "transparent",
                         }}
                       >
                         <div
                           style={{
-                            color: isCurrent ? "#39BDF8" : "#e5e5e5",
+                            color: isCurrent ? "#38C6BA" : "#F3F5F7",
                             fontSize: "12px",
                           }}
                         >
@@ -1135,7 +1132,7 @@ export function PortfolioOverview() {
                         </div>
                         <div
                           style={{
-                            color: "#9ca3af",
+                            color: R.textMid,
                             fontSize: "12px",
                             textAlign: "right",
                             fontFamily: "monospace",
@@ -1143,10 +1140,10 @@ export function PortfolioOverview() {
                         >
                           £{revLY.toLocaleString()}
                         </div>
-                        <div style={{ background: "#2a2a2a" }}></div>
+                        <div style={{ background: R.border }}></div>
                         <div
                           style={{
-                            color: "#e5e5e5",
+                            color: R.accent,
                             fontSize: "12px",
                             textAlign: "right",
                             fontFamily: "monospace",
@@ -1156,7 +1153,7 @@ export function PortfolioOverview() {
                         </div>
                         <div
                           style={{
-                            color: "#e5e5e5",
+                            color: R.accent,
                             fontSize: "12px",
                             textAlign: "right",
                             fontFamily: "monospace",
@@ -1166,7 +1163,7 @@ export function PortfolioOverview() {
                         </div>
                         <div
                           style={{
-                            color: "#39BDF8",
+                            color: R.warmTeal,
                             fontSize: "12px",
                             textAlign: "right",
                             fontFamily: "monospace",
@@ -1180,10 +1177,10 @@ export function PortfolioOverview() {
                               fontSize: "10px",
                               padding: "2px 4px",
                               borderRadius: "2px",
-                              color: delta >= 0 ? "#10b981" : "#ef4444",
+                              color: delta >= 0 ? R.warmTeal : "#ef4444",
                               backgroundColor:
                                 delta >= 0
-                                  ? "rgba(16, 185, 129, 0.1)"
+                                  ? "rgba(56, 198, 186, 0.1)"
                                   : "rgba(239, 68, 68, 0.1)",
                             }}
                           >

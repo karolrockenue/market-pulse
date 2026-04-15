@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { DatePickerCalendar } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { R } from "@/styles/tokens";
 import { OccupancyVisualizer } from "./OccupancyVisualizer";
 import {
   useRateGrid,
@@ -43,34 +44,31 @@ import {
 const styles: { [key: string]: React.CSSProperties } = {
   page: {
     minHeight: "100vh",
-    backgroundColor: "#1d1d1c",
-    position: "relative",
-    overflow: "hidden",
-    color: "#e5e5e5",
+    backgroundColor: R.bg,
+    color: R.accent,
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
   },
   container: {
-    position: "relative",
-    zIndex: 10,
     padding: "32px",
-    maxWidth: "none", // [CHANGED] Allow full width expansion
-    // margin: "0 auto", // No longer strictly needed without max-width
+    maxWidth: "none",
   },
 
   // Header
   header: { marginBottom: "24px" },
   title: {
-    color: "#e5e5e5",
+    color: R.accent,
     fontSize: "24px",
-    letterSpacing: "-0.025em",
+    fontWeight: 700,
+    letterSpacing: "-0.8px",
     marginBottom: "4px",
   },
-  subtitle: { color: "#9ca3af", fontSize: "12px" },
+  subtitle: { color: R.textDim, fontSize: "13px" },
 
   // Controls Card
   card: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "8px",
+    backgroundColor: R.darkBand,
+    border: `1px solid ${R.border}`,
+    borderRadius: "10px",
     marginBottom: "24px",
     padding: "20px",
   },
@@ -83,28 +81,28 @@ const styles: { [key: string]: React.CSSProperties } = {
   flexRow: { display: "flex", alignItems: "flex-end", gap: "16px" },
   formGroup: { display: "flex", flexDirection: "column", gap: "8px" },
   label: {
-    color: "#9ca3af",
+    color: R.textDim,
     fontSize: "12px",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
   },
 
-  // [RESTORED] Visibility & Action Section (Separate from Grid)
   gridSection: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: R.darkBand,
     borderRadius: "8px",
-    border: "1px solid #2a2a2a",
-    padding: "16px",
+    border: `1px solid ${R.border}`,
+    padding: "0",
     marginBottom: "24px",
+    overflow: "hidden",
   },
 
-  // Visibility Inner Box
   rowVisibilityContainer: {
-    marginBottom: "16px",
-    padding: "12px",
-    backgroundColor: "#1A1A1A",
-    border: "1px solid #2a2a2a",
-    borderRadius: "8px",
+    marginBottom: "0",
+    padding: "10px 16px",
+    backgroundColor: R.darkBand,
+    border: "none",
+    borderBottom: `1px solid ${R.sep}`,
+    borderRadius: "0",
   },
   rowVisibilityInner: {
     display: "flex",
@@ -114,74 +112,70 @@ const styles: { [key: string]: React.CSSProperties } = {
   rowVisibilityLeft: { display: "flex", alignItems: "center", gap: "24px" },
   rowVisibilityLabel: {
     fontSize: "12px",
-    color: "#6b7280",
+    color: R.textDim,
     textTransform: "uppercase",
     letterSpacing: "0.05em",
   },
   rowVisibilityButtons: { display: "flex", alignItems: "center", gap: "12px" },
 
-  // [RESTORED] Grid Container (Separate Block)
   gridContainer: {
     position: "relative",
-    minHeight: "400px",
-    backgroundColor: "#1a1a1a",
-    borderRadius: "8px",
-    border: "1px solid #2a2a2a",
+    minHeight: "auto",
+    backgroundColor: R.darkBand,
+    borderRadius: "0",
+    border: "none",
     overflow: "hidden",
   },
   tableWrapper: { overflowX: "auto", paddingBottom: "4px" },
 
-  // Table Cells
   thSticky: {
     position: "sticky",
     left: 0,
     zIndex: 20,
-    backgroundColor: "#1A1A1A",
-    borderRight: "1px solid #2a2a2a",
-    borderBottom: "1px solid #2a2a2a",
-    width: "240px",
+    backgroundColor: R.darkBand,
+    borderRight: `1px solid ${R.border}`,
+    borderBottom: `1px solid ${R.border}`,
+    width: "180px",
     textAlign: "left",
-    padding: "12px 16px",
-    color: "#9ca3af",
+    padding: "0 20px",
+    height: 64,
+    color: R.textDim,
   },
   tdSticky: {
     position: "sticky",
     left: 0,
     zIndex: 10,
-    backgroundColor: "#1A1A1A",
-    borderRight: "1px solid #2a2a2a",
-    borderBottom: "1px solid #2a2a2a",
-    padding: "12px 16px",
-    width: "240px",
-    color: "#e5e5e5",
+    backgroundColor: R.darkBand,
+    borderRight: `1px solid ${R.border}`,
+    borderBottom: `1px solid ${R.sep}`,
+    padding: "0 20px",
+    width: "180px",
+    height: "44px",
+    color: R.accent,
     fontSize: "13px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
   },
 
-  // Inputs & Footer
   input: {
     width: "100%",
-    backgroundColor: "#0f0f0f",
-    border: "1px solid #2a2a2a",
-    color: "#e5e5e5",
+    backgroundColor: R.sidebar,
+    border: `1px solid ${R.border}`,
+    color: R.accent,
     textAlign: "center",
     fontSize: "13px",
-    fontFamily: "monospace",
+    fontVariantNumeric: "tabular-nums",
     height: "28px",
     borderRadius: "4px",
     outline: "none",
   },
   footer: {
     padding: "12px",
-    backgroundColor: "#1A1A1A",
-    borderTop: "1px solid #2a2a2a",
+    backgroundColor: R.darkBand,
+    borderTop: `1px solid ${R.sep}`,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    color: "#6b7280",
+    color: R.textDim,
     fontSize: "12px",
   },
 };
@@ -359,7 +353,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
   // Column background: amber for daily min override, blue for hover, else transparent
   const getColBg = (date: string, fallback = "transparent") => {
-    if (hoveredColumn === date) return "rgba(57,189,248,0.05)";
+    if (hoveredColumn === date) return `${R.warmTeal}0a`;
     // No column highlight for saved daily min overrides
     return fallback;
   };
@@ -440,13 +434,13 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     gap: "6px",
     padding: "0px 10px",
     height: "24px",
-    borderRadius: "4px", // Fixed height
+    borderRadius: "4px",
     fontSize: "12px",
     border: "none",
     cursor: "pointer",
     transition: "all 0.2s",
-    backgroundColor: isHidden ? "#2a2a2a" : "rgba(57, 189, 248, 0.1)",
-    color: isHidden ? "#6b7280" : "#39BDF8",
+    backgroundColor: isHidden ? R.border : `${R.warmTeal}15`,
+    color: isHidden ? R.textDim : R.warmTeal,
   });
 
   // --- RENDER ---
@@ -454,33 +448,16 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     <div style={styles.page}>
       <style>{`
         ::-webkit-scrollbar { height: 8px; width: 8px; }
-        ::-webkit-scrollbar-track { background: #1a1a1a; border-top: 1px solid #2a2a2a; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #39BDF8; }
+        ::-webkit-scrollbar-track { background: ${R.darkBand}; border-top: 1px solid ${R.border}; }
+        ::-webkit-scrollbar-thumb { background: ${R.border}; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: ${R.warmTeal}; }
       `}</style>
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.05), transparent, rgba(250, 255, 106, 0.05))",
-        }}
-      ></div>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
-      ></div>
 
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
-          <h1 style={styles.title}>Sentinel Rate Manager</h1>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: R.gold, marginBottom: 6 }}>SENTINEL</div>
+          <h1 style={styles.title}>Rate Manager</h1>
           <p style={styles.subtitle}>
             Super Admin • 365-Day Rate Calendar • AI + Manual Control
           </p>
@@ -506,9 +483,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       width: "280px",
                       minWidth: "280px",
                       height: "40px",
-                      backgroundColor: "#0d0d0d",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.sidebar,
+                      borderColor: R.border,
+                      color: R.accent,
                       fontSize: "13px",
                       padding: "10px 12px",
                     }}
@@ -520,11 +497,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       width: "280px",
                       maxWidth: "280px",
                       minWidth: "280px",
-                      backgroundColor: "#141414",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: R.sidebar,
+                      borderColor: R.border,
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       padding: "4px",
                     }}
                   >
@@ -542,7 +519,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           <SelectItem
                             key={c.hotel_id}
                             value={String(c.hotel_id)}
-                            style={{ color: "#e5e5e5", borderRadius: "4px" }}
+                            style={{ color: R.accent, borderRadius: "4px" }}
                           >
                             <span
                               style={{
@@ -581,9 +558,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                     style={{
                       width: "180px",
                       height: "40px",
-                      backgroundColor: "#0d0d0d",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.sidebar,
+                      borderColor: R.border,
+                      color: R.accent,
                       fontSize: "13px",
                       padding: "10px 12px",
                     }}
@@ -592,11 +569,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#141414",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: R.sidebar,
+                      borderColor: R.border,
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      color: "#e5e5e5",
+                      color: R.accent,
                     }}
                   >
                     <SelectItem value="30">30 Nights</SelectItem>
@@ -620,9 +597,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                     style={{
                       width: "180px",
                       height: "40px",
-                      backgroundColor: "#0d0d0d",
-                      borderColor: "#2a2a2a",
-                      color: "#e5e5e5",
+                      backgroundColor: R.sidebar,
+                      borderColor: R.border,
+                      color: R.accent,
                       fontSize: "13px",
                       padding: "10px 12px",
                     }}
@@ -631,11 +608,11 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   </SelectTrigger>
                   <SelectContent
                     style={{
-                      backgroundColor: "#141414",
-                      borderColor: "#2a2a2a",
+                      backgroundColor: R.sidebar,
+                      borderColor: R.border,
                       borderRadius: "12px",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      color: "#e5e5e5",
+                      color: R.accent,
                     }}
                   >
                     <SelectItem value="1">Yesterday</SelectItem>
@@ -668,7 +645,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                     <div
                       style={{
                         fontSize: "10px",
-                        color: "#9ca3af",
+                        color: R.textMid,
                         textTransform: "uppercase",
                         marginBottom: "2px",
                       }}
@@ -680,7 +657,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         key={idx}
                         style={{
                           fontSize: "11px",
-                          color: idx === 0 ? "#e5e5e5" : "#6b7280",
+                          color: idx === 0 ? R.accent : R.textDim,
                           lineHeight: "1.2",
                         }}
                       >
@@ -703,14 +680,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                     <div
                       style={{
                         fontSize: "10px",
-                        color: "#9ca3af",
+                        color: R.textMid,
                         textTransform: "uppercase",
                         marginBottom: "2px",
                       }}
                     >
                       Last AI Run
                     </div>
-                    <div style={{ fontSize: "12px", color: "#e5e5e5" }}>
+                    <div style={{ fontSize: "12px", color: R.accent }}>
                       {sentinelStatus.lastRun
                         ? format(
                             new Date(sentinelStatus.lastRun),
@@ -723,8 +700,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         fontSize: "10px",
                         color:
                           sentinelStatus.changesLast24h > 0
-                            ? "#39BDF8"
-                            : "#6b7280",
+                            ? R.warmTeal
+                            : R.textDim,
                       }}
                     >
                       {sentinelStatus.changesLast24h} updates (24h)
@@ -741,9 +718,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   variant="outline"
                   className="h-9 text-sm"
                   style={{
-                    borderColor: "#39BDF8",
-                    color: "#39BDF8",
-                    backgroundColor: "rgba(57, 189, 248, 0.05)",
+                    borderColor: R.warmTeal,
+                    color: R.warmTeal,
+                    backgroundColor: `${R.warmTeal}0d`,
                   }}
                 >
                   {isRunningSentinel ? (
@@ -758,7 +735,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
               <Button
                 onClick={handleLoad}
                 disabled={isLoading || !selectedHotelId}
-                style={{ backgroundColor: "#39BDF8", color: "#1d1d1c" }}
+                style={{ backgroundColor: R.warmTeal, color: R.sidebar }}
                 className="h-9 text-sm font-semibold"
               >
                 {isLoading ? (
@@ -800,7 +777,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  marginBottom: "16px",
+                  padding: "10px 16px",
+                  borderBottom: `1px solid ${R.sep}`,
                 }}
               >
                 {/* Visibility Toolbar */}
@@ -962,9 +940,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   }}
                   variant="outline"
                   style={{
-                    borderColor: "#39BDF8",
-                    color: "#39BDF8",
-                    backgroundColor: "rgba(57, 189, 248, 0.1)",
+                    borderColor: R.warmTeal,
+                    color: R.warmTeal,
+                    backgroundColor: `${R.warmTeal}1a`,
                     marginRight: "12px",
                   }}
                   className="h-9 text-sm"
@@ -991,7 +969,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   disabled={
                     isSubmitting || Object.keys(pendingOverrides).length === 0
                   }
-                  style={{ backgroundColor: "#39BDF8", color: "#1d1d1c" }}
+                  style={{ backgroundColor: R.warmTeal, color: R.sidebar }}
                   className="h-9 text-sm"
                 >
                   {isSubmitting ? (
@@ -1011,12 +989,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       width: "100%",
                       borderCollapse: "collapse",
                       tableLayout: "fixed",
-                      minWidth: `${240 + visibleData.length * 84}px`,
+                      minWidth: `${180 + visibleData.length * 96}px`,
                     }}
                   >
                     <thead>
                       <tr>
-                        <th style={styles.thSticky}>METRIC</th>
+                        <th style={styles.thSticky}>
+                          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase" }}>Metric</span>
+                        </th>
                         {visibleData.map((day) => (
                           <th
                             key={day.date}
@@ -1025,33 +1005,36 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             style={{
                               backgroundColor:
                                 hoveredColumn === day.date
-                                  ? "rgba(58, 58, 53, 0.3)"
-                                  : "#1A1A1A",
-                              borderBottom: "1px solid #2a2a2a",
-                              borderRight: "1px solid #2a2a2a",
+                                  ? `${R.warmTeal}0a`
+                                  : amberDates.has(day.date)
+                                    ? `${R.gold}14`
+                                    : "transparent",
+                              borderBottom: `1px solid ${R.border}`,
                               textAlign: "center",
-                              padding: "12px 8px",
-                              minWidth: "84px",
+                              padding: "10px 0",
+                              minWidth: "96px",
+                              height: 64,
+                              verticalAlign: "bottom",
                               cursor: "pointer",
                             }}
                           >
                             <div
                               style={{
-                                color: "#6b7280",
-                                fontSize: "10px",
+                                color: R.textDim,
+                                fontSize: "9px",
                                 textTransform: "uppercase",
-                                marginBottom: "4px",
                               }}
                             >
                               {day.month}
                             </div>
-                            <div style={{ color: "#e5e5e5", fontSize: "12px" }}>
+                            <div style={{ color: (() => { const d = new Date(day.date); const dow = d.getDay(); return (dow === 0 || dow === 6) ? R.warmTeal : R.textDim; })(), fontSize: "9px", marginTop: 1 }}>
                               {day.dayOfWeek}
                             </div>
                             <div
                               style={{
-                                color: "#9ca3af",
-                                fontSize: "12px",
+                                color: R.accent,
+                                fontSize: "15px",
+                                fontWeight: 600,
                                 marginTop: "2px",
                               }}
                             >
@@ -1070,8 +1053,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   size={10}
                                   color={
                                     pendingOverrides[day.date]
-                                      ? "#f59e0b"
-                                      : "#9ca3af"
+                                      ? R.gold
+                                      : R.textMid
                                   }
                                 />
                               </div>
@@ -1084,14 +1067,13 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       {/* 1. AI Status Row */}
                       <tr
                         style={{
-                          borderBottom: "1px solid #2a2a2a",
-                          backgroundColor: "rgba(26, 26, 26, 0.2)",
+                          borderBottom: `1px solid ${R.sep}`,
                         }}
                       >
-                        <td style={styles.tdSticky}>AI Status</td>
+                        <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>AI Status</td>
                         {visibleData.map((day) => {
                           let text = "SENTINEL",
-                            color = "#39BDF8";
+                            color = R.warmTeal;
 
                           const currentSource = (
                             day.source || ""
@@ -1099,35 +1081,36 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                           if (day.isFrozen) {
                             text = "FROZEN";
-                            color = "#f59e0b";
+                            color = R.gold;
                           } else if (pendingOverrides[day.date]) {
                             text = "PENDING";
-                            color = "#f59e0b";
+                            color = R.gold;
                           } else if (
                             currentSource === "SENTINEL" ||
                             currentSource === "AI_AUTO" ||
                             currentSource === "AI_SUGGESTED"
                           ) {
                             text = "AI";
-                            color = "#39BDF8";
+                            color = R.warmTeal;
                           } else if (currentSource === "MANUAL" || currentSource === "HOTEL_USER") {
                             text = "MANUAL";
-                            color = "#9ca3af";
+                            color = R.textMid;
                           } else if (currentSource === "SYNC" || currentSource === "IMPORT") {
                             text = "PMS";
-                            color = "#6b7280";
+                            color = R.textDim;
                           } else {
                             text = "—";
-                            color = "#4a4a48";
+                            color = R.textDim;
                           }
                           return (
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
-                                padding: "12px 8px",
-                                width: "84px",
+                                padding: "0 4px",
+                                height: "44px",
+                                width: "96px",
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -1137,7 +1120,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   color,
                                   fontSize: "9px",
                                   fontWeight: 600,
-                                  fontFamily: "monospace",
+                                  fontVariantNumeric: "tabular-nums",
                                 }}
                               >
                                 {text}
@@ -1160,8 +1143,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                       {/* 2. Metrics Rows */}
                       {!hiddenRows.has("adr") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1170,7 +1153,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <TrendingUp size={16} color="#9ca3af" /> ADR{" "}
+                              ADR{" "}
                               <button
                                 onClick={() => toggleRow("adr")}
                                 style={{
@@ -1180,7 +1163,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1188,12 +1171,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
-                                color: "#e5e5e5",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                color: R.text,
+                                fontSize: "13px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
                                 backgroundColor:
                                   getColBg(day.date),
                                 opacity: day.isFrozen ? 0.4 : 1,
@@ -1205,8 +1190,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       )}
                       {!hiddenRows.has("occupancy") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1215,7 +1200,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <Activity size={16} color="#9ca3af" /> Occupancy{" "}
+                              <Activity size={16} color={R.textMid} /> Occupancy{" "}
                               <button
                                 onClick={() => toggleRow("occupancy")}
                                 style={{
@@ -1225,7 +1210,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1233,19 +1218,20 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
                                 fontSize: "13px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                padding: "0 4px",
+                                height: "44px",
+                                fontVariantNumeric: "tabular-nums",
                                 backgroundColor:
                                   getColBg(day.date),
                                 color:
                                   day.occupancy > 80
-                                    ? "#10b981"
+                                    ? R.warmTeal
                                     : day.occupancy > 60
-                                      ? "#facc15"
-                                      : "#ef4444",
+                                      ? R.text
+                                      : R.gold,
                               }}
                             >
                               {Math.round(day.occupancy)}%
@@ -1255,8 +1241,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       )}
 
                       {!hiddenRows.has("curveTier") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1265,7 +1251,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <span style={{ color: "#e5e5e5" }}>Curve</span>
+                              <span style={{ color: R.accent }}>Curve</span>
                               <button
                                 onClick={() => toggleRow("curveTier")}
                                 style={{
@@ -1275,7 +1261,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1283,11 +1269,12 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
                                 fontSize: "11px",
-                                padding: "12px 8px",
-                                color: "#e5e5e5",
+                                padding: "0 4px",
+                                height: "44px",
+                                color: R.accent,
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -1300,8 +1287,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                       {/* Curve Target Row */}
                       {!hiddenRows.has("curveTarget") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1310,7 +1297,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <Target size={16} color="#3b82f6" /> Curve Target
+                              <Target size={16} color={R.warmTeal} /> Curve Target
                               <button
                                 onClick={() => toggleRow("curveTarget")}
                                 style={{
@@ -1320,7 +1307,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1330,12 +1317,13 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               <td
                                 key={day.date}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
+                                  borderBottom: `1px solid ${R.sep}`,
                                   textAlign: "center",
                                   fontSize: "13px",
-                                  padding: "12px 8px",
-                                  fontFamily: "monospace",
-                                  color: "#e5e5e5",
+                                  padding: "0 4px",
+                                height: "44px",
+                                  fontVariantNumeric: "tabular-nums",
+                                  color: R.accent,
                                   backgroundColor:
                                     getColBg(day.date),
                                 }}
@@ -1351,8 +1339,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                       {/* Delta Row */}
                       {!hiddenRows.has("delta") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1361,7 +1349,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <span style={{ color: "#e5e5e5" }}>Delta</span>
+                              <span style={{ color: R.accent }}>Delta</span>
                               <button
                                 onClick={() => toggleRow("delta")}
                                 style={{
@@ -1371,7 +1359,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1382,19 +1370,20 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             const color =
                               delta !== null
                                 ? delta >= 0
-                                  ? "#10b981"
-                                  : "#ef4444"
-                                : "#4a4a48";
+                                  ? R.warmTeal
+                                  : R.red
+                                : R.textDim;
                             const sign = delta !== null && delta > 0 ? "+" : "";
                             return (
                               <td
                                 key={day.date}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
+                                  borderBottom: `1px solid ${R.sep}`,
                                   textAlign: "center",
                                   fontSize: "13px",
-                                  padding: "12px 8px",
-                                  fontFamily: "monospace",
+                                  padding: "0 4px",
+                                height: "44px",
+                                  fontVariantNumeric: "tabular-nums",
                                   fontWeight: "bold",
                                   color: color,
                                   backgroundColor:
@@ -1410,14 +1399,18 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       )}
 
-                      {/* Spacer between metrics and pricing sections */}
-                      <tr style={{ height: "8px" }}>
-                        <td colSpan={visibleData.length + 1} style={{ borderBottom: "1px solid #2a2a2a" }}></td>
+                      {/* Divider: info → guardrails */}
+                      <tr>
+                        <td style={{ ...styles.tdSticky, height: 10, borderBottom: "none", padding: 0 }} />
+                        {visibleData.map((day) => (
+                          <td key={day.date} style={{ height: 10, backgroundColor: getColBg(day.date) }}
+                            onMouseEnter={() => setHoveredColumn(day.date)} onMouseLeave={() => setHoveredColumn(null)} />
+                        ))}
                       </tr>
 
                       {!hiddenRows.has("minRate") && (<>
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={{ ...styles.tdSticky, color: "#f59e0b" }}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1436,7 +1429,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1447,18 +1440,19 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 key={day.date}
                                 onClick={() => !day.isFrozen && setEditingMinCell(day.date)}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
+                                  borderBottom: `1px solid ${R.sep}`,
                                   textAlign: "center",
-                                  color: "#6b7280",
+                                  color: R.textDim,
                                   fontSize: "12px",
-                                  padding: "12px 8px",
-                                  fontFamily: "monospace",
+                                  padding: "0 4px",
+                                height: "44px",
+                                  fontVariantNumeric: "tabular-nums",
                                   cursor: day.isFrozen ? "not-allowed" : "pointer",
                                   backgroundColor:
                                     editingMinCell === day.date
                                       ? "transparent"
                                       : isBelowMonthly
-                                        ? "rgba(239, 68, 68, 0.06)"
+                                        ? `${R.red}0f`
                                         : "transparent",
                                 }}
                                 title={isBelowMonthly ? `Monthly default: £${Math.round(day.monthlyMinDefault)}` : undefined}
@@ -1468,10 +1462,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     autoFocus
                                     style={{
                                       ...styles.input,
-                                      color: "#ef4444",
+                                      color: R.red,
                                       fontWeight: "bold",
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      border: "1px solid #ef4444",
+                                      backgroundColor: `${R.red}1a`,
+                                      border: `1px solid ${R.red}`,
                                     }}
                                     defaultValue={day.guardrailMin > 0 ? Math.round(day.guardrailMin) : ""}
                                     onFocus={(e) => e.target.select()}
@@ -1482,7 +1476,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         if (v < day.monthlyMinDefault) {
                                           toast.warning(
                                             `Min rate set to £${Math.round(v)} — below monthly default of £${Math.round(day.monthlyMinDefault)}. Make sure you know what you're doing.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                            { style: { backgroundColor: R.darkBand, border: `1px solid ${R.red}`, color: R.red } }
                                           );
                                         }
                                       } else if (e.target.value === "" && selectedHotelId) {
@@ -1514,9 +1508,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           })}
                         </tr>
                         {/* "Leads to" sub-row: shows sell rate at min rate */}
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
                           <td style={{ ...styles.tdSticky, padding: "4px 16px" }}>
-                            <span style={{ color: "#4b5563", fontSize: "10px", fontStyle: "italic", paddingLeft: "2px" }}>
+                            <span style={{ color: R.textDim, fontSize: "10px", fontStyle: "italic", paddingLeft: "2px" }}>
                               Leads to
                             </span>
                           </td>
@@ -1535,12 +1529,12 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               <td
                                 key={day.date}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
+                                  borderBottom: `1px solid ${R.sep}`,
                                   textAlign: "center",
-                                  color: "#4b5563",
+                                  color: R.textDim,
                                   fontSize: "10px",
                                   padding: "4px 8px",
-                                  fontFamily: "monospace",
+                                  fontVariantNumeric: "tabular-nums",
                                   fontStyle: "italic",
                                 }}
                               >
@@ -1551,8 +1545,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       </>)}
                       {!hiddenRows.has("floorRate") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1571,7 +1565,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1579,12 +1573,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
-                                color: "#f97316",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                color: R.textMid,
+                                fontSize: "13px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -1597,19 +1593,18 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         </tr>
                       )}
 
-                      {/* Separator */}
-                      <tr
-                        style={{ height: "12px", backgroundColor: "#1a1a1a" }}
-                      >
-                        <td
-                          colSpan={visibleData.length + 1}
-                          style={{ borderBottom: "1px dashed #2a2a2a" }}
-                        ></td>
+                      {/* Divider */}
+                      <tr>
+                        <td style={{ ...styles.tdSticky, height: 10, borderBottom: "none", padding: 0 }} />
+                        {visibleData.map((day) => (
+                          <td key={day.date} style={{ height: 10, backgroundColor: getColBg(day.date) }}
+                            onMouseEnter={() => setHoveredColumn(day.date)} onMouseLeave={() => setHoveredColumn(null)} />
+                        ))}
                       </tr>
 
                       {!hiddenRows.has("pmsRates") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1628,7 +1623,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1636,12 +1631,14 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             <td
                               key={day.date}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
-                                color: "#e5e5e5",
-                                fontSize: "12px",
-                                padding: "12px 8px",
-                                fontFamily: "monospace",
+                                color: R.accent,
+                                fontSize: "13px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
+                                fontVariantNumeric: "tabular-nums",
                                 backgroundColor:
                                   getColBg(day.date),
                               }}
@@ -1656,8 +1653,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
 
                       {/* 3. Calculations */}
                       {!hiddenRows.has("sellRate") && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
-                          <td style={styles.tdSticky}>
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             <div
                               style={{
                                 width: "100%",
@@ -1666,7 +1663,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <span style={{ color: "#10b981" }}>
+                              <span style={{ color: R.warmTeal }}>
                                 Current Sell Rate
                               </span>{" "}
                               <button
@@ -1678,7 +1675,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -1699,13 +1696,15 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               <td
                                 key={day.date}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
+                                  borderBottom: `1px solid ${R.sep}`,
                                   textAlign: "center",
-                                  fontSize: "12px",
-                                  padding: "12px 8px",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
                                   fontWeight: "bold",
-                                  fontFamily: "monospace",
-                                  color: c > 0 ? "#10b981" : "#4a4a48",
+                                  fontVariantNumeric: "tabular-nums",
+                                  color: c > 0 ? R.warmTeal : R.textDim,
                                   backgroundColor:
                                     getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
@@ -1721,20 +1720,19 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       {/* Sentinel Row (Blue) - Interactive Ghost Mode */}
                       <tr
                         style={{
-                          borderBottom: "2px solid rgba(57, 189, 248, 0.4)",
-                          backgroundColor: "rgba(57, 189, 248, 0.02)",
+                          borderBottom: `1px solid ${R.sep}`,
+                          backgroundColor: `${R.warmTeal}05`,
                         }}
                       >
                         <td
                           style={{
                             ...styles.tdSticky,
-                            backgroundColor: "#1b1d1e",
-                            padding: "16px",
+                            borderLeft: `3px solid ${R.warmTeal}`,
+                            color: R.warmTeal,
+                            fontWeight: 600,
                           }}
                         >
-                          <span style={{ fontWeight: 600 }}>
-                            Sentinel AI Rate
-                          </span>
+                          Sentinel AI Rate
                         </td>
                         {visibleData.map((day) => {
                           const pred = aiPredictions[day.date];
@@ -1753,24 +1751,26 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               onMouseEnter={() => setHoveredAiCell(day.date)}
                               onMouseLeave={() => setHoveredAiCell(null)}
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
-                                padding: "16px 8px",
+                                padding: "0 4px",
+                                height: "44px",
+                                verticalAlign: "middle",
                                 position: "relative",
                                 color: isApplied
-                                  ? "#10b981"
+                                  ? R.warmTeal
                                   : pred
-                                    ? "#39BDF8"
-                                    : "#4a4a48",
-                                fontSize: "14px",
+                                    ? R.warmTeal
+                                    : R.textMid,
+                                fontSize: "13px",
                                 fontWeight: 600,
                                 transition: "all 0.2s",
                                 cursor:
                                   pred && !day.isFrozen ? "pointer" : "default",
                                 backgroundColor: isApplied
-                                  ? "rgba(16, 185, 129, 0.05)"
+                                  ? `${R.warmTeal}0d`
                                   : hoveredColumn === day.date
-                                    ? "rgba(57,189,248,0.1)"
+                                    ? `${R.warmTeal}1a`
                                     : getColBg(day.date),
                               }}
                             >
@@ -1805,7 +1805,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     style={{
                                       position: "absolute",
                                       bottom: "2px",
-                                      backgroundColor: "#39BDF8",
+                                      backgroundColor: R.warmTeal,
                                       borderRadius: "50%",
                                       width: "16px",
                                       height: "16px",
@@ -1819,7 +1819,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   >
                                     <ArrowDown
                                       size={10}
-                                      color="#1d1d1c"
+                                      color={R.sidebar}
                                       strokeWidth={3}
                                     />
                                   </div>
@@ -1830,27 +1830,25 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                         })}
                       </tr>
 
-                      {/* Separator — divides read-only rows from editable inputs */}
-                      <tr
-                        style={{ height: "4px", backgroundColor: "#10b981", opacity: 0.3 }}
-                      >
-                        <td colSpan={visibleData.length + 1}></td>
+                      {/* Divider row */}
+                      <tr style={{ height: "10px" }}>
+                        <td colSpan={visibleData.length + 1} style={{ borderBottom: `1px solid ${R.sep}` }}></td>
                       </tr>
 
                       {/* 4. PMS Override Input */}
                       <tr
                         style={{
-                          borderTop: "1px solid #2a2a2a",
-                          borderBottom: "1px solid #2a2a2a",
-                          backgroundColor: "rgba(16, 185, 129, 0.03)",
+                          borderBottom: `1px solid ${R.sep}`,
+                          backgroundColor: `${R.warmTeal}05`,
                         }}
                       >
                         <td style={{
                           ...styles.tdSticky,
-                          backgroundColor: "#1b2420",
-                          borderLeft: "3px solid #10b981",
+                          borderLeft: `3px solid ${R.warmTeal}`,
+                          color: R.warmTeal,
+                          fontWeight: 600,
                         }}>
-                          <span style={{ color: "#10b981" }}>PMS Override</span>
+                          PMS Override
                         </td>
                         {visibleData.map((day) => {
                           const savedVal = savedOverrides[day.date];
@@ -1866,9 +1864,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 !day.isFrozen && setEditingCell(day.date)
                               }
                               style={{
-                                borderRight: "1px solid #2a2a2a",
+                                borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
-                                padding: "12px 8px",
+                                padding: "0 4px",
+                                height: "44px",
                                 cursor: day.isFrozen
                                   ? "not-allowed"
                                   : "pointer",
@@ -1876,9 +1875,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   editingCell === day.date
                                     ? "transparent"
                                     : isPending
-                                      ? "rgba(250, 255, 106, 0.06)"
+                                      ? `${R.gold}0f`
                                       : hasAny
-                                        ? "rgba(229, 229, 229, 0.03)"
+                                        ? `${R.accent}08`
                                         : "transparent",
                                 opacity: day.isFrozen ? 0.5 : 1,
                               }}
@@ -1902,7 +1901,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                         saveMinRate(selectedHotelId, day.date, v);
                                         toast.warning(
                                           `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
-                                          { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                          { style: { backgroundColor: R.darkBand, border: `1px solid ${R.red}`, color: R.red } }
                                         );
                                       }
                                       setOverride(day.date, v);
@@ -1931,7 +1930,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                           saveMinRate(selectedHotelId, day.date, v);
                                           toast.warning(
                                             `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                            { style: { backgroundColor: R.darkBand, border: `1px solid ${R.red}`, color: R.red } }
                                           );
                                         }
                                         setOverride(day.date, v);
@@ -1959,9 +1958,9 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               ) : (
                                 <span
                                   style={{
-                                    color: isPending ? "#f59e0b" : "#e5e5e5",
+                                    color: isPending ? R.gold : R.accent,
                                     fontWeight: isPending ? "bold" : "normal",
-                                    fontFamily: "monospace",
+                                    fontVariantNumeric: "tabular-nums",
                                     fontSize: "13px",
                                   }}
                                 >
@@ -1979,15 +1978,16 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                       {!hiddenRows.has("effectiveRate") && (
                         <tr
                           style={{
-                            borderBottom: "1px solid #2a2a2a",
-                            backgroundColor: "rgba(16, 185, 129, 0.03)",
+                            borderBottom: `1px solid ${R.sep}`,
+                            backgroundColor: `${R.warmTeal}05`,
                           }}
                         >
                           <td
                             style={{
                               ...styles.tdSticky,
-                              backgroundColor: "#1b2420",
-                              borderLeft: "3px solid #10b981",
+                              borderLeft: `3px solid ${R.warmTeal}`,
+                              color: R.warmTeal,
+                              fontWeight: 600,
                             }}
                           >
                             <div
@@ -1998,7 +1998,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 gap: "8px",
                               }}
                             >
-                              <span style={{ color: "#10b981" }}>
+                              <span style={{ color: R.warmTeal }}>
                                 Target Sell Rate
                               </span>{" "}
                               <button
@@ -2010,7 +2010,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={14} color="#6b7280" />
+                                <Eye size={14} color={R.textDim} />
                               </button>
                             </div>
                           </td>
@@ -2038,17 +2038,19 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     setEditingEffectiveCell(day.date);
                                 }}
                                 style={{
-                                  borderRight: "1px solid #2a2a2a",
+                                  borderBottom: `1px solid ${R.sep}`,
                                   textAlign: "center",
-                                  fontSize: "12px",
-                                  padding: "12px 8px",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
                                   fontWeight: "bold",
-                                  fontFamily: "monospace",
+                                  fontVariantNumeric: "tabular-nums",
                                   color:
-                                    effectiveVal > 0 ? "#10b981" : "#4a4a48",
+                                    effectiveVal > 0 ? R.warmTeal : R.textDim,
                                   backgroundColor:
                                     editingEffectiveCell === day.date
-                                      ? "transparent"
+                                      ? `${R.warmTeal}0a`
                                       : getColBg(day.date),
                                   opacity: day.isFrozen ? 0.4 : 1,
                                   cursor: day.isFrozen
@@ -2061,11 +2063,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                     autoFocus
                                     style={{
                                       ...styles.input,
-                                      color: "#10b981",
+                                      color: R.accent,
                                       fontWeight: "bold",
-                                      backgroundColor:
-                                        "rgba(16, 185, 129, 0.1)",
-                                      border: "1px solid #10b981",
+                                      backgroundColor: `${R.warmTeal}1a`,
+                                      border: `1px solid ${R.warmTeal}`,
                                     }}
                                     defaultValue={
                                       effectiveVal > 0
@@ -2095,7 +2096,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                           saveMinRate(selectedHotelId, day.date, roundedOverride);
                                           toast.warning(
                                             `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
-                                            { style: { backgroundColor: "#1a1a1a", border: "1px solid #ef4444", color: "#ef4444" } }
+                                            { style: { backgroundColor: R.darkBand, border: `1px solid ${R.red}`, color: R.red } }
                                           );
                                         }
                                         setOverride(
@@ -2141,13 +2142,13 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
           <div
             style={{
               height: "400px",
-              border: "1px dashed #2a2a2a",
+              border: `1px dashed ${R.border}`,
               borderRadius: "8px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              color: "#6b7280",
+              color: R.textDim,
             }}
           >
             <Zap className="w-12 h-12 mb-4 opacity-20" />

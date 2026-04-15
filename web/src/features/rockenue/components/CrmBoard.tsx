@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, createContext, useContext } from "react";
+import { R } from "../../../styles/tokens";
 import {
   Search,
   Plus,
@@ -50,18 +51,18 @@ import type {
 } from "../api/types";
 
 // ── Brand palette ──
-const BLUE = "#39BDF8";
+const BLUE = R.warmTeal;
 const GREEN = "#10b981";
 const AMBER = "#f59e0b";
 const RED = "#ef4444";
 const PURPLE = "#8b5cf6";
-const BG_PAGE = "#1d1d1c";
-const CARD_BG = "#1a1a1a";
-const INPUT_BG = "#2C2C2C";
-const BORDER = "#2a2a2a";
-const TEXT = "#e5e5e5";
-const TEXT_MID = "#9ca3af";
-const TEXT_DIM = "#6b7280";
+const BG_PAGE = R.bg;
+const CARD_BG = R.darkBand;
+const INPUT_BG = R.card;
+const BORDER = R.border;
+const TEXT = R.accent;
+const TEXT_MID = R.textMid;
+const TEXT_DIM = R.textDim;
 
 const OTA_CHANNELS_LIST = [
   "Booking.com", "Expedia", "Agoda", "Hotelbeds", "Trip.com", "HRS",
@@ -287,11 +288,8 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
 
   return (
     <TeamContext.Provider value={teamMembers}>
-    <div style={{ minHeight: "100vh", backgroundColor: "#1d1d1c", position: "relative", overflow: "hidden", paddingBottom: 64 }}>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(57,189,248,0.01), transparent, rgba(57,189,248,0.01))", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)", backgroundSize: "64px 64px", pointerEvents: "none" }} />
-
-      <div style={{ position: "relative", zIndex: 10, padding: "28px 32px" }}>
+    <div style={{ flex: 1, background: R.bg, color: R.accent, paddingBottom: 64 }}>
+      <div style={{ padding: "24px 28px" }}>
 
       {/* ── Page Header ── */}
       <div style={{ marginBottom: 28 }}>
@@ -322,7 +320,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
             </button>
             <button onClick={() => { setShowNewTask(true); setNewTaskDefaultStatus(null); }} style={{
               display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 8,
-              border: "none", background: BLUE, color: "#000",
+              border: "none", background: BLUE, color: R.sidebar,
               fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}>
               <Plus size={14} /> New Task
@@ -538,7 +536,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
                 </div>
                 {isExpanded && memberTasks.length > 0 && (
                   <div>
-                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px", padding: "8px 20px", background: "#222222" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px", padding: "8px 20px", background: R.card }}>
                       {["ID", "Task", "Property", "Category", "Priority", "Due"].map((h) => (
                         <span key={h} style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>{h}</span>
                       ))}
@@ -901,7 +899,7 @@ function HotelView({
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{
         display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
-        padding: "10px 16px", backgroundColor: "#222222", borderRadius: "8px 8px 0 0",
+        padding: "10px 16px", backgroundColor: R.card, borderRadius: "8px 8px 0 0",
         border: `1px solid ${BORDER}`, borderBottom: "none",
       }}>
         {["Scope", "Task", "Category", "Priority", "Assignee", "Due Date"].map((h) => (
@@ -1057,7 +1055,7 @@ function TimelineView({
     <div style={{ background: CARD_BG, borderRadius: 10, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
       {/* Header — dates */}
       <div style={{ display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`, borderBottom: `1px solid ${BORDER}` }}>
-        <div style={{ padding: "10px 16px", background: "#222222" }}>
+        <div style={{ padding: "10px 16px", background: R.card }}>
           <span style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>Task</span>
         </div>
         {days.map((d) => {
@@ -1066,7 +1064,7 @@ function TimelineView({
           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
           return (
             <div key={ds} style={{
-              padding: "6px 2px", textAlign: "center", background: isToday ? `${BLUE}10` : isWeekend ? "rgba(255,255,255,0.015)" : "#222222",
+              padding: "6px 2px", textAlign: "center", background: isToday ? `${BLUE}10` : isWeekend ? "rgba(255,255,255,0.015)" : R.card,
               borderLeft: `1px solid ${BORDER}`, borderBottom: isToday ? `2px solid ${BLUE}` : "none",
             }}>
               <div style={{ color: isToday ? BLUE : TEXT_DIM, fontSize: 9, fontWeight: 600 }}>{format(d, "EEE")}</div>
@@ -1336,7 +1334,7 @@ function AutomationsPanel({
           <span style={{ color: TEXT, fontSize: 16, fontWeight: 600, flex: 1 }}>Automations</span>
           <button onClick={() => setShowNewRule(!showNewRule)} style={{
             display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 6,
-            border: "none", background: BLUE, color: "#000", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            border: "none", background: BLUE, color: R.sidebar, fontSize: 12, fontWeight: 600, cursor: "pointer",
           }}>
             <Plus size={13} /> New Rule
           </button>
@@ -1368,7 +1366,7 @@ function AutomationsPanel({
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setShowNewRule(false)} style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${BORDER}`, background: INPUT_BG, color: TEXT_MID, fontSize: 12, cursor: "pointer" }}>Cancel</button>
-                <button onClick={addAutomation} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: BLUE, color: "#000", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add Rule</button>
+                <button onClick={addAutomation} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: BLUE, color: R.sidebar, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add Rule</button>
               </div>
             </div>
           )}
@@ -1434,6 +1432,9 @@ function TaskDetailPanel({
   const [comments, setComments] = useState<CrmTaskComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [loadingComments, setLoadingComments] = useState(true);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
+  const commentInputRef = useRef<HTMLInputElement>(null);
 
   // Local states for features
   const [newDepInput, setNewDepInput] = useState("");
@@ -1477,10 +1478,42 @@ function TaskDetailPanel({
     await onRefresh();
   }
 
+  function handleCommentChange(value: string) {
+    setCommentText(value);
+    // Detect @mention trigger
+    const cursorPos = commentInputRef.current?.selectionStart ?? value.length;
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (atMatch) {
+      setMentionOpen(true);
+      setMentionFilter(atMatch[1].toLowerCase());
+    } else {
+      setMentionOpen(false);
+      setMentionFilter("");
+    }
+  }
+
+  function insertMention(name: string) {
+    const cursorPos = commentInputRef.current?.selectionStart ?? commentText.length;
+    const textBeforeCursor = commentText.slice(0, cursorPos);
+    const atIdx = textBeforeCursor.lastIndexOf("@");
+    if (atIdx >= 0) {
+      const before = commentText.slice(0, atIdx);
+      const after = commentText.slice(cursorPos);
+      setCommentText(`${before}@${name} ${after}`);
+    }
+    setMentionOpen(false);
+    setMentionFilter("");
+    commentInputRef.current?.focus();
+  }
+
+  const mentionCandidates = team.filter((m) => m.name.toLowerCase().includes(mentionFilter));
+
   async function handleSubmitComment() {
     if (!commentText.trim()) return;
     await addComment(task.id, { author: userName, body: commentText.trim(), type: "comment" });
     setCommentText("");
+    setMentionOpen(false);
     const c = await fetchComments(task.id);
     setComments(c);
     await onRefresh();
@@ -1805,14 +1838,19 @@ function TaskDetailPanel({
               <div style={{ marginBottom: 24 }}>
                 <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Comments</div>
 
-                {/* Comment input */}
+                {/* Comment input with @mention */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
                   <Avatar name={userName} size={28} />
                   <div style={{ flex: 1, position: "relative" }}>
                     <input
-                      value={commentText} onChange={(e) => setCommentText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleSubmitComment(); }}
-                      placeholder="Write a comment..."
+                      ref={commentInputRef}
+                      value={commentText} onChange={(e) => handleCommentChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (mentionOpen && e.key === "Escape") { setMentionOpen(false); e.preventDefault(); return; }
+                        if (mentionOpen && e.key === "Enter" && mentionCandidates.length > 0) { insertMention(mentionCandidates[0].name); e.preventDefault(); return; }
+                        if (e.key === "Enter") handleSubmitComment();
+                      }}
+                      placeholder="Write a comment... (type @ to mention)"
                       style={{
                         width: "100%", padding: "10px 42px 10px 14px", background: CARD_BG,
                         border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 12, outline: "none",
@@ -1822,6 +1860,28 @@ function TaskDetailPanel({
                       position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
                       background: "none", border: "none", color: BLUE, cursor: "pointer", padding: 4,
                     }}><Send size={14} /></button>
+                    {/* @mention dropdown */}
+                    {mentionOpen && mentionCandidates.length > 0 && (
+                      <div style={{
+                        position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 100,
+                        background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8,
+                        padding: 4, minWidth: 180, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                      }}>
+                        {mentionCandidates.slice(0, 6).map((m) => (
+                          <div key={m.name} onClick={() => insertMention(m.name)} style={{
+                            display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+                            borderRadius: 6, cursor: "pointer", fontSize: 12, color: TEXT,
+                          }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = `rgba(255,255,255,0.04)`)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <Avatar name={m.name} size={20} />
+                            <span style={{ fontWeight: 500 }}>{m.name}</span>
+                            {m.role && <span style={{ color: TEXT_DIM, fontSize: 10, marginLeft: "auto" }}>{m.role}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1835,7 +1895,9 @@ function TaskDetailPanel({
                     <div style={{
                       padding: "10px 14px", background: CARD_BG, borderRadius: 8,
                       border: `1px solid ${BORDER}`, color: TEXT_MID, fontSize: 12, lineHeight: 1.55,
-                    }}>{c.body}</div>
+                    }}>{c.body.split(/(@\w+)/g).map((part, pi) =>
+                      part.startsWith("@") ? <span key={pi} style={{ color: BLUE, fontWeight: 600 }}>{part}</span> : part
+                    )}</div>
                   </div>
                 ))}
               </div>
@@ -1853,9 +1915,13 @@ function TaskDetailPanel({
                 <Avatar name={userName} size={28} />
                 <div style={{ flex: 1, position: "relative" }}>
                   <input
-                    value={commentText} onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSubmitComment(); }}
-                    placeholder="Write a comment..."
+                    value={commentText} onChange={(e) => handleCommentChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (mentionOpen && e.key === "Escape") { setMentionOpen(false); e.preventDefault(); return; }
+                      if (mentionOpen && e.key === "Enter" && mentionCandidates.length > 0) { insertMention(mentionCandidates[0].name); e.preventDefault(); return; }
+                      if (e.key === "Enter") handleSubmitComment();
+                    }}
+                    placeholder="Write a comment... (type @ to mention)"
                     style={{
                       width: "100%", padding: "10px 42px 10px 14px", background: CARD_BG,
                       border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 12, outline: "none",
@@ -1865,6 +1931,26 @@ function TaskDetailPanel({
                     position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", color: BLUE, cursor: "pointer", padding: 4,
                   }}><Send size={14} /></button>
+                  {mentionOpen && mentionCandidates.length > 0 && (
+                    <div style={{
+                      position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 100,
+                      background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8,
+                      padding: 4, minWidth: 180, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                    }}>
+                      {mentionCandidates.slice(0, 6).map((m) => (
+                        <div key={m.name} onClick={() => insertMention(m.name)} style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+                          borderRadius: 6, cursor: "pointer", fontSize: 12, color: TEXT,
+                        }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = `rgba(255,255,255,0.04)`)}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <Avatar name={m.name} size={20} />
+                          <span style={{ fontWeight: 500 }}>{m.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2083,7 +2169,7 @@ function CreateTaskPanel({
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 4, background: BLUE, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Plus size={18} style={{ color: "#0a0a0a" }} />
+              <Plus size={18} style={{ color: R.sidebar }} />
             </div>
             <div>
               <div style={{ color: TEXT, fontSize: 20, fontWeight: 600, letterSpacing: "-0.025em", textTransform: "uppercase" }}>New Task</div>
@@ -2362,7 +2448,7 @@ function CreateTaskPanel({
           >Cancel</button>
           <button onClick={handleCreate} disabled={creating} style={{
             height: 40, padding: "0 24px", borderRadius: 6, border: "none",
-            background: BLUE, color: "#0a0a0a",
+            background: BLUE, color: R.sidebar,
             fontSize: 13, fontWeight: 600, cursor: creating ? "wait" : "pointer",
             fontFamily: "system-ui, -apple-system, sans-serif",
             opacity: creating ? 0.7 : 1,

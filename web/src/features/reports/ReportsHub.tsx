@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft } from "lucide-react";
+import { R } from "../../styles/tokens";
 import { Button } from "../../components/ui/button"; // Stays global (up 2 levels)
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ interface ReportsHubProps {
   currencySymbol: string; // e.g. '$', '£'
   currencyCode: string; // e.g. 'USD', 'GBP'
   userRole?: string;
+  initialReport?: string | null;
 }
 
 export const ReportsHub: React.FC<ReportsHubProps> = ({
@@ -41,9 +43,10 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
   currencySymbol,
   currencyCode,
   userRole,
+  initialReport = null,
 }) => {
   // --- STATE: View Navigation ---
-  const [activeReportType, setActiveReportType] = useState<string | null>(null);
+  const [activeReportType, setActiveReportType] = useState<string | null>(initialReport);
 
   // --- STATE: Report Configuration (Lifted from Table/App) ---
   const now = new Date();
@@ -86,10 +89,15 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
 
   // --- EFFECTS ---
 
-  // 1. Reset when hotel changes
+  // 1. Reset when hotel changes (skip on initial mount if deep-linked)
+  const isInitialMount = useRef(true);
   useEffect(() => {
-    setActiveReportType(null);
-    clearReport();
+    if (isInitialMount.current && initialReport) {
+      isInitialMount.current = false;
+    } else {
+      setActiveReportType(null);
+      clearReport();
+    }
     if (hotelId) {
       loadSchedules(hotelId);
     }
@@ -313,55 +321,12 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
   // 1. Main Menu (Selector)
   if (!activeReportType) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          position: "relative",
-          backgroundColor: "#1d1d1c",
-        }}
-      >
-        {/* Fixed Full-Screen Background */}
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 0,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(250, 255, 106, 0.01))",
-            }}
+      <div style={{ flex: 1, background: R.bg, color: R.accent }}>
+        <div style={{ padding: "32px" }}>
+          <ReportSelector
+            onSelectReport={setActiveReportType}
+            userRole={userRole}
           />
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              backgroundImage:
-                "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-              backgroundSize: "64px 64px",
-            }}
-          />
-        </div>
-        <div
-          className="p-6"
-          style={{
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <div style={{ width: "100%", maxWidth: "1500px" }}>
-            <ReportSelector
-              onSelectReport={setActiveReportType}
-              userRole={userRole}
-            />
-          </div>
         </div>
       </div>
     );
@@ -408,35 +373,8 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
 
   // 3. Generic/Core Reports (Performance Metrics) - Managed by Hub State
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#1d1d1c",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Background gradient */}
-      <div
-        style={{
-          position: "absolute",
-          inset: "0",
-          background:
-            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(57, 189, 248, 0.01))",
-        }}
-      ></div>
-      {/* Grid overlay */}
-      <div
-        style={{
-          position: "absolute",
-          inset: "0",
-          backgroundImage:
-            "linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
-      ></div>
-
-      <div style={{ position: "relative", zIndex: 10, padding: "24px" }}>
+    <div style={{ flex: 1, background: R.bg, color: R.accent }}>
+      <div style={{ padding: "24px 28px" }}>
         {/* Header */}
         <div
           style={{
@@ -452,7 +390,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
               style={{
                 background: "none",
                 border: "none",
-                color: "#6b7280",
+                color: R.textDim,
                 fontSize: "12px",
                 cursor: "pointer",
                 display: "flex",
@@ -464,15 +402,15 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
                 letterSpacing: "-0.025em",
                 transition: "color 0.2s",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#39BDF8")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#6b7280")}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#38C6BA")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = R.textDim)}
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Report Selection</span>
             </button>
             <div
               style={{
-                color: "#e5e5e5",
+                color: R.accent,
                 fontSize: "18px",
                 textTransform: "uppercase",
                 letterSpacing: "-0.025em",
@@ -483,7 +421,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
             </div>
             <div
               style={{
-                color: "#6b7280",
+                color: R.textDim,
                 fontSize: "11px",
                 textTransform: "uppercase",
                 letterSpacing: "-0.025em",
@@ -505,9 +443,9 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
         {/* Unified Canvas — single #1A1A1A card */}
         <div
           style={{
-            backgroundColor: "rgb(26, 26, 26)",
+            backgroundColor: R.darkBand,
             borderRadius: "8px",
-            border: "1px solid #2a2a2a",
+            border: `1px solid ${R.border}`,
             overflow: "hidden",
             minHeight: "calc(100vh - 160px)",
             display: "flex",
@@ -530,8 +468,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
             />
           </div>
 
-          {/* Divider */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a" }} />
+          <div style={{ height: "1px", backgroundColor: R.sep }} />
 
           {/* Section 2: Metrics + Formatting */}
           <div style={{ padding: "20px 24px" }}>
@@ -551,7 +488,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
               <div
                 style={{
                   width: "1px",
-                  backgroundColor: "#2a2a2a",
+                  backgroundColor: R.border,
                   alignSelf: "stretch",
                 }}
               />
@@ -568,8 +505,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
             </div>
           </div>
 
-          {/* Divider */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a" }} />
+          <div style={{ height: "1px", backgroundColor: R.sep }} />
           {/* Report Table */}
           <div style={{ flex: 1 }}>
             <ReportTable

@@ -1,3 +1,5 @@
+import { R } from "../../../styles/tokens";
+
 interface ReportTableProps {
   startDate: string;
   endDate: string;
@@ -78,14 +80,14 @@ export function ReportTable({
     return (
       <div
         style={{
-          backgroundColor: transparent ? "transparent" : "#1a1a1a",
+          backgroundColor: transparent ? "transparent" : R.darkBand,
           borderRadius: transparent ? "0" : "4px",
-          border: transparent ? "none" : "1px solid #2a2a2a",
+          border: transparent ? "none" : `1px solid ${R.border}`,
           padding: "48px",
           textAlign: "center",
         }}
       >
-        <div style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
+        <div style={{ color: R.textMid, fontSize: "0.875rem" }}>
           No report data available. Click "Run Report" to generate.
         </div>
       </div>
@@ -95,41 +97,41 @@ export function ReportTable({
   return (
     <div
       style={{
-        backgroundColor: transparent ? "transparent" : "#1a1a1a",
+        backgroundColor: transparent ? "transparent" : R.darkBand,
         borderRadius: transparent ? "0" : "8px",
-        border: transparent ? "none" : "1px solid #2a2a2a",
+        border: transparent ? "none" : `1px solid ${R.border}`,
         overflow: "hidden",
       }}
     >
       <div
         style={{
           padding: "16px 24px",
-          borderBottom: "1px solid #2a2a2a",
+          borderBottom: `1px solid ${R.border}`,
         }}
       >
-        <div style={{ color: "#e5e5e5", fontSize: "0.875rem" }}>
-          Displaying <span style={{ color: "#39BDF8" }}>{granularity}</span>{" "}
-          data from <span style={{ color: "#39BDF8" }}>{startDate}</span> to{" "}
-          <span style={{ color: "#39BDF8" }}>{endDate}</span>
+        <div style={{ color: R.accent, fontSize: "0.875rem" }}>
+          Displaying <span style={{ color: R.gold }}>{granularity}</span>{" "}
+          data from <span style={{ color: R.gold }}>{startDate}</span> to{" "}
+          <span style={{ color: R.gold }}>{endDate}</span>
         </div>
       </div>
 
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+            <tr style={{ borderBottom: `1px solid ${R.border}` }}>
               <th
                 style={{
                   padding: "0.625rem 1rem",
                   textAlign: "left",
-                  color: "#6b7280",
+                  color: R.textDim,
                   fontSize: "0.75rem",
                   textTransform: "uppercase",
                   letterSpacing: "-0.025em",
                   fontWeight: "normal",
                   position: "sticky",
                   left: 0,
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: R.darkBand,
                   zIndex: 10,
                 }}
               >
@@ -141,7 +143,7 @@ export function ReportTable({
                   style={{
                     padding: "0.625rem 0.75rem",
                     textAlign: "center",
-                    color: "#6b7280",
+                    color: R.textDim,
                     fontSize: "0.75rem",
                     textTransform: "uppercase",
                     letterSpacing: "-0.025em",
@@ -156,12 +158,12 @@ export function ReportTable({
                   style={{
                     padding: "0.625rem 0.75rem",
                     textAlign: "center",
-                    color: "#6b7280",
+                    color: R.textDim,
                     fontSize: "0.75rem",
                     textTransform: "uppercase",
                     letterSpacing: "-0.025em",
                     fontWeight: "normal",
-                    borderLeft: "2px solid #2a2a2a",
+                    borderLeft: `1px solid ${R.border}`,
                   }}
                 >
                   Delta
@@ -174,30 +176,30 @@ export function ReportTable({
               <tr
                 key={index}
                 style={{
-                  borderBottom: "1px solid #2a2a2a",
+                  borderBottom: `1px solid ${R.sep}`,
                   transition: "background-color 0.2s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#242424";
+                  e.currentTarget.style.backgroundColor = R.card;
                   const firstCell = e.currentTarget
                     .firstElementChild as HTMLElement;
-                  if (firstCell) firstCell.style.backgroundColor = "#242424";
+                  if (firstCell) firstCell.style.backgroundColor = R.card;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "transparent";
                   const firstCell = e.currentTarget
                     .firstElementChild as HTMLElement;
-                  if (firstCell) firstCell.style.backgroundColor = "#1a1a1a";
+                  if (firstCell) firstCell.style.backgroundColor = R.darkBand;
                 }}
               >
                 <td
                   style={{
                     padding: "0.75rem 1rem",
-                    color: "#e5e5e5",
+                    color: R.accent,
                     fontSize: "0.875rem",
                     position: "sticky",
                     left: 0,
-                    backgroundColor: "#1a1a1a",
+                    backgroundColor: R.darkBand,
                     zIndex: 10,
                     transition: "background-color 0.2s",
                   }}
@@ -215,7 +217,7 @@ export function ReportTable({
                     style={{
                       padding: "0.75rem",
                       textAlign: "center",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "0.875rem",
                     }}
                   >
@@ -228,13 +230,13 @@ export function ReportTable({
                       padding: "0.75rem",
                       textAlign: "center",
                       fontSize: "0.875rem",
-                      borderLeft: "2px solid #2a2a2a",
+                      borderLeft: `1px solid ${R.border}`,
                       color:
                         row.delta > 0
-                          ? "#10b981"
+                          ? R.green
                           : row.delta < 0
                             ? "#ef4444"
-                            : "#9ca3af",
+                            : R.textMid,
                     }}
                   >
                     {row.delta > 0 ? "+" : ""}
@@ -247,19 +249,19 @@ export function ReportTable({
               <tr
                 style={{
                   borderTop: "2px solid rgba(57, 189, 248, 0.3)",
-                  backgroundColor: "#141414",
+                  backgroundColor: R.heroBg,
                 }}
               >
                 <td
                   style={{
                     padding: "0.75rem 1rem",
-                    color: "#39BDF8",
+                    color: R.warmTeal,
                     fontSize: "0.75rem",
                     textTransform: "uppercase",
                     letterSpacing: "-0.025em",
                     position: "sticky",
                     left: 0,
-                    backgroundColor: "#141414",
+                    backgroundColor: R.heroBg,
                     zIndex: 10,
                   }}
                 >
@@ -271,7 +273,7 @@ export function ReportTable({
                     style={{
                       padding: "0.75rem",
                       textAlign: "center",
-                      color: "#39BDF8",
+                      color: R.warmTeal,
                       fontSize: "0.875rem",
                     }}
                   >
@@ -282,7 +284,7 @@ export function ReportTable({
                   <td
                     style={{
                       padding: "0.75rem",
-                      borderLeft: "2px solid #2a2a2a",
+                      borderLeft: `1px solid ${R.border}`,
                     }}
                   ></td>
                 )}

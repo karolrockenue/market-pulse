@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, CSSProperties } from "react";
+import { R } from "../../../styles/tokens";
 import {
   Calendar,
   ChevronLeft,
@@ -181,8 +182,8 @@ export function RoundedGridReportControls({
 
   const inputStyle: CSSProperties = {
     background: "#0d0d0d",
-    border: "1px solid #2a2a2a",
-    color: "#e5e5e5",
+    border: `1px solid ${R.border}`,
+    color: R.accent,
     padding: "10px 12px",
     fontSize: "13px",
     borderRadius: "4px",
@@ -203,15 +204,15 @@ export function RoundedGridReportControls({
     right: 0,
     marginTop: "8px",
     zIndex: 1000,
-    background: "#141414",
-    border: "1px solid #2a2a2a",
+    background: R.heroBg,
+    border: `1px solid ${R.border}`,
     borderRadius: "12px",
     padding: "16px",
     boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
   };
 
   const labelStyle: CSSProperties = {
-    color: "#6b7280",
+    color: R.textDim,
     fontSize: "11px",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
@@ -225,8 +226,8 @@ export function RoundedGridReportControls({
     left: 0,
     marginTop: "4px",
     zIndex: 1000,
-    background: "#141414",
-    border: "1px solid #2a2a2a",
+    background: R.heroBg,
+    border: `1px solid ${R.border}`,
     borderRadius: "8px",
     padding: "4px",
     boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
@@ -236,7 +237,7 @@ export function RoundedGridReportControls({
   const dropdownItemStyle: CSSProperties = {
     padding: "8px 12px",
     fontSize: "12px",
-    color: "#e5e5e5",
+    color: R.accent,
     cursor: "pointer",
     borderRadius: "4px",
     transition: "background 0.15s",
@@ -283,7 +284,7 @@ export function RoundedGridReportControls({
             style={{
               background: "transparent",
               border: "none",
-              color: "#e5e5e5",
+              color: R.accent,
               cursor: "pointer",
               padding: "4px",
               display: "flex",
@@ -294,7 +295,7 @@ export function RoundedGridReportControls({
           </button>
           <div
             style={{
-              color: "#e5e5e5",
+              color: R.accent,
               fontSize: "12px",
               letterSpacing: "0.05em",
             }}
@@ -309,7 +310,7 @@ export function RoundedGridReportControls({
             style={{
               background: "transparent",
               border: "none",
-              color: "#e5e5e5",
+              color: R.accent,
               cursor: "pointer",
               padding: "4px",
               display: "flex",
@@ -335,7 +336,7 @@ export function RoundedGridReportControls({
               style={{
                 textAlign: "center",
                 fontSize: "9px",
-                color: "#6b7280",
+                color: R.textDim,
                 padding: "4px",
               }}
             >
@@ -370,9 +371,9 @@ export function RoundedGridReportControls({
                   color: isSelected
                     ? "#0d0d0d"
                     : day
-                      ? "#e5e5e5"
+                      ? R.accent
                       : "transparent",
-                  background: isSelected ? "#39bdf8" : "transparent",
+                  background: isSelected ? "#38C6BA" : "transparent",
                   borderRadius: "50%",
                   cursor: day ? "pointer" : "default",
                   fontFamily: "monospace",
@@ -380,7 +381,7 @@ export function RoundedGridReportControls({
                 }}
                 onMouseEnter={(e) => {
                   if (day && !isSelected)
-                    e.currentTarget.style.background = "#2a2a2a";
+                    e.currentTarget.style.background = R.border;
                 }}
                 onMouseLeave={(e) => {
                   if (day && !isSelected)
@@ -397,7 +398,7 @@ export function RoundedGridReportControls({
         <div
           style={{
             marginTop: "12px",
-            borderTop: "1px solid #2a2a2a",
+            borderTop: `1px solid ${R.border}`,
             paddingTop: "10px",
             display: "flex",
             justifyContent: "center",
@@ -425,7 +426,7 @@ export function RoundedGridReportControls({
             style={{
               background: "transparent",
               border: "none",
-              color: "#39bdf8",
+              color: "#38C6BA",
               fontSize: "11px",
               cursor: "pointer",
               letterSpacing: "0.05em",
@@ -455,8 +456,8 @@ export function RoundedGridReportControls({
         alignItems: "flex-end",
         gap: "12px",
         padding: transparent ? "0" : "16px 24px",
-        backgroundColor: transparent ? "transparent" : "#141414",
-        border: transparent ? "none" : "1px solid #2a2a2a",
+        backgroundColor: transparent ? "transparent" : R.heroBg,
+        border: transparent ? "none" : `1px solid ${R.border}`,
         borderRadius: transparent ? "0" : "8px",
       }}
     >
@@ -471,12 +472,12 @@ export function RoundedGridReportControls({
           }}
           style={{
             ...inputStyle,
-            backgroundColor: "#141414",
-            borderColor: presetOpen ? "#39bdf8" : "#2a2a2a",
+            backgroundColor: R.heroBg,
+            borderColor: presetOpen ? "#38C6BA" : R.border,
           }}
         >
           <span>{currentPresetLabel}</span>
-          <ChevronDown size={12} style={{ color: "#6b7280" }} />
+          <ChevronDown size={12} style={{ color: R.textDim }} />
         </div>
         {presetOpen && (
           <div style={dropdownStyle}>
@@ -493,11 +494,11 @@ export function RoundedGridReportControls({
                     preset.value === datePreset
                       ? "rgba(57, 189, 248, 0.1)"
                       : "transparent",
-                  color: preset.value === datePreset ? "#39bdf8" : "#e5e5e5",
+                  color: preset.value === datePreset ? "#38C6BA" : R.accent,
                 }}
                 onMouseEnter={(e) => {
                   if (preset.value !== datePreset)
-                    e.currentTarget.style.background = "#1a1a1a";
+                    e.currentTarget.style.background = R.darkBand;
                 }}
                 onMouseLeave={(e) => {
                   if (preset.value !== datePreset)
@@ -516,7 +517,7 @@ export function RoundedGridReportControls({
         style={{
           width: "1px",
           height: "36px",
-          backgroundColor: "#2a2a2a",
+          backgroundColor: R.border,
           flexShrink: 0,
         }}
       />
@@ -535,12 +536,12 @@ export function RoundedGridReportControls({
           }}
           style={{
             ...inputStyle,
-            backgroundColor: "#141414",
-            borderColor: openPicker === "from" ? "#39bdf8" : "#2a2a2a",
+            backgroundColor: R.heroBg,
+            borderColor: openPicker === "from" ? "#38C6BA" : R.border,
           }}
         >
           <span>{formatDateDisplay(startDate)}</span>
-          <Calendar size={14} style={{ color: "#6b7280" }} />
+          <Calendar size={14} style={{ color: R.textDim }} />
         </div>
         {openPicker === "from" &&
           renderCalendar(fromViewMonth, selectedFromDay, "from")}
@@ -551,7 +552,7 @@ export function RoundedGridReportControls({
         style={{
           width: "1px",
           height: "36px",
-          backgroundColor: "#2a2a2a",
+          backgroundColor: R.border,
           flexShrink: 0,
         }}
       />
@@ -569,12 +570,12 @@ export function RoundedGridReportControls({
           }}
           style={{
             ...inputStyle,
-            backgroundColor: "#141414",
-            borderColor: openPicker === "to" ? "#39bdf8" : "#2a2a2a",
+            backgroundColor: R.heroBg,
+            borderColor: openPicker === "to" ? "#38C6BA" : R.border,
           }}
         >
           <span>{formatDateDisplay(endDate)}</span>
-          <Calendar size={14} style={{ color: "#6b7280" }} />
+          <Calendar size={14} style={{ color: R.textDim }} />
         </div>
         {openPicker === "to" &&
           renderCalendar(toViewMonth, selectedToDay, "to")}
@@ -585,7 +586,7 @@ export function RoundedGridReportControls({
         style={{
           width: "1px",
           height: "36px",
-          backgroundColor: "#2a2a2a",
+          backgroundColor: R.border,
           flexShrink: 0,
         }}
       />
@@ -601,12 +602,12 @@ export function RoundedGridReportControls({
           }}
           style={{
             ...inputStyle,
-            backgroundColor: "#141414",
-            borderColor: granularityOpen ? "#39bdf8" : "#2a2a2a",
+            backgroundColor: R.heroBg,
+            borderColor: granularityOpen ? "#38C6BA" : R.border,
           }}
         >
           <span>{currentGranularityLabel}</span>
-          <ChevronDown size={12} style={{ color: "#6b7280" }} />
+          <ChevronDown size={12} style={{ color: R.textDim }} />
         </div>
         {granularityOpen && (
           <div style={dropdownStyle}>
@@ -623,11 +624,11 @@ export function RoundedGridReportControls({
                     opt.value === granularity
                       ? "rgba(57, 189, 248, 0.1)"
                       : "transparent",
-                  color: opt.value === granularity ? "#39bdf8" : "#e5e5e5",
+                  color: opt.value === granularity ? "#38C6BA" : R.accent,
                 }}
                 onMouseEnter={(e) => {
                   if (opt.value !== granularity)
-                    e.currentTarget.style.background = "#1a1a1a";
+                    e.currentTarget.style.background = R.darkBand;
                 }}
                 onMouseLeave={(e) => {
                   if (opt.value !== granularity)
@@ -650,8 +651,8 @@ export function RoundedGridReportControls({
         onMouseEnter={() => setRunButtonHovered(true)}
         onMouseLeave={() => setRunButtonHovered(false)}
         style={{
-          backgroundColor: runButtonHovered ? "#29ADEE" : "#39BDF8",
-          color: "#0a0a0a",
+          backgroundColor: runButtonHovered ? "#2fb3a8" : "#38C6BA",
+          color: R.sidebar,
           height: "38px",
           padding: "0 20px",
           fontSize: "12px",

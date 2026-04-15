@@ -1,4 +1,3 @@
-// [MODIFIED] Imported useEffect, useState, and toast
 import { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle,
@@ -64,9 +63,9 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-// [MODIFIED] Import toast for error notifications
 import { toast } from "sonner";
 import { PortfolioFlowcast } from "./PortfolioFlowcast";
+import { R } from "@/styles/tokens";
 
 // --- Currency symbol helper ---
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -81,16 +80,14 @@ function getCurrencySymbol(currencyCode?: string): string {
   return CURRENCY_SYMBOLS[code] || code + " ";
 }
 
-// --- Quadrant → Color map (canonical, do NOT recompute quadrant from x/y) ---
+// --- Quadrant → Color map ---
 const QUADRANT_COLORS: Record<string, string> = {
-  "Critical Risk": "#ef4444", // red
-  "Fill Risk": "#f59e0b", // orange
-  "Rate Strategy Risk": "#39BDF8", // yellow
-  "On Pace": "#10b981", // green
+  "Critical Risk": R.red,
+  "Fill Risk": R.gold,
+  "Rate Strategy Risk": R.warmTeal,
+  "On Pace": R.green,
 };
 
-// Robust normalizer: trims, collapses whitespace, normalizes Unicode.
-// This prevents invisible differences like "Fill Risk" (NBSP) or trailing spaces.
 function normalizeQuadrant(q: unknown): string {
   if (typeof q !== "string") return "";
   return q.normalize("NFKC").replace(/\s+/g, " ").trim();
@@ -98,9 +95,9 @@ function normalizeQuadrant(q: unknown): string {
 
 function colorForQuadrant(q: unknown): string {
   const key = normalizeQuadrant(q);
-  return QUADRANT_COLORS[key] ?? "#9ca3af"; // neutral grey fallback
+  return QUADRANT_COLORS[key] ?? R.textMid;
 }
-// --- Robust numeric parser: handles numbers, "52.3", "52.3%", " 52 ", null/undefined ---
+
 function num(val: any): number {
   if (val == null) return NaN;
   if (typeof val === "number") return val;
@@ -112,16 +109,12 @@ function num(val: any): number {
   return NaN;
 }
 
-// --- Normalize quadrant text safely ---
 function normQuad(q: any): string {
   return (typeof q === "string" ? q.normalize("NFKC") : "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-// --- Choose color from payload: [FIXED & DEBUGGED] ---
-// The logic now *only* uses X/Y coordinates to guarantee alignment.
-// A console.log has been added to debug invalid data.
 function colorFromPayload(payload: any): string {
   const x = num(
     payload?.forwardOccupancy ?? payload?.forward_occupancy ?? payload?.x
@@ -131,43 +124,13 @@ function colorFromPayload(payload: any): string {
       payload?.pacing_difficulty_percent ??
       payload?.y
   );
-  const hotelName = payload?.hotelName ?? "Unknown Hotel";
-
-  // Use neutral grey for any invalid data points
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    console.warn(`[DOT DEBUG] ${hotelName}: SKIPPED (Invalid Coords)`, {
-      x,
-      y,
-    });
-    return "#9ca3af"; // Grey
-  }
-
-  // Reference lines: x=60, y=115
-  // Y-axis is reversed, so y < 115 is the TOP half.
-
-  // Top-Left (Fill Risk / Need Volume)
-  if (x < 60 && y < 115) {
-    // console.log(`[DOT DEBUG] ${hotelName}: Top-Left (Orange)`, { x, y });
-    return "#f59e0b"; // Orange
-  }
-
-  // Bottom-Left (Critical Risk)
-  if (x < 60 && y >= 115) {
-    // console.log(`[DOT DEBUG] ${hotelName}: Bottom-Left (Red)`, { x, y });
-    return "#ef4444"; // Red
-  }
-
-  // Bottom-Right (Rate Strategy / Selling too cheap)
-  if (x >= 60 && y >= 115) {
-    // console.log(`[DOT DEBUG] ${hotelName}: Bottom-Right (Yellow)`, { x, y });
-    return "#39BDF8"; // Yellow
-  }
-
-  // Top-Right (On Pace)
-  // console.log(`[DOT DEBUG] ${hotelName}: Top-Right (Green)`, { x, y });
-  return "#10b981"; // Green
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return R.textMid;
+  if (x < 60 && y < 115) return R.gold;
+  if (x < 60 && y >= 115) return R.red;
+  if (x >= 60 && y >= 115) return R.warmTeal;
+  return R.green;
 }
-// Custom shape: color each dot directly from its payload
+
 const DotByPayload = (props: any) => {
   const { cx, cy, r = 5, payload } = props;
   if (cx == null || cy == null) return null;
@@ -175,524 +138,81 @@ const DotByPayload = (props: any) => {
   return <circle cx={cx} cy={cy} r={r} fill={fill} />;
 };
 
-// Custom dot that ALWAYS uses the color passed in by <Cell>
 const DotShape = (props: any) => {
   const { cx, cy, r = 4, fill, stroke, strokeWidth = 0 } = props;
   if (cx == null || cy == null) return null;
   return (
-    <circle
-      cx={cx}
-      cy={cy}
-      r={r}
-      fill={fill}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-    />
+    <circle cx={cx} cy={cy} r={r} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
   );
 };
 
-// --- [NEW] INLINE STYLE OBJECTS (Updated to match PROT design) ---
-const styles = {
-  pageWrapper: {
-    minHeight: "100vh",
-    backgroundColor: "#1d1d1c", // [UPDATED] Deep dark background
-    padding: "24px",
-    position: "relative" as "relative",
-    overflow: "hidden" as "hidden",
-  },
-  // [NEW] Background effects container
-  bgGradient: {
-    position: "absolute" as "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(to bottom right, rgba(57, 189, 248, 0.02), transparent, rgba(250, 255, 106, 0.02))",
-    pointerEvents: "none" as "none",
-  },
-  bgGrid: {
-    position: "absolute" as "absolute",
-    inset: 0,
-    backgroundImage:
-      "linear-gradient(rgba(57,189,248,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.02) 1px, transparent 1px)",
-    backgroundSize: "64px 64px",
-    pointerEvents: "none" as "none",
-  },
-  contentContainer: {
-    position: "relative" as "relative",
-    zIndex: 10,
-  },
-  mb6: { marginBottom: "24px" },
-  mb8: { marginBottom: "32px" },
-  mb4: { marginBottom: "16px" },
-  mb3: { marginBottom: "12px" },
-  mb2: { marginBottom: "8px" },
-  mb1: { marginBottom: "4px" },
-  mt4: { marginTop: "16px" },
-  mt6: { marginTop: "24px" },
-  header: {
-    marginBottom: "1.5rem",
-  },
-  h1: {
-    color: "#e5e5e5",
-    fontSize: "1.125rem",
-    textTransform: "uppercase" as "uppercase",
-    letterSpacing: "-0.025em",
-    marginBottom: "0.25rem",
-  },
-  h2: {
-    color: "#e5e5e5",
-    fontSize: "0.875rem",
-    textTransform: "uppercase" as "uppercase",
-    letterSpacing: "-0.025em",
-    marginBottom: "0.25rem",
-  },
-  h3: { color: "#e5e5e5", fontSize: "15px" },
-  pSubtle: { color: "#6b7280", fontSize: "0.75rem" },
-  pSmall: { color: "#6b7280", fontSize: "0.75rem" },
-  pXSmall: {
-    color: "#6b7280",
-    fontSize: "0.75rem",
-    textTransform: "uppercase" as "uppercase",
-    letterSpacing: "0.05em",
-  },
-
-  grid4: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "16px",
-  },
-  grid3: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "24px", // [UPDATED] Wider gap
-  },
-  grid7: {
-    display: "grid",
-    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-    gap: "16px",
-  },
-  grid12: {
-    display: "grid",
-    gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
-    gap: "16px",
-  },
-  colSpan1: { gridColumn: "span 1 / span 1" },
-  colSpan2: { gridColumn: "span 2 / span 2" },
-  colSpan3: { gridColumn: "span 3 / span 3" },
-
-  // [UPDATED] Card Styles with new border color #2a2a2a
-  card: {
-    backgroundColor: "#1a1a1a", // [UPDATED] Lighter dark
-    border: "1px solid #2a2a2a", // [UPDATED] Subtle border
-    borderRadius: "4px",
-    padding: "12px",
-  },
-  cardPadded: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "20px",
-  },
-  // [UPDATED] Colored borders
-  cardCriticalBorder: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a", // Keep base border
-    borderRadius: "4px",
-    padding: "12px",
-  },
-  cardModerateBorder: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "12px",
-  },
-  cardYellowBorder: {
-    backgroundColor: "#1d1d1c",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "8px",
-  },
-  cardOrangeBorder: {
-    backgroundColor: "#1d1d1c",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "8px",
-  },
-  cardRedBorder: {
-    backgroundColor: "#1d1d1c",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "8px",
-  },
-
-  cardHeader: {
-    padding: "12px 16px",
-    backgroundColor: "#1a1a1a",
-    borderBottom: "1px solid #2a2a2a",
-    fontSize: "11px",
-    color: "#9ca3af",
-  },
-  cardRow: {
-    padding: "12px 16px",
-    transition: "background-color 0.2s",
-  },
-
-  textRight: { textAlign: "right" as "right" },
-  textCenter: { textAlign: "center" as "center" },
-  textXs: { fontSize: "12px" },
-  textSm: { fontSize: "14px" },
-  textLg: { fontSize: "18px" },
-  textXl: { fontSize: "20px" }, // 1.25rem
-  text2Xl: { fontSize: "20px" }, // [UPDATED] Smaller than before
-  textWhite: { color: "#e5e5e5" },
-  textRed: { color: "#ef4444" },
-  textRedLight: { color: "#f87171" },
-  textOrange: { color: "#f59e0b" },
-  textGreen: { color: "#10b981" },
-  textYellow: { color: "#39BDF8" },
-
-  flex: { display: "flex" },
-  flexCol: { display: "flex", flexDirection: "column" as "column" },
-  flexBetween: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  flexGap2: { display: "flex", alignItems: "center", gap: "8px" },
-  flexGap3: { display: "flex", alignItems: "center", gap: "12px" },
-  flexGap4: { display: "flex", alignItems: "center", gap: "16px" },
-  flex1: { flex: "1 1 0%" },
-
-  overflowHidden: { overflow: "hidden" },
-  overflowAuto: { overflow: "auto" },
-  overflowYAuto: { overflowY: "auto" as "auto" },
-  maxH180: { maxHeight: "180px" },
-
-  // Matrix Styles
-  matrixControls: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "12px",
-    marginBottom: "16px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  matrixTableWrapper: {
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    overflow: "hidden",
-  },
-  matrixOverflow: { overflowX: "auto" as "auto" },
-  matrixMinWidth: { display: "inline-block", minWidth: "100%" },
-  matrixHeaderRow: {
-    display: "flex",
-    position: "sticky" as "sticky",
-    top: 0,
-    zIndex: 10,
-    backgroundColor: "#1a1a1a",
-    borderBottom: "1px solid #2a2a2a",
-  },
-  matrixStickyHeader: {
-    position: "sticky" as "sticky",
-    left: 0,
-    zIndex: 20,
-    backgroundColor: "#1a1a1a",
-    borderRight: "1px solid #2a2a2a",
-    width: "240px",
-    flexShrink: 0,
-    padding: "12px 16px",
-  },
-  matrixDateHeader: {
-    width: "56px",
-    flexShrink: 0,
-    padding: "8px 4px",
-    textAlign: "center" as "center",
-  },
-  matrixDateToday: {
-    backgroundColor: "rgba(250, 255, 106, 0.1)",
-    borderLeft: "2px solid #39BDF8",
-  },
-  matrixRow: {
-    display: "flex",
-    borderBottom: "1px solid #2a2a2a",
-  },
-  matrixStickyCell: {
-    position: "sticky" as "sticky",
-    left: 0,
-    zIndex: 10,
-    backgroundColor: "#1a1a1a",
-    borderRight: "1px solid #2a2a2a",
-    width: "240px",
-    flexShrink: 0,
-    padding: "8px 16px",
-  },
-  matrixDataCell: {
-    width: "56px",
-    flexShrink: 0,
-    padding: "4px",
-    textAlign: "center" as "center",
-    position: "relative" as "relative",
-  },
-  matrixDataCellInner: {
-    borderWidth: "1px",
-    borderRadius: "2px",
-    padding: "2px 4px",
-    fontSize: "11px",
-    position: "relative" as "relative",
-    height: "24px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  matrixDataCellToday: {
-    backgroundColor: "rgba(250, 255, 106, 0.05)",
-    borderLeft: "2px solid #39BDF8",
-  },
-  matrixTooltip: {
-    position: "absolute" as "absolute",
-    left: "50%",
-    transform: "translateX(-50%)",
-    bottom: "100%",
-    marginBottom: "4px",
-    backgroundColor: "#1d1d1c",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "8px",
-    zIndex: 30,
-    opacity: 0,
-    pointerEvents: "none" as "none",
-    transition: "opacity 0.2s",
-    whiteSpace: "nowrap" as "nowrap",
-    fontSize: "11px",
-  },
-
-  // Quadrant Styles
-  quadrantGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "24px",
-  },
-  quadrantChartWrapper: {
-    gridColumn: "span 2 / span 2",
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "4px",
-    padding: "20px",
-  },
-  quadrantChartRelative: {
-    position: "relative" as "relative",
-    height: "520px",
-  },
-  quadrantOverlays: {
-    position: "absolute" as "absolute",
-    inset: 0,
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gridTemplateRows: "repeat(2, minmax(0, 1fr))",
-    gap: "1px",
-    pointerEvents: "none" as "none",
-    zIndex: 0,
-  },
-  quadrantLabel: {
-    position: "absolute" as "absolute",
-    zIndex: 10,
-    backgroundColor: "#1a1a1a",
-    borderRadius: "4px",
-    padding: "4px 8px",
-    border: "1px solid #2a2a2a",
-  },
-  quadrantLegendDot: {
-    width: "6px",
-    height: "6px",
-    borderRadius: "9999px",
-  },
-  quadrantActionList: {
-    gridColumn: "span 1 / span 1",
-    display: "flex",
-    flexDirection: "column" as "column",
-    gap: "16px",
-  },
-  quadrantActionItem: {
-    backgroundColor: "#1d1d1c",
-    borderRadius: "4px",
-    padding: "8px",
-    border: "1px solid #2a2a2a",
-  },
-
-  flexHalf: { display: "flex", gap: "24px", marginBottom: "32px" },
-  widthHalf: { width: "50%" },
-
-  loadingOverlay: {
-    position: "absolute" as "absolute",
-    inset: 0,
-    backgroundColor: "rgba(29, 29, 28, 0.9)",
-    display: "flex",
-    flexDirection: "column" as "column",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 50,
-    backdropFilter: "blur(4px)",
-  },
-  loadingSpinner: {
-    width: "40px",
-    height: "40px",
-    border: "3px solid #39BDF8",
-    borderTopColor: "transparent",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
-  loadingText: {
-    color: "#6b7280",
-    marginTop: "16px",
-    fontSize: "12px",
-    textTransform: "uppercase" as "uppercase",
-    letterSpacing: "0.05em",
-  },
-};
-// --- [END] INLINE STYLES ---
-
-// [MODIFIED] All mock data functions (generateHotelData, generateForwardPaceData, generateBudgetPacingData)
-// and their direct calls (const hotels = ...) have been REMOVED.
-
-// Helper functions for matrix
+// --- Helper functions ---
 const getOccupancyColor = (value: number) => {
-  if (value >= 100)
-    return {
-      backgroundColor: "rgba(168, 85, 247, 0.3)",
-      borderColor: "rgba(168, 85, 247, 0.5)",
-    }; // Overbooked
-  if (value >= 80)
-    return {
-      backgroundColor: "rgba(16, 185, 129, 0.3)",
-      borderColor: "rgba(16, 185, 129, 0.5)",
-    }; // Excellent
-  if (value >= 70)
-    return {
-      backgroundColor: "rgba(250, 255, 106, 0.2)",
-      borderColor: "rgba(250, 255, 106, 0.3)",
-    }; // Good
-  if (value >= 50)
-    return {
-      backgroundColor: "rgba(249, 115, 22, 0.2)",
-      borderColor: "rgba(249, 115, 22, 0.3)",
-    }; // Fair
-  if (value >= 40)
-    return {
-      backgroundColor: "rgba(234, 88, 12, 0.3)",
-      borderColor: "rgba(234, 88, 12, 0.5)",
-    }; // Warning
-  return {
-    backgroundColor: "rgba(239, 68, 68, 0.3)",
-    borderColor: "rgba(239, 68, 68, 0.5)",
-  }; // Critical
+  if (value >= 100) return { backgroundColor: `${R.warmTeal}30`, borderColor: `${R.warmTeal}50` };
+  if (value >= 80) return { backgroundColor: `${R.green}25`, borderColor: `${R.green}40` };
+  if (value >= 70) return { backgroundColor: `${R.warmTeal}20`, borderColor: `${R.warmTeal}40` };
+  if (value >= 50) return { backgroundColor: `${R.gold}20`, borderColor: `${R.gold}30` };
+  if (value >= 40) return { backgroundColor: `${R.gold}30`, borderColor: `${R.gold}50` };
+  return { backgroundColor: `${R.red}40`, borderColor: `${R.red}60` };
 };
 
 const getOccupancyTextColor = (value: number) => {
-  if (value >= 100) return { color: "#c084fc" }; // text-purple-400
-  if (value >= 80) return { color: "#34d399" }; // text-emerald-400
-  if (value >= 70) return { color: "#39BDF8" }; // text-[#39BDF8]
-  if (value >= 50) return { color: "#fb923c" }; // text-orange-400
-  if (value >= 40) return { color: "#f97316" }; // text-orange-500
-  return { color: "#f87171" }; // text-red-400
+  if (value >= 100) return { color: R.warmTeal };
+  if (value >= 80) return { color: R.green };
+  if (value >= 70) return { color: R.warmTeal };
+  if (value >= 50) return { color: R.gold };
+  if (value >= 40) return { color: R.gold };
+  return { color: R.red };
 };
 
-// Helper functions for pace variance
 const getPaceVarianceColor = (variance: number) => {
-  if (variance < -30)
-    return {
-      backgroundColor: "rgba(239, 68, 68, 0.4)",
-      borderColor: "rgba(239, 68, 68, 0.6)",
-    }; // Deep Red
-  if (variance < -10)
-    return {
-      backgroundColor: "rgba(239, 68, 68, 0.2)",
-      borderColor: "rgba(239, 68, 68, 0.4)",
-    }; // Light Red
-  if (variance <= 10)
-    return { backgroundColor: "#2a2a2a", borderColor: "#4a4a45" }; // Grey
-  return {
-    backgroundColor: "rgba(16, 185, 129, 0.3)",
-    borderColor: "rgba(16, 185, 129, 0.5)",
-  }; // Green
+  if (variance < -30) return { backgroundColor: `${R.red}40`, borderColor: `${R.red}60` };
+  if (variance < -10) return { backgroundColor: `${R.red}20`, borderColor: `${R.red}40` };
+  if (variance <= 10) return { backgroundColor: R.border, borderColor: R.textDim };
+  return { backgroundColor: `${R.green}25`, borderColor: `${R.green}40` };
 };
 
 const getPaceVarianceTextColor = (variance: number) => {
-  if (variance < -30) return { color: "#f87171" }; // text-red-400
-  if (variance < -10) return { color: "#fca5a5" }; // text-red-300
-  if (variance <= 10) return { color: "#9ca3af" };
-  return { color: "#34d399" }; // text-emerald-400
+  if (variance < -30) return { color: R.red };
+  if (variance < -10) return { color: R.red };
+  if (variance <= 10) return { color: R.textMid };
+  return { color: R.green };
 };
 
 const detectAnomalies = (matrixData: any[]) => {
-  const anomalies: {
-    day: number;
-    type: "drop" | "persistent" | "overbooked";
-  }[] = [];
-
+  const anomalies: { day: number; type: "drop" | "persistent" | "overbooked" }[] = [];
   for (let i = 1; i < matrixData.length; i++) {
     const diff = matrixData[i - 1].occupancy - matrixData[i].occupancy;
-    if (diff >= 15) {
-      anomalies.push({ day: i, type: "drop" });
-    }
+    if (diff >= 15) anomalies.push({ day: i, type: "drop" });
   }
-
   let lowCount = 0;
   for (let i = 0; i < matrixData.length; i++) {
     if (matrixData[i].occupancy < 50) {
       lowCount++;
-      if (
-        lowCount >= 7 &&
-        !anomalies.some((a) => a.day === i && a.type === "persistent")
-      ) {
+      if (lowCount >= 7 && !anomalies.some((a) => a.day === i && a.type === "persistent")) {
         anomalies.push({ day: i, type: "persistent" });
       }
     } else {
       lowCount = 0;
     }
   }
-
   for (let i = 0; i < matrixData.length; i++) {
-    if (matrixData[i].occupancy > 100) {
-      anomalies.push({ day: i, type: "overbooked" });
-    }
+    if (matrixData[i].occupancy > 100) anomalies.push({ day: i, type: "overbooked" });
   }
-
   return anomalies;
 };
 
-// --- [NEW] Custom Tooltip for Quadrant Chart ---
 const QuadrantTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div
-        style={{
-          backgroundColor: "#1d1d1c",
-          border: "1px solid #39BDF8",
-          borderRadius: "8px",
-          padding: "8px 12px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-          zIndex: 100,
-        }}
-      >
-        <div
-          style={{ color: "#e5e5e5", fontSize: "13px", marginBottom: "4px" }}
-        >
-          {data.hotelName}
+      <div style={{ background: R.sidebar, border: `1px solid ${R.border}`, borderRadius: 8, padding: "8px 12px", boxShadow: "0 4px 12px rgba(0,0,0,0.5)" }}>
+        <div style={{ color: R.accent, fontSize: 13, marginBottom: 4 }}>{data.hotelName}</div>
+        <div style={{ color: R.textMid, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Occ: <span style={{ color: R.accent }}>{data.forwardOccupancy.toFixed(1)}%</span>
         </div>
-        <div style={{ ...styles.pXSmall, color: "#9ca3af" }}>
-          Occ:{" "}
-          <span style={styles.textWhite}>
-            {data.forwardOccupancy.toFixed(1)}%
-          </span>
-        </div>
-        <div style={{ ...styles.pXSmall, color: "#9ca3af" }}>
-          Pressure:{" "}
-          <span style={styles.textWhite}>
-            {data.pacingDifficultyPercent.toFixed(1)}%
-          </span>
+        <div style={{ color: R.textMid, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Pressure: <span style={{ color: R.accent }}>{data.pacingDifficultyPercent.toFixed(1)}%</span>
         </div>
       </div>
     );
@@ -700,21 +220,13 @@ const QuadrantTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-// --- [NEW] Custom Tooltip for Matrix Chart ---
-// [MODIFIED] This tooltip is no longer needed as the matrix is rendered
-// differently. We will keep the helper functions though.
-// ... (MatrixTooltip component removed for brevity, it's unused)
-
 export function PortfolioRiskOverview() {
-  // --- [MODIFIED] State Declarations ---
   const [isLoading, setIsLoading] = useState(true);
   const [occupancyProblemList, setOccupancyProblemList] = useState<any[]>([]);
   const [pacingOverviewData, setPacingOverviewData] = useState<any[]>([]);
   const [occupancyMatrixData, setOccupancyMatrixData] = useState<any[]>([]);
 
-  const [matrixMetric, setMatrixMetric] = useState<
-    "occupancy" | "adr" | "available"
-  >("occupancy");
+  const [matrixMetric, setMatrixMetric] = useState<"occupancy" | "adr" | "available">("occupancy");
   const [matrixDays, setMatrixDays] = useState<number>(45);
   const [sortByRisk, setSortByRisk] = useState<boolean>(false);
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
@@ -723,15 +235,12 @@ export function PortfolioRiskOverview() {
 
   const [globalSelectedGroup, setGlobalSelectedGroup] = useState<string>("all");
   const [globalSelectedHotel, setGlobalSelectedHotel] = useState<string>("all");
-  const [globalHotelSearchOpen, setGlobalHotelSearchOpen] = useState(false); // <-- ADD THIS LINE
+  const [globalHotelSearchOpen, setGlobalHotelSearchOpen] = useState(false);
   const [viewType, setViewType] = useState<"group" | "individual">("group");
-  const [allHotels, setAllHotels] = useState<any[]>([]); // For populating filters
+  const [allHotels, setAllHotels] = useState<any[]>([]);
 
-  // [NEW] Memoized hook to get unique group names for filters
   const globalHotelGroups = useMemo(() => {
-    const groups = new Set(
-      allHotels.map((h) => h.management_group).filter(Boolean)
-    );
+    const groups = new Set(allHotels.map((h) => h.management_group).filter(Boolean));
     return Array.from(groups).sort();
   }, [allHotels]);
 
@@ -739,7 +248,6 @@ export function PortfolioRiskOverview() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // --- [NEW] Build query params from global filters ---
         const params = new URLSearchParams();
         if (globalSelectedHotel !== "all") {
           params.append("hotelId", globalSelectedHotel);
@@ -748,17 +256,13 @@ export function PortfolioRiskOverview() {
         }
         const queryString = params.toString();
         const query = queryString ? `?${queryString}` : "";
-        // --- [END NEW] ---
         const [occProblemRes, pacingRes, matrixRes] = await Promise.all([
-          // [MODIFY] Append query string to all fetch calls
-          // Endpoints updated to match metrics.router.js definitions
           fetch(`/api/metrics/portfolio/occupancy-problems${query}`),
           fetch(`/api/metrics/portfolio/pacing${query}`),
           fetch(`/api/metrics/portfolio/matrix${query}`),
         ]);
 
-        if (!occProblemRes.ok)
-          throw new Error("Failed to fetch occupancy problem list");
+        if (!occProblemRes.ok) throw new Error("Failed to fetch occupancy problem list");
         if (!pacingRes.ok) throw new Error("Failed to fetch pacing overview");
         if (!matrixRes.ok) throw new Error("Failed to fetch occupancy matrix");
 
@@ -769,69 +273,46 @@ export function PortfolioRiskOverview() {
         setOccupancyProblemList(occProblemData);
         setPacingOverviewData(pacingData);
         setOccupancyMatrixData(matrixData);
-
       } catch (error: any) {
         console.error("Error fetching portfolio data:", error);
-        toast.error("Failed to load portfolio data", {
-          description: error.message,
-        });
+        toast.error("Failed to load portfolio data", { description: error.message });
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchData();
-  }, [globalSelectedGroup, globalSelectedHotel]); // [MODIFY] Re-run when global filters change
+  }, [globalSelectedGroup, globalSelectedHotel]);
 
-  // --- [NEW] Data Fetching Effect for Filters ---
-  // Fetches all hotels *once* to populate the global filter dropdowns
   useEffect(() => {
     const fetchAllHotels = async () => {
       try {
-        // Use the admin endpoint to get a simple list of all hotels
-        const response = await fetch("/api/hotels"); //
-        if (!response.ok) {
-          throw new Error("Failed to fetch hotel list for filters");
-        }
+        const response = await fetch("/api/hotels");
+        if (!response.ok) throw new Error("Failed to fetch hotel list for filters");
         const data = await response.json();
         setAllHotels(data);
       } catch (error: any) {
         console.error("Error fetching filter data:", error);
-        toast.error("Failed to load filter options", {
-          description: error.message,
-        });
+        toast.error("Failed to load filter options", { description: error.message });
       }
     };
     fetchAllHotels();
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
-  // Get unique hotel groups from the matrix data
-  // [REMOVED] This line is no longer needed, we use 'globalHotelGroups'
-  // const hotelGroups = Array.from(new Set(occupancyMatrixData.map(h => h.group))).sort();
-
-  // Generate dates for matrix columns
   const matrixDates = Array.from({ length: matrixDays }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() + i);
     return date;
   });
 
-  // Filter hotels by selected group and specific hotel
   let filteredHotels = occupancyMatrixData;
-
   if (selectedHotel !== "all") {
-    filteredHotels = occupancyMatrixData.filter(
-      (h) => h.name === selectedHotel
-    );
+    filteredHotels = occupancyMatrixData.filter((h) => h.name === selectedHotel);
   } else if (selectedGroup !== "all") {
-    filteredHotels = occupancyMatrixData.filter(
-      (h) => h.group === selectedGroup
-    );
+    filteredHotels = occupancyMatrixData.filter((h) => h.group === selectedGroup);
   }
 
   const sortedHotels = sortByRisk
     ? [...filteredHotels].sort((a, b) => {
-        // [MODIFIED] Sort logic now uses the avg occupancy from the API data
         const aRisk = a.occupancy < 45 ? 0 : a.occupancy < 60 ? 1 : 2;
         const bRisk = b.occupancy < 45 ? 0 : b.occupancy < 60 ? 1 : 2;
         if (aRisk !== bRisk) return aRisk - bRisk;
@@ -839,2493 +320,565 @@ export function PortfolioRiskOverview() {
       })
     : filteredHotels;
 
-  // Calculate average occupancy for the header card
   const avgPortfolioOcc =
     occupancyMatrixData.length > 0
-      ? occupancyMatrixData.reduce((sum, h) => sum + h.occupancy, 0) /
-        occupancyMatrixData.length
+      ? occupancyMatrixData.reduce((sum, h) => sum + h.occupancy, 0) / occupancyMatrixData.length
       : 0;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#1d1d1c",
-        position: "relative",
-        overflow: "hidden",
-        padding: "24px",
-      }}
-    >
-      {/* Animated background gradient */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.02), transparent, rgba(250, 255, 106, 0.02))",
-          pointerEvents: "none",
-        }}
-      ></div>
-
-      {/* Grid overlay */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(57,189,248,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.02) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          pointerEvents: "none",
-        }}
-      ></div>
-
-      {/* [NEW] Loading Overlay */}
+    <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", padding: "24px 36px" }}>
+      {/* Loading Overlay */}
       {isLoading && (
-        <div style={styles.loadingOverlay}>
-          <style>{`
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `}</style>
-          <div style={styles.loadingSpinner}></div>
-          <p style={styles.loadingText}>Loading Portfolio Intelligence...</p>
+        <div style={{ position: "fixed", inset: 0, background: `${R.bg}e6`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 50, backdropFilter: "blur(4px)" }}>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          <div style={{ width: 40, height: 40, border: `3px solid ${R.warmTeal}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <p style={{ color: R.textDim, marginTop: 16, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>Loading Portfolio Intelligence...</p>
         </div>
       )}
 
-      <div style={{ position: "relative", zIndex: 10, padding: "1.5rem" }}>
-        {/* Page Header */}
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h1
-            style={{
-              color: "#e5e5e5",
-              fontSize: "1.125rem",
-              textTransform: "uppercase",
-              letterSpacing: "-0.025em",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Risk Overview
-          </h1>
-          <p style={{ color: "#6b7280", fontSize: "0.75rem" }}>
-            Next 30-day availability risk across all managed properties •
-            Identify underperforming hotels requiring immediate action
-          </p>
+      {/* Page Header */}
+      <div style={{ marginBottom: 24, borderBottom: `1px solid ${R.border}`, paddingBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: R.gold, marginBottom: 6 }}>SENTINEL</div>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.8, margin: 0, color: R.accent }}>Risk Overview</h1>
+        <p style={{ fontSize: 13, color: R.textDim, margin: "4px 0 0" }}>
+          Next 30-day availability risk across all managed properties
+        </p>
+      </div>
+
+      {/* Global Filter Bar */}
+      <div style={{ marginBottom: 24, background: R.darkBand, borderRadius: 10, border: `1px solid ${R.border}`, padding: "10px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ color: R.textDim, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>View:</span>
+
+          <div style={{ display: "flex", gap: 8, padding: 4 }}>
+            <button
+              onClick={() => { setViewType("individual"); setGlobalSelectedHotel("all"); }}
+              style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, display: "flex", alignItems: "center", gap: 8, background: viewType === "individual" ? R.border : "transparent", color: viewType === "individual" ? R.accent : R.textDim, border: "none", cursor: "pointer", transition: "all 0.2s" }}
+            >
+              <User size={14} /> Individual Hotel
+            </button>
+            <button
+              onClick={() => { setViewType("group"); setGlobalSelectedGroup("all"); }}
+              style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, display: "flex", alignItems: "center", gap: 8, background: viewType === "group" ? R.border : "transparent", color: viewType === "group" ? R.accent : R.textDim, border: "none", cursor: "pointer", transition: "all 0.2s" }}
+            >
+              <Building2 size={14} /> Group/Portfolio
+            </button>
+          </div>
+
+          <div style={{ height: 24, width: 1, background: R.border }} />
+
+          {viewType === "individual" ? (
+            <Popover open={globalHotelSearchOpen} onOpenChange={setGlobalHotelSearchOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  style={{ width: 240, justifyContent: "space-between", background: R.sidebar, border: `1px solid ${R.border}`, color: R.accent, height: 36, padding: "0 12px", borderRadius: 6, fontSize: 12, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+                  role="combobox"
+                  aria-expanded={globalHotelSearchOpen}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <User size={14} style={{ color: R.textDim, flexShrink: 0 }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {globalSelectedHotel === "all" ? "Select Hotel..." : allHotels.find((h) => h.hotel_id.toString() === globalSelectedHotel)?.property_name || "Select Hotel..."}
+                    </span>
+                  </div>
+                  <ChevronsUpDown size={16} style={{ color: R.textDim, flexShrink: 0 }} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" style={{ background: R.darkBand, border: `1px solid ${R.border}` }} align="start">
+                <Command style={{ background: R.darkBand }}>
+                  <CommandInput placeholder="Type to search hotels..." style={{ color: R.accent, borderBottom: `1px solid ${R.border}` }} className="placeholder:text-[#4E5868]" />
+                  <CommandList style={{ background: R.darkBand }}>
+                    <CommandEmpty style={{ color: R.textDim, fontSize: 14, padding: 24, textAlign: "center" }}>No hotel found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem value="all" onSelect={() => { setGlobalSelectedHotel("all"); setGlobalHotelSearchOpen(false); }} style={{ color: R.accent }} className="aria-selected:bg-[#1E2330] aria-selected:text-[#F3F5F7]">
+                        <Check style={{ marginRight: 8, height: 16, width: 16, opacity: globalSelectedHotel === "all" ? 1 : 0 }} />
+                        All Hotels ({allHotels.length})
+                      </CommandItem>
+                      {allHotels.map((hotel) => (
+                        <CommandItem key={hotel.hotel_id} value={hotel.property_name || `Hotel ${hotel.hotel_id}`} onSelect={() => { setGlobalSelectedHotel(hotel.hotel_id.toString()); setGlobalHotelSearchOpen(false); }} style={{ color: R.accent }} className="aria-selected:bg-[#1E2330] aria-selected:text-[#F3F5F7]">
+                          <Check style={{ marginRight: 8, height: 16, width: 16, opacity: globalSelectedHotel === hotel.hotel_id.toString() ? 1 : 0 }} />
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            <span>{hotel.property_name || `Hotel ${hotel.hotel_id}`}</span>
+                            <span style={{ color: R.textDim, fontSize: 12 }}>{hotel.management_group}</span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Select value={globalSelectedGroup} onValueChange={setGlobalSelectedGroup}>
+              <SelectTrigger className="w-[240px] h-9 text-xs" style={{ background: R.sidebar, border: `1px solid ${R.border}`, color: R.accent }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Building2 size={14} style={{ color: R.textDim }} />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent style={{ background: R.darkBand, border: `1px solid ${R.border}` }}>
+                <SelectItem value="all" className="text-[#F3F5F7] focus:bg-[#1E2330] focus:text-[#F3F5F7] text-xs">
+                  All Groups ({globalHotelGroups.length} groups, {allHotels.length} hotels)
+                </SelectItem>
+                {globalHotelGroups.map((group) => (
+                  <SelectItem key={group} value={group} className="text-[#F3F5F7] focus:bg-[#1E2330] focus:text-[#F3F5F7] text-xs">
+                    {group} ({allHotels.filter((h) => h.management_group === group).length} hotels)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: R.green }} />
+              <span style={{ color: R.textDim, fontSize: 12 }}>
+                Viewing:{" "}
+                <span style={{ color: R.accent }}>
+                  {viewType === "individual"
+                    ? globalSelectedHotel === "all"
+                      ? "All Individual Hotels"
+                      : allHotels.find((h) => h.hotel_id.toString() === globalSelectedHotel)?.property_name
+                    : globalSelectedGroup === "all"
+                    ? "All Portfolio"
+                    : globalSelectedGroup}
+                </span>
+                {viewType === "group" && <span style={{ color: R.textDim, marginLeft: 4 }}>({pacingOverviewData.length} hotels)</span>}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
+        {[
+          {
+            label: viewType === "individual" && globalSelectedHotel !== "all" ? "Selected Hotel" : "Portfolio Hotels",
+            value: String(pacingOverviewData.length || 0),
+            sub: "ACTIVE PROPERTIES",
+            icon: Building2,
+            color: R.warmTeal,
+          },
+          {
+            label: "Critical Risk",
+            value: String(pacingOverviewData.filter((h) => num(h.forwardOccupancy) < 60 && num(h.pacingDifficultyPercent) >= 115).length),
+            sub: "QUADRANT ALIGNED",
+            icon: AlertTriangle,
+            color: R.red,
+            pct: (pacingOverviewData.filter((h) => num(h.forwardOccupancy) < 60 && num(h.pacingDifficultyPercent) >= 115).length / Math.max(pacingOverviewData.length, 1)) * 100,
+          },
+          {
+            label: "Risk Warnings",
+            value: String(pacingOverviewData.filter((h) => { const occ = num(h.forwardOccupancy); const p = num(h.pacingDifficultyPercent); return !(occ < 60 && p >= 115) && !(occ >= 60 && p < 115); }).length),
+            sub: "FILL or RATE RISK",
+            icon: AlertCircle,
+            color: R.gold,
+            pct: (pacingOverviewData.filter((h) => { const occ = num(h.forwardOccupancy); const p = num(h.pacingDifficultyPercent); return !(occ < 60 && p >= 115) && !(occ >= 60 && p < 115); }).length / Math.max(pacingOverviewData.length, 1)) * 100,
+          },
+          {
+            label: `Avg ${viewType === "group" ? "Portfolio" : "Selected"} Occ.`,
+            value: pacingOverviewData.length > 0 ? `${(pacingOverviewData.reduce((sum, h) => sum + num(h.forwardOccupancy), 0) / pacingOverviewData.length).toFixed(0)}` : "0",
+            valueSuffix: "%",
+            sub: "30-DAY FWD",
+            icon: Activity,
+            color: R.warmTeal,
+            pct: pacingOverviewData.length > 0 ? Math.round(pacingOverviewData.reduce((sum, h) => sum + num(h.forwardOccupancy), 0) / pacingOverviewData.length) : 0,
+          },
+        ].map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.label} style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <Icon size={14} color={kpi.color} />
+                <span style={{ fontSize: 11, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>{kpi.label}</span>
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: kpi.color, letterSpacing: -1, lineHeight: 1, marginBottom: 8 }}>
+                {kpi.value}
+                {kpi.valueSuffix && <span style={{ fontSize: 20, color: R.textDim }}>{kpi.valueSuffix}</span>}
+              </div>
+              {kpi.pct !== undefined ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ flex: 1, height: 4, background: R.border, borderRadius: 9999, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${kpi.pct}%`, background: kpi.color, opacity: 0.8, transition: "width 0.3s" }} />
+                  </div>
+                  <span style={{ color: R.textDim, fontSize: 10, fontFamily: "monospace" }}>{kpi.sub}</span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: R.textDim }}>{kpi.sub}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Risk Quadrant Analysis */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Risk Matrix</div>
+          <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: -0.3, color: R.accent }}>Quadrant Analysis</div>
+          <div style={{ fontSize: 12, color: R.textMid, marginTop: 2 }}>Strategic diagnostic tool — combines volume and budget pacing risk</div>
         </div>
 
-        {/* Global Filter Bar */}
-        <div
-          style={{
-            marginBottom: "1.5rem",
-            backgroundColor: "#1a1a1a",
-            borderRadius: "0.25rem",
-            border: "1px solid #2a2a2a",
-            padding: "0.625rem 1rem",
-            position: "relative",
-            zIndex: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <label
-              style={{
-                color: "#6b7280",
-                fontSize: "0.75rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              View:
-            </label>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+          {/* Scatter Plot */}
+          <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 20 }}>
+            <div style={{ position: "relative", height: 520 }}>
+              {/* Quadrant Background */}
+              <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 1, pointerEvents: "none", zIndex: 0 }}>
+                <div style={{ background: `${R.gold}08` }} />
+                <div style={{ background: `${R.green}08` }} />
+                <div style={{ background: `${R.red}08` }} />
+                <div style={{ background: `${R.warmTeal}08` }} />
+              </div>
 
-            {/* View Type Toggle */}
-            <div
-              style={{
-                display: "flex",
-                gap: "0.5rem",
-                backgroundColor: "#1a1a1a",
-                borderRadius: "0.25rem",
-                padding: "0.25rem",
-              }}
-            >
-              <button
-                onClick={() => {
-                  setViewType("individual");
-                  setGlobalSelectedHotel("all");
-                }}
-                style={{
-                  padding: "0.375rem 0.75rem",
-                  borderRadius: "0.25rem",
-                  fontSize: "0.75rem",
-                  transition: "all 0.2s",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  backgroundColor:
-                    viewType === "individual" ? "#2a2a2a" : "transparent",
-                  color: viewType === "individual" ? "#e5e5e5" : "#6b7280",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <User style={{ width: "0.875rem", height: "0.875rem" }} />
-                Individual Hotel
-              </button>
-              <button
-                onClick={() => {
-                  setViewType("group");
-                  setGlobalSelectedGroup("all");
-                }}
-                style={{
-                  padding: "0.375rem 0.75rem",
-                  borderRadius: "0.25rem",
-                  fontSize: "0.75rem",
-                  transition: "all 0.2s",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  backgroundColor:
-                    viewType === "group" ? "#2a2a2a" : "transparent",
-                  color: viewType === "group" ? "#e5e5e5" : "#6b7280",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <Building2 style={{ width: "0.875rem", height: "0.875rem" }} />
-                Group/Portfolio
-              </button>
+              {/* Quadrant Labels */}
+              <div style={{ position: "absolute", top: 16, left: 16, zIndex: 10, background: R.darkBand, border: `1px solid ${R.gold}30`, borderRadius: 6, padding: "4px 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, background: R.gold, borderRadius: "50%" }} />
+                  <span style={{ color: R.gold, fontSize: 12 }}>Fill Risk</span>
+                </div>
+              </div>
+              <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10, background: R.darkBand, border: `1px solid ${R.green}30`, borderRadius: 6, padding: "4px 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, background: R.green, borderRadius: "50%" }} />
+                  <span style={{ color: R.green, fontSize: 12 }}>On Pace</span>
+                </div>
+              </div>
+              <div style={{ position: "absolute", bottom: 16, left: 16, zIndex: 10, background: R.darkBand, border: `1px solid ${R.red}30`, borderRadius: 6, padding: "4px 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, background: R.red, borderRadius: "50%" }} />
+                  <span style={{ color: R.red, fontSize: 12 }}>Critical Risk</span>
+                </div>
+              </div>
+              <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 10, background: R.darkBand, border: `1px solid ${R.warmTeal}30`, borderRadius: 6, padding: "4px 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, background: R.warmTeal, borderRadius: "50%" }} />
+                  <span style={{ color: R.warmTeal, fontSize: 12 }}>Rate Strategy Risk</span>
+                </div>
+              </div>
+
+              <ResponsiveContainer width="100%" height="100%" style={{ position: "relative", zIndex: 5 }}>
+                <ScatterChart margin={{ top: 30, right: 30, bottom: 60, left: 80 }}>
+                  <CartesianGrid strokeDasharray="0" stroke={R.border} opacity={0.3} />
+                  <XAxis type="number" dataKey="forwardOccupancy" name="Forward Volume (Occupancy %)" domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} label={{ value: "Forward Volume (Occupancy %)", position: "bottom", fill: R.textMid, offset: 30, style: { fontSize: 10 } }} />
+                  <YAxis type="number" dataKey="pacingDifficultyPercent" name="Pacing Rate Pressure (%)" reversed={true} domain={[0, "auto"]} ticks={[0, 50, 100, 115, 200, 300, 400, 500]} stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}`} label={{ value: "Pacing Rate Pressure (%)", angle: -90, position: "insideLeft", fill: R.textMid, offset: -50, style: { fontSize: 10, textAnchor: "middle" } }} />
+                  <ZAxis range={[100, 100]} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3", stroke: R.warmTeal }} content={<QuadrantTooltip />} />
+                  <ReferenceLine y={115} stroke={R.warmTeal} strokeWidth={1} strokeDasharray="5 5" />
+                  <ReferenceLine x={60} stroke={R.warmTeal} strokeWidth={1} strokeDasharray="5 5" />
+                  <Scatter name="Hotels" data={pacingOverviewData} shape={DotByPayload} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Quadrant Summary */}
+          <div style={{ height: 520, display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Critical Risk */}
+            <div style={{ flex: 1, background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, borderLeft: `3px solid ${R.red}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                <AlertCircle size={14} color={R.red} />
+                <span style={{ color: R.red, fontSize: 13, fontWeight: 600 }}>Critical Risk</span>
+                <span style={{ marginLeft: "auto", fontSize: 18, fontWeight: 700, color: R.red }}>{pacingOverviewData.filter((d) => num(d.forwardOccupancy) < 60 && num(d.pacingDifficultyPercent) >= 115).length}</span>
+              </div>
+              <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, paddingRight: 4 }}>
+                {pacingOverviewData.filter((d) => num(d.forwardOccupancy) < 60 && num(d.pacingDifficultyPercent) >= 115).sort((a, b) => num(b.pacingDifficultyPercent) - num(a.pacingDifficultyPercent)).map((hotel, i) => (
+                  <div key={i} style={{ background: R.sidebar, border: `1px solid ${R.border}`, borderRadius: 6, padding: 8 }}>
+                    <div style={{ color: R.accent, fontSize: 12, marginBottom: 2, fontWeight: 500 }}>{hotel.hotelName}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: R.textDim, fontSize: 11 }}>Occ: {num(hotel.forwardOccupancy).toFixed(0)}%</span>
+                      <span style={{ color: R.red, fontSize: 11 }}>{num(hotel.pacingDifficultyPercent).toFixed(0)}% Pressure</span>
+                    </div>
+                  </div>
+                ))}
+                {pacingOverviewData.filter((d) => num(d.forwardOccupancy) < 60 && num(d.pacingDifficultyPercent) >= 115).length === 0 && (
+                  <div style={{ color: R.textDim, fontSize: 12, fontStyle: "italic", padding: 8 }}>No hotels in critical risk.</div>
+                )}
+              </div>
             </div>
 
-            <div
-              style={{
-                height: "1.5rem",
-                width: "1px",
-                backgroundColor: "#2a2a2a",
-              }}
-            />
-
-            {/* Conditional Dropdown */}
-            {viewType === "individual" ? (
-              <Popover
-                open={globalHotelSearchOpen}
-                onOpenChange={setGlobalHotelSearchOpen}
-              >
-                <PopoverTrigger asChild>
-                  <button
-                    style={{
-                      width: "240px",
-                      justifyContent: "space-between",
-                      backgroundColor: "#0a0a0a",
-                      border: "1px solid #2a2a2a",
-                      color: "#e5e5e5",
-                      height: "2.25rem",
-                      padding: "0 0.75rem",
-                      borderRadius: "0.25rem",
-                      fontSize: "0.75rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      cursor: "pointer",
-                    }}
-                    role="combobox"
-                    aria-expanded={globalHotelSearchOpen}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <User
-                        style={{
-                          width: "0.875rem",
-                          height: "0.875rem",
-                          color: "#6b7280",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span
-                        style={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {globalSelectedHotel === "all"
-                          ? "Select Hotel..."
-                          : allHotels.find(
-                              (h) =>
-                                h.hotel_id.toString() === globalSelectedHotel
-                            )?.property_name || "Select Hotel..."}
-                      </span>
+            {/* Rate Strategy Risk */}
+            <div style={{ flex: 1, background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, borderLeft: `3px solid ${R.warmTeal}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                <Target size={14} color={R.warmTeal} />
+                <span style={{ color: R.warmTeal, fontSize: 13, fontWeight: 600 }}>Rate Strategy Risk</span>
+                <span style={{ marginLeft: "auto", fontSize: 18, fontWeight: 700, color: R.warmTeal }}>{pacingOverviewData.filter((d) => num(d.forwardOccupancy) >= 60 && num(d.pacingDifficultyPercent) >= 115).length}</span>
+              </div>
+              <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, paddingRight: 4 }}>
+                {pacingOverviewData.filter((d) => num(d.forwardOccupancy) >= 60 && num(d.pacingDifficultyPercent) >= 115).sort((a, b) => num(b.pacingDifficultyPercent) - num(a.pacingDifficultyPercent)).map((hotel, i) => (
+                  <div key={i} style={{ background: R.sidebar, border: `1px solid ${R.border}`, borderRadius: 6, padding: 8 }}>
+                    <div style={{ color: R.accent, fontSize: 12, marginBottom: 2, fontWeight: 500 }}>{hotel.hotelName}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: R.textDim, fontSize: 11 }}>Occ: {num(hotel.forwardOccupancy).toFixed(0)}%</span>
+                      <span style={{ color: R.warmTeal, fontSize: 11 }}>{num(hotel.pacingDifficultyPercent).toFixed(0)}% Pressure</span>
                     </div>
-                    <ChevronsUpDown
-                      style={{
-                        width: "1rem",
-                        height: "1rem",
-                        color: "#6b7280",
-                        flexShrink: 0,
-                      }}
-                    />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[300px] p-0"
-                  style={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
-                  }}
-                  align="start"
-                >
-                  <Command style={{ backgroundColor: "#1a1a1a" }}>
-                    <CommandInput
-                      placeholder="Type to search hotels..."
-                      style={{
-                        color: "#e5e5e5",
-                        borderBottom: "1px solid #2a2a2a",
-                      }}
-                      className="placeholder:text-[#6b7280]"
-                    />
-                    <CommandList style={{ backgroundColor: "#1a1a1a" }}>
-                      <CommandEmpty className="text-[#6b7280] text-sm py-6 text-center">
-                        No hotel found.
-                      </CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="all"
-                          onSelect={() => {
-                            setGlobalSelectedHotel("all");
-                            setGlobalHotelSearchOpen(false);
-                          }}
-                          style={{ color: "#e5e5e5" }}
-                          className="aria-selected:bg-[#2a2a2a] aria-selected:text-[#e5e5e5]"
-                        >
-                          <Check
-                            style={{
-                              marginRight: "0.5rem",
-                              height: "1rem",
-                              width: "1rem",
-                              opacity: globalSelectedHotel === "all" ? 1 : 0,
-                            }}
-                          />
-                          All Hotels ({allHotels.length})
-                        </CommandItem>
-                        {allHotels.map((hotel) => (
-                          <CommandItem
-                            key={hotel.hotel_id}
-                            value={
-                              hotel.property_name || `Hotel ${hotel.hotel_id}`
-                            }
-                            onSelect={() => {
-                              setGlobalSelectedHotel(hotel.hotel_id.toString());
-                              setGlobalHotelSearchOpen(false);
-                            }}
-                            style={{ color: "#e5e5e5" }}
-                            className="aria-selected:bg-[#2a2a2a] aria-selected:text-[#e5e5e5]"
-                          >
-                            <Check
-                              style={{
-                                marginRight: "0.5rem",
-                                height: "1rem",
-                                width: "1rem",
-                                opacity:
-                                  globalSelectedHotel ===
-                                  hotel.hotel_id.toString()
-                                    ? 1
-                                    : 0,
-                              }}
-                            />
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                              }}
-                            >
-                              <span>
-                                {hotel.property_name ||
-                                  `Hotel ${hotel.hotel_id}`}
-                              </span>
-                              <span
-                                style={{
-                                  color: "#6b7280",
-                                  fontSize: "0.75rem",
-                                }}
-                              >
-                                {hotel.management_group}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <Select
-                value={globalSelectedGroup}
-                onValueChange={setGlobalSelectedGroup}
-              >
-                <SelectTrigger className="w-[240px] bg-[#0a0a0a] border-[#2a2a2a] text-[#e5e5e5] h-9 text-xs">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <Building2
-                      style={{
-                        width: "0.875rem",
-                        height: "0.875rem",
-                        color: "#6b7280",
-                      }}
-                    />
-                    <SelectValue />
                   </div>
-                </SelectTrigger>
-                <SelectContent
-                  style={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
-                  }}
-                >
-                  <SelectItem
-                    value="all"
-                    className="text-[#e5e5e5] focus:bg-[#2a2a2a] focus:text-[#e5e5e5] text-xs"
-                  >
-                    All Groups ({globalHotelGroups.length} groups,{" "}
-                    {allHotels.length} hotels)
-                  </SelectItem>
-                  {globalHotelGroups.map((group) => (
-                    <SelectItem
-                      key={group}
-                      value={group}
-                      className="text-[#e5e5e5] focus:bg-[#2a2a2a] focus:text-[#e5e5e5] text-xs"
-                    >
-                      {group} (
-                      {
-                        allHotels.filter((h) => h.management_group === group)
-                          .length
-                      }{" "}
-                      hotels)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+                ))}
+                {pacingOverviewData.filter((d) => num(d.forwardOccupancy) >= 60 && num(d.pacingDifficultyPercent) >= 115).length === 0 && (
+                  <div style={{ color: R.textDim, fontSize: 12, fontStyle: "italic", padding: 8 }}>No hotels in rate risk.</div>
+                )}
+              </div>
+            </div>
 
-            <div style={{ flex: 1 }} />
+            {/* Fill Risk */}
+            <div style={{ flex: 1, background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, borderLeft: `3px solid ${R.gold}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
+                <AlertTriangle size={14} color={R.gold} />
+                <span style={{ color: R.gold, fontSize: 13, fontWeight: 600 }}>Fill Risk</span>
+                <span style={{ marginLeft: "auto", fontSize: 18, fontWeight: 700, color: R.gold }}>{pacingOverviewData.filter((d) => num(d.forwardOccupancy) < 60 && num(d.pacingDifficultyPercent) < 115).length}</span>
+              </div>
+              <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, paddingRight: 4 }}>
+                {pacingOverviewData.filter((d) => num(d.forwardOccupancy) < 60 && num(d.pacingDifficultyPercent) < 115).sort((a, b) => num(a.forwardOccupancy) - num(b.forwardOccupancy)).map((hotel, i) => (
+                  <div key={i} style={{ background: R.sidebar, border: `1px solid ${R.border}`, borderRadius: 6, padding: 8 }}>
+                    <div style={{ color: R.accent, fontSize: 12, marginBottom: 2, fontWeight: 500 }}>{hotel.hotelName}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: R.textDim, fontSize: 11 }}>Pressure: {num(hotel.pacingDifficultyPercent).toFixed(0)}%</span>
+                      <span style={{ color: R.gold, fontSize: 11 }}>{num(hotel.forwardOccupancy).toFixed(0)}% Occ</span>
+                    </div>
+                  </div>
+                ))}
+                {pacingOverviewData.filter((d) => num(d.forwardOccupancy) < 60 && num(d.pacingDifficultyPercent) < 115).length === 0 && (
+                  <div style={{ color: R.textDim, fontSize: 12, fontStyle: "italic", padding: 8 }}>No hotels in fill risk.</div>
+                )}
+              </div>
+            </div>
 
-            {/* Display badge showing current selection */}
-            <div
-              style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
-                borderRadius: "0.25rem",
-                padding: "0.375rem 0.75rem",
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-              >
-                <div
-                  style={{
-                    width: "0.375rem",
-                    height: "0.375rem",
-                    borderRadius: "9999px",
-                    backgroundColor: "#10b981",
-                  }}
-                ></div>
-                <span style={{ color: "#6b7280", fontSize: "0.75rem" }}>
-                  Viewing:{" "}
-                  <span style={{ color: "#e5e5e5" }}>
-                    {viewType === "individual"
-                      ? globalSelectedHotel === "all"
-                        ? "All Individual Hotels"
-                        : allHotels.find(
-                            (h) => h.hotel_id.toString() === globalSelectedHotel
-                          )?.property_name
-                      : globalSelectedGroup === "all"
-                      ? "All Portfolio"
-                      : globalSelectedGroup}
-                  </span>
-                  {viewType === "group" && (
-                    <span style={{ color: "#6b7280", marginLeft: "0.25rem" }}>
-                      ({pacingOverviewData.length} hotels)
-                    </span>
-                  )}
+            {/* On Pace */}
+            <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, borderLeft: `3px solid ${R.green}`, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Check size={14} color={R.green} />
+                <span style={{ color: R.green, fontSize: 13, fontWeight: 600 }}>On Pace</span>
+                <span style={{ marginLeft: "auto", color: R.green, fontSize: 18, fontWeight: 700 }}>
+                  {pacingOverviewData.filter((d) => num(d.forwardOccupancy) >= 60 && num(d.pacingDifficultyPercent) < 115).length}
                 </span>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Summary Stats (HUD Style) */}
-        <div
-          style={{ marginBottom: "1.5rem", position: "relative", zIndex: 10 }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "1rem",
-            }}
-          >
-            {/* 1. Portfolio Hotels Count */}
-            <div
-              style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
-                borderRadius: "0.25rem",
-                padding: "1rem",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              {/* Corner Brackets */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #39BDF8",
-                  borderLeft: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #39BDF8",
-                  borderRight: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #39BDF8",
-                  borderLeft: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #39BDF8",
-                  borderRight: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
+      {/* Portfolio Flowcast */}
+      <PortfolioFlowcast
+        startDate={new Date()}
+        globalGroupFilter={selectedGroup !== "all" ? selectedGroup : globalSelectedGroup}
+        globalHotelFilter={selectedHotel !== "all" ? selectedHotel : globalSelectedHotel}
+      />
 
-              {/* Subtle gradient background */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "50%",
-                  background:
-                    "linear-gradient(180deg, rgba(57, 189, 248, 0.015) 0%, transparent 100%)",
-                  pointerEvents: "none",
-                }}
-              ></div>
+      {/* Occupancy Matrix */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Portfolio View</div>
+          <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: -0.3, color: R.accent }}>Occupancy Matrix</div>
+          <p style={{ color: R.textMid, fontSize: 12, marginTop: 2 }}>Dense at-a-glance view of all properties vs next 45 days</p>
+        </div>
 
-              <div style={{ position: "relative", zIndex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.75rem",
-                  }}
+        {/* Controls Bar */}
+        <div style={{ marginBottom: 16, background: R.darkBand, borderRadius: 10, border: `1px solid ${R.border}`, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Filter size={16} color={R.textDim} style={{ marginRight: 8 }} />
+            <div style={{ display: "flex", gap: 8, padding: 4 }}>
+              {(["occupancy", "adr", "available"] as const).map((metric) => (
+                <button
+                  key={metric}
+                  onClick={() => setMatrixMetric(metric)}
+                  style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, transition: "all 0.2s", background: matrixMetric === metric ? R.border : "transparent", color: matrixMetric === metric ? R.accent : R.textDim, border: "none", cursor: "pointer" }}
                 >
-                  <div
-                    style={{
-                      width: "1.5rem",
-                      height: "1.5rem",
-                      borderRadius: "0.25rem",
-                      backgroundColor: "rgba(57, 189, 248, 0.06)",
-                      border: "1px solid rgba(57, 189, 248, 0.2)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Building2
-                      style={{
-                        width: "0.875rem",
-                        height: "0.875rem",
-                        color: "#39BDF8",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {viewType === "individual" && globalSelectedHotel !== "all"
-                      ? "Selected Hotel"
-                      : "Portfolio Hotels"}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    color: "#e5e5e5",
-                    fontSize: "2rem",
-                    fontFamily: "monospace",
-                    lineHeight: 1,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  46
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.375rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "0.25rem",
-                      height: "0.25rem",
-                      borderRadius: "9999px",
-                      backgroundColor: "#39BDF8",
-                      opacity: 0.7,
-                    }}
-                  ></div>
-                  <span style={{ color: "#6b7280", fontSize: "0.625rem" }}>
-                    ACTIVE PROPERTIES
-                  </span>
-                </div>
-              </div>
+                  {metric === "occupancy" ? "Occupancy %" : metric === "adr" ? "ADR" : "Rooms Available"}
+                </button>
+              ))}
             </div>
 
-            {/* 2. Critical Risk */}
-            <div
-              style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid rgba(239, 68, 68, 0.2)",
-                borderRadius: "0.25rem",
-                padding: "1rem",
-                position: "relative",
-                overflow: "hidden",
-                boxShadow: "0 0 16px rgba(239, 68, 68, 0.04)",
-              }}
+            <button
+              onClick={() => setSortByRisk(!sortByRisk)}
+              style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, background: sortByRisk ? R.red : "transparent", color: sortByRisk ? R.accent : R.textMid, border: sortByRisk ? "none" : `1px solid ${R.border}`, cursor: "pointer", transition: "all 0.2s" }}
             >
-              {/* Corner Brackets */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #ef4444",
-                  borderLeft: "2px solid #ef4444",
-                  opacity: 0.3,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #ef4444",
-                  borderRight: "2px solid #ef4444",
-                  opacity: 0.3,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #ef4444",
-                  borderLeft: "2px solid #ef4444",
-                  opacity: 0.3,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #ef4444",
-                  borderRight: "2px solid #ef4444",
-                  opacity: 0.3,
-                }}
-              ></div>
+              {sortByRisk ? "Showing Highest Risk First" : "Sort by Risk"}
+            </button>
+          </div>
 
-              {/* Red gradient background */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "50%",
-                  background:
-                    "linear-gradient(180deg, rgba(239, 68, 68, 0.04) 0%, transparent 100%)",
-                  pointerEvents: "none",
-                }}
-              ></div>
-
-              <div style={{ position: "relative", zIndex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "1.5rem",
-                      height: "1.5rem",
-                      borderRadius: "0.25rem",
-                      backgroundColor: "rgba(239, 68, 68, 0.08)",
-                      border: "1px solid rgba(239, 68, 68, 0.25)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <AlertTriangle
-                      style={{
-                        width: "0.875rem",
-                        height: "0.875rem",
-                        color: "#ef4444",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    Critical Risk
-                  </div>
-                </div>
-                <div
-                  style={{
-                    color: "#ef4444",
-                    fontSize: "2rem",
-                    fontFamily: "monospace",
-                    lineHeight: 1,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  {
-                    pacingOverviewData.filter(
-                      (h) =>
-                        num(h.forwardOccupancy) < 60 &&
-                        num(h.pacingDifficultyPercent) >= 115
-                    ).length
-                  }
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.375rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      height: "0.25rem",
-                      backgroundColor: "#2a2a2a",
-                      borderRadius: "9999px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${
-                          (pacingOverviewData.filter(
-                            (h) =>
-                              num(h.forwardOccupancy) < 60 &&
-                              num(h.pacingDifficultyPercent) >= 115
-                          ).length /
-                            Math.max(pacingOverviewData.length, 1)) *
-                          100
-                        }%`,
-                        backgroundColor: "#ef4444",
-                        opacity: 0.8,
-                        transition: "width 0.3s",
-                      }}
-                    ></div>
-                  </div>
-                  <span
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    QUADRANT ALIGNED
-                  </span>
-                </div>
+          {/* Legend */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            {[
+              { label: "<40%", value: 30 },
+              { label: "40-70%", value: 55 },
+              { label: "70-80%", value: 75 },
+              { label: "80-100%", value: 90 },
+              { label: ">100%", value: 101 },
+            ].map((l) => (
+              <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 16, height: 16, ...getOccupancyColor(l.value), borderRadius: 4 }} />
+                <span style={{ fontSize: 12, color: R.textMid }}>{l.label}</span>
               </div>
-            </div>
-
-            {/* 3. Risk Warnings (Formerly Moderate) */}
-            <div
-              style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid rgba(245, 158, 11, 0.2)",
-                borderRadius: "0.25rem",
-                padding: "1rem",
-                position: "relative",
-                overflow: "hidden",
-                boxShadow: "0 0 16px rgba(245, 158, 11, 0.03)",
-              }}
-            >
-              {/* Corner Brackets */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #f59e0b",
-                  borderLeft: "2px solid #f59e0b",
-                  opacity: 0.3,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #f59e0b",
-                  borderRight: "2px solid #f59e0b",
-                  opacity: 0.3,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #f59e0b",
-                  borderLeft: "2px solid #f59e0b",
-                  opacity: 0.3,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #f59e0b",
-                  borderRight: "2px solid #f59e0b",
-                  opacity: 0.3,
-                }}
-              ></div>
-
-              {/* Orange gradient background */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "50%",
-                  background:
-                    "linear-gradient(180deg, rgba(245, 158, 11, 0.03) 0%, transparent 100%)",
-                  pointerEvents: "none",
-                }}
-              ></div>
-
-              <div style={{ position: "relative", zIndex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "1.5rem",
-                      height: "1.5rem",
-                      borderRadius: "0.25rem",
-                      backgroundColor: "rgba(245, 158, 11, 0.08)",
-                      border: "1px solid rgba(245, 158, 11, 0.25)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <AlertCircle
-                      style={{
-                        width: "0.875rem",
-                        height: "0.875rem",
-                        color: "#f59e0b",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    Risk Warnings
-                  </div>
-                </div>
-                <div
-                  style={{
-                    color: "#f59e0b",
-                    fontSize: "2rem",
-                    fontFamily: "monospace",
-                    lineHeight: 1,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  {
-                    pacingOverviewData.filter((h) => {
-                      const occ = num(h.forwardOccupancy);
-                      const pressure = num(h.pacingDifficultyPercent);
-                      const isCritical = occ < 60 && pressure >= 115;
-                      const isOnPace = occ >= 60 && pressure < 115;
-                      return !isCritical && !isOnPace;
-                    }).length
-                  }
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.375rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      height: "0.25rem",
-                      backgroundColor: "#2a2a2a",
-                      borderRadius: "9999px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${
-                          (pacingOverviewData.filter((h) => {
-                            const occ = num(h.forwardOccupancy);
-                            const pressure = num(h.pacingDifficultyPercent);
-                            const isCritical = occ < 60 && pressure >= 115;
-                            const isOnPace = occ >= 60 && pressure < 115;
-                            return !isCritical && !isOnPace;
-                          }).length /
-                            Math.max(pacingOverviewData.length, 1)) *
-                          100
-                        }%`,
-                        opacity: 0.8,
-                        backgroundColor: "#f59e0b",
-                        transition: "width 0.3s",
-                      }}
-                    ></div>
-                  </div>
-                  <span
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    FILL or RATE RISK
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Avg Portfolio Occupancy */}
-            <div
-              style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid rgba(250, 255, 106, 0.2)",
-                borderRadius: "0.25rem",
-                padding: "1rem",
-                position: "relative",
-                overflow: "hidden",
-                boxShadow: "0 0 16px rgba(250, 255, 106, 0.02)",
-              }}
-            >
-              {/* Corner Brackets */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #39BDF8",
-                  borderLeft: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  top: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderTop: "2px solid #39BDF8",
-                  borderRight: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  left: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #39BDF8",
-                  borderLeft: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "0.5rem",
-                  right: "0.5rem",
-                  width: "0.75rem",
-                  height: "0.75rem",
-                  borderBottom: "2px solid #39BDF8",
-                  borderRight: "2px solid #39BDF8",
-                  opacity: 0.25,
-                }}
-              ></div>
-
-              {/* Yellow gradient background */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "50%",
-                  background:
-                    "linear-gradient(180deg, rgba(250, 255, 106, 0.02) 0%, transparent 100%)",
-                  pointerEvents: "none",
-                }}
-              ></div>
-
-              <div style={{ position: "relative", zIndex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "1.5rem",
-                      height: "1.5rem",
-                      borderRadius: "0.25rem",
-                      backgroundColor: "rgba(250, 255, 106, 0.06)",
-                      border: "1px solid rgba(250, 255, 106, 0.2)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Activity
-                      style={{
-                        width: "0.875rem",
-                        height: "0.875rem",
-                        color: "#39BDF8",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    Avg {viewType === "group" ? "Portfolio" : "Selected"} Occ.
-                  </div>
-                </div>
-                <div
-                  style={{
-                    color: "#e5e5e5",
-                    fontSize: "2rem",
-                    fontFamily: "monospace",
-                    lineHeight: 1,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  {pacingOverviewData.length > 0
-                    ? (
-                        pacingOverviewData.reduce(
-                          (sum, h) => sum + num(h.forwardOccupancy),
-                          0
-                        ) / pacingOverviewData.length
-                      ).toFixed(0)
-                    : 0}
-                  <span style={{ fontSize: "1.25rem", color: "#6b7280" }}>
-                    %
-                  </span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.375rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      height: "0.25rem",
-                      backgroundColor: "#2a2a2a",
-                      borderRadius: "9999px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${
-                          pacingOverviewData.length > 0
-                            ? Math.round(
-                                pacingOverviewData.reduce(
-                                  (sum, h) => sum + num(h.forwardOccupancy),
-                                  0
-                                ) / pacingOverviewData.length
-                              )
-                            : 0
-                        }%`,
-                        backgroundColor: "#39BDF8",
-                        opacity: 0.75,
-                        transition: "width 0.3s",
-                      }}
-                    ></div>
-                  </div>
-                  <span
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.625rem",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    30-DAY FWD
-                  </span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Risk Quadrant Chart */}
-        <div style={{ marginBottom: "2rem", position: "relative", zIndex: 10 }}>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <h2
-              style={{
-                color: "#e5e5e5",
-                textTransform: "uppercase",
-                letterSpacing: "-0.025em",
-                fontSize: "0.875rem",
-                marginBottom: "0.25rem",
-              }}
-            >
-              Risk Quadrant Analysis
-            </h2>
-            <p style={{ color: "#6b7280", fontSize: "0.75rem" }}>
-              Strategic diagnostic tool • Combines volume and budget pacing risk
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "1.5rem",
-            }}
-          >
-            {/* Scatter Plot */}
-            <div
-              style={{
-                gridColumn: "span 2",
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
-                borderRadius: "0.25rem",
-                padding: "1.25rem",
-              }}
-            >
-              <div style={{ position: "relative", height: "520px" }}>
-                {/* Quadrant Background Overlays */}
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, 1fr)",
-                    gridTemplateRows: "repeat(2, 1fr)",
-                    gap: "1px",
-                    pointerEvents: "none",
-                    zIndex: 0,
-                  }}
-                >
-                  <div
-                    style={{ backgroundColor: "rgba(251, 146, 60, 0.03)" }}
-                  ></div>
-                  <div
-                    style={{ backgroundColor: "rgba(16, 185, 129, 0.03)" }}
-                  ></div>
-                  <div
-                    style={{ backgroundColor: "rgba(220, 38, 38, 0.03)" }}
-                  ></div>
-                  <div
-                    style={{ backgroundColor: "rgba(57, 189, 248, 0.03)" }}
-                  ></div>
+        {/* Matrix Table */}
+        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "inline-block", minWidth: "100%" }}>
+              {/* Header Row */}
+              <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 10, background: R.darkBand, borderBottom: `1px solid ${R.border}` }}>
+                <div style={{ position: "sticky", left: 0, zIndex: 20, background: R.darkBand, borderRight: `1px solid ${R.border}`, width: 240, flexShrink: 0, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>Hotel</div>
                 </div>
-
-                {/* Quadrant Labels (Positioned) */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "1rem",
-                    left: "1rem",
-                    zIndex: 10,
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid rgba(251, 146, 60, 0.2)",
-                    borderRadius: "0.25rem",
-                    padding: "0.25rem 0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "0.375rem",
-                        height: "0.375rem",
-                        backgroundColor: "#fb923c",
-                        borderRadius: "9999px",
-                      }}
-                    ></div>
-                    <span style={{ color: "#fb923c", fontSize: "0.75rem" }}>
-                      Fill Risk
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "1rem",
-                    right: "1rem",
-                    zIndex: 10,
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    borderRadius: "0.25rem",
-                    padding: "0.25rem 0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "0.375rem",
-                        height: "0.375rem",
-                        backgroundColor: "#10b981",
-                        borderRadius: "9999px",
-                      }}
-                    ></div>
-                    <span style={{ color: "#10b981", fontSize: "0.75rem" }}>
-                      On Pace
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "1rem",
-                    left: "1rem",
-                    zIndex: 10,
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid rgba(220, 38, 38, 0.2)",
-                    borderRadius: "0.25rem",
-                    padding: "0.25rem 0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "0.375rem",
-                        height: "0.375rem",
-                        backgroundColor: "#dc2626",
-                        borderRadius: "9999px",
-                      }}
-                    ></div>
-                    <span style={{ color: "#dc2626", fontSize: "0.75rem" }}>
-                      Critical Risk
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "1rem",
-                    right: "1rem",
-                    zIndex: 10,
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid rgba(57, 189, 248, 0.2)",
-                    borderRadius: "0.25rem",
-                    padding: "0.25rem 0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "0.375rem",
-                        height: "0.375rem",
-                        backgroundColor: "#39BDF8",
-                        borderRadius: "9999px",
-                      }}
-                    ></div>
-                    <span style={{ color: "#39BDF8", fontSize: "0.75rem" }}>
-                      Rate Strategy Risk
-                    </span>
-                  </div>
-                </div>
-
-                {/* Chart */}
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                  style={{ position: "relative", zIndex: 5 }}
-                >
-                  <ScatterChart
-                    margin={{ top: 30, right: 30, bottom: 60, left: 80 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                    <XAxis
-                      type="number"
-                      dataKey="forwardOccupancy"
-                      name="Forward Volume (Occupancy %)"
-                      domain={[0, 100]}
-                      ticks={[0, 20, 40, 60, 80, 100]}
-                      stroke="#9ca3af"
-                      tick={{ fill: "#9ca3af", fontSize: 12 }}
-                      label={{
-                        value: "Forward Volume (Occupancy %)",
-                        position: "bottom",
-                        fill: "#e5e5e5",
-                        offset: 30,
-                        style: { fontSize: 13 },
-                      }}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="pacingDifficultyPercent"
-                      name="Pacing Rate Pressure (%)"
-                      reversed={true}
-                      domain={[0, "auto"]}
-                      ticks={[0, 50, 100, 115, 200, 300, 400, 500]}
-                      stroke="#9ca3af"
-                      tick={{ fill: "#9ca3af", fontSize: 12 }}
-                      label={{
-                        value: "Pacing Rate Pressure (%)",
-                        angle: -90,
-                        position: "insideLeft",
-                        fill: "#e5e5e5",
-                        offset: -50,
-                        style: { fontSize: 13, textAnchor: "middle" },
-                      }}
-                    />
-                    <ZAxis range={[100, 100]} />
-                    <Tooltip
-                      cursor={{ strokeDasharray: "3 3", stroke: "#39BDF8" }}
-                      content={<QuadrantTooltip />}
-                    />
-
-                    {/* Reference Lines */}
-                    <ReferenceLine
-                      y={115}
-                      stroke="#39BDF8"
-                      strokeWidth={1}
-                      strokeDasharray="5 5"
-                    />
-                    <ReferenceLine
-                      x={60}
-                      stroke="#39BDF8"
-                      strokeWidth={1}
-                      strokeDasharray="5 5"
-                    />
-
-                    <Scatter
-                      name="Hotels"
-                      data={pacingOverviewData}
-                      shape={DotByPayload}
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Quadrant Summary - Right Side (Detailed Lists) */}
-            <div
-              style={{
-                height: "520px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "1rem",
-              }}
-            >
-              {/* 1. Critical Risk (Red) - Occ < 60 && Pressure >= 115 */}
-              <div
-                style={{
-                  flex: 1,
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: "0.25rem",
-                  padding: "0.75rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.5rem",
-                    flexShrink: 0,
-                  }}
-                >
-                  <AlertCircle
-                    style={{
-                      width: "0.875rem",
-                      height: "0.875rem",
-                      color: "#ef4444",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      color: "#ef4444",
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Critical Risk
-                  </h3>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                      color: "#ef4444",
-                      fontSize: "0.65rem",
-                      padding: "1px 6px",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    {
-                      pacingOverviewData.filter(
-                        (d) =>
-                          num(d.forwardOccupancy) < 60 &&
-                          num(d.pacingDifficultyPercent) >= 115
-                      ).length
-                    }
-                  </span>
-                </div>
-                <div
-                  style={{
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                    paddingRight: "4px",
-                  }}
-                >
-                  {pacingOverviewData
-                    .filter(
-                      (d) =>
-                        num(d.forwardOccupancy) < 60 &&
-                        num(d.pacingDifficultyPercent) >= 115
-                    )
-                    .sort(
-                      (a, b) =>
-                        num(b.pacingDifficultyPercent) -
-                        num(a.pacingDifficultyPercent)
-                    )
-                    .map((hotel, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          backgroundColor: "#1d1d1c",
-                          border: "1px solid #2a2a2a",
-                          borderRadius: "0.25rem",
-                          padding: "0.5rem",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "#e5e5e5",
-                            fontSize: "0.75rem",
-                            marginBottom: "2px",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {hotel.hotelName}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{ color: "#6b7280", fontSize: "0.65rem" }}
-                          >
-                            Occ: {num(hotel.forwardOccupancy).toFixed(0)}%
-                          </span>
-                          <span
-                            style={{ color: "#ef4444", fontSize: "0.65rem" }}
-                          >
-                            {num(hotel.pacingDifficultyPercent).toFixed(0)}%
-                            Pressure
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  {pacingOverviewData.filter(
-                    (d) =>
-                      num(d.forwardOccupancy) < 60 &&
-                      num(d.pacingDifficultyPercent) >= 115
-                  ).length === 0 && (
-                    <div
-                      style={{
-                        color: "#6b7280",
-                        fontSize: "0.75rem",
-                        fontStyle: "italic",
-                        padding: "0.5rem",
-                      }}
-                    >
-                      No hotels in critical risk.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 2. Rate Strategy Risk (Yellow) - Occ >= 60 && Pressure >= 115 */}
-              <div
-                style={{
-                  flex: 1,
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: "0.25rem",
-                  padding: "0.75rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.5rem",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Target
-                    style={{
-                      width: "0.875rem",
-                      height: "0.875rem",
-                      color: "#39BDF8",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      color: "#39BDF8",
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Rate Strategy Risk
-                  </h3>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      backgroundColor: "rgba(250, 255, 106, 0.1)",
-                      color: "#39BDF8",
-                      fontSize: "0.65rem",
-                      padding: "1px 6px",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    {
-                      pacingOverviewData.filter(
-                        (d) =>
-                          num(d.forwardOccupancy) >= 60 &&
-                          num(d.pacingDifficultyPercent) >= 115
-                      ).length
-                    }
-                  </span>
-                </div>
-                <div
-                  style={{
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                    paddingRight: "4px",
-                  }}
-                >
-                  {pacingOverviewData
-                    .filter(
-                      (d) =>
-                        num(d.forwardOccupancy) >= 60 &&
-                        num(d.pacingDifficultyPercent) >= 115
-                    )
-                    .sort(
-                      (a, b) =>
-                        num(b.pacingDifficultyPercent) -
-                        num(a.pacingDifficultyPercent)
-                    )
-                    .map((hotel, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          backgroundColor: "#1d1d1c",
-                          border: "1px solid #2a2a2a",
-                          borderRadius: "0.25rem",
-                          padding: "0.5rem",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "#e5e5e5",
-                            fontSize: "0.75rem",
-                            marginBottom: "2px",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {hotel.hotelName}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{ color: "#6b7280", fontSize: "0.65rem" }}
-                          >
-                            Occ: {num(hotel.forwardOccupancy).toFixed(0)}%
-                          </span>
-                          <span
-                            style={{ color: "#39BDF8", fontSize: "0.65rem" }}
-                          >
-                            {num(hotel.pacingDifficultyPercent).toFixed(0)}%
-                            Pressure
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  {pacingOverviewData.filter(
-                    (d) =>
-                      num(d.forwardOccupancy) >= 60 &&
-                      num(d.pacingDifficultyPercent) >= 115
-                  ).length === 0 && (
-                    <div
-                      style={{
-                        color: "#6b7280",
-                        fontSize: "0.75rem",
-                        fontStyle: "italic",
-                        padding: "0.5rem",
-                      }}
-                    >
-                      No hotels in rate risk.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 3. Fill Risk (Orange) - Occ < 60 && Pressure < 115 */}
-              <div
-                style={{
-                  flex: 1,
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: "0.25rem",
-                  padding: "0.75rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginBottom: "0.5rem",
-                    flexShrink: 0,
-                  }}
-                >
-                  <AlertTriangle
-                    style={{
-                      width: "0.875rem",
-                      height: "0.875rem",
-                      color: "#f59e0b",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      color: "#f59e0b",
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Fill Risk
-                  </h3>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      backgroundColor: "rgba(245, 158, 11, 0.1)",
-                      color: "#f59e0b",
-                      fontSize: "0.65rem",
-                      padding: "1px 6px",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    {
-                      pacingOverviewData.filter(
-                        (d) =>
-                          num(d.forwardOccupancy) < 60 &&
-                          num(d.pacingDifficultyPercent) < 115
-                      ).length
-                    }
-                  </span>
-                </div>
-                <div
-                  style={{
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                    paddingRight: "4px",
-                  }}
-                >
-                  {pacingOverviewData
-                    .filter(
-                      (d) =>
-                        num(d.forwardOccupancy) < 60 &&
-                        num(d.pacingDifficultyPercent) < 115
-                    )
-                    .sort(
-                      (a, b) =>
-                        num(a.forwardOccupancy) - num(b.forwardOccupancy)
-                    )
-                    .map((hotel, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          backgroundColor: "#1d1d1c",
-                          border: "1px solid #2a2a2a",
-                          borderRadius: "0.25rem",
-                          padding: "0.5rem",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "#e5e5e5",
-                            fontSize: "0.75rem",
-                            marginBottom: "2px",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {hotel.hotelName}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{ color: "#6b7280", fontSize: "0.65rem" }}
-                          >
-                            Pressure:{" "}
-                            {num(hotel.pacingDifficultyPercent).toFixed(0)}%
-                          </span>
-                          <span
-                            style={{ color: "#f59e0b", fontSize: "0.65rem" }}
-                          >
-                            {num(hotel.forwardOccupancy).toFixed(0)}% Occ
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  {pacingOverviewData.filter(
-                    (d) =>
-                      num(d.forwardOccupancy) < 60 &&
-                      num(d.pacingDifficultyPercent) < 115
-                  ).length === 0 && (
-                    <div
-                      style={{
-                        color: "#6b7280",
-                        fontSize: "0.75rem",
-                        fontStyle: "italic",
-                        padding: "0.5rem",
-                      }}
-                    >
-                      No hotels in fill risk.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 4. On Pace (Green) - Minimal view */}
-              <div
-                style={{
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: "0.25rem",
-                  padding: "0.75rem",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <Check
-                    style={{
-                      width: "0.875rem",
-                      height: "0.875rem",
-                      color: "#10b981",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      color: "#10b981",
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      fontWeight: 600,
-                    }}
-                  >
-                    On Pace
-                  </h3>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      color: "#10b981",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {
-                      pacingOverviewData.filter(
-                        (d) =>
-                          num(d.forwardOccupancy) >= 60 &&
-                          num(d.pacingDifficultyPercent) < 115
-                      ).length
-                    }
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 1.5: Portfolio Flowcast */}
-        <PortfolioFlowcast
-          startDate={new Date()}
-          globalGroupFilter={
-            selectedGroup !== "all" ? selectedGroup : globalSelectedGroup
-          }
-          globalHotelFilter={
-            selectedHotel !== "all" ? selectedHotel : globalSelectedHotel
-          }
-        />
-
-        {/* SECTION 2: Occupancy Matrix */}
-        <div style={styles.mb8}>
-          <div style={styles.mb4}>
-            <h2 style={styles.h2}>Occupancy Matrix</h2>
-            <p style={styles.pSmall}>
-              Dense at-a-glance view of all properties vs next 45 days • Visual
-              anomaly detection
-            </p>
-          </div>
-
-          {/* Controls Bar */}
-          <div
-            style={{
-              marginBottom: "1rem",
-              backgroundColor: "#1a1a1a",
-              borderRadius: "0.25rem",
-              border: "1px solid #2a2a2a",
-              padding: "0.625rem 1rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={styles.flexGap4}>
-              {/* Metric Toggle */}
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-              >
-                <Filter className="w-4 h-4 text-[#6b7280] mr-2" />
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    backgroundColor: "#1a1a1a",
-                    borderRadius: "0.25rem",
-                    padding: "0.25rem",
-                  }}
-                >
-                  <button
-                    onClick={() => setMatrixMetric("occupancy")}
-                    style={{
-                      padding: "0.375rem 0.75rem",
-                      borderRadius: "0.25rem",
-                      fontSize: "0.75rem",
-                      transition: "all 0.2s",
-                      backgroundColor:
-                        matrixMetric === "occupancy"
-                          ? "#2a2a2a"
-                          : "transparent",
-                      color:
-                        matrixMetric === "occupancy" ? "#e5e5e5" : "#6b7280",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Occupancy %
-                  </button>
-                  <button
-                    onClick={() => setMatrixMetric("adr")}
-                    style={{
-                      padding: "0.375rem 0.75rem",
-                      borderRadius: "0.25rem",
-                      fontSize: "0.75rem",
-                      transition: "all 0.2s",
-                      backgroundColor:
-                        matrixMetric === "adr" ? "#2a2a2a" : "transparent",
-                      color: matrixMetric === "adr" ? "#e5e5e5" : "#6b7280",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    ADR
-                  </button>
-                  <button
-                    onClick={() => setMatrixMetric("available")}
-                    style={{
-                      padding: "0.375rem 0.75rem",
-                      borderRadius: "0.25rem",
-                      fontSize: "0.75rem",
-                      transition: "all 0.2s",
-                      backgroundColor:
-                        matrixMetric === "available"
-                          ? "#2a2a2a"
-                          : "transparent",
-                      color:
-                        matrixMetric === "available" ? "#e5e5e5" : "#6b7280",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Rooms Available
-                  </button>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setSortByRisk(!sortByRisk)}
-                className={`px-3 py-1.5 rounded text-sm transition-all ${
-                  sortByRisk
-                    ? "bg-[#ef4444] text-white"
-                    : "bg-[#1d1d1c] border border-[#2a2a2a] text-[#9ca3af] hover:border-[#ef4444]/50"
-                }`}
-              >
-                {sortByRisk ? "Showing Highest Risk First" : "Sort by Risk"}
-              </button>
-            </div>
-
-            {/* Legend */}
-            <div style={styles.flexGap4}>
-              <div style={styles.flexGap2}>
-                <div
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    ...getOccupancyColor(30),
-                    borderRadius: "4px",
-                  }}
-                ></div>
-                <span style={styles.textXs}>{"<40%"}</span>
-              </div>
-              <div style={styles.flexGap2}>
-                <div
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    ...getOccupancyColor(55),
-                    borderRadius: "4px",
-                  }}
-                ></div>
-                <span style={styles.textXs}>40-70%</span>
-              </div>
-              <div style={styles.flexGap2}>
-                <div
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    ...getOccupancyColor(75),
-                    borderRadius: "4px",
-                  }}
-                ></div>
-                <span style={styles.textXs}>70-80%</span>
-              </div>
-              <div style={styles.flexGap2}>
-                <div
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    ...getOccupancyColor(90),
-                    borderRadius: "4px",
-                  }}
-                ></div>
-                <span style={styles.textXs}>80-100%</span>
-              </div>
-              <div style={styles.flexGap2}>
-                <div
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    ...getOccupancyColor(101),
-                    borderRadius: "4px",
-                  }}
-                ></div>
-                <span style={styles.textXs}>{">100%"}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Matrix Table */}
-          <div style={styles.matrixTableWrapper}>
-            <div style={styles.matrixOverflow}>
-              <div style={styles.matrixMinWidth}>
-                {/* Header Row */}
-                <div style={styles.matrixHeaderRow}>
-                  <div style={styles.matrixStickyHeader}>
-                    <div style={styles.textXs}>Hotel</div>
-                  </div>
-
-                  <div style={styles.flex}>
-                    {matrixDates.map((date, i) => {
-                      const isToday = i === 0;
-                      const dayOfWeek = date.toLocaleDateString("en-US", {
-                        weekday: "short",
-                      });
-                      const dayOfMonth = date.getDate();
-                      const month = date.toLocaleDateString("en-US", {
-                        month: "short",
-                      });
-
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            ...styles.matrixDateHeader,
-                            ...(isToday ? styles.matrixDateToday : {}),
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "10px",
-                              color: isToday ? "#39BDF8" : "#6b7280",
-                            }}
-                          >
-                            {dayOfWeek}
-                          </div>
-                          <div
-                            style={{
-                              ...styles.textXs,
-                              color: isToday ? "#39BDF8" : "#9ca3af",
-                            }}
-                          >
-                            {month} {dayOfMonth}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Hotel Rows */}
-                <div>
-                  {sortedHotels.map((hotel) => {
-                    const anomalies = detectAnomalies(hotel.matrixData);
-
+                <div style={{ display: "flex" }}>
+                  {matrixDates.map((date, i) => {
+                    const isToday = i === 0;
+                    const dayOfWeek = date.toLocaleDateString("en-US", { weekday: "short" });
+                    const dayOfMonth = date.getDate();
+                    const month = date.toLocaleDateString("en-US", { month: "short" });
                     return (
-                      <div key={hotel.id} style={styles.matrixRow}>
-                        {/* Sticky Left Column - Hotel Info */}
-                        <div style={styles.matrixStickyCell}>
-                          <div style={styles.flexBetween}>
-                            <div
-                              style={{ ...styles.textWhite, ...styles.textSm }}
-                            >
-                              {hotel.name}
-                            </div>
-                            {hotel.riskLevel === "critical" && (
-                              <AlertCircle className="w-4 h-4 text-[#ef4444]" />
-                            )}
-                            {hotel.riskLevel === "moderate" && (
-                              <AlertTriangle className="w-4 h-4 text-[#f59e0b]" />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Date Cells */}
-                        <div style={styles.flex}>
-                          {hotel.matrixData
-                            .slice(0, matrixDays)
-                            .map((dayData: any, dayIndex: number) => {
-                              const isToday = dayIndex === 0;
-                              const value =
-                                matrixMetric === "occupancy"
-                                  ? dayData.occupancy
-                                  : matrixMetric === "adr"
-                                  ? dayData.adr
-                                  : dayData.available;
-
-                              const anomaly = anomalies.find(
-                                (a) => a.day === dayIndex
-                              );
-                              const colorStyle =
-                                matrixMetric === "occupancy"
-                                  ? getOccupancyColor(value)
-                                  : {};
-                              const textStyle =
-                                matrixMetric === "occupancy"
-                                  ? getOccupancyTextColor(value)
-                                  : styles.textWhite;
-
-                              return (
-                                <div
-                                  key={dayIndex}
-                                  className="group" // Keep group for hover
-                                  style={{
-                                    ...styles.matrixDataCell,
-                                    ...(isToday
-                                      ? styles.matrixDataCellToday
-                                      : {}),
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      ...styles.matrixDataCellInner,
-                                      ...(matrixMetric === "occupancy"
-                                        ? colorStyle
-                                        : { backgroundColor: "#1d1d1c" }),
-                                      ...textStyle,
-                                    }}
-                                  >
-                                    {matrixMetric === "occupancy" &&
-                                      `${value.toFixed(0)}%`}
-                                    {matrixMetric === "adr" &&
-                                      `${getCurrencySymbol(hotel.currencyCode)}${value.toFixed(0)}`}
-                                    {matrixMetric === "available" && value}
-
-                                    {anomaly && (
-                                      <div
-                                        style={{
-                                          position: "absolute",
-                                          top: "-4px",
-                                          right: "-4px",
-                                        }}
-                                      >
-                                        {anomaly.type === "drop" && (
-                                          <TrendingDown
-                                            className="w-3 h-3 text-[#ef4444]"
-                                            title="Sudden drop ≥15%"
-                                          />
-                                        )}
-                                        {anomaly.type === "persistent" && (
-                                          <AlertTriangle
-                                            className="w-3 h-3 text-[#f59e0b]"
-                                            title="Persistent low <50% for 7+ days"
-                                          />
-                                        )}
-                                        {anomaly.type === "overbooked" && (
-                                          <div
-                                            className="w-3 h-3 bg-purple-500 rounded-full"
-                                            title="Overbooked >100%"
-                                          />
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Hover Tooltip (Requires CSS to show on .group:hover) */}
-                                  <div
-                                    className="matrix-tooltip"
-                                    style={styles.matrixTooltip}
-                                  >
-                                    <div
-                                      style={{
-                                        ...styles.textWhite,
-                                        ...styles.mb1,
-                                      }}
-                                    >
-                                      {hotel.name}
-                                    </div>
-                                    <div style={styles.pXSmall}>
-                                      {matrixDates[dayIndex].toLocaleDateString(
-                                        "en-US",
-                                        {
-                                          month: "short",
-                                          day: "numeric",
-                                          year: "numeric",
-                                        }
-                                      )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        borderTop: "1px solid #2a2a2a",
-                                        marginTop: "4px",
-                                        paddingTop: "4px",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: "2px",
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          ...styles.flexBetween,
-                                          gap: "12px",
-                                        }}
-                                      >
-                                        <span style={styles.pXSmall}>
-                                          Occupancy:
-                                        </span>
-                                        <span
-                                          style={{
-                                            ...getOccupancyTextColor(
-                                              dayData.occupancy
-                                            ),
-                                            fontSize: "12px",
-                                          }}
-                                        >
-                                          {dayData.occupancy.toFixed(1)}%
-                                        </span>
-                                      </div>
-                                      <div
-                                        style={{
-                                          ...styles.flexBetween,
-                                          gap: "12px",
-                                        }}
-                                      >
-                                        <span style={styles.pXSmall}>ADR:</span>
-                                        <span
-                                          style={{
-                                            ...styles.textWhite,
-                                            fontSize: "12px",
-                                          }}
-                                        >
-                                          {getCurrencySymbol(hotel.currencyCode)}{dayData.adr.toFixed(0)}
-                                        </span>
-                                      </div>
-                                      <div
-                                        style={{
-                                          ...styles.flexBetween,
-                                          gap: "12px",
-                                        }}
-                                      >
-                                        <span style={styles.pXSmall}>
-                                          Available:
-                                        </span>
-                                        <span
-                                          style={{
-                                            ...styles.textWhite,
-                                            fontSize: "12px",
-                                          }}
-                                        >
-                                          {dayData.available} rooms
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
+                      <div key={i} style={{ width: 56, flexShrink: 0, padding: "8px 4px", textAlign: "center", ...(isToday ? { background: `${R.warmTeal}10`, borderLeft: `2px solid ${R.warmTeal}` } : {}) }}>
+                        <div style={{ fontSize: 10, color: isToday ? R.warmTeal : R.textDim }}>{dayOfWeek}</div>
+                        <div style={{ fontSize: 12, color: isToday ? R.warmTeal : R.textMid }}>{month} {dayOfMonth}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-            </div>
-          </div>
-          {/* Add this CSS to your index.css or a <style> tag to make tooltips work */}
-          <style>{`
-          .group:hover .matrix-tooltip {
-            opacity: 1;
-            pointer-events: auto;
-          }
-        `}</style>
-        </div>
 
-        {/* [MODIFIED] VARIATION 1: Budget Pacing Problem List */}
-        <div style={styles.mb8}>
-          <div style={styles.mb4}>
-            <h2 style={styles.h2}>Budget Pacing Problem List</h2>
-            <p style={styles.pSmall}>
-              Tactical action required • Sorted by most urgent budget risk
-            </p>
-          </div>
-
-          <div style={{ ...styles.card, padding: 0, ...styles.overflowHidden }}>
-            {/* Table Header */}
-            <div style={{ ...styles.cardHeader, ...styles.grid12 }}>
-              <div style={styles.colSpan3}>Hotel Name</div>
-              <div style={styles.colSpan2}>Current Month Status</div>
-              <div style={{ ...styles.colSpan2, ...styles.textRight }}>
-                Current Month Shortfall
-              </div>
-              <div style={{ ...styles.colSpan2, ...styles.textRight }}>
-                Required ADR
-              </div>
-              <div style={{ ...styles.colSpan3, ...styles.textCenter }}>
-                Next Month Status
-              </div>
-            </div>
-
-            {/* Table Rows */}
-            <div>
-              {/* [MODIFIED] Data source is now pacingOverviewData */}
-              {pacingOverviewData
-                .sort((a, b) => {
-                  const statusOrder = { red: 0, yellow: 1, green: 2 };
+              {/* Hotel Rows */}
+              <div>
+                {sortedHotels.map((hotel) => {
+                  const anomalies = detectAnomalies(hotel.matrixData);
                   return (
-                    statusOrder[
-                      a.currentMonthStatus as keyof typeof statusOrder
-                    ] -
-                    statusOrder[
-                      b.currentMonthStatus as keyof typeof statusOrder
-                    ]
-                  );
-                })
-                .map((hotel, index) => {
-                  // [MODIFIED] Logic simplified as API does not provide 'statusText'
-                  const currentStatusConfig = {
-                    red: { label: "At Risk" },
-                    yellow: { label: "Slightly Behind" },
-                    green: { label: "On Target" },
-                  };
-
-                  const statusColorMap = {
-                    red: "bg-[#ef4444]",
-                    yellow: "bg-[#f59e0b]",
-                    green: "bg-[#10b981]",
-                  };
-
-                  const current =
-                    currentStatusConfig[
-                      hotel.currentMonthStatus as keyof typeof currentStatusConfig
-                    ];
-
-                  return (
-                    <div
-                      key={`trend-${hotel.hotelName}`}
-                      style={{
-                        ...styles.cardRow,
-                        ...styles.grid12,
-                        ...styles.textSm,
-                        borderTop: index === 0 ? "none" : "1px solid #2a2a2a",
-                      }}
-                    >
-                      <div style={{ ...styles.colSpan3, ...styles.textWhite }}>
-                        {hotel.hotelName}
-                      </div>
-
-                      <div style={styles.colSpan2}>
-                        <Badge
-                          className={
-                            hotel.currentMonthStatus === "red"
-                              ? "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/40"
-                              : hotel.currentMonthStatus === "yellow"
-                              ? "bg-[#f59e0b]/20 text-[#f59e0b] border-[#f59e0b]/40"
-                              : "bg-[#10b981]/20 text-[#10b981] border-[#10b981]/40"
-                          }
-                        >
-                          {current.label}
-                        </Badge>
-                      </div>
-
-                      <div style={{ ...styles.colSpan2, ...styles.textRight }}>
-                        <span
-                          style={
-                            hotel.currentMonthShortfall < 0
-                              ? styles.textRedLight
-                              : styles.textGreen
-                          }
-                        >
-                          {hotel.currentMonthShortfall < 0 ? "-" : "+"}{getCurrencySymbol(hotel.currencyCode)}
-                          {Math.abs(hotel.currentMonthShortfall).toLocaleString(
-                            undefined,
-                            { maximumFractionDigits: 0 }
-                          )}
-                        </span>
-                      </div>
-
-                      <div style={{ ...styles.colSpan2, ...styles.textRight }}>
-                        <span
-                          style={
-                            hotel.currentMonthStatus === "red"
-                              ? styles.textYellow
-                              : styles.textWhite
-                          }
-                        >
-                          {/* [MODIFIED] Handle 'Infinity' case */}
-                          {hotel.currentMonthRequiredADR > 90000
-                            ? "N/A"
-                            : `${getCurrencySymbol(hotel.currencyCode)}${hotel.currentMonthRequiredADR.toFixed(2)}`}
-                        </span>
-                      </div>
-
-                      {/* [MODIFIED] This column now only shows the *one* next month we have data for */}
-                      <div
-                        style={{
-                          ...styles.colSpan3,
-                          ...styles.flex,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div style={styles.flexGap2}>
-                          <div
-                            style={{
-                              width: "20px",
-                              height: "20px",
-                              borderRadius: "4px",
-                              backgroundColor: statusColorMap[
-                                hotel.nextMonthStatus as keyof typeof statusColorMap
-                              ].replace("bg-", ""),
-                            }}
-                            title="Next Month"
-                          ></div>
+                    <div key={hotel.id} style={{ display: "flex", borderBottom: `1px solid ${R.sep}` }}>
+                      <div style={{ position: "sticky", left: 0, zIndex: 10, background: R.darkBand, borderRight: `1px solid ${R.border}`, width: 240, flexShrink: 0, padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ color: R.accent, fontSize: 14 }}>{hotel.name}</div>
                         </div>
-                        <span style={{ ...styles.pXSmall, marginLeft: "8px" }}>
-                          Next Month
-                        </span>
+                        {hotel.riskLevel === "critical" && <AlertCircle size={16} color={R.red} />}
+                        {hotel.riskLevel === "moderate" && <AlertTriangle size={16} color={R.gold} />}
+                      </div>
+                      <div style={{ display: "flex" }}>
+                        {hotel.matrixData.slice(0, matrixDays).map((dayData: any, dayIndex: number) => {
+                          const isToday = dayIndex === 0;
+                          const value = matrixMetric === "occupancy" ? dayData.occupancy : matrixMetric === "adr" ? dayData.adr : dayData.available;
+                          const anomaly = anomalies.find((a) => a.day === dayIndex);
+                          const colorStyle = matrixMetric === "occupancy" ? getOccupancyColor(value) : {};
+                          const textStyle = matrixMetric === "occupancy" ? getOccupancyTextColor(value) : { color: R.accent };
+
+                          return (
+                            <div key={dayIndex} className="group" style={{ width: 56, flexShrink: 0, padding: 4, textAlign: "center", position: "relative", ...(isToday ? { background: `${R.warmTeal}08`, borderLeft: `2px solid ${R.warmTeal}` } : {}) }}>
+                              <div style={{ borderWidth: 1, borderRadius: 2, padding: "2px 4px", fontSize: 11, position: "relative", height: 24, display: "flex", alignItems: "center", justifyContent: "center", ...(matrixMetric === "occupancy" ? colorStyle : { background: R.sidebar }), ...textStyle, fontVariantNumeric: "tabular-nums" }}>
+                                {matrixMetric === "occupancy" && `${value.toFixed(0)}%`}
+                                {matrixMetric === "adr" && `${getCurrencySymbol(hotel.currencyCode)}${value.toFixed(0)}`}
+                                {matrixMetric === "available" && value}
+                                {anomaly && (
+                                  <div style={{ position: "absolute", top: -4, right: -4 }}>
+                                    {anomaly.type === "drop" && <TrendingDown size={12} color={R.red} />}
+                                    {anomaly.type === "persistent" && <AlertTriangle size={12} color={R.gold} />}
+                                    {anomaly.type === "overbooked" && <div style={{ width: 12, height: 12, background: R.warmTeal, borderRadius: "50%" }} />}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="matrix-tooltip" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: "100%", marginBottom: 4, background: R.sidebar, border: `1px solid ${R.border}`, borderRadius: 6, padding: 8, zIndex: 30, opacity: 0, pointerEvents: "none", transition: "opacity 0.2s", whiteSpace: "nowrap", fontSize: 11 }}>
+                                <div style={{ color: R.accent, marginBottom: 4 }}>{hotel.name}</div>
+                                <div style={{ color: R.textDim, textTransform: "uppercase", letterSpacing: "0.05em" }}>{matrixDates[dayIndex].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                                <div style={{ borderTop: `1px solid ${R.border}`, marginTop: 4, paddingTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                    <span style={{ color: R.textDim }}>Occupancy:</span>
+                                    <span style={{ ...getOccupancyTextColor(dayData.occupancy), fontSize: 12 }}>{dayData.occupancy.toFixed(1)}%</span>
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                    <span style={{ color: R.textDim }}>ADR:</span>
+                                    <span style={{ color: R.accent, fontSize: 12 }}>{getCurrencySymbol(hotel.currencyCode)}{dayData.adr.toFixed(0)}</span>
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                    <span style={{ color: R.textDim }}>Available:</span>
+                                    <span style={{ color: R.accent, fontSize: 12 }}>{dayData.available} rooms</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
                 })}
+              </div>
             </div>
+          </div>
+        </div>
+        <style>{`.group:hover .matrix-tooltip { opacity: 1; pointer-events: auto; }`}</style>
+      </div>
+
+      {/* Budget Pacing Problem List */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Tactical</div>
+          <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: -0.3, color: R.accent }}>Budget Pacing Problem List</div>
+          <p style={{ color: R.textMid, fontSize: 12, marginTop: 2 }}>Sorted by most urgent budget risk</p>
+        </div>
+
+        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, overflow: "hidden" }}>
+          {/* Table Header */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", padding: "12px 16px", background: R.sidebar, borderBottom: `1px solid ${R.border}`, fontSize: 11, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div style={{ gridColumn: "span 3" }}>Hotel Name</div>
+            <div style={{ gridColumn: "span 2" }}>Current Month Status</div>
+            <div style={{ gridColumn: "span 2", textAlign: "right" }}>Current Month Shortfall</div>
+            <div style={{ gridColumn: "span 2", textAlign: "right" }}>Required ADR</div>
+            <div style={{ gridColumn: "span 3", textAlign: "center" }}>Next Month Status</div>
+          </div>
+
+          {/* Table Rows */}
+          <div>
+            {pacingOverviewData
+              .sort((a, b) => {
+                const statusOrder = { red: 0, yellow: 1, green: 2 };
+                return (statusOrder[a.currentMonthStatus as keyof typeof statusOrder] || 2) - (statusOrder[b.currentMonthStatus as keyof typeof statusOrder] || 2);
+              })
+              .map((hotel, index) => {
+                const currentStatusConfig: Record<string, { label: string }> = {
+                  red: { label: "At Risk" },
+                  yellow: { label: "Slightly Behind" },
+                  green: { label: "On Target" },
+                };
+                const current = currentStatusConfig[hotel.currentMonthStatus as string] || { label: "Unknown" };
+
+                const statusColorMap: Record<string, string> = { red: R.red, yellow: R.gold, green: R.green };
+                const statusColor = statusColorMap[hotel.nextMonthStatus as string] || R.textDim;
+
+                return (
+                  <div
+                    key={`trend-${hotel.hotelName}`}
+                    style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", padding: "12px 16px", fontSize: 14, borderTop: index === 0 ? "none" : `1px solid ${R.sep}`, alignItems: "center" }}
+                  >
+                    <div style={{ gridColumn: "span 3", color: R.accent }}>{hotel.hotelName}</div>
+                    <div style={{ gridColumn: "span 2" }}>
+                      <Badge className={
+                        hotel.currentMonthStatus === "red"
+                          ? "bg-[#ef4444]/20 text-[#ef4444] border-[#ef4444]/40"
+                          : hotel.currentMonthStatus === "yellow"
+                          ? "bg-[#C8A66E]/20 text-[#C8A66E] border-[#C8A66E]/40"
+                          : "bg-[#34D068]/20 text-[#34D068] border-[#34D068]/40"
+                      }>
+                        {current.label}
+                      </Badge>
+                    </div>
+                    <div style={{ gridColumn: "span 2", textAlign: "right" }}>
+                      <span style={{ color: hotel.currentMonthShortfall < 0 ? R.red : R.green }}>
+                        {hotel.currentMonthShortfall < 0 ? "-" : "+"}{getCurrencySymbol(hotel.currencyCode)}
+                        {Math.abs(hotel.currentMonthShortfall).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div style={{ gridColumn: "span 2", textAlign: "right" }}>
+                      <span style={{ color: hotel.currentMonthStatus === "red" ? R.warmTeal : R.accent }}>
+                        {hotel.currentMonthRequiredADR > 90000 ? "N/A" : `${getCurrencySymbol(hotel.currencyCode)}${hotel.currentMonthRequiredADR.toFixed(2)}`}
+                      </span>
+                    </div>
+                    <div style={{ gridColumn: "span 3", display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: 4, background: statusColor }} />
+                      <span style={{ color: R.textDim, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>Next Month</span>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       </div>

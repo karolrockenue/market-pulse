@@ -48,7 +48,7 @@ export function InitialSyncScreen() {
                 width: '96px',
                 height: '96px',
                 border: '3px solid #2a2a2a',
-                borderTopColor: '#39BDF8',
+                borderTopColor: '#38C6BA',
                 borderRadius: '50%',
               }}
             />
@@ -59,7 +59,7 @@ export function InitialSyncScreen() {
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <CurrentIcon style={{ width: '36px', height: '36px', color: '#39BDF8' }} />
+              <CurrentIcon style={{ width: '36px', height: '36px', color: '#38C6BA' }} />
             </div>
           </div>
         </div>
@@ -94,7 +94,7 @@ export function InitialSyncScreen() {
           padding: '10px 16px',
           marginBottom: '24px',
         }}>
-          <p style={{ color: '#39BDF8', fontSize: '12px', margin: 0 }}>
+          <p style={{ color: '#38C6BA', fontSize: '12px', margin: 0 }}>
             Please keep this page open while we complete the sync.
           </p>
         </div>
@@ -108,7 +108,7 @@ export function InitialSyncScreen() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
             <span style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progress</span>
-            <span style={{ color: '#39BDF8', fontSize: '11px' }}>Step {currentStep + 1} of {steps.length}</span>
+            <span style={{ color: '#38C6BA', fontSize: '11px' }}>Step {currentStep + 1} of {steps.length}</span>
           </div>
 
           {/* Progress Bar */}
@@ -120,7 +120,7 @@ export function InitialSyncScreen() {
             marginBottom: '14px',
           }}>
             <div style={{
-              backgroundColor: '#39BDF8',
+              backgroundColor: '#38C6BA',
               height: '6px',
               borderRadius: '4px',
               transition: 'width 0.5s ease',
@@ -130,7 +130,7 @@ export function InitialSyncScreen() {
 
           {/* Current Step */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-            <Loader2 className="animate-spin" style={{ width: '14px', height: '14px', color: '#39BDF8' }} />
+            <Loader2 className="animate-spin" style={{ width: '14px', height: '14px', color: '#38C6BA' }} />
             <span style={{ color: '#e5e5e5', fontSize: '13px' }}>{steps[currentStep].text}</span>
           </div>
         </div>

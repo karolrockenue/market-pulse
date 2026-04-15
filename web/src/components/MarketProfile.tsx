@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { R } from "../styles/tokens";
 import {
   ComposedChart, LineChart, BarChart, Bar, Line, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -7,22 +8,22 @@ import {
 const NeighbourhoodMaps = lazy(() => import("./NeighbourhoodMaps"));
 
 // ─── Color constants (brand palette) ───
-const BLUE = "#39BDF8";
-const WHITE = "#e5e5e5";
-const GRAY = "#9ca3af";
-const DIM = "#6b7280";
-const SURFACE = "#1d1d1c";
-const BORDER = "#2a2a2a";
+const BLUE = R.warmTeal;
+const WHITE = R.accent;
+const GRAY = R.textMid;
+const DIM = R.textDim;
+const SURFACE = R.bg;
+const BORDER = R.border;
 const GREEN = "#10b981";
 const AMBER = "#f59e0b";
 const RED = "#ef4444";
 const PURPLE = "#8b5cf6";
 const PINK = "#ec4899";
-const INPUT_BG = "#2C2C2C";
+const INPUT_BG = R.card;
 
 // ─── Shared styles ───
 const card: React.CSSProperties = {
-  backgroundColor: "rgb(26, 26, 26)",
+  backgroundColor: R.darkBand,
   borderRadius: "8px",
   border: `1px solid ${BORDER}`,
   overflow: "hidden",
@@ -108,6 +109,7 @@ export function MarketProfile() {
   const [priceMovement, setPriceMovement] = useState<any[]>([]);
   const [compression, setCompression] = useState<any[]>([]);
   const [neighbourhoods, setNeighbourhoods] = useState<any[]>([]);
+  const [areaIntel, setAreaIntel] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data in parallel ───
@@ -121,14 +123,16 @@ export function MarketProfile() {
       fetch(`${base}/price-movement?city=${city}`).then((r) => r.json()),
       fetch(`${base}/compression?city=${city}`).then((r) => r.json()),
       fetch(`${base}/neighbourhoods?city=${city}`).then((r) => r.json()),
+      fetch(`${base}/neighbourhood-intel?city=${city}`).then((r) => r.json()),
     ])
-      .then(([ov, sea, absDow, pm, comp, neigh]) => {
+      .then(([ov, sea, absDow, pm, comp, neigh, intel]) => {
         setOverview(ov);
         setSeasonal(Array.isArray(sea) ? sea : []);
         setAbsorptionDow(Array.isArray(absDow) ? absDow : []);
         setPriceMovement(Array.isArray(pm) ? pm : []);
         setCompression(Array.isArray(comp) ? comp : []);
         setNeighbourhoods(Array.isArray(neigh) ? neigh : []);
+        setAreaIntel(Array.isArray(intel) ? intel : []);
       })
       .catch((err) => console.error("MarketProfile fetch error:", err))
       .finally(() => setLoading(false));
@@ -194,14 +198,30 @@ export function MarketProfile() {
     }));
   }, [compression]);
 
+  // Area intel: build chart data from top 8 areas' absorption curves
+  const AREA_COLORS = [BLUE, RED, AMBER, GREEN, PURPLE, PINK, "#3b82f6", "#f97316"];
+  const areaTop8 = useMemo(() => areaIntel.slice(0, 8), [areaIntel]);
+  const areaChartData = useMemo(() => {
+    if (!areaTop8.length) return [];
+    const buckets = [90, 60, 30, 14, 7, 3];
+    return buckets.map((b) => {
+      const point: any = { days_out: `${b}d`, _sort: b };
+      areaTop8.forEach((area) => {
+        const match = area.curve?.find((c: any) => c.days_out === b);
+        point[area.neighbourhood] = match ? match.pct_remaining : null;
+      });
+      return point;
+    });
+  }, [areaTop8]);
+
   // Currency — detect from city
   const curr = city === "las-vegas" ? "$" : city === "archanes" ? "E" : "£";
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", backgroundColor: "#1d1d1c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ flex: 1, background: R.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center", color: GRAY }}>
-          <div className="w-12 h-12 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin" style={{ margin: "0 auto 20px" }} />
+          <div className="w-12 h-12 border-4 border-[#38C6BA] border-t-transparent border-solid rounded-full animate-spin" style={{ margin: "0 auto 20px" }} />
           Loading Market Profile...
         </div>
       </div>
@@ -209,12 +229,8 @@ export function MarketProfile() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#1d1d1c", position: "relative", overflow: "hidden" }}>
-      {/* Background */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(57,189,248,0.01), transparent, rgba(57,189,248,0.01))", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)", backgroundSize: "64px 64px", pointerEvents: "none" }} />
-
-      <div style={{ position: "relative", zIndex: 10, padding: "24px" }}>
+    <div style={{ flex: 1, background: R.bg, color: R.accent }}>
+      <div style={{ padding: "24px 28px" }}>
         {/* Header */}
         <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -257,6 +273,91 @@ export function MarketProfile() {
           ))}
         </div>
 
+        {/* ─── AREA DEMAND INTELLIGENCE (absorption curves + ranked table) ─── */}
+        {areaIntel.length > 0 && (
+        <div style={{ marginBottom: "24px" }}>
+          <div style={card}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
+              <div style={sectionLabel}>AREA DEMAND INTELLIGENCE</div>
+              <h3 style={sectionTitle}>Search Demand by Neighbourhood</h3>
+              <p style={sectionSub}>Booking absorption as a proxy for search volume — steeper drop = higher converting demand in that area</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr" }}>
+              {/* Left: Absorption curves */}
+              <div style={{ padding: "16px 20px", borderRight: `1px solid ${BORDER}` }}>
+                <div style={{ fontSize: "10px", color: DIM, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                  Supply remaining (%) as stay date approaches — 90 days out to 3 days out
+                </div>
+                <div style={{ height: "320px" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={areaChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                      <XAxis dataKey="days_out" stroke={DIM} fontSize={10} tickLine={false} />
+                      <YAxis stroke={DIM} fontSize={10} tickLine={false} domain={[80, 102]} unit="%" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "rgba(26,26,26,0.95)", border: `1px solid ${BORDER}`, borderRadius: "4px", padding: "8px" }}
+                        labelStyle={{ color: GRAY, fontSize: "10px" }}
+                        itemStyle={{ fontSize: "11px" }}
+                        formatter={(val: any) => val != null ? `${val}%` : "—"}
+                      />
+                      {areaTop8.map((area, i) => (
+                        <Line
+                          key={area.neighbourhood}
+                          type="monotone"
+                          dataKey={area.neighbourhood}
+                          stroke={AREA_COLORS[i]}
+                          strokeWidth={i < 3 ? 2.5 : 1.5}
+                          dot={i < 3 ? { r: 3 } : false}
+                          connectNulls
+                          name={area.neighbourhood}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Right: Ranked table */}
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "14px 1fr 48px 48px 42px 1fr", gap: "5px", padding: "10px 16px", borderBottom: `1px solid ${BORDER}`, backgroundColor: SURFACE, alignItems: "center" }}>
+                  <span />
+                  {["Area", "Supply", "Booked", "Abs %", "Demand Score"].map((h) => (
+                    <span key={h} style={{ fontSize: "9px", color: DIM, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</span>
+                  ))}
+                </div>
+                <div style={{ flex: 1, overflowY: "auto" }}>
+                  {areaIntel.slice(0, 15).map((row: any, i: number) => {
+                    const score = row.demand_score || 0;
+                    const scoreColor = score >= 80 ? RED : score >= 55 ? AMBER : score >= 30 ? BLUE : DIM;
+                    const scoreLabel = score >= 80 ? "Hot" : score >= 55 ? "Warm" : score >= 30 ? "Active" : "Cool";
+                    return (
+                      <div key={row.neighbourhood} style={{
+                        display: "grid", gridTemplateColumns: "14px 1fr 48px 48px 42px 1fr", gap: "5px",
+                        padding: "8px 16px", borderBottom: i < 14 ? `1px solid ${BORDER}` : "none", alignItems: "center",
+                      }}>
+                        {i < 8 ? (
+                          <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: AREA_COLORS[i] }} />
+                        ) : <span />}
+                        <span style={{ fontSize: "12px", color: WHITE, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.neighbourhood}</span>
+                        <span style={{ fontSize: "11px", color: GRAY }}>{row.avg_supply}</span>
+                        <span style={{ fontSize: "11px", color: BLUE }}>{row.rooms_absorbed ?? "—"}</span>
+                        <span style={{ fontSize: "11px", fontWeight: 500, color: scoreColor }}>{row.pct_absorbed}%</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ flex: 1, height: "6px", backgroundColor: INPUT_BG, borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{ width: `${score}%`, height: "100%", backgroundColor: scoreColor, borderRadius: "3px", transition: "width 0.3s" }} />
+                          </div>
+                          <span style={{ fontSize: "9px", color: scoreColor, fontWeight: 600, minWidth: "30px" }}>{scoreLabel}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        )}
+
         {/* ─── ROW 2: Accommodation Map (full-width hero) ─── */}
         <div style={{ marginBottom: "24px" }}>
           <div style={card}>
@@ -284,9 +385,9 @@ export function MarketProfile() {
             <div style={{ padding: "16px 20px", height: "300px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dowChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="days_out" stroke="#6b7280" fontSize={10} tickLine={false} />
-                  <YAxis stroke="#6b7280" fontSize={10} tickLine={false} domain={[60, 110]} unit="%" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={R.border} />
+                  <XAxis dataKey="days_out" stroke={R.textDim} fontSize={10} tickLine={false} />
+                  <YAxis stroke={R.textDim} fontSize={10} tickLine={false} domain={[60, 110]} unit="%" />
                   <Tooltip {...tooltipStyle} />
                   {Object.entries(DOW_COLORS).map(([dow, color]) => (
                     <Line key={dow} type="monotone" dataKey={dow} stroke={color}
@@ -309,10 +410,10 @@ export function MarketProfile() {
             <div style={{ padding: "16px 20px", height: "300px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={priceChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="days_out" stroke="#6b7280" fontSize={10} tickLine={false} />
-                  <YAxis yAxisId="left" stroke="#6b7280" fontSize={10} tickLine={false} unit={curr} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#6b7280" fontSize={10} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={R.border} />
+                  <XAxis dataKey="days_out" stroke={R.textDim} fontSize={10} tickLine={false} />
+                  <YAxis yAxisId="left" stroke={R.textDim} fontSize={10} tickLine={false} unit={curr} />
+                  <YAxis yAxisId="right" orientation="right" stroke={R.textDim} fontSize={10} tickLine={false} />
                   <Tooltip {...tooltipStyle} />
                   <Bar yAxisId="right" dataKey="supply" fill={BLUE} fillOpacity={0.2} radius={[4, 4, 0, 0]} name="Supply" />
                   <Line yAxisId="left" type="monotone" dataKey="wap" stroke={AMBER} strokeWidth={2.5} dot={{ r: 4 }} name={`WAP (${curr})`} />
@@ -333,9 +434,9 @@ export function MarketProfile() {
             <div style={{ padding: "16px 20px", height: "260px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={MOCK_PRICE_HISTOGRAM} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                  <XAxis dataKey="bucket" stroke="#6b7280" fontSize={10} tickLine={false} interval={0} angle={-35} textAnchor="end" height={50} />
-                  <YAxis stroke="#6b7280" fontSize={10} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={R.border} vertical={false} />
+                  <XAxis dataKey="bucket" stroke={R.textDim} fontSize={10} tickLine={false} interval={0} angle={-35} textAnchor="end" height={50} />
+                  <YAxis stroke={R.textDim} fontSize={10} tickLine={false} />
                   <Tooltip {...tooltipStyle} />
                   <Bar dataKey="count" name="Properties" radius={[4, 4, 0, 0]}>
                     {MOCK_PRICE_HISTOGRAM.map((_, i) => (
@@ -359,10 +460,10 @@ export function MarketProfile() {
             <div style={{ padding: "16px 20px", height: "280px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={compressionData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis dataKey="date" stroke="#6b7280" fontSize={9} tickLine={false} />
-                  <YAxis yAxisId="left" stroke="#6b7280" fontSize={10} tickLine={false} unit={curr} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#6b7280" fontSize={10} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={R.border} />
+                  <XAxis dataKey="date" stroke={R.textDim} fontSize={9} tickLine={false} />
+                  <YAxis yAxisId="left" stroke={R.textDim} fontSize={10} tickLine={false} unit={curr} />
+                  <YAxis yAxisId="right" orientation="right" stroke={R.textDim} fontSize={10} tickLine={false} />
                   <Tooltip {...tooltipStyle} />
                   <Area yAxisId="right" type="monotone" dataKey="spread" stroke={PURPLE} strokeWidth={1.5} fill={PURPLE} fillOpacity={0.08} name={`Price Spread (${curr})`} />
                   <Line yAxisId="left" type="monotone" dataKey="wap" stroke={BLUE} strokeWidth={2} dot={false} name={`WAP (${curr})`} />

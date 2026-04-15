@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { R } from "../../../styles/tokens";
 import { ArrowUp, ArrowDown, Minus, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
@@ -310,15 +311,15 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
     return (
       <div className="flex items-center justify-center gap-1.5">
         {delta.isNeutral ? (
-          <Minus className="w-3.5 h-3.5 text-[#9ca3af]" />
+          <Minus className="w-3.5 h-3.5 text-[#7A8494]" />
         ) : delta.isPositive ? (
-          <ArrowUp className="w-3.5 h-3.5 text-[#10b981]" />
+          <ArrowUp className="w-3.5 h-3.5 text-[#34D068]" />
         ) : (
           <ArrowDown className="w-3.5 h-3.5 text-[#ef4444]" />
         )}
         <div className="text-center">
           <div className={`text-sm ${
-            delta.isNeutral ? 'text-[#9ca3af]' : delta.isPositive ? 'text-[#10b981]' : 'text-[#ef4444]'
+            delta.isNeutral ? 'text-[#7A8494]' : delta.isPositive ? 'text-[#34D068]' : 'text-[#ef4444]'
           }`}>
             {delta.isPositive ? '+' : ''}{delta.percent.toFixed(1)}%
           </div>
@@ -386,10 +387,10 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
     return selectedDeltaMetric === metric
       ? {
           backgroundColor: 'rgba(57, 189, 248, 0.1)',
-          color: '#39BDF8',
+          color: R.warmTeal,
         }
       : {
-          color: '#9ca3af',
+          color: R.textMid,
         };
   };
 
@@ -422,40 +423,18 @@ periodLabel: `YTD (${monthNames[0].substring(0, 3)} - ${monthNames[lastCompleteM
   // --- RENDER LOGIC ---
 
 return (
-  <div style={{ position: 'relative', width: '100%' }}>
-    {/* Fixed Background Layer from ReportTable */}
-    <div style={{
-      position: 'fixed', 
-      inset: 0, 
-      backgroundColor: '#1d1d1c', 
-      zIndex: 0,
-      pointerEvents: 'none'
-    }}>
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(250, 255, 106, 0.01))'
-      }} />
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: 'linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)',
-        backgroundSize: '64px 64px'
-      }} />
-    </div>
-
-{/* Content Layer */}
-    <div style={{ position: 'relative', zIndex: 10 }}>
+  <div style={{ flex: 1, background: R.bg, color: R.accent }}>
+    <div>
       
       {/* Header - Moved inside component to sit above fixed background */}
-      <div style={{ padding: '1.5rem 1.5rem 0 1.5rem' }}>
+      <div style={{ padding: '24px 28px 0 28px' }}>
         <div style={{ marginBottom: '0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             {onBack && (
               <button
                 onClick={onBack}
                 style={{
-                  color: '#9ca3af',
+                  color: R.textMid,
                   fontSize: '14px',
                   marginBottom: '8px',
                   display: 'flex',
@@ -468,8 +447,8 @@ return (
                   padding: 0,
                   fontFamily: 'inherit'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#39BDF8'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                onMouseEnter={(e) => e.currentTarget.style.color = R.warmTeal}
+                onMouseLeave={(e) => e.currentTarget.style.color = R.textMid}
               >
                 <span>←</span>
                 <span>Back to Report Selection</span>
@@ -478,7 +457,7 @@ return (
             <h1 style={{ color: 'white', fontSize: '24px', marginBottom: '4px', marginTop: 0 }}>
               Year-on-Year Comparison Report
             </h1>
-            <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>
+            <p style={{ color: R.textMid, fontSize: '14px', margin: 0 }}>
               Side-by-side performance comparison with variance analysis
             </p>
           </div>
@@ -497,8 +476,8 @@ return (
 
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-[#0a0a0a]/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
-          <div className="w-8 h-8 border-2 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin"></div>
+        <div className="absolute inset-0 bg-[#0C0E12]/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+          <div className="w-8 h-8 border-2 border-[#38C6BA] border-t-transparent border-solid rounded-full animate-spin"></div>
         </div>
       )}
 
@@ -513,15 +492,15 @@ return (
         {/* Avg Occupancy */}
         <div
           style={{
-            backgroundColor: '#1a1a1a',
+            backgroundColor: R.darkBand,
             borderRadius: '0.5rem',
             padding: '0.75rem 1rem',
-            border: '1px solid #2a2a2a',
+            border: `1px solid ${R.border}`,
           }}
         >
           <div
             style={{
-              color: '#6b7280',
+              color: R.textDim,
               fontSize: '0.75rem',
               marginBottom: '0.375rem',
               textTransform: 'uppercase',
@@ -545,11 +524,11 @@ return (
                 gap: '0.5rem',
               }}
             >
-              <span style={{ color: '#e5e5e5' }}>
+              <span style={{ color: R.accent }}>
                 {summary.avg1.occupancy.toFixed(1)}%
               </span>
-              <span style={{ color: '#6b7280' }}>→</span>
-              <span style={{ color: '#39BDF8' }}>
+              <span style={{ color: R.textDim }}>→</span>
+              <span style={{ color: R.warmTeal }}>
                 {summary.avg2.occupancy.toFixed(1)}%
               </span>
             </div>
@@ -564,15 +543,15 @@ return (
         {/* Avg ADR */}
         <div
           style={{
-            backgroundColor: '#1a1a1a',
+            backgroundColor: R.darkBand,
             borderRadius: '0.5rem',
             padding: '0.75rem 1rem',
-            border: '1px solid #2a2a2a',
+            border: `1px solid ${R.border}`,
           }}
         >
           <div
             style={{
-              color: '#6b7280',
+              color: R.textDim,
               fontSize: '0.75rem',
               marginBottom: '0.375rem',
               textTransform: 'uppercase',
@@ -596,11 +575,11 @@ return (
                 gap: '0.5rem',
               }}
             >
-              <span style={{ color: '#e5e5e5' }}>
+              <span style={{ color: R.accent }}>
                 {formatCurrency(summary.avg1.adr)}
               </span>
-              <span style={{ color: '#6b7280' }}>→</span>
-              <span style={{ color: '#39BDF8' }}>
+              <span style={{ color: R.textDim }}>→</span>
+              <span style={{ color: R.warmTeal }}>
                 {formatCurrency(summary.avg2.adr)}
               </span>
             </div>
@@ -611,16 +590,16 @@ return (
         {/* Avg RevPAR */}
         <div
           style={{
-            backgroundColor: '#1a1a1a',
+            backgroundColor: R.darkBand,
             borderRadius: '0.5rem',
             padding: '0.75rem 1rem',
-         border: '1px solid #2a2a2a',
+         border: `1px solid ${R.border}`,
 
           }}
         >
           <div
             style={{
-              color: '#6b7280',
+              color: R.textDim,
               fontSize: '0.75rem',
               marginBottom: '0.375rem',
               textTransform: 'uppercase',
@@ -644,11 +623,11 @@ return (
                 gap: '0.5rem',
               }}
             >
-              <span style={{ color: '#e5e5e5' }}>
+              <span style={{ color: R.accent }}>
                 {formatCurrency(summary.avg1.revpar)}
               </span>
-              <span style={{ color: '#6b7280' }}>→</span>
-              <span style={{ color: '#39BDF8' }}>
+              <span style={{ color: R.textDim }}>→</span>
+              <span style={{ color: R.warmTeal }}>
                 {formatCurrency(summary.avg2.revpar)}
               </span>
             </div>
@@ -662,15 +641,15 @@ return (
         {/* Total Revenue */}
         <div
           style={{
-            backgroundColor: '#1a1a1a',
+            backgroundColor: R.darkBand,
             borderRadius: '0.5rem',
             padding: '0.75rem 1rem',
-            border: '1px solid #2a2a2a',
+            border: `1px solid ${R.border}`,
           }}
         >
           <div
             style={{
-              color: '#6b7280',
+              color: R.textDim,
               fontSize: '0.75rem',
               marginBottom: '0.375rem',
               textTransform: 'uppercase',
@@ -694,11 +673,11 @@ return (
                 gap: '0.5rem',
               }}
             >
-              <span style={{ color: '#e5e5e5' }}>
+              <span style={{ color: R.accent }}>
                 {formatCurrencyDynamic(summary.total1.revenue)}
               </span>
-              <span style={{ color: '#6b7280' }}>→</span>
-              <span style={{ color: '#39BDF8' }}>
+              <span style={{ color: R.textDim }}>→</span>
+              <span style={{ color: R.warmTeal }}>
                 {formatCurrencyDynamic(summary.total2.revenue)}
               </span>
             </div>
@@ -717,10 +696,10 @@ return (
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: '#1a1a1a',
+          backgroundColor: R.darkBand,
           borderRadius: '0.5rem',
           padding: '1rem',
-          border: '1px solid #2a2a2a',
+          border: `1px solid ${R.border}`,
         }}
       >
         <div
@@ -740,7 +719,7 @@ return (
           >
             <span
               style={{
-                color: '#6b7280',
+                color: R.textDim,
                 fontSize: '0.75rem',
                 textTransform: 'uppercase',
                 letterSpacing: '-0.025em',
@@ -750,10 +729,10 @@ return (
             </span>
 
             <Select value={year1} onValueChange={setYear1} disabled={isLoading}>
-              <SelectTrigger className="w-24 h-9 bg-[#0a0a0a] border-[#2a2a2a] text-[#e5e5e5]">
+              <SelectTrigger className="w-24 h-9 bg-[#0C0E12] border-[#1E2330] text-[#F3F5F7]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] text-[#e5e5e5]">
+              <SelectContent className="bg-[#121519] border-[#1E2330] text-[#F3F5F7]">
                 {availableYears.map((year) => (
                   <SelectItem key={year} value={year}>
                     {year}
@@ -762,13 +741,13 @@ return (
               </SelectContent>
             </Select>
 
-            <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>vs</span>
+            <span style={{ color: R.textMid, fontSize: '0.875rem' }}>vs</span>
 
             <Select value={year2} onValueChange={setYear2} disabled={isLoading}>
-              <SelectTrigger className="w-24 h-9 bg-[#0a0a0a] border-[#2a2a2a] text-[#39BDF8]">
+              <SelectTrigger className="w-24 h-9 bg-[#0C0E12] border-[#1E2330] text-[#38C6BA]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] text-[#e5e5e5]">
+              <SelectContent className="bg-[#121519] border-[#1E2330] text-[#F3F5F7]">
                 {availableYears.map((year) => (
                   <SelectItem key={year} value={year}>
                     {year}
@@ -783,7 +762,7 @@ return (
             style={{
               height: '1.5rem',
               width: '1px',
-              backgroundColor: '#2a2a2a',
+              backgroundColor: R.border,
             }}
           />
 
@@ -797,7 +776,7 @@ return (
           >
             <span
               style={{
-                color: '#6b7280',
+                color: R.textDim,
                 fontSize: '0.75rem',
                 textTransform: 'uppercase',
                 letterSpacing: '-0.025em',
@@ -832,9 +811,9 @@ return (
                     cursor: isLoading ? 'default' : 'pointer',
                     transition: 'all 0.2s',
                     backgroundColor:
-                      selectedDeltaMetric === metric.id ? '#39BDF8' : '#0a0a0a',
+                      selectedDeltaMetric === metric.id ? R.warmTeal : R.sidebar,
                     color:
-                      selectedDeltaMetric === metric.id ? '#0a0a0a' : '#9ca3af',
+                      selectedDeltaMetric === metric.id ? R.sidebar : R.textMid,
                   }}
                 >
                   {metric.label}
@@ -850,7 +829,7 @@ return (
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            color: '#6b7280',
+            color: R.textDim,
             fontSize: '0.75rem',
           }}
         >
@@ -862,27 +841,27 @@ return (
       {/* Detailed Table – PROT visual style */}
       <div
         style={{
-          backgroundColor: '#1a1a1a',
+          backgroundColor: R.darkBand,
           borderRadius: '0.5rem',
-          border: '1px solid #2a2a2a',
+          border: `1px solid ${R.border}`,
           overflow: 'hidden',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+              <tr style={{ borderBottom: `1px solid ${R.border}` }}>
                 <th
                   style={{
                     padding: '0.75rem 1rem',
                     textAlign: 'left',
-                    color: '#6b7280',
+                    color: R.textDim,
                     fontSize: '0.75rem',
                     textTransform: 'uppercase',
                     letterSpacing: '-0.025em',
                     position: 'sticky',
                     left: 0,
-                    backgroundColor: '#1a1a1a',
+                    backgroundColor: R.darkBand,
                     zIndex: 10,
                   }}
                 >
@@ -892,11 +871,11 @@ return (
                   style={{
                     padding: '0.75rem 1rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.75rem',
                     textTransform: 'uppercase',
                     letterSpacing: '-0.025em',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                   }}
                   colSpan={4}
                 >
@@ -906,11 +885,11 @@ return (
                   style={{
                     padding: '0.75rem 1rem',
                     textAlign: 'center',
-                    color: '#39BDF8',
+                    color: R.warmTeal,
                     fontSize: '0.75rem',
                     textTransform: 'uppercase',
                     letterSpacing: '-0.025em',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                   }}
                   colSpan={4}
                 >
@@ -920,11 +899,11 @@ return (
                   style={{
                     padding: '0.75rem 1rem',
                     textAlign: 'center',
-                    color: '#39BDF8',
+                    color: R.warmTeal,
                     fontSize: '0.75rem',
                     textTransform: 'uppercase',
                     letterSpacing: '-0.025em',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                   }}
                 >
                   Δ {selectedDeltaMetric === 'revenue'
@@ -938,8 +917,8 @@ return (
               </tr>
               <tr
                 style={{
-                  borderBottom: '1px solid #2a2a2a',
-                  backgroundColor: '#0f0f0f',
+                  borderBottom: `1px solid ${R.border}`,
+                  backgroundColor: R.sidebar,
                 }}
               >
                 <th
@@ -947,7 +926,7 @@ return (
                     padding: '0.625rem 1rem',
                     position: 'sticky',
                     left: 0,
-                    backgroundColor: '#0f0f0f',
+                    backgroundColor: R.sidebar,
                     zIndex: 10,
                   }}
                 />
@@ -956,7 +935,7 @@ return (
                     padding: '0.625rem 0.75rem',
                     textAlign: 'center',
                     fontSize: '0.75rem',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                     ...getHeaderHighlight('occupancy'),
                   }}
                 >
@@ -997,7 +976,7 @@ return (
                     padding: '0.625rem 0.75rem',
                     textAlign: 'center',
                     fontSize: '0.75rem',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                     ...getHeaderHighlight('occupancy'),
                   }}
                 >
@@ -1037,9 +1016,9 @@ return (
                   style={{
                     padding: '0.625rem 0.75rem',
                     textAlign: 'center',
-                    color: '#9ca3af',
+                    color: R.textMid,
                     fontSize: '0.75rem',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                   }}
                 >
                   Change
@@ -1051,17 +1030,17 @@ return (
                 <tr
                   key={data.month}
                   style={{
-                    borderBottom: '1px solid #2a2a2a',
+                    borderBottom: `1px solid ${R.border}`,
                   }}
                 >
                   <td
                     style={{
                       padding: '0.75rem 1rem',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       position: 'sticky',
                       left: 0,
-                      backgroundColor: '#1a1a1a',
+                      backgroundColor: R.darkBand,
                       zIndex: 10,
                     }}
                   >
@@ -1073,9 +1052,9 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
-                      borderLeft: '2px solid #2a2a2a',
+                      borderLeft: `2px solid ${R.border}`,
                       ...getColumnHighlight('occupancy'),
                     }}
                   >
@@ -1085,7 +1064,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('adr'),
                     }}
@@ -1096,7 +1075,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revpar'),
                     }}
@@ -1107,7 +1086,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revenue'),
                     }}
@@ -1120,9 +1099,9 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
-                      borderLeft: '2px solid #2a2a2a',
+                      borderLeft: `2px solid ${R.border}`,
                       ...getColumnHighlight('occupancy'),
                     }}
                   >
@@ -1132,7 +1111,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('adr'),
                     }}
@@ -1143,7 +1122,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revpar'),
                     }}
@@ -1154,7 +1133,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revenue'),
                     }}
@@ -1167,7 +1146,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      borderLeft: '2px solid #2a2a2a',
+                      borderLeft: `2px solid ${R.border}`,
                     }}
                   >
                     <DeltaCell {...getDeltaProps(data)} />
@@ -1178,18 +1157,18 @@ return (
               {currentPeriodSummary && (
                 <tr
                   style={{
-                    backgroundColor: '#0f0f0f',
-                    borderBottom: '1px solid #2a2a2a',
+                    backgroundColor: R.sidebar,
+                    borderBottom: `1px solid ${R.border}`,
                   }}
                 >
                   <td
                     style={{
                       padding: '0.75rem 1rem',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       position: 'sticky',
                       left: 0,
-                      backgroundColor: '#0f0f0f',
+                      backgroundColor: R.sidebar,
                       zIndex: 10,
                       position: 'relative',
                     }}
@@ -1201,7 +1180,7 @@ return (
                         top: 0,
                         bottom: 0,
                         width: '0.25rem',
-                        backgroundColor: '#39BDF8',
+                        backgroundColor: R.warmTeal,
                       }}
                     />
                     <span style={{ paddingLeft: '0.75rem', fontWeight: 600 }}>
@@ -1214,9 +1193,9 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
-                      borderLeft: '2px solid #2a2a2a',
+                      borderLeft: `2px solid ${R.border}`,
                       ...getColumnHighlight('occupancy'),
                     }}
                   >
@@ -1228,7 +1207,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('adr'),
                     }}
@@ -1239,7 +1218,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revpar'),
                     }}
@@ -1252,7 +1231,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revenue'),
                     }}
@@ -1267,9 +1246,9 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
-                      borderLeft: '2px solid #2a2a2a',
+                      borderLeft: `2px solid ${R.border}`,
                       ...getColumnHighlight('occupancy'),
                     }}
                   >
@@ -1281,7 +1260,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('adr'),
                     }}
@@ -1292,7 +1271,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revpar'),
                     }}
@@ -1305,7 +1284,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      color: '#e5e5e5',
+                      color: R.accent,
                       fontSize: '0.875rem',
                       ...getColumnHighlight('revenue'),
                     }}
@@ -1320,7 +1299,7 @@ return (
                     style={{
                       padding: '0.75rem',
                       textAlign: 'center',
-                      borderLeft: '2px solid #2a2a2a',
+                      borderLeft: `2px solid ${R.border}`,
                     }}
                   >
                     <DeltaCell {...getCurrentPeriodSummaryDeltaProps()} />
@@ -1332,19 +1311,19 @@ return (
               <tr
                 style={{
                   borderTop: '2px solid rgba(57, 189, 248, 0.3)',
-                  backgroundColor: '#0f0f0f',
+                  backgroundColor: R.sidebar,
                 }}
               >
                 <td
                   style={{
                     padding: '0.75rem 1rem',
-                    color: '#39BDF8',
+                    color: R.warmTeal,
                     fontSize: '0.75rem',
                     textTransform: 'uppercase',
                     letterSpacing: '-0.025em',
                     position: 'sticky',
                     left: 0,
-                    backgroundColor: '#0f0f0f',
+                    backgroundColor: R.sidebar,
                     zIndex: 10,
                   }}
                 >
@@ -1356,9 +1335,9 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                     ...getColumnHighlight('occupancy'),
                   }}
                 >
@@ -1368,7 +1347,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
                     ...getColumnHighlight('adr'),
                   }}
@@ -1379,7 +1358,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
                     ...getColumnHighlight('revpar'),
                   }}
@@ -1390,7 +1369,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
                   }}
                 >
@@ -1402,9 +1381,9 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                     ...getColumnHighlight('occupancy'),
                   }}
                 >
@@ -1414,7 +1393,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
                     ...getColumnHighlight('adr'),
                   }}
@@ -1425,7 +1404,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
                     ...getColumnHighlight('revpar'),
                   }}
@@ -1436,7 +1415,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    color: '#e5e5e5',
+                    color: R.accent,
                     fontSize: '0.875rem',
                   }}
                 >
@@ -1448,7 +1427,7 @@ return (
                   style={{
                     padding: '0.75rem',
                     textAlign: 'center',
-                    borderLeft: '2px solid #2a2a2a',
+                    borderLeft: `2px solid ${R.border}`,
                   }}
                 >
                   <DeltaCell {...getSummaryDeltaProps()} />

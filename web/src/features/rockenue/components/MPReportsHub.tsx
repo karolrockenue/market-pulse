@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { BarChart3, FileText, Calendar, DollarSign, TrendingUp, Target, Wallet, ArrowUpDown, Bell, Search, ChevronDown, Download } from "lucide-react";
-import { MPSidebar } from "./MPSidebar";
 
 // ── MP Reports Hub — Rockenue style mockup ──
 interface MPReportsHubProps { activeView: string; onNavigate: (view: string) => void; }
@@ -42,8 +41,7 @@ export function MPReportsHub({ activeView, onNavigate }: MPReportsHubProps) {
   const categories = ["Core Analytics", "Financial", "Forecasting", "Market Intelligence"];
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
+    <div style={{ background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
 
       <div style={{ flex: 1, overflow: "auto" }}>
         {/* Top bar */}

@@ -30,16 +30,17 @@ import {
   ZAxis,
 } from "recharts";
 
-// ── Market Pulse Design System ──
+// ── Navy Design System (from tokens) ──
+import { R } from "../../../../styles/tokens";
 const MP = {
-  bg: "#1d1d1c",
-  card: "#1A1A1A",
-  border: "#2a2a2a",
-  input: "#2C2C2C",
-  accent: "#39BDF8",
-  text: "#e5e5e5",
-  textSec: "#9ca3af",
-  textMuted: "#6b7280",
+  bg: R.bg,
+  card: R.darkBand,
+  border: R.border,
+  input: R.card,
+  accent: R.warmTeal,
+  text: R.accent,
+  textSec: R.textMid,
+  textMuted: R.textDim,
   green: "#22c55e",
   red: "#ef4444",
   amber: "#f59e0b",
@@ -51,7 +52,7 @@ const MP = {
 const gridStroke = { strokeDasharray: "0", stroke: MP.border, opacity: 0.5 };
 const axisStyle = { stroke: MP.border, tick: { fill: MP.textMuted, fontSize: 10 }, tickLine: { stroke: MP.border }, axisLine: { stroke: MP.border } };
 const tipStyle = {
-  contentStyle: { backgroundColor: "rgba(26,26,26,0.95)", border: `1px solid ${MP.border}`, borderRadius: "6px", padding: "10px 14px" },
+  contentStyle: { backgroundColor: "rgba(18,21,25,0.95)", border: `1px solid ${MP.border}`, borderRadius: "6px", padding: "10px 14px" },
   labelStyle: { color: MP.textSec, fontSize: "11px", marginBottom: "4px" },
   itemStyle: { fontSize: "12px", color: MP.text, padding: "1px 0" },
 };
@@ -139,7 +140,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
   }, [allHotels]);
   const hotelIdsParam = hotelIds.join(",");
 
-  const curr = "\u00A3";
+  const curr = citySlug === "archanes" ? "€" : "£";
 
   const [baseDays, setBaseDays] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -370,10 +371,8 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
       ? cityName.charAt(0).toUpperCase() + cityName.slice(1)
       : "this market";
     return (
-      <div className="min-h-screen" style={{ backgroundColor: MP.bg, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(57,189,248,0.01), transparent, rgba(57,189,248,0.01))", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)", backgroundSize: "64px 64px", pointerEvents: "none" }} />
-        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "80vh", padding: "48px 24px", textAlign: "center" }}>
+      <div style={{ flex: 1, background: MP.bg, color: MP.text }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "80vh", padding: "48px 24px", textAlign: "center" }}>
           <div style={{ width: "80px", height: "80px", borderRadius: "16px", backgroundColor: "rgba(57,189,248,0.08)", border: "1px solid rgba(57,189,248,0.15)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
             <Activity size={36} color={MP.accent} strokeWidth={1.5} />
           </div>
@@ -381,8 +380,8 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
             Demand Radar not available for {displayCity}
           </h2>
           <p style={{ color: MP.textMuted, fontSize: "14px", maxWidth: "460px", lineHeight: "1.6", marginBottom: "32px" }}>
-            Market intelligence requires a minimum of 5 properties in a city and active Booking.com
-            scrape coverage. {displayCity} does not have enough data yet.
+            Market intelligence requires active scrape coverage (Booking.com or Airbnb).
+            {displayCity} does not have enough data yet.
           </p>
           <div style={{ display: "flex", gap: "8px", marginBottom: "32px" }}>
             {Array.from({ length: 5 }).map((_, i) => (
@@ -406,20 +405,17 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: MP.bg, position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(57,189,248,0.01), transparent, rgba(57,189,248,0.01))", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)", backgroundSize: "64px 64px", pointerEvents: "none" }} />
-
-      <div style={{ position: "relative", zIndex: 10, padding: "24px", maxWidth: "1600px", margin: "0 auto" }}>
+    <div style={{ flex: 1, background: MP.bg, color: MP.text }}>
+      <div style={{ padding: "28px 32px" }}>
 
         {/* ── HEADER ── */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
           <Activity style={{ width: "24px", height: "24px", color: MP.accent }} />
           <h1 style={{ color: MP.text, fontSize: "24px", margin: 0, fontWeight: 600 }}>Demand Radar</h1>
-          <span style={{ fontSize: "10px", color: MP.accent, backgroundColor: "rgba(57,189,248,0.1)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2</span>
+          <span style={{ fontSize: "10px", color: "#7BAFD4", backgroundColor: "rgba(123,175,212,0.08)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2</span>
         </div>
         <p style={{ color: MP.textSec, margin: "0 0 20px", fontSize: "13px" }}>
-          90-day forward market intelligence for {cityName || citySlug} • Live Booking.com data
+          90-day forward market intelligence for {cityName || citySlug} • Live {citySlug === "archanes" ? "Airbnb" : "Booking.com"} data
         </p>
 
         {/* ── OUTLOOK BANNER ── */}
@@ -534,7 +530,7 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
               {/* Background event columns */}
               <div style={{ position: "absolute", top: "160px", left: "20px", right: "10px", bottom: 0, display: "flex", pointerEvents: "none" }}>
                 {days.map((d) => (
-                  <div key={d.i} style={{ flex: 1, backgroundColor: d.event ? MP.accent : "transparent", opacity: d.event ? (d.event.localRank >= 95 ? 0.08 : 0.04) : 0 }} />
+                  <div key={d.i} style={{ flex: 1, backgroundColor: d.event ? "#7BAFD4" : "transparent", opacity: d.event ? (d.event.localRank >= 95 ? 0.08 : 0.04) : 0 }} />
                 ))}
               </div>
               {/* Chart */}
@@ -956,7 +952,7 @@ function DateScanner({ days, curr }: { days: any[]; curr: string }) {
       legend={
         <button onClick={() => setExpanded(!expanded)} style={{
           display: "flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: 500, cursor: "pointer",
-          border: `1px solid ${MP.border}`, backgroundColor: expanded ? "rgba(57,189,248,0.1)" : "transparent", color: expanded ? MP.accent : MP.textMuted,
+          border: `1px solid ${MP.border}`, backgroundColor: expanded ? "rgba(123,175,212,0.08)" : "transparent", color: expanded ? "#7BAFD4" : MP.textMuted,
         }}>
           <BarChart3 className="w-3 h-3" />
           {expanded ? "Collapse" : "Expand"}
@@ -1087,7 +1083,7 @@ function EventLabels({ days, curr }: { days: any[]; curr: string }) {
                 position: "absolute", bottom: "14px", left: "0px",
                 transform: "rotate(-45deg)", transformOrigin: "bottom left",
                 whiteSpace: "nowrap", fontSize: "11px", fontWeight: 500, cursor: "default",
-                color: MP.accent, opacity: hover?.idx === d.i ? 1 : (d.event.localRank >= 95 ? 0.8 : 0.5),
+                color: "#7BAFD4", opacity: hover?.idx === d.i ? 1 : (d.event.localRank >= 95 ? 0.8 : 0.5),
                 transition: "opacity 0.15s",
               }}>
                 {d.event.name.length > 28 ? d.event.name.slice(0, 26) + "…" : d.event.name}
@@ -1105,7 +1101,7 @@ function EventLabels({ days, curr }: { days: any[]; curr: string }) {
           <div key={span.name} style={{
             position: "absolute", bottom: "0px",
             left: `${leftPct}%`, width: `${widthPct}%`,
-            height: "4px", backgroundColor: MP.accent,
+            height: "4px", backgroundColor: "#7BAFD4",
             opacity: span.localRank >= 95 ? 0.4 : 0.2, borderRadius: "2px",
           }} />
         );
@@ -1127,7 +1123,7 @@ function EventLabels({ days, curr }: { days: any[]; curr: string }) {
             <span style={{ color: MP.textMuted }}>Category</span>
             <span style={{ color: MP.text }}>{catLabel(hoverEv.category)}</span>
             <span style={{ color: MP.textMuted }}>Attendance</span>
-            <span style={{ color: MP.accent, fontWeight: 600 }}>{hoverEv.attendance ? hoverEv.attendance.toLocaleString() : "—"}</span>
+            <span style={{ color: "#7BAFD4", fontWeight: 600 }}>{hoverEv.attendance ? hoverEv.attendance.toLocaleString() : "—"}</span>
             <span style={{ color: MP.textMuted }}>Accom. spend</span>
             <span style={{ color: MP.green, fontWeight: 600 }}>{hoverEv.accommodationSpend ? `${curr}${Math.round(hoverEv.accommodationSpend / 1000).toLocaleString()}k` : "—"}</span>
             <span style={{ color: MP.textMuted }}>Local rank</span>

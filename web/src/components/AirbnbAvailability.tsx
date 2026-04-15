@@ -177,7 +177,7 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
       {/* Section Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Home size={18} color="#39BDF8" />
+          <Home size={18} color="#38C6BA" />
           <span style={{ color: "#e5e5e5", fontSize: "16px", fontWeight: 600 }}>Airbnb Market Intelligence</span>
           <span style={{ color: "#6b7280", fontSize: "12px" }}>Archanes & Surrounding Area</span>
         </div>
@@ -215,7 +215,7 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
               <Line
                 type="monotone"
                 dataKey="total_listings"
-                stroke="#39BDF8"
+                stroke="#38C6BA"
                 strokeWidth={2}
                 dot={false}
                 name="Total Listings"
@@ -353,9 +353,9 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
                 const end = new Date(s.finished_at);
                 return (
                   <tr key={s.scrape_date} style={{ borderBottom: "1px solid rgba(42,42,42,0.5)", backgroundColor: isLatest ? "rgba(57, 189, 248, 0.04)" : "transparent" }}>
-                    <td style={{ color: isLatest ? "#39BDF8" : "#e5e5e5", fontSize: "12px", padding: "8px 12px", fontWeight: isLatest ? 600 : 400 }}>
+                    <td style={{ color: isLatest ? "#38C6BA" : "#e5e5e5", fontSize: "12px", padding: "8px 12px", fontWeight: isLatest ? 600 : 400 }}>
                       {new Date(s.scrape_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                      {isLatest && <span style={{ color: "#39BDF8", fontSize: "10px", marginLeft: "6px", fontWeight: 400 }}>latest</span>}
+                      {isLatest && <span style={{ color: "#38C6BA", fontSize: "10px", marginLeft: "6px", fontWeight: 400 }}>latest</span>}
                     </td>
                     <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 12px", textAlign: "right" }}>
                       {start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} – {end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
@@ -433,7 +433,7 @@ export function AirbnbAvailability({ citySlug, currencySymbol }: AirbnbAvailabil
                     <td style={{ color: "#9ca3af", fontSize: "12px", padding: "8px 10px", textAlign: "right" }}>
                       {p.rating ? `${p.rating} (${p.reviews})` : "—"}
                     </td>
-                    <td style={{ color: "#39BDF8", fontSize: "12px", padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>
+                    <td style={{ color: "#38C6BA", fontSize: "12px", padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>
                       {formatPrice(p.avg_price)}
                     </td>
                     <td style={{ color: "#10b981", fontSize: "12px", padding: "8px 10px", textAlign: "right" }}>

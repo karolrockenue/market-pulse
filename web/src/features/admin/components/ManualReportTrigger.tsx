@@ -60,17 +60,17 @@ export function ManualReportTrigger({ reports }: ManualReportTriggerProps) {
   return (
     <div
       style={{
-        backgroundColor: "#1a1a1a",
-        border: "1px solid #2a2a2a",
+        backgroundColor: "#121519",
+        border: "1px solid #1E2330",
         borderRadius: "0.25rem",
       }}
     >
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #2a2a2a" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #1E2330" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <FileText className="w-4 h-4" style={{ color: "#39BDF8" }} />
+          <FileText className="w-4 h-4" style={{ color: "#7BAFD4" }} />
           <h2
             style={{
-              color: "#e5e5e5",
+              color: "#F3F5F7",
               fontSize: "12px",
               textTransform: "uppercase",
               letterSpacing: "-0.025em",
@@ -87,7 +87,7 @@ export function ManualReportTrigger({ reports }: ManualReportTriggerProps) {
           <div style={{ flex: 1 }}>
             <label
               style={{
-                color: "#9ca3af",
+                color: "#7A8494",
                 fontSize: "12px",
                 marginBottom: "8px",
                 display: "block",
@@ -100,18 +100,18 @@ export function ManualReportTrigger({ reports }: ManualReportTriggerProps) {
             <Select value={selectedReport} onValueChange={setSelectedReport}>
               <SelectTrigger
                 style={{
-                  backgroundColor: "#0f0f0f",
-                  borderColor: "#2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: "#121519",
+                  borderColor: "#1E2330",
+                  color: "#F3F5F7",
                 }}
               >
                 <SelectValue placeholder="Choose a scheduled report..." />
               </SelectTrigger>
               <SelectContent
                 style={{
-                  backgroundColor: "#1a1a1a",
-                  borderColor: "#2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: "#121519",
+                  borderColor: "#1E2330",
+                  color: "#F3F5F7",
                 }}
               >
                 {reports.length === 0 ? (
@@ -137,8 +137,8 @@ export function ManualReportTrigger({ reports }: ManualReportTriggerProps) {
             onClick={handleSendReport}
             disabled={!selectedReport || status === "sending"}
             style={{
-              backgroundColor: "#39BDF8",
-              color: "#0f0f0f",
+              backgroundColor: "#7BAFD4",
+              color: "#121519",
               height: "40px",
               padding: "0 24px",
               opacity: !selectedReport || status === "sending" ? 0.5 : 1,
@@ -175,13 +175,13 @@ export function ManualReportTrigger({ reports }: ManualReportTriggerProps) {
               fontSize: "12px",
               backgroundColor:
                 status === "sending"
-                  ? "rgba(57, 189, 248, 0.1)"
-                  : "rgba(16, 185, 129, 0.1)",
+                  ? "rgba(56, 198, 186, 0.1)"
+                  : "rgba(56, 198, 186, 0.1)",
               borderColor:
                 status === "sending"
-                  ? "rgba(57, 189, 248, 0.3)"
-                  : "rgba(16, 185, 129, 0.3)",
-              color: status === "sending" ? "#39BDF8" : "#10b981",
+                  ? "rgba(56, 198, 186, 0.3)"
+                  : "rgba(56, 198, 186, 0.3)",
+              color: status === "sending" ? "#7BAFD4" : "#7BAFD4",
             }}
           >
             {status === "sending"

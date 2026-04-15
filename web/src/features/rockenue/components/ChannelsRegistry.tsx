@@ -30,23 +30,29 @@ import type {
   PaymentMethod,
 } from "../api/types";
 
-// ── Brand palette ──
-const BLUE = "#39BDF8";
-const GREEN = "#10b981";
-const AMBER = "#f59e0b";
-const BG_PAGE = "#1d1d1c";
-const CARD_BG = "#1a1a1a";
-const INPUT_BG = "#2C2C2C";
-const BORDER = "#2a2a2a";
-const TEXT = "#e5e5e5";
-const TEXT_MID = "#9ca3af";
-const TEXT_DIM = "#6b7280";
+// ── New palette (matching MP mockups) ──
+const R = {
+  bg: "#14181D", card: "#121519", cardRaised: "#1C2228", border: "#1E2330", sep: "rgba(255,255,255,0.04)", accent: "#F3F5F7",
+  text: "#B0B8C4", textMid: "#7A8494", textDim: "#4E5868", teal: "#38C6BA", gold: "#C8A66E",
+  darkBand: "#0C0E12", green: "#34D068", red: "#ef4444",
+};
+// Aliases for backward compat within this file
+const BLUE = R.warmTeal;
+const GREEN = R.green;
+const AMBER = R.gold;
+const BG_PAGE = R.bg;
+const CARD_BG = R.card;
+const INPUT_BG = R.cardRaised;
+const BORDER = R.border;
+const TEXT = R.accent;
+const TEXT_MID = R.textMid;
+const TEXT_DIM = R.textDim;
 
 const AGREEMENT_CFG: Record<AgreementType, { color: string; label: string }> = {
   group: { color: BLUE, label: "Group" },
   individual: { color: AMBER, label: "Individual" },
   direct: { color: GREEN, label: "Direct" },
-  meta: { color: "#8b5cf6", label: "Meta" },
+  meta: { color: R.warmTeal, label: "Meta" },
 };
 
 const TIER_CFG: Record<ChannelTier, { color: string; label: string }> = {
@@ -65,9 +71,9 @@ const INTEGRATION_CFG: Record<IntegrationType, { label: string }> = {
 const CHANNEL_TYPE_CFG: Record<ChannelType, { color: string; label: string }> = {
   ota: { color: BLUE, label: "OTA" },
   wholesaler: { color: AMBER, label: "Wholesaler" },
-  flash_sale: { color: "#ec4899", label: "Flash Sale" },
+  flash_sale: { color: R.gold, label: "Flash Sale" },
   direct: { color: GREEN, label: "Direct" },
-  meta: { color: "#8b5cf6", label: "Meta" },
+  meta: { color: R.warmTeal, label: "Meta" },
 };
 
 const PAYMENT_CFG: Record<PaymentMethod, { label: string }> = {

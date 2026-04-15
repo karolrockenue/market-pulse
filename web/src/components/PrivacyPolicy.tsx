@@ -16,7 +16,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
           <Button
             onClick={onBack}
             variant="ghost"
-            className="text-[#9ca3af] hover:text-[#39BDF8] hover:bg-transparent"
+            className="text-[#9ca3af] hover:text-[#38C6BA] hover:bg-transparent"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -32,7 +32,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Title Section */}
         <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-full text-[#39BDF8] text-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#38C6BA]/10 border border-[#38C6BA]/30 rounded-full text-[#38C6BA] text-sm mb-6">
             <Shield className="w-4 h-4" />
             <span>Privacy & Security</span>
           </div>
@@ -71,7 +71,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             
             <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="text-lg text-[#39BDF8] mb-2">Account Information</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">Account Information</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Email address (for magic link authentication)</li>
                   <li>Hotel property details (name, location, room count)</li>
@@ -80,7 +80,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               </div>
 
               <div>
-                <h3 className="text-lg text-[#39BDF8] mb-2">Property Management System (PMS) Data</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">Property Management System (PMS) Data</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Occupancy rates and room night statistics</li>
                   <li>Average Daily Rate (ADR) and revenue data</li>
@@ -90,7 +90,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               </div>
 
               <div>
-                <h3 className="text-lg text-[#39BDF8] mb-2">Usage Information</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">Usage Information</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Platform usage statistics and feature interactions</li>
                   <li>Report generation and export activities</li>
@@ -99,7 +99,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               </div>
 
               <div>
-                <h3 className="text-lg text-[#39BDF8] mb-2">Technical Information</h3>
+                <h3 className="text-lg text-[#38C6BA] mb-2">Technical Information</h3>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>IP address and browser information</li>
                   <li>Device type and operating system</li>
@@ -200,8 +200,8 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               <li>Regular backups and disaster recovery procedures</li>
             </ul>
 
-            <div className="bg-[#39BDF8]/10 border border-[#39BDF8]/30 rounded-lg p-4 mt-4">
-              <p className="text-[#39BDF8]">
+            <div className="bg-[#38C6BA]/10 border border-[#38C6BA]/30 rounded-lg p-4 mt-4">
+              <p className="text-[#38C6BA]">
                 <strong>Important:</strong> While we implement robust security measures, no system is 100% secure. 
                 We encourage you to use strong passwords and keep your login credentials confidential.
               </p>
@@ -232,32 +232,32 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             
             <div className="grid md:grid-cols-2 gap-4 mt-4">
               <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-[#39BDF8] mb-2">Access</h3>
+                <h3 className="text-[#38C6BA] mb-2">Access</h3>
                 <p className="text-sm">Request a copy of the personal data we hold about you</p>
               </div>
               
               <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-[#39BDF8] mb-2">Correction</h3>
+                <h3 className="text-[#38C6BA] mb-2">Correction</h3>
                 <p className="text-sm">Request corrections to inaccurate or incomplete data</p>
               </div>
               
               <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-[#39BDF8] mb-2">Deletion</h3>
+                <h3 className="text-[#38C6BA] mb-2">Deletion</h3>
                 <p className="text-sm">Request deletion of your personal data (subject to legal requirements)</p>
               </div>
               
               <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-[#39BDF8] mb-2">Export</h3>
+                <h3 className="text-[#38C6BA] mb-2">Export</h3>
                 <p className="text-sm">Request a portable copy of your data in a common format</p>
               </div>
               
               <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-[#39BDF8] mb-2">Opt-out</h3>
+                <h3 className="text-[#38C6BA] mb-2">Opt-out</h3>
                 <p className="text-sm">Unsubscribe from marketing communications at any time</p>
               </div>
               
               <div className="bg-[#1a1a18] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-[#39BDF8] mb-2">Object</h3>
+                <h3 className="text-[#38C6BA] mb-2">Object</h3>
                 <p className="text-sm">Object to certain types of data processing activities</p>
               </div>
             </div>
@@ -265,7 +265,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
        <p className="mt-4">
               To exercise any of these rights, please contact us at{' '}
               {/* [FIX] Standardized email to support@ */}
-              <a href="mailto:support@market-pulse.io" className="text-[#39BDF8] hover:underline">
+              <a href="mailto:support@market-pulse.io" className="text-[#38C6BA] hover:underline">
                 support@market-pulse.io
               </a>
             </p>
@@ -337,7 +337,7 @@ export function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 <p>
                   <span className="text-[#e5e5e5]">Email:</span>{' '}
                   {/* [FIX] Standardized email to support@ */}
-                  <a href="mailto:support@market-pulse.io" className="text-[#39BDF8] hover:underline">
+                  <a href="mailto:support@market-pulse.io" className="text-[#38C6BA] hover:underline">
                     support@market-pulse.io
                   </a>
                 </p>

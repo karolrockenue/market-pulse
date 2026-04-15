@@ -198,7 +198,7 @@ export function DailyMaxRatesDialog({
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "#1a1a1a";
               e.currentTarget.style.borderColor = "rgba(57, 189, 248, 0.3)";
-              e.currentTarget.style.color = "#39BDF8";
+              e.currentTarget.style.color = "#38C6BA";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "rgba(26, 26, 26, 0.5)";
@@ -308,7 +308,7 @@ export function DailyMaxRatesDialog({
                   backgroundColor: showBulkUpdate
                     ? "rgba(57, 189, 248, 0.05)"
                     : "transparent",
-                  color: showBulkUpdate ? "#39BDF8" : "#6b7280",
+                  color: showBulkUpdate ? "#38C6BA" : "#6b7280",
                   cursor: "pointer",
                   display: "inline-flex",
                   alignItems: "center",
@@ -317,7 +317,7 @@ export function DailyMaxRatesDialog({
                 }}
                 onMouseEnter={(e) => {
                   if (!showBulkUpdate) {
-                    e.currentTarget.style.color = "#39BDF8";
+                    e.currentTarget.style.color = "#38C6BA";
                     e.currentTarget.style.backgroundColor =
                       "rgba(57, 189, 248, 0.05)";
                   }
@@ -472,7 +472,7 @@ export function DailyMaxRatesDialog({
           >
             <div
               style={{
-                color: "#39BDF8",
+                color: "#38C6BA",
                 fontSize: "12px",
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
@@ -514,7 +514,7 @@ export function DailyMaxRatesDialog({
                         ? "rgba(57, 189, 248, 0.2)"
                         : "#1a1a1a",
                       color: selectedDays.includes(day.id)
-                        ? "#39BDF8"
+                        ? "#38C6BA"
                         : "#6b7280",
                       cursor: "pointer",
                       transition: "all 0.2s",
@@ -573,7 +573,7 @@ export function DailyMaxRatesDialog({
                         ? "rgba(57, 189, 248, 0.2)"
                         : "#1a1a1a",
                       color: selectedMonths.includes(idx)
-                        ? "#39BDF8"
+                        ? "#38C6BA"
                         : "#6b7280",
                       cursor: "pointer",
                       transition: "all 0.2s",
@@ -656,7 +656,7 @@ export function DailyMaxRatesDialog({
                   selectedMonths.length === 0
                 }
                 style={{
-                  backgroundColor: "#39BDF8",
+                  backgroundColor: "#38C6BA",
                   color: "#0f0f0f",
                   height: "32px",
                   padding: "0 16px",
@@ -692,7 +692,7 @@ export function DailyMaxRatesDialog({
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#39BDF8";
+                  e.currentTarget.style.backgroundColor = "#38C6BA";
                 }}
               >
                 <Zap style={{ width: "12px", height: "12px" }} />
@@ -712,13 +712,13 @@ export function DailyMaxRatesDialog({
                 }}
               >
                 Will update all{" "}
-                <span style={{ color: "#39BDF8", fontWeight: "500" }}>
+                <span style={{ color: "#38C6BA", fontWeight: "500" }}>
                   {selectedDays
                     .map((d) => daysOfWeek.find((day) => day.id === d)?.name)
                     .join(", ")}
                 </span>{" "}
                 in{" "}
-                <span style={{ color: "#39BDF8", fontWeight: "500" }}>
+                <span style={{ color: "#38C6BA", fontWeight: "500" }}>
                   {selectedMonths.map((m) => months[m].name).join(", ")}
                 </span>
               </div>
@@ -832,7 +832,7 @@ export function DailyMaxRatesDialog({
                         transition: "all 0.2s",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "#39BDF8";
+                        e.currentTarget.style.color = "#38C6BA";
                         e.currentTarget.style.borderColor =
                           "rgba(57, 189, 248, 0.3)";
                       }}
@@ -966,7 +966,7 @@ export function DailyMaxRatesDialog({
                               style={{
                                 fontSize: "12px",
                                 fontWeight: "500",
-                                color: isWeekend ? "#39BDF8" : "#9ca3af",
+                                color: isWeekend ? "#38C6BA" : "#9ca3af",
                               }}
                             >
                               {day}
@@ -1084,7 +1084,7 @@ export function DailyMaxRatesDialog({
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#39BDF8";
+              e.currentTarget.style.backgroundColor = "#38C6BA";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "rgba(57, 189, 248, 0.9)";

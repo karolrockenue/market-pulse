@@ -126,7 +126,7 @@ export function ImportCurvesDialog({
           <Button
             onClick={handleImport}
             disabled={!selectedSource || isSubmitting}
-            style={{ backgroundColor: "#39BDF8", color: "#0f0f0f" }}
+            style={{ backgroundColor: "#38C6BA", color: "#0f0f0f" }}
           >
             {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Import Curves

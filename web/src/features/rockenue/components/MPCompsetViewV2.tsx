@@ -1,10 +1,10 @@
-import { useMemo } from "react";
-import { Trophy, Zap, Target, TrendingUp, Bell, Search, ChevronDown, Building2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Trophy, Zap, Target, TrendingUp, TrendingDown, Bell, Search, ChevronDown, Building2, CalendarDays } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-// ── MP Compset Intel — Rockenue style mockup ──
+// ── MP Compset Intel V2 — with date pickers ──
 
-interface MPCompsetViewProps { activeView: string; onNavigate: (view: string) => void; }
+interface MPCompsetViewV2Props { activeView: string; onNavigate: (view: string) => void; }
 
 const R = {
   bg: "#14181D", card: "#121519", cardRaised: "#1C2228", border: "#1E2330", sep: "rgba(255,255,255,0.04)", accent: "#F3F5F7",
@@ -23,7 +23,112 @@ function Leg({ color, label, dashed }: { color: string; label: string; dashed?: 
   );
 }
 
-export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
+function DatePicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+
+  // Generate 42 days for a calendar grid
+  const parsed = new Date(value + "T12:00:00");
+  const year = parsed.getFullYear();
+  const month = parsed.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
+
+  const monthLabel = parsed.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+
+  const days: { day: number; current: boolean; date: string }[] = [];
+  // Previous month fill
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = prevMonthDays - i;
+    const m = month === 0 ? 11 : month - 1;
+    const y = month === 0 ? year - 1 : year;
+    days.push({ day: d, current: false, date: `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push({ day: d, current: true, date: `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
+  // Next month fill
+  const remaining = 42 - days.length;
+  for (let d = 1; d <= remaining; d++) {
+    const m = month === 11 ? 0 : month + 1;
+    const y = month === 11 ? year + 1 : year;
+    days.push({ day: d, current: false, date: `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
+
+  const navMonth = (dir: number) => {
+    const d = new Date(year, month + dir, 1);
+    onChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+  };
+
+  const displayValue = parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>{label}</div>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex", alignItems: "center", gap: 8, padding: "7px 12px",
+          background: R.cardRaised, border: `1px solid ${open ? `${R.teal}40` : R.border}`,
+          borderRadius: 6, cursor: "pointer", transition: "border-color 0.15s", width: 260,
+        }}
+      >
+        <CalendarDays size={13} color={R.textDim} />
+        <span style={{ fontSize: 12, color: R.accent }}>{displayValue}</span>
+      </div>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, zIndex: 50, marginTop: 6,
+          background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 8,
+          padding: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)", width: 260,
+        }}>
+          {/* Month nav */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <button onClick={() => navMonth(-1)} style={{ background: "none", border: "none", color: R.textMid, cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>‹</button>
+            <span style={{ fontSize: 12, fontWeight: 600, color: R.accent }}>{monthLabel}</span>
+            <button onClick={() => navMonth(1)} style={{ background: "none", border: "none", color: R.textMid, cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>›</button>
+          </div>
+          {/* Day headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+            {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(d => (
+              <div key={d} style={{ fontSize: 9, color: R.textDim, textAlign: "center", padding: 4, textTransform: "uppercase" }}>{d}</div>
+            ))}
+          </div>
+          {/* Days grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+            {days.map((d, i) => {
+              const isSelected = d.date === value;
+              const isToday = d.date === new Date().toISOString().split("T")[0];
+              return (
+                <button
+                  key={i}
+                  onClick={() => { onChange(d.date); setOpen(false); }}
+                  style={{
+                    width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, borderRadius: 4, border: "none", cursor: "pointer",
+                    background: isSelected ? R.teal : "transparent",
+                    color: isSelected ? R.darkBand : d.current ? R.accent : R.textDim,
+                    fontWeight: isSelected || isToday ? 600 : 400,
+                    outline: isToday && !isSelected ? `1px solid ${R.teal}50` : "none",
+                  }}
+                >
+                  {d.day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MPCompsetViewV2({ activeView, onNavigate }: MPCompsetViewV2Props) {
+  const [startDate, setStartDate] = useState("2026-04-14");
+  const [endDate, setEndDate] = useState("2026-05-14");
+
   // 30 days of mock performance data
   const chartData = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const d = new Date(2026, 3, 14 + i);
@@ -41,13 +146,9 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
   }), []);
 
   const dailyData = useMemo(() => chartData.map(row => ({
-    date: row.date,
-    myOcc: row.myOcc, compOcc: row.compOcc,
-    myRate: row.myADR, compRate: row.compADR,
-    myRevPAR: row.myRevPAR, compRevPAR: row.compRevPAR,
+    date: row.date, myOcc: row.myOcc, compOcc: row.compOcc, myRate: row.myADR, compRate: row.compADR,
   })), [chartData]);
 
-  // Portfolio mock
   const portfolio = [
     { name: "The W14 Hotel", cat: "3★", myOcc: 84, segOcc: 68, myAdr: 152, segAdr: 136, rank: 3, total: 42 },
     { name: "Jubilee Hotel Victoria", cat: "3★", myOcc: 78, segOcc: 68, myAdr: 138, segAdr: 136, rank: 8, total: 42 },
@@ -82,10 +183,6 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
               <ChevronDown size={14} color={R.textMid} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}>
-              <span style={{ fontSize: 12, color: R.textMid }}>Next 30 days</span>
-              <ChevronDown size={12} color={R.textDim} />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}>
               <span style={{ fontSize: 12, color: R.textMid }}>My Segment</span>
               <ChevronDown size={12} color={R.textDim} />
             </div>
@@ -97,13 +194,30 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
         </div>
 
         <div style={{ padding: "28px 32px" }}>
-          {/* Header */}
+          {/* Header + Date Pickers */}
           <div style={{ marginBottom: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <Target size={22} color={R.teal} />
-              <h1 style={{ fontSize: 22, fontWeight: 400, color: R.gold, margin: 0, letterSpacing: -0.5 }}>Compset Intelligence</h1>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <Target size={22} color={R.teal} />
+                  <h1 style={{ fontSize: 22, fontWeight: 400, color: R.accent, margin: 0, letterSpacing: -0.5 }}>Compset Intelligence</h1>
+                </div>
+                <p style={{ fontSize: 13, color: R.gold, margin: 0 }}>Your hotel vs competitive set — occupancy, ADR, RevPAR rankings and trends</p>
+              </div>
+              {/* Date Range Pickers */}
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+                <DatePicker label="From" value={startDate} onChange={setStartDate} />
+                <div style={{ fontSize: 12, color: R.textDim, paddingBottom: 10 }}>→</div>
+                <DatePicker label="To" value={endDate} onChange={setEndDate} />
+                <button style={{
+                  padding: "7px 16px", borderRadius: 6, border: "none", cursor: "pointer",
+                  background: R.teal, color: R.darkBand, fontSize: 12, fontWeight: 600,
+                  height: 32, marginBottom: 0,
+                }}>
+                  Apply
+                </button>
+              </div>
             </div>
-            <p style={{ fontSize: 13, color: R.textMid, margin: 0 }}>Your hotel vs competitive set — occupancy, ADR, RevPAR rankings and trends</p>
           </div>
 
           {/* Portfolio Summary */}
@@ -181,7 +295,6 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
 
           {/* Main Content: Chart + Insights */}
           <div style={{ display: "grid", gridTemplateColumns: "3fr 1fr", gap: 20 }}>
-            {/* Left — Chart + Daily Table */}
             <div>
               {/* Performance Chart */}
               <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, marginBottom: 20 }}>
@@ -249,7 +362,28 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
 
             {/* Right — Insights Sidebar */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Market Context */}
+              {/* Key Insights */}
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>Key Insights</div>
+              {[
+                { label: "Occupancy", value: "+16 pts", desc: "above segment average", winning: true },
+                { label: "ADR", value: "£16", desc: "above segment average", winning: true },
+                { label: "RevPAR", value: "£36", desc: "above segment average", winning: true },
+              ].map(item => {
+                const accent = item.winning ? R.teal : R.gold;
+                const Icon = item.winning ? TrendingUp : TrendingDown;
+                return (
+                  <div key={item.label} style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, padding: "18px 18px", marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <Icon size={15} color={accent} />
+                      <span style={{ fontSize: 14, fontWeight: 600, color: R.accent }}>{item.label}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: R.textMid, margin: 0, lineHeight: 1.5 }}>
+                      <span style={{ color: accent, fontWeight: 600 }}>{item.value}</span> {item.desc}
+                    </p>
+                  </div>
+                );
+              })}
+
               <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, padding: "18px" }}>
                 <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.textDim, textTransform: "uppercase", marginBottom: 14 }}>Market Context</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -267,7 +401,6 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
                 </div>
               </div>
 
-              {/* Star Tier Distribution */}
               <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, padding: "18px" }}>
                 <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.textDim, textTransform: "uppercase", marginBottom: 14 }}>Tier Distribution</div>
                 {[
@@ -287,7 +420,6 @@ export function MPCompsetView({ activeView, onNavigate }: MPCompsetViewProps) {
                 ))}
               </div>
 
-              {/* Neighbourhood Breakdown */}
               <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, padding: "18px" }}>
                 <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.textDim, textTransform: "uppercase", marginBottom: 14 }}>Neighbourhoods</div>
                 {neighbourhoods.map((n, i) => (

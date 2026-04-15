@@ -15,8 +15,8 @@ const demandColor = (v: number) => v >= 85 ? R.red : v >= 70 ? "#f97316" : v >= 
 
 function Sidebar() {
   return (
-    <div style={{ width: 220, background: R.darkBand, borderRight: `1px solid ${R.border}`, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-      <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", gap: 5 }}>
+    <div style={{ width: 220, background: R.darkBand, borderRight: `1px solid ${R.border}`, padding: "20px 0", flexDirection: "column", flexShrink: 0 }}>
+      <div style={{ padding: "0 20px 24px", alignItems: "center", gap: 5 }}>
         <span style={{ color: R.teal, fontSize: 18, fontWeight: 200 }}>(</span>
         <span style={{ color: R.accent, fontSize: 10, fontWeight: 700, letterSpacing: 2 }}>ROCKENUE</span>
         <span style={{ color: R.gold, fontSize: 18, fontWeight: 200 }}>)</span>
@@ -25,8 +25,8 @@ function Sidebar() {
         <div key={item} style={{ padding: "10px 20px", fontSize: 13, fontWeight: i === 0 ? 600 : 400, color: i === 0 ? R.accent : R.textMid, cursor: "pointer", background: i === 0 ? `${R.teal}10` : "transparent", borderLeft: i === 0 ? `2px solid ${R.teal}` : "2px solid transparent" }}>{item}</div>
       ))}
       <div style={{ flex: 1 }} />
-      <div style={{ padding: "16px 20px", borderTop: `1px solid ${R.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 14, background: R.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: R.darkBand }}>KM</div>
+      <div style={{ padding: "16px 20px", borderTop: `1px solid ${R.border}`, alignItems: "center", gap: 10 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 14, background: R.teal, alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: R.darkBand }}>KM</div>
         <div><div style={{ fontSize: 12, color: R.accent }}>Karol Marcu</div><div style={{ fontSize: 10, color: R.textDim }}>Managing Director</div></div>
       </div>
     </div>
@@ -57,22 +57,21 @@ export function MPDash2() {
 
   return (
     <div style={{ minHeight: "100vh", background: R.heroBg, color: R.accent, fontFamily: "'Inter', system-ui, sans-serif", display: "flex" }}>
-      <Sidebar />
       <div style={{ flex: 1, overflow: "auto" }}>
         {/* Top bar */}
-        <div style={{ padding: "14px 28px", borderBottom: `1px solid ${R.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "14px 28px", borderBottom: `1px solid ${R.border}`, alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: R.accent }}>Dashboard</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: R.card, border: `1px solid ${R.border}`, borderRadius: 6, cursor: "pointer" }}>
+            <div style={{ alignItems: "center", gap: 6, padding: "5px 12px", background: R.card, border: `1px solid ${R.border}`, borderRadius: 6, cursor: "pointer" }}>
               <span style={{ fontSize: 12, color: R.accent }}>W14 Hotel</span><ChevronDown size={12} color={R.textDim} />
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}><Search size={15} color={R.textDim} /><Bell size={15} color={R.textDim} /></div>
+          <div style={{ alignItems: "center", gap: 14 }}><Search size={15} color={R.textDim} /><Bell size={15} color={R.textDim} /></div>
         </div>
 
         <div style={{ padding: "24px 28px" }}>
           {/* Outlook */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 8, background: "rgba(52,208,104,0.05)", border: "1px solid rgba(52,208,104,0.15)", marginBottom: 24 }}>
+          <div style={{ alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 8, background: "rgba(52,208,104,0.05)", border: "1px solid rgba(52,208,104,0.15)", marginBottom: 24 }}>
             <TrendingUp size={14} color={R.green} />
             <span style={{ fontSize: 12, color: "#86efac", fontWeight: 500, flex: 1 }}>Market demand strengthening</span>
             <span style={{ fontSize: 16, fontWeight: 600, color: "#86efac" }}>+8.4%</span>
@@ -82,7 +81,7 @@ export function MPDash2() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 32 }}>
             {months.map((m) => (
               <div key={m.period} style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 10, padding: "18px 20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <div><div style={{ fontSize: 14, color: R.accent, textTransform: "uppercase" }}>{m.period}</div><div style={{ fontSize: 10, color: R.textDim }}>{m.label}</div></div>
                   <span style={{ fontSize: 10, fontWeight: 600, color: R.green, padding: "2px 6px", background: "rgba(52,208,104,0.08)", borderRadius: 3 }}>+{m.yoy}%</span>
                 </div>
@@ -97,7 +96,7 @@ export function MPDash2() {
             <div>
               <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>90-DAY FORWARD</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: R.accent, marginBottom: 14 }}>Market Demand</div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 130 }}>
+              <div style={{ alignItems: "flex-end", gap: 1, height: 130 }}>
                 {demandBars.map((b) => (
                   <div key={b.i} style={{ flex: 1, position: "relative" }}>
                     {b.isEvent && <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, background: `${R.teal}08` }} />}
@@ -105,7 +104,7 @@ export function MPDash2() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+              <div style={{ gap: 4, marginTop: 8 }}>
                 {["Chelsea Flower Show", "Wimbledon", "BST Hyde Park"].map((e) => (
                   <span key={e} style={{ fontSize: 7, color: R.gold, padding: "1px 5px", background: `${R.gold}10`, borderRadius: 2 }}>{e}</span>
                 ))}
@@ -114,9 +113,9 @@ export function MPDash2() {
             <div>
               <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>90-DAY FORWARD</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: R.accent, marginBottom: 14 }}>Occupancy & Pickup</div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 130 }}>
+              <div style={{ alignItems: "flex-end", gap: 1, height: 130 }}>
                 {occBars.map((b) => (
-                  <div key={b.i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "stretch", height: `${b.occ * 1.2}%` }}>
+                  <div key={b.i} style={{ flex: 1, flexDirection: "column", alignItems: "stretch", height: `${b.occ * 1.2}%` }}>
                     <div style={{ flex: b.pickup, background: R.teal, borderRadius: "1px 1px 0 0", opacity: 0.9, minHeight: b.pickup > 0 ? 1 : 0 }} />
                     <div style={{ flex: b.base, background: R.textDim, opacity: 0.4, minHeight: 1 }} />
                   </div>
@@ -130,7 +129,7 @@ export function MPDash2() {
 
           {/* Bookings — keeps box */}
           <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${R.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${R.border}`, justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: R.accent }}>Recent Bookings</div>
               <span style={{ fontSize: 11, color: R.teal, cursor: "pointer" }}>View all</span>
             </div>

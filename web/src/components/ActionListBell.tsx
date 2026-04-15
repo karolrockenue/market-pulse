@@ -24,7 +24,7 @@ export function ActionListBell() {
           <div className="relative inline-block">
             <ClipboardList
               className="w-5 h-5 transition-colors"
-              style={{ color: count > 0 ? "#39BDF8" : "#9ca3af" }}
+              style={{ color: count > 0 ? "#38C6BA" : "#9ca3af" }}
             />
 
             {count > 0 && (
@@ -32,7 +32,7 @@ export function ActionListBell() {
                 <span
                   className="absolute -top-1 -right-1 flex items-center justify-center rounded-full z-10"
                   style={{
-                    backgroundColor: "#39BDF8",
+                    backgroundColor: "#38C6BA",
                     color: "#1a1a1a",
                     fontSize: "10px",
                     fontWeight: "bold",
@@ -44,7 +44,7 @@ export function ActionListBell() {
                 >
                   {count}
                 </span>
-                <span className="absolute -top-1 -right-1 rounded-full w-4 h-4 bg-[#39BDF8] opacity-75 animate-ping"></span>
+                <span className="absolute -top-1 -right-1 rounded-full w-4 h-4 bg-[#38C6BA] opacity-75 animate-ping"></span>
               </>
             )}
           </div>
@@ -68,7 +68,7 @@ export function ActionListBell() {
           style={{ borderColor: "#2a2a2a" }}
         >
           <div className="flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-[#39BDF8]" />
+            <ClipboardList className="w-4 h-4 text-[#38C6BA]" />
             <h3 style={{ color: "white", fontWeight: 600, fontSize: "0.9rem" }}>
               Action List
             </h3>

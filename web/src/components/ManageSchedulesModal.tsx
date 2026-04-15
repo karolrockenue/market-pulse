@@ -121,7 +121,7 @@ export function ManageSchedulesModal({
     position: "relative",
     cursor: "pointer",
     transition: "background-color 0.2s",
-    backgroundColor: isEnabled ? "#39BDF8" : "#333",
+    backgroundColor: isEnabled ? "#38C6BA" : "#333",
     flexShrink: 0,
   });
 
@@ -262,7 +262,7 @@ export function ManageSchedulesModal({
                   style={{
                     width: "40px",
                     height: "40px",
-                    background: "#39BDF8",
+                    background: "#38C6BA",
                     borderRadius: "4px",
                     display: "flex",
                     alignItems: "center",
@@ -331,7 +331,7 @@ export function ManageSchedulesModal({
                       style={{
                         width: "40px",
                         height: "40px",
-                        color: "#39BDF8",
+                        color: "#38C6BA",
                       }}
                     />
                   </div>
@@ -489,7 +489,7 @@ export function ManageSchedulesModal({
                                 toast.info("Edit functionality coming soon")
                               }
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.color = "#39BDF8";
+                                e.currentTarget.style.color = "#38C6BA";
                                 e.currentTarget.style.backgroundColor =
                                   "rgba(57,189,248,0.1)";
                               }}
@@ -548,7 +548,7 @@ export function ManageSchedulesModal({
                                       style={{
                                         width: "14px",
                                         height: "14px",
-                                        color: "#39BDF8",
+                                        color: "#38C6BA",
                                       }}
                                     />{" "}
                                     Schedule
@@ -594,7 +594,7 @@ export function ManageSchedulesModal({
                                         style={{
                                           width: "14px",
                                           height: "14px",
-                                          color: "#39BDF8",
+                                          color: "#38C6BA",
                                         }}
                                       />{" "}
                                       Period
@@ -623,7 +623,7 @@ export function ManageSchedulesModal({
                                       style={{
                                         width: "14px",
                                         height: "14px",
-                                        color: "#39BDF8",
+                                        color: "#38C6BA",
                                       }}
                                     />{" "}
                                     Recipients
@@ -666,7 +666,7 @@ export function ManageSchedulesModal({
                                       style={{
                                         width: "14px",
                                         height: "14px",
-                                        color: "#39BDF8",
+                                        color: "#38C6BA",
                                       }}
                                     />{" "}
                                     Format
@@ -698,7 +698,7 @@ export function ManageSchedulesModal({
                               >
                                 <span
                                   style={{
-                                    color: "#39BDF8",
+                                    color: "#38C6BA",
                                     textTransform: "uppercase",
                                     letterSpacing: "-0.025em",
                                   }}
@@ -737,7 +737,7 @@ export function ManageSchedulesModal({
                   border: "none",
                   cursor: "pointer",
                   fontFamily: font,
-                  backgroundColor: "#39BDF8",
+                  backgroundColor: "#38C6BA",
                   color: "#0a0a0a",
                   transition: "background-color 0.2s",
                 }}
@@ -745,7 +745,7 @@ export function ManageSchedulesModal({
                   (e.currentTarget.style.backgroundColor = "#29ADEE")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#39BDF8")
+                  (e.currentTarget.style.backgroundColor = "#38C6BA")
                 }
               >
                 Done

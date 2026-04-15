@@ -34,6 +34,9 @@ const NAV_ITEMS = [
   { label: "My Rates", value: "mpMyRates" },
   { label: "Control Panel", value: "mpControlPanel" },
   { label: "Risk Overview", value: "mpRiskOverview" },
+  { label: "Channel Pricing", value: "mpChannelPricing" },
+  { label: "Channel Pricing V2", value: "mpChannelPricingV2" },
+  { label: "Distribution", value: "mpDistribution" },
   { label: "CRM", value: "mpCrmBoard" },
 ];
 

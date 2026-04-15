@@ -14,7 +14,7 @@ interface DeckV2Props {
 export function DeckV2({ onBack }: DeckV2Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const BLUE = "#39BDF8";
+  const BLUE = "#38C6BA";
   const WHITE = "#e5e5e5";
   const GRAY = "#9ca3af";
   const DIM = "#6b7280";
@@ -496,7 +496,7 @@ export function DeckV2({ onBack }: DeckV2Props) {
               <XAxis dataKey="date" stroke="#2a2a2a" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={{ stroke: "#2a2a2a" }} axisLine={{ stroke: "#2a2a2a" }} interval={6} />
               <YAxis stroke="#2a2a2a" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={{ stroke: "#2a2a2a" }} axisLine={{ stroke: "#2a2a2a" }} width={35} domain={[0, 100]} />
               <Bar dataKey="baseOcc" stackId="occ" name="Base Occupancy" radius={[0, 0, 0, 0]} maxBarSize={12} fill="#6b7280" fillOpacity={0.7} />
-              <Bar dataKey="pickup" stackId="occ" name="24h Pickup" radius={[3, 3, 0, 0]} maxBarSize={12} fill="#39BDF8" fillOpacity={0.9} />
+              <Bar dataKey="pickup" stackId="occ" name="24h Pickup" radius={[3, 3, 0, 0]} maxBarSize={12} fill="#38C6BA" fillOpacity={0.9} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -570,7 +570,7 @@ export function DeckV2({ onBack }: DeckV2Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
               <XAxis dataKey="date" stroke="#6b7280" fontSize={10} tickLine={false} interval={3} />
               <YAxis stroke="#6b7280" fontSize={10} tickLine={false} />
-              <Line type="monotone" dataKey="myOccupancy" stroke="#39BDF8" strokeWidth={2.5} name="My Occupancy" dot={false} />
+              <Line type="monotone" dataKey="myOccupancy" stroke="#38C6BA" strokeWidth={2.5} name="My Occupancy" dot={false} />
               <Line type="monotone" dataKey="compsetOccupancy" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" name="Compset Occupancy" dot={false} />
               <Line type="monotone" dataKey="myADR" stroke="#8b5cf6" strokeWidth={2.5} name="My ADR" dot={false} />
               <Line type="monotone" dataKey="compsetADR" stroke="#ec4899" strokeWidth={2} strokeDasharray="5 5" name="Compset ADR" dot={false} />

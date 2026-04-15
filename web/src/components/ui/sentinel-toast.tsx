@@ -7,7 +7,7 @@ export const sentinelToast = {
   message: (title: string, description?: MaybeDescription) =>
     toast.message(title, {
       description,
-      icon: <Zap className="w-4 h-4 text-[#39BDF8]" />,
+      icon: <Zap className="w-4 h-4 text-[#38C6BA]" />,
       style: {
         backgroundColor: "#0f151a",
         border: "1px solid rgba(57, 189, 248, 0.3)",
@@ -18,7 +18,7 @@ export const sentinelToast = {
   success: (title: string, description?: MaybeDescription) =>
     toast.success(title, {
       description,
-      icon: <Zap className="w-4 h-4 text-[#39BDF8]" />,
+      icon: <Zap className="w-4 h-4 text-[#38C6BA]" />,
       style: {
         backgroundColor: "#0f151a",
         border: "1px solid rgba(57, 189, 248, 0.3)",
@@ -29,7 +29,7 @@ export const sentinelToast = {
   error: (title: string, description?: MaybeDescription) =>
     toast.error(title, {
       description,
-      icon: <Zap className="w-4 h-4 text-[#39BDF8]" />,
+      icon: <Zap className="w-4 h-4 text-[#38C6BA]" />,
       style: {
         backgroundColor: "#1a0f0f",
         border: "1px solid rgba(248, 57, 57, 0.3)",

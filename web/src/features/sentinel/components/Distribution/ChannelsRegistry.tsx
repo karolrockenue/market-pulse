@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 // ── Brand palette ──
-const BLUE = "#39BDF8";
+const BLUE = "#38C6BA";
 const GREEN = "#10b981";
 const AMBER = "#f59e0b";
 const BG_PAGE = "#1d1d1c";

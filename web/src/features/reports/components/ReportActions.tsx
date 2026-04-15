@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, CSSProperties } from 'react';
+import { R } from "../../../styles/tokens";
 import { Download, Clock, ChevronDown } from 'lucide-react';
 
 interface ReportActionsProps {
@@ -29,9 +30,9 @@ export function ReportActions({
   }, []);
 
   const buttonStyle: CSSProperties = {
-    background: '#141414',
-    border: '1px solid #2a2a2a',
-    color: '#e5e5e5',
+    background: R.heroBg,
+    border: `1px solid ${R.border}`,
+    color: R.accent,
     padding: '8px 14px',
     fontSize: '13px',
     borderRadius: '4px',
@@ -49,8 +50,8 @@ export function ReportActions({
     right: 0,
     marginTop: '4px',
     zIndex: 1000,
-    background: '#141414',
-    border: '1px solid #2a2a2a',
+    background: R.heroBg,
+    border: `1px solid ${R.border}`,
     borderRadius: '8px',
     padding: '4px',
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
@@ -59,7 +60,7 @@ export function ReportActions({
 
   const menuItemStyle: CSSProperties = {
     padding: '8px 12px',
-    color: '#e5e5e5',
+    color: R.accent,
     fontSize: '13px',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     cursor: 'pointer',
@@ -80,11 +81,11 @@ export function ReportActions({
           style={buttonStyle}
           onClick={() => { setExportOpen(!exportOpen); setScheduleOpen(false); }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#1e1e1e')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = '#141414')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = R.heroBg)}
         >
-          <Download size={14} color="#9ca3af" />
+          <Download size={14} color={R.textMid} />
           Export
-          <ChevronDown size={12} color="#6b7280" />
+          <ChevronDown size={12} color={R.textDim} />
         </button>
         {exportOpen && (
           <div style={dropdownStyle}>
@@ -114,11 +115,11 @@ export function ReportActions({
           style={buttonStyle}
           onClick={() => { setScheduleOpen(!scheduleOpen); setExportOpen(false); }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#1e1e1e')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = '#141414')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = R.heroBg)}
         >
-          <Clock size={14} color="#9ca3af" />
+          <Clock size={14} color={R.textMid} />
           Schedule
-          <ChevronDown size={12} color="#6b7280" />
+          <ChevronDown size={12} color={R.textDim} />
         </button>
         {scheduleOpen && (
           <div style={dropdownStyle}>

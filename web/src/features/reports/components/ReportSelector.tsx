@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   BarChart3,
   DollarSign,
@@ -6,10 +5,10 @@ import {
   Calendar,
   ArrowUpDown,
   FileText,
-  ChevronRight,
   Target,
   Wallet,
 } from "lucide-react";
+import { R } from "../../../styles/tokens";
 
 interface ReportType {
   id: string;
@@ -30,56 +29,44 @@ export function ReportSelector({
   onSelectReport,
   userRole,
 }: ReportSelectorProps) {
-  const [hoveredReport, setHoveredReport] = useState<string | null>(null);
-
   const reportTypes: ReportType[] = [
-    // --- Core Analytics ---
     {
       id: "performance-metrics",
       title: "Performance Metrics",
-      description:
-        "Comprehensive analysis of occupancy, ADR, RevPAR, and market comparisons over time",
+      description: "Occupancy, ADR, RevPAR and market comparisons",
       icon: BarChart3,
       category: "Core Analytics",
       available: true,
     },
     {
       id: "year-on-year",
-      title: "Year-on-Year Comparison",
-      description:
-        "Side-by-side comparison of 2024 vs 2025 performance with variance analysis and growth metrics",
+      title: "Year-on-Year",
+      description: "Side-by-side comparison with variance analysis",
       icon: ArrowUpDown,
       category: "Core Analytics",
       available: true,
     },
-    // --- Internal Reports (Restricted) ---
-    {
-      id: "shreeji-report",
-      title: "Shreeji Report",
-      description:
-        "Daily financial and occupancy report for property management with in-house guests and takings",
-      icon: FileText,
-      category: "Core Analytics", // Kept in Core as per PROT, or move to 'Internal Reports' if you prefer separation
-      available: true,
-      requiredRole: "super_admin",
-    },
-
     {
       id: "bookings-report",
       title: "Bookings Report",
-      description:
-        "Daily booking summary and individual reservation details with guest names, rates, and sources",
+      description: "Daily booking summary with guest details and sources",
       icon: Calendar,
       category: "Core Analytics",
       available: true,
     },
-
-    // --- Financial ---
+    {
+      id: "shreeji-report",
+      title: "Shreeji Report",
+      description: "Daily financial and occupancy report for property management",
+      icon: FileText,
+      category: "Core Analytics",
+      available: true,
+      requiredRole: "super_admin",
+    },
     {
       id: "financial-transactions",
       title: "Financial Transactions",
-      description:
-        "Detailed financial reporting including revenue streams, payment methods, and transaction analysis",
+      description: "Revenue streams, payment methods, transaction analysis",
       icon: DollarSign,
       category: "Financial",
       available: true,
@@ -87,30 +74,23 @@ export function ReportSelector({
     {
       id: "monthly-takings",
       title: "Monthly Takings",
-      description:
-        "Reconcile Cash (Takings) vs Accrual (Revenue) for end-of-month reporting",
+      description: "Cash vs Accrual reconciliation for end-of-month",
       icon: Wallet,
       category: "Financial",
       available: true,
     },
-
-    // --- Forecasting ---
     {
       id: "forecast-report",
       title: "Forecast & Projections",
-      description:
-        "Forward-looking analysis with demand forecasting, rate recommendations, and revenue projections",
+      description: "Forward demand forecasting and rate recommendations",
       icon: TrendingUp,
       category: "Forecasting",
       available: false,
     },
-
-    // --- Market Intelligence ---
     {
       id: "events-impact",
-      title: "Events Impact Analysis",
-      description:
-        "Correlation between local events, market demand, and pricing performance",
+      title: "Events Impact",
+      description: "Event correlation with demand and pricing",
       icon: Calendar,
       category: "Market Intelligence",
       available: false,
@@ -118,237 +98,78 @@ export function ReportSelector({
     {
       id: "competitive-positioning",
       title: "Competitive Positioning",
-      description:
-        "Analyze your hotel's pricing and ranking against the compset.",
+      description: "Pricing and ranking against competitive set",
       icon: Target,
       category: "Market Intelligence",
       available: false,
     },
   ];
 
-  const categories = [
-    "Core Analytics",
-    "Financial",
-    "Forecasting",
-    "Market Intelligence",
-    "Internal Reports",
-  ];
+  const categories = ["Core Analytics", "Financial", "Forecasting", "Market Intelligence"];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      {/* Header - Aligned with ReportsHub.tsx detail view */}
-      <div style={{ marginBottom: "24px" }}>
-        {/* Spacer to match Back Button height (text-sm + mb-2 = ~28px) */}
-        <div style={{ height: "28px", marginBottom: "0px" }} />
-        <h1
-          style={{
-            color: "white",
-            fontSize: "24px",
-            lineHeight: "32px",
-            margin: 0,
-            marginBottom: "4px",
-            fontWeight: 400,
-          }}
-        >
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 2, color: R.gold, textTransform: "uppercase", marginBottom: 8 }}>
+          Reports
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: R.accent, margin: "0 0 6px", letterSpacing: -0.5 }}>
           Reports Hub
         </h1>
-        <p
-          style={{
-            color: "#9ca3af",
-            fontSize: "14px",
-            lineHeight: "20px",
-            margin: 0,
-          }}
-        >
-          Select a report type to begin building your custom analysis
+        <p style={{ fontSize: 13, color: R.textMid, margin: 0 }}>
+          Select a report type to generate custom analysis
         </p>
       </div>
 
-      {/* Reports by Category */}
-      {categories.map((category) => {
-        // Filter: Category match AND Role match
-        const categoryReports = reportTypes.filter((r) => {
-          if (r.category !== category) return false;
+      {/* Report cards by category */}
+      {categories.map((cat) => {
+        const items = reportTypes.filter((r) => {
+          if (r.category !== cat) return false;
           if (r.requiredRole && r.requiredRole !== userRole) return false;
           return true;
         });
-
-        if (categoryReports.length === 0) return null;
+        if (!items.length) return null;
 
         return (
-          <div
-            key={category}
-            style={{
-              backgroundColor: "#1a1a1a",
-              border: "1px solid #2a2a2a",
-              borderRadius: "8px",
-              overflow: "hidden",
-            }}
-          >
-            {/* Category Header */}
-            <div
-              style={{
-                backgroundColor: "#242424",
-                borderBottom: "1px solid #2a2a2a",
-                padding: "12px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <h2
-                style={{
-                  color: "#9ca3af",
-                  fontSize: "12px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  margin: 0,
-                }}
-              >
-                {category}
-              </h2>
-              <span
-                style={{
-                  color: "#9ca3af",
-                  fontSize: "11px",
-                }}
-              >
-                {categoryReports.filter((r) => r.available).length}/
-                {categoryReports.length}
-              </span>
+          <div key={cat} style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.textDim, textTransform: "uppercase", marginBottom: 12 }}>
+              {cat}
             </div>
-
-            {/* Reports List */}
-            <div style={{ padding: "8px" }}>
-              {categoryReports.map((report) => {
-                const Icon = report.icon;
-                const isHovered = hoveredReport === report.id;
-
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+              {items.map((r, i) => {
+                const Icon = r.icon;
+                const accent = i % 2 === 0 ? R.warmTeal : R.gold;
                 return (
                   <div
-                    key={report.id}
-                    onMouseEnter={() => setHoveredReport(report.id)}
-                    onMouseLeave={() => setHoveredReport(null)}
+                    key={r.id}
+                    onClick={() => r.available && onSelectReport(r.id)}
                     style={{
-                      backgroundColor:
-                        isHovered && report.available
-                          ? "rgba(57, 189, 248, 0.05)"
-                          : "transparent",
-                      border:
-                        isHovered && report.available
-                          ? "1px solid rgba(57, 189, 248, 0.2)"
-                          : "1px solid transparent",
-                      borderRadius: "6px",
-                      padding: "12px 14px",
-                      marginBottom: "6px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "14px",
-                      cursor: report.available ? "pointer" : "default",
-                      transition: "all 0.2s",
-                      opacity: report.available ? 1 : 0.6,
+                      background: R.darkBand,
+                      border: `1px solid ${R.border}`,
+                      borderRadius: 8,
+                      padding: "18px",
+                      cursor: r.available ? "pointer" : "default",
+                      opacity: r.available ? 1 : 0.45,
+                      transition: "border-color 0.15s",
                     }}
-                    onClick={() =>
-                      report.available && onSelectReport(report.id)
-                    }
+                    onMouseEnter={(e) => {
+                      if (r.available) e.currentTarget.style.borderColor = `${R.warmTeal}40`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = R.border;
+                    }}
                   >
-                    {/* Icon */}
-                    <div
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: report.available
-                          ? "rgba(57, 189, 248, 0.1)"
-                          : "#2a2a2a",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon
-                        style={{
-                          width: "18px",
-                          height: "18px",
-                          color: report.available ? "#39BDF8" : "#6b7280",
-                        }}
-                      />
-                    </div>
-
-                    {/* Content */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          color: report.available ? "#e5e5e5" : "#9ca3af",
-                          fontSize: "13px",
-                          textTransform: "uppercase",
-                          letterSpacing: "-0.025em",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {report.title}
-                      </div>
-                      <div
-                        style={{
-                          color: "#6b7280",
-                          fontSize: "11px",
-                          lineHeight: "1.4",
-                        }}
-                      >
-                        {report.description}
-                      </div>
-                    </div>
-
-                    {/* Status & Action */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {!report.available && (
-                        <span
-                          style={{
-                            color: "#6b7280",
-                            fontSize: "10px",
-                            backgroundColor: "#2a2a2a",
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          Soon
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <Icon size={15} color={accent} />
+                      <span style={{ fontSize: 14, fontWeight: 600, color: R.accent }}>{r.title}</span>
+                      {!r.available && (
+                        <span style={{ fontSize: 9, color: R.textDim, background: R.bg, padding: "2px 8px", borderRadius: 4, fontWeight: 600, letterSpacing: 0.5 }}>
+                          COMING SOON
                         </span>
                       )}
-                      {report.available && (
-                        <div
-                          style={{
-                            width: "32px",
-                            height: "32px",
-                            borderRadius: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            backgroundColor: isHovered
-                              ? "#39BDF8"
-                              : "rgba(57, 189, 248, 0.1)",
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          <ChevronRight
-                            style={{
-                              width: "16px",
-                              height: "16px",
-                              color: isHovered ? "#0f0f0f" : "#39BDF8",
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
+                    <p style={{ fontSize: 12, color: R.textMid, margin: 0, lineHeight: 1.5 }}>{r.description}</p>
                   </div>
                 );
               })}

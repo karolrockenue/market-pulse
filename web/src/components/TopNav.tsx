@@ -216,7 +216,6 @@ export function TopNav({
       "sentinel-group",
       "riskOverview",
       "rateManager",
-      "shadowfax",
       "competitive-intel",
       "demandRadar",
     ];
@@ -265,7 +264,7 @@ export function TopNav({
         { label: "Risk Overview", value: "riskOverview", icon: Shield },
         { label: "Control Panel", value: "sentinel", icon: TerminalSquare },
         { label: "Rate Manager", value: "rateManager", icon: DollarSign },
-        { label: "Shadowfax", value: "shadowfax", icon: Tag },
+
         { label: "Demand Radar", value: "demandRadar", icon: Radar },
         { label: "Market Profile", value: "marketProfile", icon: BarChart3 },
       ],
@@ -325,7 +324,7 @@ export function TopNav({
   const showPropertySelector = activeView !== "landing";
 
   // Color Constants
-  const BLUE = "#39BDF8";
+  const BLUE = "#38C6BA";
   const WHITE = "#e5e5e5";
   const GRAY = "#9ca3af";
   const BG_DARK = "#1d1d1c";

@@ -135,7 +135,7 @@ export function YearlyRatesVisualization({
             }}
           >
             <BarChart3
-              style={{ width: "16px", height: "16px", color: "#39BDF8" }}
+              style={{ width: "16px", height: "16px", color: "#38C6BA" }}
             />
           </div>
           <div>
@@ -167,7 +167,7 @@ export function YearlyRatesVisualization({
             backgroundColor: "rgba(57, 189, 248, 0.1)",
             border: "1px solid rgba(57, 189, 248, 0.2)",
             borderRadius: "6px",
-            color: "#39BDF8",
+            color: "#38C6BA",
             fontSize: "11px",
             cursor: "pointer",
             display: "flex",
@@ -273,7 +273,7 @@ export function YearlyRatesVisualization({
                         marginBottom: "12px",
                         textAlign: "center",
                         fontSize: "11px",
-                        color: "#39BDF8",
+                        color: "#38C6BA",
                         fontWeight: "600",
                         textTransform: "uppercase",
                         letterSpacing: "0.5px",
@@ -342,7 +342,7 @@ export function YearlyRatesVisualization({
                                   left: "0",
                                   right: "0",
                                   height: "2px",
-                                  backgroundColor: "#39BDF8",
+                                  backgroundColor: "#38C6BA",
                                   borderRadius: "1px",
                                 }}
                               />
@@ -355,7 +355,7 @@ export function YearlyRatesVisualization({
                                   left: "0",
                                   right: "0",
                                   height: "2px",
-                                  backgroundColor: "#39BDF8",
+                                  backgroundColor: "#38C6BA",
                                   borderRadius: "1px",
                                 }}
                               />
@@ -374,7 +374,7 @@ export function YearlyRatesVisualization({
           <div
             style={{
               backgroundColor: "#1a1a1a",
-              border: "2px solid #39BDF8",
+              border: "2px solid #38C6BA",
               borderRadius: "8px",
               padding: "12px 14px",
               fontSize: "11px",
@@ -386,7 +386,7 @@ export function YearlyRatesVisualization({
             <div
               style={{
                 fontWeight: "600",
-                color: activeDayData ? "#39BDF8" : "#6b7280",
+                color: activeDayData ? "#38C6BA" : "#6b7280",
                 marginBottom: "8px",
                 fontSize: "12px",
                 textAlign: "center",
@@ -420,7 +420,7 @@ export function YearlyRatesVisualization({
                 </span>
                 <span
                   style={{
-                    color: "#39BDF8",
+                    color: "#38C6BA",
                     fontWeight: "600",
                     fontSize: "14px",
                   }}
@@ -443,7 +443,7 @@ export function YearlyRatesVisualization({
                 </span>
                 <span
                   style={{
-                    color: "#39BDF8",
+                    color: "#38C6BA",
                     fontWeight: "600",
                     fontSize: "14px",
                   }}
@@ -548,7 +548,7 @@ export function YearlyRatesVisualization({
                   style={{
                     width: "16px",
                     height: "2px",
-                    backgroundColor: "#39BDF8",
+                    backgroundColor: "#38C6BA",
                     borderRadius: "1px",
                   }}
                 />
@@ -563,7 +563,7 @@ export function YearlyRatesVisualization({
                   style={{
                     width: "16px",
                     height: "2px",
-                    backgroundColor: "#39BDF8",
+                    backgroundColor: "#38C6BA",
                     borderRadius: "1px",
                   }}
                 />

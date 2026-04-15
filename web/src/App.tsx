@@ -8,6 +8,8 @@ import {
 } from "react";
 
 import { TopNav } from "./components/TopNav";
+import { AppSidebar } from "./components/AppSidebar";
+import { AppTopBar } from "./components/AppTopBar";
 
 import { DemandPace } from "./components/DemandPace";
 
@@ -75,6 +77,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<string | null>(null);
   // [NEW] Add state to remember the view before navigating to a legal page
   const [previousView, setPreviousView] = useState<string | null>(null);
+  const [initialReport, setInitialReport] = useState<string | null>(null);
 
   // [MODIFIED] Add the user's role to the userInfo state object
   const [userInfo, setUserInfo] = useState<{
@@ -451,6 +454,14 @@ export default function App() {
     // [FIX] Scroll to the top of the page on every view change
     window.scrollTo(0, 0);
 
+    // Support "reports:bookings-report" style deep-links
+    if (newView.startsWith("reports:")) {
+      setInitialReport(newView.split(":")[1]);
+      newView = "reports";
+    } else {
+      setInitialReport(null);
+    }
+
     // If we are navigating TO a legal page, store the current view
     if (newView === "privacy" || newView === "terms") {
       setPreviousView(activeView);
@@ -582,7 +593,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#1a1a18] flex items-center justify-center">
         {/* Simple loader */}
-        <div className="w-12 h-12 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-[#38C6BA] border-t-transparent border-solid rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -650,37 +661,35 @@ export default function App() {
       // <ErrorBoundary>  <-- Removed
       <ActionListProvider>
         <div
-          className="min-h-screen"
-          style={
-            activeView === "reports"
-              ? {
-                  backgroundImage:
-                    "linear-gradient(180deg, #111111 0%, #050507 60%, #000000 100%), radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
-                  backgroundSize: "100% 100%, 4px 4px",
-                  backgroundAttachment: "fixed",
-                  backgroundColor: "#050507",
-                }
-              : { backgroundColor: "#1a1a1a" }
-          }
+          style={{
+            display: "flex",
+            minHeight: "100vh",
+            backgroundColor: "#14181D",
+          }}
         >
-          {/* [NEW] Conditionally render the InitialSyncScreen as a full-screen overlay
-        based on the new `isSyncing` state, which mimics the original app. 
-        */}
           {isSyncing && <InitialSyncScreen />}
 
-          <TopNav
+          <AppSidebar
             activeView={activeView}
-            // [MODIFIED] Pass our new, smarter handler to the TopNav
             onViewChange={handleViewChange}
             property={property}
             onPropertyChange={setProperty}
             properties={properties}
-            // Pass the new state variable down to the TopNav component
-            lastUpdatedAt={lastUpdatedAt}
-            cityName={selectedPropertyDetails?.city}
             userInfo={userInfo}
+            cityName={selectedPropertyDetails?.city}
             isArchanesOnly={isArchanesOnly}
           />
+
+          <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+            <AppTopBar
+              activeView={activeView}
+              propertyName={
+                property === "ALL"
+                  ? "Portfolio"
+                  : properties.find((p) => p.property_id.toString() === property)?.property_name ?? ""
+              }
+              userRole={userInfo?.role}
+            />
           {/* Landing View block is now removed and handled above */}
 
           {/* Archanes-only users get a "no hotel connected" overlay anywhere
@@ -704,6 +713,7 @@ export default function App() {
           )}
           {activeView === "reports" && (
             <ReportsHub
+              key={initialReport || "hub"}
               hotelId={property}
               currencySymbol={
                 currencyCode === "GBP"
@@ -714,6 +724,7 @@ export default function App() {
               }
               currencyCode={currencyCode}
               userRole={userInfo?.role}
+              initialReport={initialReport}
             />
           )}
           {activeView === "admin" && <AdminHub />}
@@ -748,7 +759,7 @@ export default function App() {
               <div className="flex justify-center">
                 <button
                   onClick={() => setShowPropertySetup(true)}
-                  className="bg-[#39BDF8] text-[#1a1a1a] px-6 py-3 rounded hover:bg-[#e8ef5a]"
+                  className="bg-[#38C6BA] text-[#1a1a1a] px-6 py-3 rounded hover:bg-[#e8ef5a]"
                 >
                   Open Property Setup Modal
                 </button>
@@ -797,7 +808,7 @@ export default function App() {
                   padding: "24px",
                 }}
               >
-                <div className="w-8 h-8 border-4 border-[#39BDF8] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
+                <div className="w-8 h-8 border-4 border-[#38C6BA] border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
                 <h2 className="text-xl font-light text-[#e5e5e5]">
                   Loading Market Context...
                 </h2>
@@ -839,7 +850,6 @@ export default function App() {
           {/* Sentinel Domain Hub */}
           {(activeView === "sentinel" ||
             activeView === "rateManager" ||
-            activeView === "shadowfax" ||
             activeView === "riskOverview" ||
             activeView === "demandRadar") && (
             <SentinelHub
@@ -865,10 +875,17 @@ export default function App() {
             activeView === "mpDemandRadar" ||
             activeView === "mpCompsetIntel" ||
             activeView === "mpCompsetView" ||
+            activeView === "mpCompsetViewV2" ||
             activeView === "mpMyRates" ||
             activeView === "mpCrmBoard" ||
             activeView === "mpRiskOverview" ||
-            activeView === "mpControlPanel") && (
+            activeView === "mpControlPanel" ||
+            activeView === "mpControlPanelV2" ||
+            activeView === "mpAdminHub" ||
+            activeView === "mpChannelPricing" ||
+            activeView === "mpChannelPricingV2" ||
+            activeView === "mpChannelPricingV3" ||
+            activeView === "mpDistribution") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
@@ -905,14 +922,15 @@ export default function App() {
 
           <Toaster
             theme="dark"
-            expand={true} // <--- THIS FIXES THE OVERLAP (stacks them vertically)
-            position="top-right" // Right side is usually better for vertical stacking
+            expand={true}
+            position="top-right"
             closeButton
             toastOptions={{
               style: { zIndex: 9999 },
             }}
           />
-        </div>
+          </div>{/* end content column */}
+        </div>{/* end flex container */}
       </ActionListProvider>
       // </ErrorBoundary> <-- Removed
     ) // [NEW] This closes the conditional render from `activeView && (`

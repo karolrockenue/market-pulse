@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Search, Plus, Filter, Clock, Flag, Building2, User, MessageSquare } from "lucide-react";
-import { MPSidebar } from "./MPSidebar";
 
 // ── MP CRM Board — Rockenue style mockup ──
 
@@ -78,7 +77,6 @@ export function MPCrmBoard({ activeView, onNavigate }: MPCrmBoardProps) {
 
   return (
     <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", display: "flex" }}>
-      <MPSidebar activeView={activeView} onNavigate={onNavigate} />
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
 
         {/* Header */}

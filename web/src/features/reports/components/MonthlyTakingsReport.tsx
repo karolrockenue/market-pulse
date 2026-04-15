@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { R } from "../../../styles/tokens";
 import {
   ArrowLeft,
   Loader2,
@@ -245,9 +246,10 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
   return (
     <div
       style={{
-        minHeight: "100vh",
-        background: "#1D1D1C",
-        padding: "24px",
+        flex: 1,
+        background: R.bg,
+        color: R.accent,
+        padding: "24px 28px",
       }}
     >
       <div
@@ -262,7 +264,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
             <Button
               variant="ghost"
               onClick={onBack}
-              className="text-[#9ca3af] hover:text-[#e5e5e5] pl-0"
+              className="text-[#7A8494] hover:text-[#F3F5F7] pl-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Reports
@@ -272,7 +274,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
             <Button
               variant="outline"
               onClick={() => setIsSelectionOpen(!isSelectionOpen)}
-              className="border-[#2a2a2a] text-[#9ca3af] hover:text-white hover:bg-[#2a2a2a]"
+              className="border-[#1E2330] text-[#7A8494] hover:text-white hover:bg-[#1E2330]"
             >
               <Filter className="w-4 h-4 mr-2" />
               {isSelectionOpen ? "Hide Selector" : "Select Hotels"}
@@ -281,8 +283,8 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
 
           {/* NEW: Hotel Selection Grid */}
           {isSelectionOpen && (
-            <div className="mb-6 p-4 bg-[#151515] border border-[#2a2a2a] rounded-lg">
-              <div className="flex items-center justify-between mb-3 border-b border-[#2a2a2a] pb-2">
+            <div className="mb-6 p-4 bg-[#111519] border border-[#1E2330] rounded-lg">
+              <div className="flex items-center justify-between mb-3 border-b border-[#1E2330] pb-2">
                 <span className="text-sm font-medium text-gray-400">
                   Select Hotels for Group Audit
                 </span>
@@ -290,7 +292,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={toggleAll}
-                  className="text-xs text-[#39BDF8] hover:text-[#e5e5e5] hover:bg-[#2a2a2a]"
+                  className="text-xs text-[#38C6BA] hover:text-[#F3F5F7] hover:bg-[#1E2330]"
                 >
                   {selectedHotelIds.length === availableHotels.length
                     ? "Deselect All"
@@ -309,13 +311,13 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         cursor-pointer flex items-center p-2 rounded border text-sm transition-colors select-none
                         ${
                           isSelected
-                            ? "bg-[#39BDF8]/10 border-[#39BDF8] text-white"
-                            : "bg-[#1A1A1A] border-[#2a2a2a] text-gray-500 hover:border-gray-500"
+                            ? "bg-[#38C6BA]/10 border-[#38C6BA] text-white"
+                            : "bg-[#121519] border-[#1E2330] text-gray-500 hover:border-[#1E2330]"
                         }
                       `}
                     >
                       {isSelected ? (
-                        <CheckSquare className="w-4 h-4 mr-2 text-[#39BDF8]" />
+                        <CheckSquare className="w-4 h-4 mr-2 text-[#38C6BA]" />
                       ) : (
                         <Square className="w-4 h-4 mr-2" />
                       )}
@@ -333,7 +335,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
             <div>
               <h1
                 style={{
-                  color: "#e5e5e5",
+                  color: R.accent,
                   fontSize: "24px",
                   fontWeight: "600",
                   marginBottom: "8px",
@@ -344,7 +346,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
               </h1>
               <p
                 style={{
-                  color: "#9ca3af",
+                  color: R.textMid,
                   fontSize: "14px",
                 }}
               >
@@ -358,22 +360,22 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                 variant="outline"
                 onClick={() => setIsScheduleModalOpen(true)}
                 disabled={selectedHotelIds.length === 0}
-                className="bg-[#2C2C2C] border-[#2a2a2a] text-[#e5e5e5] hover:bg-[#2C2C2C] h-10"
+                className="bg-[#1C2228] border-[#1E2330] text-[#F3F5F7] hover:bg-[#1C2228] h-10"
               >
                 <Clock className="w-4 h-4 mr-2" />
                 Schedule Report
               </Button>
 
-              <div className="flex items-center gap-4 bg-[#1A1A1A] p-2 rounded-lg border border-[#2a2a2a]">
+              <div className="flex items-center gap-4 bg-[#121519] p-2 rounded-lg border border-[#1E2330]">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className="justify-start text-left h-9"
                       style={{
-                        backgroundColor: "#0f0f0f",
-                        border: "1px solid #2a2a2a",
-                        color: "#e5e5e5",
+                        backgroundColor: R.sidebar,
+                        border: `1px solid ${R.border}`,
+                        color: R.accent,
                         fontSize: "13px",
                       }}
                     >
@@ -381,20 +383,20 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       {startDate ? format(new Date(startDate), "dd MMM yyyy") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                  <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: `1px solid ${R.border}` }}>
                     <Calendar mode="single" selected={startDate ? new Date(startDate) : undefined} onSelect={(d) => d && setStartDate(format(d, "yyyy-MM-dd"))} initialFocus />
                   </PopoverContent>
                 </Popover>
-                <span style={{ color: "#6b7280" }}>to</span>
+                <span style={{ color: R.textDim }}>to</span>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className="justify-start text-left h-9"
                       style={{
-                        backgroundColor: "#0f0f0f",
-                        border: "1px solid #2a2a2a",
-                        color: "#e5e5e5",
+                        backgroundColor: R.sidebar,
+                        border: `1px solid ${R.border}`,
+                        color: R.accent,
                         fontSize: "13px",
                       }}
                     >
@@ -402,7 +404,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       {endDate ? format(new Date(endDate), "dd MMM yyyy") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: "1px solid #2a2a2a" }}>
+                  <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: "#1a1a18", border: `1px solid ${R.border}` }}>
                     <Calendar mode="single" selected={endDate ? new Date(endDate) : undefined} onSelect={(d) => d && setEndDate(format(d, "yyyy-MM-dd"))} initialFocus />
                   </PopoverContent>
                 </Popover>
@@ -410,7 +412,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                   onClick={loadData}
                   size="sm"
                   style={{
-                    background: "#39BDF8",
+                    background: "#38C6BA",
                     color: "black",
                     fontWeight: "bold",
                     marginLeft: "8px",
@@ -432,14 +434,14 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
 
         {/* Main Table */}
         {loading ? (
-          <div className="flex items-center justify-center h-64 border border-[#2a2a2a] rounded-lg bg-[#1A1A1A]">
-            <Loader2 className="w-8 h-8 text-[#39BDF8] animate-spin" />
+          <div className="flex items-center justify-center h-64 border border-[#1E2330] rounded-lg bg-[#121519]">
+            <Loader2 className="w-8 h-8 text-[#38C6BA] animate-spin" />
           </div>
         ) : (
           <div
             style={{
-              background: "#1A1A1A",
-              border: "1px solid #2a2a2a",
+              background: R.darkBand,
+              border: `1px solid ${R.border}`,
               borderRadius: "8px",
               overflow: "hidden",
             }}
@@ -453,20 +455,20 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
               <thead>
                 <tr
                   style={{
-                    background: "#0a0a0a",
-                    borderBottom: "1px solid #2a2a2a",
+                    background: R.sidebar,
+                    borderBottom: `1px solid ${R.border}`,
                   }}
                 >
                   <th
                     style={{
                       textAlign: "left",
                       padding: "16px",
-                      color: "#9ca3af",
+                      color: R.textMid,
                       fontSize: "11px",
                       fontWeight: "600",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Hotel Name
@@ -476,12 +478,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "center",
                       padding: "16px",
-                      color: "#9ca3af",
+                      color: R.textMid,
                       fontSize: "11px",
                       fontWeight: "600",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Takings (Cash Basis)
@@ -491,7 +493,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "center",
                       padding: "16px",
-                      color: "#9ca3af",
+                      color: R.textMid,
                       fontSize: "11px",
                       fontWeight: "600",
                       textTransform: "uppercase",
@@ -503,26 +505,26 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                 </tr>
                 <tr
                   style={{
-                    background: "#0a0a0a",
-                    borderBottom: "1px solid #2a2a2a",
+                    background: R.sidebar,
+                    borderBottom: `1px solid ${R.border}`,
                   }}
                 >
                   <th
                     style={{
                       padding: "12px 16px",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   ></th>
                   <th
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Cash
@@ -531,12 +533,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Credit Cards
@@ -545,12 +547,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     BACS
@@ -559,12 +561,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Extras
@@ -573,12 +575,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                       borderLeft: "2px solid #444",
                     }}
                   >
@@ -588,12 +590,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     ADR
@@ -602,12 +604,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#6b7280",
+                      color: R.textDim,
                       fontSize: "10px",
                       fontWeight: "500",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Revpar
@@ -616,7 +618,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "12px 16px",
-                      color: "#39BDF8",
+                      color: "#38C6BA",
                       fontSize: "10px",
                       fontWeight: "600",
                       textTransform: "uppercase",
@@ -632,17 +634,17 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                   <tr
                     key={index}
                     style={{
-                      borderBottom: "1px solid #2a2a2a",
-                      background: index % 2 === 0 ? "#1A1A1A" : "#151515",
+                      borderBottom: `1px solid ${R.border}`,
+                      background: index % 2 === 0 ? R.darkBand : R.heroBg,
                     }}
                   >
                     <td
                       style={{
                         padding: "16px",
-                        color: "#e5e5e5",
+                        color: R.accent,
                         fontSize: "14px",
                         fontWeight: "500",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {hotel.name}
@@ -654,7 +656,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {formatCurrency(hotel.takings?.cash || 0)}
@@ -666,7 +668,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {formatCurrency(hotel.takings?.cards || 0)}
@@ -678,7 +680,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {formatCurrency(hotel.takings?.bacs || 0)}
@@ -690,7 +692,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {formatCurrency(hotel.revenue?.extras?.total || 0)}
@@ -702,7 +704,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                         borderLeft: "2px solid #444",
                       }}
                     >
@@ -715,7 +717,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {formatCurrency(hotel.revenue?.adr || 0)}
@@ -727,7 +729,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         color: "#d1d5db",
                         fontSize: "13px",
                         fontFamily: "ui-monospace, monospace",
-                        borderRight: "1px solid #2a2a2a",
+                        borderRight: `1px solid ${R.border}`,
                       }}
                     >
                       {formatCurrency(hotel.revenue?.revpar || 0)}
@@ -736,7 +738,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       style={{
                         textAlign: "right",
                         padding: "16px",
-                        color: "#e5e5e5",
+                        color: R.accent,
                         fontSize: "14px",
                         fontWeight: "600",
                         fontFamily: "ui-monospace, monospace",
@@ -749,19 +751,19 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                 {/* Totals Row */}
                 <tr
                   style={{
-                    background: "#0a0a0a",
+                    background: R.sidebar,
                     borderTop: "2px solid #3a3a3a",
                   }}
                 >
                   <td
                     style={{
                       padding: "16px",
-                      color: "#9ca3af",
+                      color: R.textMid,
                       fontSize: "12px",
                       fontWeight: "600",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     Total
@@ -770,11 +772,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     {formatCurrency(totals.cash)}
@@ -783,11 +785,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     {formatCurrency(totals.creditCards)}
@@ -796,11 +798,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     {formatCurrency(totals.bacs)}
@@ -809,11 +811,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     {formatCurrency(totals.extras)}
@@ -822,11 +824,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                       borderLeft: "2px solid #444",
                     }}
                   >
@@ -836,11 +838,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     {formatCurrency(totals.avgAdr || 0)}
@@ -849,11 +851,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#e5e5e5",
+                      color: R.accent,
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
-                      borderRight: "1px solid #2a2a2a",
+                      borderRight: `1px solid ${R.border}`,
                     }}
                   >
                     {formatCurrency(totals.avgRevpar || 0)}
@@ -862,7 +864,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                     style={{
                       textAlign: "right",
                       padding: "16px",
-                      color: "#39BDF8",
+                      color: "#38C6BA",
                       fontSize: "14px",
                       fontWeight: "600",
                       fontFamily: "ui-monospace, monospace",
@@ -883,7 +885,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
             <div key={hotel.hotelId} style={{ marginTop: "48px" }}>
               <h2
                 style={{
-                  color: "#e5e5e5",
+                  color: R.accent,
                   fontSize: "18px",
                   marginBottom: "16px",
                   borderBottom: "1px solid #333",
@@ -903,16 +905,16 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                 {/* 1. Payment Method Summary */}
                 <div
                   style={{
-                    background: "#1A1A1A",
+                    background: R.darkBand,
                     padding: "16px",
                     borderRadius: "8px",
-                    border: "1px solid #2a2a2a",
+                    border: `1px solid ${R.border}`,
                     height: "fit-content",
                   }}
                 >
                   <h3
                     style={{
-                      color: "#9ca3af",
+                      color: R.textMid,
                       fontSize: "12px",
                       textTransform: "uppercase",
                       marginBottom: "12px",
@@ -926,12 +928,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         ([method, amount]: [string, any]) => (
                           <tr
                             key={method}
-                            style={{ borderBottom: "1px solid #2a2a2a" }}
+                            style={{ borderBottom: `1px solid ${R.border}` }}
                           >
                             <td
                               style={{
                                 padding: "8px 0",
-                                color: "#e5e5e5",
+                                color: R.accent,
                                 fontSize: "13px",
                               }}
                             >
@@ -941,7 +943,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                               style={{
                                 padding: "8px 0",
                                 textAlign: "right",
-                                color: "#e5e5e5",
+                                color: R.accent,
                                 fontFamily: "monospace",
                               }}
                             >
@@ -952,11 +954,11 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       )}
                       {/* Add Cash/BACS manually if not in breakdown */}
                       {hotel.takings?.cash > 0 && (
-                        <tr style={{ borderBottom: "1px solid #2a2a2a" }}>
+                        <tr style={{ borderBottom: `1px solid ${R.border}` }}>
                           <td
                             style={{
                               padding: "8px 0",
-                              color: "#e5e5e5",
+                              color: R.accent,
                               fontSize: "13px",
                             }}
                           >
@@ -966,7 +968,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                             style={{
                               padding: "8px 0",
                               textAlign: "right",
-                              color: "#e5e5e5",
+                              color: R.accent,
                               fontFamily: "monospace",
                             }}
                           >
@@ -981,16 +983,16 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                 {/* 2. Extras Breakdown (NEW) */}
                 <div
                   style={{
-                    background: "#1A1A1A",
+                    background: R.darkBand,
                     padding: "16px",
                     borderRadius: "8px",
-                    border: "1px solid #2a2a2a",
+                    border: `1px solid ${R.border}`,
                     height: "fit-content",
                   }}
                 >
                   <h3
                     style={{
-                      color: "#9ca3af",
+                      color: R.textMid,
                       fontSize: "12px",
                       textTransform: "uppercase",
                       marginBottom: "12px",
@@ -1009,7 +1011,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         <th
                           style={{
                             padding: "8px 0",
-                            color: "#6b7280",
+                            color: R.textDim,
                             fontSize: "10px",
                           }}
                         >
@@ -1018,7 +1020,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         <th
                           style={{
                             padding: "8px 0",
-                            color: "#6b7280",
+                            color: R.textDim,
                             fontSize: "10px",
                             textAlign: "center",
                           }}
@@ -1028,7 +1030,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                         <th
                           style={{
                             padding: "8px 0",
-                            color: "#6b7280",
+                            color: R.textDim,
                             fontSize: "10px",
                             textAlign: "right",
                           }}
@@ -1043,12 +1045,12 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                       ).map(([item, data]: [string, any]) => (
                         <tr
                           key={item}
-                          style={{ borderBottom: "1px solid #2a2a2a" }}
+                          style={{ borderBottom: `1px solid ${R.border}` }}
                         >
                           <td
                             style={{
                               padding: "8px 0",
-                              color: "#e5e5e5",
+                              color: R.accent,
                               fontSize: "13px",
                             }}
                           >
@@ -1058,7 +1060,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                             style={{
                               padding: "8px 0",
                               textAlign: "center",
-                              color: "#9ca3af",
+                              color: R.textMid,
                               fontSize: "13px",
                             }}
                           >
@@ -1068,7 +1070,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                             style={{
                               padding: "8px 0",
                               textAlign: "right",
-                              color: "#e5e5e5",
+                              color: R.accent,
                               fontFamily: "monospace",
                             }}
                           >
@@ -1082,7 +1084,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
                           <td
                             colSpan={3}
                             style={{
-                              color: "#6b7280",
+                              color: R.textDim,
                               fontSize: "12px",
                               padding: "8px 0",
                             }}

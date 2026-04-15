@@ -1,53 +1,109 @@
+import { useState } from "react";
+import {
+  ChevronDown, ChevronRight, Check, Pencil,
+  Building2, Bell, Search, Info, Plus,
+} from "lucide-react";
+
 /**
- * Channel Pricing — V3 design with agreed token palette.
- * Wired to real API. Horizontal waterfall, channel tabs, per-hotel overrides.
+ * ── MP Channel Pricing V3 — Rockenue style mockup ──
+ * Mock data. Not wired. Design exercise.
+ * Same layout as V2 but with agreed token palette, subtler styling.
  */
 
-import { useState, useEffect, useMemo } from "react";
-import {
-  ChevronDown, ChevronRight, Check, Pencil, Info, Loader2, Plus,
-} from "lucide-react";
-import {
-  fetchPricingChannels, fetchChannelPricing, updateChannelPricingSteps,
-  setHotelPricingOverride, deleteHotelPricingOverride, createChannel,
-} from "../api/distribution.api";
+interface MPChannelPricingV3Props { activeView: string; onNavigate: (view: string) => void; }
 
-// ── Agreed token palette ──
 const R = {
   bg: "#14181D", card: "#121519", cardRaised: "#1C2228", border: "#1E2330", sep: "rgba(255,255,255,0.04)", accent: "#F3F5F7",
   text: "#B0B8C4", textMid: "#7A8494", textDim: "#4E5868",
-  teal: "#38C6BA", warmTeal: "#38C6BA", gold: "#C8A66E",
+  teal: "#39BDF8", warmTeal: "#38C6BA", gold: "#C8A66E",
   darkBand: "#0C0E12", green: "#34D068", red: "#ef4444",
 };
 
 const curr = "£";
 
 // ══════════════════════════════════════════
-// INTERFACES
+// MOCK DATA
 // ══════════════════════════════════════════
 
 interface WaterfallStep {
-  key: string; label: string; type: "multiplier" | "discount" | "tax";
-  value: number; active: boolean; locked?: boolean;
-  channelSpecific?: boolean; description?: string;
+  key: string; label: string; type: "multiplier" | "discount"; value: number;
+  active: boolean; locked?: boolean;
 }
 
-interface ChannelMeta {
-  agreement: string; channelType: string; pricingModel: string;
+interface MockChannel {
+  slug: string; name: string; channelType: string; agreement: string;
   commission: number | null; paymentMethod: string;
   contractExpiry: string | null; primaryContact: string | null;
   contactEmail: string | null; notes: string | null;
+  steps: WaterfallStep[];
 }
 
-interface ChannelDefaults {
-  channelId: number; channelName: string; slug: string;
-  meta: ChannelMeta; steps: WaterfallStep[];
-}
-
-interface HotelOverride {
-  hotelId: number; hotelName: string; channelSlug: string;
+interface MockOverride {
+  hotelName: string; channelSlug: string;
   overrides: Record<string, { value?: number; active?: boolean }>;
 }
+
+const MOCK_CHANNELS: MockChannel[] = [
+  {
+    slug: "booking-com", name: "Booking.com", channelType: "OTA", agreement: "Group", commission: 18, paymentMethod: "VCC",
+    contractExpiry: "2027-03-01", primaryContact: "Sarah Jenkins", contactEmail: "sarah.j@booking.com",
+    notes: "Genius L2 active across portfolio. Long campaign 30% runs until Aug 2026.",
+    steps: [
+      { key: "multiplier", label: "Rate Multiplier", type: "multiplier", value: 1.42, active: true, locked: true },
+      { key: "nrf", label: "Non-Refundable", type: "discount", value: 10, active: true },
+      { key: "genius", label: "Genius Programme", type: "discount", value: 15, active: true },
+      { key: "campaign", label: "Long Campaign", type: "discount", value: 30, active: true },
+      { key: "mobile", label: "Mobile Rate", type: "discount", value: 10, active: false },
+    ],
+  },
+  {
+    slug: "expedia", name: "Expedia", channelType: "OTA", agreement: "Group", commission: 20, paymentMethod: "VCC",
+    contractExpiry: "2026-12-01", primaryContact: "Tom Reid", contactEmail: "t.reid@expedia.com", notes: null,
+    steps: [
+      { key: "multiplier", label: "Rate Multiplier", type: "multiplier", value: 1.35, active: true, locked: true },
+      { key: "nrf", label: "Non-Refundable", type: "discount", value: 10, active: true },
+      { key: "member_deal", label: "Member Deal", type: "discount", value: 10, active: true },
+    ],
+  },
+  {
+    slug: "hostelworld", name: "Hostelworld", channelType: "OTA", agreement: "Individual", commission: 15, paymentMethod: "Guest Pays",
+    contractExpiry: null, primaryContact: null, contactEmail: null, notes: null,
+    steps: [
+      { key: "multiplier", label: "Rate Multiplier", type: "multiplier", value: 1.18, active: true, locked: true },
+    ],
+  },
+  {
+    slug: "direct", name: "Direct (Distributor)", channelType: "Direct", agreement: "Direct", commission: null, paymentMethod: "Guest Pays",
+    contractExpiry: null, primaryContact: null, contactEmail: null, notes: "Best price guarantee — always 10% below lowest OTA.",
+    steps: [
+      { key: "multiplier", label: "Rate Multiplier", type: "multiplier", value: 1.00, active: true, locked: true },
+      { key: "direct_discount", label: "Best Price Guarantee", type: "discount", value: 10, active: true },
+    ],
+  },
+  {
+    slug: "hrs", name: "HRS", channelType: "Wholesaler", agreement: "Group", commission: 22, paymentMethod: "BACS",
+    contractExpiry: "2026-09-15", primaryContact: "Anna Becker", contactEmail: "a.becker@hrs.com",
+    notes: "High commission — review at renewal.",
+    steps: [
+      { key: "multiplier", label: "Rate Multiplier", type: "multiplier", value: 1.30, active: true, locked: true },
+      { key: "corporate", label: "Corporate Discount", type: "discount", value: 8, active: true },
+    ],
+  },
+];
+
+const MOCK_HOTELS = [
+  "The W14 Hotel", "Jubilee Hotel Victoria", "The Melita", "Elysee Hyde Park",
+  "Camden Suites", "Vilenza Hotel", "The Whitechapel Hotel", "Notting Hill House Hotel",
+];
+
+const MOCK_OVERRIDES: MockOverride[] = [
+  { hotelName: "The W14 Hotel", channelSlug: "booking-com", overrides: { genius: { value: 20 }, campaign: { value: 35 } } },
+  { hotelName: "Camden Suites", channelSlug: "booking-com", overrides: { genius: { active: false } } },
+  { hotelName: "The W14 Hotel", channelSlug: "expedia", overrides: { member_deal: { value: 15 } } },
+  { hotelName: "The Melita", channelSlug: "booking-com", overrides: { campaign: { value: 25 } } },
+  { hotelName: "Elysee Hyde Park", channelSlug: "hrs", overrides: { corporate: { value: 12 } } },
+  { hotelName: "The Whitechapel Hotel", channelSlug: "expedia", overrides: { member_deal: { active: false } } },
+];
 
 // ══════════════════════════════════════════
 // HELPERS
@@ -55,30 +111,30 @@ interface HotelOverride {
 
 function calcWaterfall(steps: WaterfallStep[], pmsRate: number) {
   let rate = pmsRate;
-  const result: { label: string; rate: number; discount: string; active: boolean }[] = [];
+  const result: { key: string; label: string; rate: number; discount: string; active: boolean; type: string }[] = [];
   for (const step of steps) {
     if (!step.active) {
-      result.push({ label: step.label, rate, discount: step.type === "multiplier" ? `${step.value}×` : `${step.value}%`, active: false });
+      result.push({ key: step.key, label: step.label, rate, discount: step.type === "multiplier" ? `${step.value}×` : `${step.value}%`, active: false, type: step.type });
       continue;
     }
     if (step.type === "multiplier") {
       rate = rate * step.value;
-      result.push({ label: step.label, rate, discount: `${step.value}×`, active: true });
-    } else if (step.type === "discount") {
+      result.push({ key: step.key, label: step.label, rate, discount: `${step.value}×`, active: true, type: step.type });
+    } else {
       rate = rate * (1 - step.value / 100);
-      result.push({ label: step.label, rate, discount: `−${step.value}%`, active: true });
+      result.push({ key: step.key, label: step.label, rate, discount: `−${step.value}%`, active: true, type: step.type });
     }
   }
   return { steps: result, final: Math.round(rate * 100) / 100 };
 }
 
-function getEffectiveSteps(channel: ChannelDefaults, hotelId: number, hotelOverrides: HotelOverride[]): WaterfallStep[] {
-  const entry = hotelOverrides.find(o => o.hotelId === hotelId && o.channelSlug === channel.slug);
-  if (!entry) return channel.steps;
+function getEffectiveSteps(channel: MockChannel, hotelName: string): WaterfallStep[] {
+  const ov = MOCK_OVERRIDES.find(o => o.hotelName === hotelName && o.channelSlug === channel.slug);
+  if (!ov) return channel.steps;
   return channel.steps.map(step => {
-    const ov = entry.overrides[step.key];
-    if (!ov) return step;
-    return { ...step, value: ov.value ?? step.value, active: ov.active ?? step.active };
+    const override = ov.overrides[step.key];
+    if (!override) return step;
+    return { ...step, value: override.value ?? step.value, active: override.active ?? step.active };
   });
 }
 
@@ -86,111 +142,46 @@ function getEffectiveSteps(channel: ChannelDefaults, hotelId: number, hotelOverr
 // MAIN COMPONENT
 // ══════════════════════════════════════════
 
-export function ChannelPricingConcept() {
-  const [selectedChannel, setSelectedChannel] = useState<string>("");
-  const [expandedHotel, setExpandedHotel] = useState<number | null>(null);
+export function MPChannelPricingV3({ activeView, onNavigate }: MPChannelPricingV3Props) {
+  const [selectedChannel, setSelectedChannel] = useState("booking-com");
   const [simPmsRate, setSimPmsRate] = useState(185);
   const [showChannelInfo, setShowChannelInfo] = useState(false);
+  const [expandedHotel, setExpandedHotel] = useState<string | null>(null);
 
-  // API state
-  const [channels, setChannels] = useState<ChannelDefaults[]>([]);
-  const [allHotels, setAllHotels] = useState<{ id: number; name: string }[]>([]);
-  const [overrides, setOverrides] = useState<HotelOverride[]>([]);
-  const [allOverrides, setAllOverrides] = useState<HotelOverride[]>([]);
-  const [loadingChannels, setLoadingChannels] = useState(true);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [editedSteps, setEditedSteps] = useState<WaterfallStep[] | null>(null);
-  const [savingSteps, setSavingSteps] = useState(false);
-  const [editingStepKey, setEditingStepKey] = useState<string | null>(null);
-
-  // Fetch channels
-  function loadChannels(selectSlug?: string) {
-    return fetchPricingChannels().then(data => {
-      const mapped: ChannelDefaults[] = data.map((ch: any) => ({
-        channelId: ch.channel_id, channelName: ch.name, slug: ch.slug,
-        meta: {
-          agreement: ch.agreement_type ?? "—", channelType: ch.channel_type ?? "—",
-          pricingModel: "Net", commission: ch.commission_pct ?? null,
-          paymentMethod: ch.payment_method ?? "—", contractExpiry: ch.contract_expiry ?? null,
-          primaryContact: ch.primary_contact ?? null, contactEmail: ch.contact_email ?? null,
-          notes: ch.notes ?? null,
-        },
-        steps: ch.steps ?? [],
-      }));
-      setChannels(mapped);
-      if (selectSlug) setSelectedChannel(selectSlug);
-      else if (mapped.length > 0 && !selectedChannel) setSelectedChannel(mapped[0].slug);
-      setLoadingChannels(false);
-    }).catch(err => { console.error(err); setLoadingChannels(false); });
-  }
-
-  useEffect(() => { loadChannels(); }, []);
-  useEffect(() => { setEditedSteps(null); }, [selectedChannel]);
-
-  // Fetch channel detail
-  useEffect(() => {
-    const ch = channels.find(c => c.slug === selectedChannel);
-    if (!ch) return;
-    setLoadingDetail(true);
-    fetchChannelPricing(ch.channelId).then(data => {
-      const detailSteps = data.channel?.steps ?? [];
-      const mappedOverrides: HotelOverride[] = (data.overrides ?? []).map((o: any) => ({
-        hotelId: o.hotel_id, hotelName: o.hotel_name, channelSlug: selectedChannel,
-        overrides: o.overrides ?? {},
-      }));
-      setOverrides(mappedOverrides);
-      setAllOverrides(prev => [...prev.filter(o => o.channelSlug !== selectedChannel), ...mappedOverrides]);
-      setAllHotels((data.hotels ?? []).map((h: any) => ({ id: h.hotel_id ?? h.id, name: h.hotel_name ?? h.name })));
-      setChannels(prev => prev.map(c => c.slug === selectedChannel ? { ...c, steps: detailSteps } : c));
-      setLoadingDetail(false);
-    }).catch(err => { console.error(err); setLoadingDetail(false); });
-  }, [selectedChannel, channels.length]);
-
-  const channel = channels.find(c => c.slug === selectedChannel);
-  const activeSteps = editedSteps || channel?.steps || [];
-  const selectedResult = calcWaterfall(activeSteps, simPmsRate);
-  const channelOverrides = overrides;
-  const hasUnsavedChanges = editedSteps !== null;
-
-  function handleToggleStep(key: string) {
-    const steps = [...(editedSteps || channel?.steps || [])];
-    const idx = steps.findIndex(s => s.key === key);
-    if (idx === -1 || steps[idx].locked) return;
-    steps[idx] = { ...steps[idx], active: !steps[idx].active };
-    setEditedSteps(steps);
-  }
-
-  function handleChangeStepValue(key: string, value: number) {
-    const steps = [...(editedSteps || channel?.steps || [])];
-    const idx = steps.findIndex(s => s.key === key);
-    if (idx === -1) return;
-    steps[idx] = { ...steps[idx], value };
-    setEditedSteps(steps);
-  }
-
-  async function handleSaveSteps() {
-    if (!channel || !editedSteps || savingSteps) return;
-    setSavingSteps(true);
-    try {
-      await updateChannelPricingSteps(channel.channelId, editedSteps);
-      setChannels(prev => prev.map(c => c.channelId === channel.channelId ? { ...c, steps: editedSteps } : c));
-      setEditedSteps(null);
-    } catch (err) { console.error("Save steps failed:", err); }
-    finally { setSavingSteps(false); }
-  }
-
-  // Loading guard
-  if (loadingChannels) {
-    return (
-      <div style={{ minHeight: "100vh", background: R.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Loader2 size={24} style={{ color: R.warmTeal, animation: "spin 1s linear infinite" }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
+  const channel = MOCK_CHANNELS.find(c => c.slug === selectedChannel)!;
+  const channelOverrides = MOCK_OVERRIDES.filter(o => o.channelSlug === selectedChannel);
+  const selectedResult = calcWaterfall(channel.steps, simPmsRate);
 
   return (
-    <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+    <div style={{ height: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", overflow: "auto" }}>
+
+      {/* Top bar */}
+      <div style={{ padding: "14px 32px", borderBottom: `1px solid ${R.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}>
+            <span style={{ fontSize: 13, color: R.accent, fontWeight: 500 }}>Portfolio</span>
+            <ChevronDown size={14} color={R.textMid} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: R.textDim }}>PMS Rate</span>
+            <div style={{ display: "flex", alignItems: "center", background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "4px 10px", gap: 2 }}>
+              <span style={{ fontSize: 12, color: R.textDim }}>{curr}</span>
+              <input type="number" value={simPmsRate} onChange={e => setSimPmsRate(Number(e.target.value) || 0)}
+                style={{ width: 50, background: "transparent", border: "none", color: R.accent, fontSize: 13, fontWeight: 500, textAlign: "center", outline: "none" }} />
+            </div>
+            <span style={{ fontSize: 11, color: R.textDim }}>→</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: R.warmTeal, fontVariantNumeric: "tabular-nums" }}>{curr}{selectedResult.final.toFixed(2)}</span>
+            <span style={{ fontSize: 10, color: R.textDim }}>guest sees</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <Search size={14} color={R.textDim} style={{ position: "absolute", left: 10 }} />
+            <input style={{ background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6, padding: "6px 10px 6px 30px", fontSize: 12, color: R.text, outline: "none", width: 180 }} placeholder="Search channels..." />
+          </div>
+          <Bell size={16} color={R.textMid} />
+        </div>
+      </div>
 
       <div style={{ padding: "32px" }}>
         {/* Header */}
@@ -202,22 +193,25 @@ export function ChannelPricingConcept() {
 
         {/* Channel Tabs */}
         <div style={{ display: "flex", gap: 4, marginBottom: 32, borderBottom: `1px solid ${R.border}`, paddingBottom: 0 }}>
-          {channels.map(ch => {
+          {MOCK_CHANNELS.map(ch => {
             const isActive = selectedChannel === ch.slug;
-            const ovCount = allOverrides.filter(o => o.channelSlug === ch.slug).length;
+            const overrideCount = MOCK_OVERRIDES.filter(o => o.channelSlug === ch.slug).length;
             return (
               <button key={ch.slug} onClick={() => { setSelectedChannel(ch.slug); setExpandedHotel(null); setShowChannelInfo(false); }}
                 style={{
                   padding: "14px 24px", border: "none",
                   borderBottom: isActive ? `2px solid ${R.warmTeal}` : "2px solid transparent",
-                  background: "transparent", color: isActive ? R.accent : R.textDim,
+                  background: "transparent",
+                  color: isActive ? R.accent : R.textDim,
                   fontSize: 14, fontWeight: isActive ? 500 : 400, cursor: "pointer",
                   transition: "all 0.15s", marginBottom: -1,
                   display: "flex", alignItems: "center", gap: 8,
                 }}>
-                <span>{ch.channelName}</span>
-                {ovCount > 0 && (
-                  <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, background: `${R.gold}15`, color: R.gold, fontWeight: 500 }}>{ovCount}</span>
+                <span>{ch.name}</span>
+                {overrideCount > 0 && (
+                  <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, background: `${R.gold}15`, color: R.gold, fontWeight: 500 }}>
+                    {overrideCount}
+                  </span>
                 )}
               </button>
             );
@@ -231,28 +225,25 @@ export function ChannelPricingConcept() {
           </button>
         </div>
 
-        {!channel || loadingDetail ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-            <Loader2 size={20} style={{ color: R.warmTeal, animation: "spin 1s linear infinite" }} />
-          </div>
-        ) : (<>
-
         {/* Channel Info Bar */}
         <div style={{ marginBottom: 24 }}>
-          <div onClick={() => setShowChannelInfo(!showChannelInfo)}
+          <div
+            onClick={() => setShowChannelInfo(!showChannelInfo)}
             style={{
               display: "flex", alignItems: "center", gap: 8, padding: "12px 20px",
               background: R.card, border: `1px solid ${R.border}`, cursor: "pointer",
               borderRadius: showChannelInfo ? "8px 8px 0 0" : 8,
             }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: R.accent }}>{channel.channelName}</span>
-            <span style={{ fontSize: 10, color: R.textDim }}>{channel.meta.channelType}</span>
-            {channel.meta.commission != null && (<>
-              <span style={{ fontSize: 10, color: R.textDim }}>·</span>
-              <span style={{ fontSize: 10, color: R.textMid }}>{channel.meta.commission}%</span>
-            </>)}
+            <span style={{ fontSize: 13, fontWeight: 500, color: R.accent }}>{channel.name}</span>
+            <span style={{ fontSize: 10, color: R.textDim }}>{channel.channelType}</span>
+            {channel.commission != null && (
+              <>
+                <span style={{ fontSize: 10, color: R.textDim }}>·</span>
+                <span style={{ fontSize: 10, color: R.textMid }}>{channel.commission}%</span>
+              </>
+            )}
             <span style={{ fontSize: 10, color: R.textDim }}>·</span>
-            <span style={{ fontSize: 10, color: R.textDim }}>{channel.meta.paymentMethod}</span>
+            <span style={{ fontSize: 10, color: R.textDim }}>{channel.paymentMethod}</span>
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={10} color={R.textDim} />
               <ChevronDown size={12} color={R.textDim} style={{ transform: showChannelInfo ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
@@ -262,10 +253,10 @@ export function ChannelPricingConcept() {
             <div style={{ padding: "16px 20px", background: R.darkBand, border: `1px solid ${R.border}`, borderTop: "none", borderRadius: "0 0 8px 8px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
                 {[
-                  { label: "Agreement", value: channel.meta.agreement, sub: `Pricing: ${channel.meta.pricingModel}` },
-                  { label: "Commission", value: channel.meta.commission != null ? `${channel.meta.commission}%` : "—", sub: `Payment: ${channel.meta.paymentMethod}` },
-                  { label: "Contract", value: channel.meta.contractExpiry ? `Expires ${new Date(channel.meta.contractExpiry).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}` : "No expiry", sub: null },
-                  { label: "Contact", value: channel.meta.primaryContact ?? "—", sub: channel.meta.contactEmail },
+                  { label: "Agreement", value: channel.agreement, sub: "Pricing: Net" },
+                  { label: "Commission", value: channel.commission != null ? `${channel.commission}%` : "—", sub: `Payment: ${channel.paymentMethod}` },
+                  { label: "Contract", value: channel.contractExpiry ? `Expires ${new Date(channel.contractExpiry).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}` : "No expiry", sub: null },
+                  { label: "Contact", value: channel.primaryContact ?? "—", sub: channel.contactEmail },
                 ].map(col => (
                   <div key={col.label}>
                     <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 6 }}>{col.label}</div>
@@ -274,9 +265,9 @@ export function ChannelPricingConcept() {
                   </div>
                 ))}
               </div>
-              {channel.meta.notes && (
+              {channel.notes && (
                 <div style={{ marginTop: 12, padding: "8px 10px", background: `${R.gold}06`, borderRadius: 4, borderLeft: `2px solid ${R.gold}20` }}>
-                  <span style={{ fontSize: 11, color: R.textMid, lineHeight: 1.5 }}>{channel.meta.notes}</span>
+                  <span style={{ fontSize: 11, color: R.textMid, lineHeight: 1.5 }}>{channel.notes}</span>
                 </div>
               )}
             </div>
@@ -287,30 +278,11 @@ export function ChannelPricingConcept() {
         <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, marginBottom: 24, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${R.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: R.text }}>Waterfall — Portfolio Default</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 11, color: R.textDim }}>
-                {channelOverrides.length > 0
-                  ? `${allHotels.length - channelOverrides.length} using defaults · ${channelOverrides.length} override${channelOverrides.length !== 1 ? "s" : ""}`
-                  : `All ${allHotels.length} hotels`}
-              </span>
-              {hasUnsavedChanges && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 10, color: R.gold }}>Unsaved changes</span>
-                  <button onClick={handleSaveSteps} style={{
-                    padding: "4px 12px", borderRadius: 5, border: "none",
-                    background: R.warmTeal, color: R.darkBand, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                  }}>
-                    {savingSteps ? "Saving..." : "Save"}
-                  </button>
-                  <button onClick={() => setEditedSteps(null)} style={{
-                    padding: "4px 10px", borderRadius: 5, border: `1px solid ${R.border}`,
-                    background: "transparent", color: R.textDim, fontSize: 11, cursor: "pointer",
-                  }}>
-                    Discard
-                  </button>
-                </div>
-              )}
-            </div>
+            <span style={{ fontSize: 11, color: R.textDim }}>
+              {channelOverrides.length > 0
+                ? `${MOCK_HOTELS.length - channelOverrides.length} using defaults · ${channelOverrides.length} override${channelOverrides.length !== 1 ? "s" : ""}`
+                : `All ${MOCK_HOTELS.length} hotels`}
+            </span>
           </div>
 
           <div style={{ padding: "32px 24px", overflowX: "auto" }}>
@@ -327,7 +299,7 @@ export function ChannelPricingConcept() {
               </div>
 
               {/* Steps */}
-              {activeSteps.map((step, i) => {
+              {channel.steps.map((step, i) => {
                 const result = selectedResult.steps[i];
                 return (
                   <div key={step.key} style={{ display: "flex", alignItems: "center" }}>
@@ -337,52 +309,18 @@ export function ChannelPricingConcept() {
                         borderLeft: `6px solid ${step.active ? R.border : `${R.border}50`}`,
                       }} />
                     </div>
-                    <div style={{ width: 148, flexShrink: 0, opacity: step.active ? 1 : 0.3, position: "relative" }}>
+                    <div style={{ width: 148, flexShrink: 0, opacity: step.active ? 1 : 0.3 }}>
                       <div style={{
                         padding: "20px 14px", borderRadius: 8, textAlign: "center", height: 96,
                         display: "flex", flexDirection: "column", justifyContent: "center",
-                        background: R.card, border: `1px solid ${editingStepKey === step.key ? R.warmTeal : R.border}`,
-                        cursor: step.locked ? "default" : "pointer",
-                      }}
-                        onClick={() => { if (!step.locked && editingStepKey !== step.key) handleToggleStep(step.key); }}>
+                        background: R.card, border: `1px solid ${R.border}`,
+                      }}>
                         <div style={{ fontSize: 11, fontWeight: 400, color: R.textMid, marginBottom: 10 }}>{step.label}</div>
-                        {editingStepKey === step.key ? (
-                          <input
-                            autoFocus
-                            type="text"
-                            inputMode="decimal"
-                            defaultValue={step.value}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                const v = parseFloat((e.target as HTMLInputElement).value);
-                                if (!isNaN(v)) handleChangeStepValue(step.key, v);
-                                setEditingStepKey(null);
-                              }
-                              if (e.key === "Escape") setEditingStepKey(null);
-                            }}
-                            onBlur={(e) => {
-                              const v = parseFloat(e.target.value);
-                              if (!isNaN(v)) handleChangeStepValue(step.key, v);
-                              setEditingStepKey(null);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              width: 70, fontSize: 18, fontWeight: 500, textAlign: "center",
-                              background: "transparent", border: "none", borderBottom: `1px solid ${R.warmTeal}40`,
-                              color: step.type === "multiplier" ? R.warmTeal : R.gold,
-                              outline: "none", fontVariantNumeric: "tabular-nums", margin: "0 auto",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            onClick={(e) => { e.stopPropagation(); setEditingStepKey(step.key); }}
-                            style={{ fontSize: 18, fontWeight: 500, fontVariantNumeric: "tabular-nums",
-                              color: step.active ? (step.type === "multiplier" ? R.warmTeal : R.gold) : R.textDim,
-                              cursor: "text",
-                            }}>
-                            {step.type === "multiplier" ? `${step.value}×` : `−${step.value}%`}
-                          </div>
-                        )}
+                        <div style={{ fontSize: 18, fontWeight: 500, fontVariantNumeric: "tabular-nums",
+                          color: step.active ? (step.type === "multiplier" ? R.warmTeal : R.gold) : R.textDim,
+                        }}>
+                          {step.type === "multiplier" ? `${step.value}×` : `−${step.value}%`}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -418,7 +356,7 @@ export function ChannelPricingConcept() {
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${R.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: R.text, fontSize: 13, fontWeight: 500 }}>Per-Hotel Overrides</span>
-              <span style={{ color: R.textDim, fontSize: 11 }}>— {channel.channelName}</span>
+              <span style={{ color: R.textDim, fontSize: 11 }}>— {channel.name}</span>
             </div>
             <button style={{
               padding: "6px 14px", borderRadius: 6, border: `1px solid ${R.border}`,
@@ -430,21 +368,21 @@ export function ChannelPricingConcept() {
 
           {channelOverrides.length === 0 ? (
             <div style={{ padding: 40, textAlign: "center" }}>
-              <div style={{ color: R.textDim, fontSize: 12 }}>All hotels use the portfolio default for {channel.channelName}</div>
+              <div style={{ color: R.textDim, fontSize: 12 }}>All hotels use the portfolio default for {channel.name}</div>
             </div>
           ) : (
             <div>
-              {allHotels.map((hotel, hi) => {
-                const override = channelOverrides.find(o => o.hotelId === hotel.id);
+              {MOCK_HOTELS.map((hotel, hi) => {
+                const override = channelOverrides.find(o => o.hotelName === hotel);
                 const hasOverride = !!override;
-                const isExpanded = expandedHotel === hotel.id;
-                const effectiveSteps = getEffectiveSteps(channel, hotel.id, overrides);
+                const isExpanded = expandedHotel === hotel;
+                const effectiveSteps = getEffectiveSteps(channel, hotel);
                 const waterfallResult = calcWaterfall(effectiveSteps, simPmsRate);
 
                 return (
-                  <div key={hotel.id} style={{ borderBottom: hi < allHotels.length - 1 ? `1px solid ${R.sep}` : "none" }}>
+                  <div key={hotel} style={{ borderBottom: hi < MOCK_HOTELS.length - 1 ? `1px solid ${R.sep}` : "none" }}>
                     <div
-                      onClick={() => hasOverride && setExpandedHotel(isExpanded ? null : hotel.id)}
+                      onClick={() => hasOverride && setExpandedHotel(isExpanded ? null : hotel)}
                       style={{
                         display: "grid", gridTemplateColumns: "24px 1fr auto 120px",
                         padding: "12px 20px", alignItems: "center", gap: 12,
@@ -458,7 +396,7 @@ export function ChannelPricingConcept() {
                       )}
 
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ color: hasOverride ? R.accent : R.textDim, fontSize: 13, fontWeight: 400 }}>{hotel.name}</span>
+                        <span style={{ color: hasOverride ? R.accent : R.textDim, fontSize: 13, fontWeight: 400 }}>{hotel}</span>
                         {hasOverride && override && (
                           <div style={{ display: "flex", gap: 4 }}>
                             {Object.entries(override.overrides).map(([key, val]) => {
@@ -469,7 +407,8 @@ export function ChannelPricingConcept() {
                                 <span key={key} style={{
                                   fontSize: 9, padding: "2px 6px", borderRadius: 3,
                                   background: isDisabled ? `${R.red}08` : `${R.gold}10`,
-                                  color: isDisabled ? R.red : R.gold, fontWeight: 500,
+                                  color: isDisabled ? R.red : R.gold,
+                                  fontWeight: 500,
                                 }}>
                                   {isDisabled ? `✕ ${stepDef.label}` : `${stepDef.label} → ${val.value}${stepDef.type === "multiplier" ? "×" : "%"}`}
                                 </span>
@@ -494,7 +433,6 @@ export function ChannelPricingConcept() {
                     {/* Expanded comparison */}
                     {isExpanded && hasOverride && (() => {
                       let runningRate = simPmsRate;
-                      const defaultResult = selectedResult;
                       return (
                         <div style={{ padding: "0 20px 16px 56px" }}>
                           <div style={{ background: R.darkBand, borderRadius: 8, border: `1px solid ${R.border}`, overflow: "hidden" }}>
@@ -550,7 +488,10 @@ export function ChannelPricingConcept() {
                                   </span>
 
                                   <div style={{ textAlign: "center" }}>
-                                    <span style={{ color: R.textDim, fontSize: 12, textDecoration: isOverridden ? "line-through" : "none", opacity: isOverridden ? 0.5 : 1 }}>
+                                    <span style={{
+                                      color: R.textDim, fontSize: 12,
+                                      textDecoration: isOverridden ? "line-through" : "none", opacity: isOverridden ? 0.5 : 1,
+                                    }}>
                                       {defaultStep.active ? `${defaultStep.value}${defaultSuffix}` : "off"}
                                     </span>
                                   </div>
@@ -576,6 +517,7 @@ export function ChannelPricingConcept() {
                               );
                             })}
 
+                            {/* Footer */}
                             <div style={{
                               display: "grid", gridTemplateColumns: "28px 1fr 90px 90px 100px",
                               padding: "12px 16px", gap: 8, alignItems: "center",
@@ -585,7 +527,7 @@ export function ChannelPricingConcept() {
                               <span style={{ color: R.text, fontSize: 12, fontWeight: 500 }}>Guest Sees</span>
                               <div style={{ textAlign: "center" }}>
                                 <span style={{ color: R.textDim, fontSize: 12, textDecoration: "line-through", opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>
-                                  {curr}{defaultResult.final.toFixed(2)}
+                                  {curr}{selectedResult.final.toFixed(2)}
                                 </span>
                               </div>
                               <div style={{ textAlign: "center" }}>
@@ -595,7 +537,7 @@ export function ChannelPricingConcept() {
                               </div>
                               <div style={{ textAlign: "right" }}>
                                 {(() => {
-                                  const diff = waterfallResult.final - defaultResult.final;
+                                  const diff = waterfallResult.final - selectedResult.final;
                                   return (
                                     <span style={{ color: diff > 0 ? R.warmTeal : diff < 0 ? R.gold : R.textDim, fontSize: 11 }}>
                                       {diff > 0 ? "+" : ""}{diff.toFixed(2)}
@@ -614,8 +556,6 @@ export function ChannelPricingConcept() {
             </div>
           )}
         </div>
-
-        </>)}
       </div>
     </div>
   );

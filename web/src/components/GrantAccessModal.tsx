@@ -67,7 +67,7 @@ export function GrantAccessModal({
           {
             "--color-ring": "rgba(57, 189, 248, 0.5)",
             "--color-accent": "rgba(57, 189, 248, 0.1)",
-            "--color-accent-foreground": "#39BDF8",
+            "--color-accent-foreground": "#38C6BA",
           } as React.CSSProperties
         }
       >
@@ -102,12 +102,12 @@ export function GrantAccessModal({
                 }}
               >
                 <Shield
-                  style={{ width: "20px", height: "20px", color: "#39BDF8" }}
+                  style={{ width: "20px", height: "20px", color: "#38C6BA" }}
                 />
               </div>
               <DialogTitle
                 style={{
-                  color: "#39BDF8",
+                  color: "#38C6BA",
                   fontSize: "18px",
                   textTransform: "uppercase",
                   letterSpacing: "-0.025em",
@@ -231,7 +231,7 @@ export function GrantAccessModal({
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor =
                             "rgba(57, 189, 248, 0.1)";
-                          e.currentTarget.style.color = "#39BDF8";
+                          e.currentTarget.style.color = "#38C6BA";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = "transparent";
@@ -266,7 +266,7 @@ export function GrantAccessModal({
                 style={{
                   width: "16px",
                   height: "16px",
-                  color: "#39BDF8",
+                  color: "#38C6BA",
                   flexShrink: 0,
                   marginTop: "2px",
                 }}
@@ -324,7 +324,7 @@ export function GrantAccessModal({
               onClick={handleGrant}
               disabled={!email || !propertyId || isLoading}
               style={{
-                backgroundColor: !email || !propertyId ? "#2a2a2a" : "#39BDF8",
+                backgroundColor: !email || !propertyId ? "#2a2a2a" : "#38C6BA",
                 color: !email || !propertyId ? "#6b7280" : "#0f0f0f",
                 height: "40px",
                 padding: "0 20px",
@@ -347,7 +347,7 @@ export function GrantAccessModal({
               }}
               onMouseLeave={(e) => {
                 if (email && propertyId && !isLoading) {
-                  e.currentTarget.style.backgroundColor = "#39BDF8";
+                  e.currentTarget.style.backgroundColor = "#38C6BA";
                 }
               }}
             >

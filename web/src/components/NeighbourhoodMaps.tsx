@@ -18,7 +18,7 @@ interface POI {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  hotel: "#39BDF8",
+  hotel: "#38C6BA",
   hostel: "#f59e0b",
   guest_house: "#10b981",
   apartment: "#8b5cf6",
@@ -100,7 +100,7 @@ export default function NeighbourhoodMaps({ citySlug, onTypeCounts }: Neighbourh
         padding: "40px", display: "flex", alignItems: "center", justifyContent: "center",
         color: "#6b7280", fontSize: "13px", gap: "8px",
       }}>
-        <div className="w-4 h-4 border-2 border-[#39BDF8] border-t-transparent rounded-full animate-spin" />
+        <div className="w-4 h-4 border-2 border-[#38C6BA] border-t-transparent rounded-full animate-spin" />
         Loading accommodation map...
       </div>
     );
@@ -167,7 +167,7 @@ export default function NeighbourhoodMaps({ citySlug, onTypeCounts }: Neighbourh
                   background:rgba(57,189,248,0.2);
                   border:2px solid rgba(57,189,248,0.6);
                   border-radius:50%;
-                  color:#39BDF8;font-size:12px;font-weight:600;
+                  color:#38C6BA;font-size:12px;font-weight:600;
                 ">${count}</div>`,
                 className: "",
                 iconSize: L.point(size, size),
@@ -181,7 +181,7 @@ export default function NeighbourhoodMaps({ citySlug, onTypeCounts }: Neighbourh
                 radius={4}
                 pathOptions={{
                   color: "transparent",
-                  fillColor: TYPE_COLORS[p.type] || "#39BDF8",
+                  fillColor: TYPE_COLORS[p.type] || "#38C6BA",
                   fillOpacity: 0.6,
                   weight: 0,
                 }}
@@ -209,7 +209,7 @@ export default function NeighbourhoodMaps({ citySlug, onTypeCounts }: Neighbourh
           .sort((a, b) => b[1] - a[1])
           .map(([type, count]) => (
             <div key={type} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: TYPE_COLORS[type] || "#39BDF8" }} />
+              <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: TYPE_COLORS[type] || "#38C6BA" }} />
               <span style={{ color: "#9ca3af", fontSize: "10px", textTransform: "capitalize" }}>
                 {type.replace("_", " ")} ({count})
               </span>

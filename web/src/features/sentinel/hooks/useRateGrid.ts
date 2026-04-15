@@ -462,8 +462,8 @@ export const useRateGrid = () => {
       toast.success("Updates Queued", {
         style: {
           backgroundColor: "#0f151a",
-          border: "1px solid #39BDF8",
-          color: "#39BDF8",
+          border: "1px solid #38C6BA",
+          color: "#38C6BA",
         },
       });
     } catch (err: any) {

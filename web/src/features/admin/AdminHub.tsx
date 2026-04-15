@@ -52,9 +52,10 @@ export default function AdminHub() {
       <div
         style={{
           minHeight: "100vh",
-          backgroundColor: "#1d1d1c",
-          padding: "48px",
-          color: "#9ca3af",
+          backgroundColor: "#14181D",
+          padding: "28px 32px",
+          color: "#7A8494",
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         }}
       >
         Loading Admin Dashboard...
@@ -66,54 +67,29 @@ export default function AdminHub() {
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#1d1d1c",
-        position: "relative",
-        overflow: "hidden",
+        backgroundColor: "#14181D",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Animated background gradient */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to bottom right, rgba(57, 189, 248, 0.05), transparent, rgba(250, 255, 106, 0.05))",
-        }}
-      ></div>
-
-      {/* Grid overlay */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(57,189,248,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57,189,248,0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-        }}
-      ></div>
-
       {/* Content */}
       <div
         style={{
-          position: "relative",
-          zIndex: 10,
-          padding: "48px",
+          padding: "28px 32px",
           display: "flex",
           flexDirection: "column",
-          gap: "32px",
-          maxWidth: "1800px",
-          marginLeft: "auto",
-          marginRight: "auto",
+          gap: "16px",
         }}
       >
         {/* Page Header */}
-        <div style={{ marginBottom: "48px" }}>
+        <div style={{ marginBottom: "12px" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 2.5, textTransform: "uppercase", color: "#C8A66E", marginBottom: 8 }}>ADMIN</div>
           <h1
             style={{
-              color: "#e5e5e5",
-              fontSize: "30px",
-              letterSpacing: "-0.025em",
-              marginBottom: "8px",
+              color: "#F3F5F7",
+              fontSize: "24px",
+              fontWeight: 700,
+              letterSpacing: "-0.5px",
+              marginBottom: "6px",
               margin: 0,
             }}
           >
@@ -121,8 +97,8 @@ export default function AdminHub() {
           </h1>
           <p
             style={{
-              color: "#9ca3af",
-              fontSize: "14px",
+              color: "#7A8494",
+              fontSize: "13px",
               margin: 0,
             }}
           >
@@ -161,15 +137,15 @@ export default function AdminHub() {
         {/* API Target Property Selector */}
         <div
           style={{
-            backgroundColor: "#1A1A1A",
-            borderRadius: "8px",
-            border: "1px solid #2a2a2a",
-            padding: "24px",
+            backgroundColor: "#121519",
+            borderRadius: "10px",
+            border: "1px solid #1E2330",
+            padding: "16px 20px",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <label
-              style={{ fontSize: "14px", fontWeight: 500, color: "#e5e5e5" }}
+              style={{ fontSize: "13px", fontWeight: 500, color: "#F3F5F7" }}
             >
               API Target Property:
             </label>
@@ -181,18 +157,18 @@ export default function AdminHub() {
                 style={{
                   width: "288px",
                   height: "36px",
-                  backgroundColor: "#1d1d1c",
-                  borderColor: "#2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: "#121519",
+                  borderColor: "#1E2330",
+                  color: "#F3F5F7",
                 }}
               >
                 <SelectValue placeholder="Select a property..." />
               </SelectTrigger>
               <SelectContent
                 style={{
-                  backgroundColor: "#2C2C2C",
-                  borderColor: "#2a2a2a",
-                  color: "#e5e5e5",
+                  backgroundColor: "#121519",
+                  borderColor: "#1E2330",
+                  color: "#F3F5F7",
                 }}
               >
                 {hotels.map((hotel) => (
@@ -205,8 +181,8 @@ export default function AdminHub() {
                 ))}
               </SelectContent>
             </Select>
-            <p style={{ color: "#9ca3af", fontSize: "12px", margin: 0 }}>
-              Select the property to use for API tests and the API Explorer.
+            <p style={{ color: "#4E5868", fontSize: "11px", margin: 0 }}>
+              Select the property to use for API tests
             </p>
           </div>
         </div>

@@ -1,53 +1,49 @@
-// Imports for icons
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
-// Define the props the component will accept
 interface MarketOutlookBannerProps {
-  status: "strengthening" | "softening" | "stable" | "initializing"; // Added initializing
+  status: "strengthening" | "softening" | "stable" | "initializing";
   metric: string;
 }
 
-// Helper object to store content for each status
 const statusContent = {
   strengthening: {
-    title: "The 30-day market demand is", // [MODIFIED]
+    title: "The 30-day market demand is strengthening",
     Icon: TrendingUp,
-    // Using inline styles as required
     style: {
-      background: "rgba(34, 197, 94, 0.1)", // Green tint
-      borderColor: "rgba(34, 197, 94, 0.4)",
-      iconColor: "#22c55e",
-      textColor: "#86efac",
+      background: "rgba(52, 208, 104, 0.06)",
+      borderColor: "rgba(52, 208, 104, 0.2)",
+      iconColor: "#34D068",
+      textColor: "#34D068",
     },
   },
   softening: {
-    title: "The 30-day market demand is", // [MODIFIED]
+    title: "The 30-day market demand is softening",
     Icon: TrendingDown,
     style: {
-      background: "rgba(239, 68, 68, 0.1)", // Red tint
-      borderColor: "rgba(239, 68, 68, 0.4)",
+      background: "rgba(239, 68, 68, 0.06)",
+      borderColor: "rgba(239, 68, 68, 0.2)",
       iconColor: "#ef4444",
-      textColor: "#fca5a5",
+      textColor: "#ef4444",
     },
   },
   stable: {
-    title: "The 30-day market demand is",
+    title: "The 30-day market demand is stable",
     Icon: Minus,
     style: {
-      background: "rgba(234, 179, 8, 0.1)", // Yellow tint
-      borderColor: "rgba(234, 179, 8, 0.4)",
-      iconColor: "#eab308",
-      textColor: "#fde047",
+      background: "rgba(200, 166, 110, 0.06)",
+      borderColor: "rgba(200, 166, 110, 0.2)",
+      iconColor: "#C8A66E",
+      textColor: "#C8A66E",
     },
   },
   initializing: {
     title: "System Initializing",
-    Icon: TrendingUp, // Or a 'Bot' icon if available
+    Icon: TrendingUp,
     style: {
-      background: "rgba(56, 189, 248, 0.1)", // Blue tint (Brand color)
-      borderColor: "rgba(56, 189, 248, 0.4)",
-      iconColor: "#38bdf8",
-      textColor: "#bae6fd",
+      background: "rgba(57, 189, 248, 0.06)",
+      borderColor: "rgba(57, 189, 248, 0.2)",
+      iconColor: "#38C6BA",
+      textColor: "#38C6BA",
     },
   },
 };
@@ -56,29 +52,18 @@ export function MarketOutlookBanner({
   status,
   metric,
 }: MarketOutlookBannerProps) {
-  // Get the correct content based on the status prop
   const content = statusContent[status] || statusContent.stable;
 
   return (
-    // Using inline style prop for layout
     <div
       style={{
         display: "flex",
         alignItems: "center",
         gap: "16px",
-        padding: "16px",
-        // [FIX] Radius only on top to merge with chart below
-        borderRadius: "8px 8px 0 0",
-        // [FIX] Remove border width (parent container handles it)
-        borderWidth: "0",
-        // [FIX] Add bottom separator only
-        borderBottom: "1px solid #2a2a2a",
-        // [FIX] Remove gap below
-        marginBottom: "0",
-        ...content.style,
-        // Ensure background tint doesn't bleed weirdly if overridden
-        border: "none",
-        borderBottom: `1px solid ${content.style.borderColor}`,
+        padding: "16px 20px",
+        borderRadius: "8px",
+        backgroundColor: content.style.background,
+        border: `1px solid ${content.style.borderColor}`,
       }}
     >
       {/* Icon */}
@@ -101,36 +86,30 @@ export function MarketOutlookBanner({
         />
       </div>
 
-      {/* Text Content */}
-      <div style={{ flexGrow: 1 }}>
-        <h3
+      {/* Text — title + inline description */}
+      <div style={{ flexGrow: 1, display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap" }}>
+        <span
           style={{
             fontSize: "16px",
-            fontWeight: "500",
-            color: content.textColor,
+            fontWeight: 500,
+            color: content.style.textColor,
           }}
         >
-          {content.title} {status}
-        </h3>
-        <p
-          style={{
-            fontSize: "12px",
-            color: "#9ca3af",
-          }}
-        >
+          {content.title}
+        </span>
+        <span style={{ fontSize: "12px", color: "#7A8494" }}>
           {status === "initializing"
-            ? "We are currently scraping market signals and syncing your historical data. Full market intelligence will be available in approximately 24 hours. Please check back soon."
-            : "This trend is calculated by analyzing thousands of data points collected daily from live market sources, including OTA availability and advertised prices."}
-        </p>
+            ? "Full market intelligence will be available in approximately 24 hours."
+            : "Calculated from thousands of live OTA data points daily"}
+        </span>
       </div>
 
       {/* Metric */}
       <div
         style={{
           fontSize: "24px",
-          fontWeight: "600",
+          fontWeight: 600,
           color: content.style.textColor,
-          marginLeft: "16px",
           whiteSpace: "nowrap",
         }}
       >

@@ -1,15 +1,10 @@
 import { useState, useEffect, useMemo, CSSProperties } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { R } from '../../../styles/tokens';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, Trophy, AlertTriangle, Target, Zap, Loader2, ChevronDown, Building2 } from 'lucide-react';
 import { format, addDays, addMonths } from 'date-fns';
-import { DatePickerCalendar } from '@/components/ui/date-picker';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DatePickerNav } from '@/components/DatePickerNav';
+// Select removed — period dropdown dropped
 
 interface Property {
   property_id: number;
@@ -45,6 +40,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
   const [endDate, setEndDate] = useState(format(addDays(today, 30), 'yyyy-MM-dd'));
   const [datePreset, setDatePreset] = useState('30-days');
   const [comparison, setComparison] = useState('my-segment');
+  const [openPicker, setOpenPicker] = useState<'from' | 'to' | null>(null);
 
   const handlePresetChange = (preset: string) => {
     setDatePreset(preset);
@@ -97,44 +93,34 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
     const fetchPortfolio = async () => {
       setPortfolioLoading(true);
       try {
-        const rows: PortfolioRow[] = await Promise.all(
-          properties.map(async (prop) => {
-            const id = prop.property_id.toString();
-            const scope = comparison === 'total-market' ? 'total-market' : 'my-segment';
-            const params = new URLSearchParams({ propertyId: id, startDate, endDate, scope });
+        const scope = comparison === 'total-market' ? 'total-market' : 'my-segment';
+        const propertyIds = properties.map((p) => p.property_id).join(',');
+        const params = new URLSearchParams({ propertyIds, startDate, endDate, scope });
+        const res = await fetch(`/api/metrics/portfolio-competitive?${params}`);
+        const batchData = await res.json();
 
-            const [kpiRes, rankRes, detailRes] = await Promise.all([
-              fetch(`/api/metrics/kpi-summary?${params}`),
-              fetch(`/api/metrics/ranking?${params}`),
-              fetch(`/api/hotels/${id}/details`),
-            ]);
+        const safeRound = (val: any) => val != null ? Math.round(Number(val)) : null;
+        const safeOcc = (val: any) => val != null ? Math.round(Number(val) * 100) : null;
+        const pick = (...vals: any[]) => vals.find((v) => v != null) ?? null;
 
-            const kpiJson = await kpiRes.json();
-            const rankJson = await rankRes.json();
-            const detailJson = await detailRes.json();
-
-            const yh = kpiJson.yourHotel || {};
-            const mkt = kpiJson.market || {};
-
-            const safeRound = (val: any) => val != null ? Math.round(Number(val)) : null;
-            const safeOcc = (val: any) => val != null ? Math.round(Number(val) * 100) : null;
-            const pick = (...vals: any[]) => vals.find((v) => v != null) ?? null;
-
-            return {
-              hotelId: id,
-              hotelName: prop.property_name,
-              category: detailJson.category || '--',
-              myOcc: safeOcc(pick(yh.occupancy, yh.your_occupancy, yh.your_occupancy_direct)),
-              segOcc: safeOcc(pick(mkt.occupancy, mkt.market_occupancy)),
-              myAdr: safeRound(pick(yh.adr, yh.your_adr)),
-              segAdr: safeRound(pick(mkt.adr, mkt.market_adr)),
-              myRevpar: safeRound(pick(yh.revpar, yh.your_revpar)),
-              segRevpar: safeRound(pick(mkt.revpar, mkt.market_revpar)),
-              occRank: rankJson.occupancy?.rank ?? null,
-              occTotal: rankJson.occupancy?.total ?? null,
-            };
-          })
-        );
+        const rows: PortfolioRow[] = batchData.map((item: any) => {
+          const prop = properties.find((p) => p.property_id.toString() === item.hotelId.toString());
+          const yh = item.kpis?.yourHotel || {};
+          const mkt = item.kpis?.market || {};
+          return {
+            hotelId: item.hotelId,
+            hotelName: prop?.property_name || '--',
+            category: item.category || '--',
+            myOcc: safeOcc(pick(yh.occupancy, yh.your_occupancy, yh.your_occupancy_direct)),
+            segOcc: safeOcc(pick(mkt.occupancy, mkt.market_occupancy)),
+            myAdr: safeRound(pick(yh.adr, yh.your_adr)),
+            segAdr: safeRound(pick(mkt.adr, mkt.market_adr)),
+            myRevpar: safeRound(pick(yh.revpar, yh.your_revpar)),
+            segRevpar: safeRound(pick(mkt.revpar, mkt.market_revpar)),
+            occRank: item.ranking?.occupancy?.rank ?? null,
+            occTotal: item.ranking?.occupancy?.total ?? null,
+          };
+        });
         setPortfolioData(rows);
       } catch (err) {
         console.error('Portfolio competitive fetch failed', err);
@@ -154,27 +140,13 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       setIsLoading(true);
       try {
         const scope = comparison === 'total-market' ? 'total-market' : 'my-segment';
-        const chartParams = new URLSearchParams({
-          propertyId,
-          startDate,
-          endDate,
-          granularity: 'daily',
-          scope,
-        });
-        const intelParams = new URLSearchParams({ propertyId, startDate, endDate, scope });
+        const intelParams = new URLSearchParams({ propertyId, startDate, endDate, scope, granularity: 'daily' });
 
-        // 2 calls instead of 5: combined intel + chart data
-        const [intelRes, myRes, compRes] = await Promise.all([
-          fetch(`/api/metrics/competitive-intel?${intelParams}`),
-          fetch(`/api/metrics/range?${chartParams}`),
-          fetch(`/api/metrics/competitors?${chartParams}`),
-        ]);
-
+        // Single call — returns KPIs, ranking, market context, range, and competitors
+        const intelRes = await fetch(`/api/metrics/competitive-intel?${intelParams}`);
         const intelJson = await intelRes.json();
-        const myJson = await myRes.json();
-        const compJson = await compRes.json();
 
-        // KPIs + ranking + market context from single endpoint
+        // KPIs + ranking + market context
         const yh = intelJson.kpis?.yourHotel || {};
         setKpis({
           yourHotel: {
@@ -187,9 +159,9 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
         setRanking(intelJson.ranking || { occupancy: {}, adr: {}, revpar: {} });
         setMarketContext(intelJson.marketContext || null);
 
-        // Merge chart data
-        const myMetrics = myJson.metrics || [];
-        const compMetrics = compJson.metrics || [];
+        // Merge chart data from the same response
+        const myMetrics = intelJson.range?.metrics || [];
+        const compMetrics = intelJson.competitors?.metrics || [];
 
         const compByPeriod: Record<string, any> = {};
         compMetrics.forEach((row: any) => {
@@ -243,37 +215,25 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
 
   const styles: Record<string, CSSProperties> = {
     container: {
-      minHeight: '100vh',
-      backgroundColor: '#1d1d1c',
-      position: 'relative',
-      overflow: 'hidden'
-    },
-    backgroundGradient: {
-      position: 'absolute',
-      inset: '0',
-      background: 'linear-gradient(to bottom right, rgba(57, 189, 248, 0.01), transparent, rgba(57, 189, 248, 0.01))'
-    },
-    gridOverlay: {
-      position: 'absolute',
-      inset: '0',
-      backgroundImage: 'linear-gradient(rgba(57, 189, 248, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 189, 248, 0.03) 1px, transparent 1px)',
-      backgroundSize: '64px 64px'
+      flex: 1,
+      background: R.bg,
+      color: R.accent,
     },
     contentWrapper: {
-      position: 'relative',
-      zIndex: 10,
-      padding: '24px'
+      padding: '24px 28px'
     },
     header: {
       marginBottom: '24px'
     },
     title: {
-      color: '#e5e5e5',
-      fontSize: '18px',
+      color: R.gold,
+      fontSize: '22px',
+      fontWeight: 400,
+      letterSpacing: -0.5,
       marginBottom: '4px'
     },
     subtitle: {
-      color: '#9ca3af',
+      color: R.textMid,
       fontSize: '12px'
     },
     filterBar: {
@@ -284,37 +244,37 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
     },
     toggleButton: {
       padding: '8px 16px',
-      backgroundColor: 'rgb(26, 26, 26)',
-      border: '1px solid #2a2a2a',
+      backgroundColor: R.darkBand,
+      border: `1px solid ${R.border}`,
       borderRadius: '6px',
-      color: '#9ca3af',
+      color: R.textMid,
       fontSize: '12px',
       cursor: 'pointer',
       transition: 'all 0.2s'
     },
     toggleButtonActive: {
-      backgroundColor: '#39BDF8',
-      color: '#1d1d1c',
-      borderColor: '#39BDF8'
+      backgroundColor: R.warmTeal,
+      color: R.bg,
+      borderColor: R.warmTeal
     },
     scorecardGrid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '16px',
+      gap: '14px',
       marginBottom: '24px'
     },
     card: {
-      backgroundColor: 'rgb(26, 26, 26)',
+      backgroundColor: R.card,
       borderRadius: '8px',
-      border: '1px solid #2a2a2a',
-      padding: '16px',
+      border: `1px solid ${R.border}`,
+      padding: '16px 18px',
       position: 'relative'
     },
     rankBadge: {
       position: 'absolute',
       top: '12px',
       right: '12px',
-      padding: '4px 8px',
+      padding: '3px 8px',
       borderRadius: '4px',
       fontSize: '11px',
       fontWeight: 600
@@ -323,34 +283,33 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      marginBottom: '12px'
     },
     metricLabel: {
-      color: '#6b7280',
-      fontSize: '11px',
+      color: R.textDim,
+      fontSize: '10px',
       textTransform: 'uppercase',
-      letterSpacing: '-0.025em',
-      marginBottom: '8px'
+      letterSpacing: '0.05em',
+      marginBottom: '12px'
     },
     metricValue: {
-      fontSize: '28px',
-      fontWeight: 600
+      fontSize: '26px',
+      fontWeight: 700
     },
     comparisonLabel: {
-      color: '#6b7280',
+      color: R.textDim,
       fontSize: '10px',
       textTransform: 'uppercase',
       letterSpacing: '-0.025em',
       marginBottom: '4px'
     },
     comparisonValue: {
-      color: '#9ca3af',
+      color: R.textMid,
       fontSize: '14px'
     },
     chartCard: {
-      backgroundColor: 'rgb(26, 26, 26)',
+      backgroundColor: R.darkBand,
       borderRadius: '8px',
-      border: '1px solid #2a2a2a',
+      border: `1px solid ${R.border}`,
       padding: '20px',
       marginBottom: '24px'
     },
@@ -361,7 +320,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       marginBottom: '20px'
     },
     chartTitle: {
-      color: '#e5e5e5',
+      color: R.accent,
       fontSize: '14px',
       fontWeight: 600
     },
@@ -371,9 +330,9 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       alignItems: 'center'
     },
     table: {
-      backgroundColor: 'rgb(26, 26, 26)',
+      backgroundColor: R.darkBand,
       borderRadius: '8px',
-      border: '1px solid #2a2a2a',
+      border: `1px solid ${R.border}`,
       overflow: 'hidden'
     },
     tableHeader: {
@@ -381,11 +340,11 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       gridTemplateColumns: '120px 1fr 1fr 1fr 1fr 140px',
       gap: '12px',
       padding: '12px 16px',
-      borderBottom: '1px solid #2a2a2a',
-      backgroundColor: '#1d1d1c'
+      borderBottom: `1px solid ${R.sep}`,
+      backgroundColor: R.bg
     },
     tableHeaderCell: {
-      color: '#6b7280',
+      color: R.textDim,
       fontSize: '10px',
       textTransform: 'uppercase',
       letterSpacing: '-0.025em',
@@ -396,11 +355,11 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
       gridTemplateColumns: '120px 1fr 1fr 1fr 1fr 140px',
       gap: '12px',
       padding: '12px 16px',
-      borderBottom: '1px solid #2a2a2a',
+      borderBottom: `1px solid ${R.sep}`,
       transition: 'background-color 0.2s'
     },
     tableCell: {
-      color: '#e5e5e5',
+      color: R.accent,
       fontSize: '12px',
       display: 'flex',
       alignItems: 'center'
@@ -420,13 +379,13 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
     if (active && payload && payload.length) {
       return (
         <div style={{
-          backgroundColor: 'rgb(26, 26, 26)',
-          border: '1px solid #2a2a2a',
+          backgroundColor: R.darkBand,
+          border: `1px solid ${R.border}`,
           borderRadius: '6px',
           padding: '12px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)'
         }}>
-          <div style={{ color: '#e5e5e5', fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>
+          <div style={{ color: R.accent, fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>
             {payload[0].payload.date}
           </div>
           {payload.map((entry: any, index: number) => (
@@ -443,216 +402,132 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
 
   return (
     <div style={styles.container}>
-      <div style={styles.backgroundGradient}></div>
-      <div style={styles.gridOverlay}></div>
 
       <div style={styles.contentWrapper}>
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.title}>Compset Intel</div>
-          <div style={styles.subtitle}>Compare your performance against your compset and market segment</div>
-        </div>
-
-        {/* Filter Bar */}
-        <div style={styles.filterBar}>
-          <DatePickerCalendar
-            label="From"
-            value={startDate}
-            onChange={(d) => { setStartDate(d); setDatePreset('custom'); }}
-          />
-          <DatePickerCalendar
-            label="To"
-            value={endDate}
-            onChange={(d) => { setEndDate(d); setDatePreset('custom'); }}
-          />
-
-          {/* Period Preset */}
-          <div>
-            <label style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>Period</label>
-            <Select value={datePreset} onValueChange={handlePresetChange}>
-              <SelectTrigger
+        {/* Header + Date Pickers — exact copy of MPCompsetViewV2 layout */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <Target size={22} color={R.warmTeal} />
+                <h1 style={{ fontSize: 22, fontWeight: 400, color: R.accent, margin: 0, letterSpacing: -0.5 }}>Compset Intelligence</h1>
+              </div>
+              <p style={{ fontSize: 13, color: R.gold, margin: 0 }}>Your hotel vs competitive set — occupancy, ADR, RevPAR rankings and trends</p>
+            </div>
+            {/* Date Range Pickers */}
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+              <DatePickerNav label="From" value={startDate} onChange={(d) => { setStartDate(d); setDatePreset('custom'); }} isOpen={openPicker === 'from'} onOpenChange={(v) => setOpenPicker(v ? 'from' : null)} />
+              <div style={{ fontSize: 12, color: R.textDim, paddingBottom: 10 }}>→</div>
+              <DatePickerNav label="To" value={endDate} onChange={(d) => { setEndDate(d); setDatePreset('custom'); }} isOpen={openPicker === 'to'} onOpenChange={(v) => setOpenPicker(v ? 'to' : null)} />
+              <button
+                onClick={() => fetchData()}
                 style={{
-                  width: '280px',
-                  minWidth: '280px',
-                  height: '42px',
-                  backgroundColor: '#0d0d0d',
-                  border: '1px solid #2a2a2a',
-                  color: '#e5e5e5',
-                  fontSize: '13px',
-                  borderRadius: '4px',
-                  paddingLeft: '12px',
-                  paddingRight: '12px',
+                  padding: "7px 16px", borderRadius: 6, border: "none", cursor: "pointer",
+                  background: "#38C6BA", color: R.darkBand, fontSize: 12, fontWeight: 600,
+                  height: 32, marginBottom: 0,
                 }}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                style={{
-                  width: '280px',
-                  minWidth: '280px',
-                  backgroundColor: '#1a1a18',
-                  border: '1px solid #2a2a2a',
-                  color: '#e5e5e5',
-                  padding: '4px',
-                }}
-              >
-                <SelectItem value="30-days" style={{ color: '#e5e5e5', borderRadius: '4px' }}>Next 30 Days</SelectItem>
-                <SelectItem value="90-days" style={{ color: '#e5e5e5', borderRadius: '4px' }}>Next 90 Days</SelectItem>
-                <SelectItem value="6-months" style={{ color: '#e5e5e5', borderRadius: '4px' }}>Next 6 Months</SelectItem>
-                {datePreset === 'custom' && <SelectItem value="custom" style={{ color: '#e5e5e5', borderRadius: '4px' }}>Custom</SelectItem>}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Segment Toggle */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={{
-                ...styles.toggleButton,
-                ...(comparison === 'my-segment' ? styles.toggleButtonActive : {})
-              }}
-              onClick={() => setComparison('my-segment')}
-            >
-              My Segment{hotelCategory ? ` (${hotelCategory})` : ''}
-            </button>
-            <button
-              style={{
-                ...styles.toggleButton,
-                ...(comparison === 'total-market' ? styles.toggleButtonActive : {})
-              }}
-              onClick={() => setComparison('total-market')}
-            >
-              Total Market
-            </button>
+                Apply
+              </button>
+            </div>
           </div>
         </div>
 
 
         {/* Portfolio Competitive Summary */}
         {isGroup && (
-          <div style={{
-            backgroundColor: 'rgb(26, 26, 26)',
-            borderRadius: '8px',
-            border: '1px solid #2a2a2a',
-            marginBottom: '24px',
-            overflow: 'hidden',
-          }}>
+          <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, marginBottom: 24, overflow: 'hidden' }}>
             <div
               onClick={() => setPortfolioExpanded(!portfolioExpanded)}
-              style={{ padding: '16px 20px', borderBottom: portfolioExpanded ? '1px solid #2a2a2a' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              style={{ padding: '14px 20px', borderBottom: portfolioExpanded ? `1px solid ${R.sep}` : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
             >
-              <div>
-                <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
-                  Property-by-Property Market Comparison
-                </div>
-                <div style={{ color: '#6b7280', fontSize: '11px' }}>
-                  Each hotel compared against its own segment — click a row to drill in
-                </div>
-              </div>
+              <Building2 size={14} color={R.gold} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: R.accent }}>Portfolio Competitive Summary</span>
+              <span style={{ fontSize: 11, color: R.textDim, marginLeft: 'auto' }}>{portfolioData.length} properties</span>
               <ChevronDown
-                style={{
-                  width: '18px',
-                  height: '18px',
-                  color: '#6b7280',
-                  transition: 'transform 0.2s',
-                  transform: portfolioExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
-                  flexShrink: 0,
-                }}
+                size={14}
+                color={R.textDim}
+                style={{ transition: 'transform 0.2s', transform: portfolioExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', flexShrink: 0 }}
               />
             </div>
 
             {portfolioExpanded && (portfolioLoading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#6b7280', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: R.textDim, gap: '8px' }}>
                 <Loader2 style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
                 <span style={{ fontSize: '12px' }}>Loading portfolio data...</span>
               </div>
             ) : (
-              <>
-                {/* Table Header */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 80px',
-                  gap: '8px',
-                  padding: '10px 20px',
-                  borderBottom: '1px solid #2a2a2a',
-                  backgroundColor: '#1d1d1c',
-                }}>
-                  {['Hotel', 'Category', 'My Occ', 'Seg Occ', 'My ADR', 'Seg ADR', 'My RevPAR', 'Seg RevPAR', 'Rank'].map((h) => (
-                    <div key={h} style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.03em', fontWeight: 600 }}>{h}</div>
-                  ))}
-                </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                    {['Property', 'Cat', 'My Occ', 'Seg Occ', 'My ADR', 'Seg ADR', 'Rank'].map(h => (
+                      <th key={h} style={{ padding: '8px 16px', fontSize: 10, fontWeight: 600, letterSpacing: 0.5, color: R.textDim, textTransform: 'uppercase', textAlign: h === 'Property' ? 'left' : 'right' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {portfolioData.map((row, i) => {
+                    const occWinning = row.myOcc != null && row.segOcc != null && row.myOcc >= row.segOcc;
+                    const rankVal = row.occRank;
+                    const rankTotal = row.occTotal || 1;
+                    const rankPct = rankVal != null ? rankVal / rankTotal : 1;
+                    const rc = rankVal == null
+                      ? { bg: 'transparent', color: R.textDim, border: 'none' }
+                      : rankPct <= 0.33
+                      ? { bg: 'rgba(52,208,104,0.1)', color: R.green, border: `1px solid rgba(52,208,104,0.3)` }
+                      : rankPct <= 0.66
+                      ? { bg: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: `1px solid rgba(245,158,11,0.3)` }
+                      : { bg: 'rgba(239,68,68,0.1)', color: R.red, border: `1px solid rgba(239,68,68,0.3)` };
 
-                {/* Table Rows */}
-                {portfolioData.map((row) => {
-                  const isSelected = row.hotelId === propertyId;
-                  const occWinning = row.myOcc != null && row.segOcc != null && row.myOcc >= row.segOcc;
-                  const adrWinning = row.myAdr != null && row.segAdr != null && row.myAdr >= row.segAdr;
-
-                  return (
-                    <div
-                      key={row.hotelId}
-                      onClick={() => onPropertyChange(row.hotelId)}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 80px',
-                        gap: '8px',
-                        padding: '12px 20px',
-                        borderBottom: '1px solid #2a2a2a',
-                        cursor: 'pointer',
-                        backgroundColor: isSelected ? 'rgba(57, 189, 248, 0.08)' : 'transparent',
-                        borderLeft: isSelected ? '3px solid #39BDF8' : '3px solid transparent',
-                        transition: 'background-color 0.15s',
-                      }}
-                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(57, 189, 248, 0.04)'; }}
-                      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                    >
-                      <div style={{ color: isSelected ? '#39BDF8' : '#e5e5e5', fontSize: '12px', fontWeight: isSelected ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {row.hotelName}
-                      </div>
-                      <div style={{ color: '#9ca3af', fontSize: '12px' }}>{row.category}</div>
-                      <div style={{ color: occWinning ? '#10b981' : '#e5e5e5', fontSize: '12px' }}>
-                        {row.myOcc != null ? `${row.myOcc}%` : '--'}
-                      </div>
-                      <div style={{ color: '#9ca3af', fontSize: '12px' }}>
-                        {row.segOcc != null ? `${row.segOcc}%` : '--'}
-                      </div>
-                      <div style={{ color: adrWinning ? '#10b981' : '#e5e5e5', fontSize: '12px' }}>
-                        {row.myAdr != null ? `${currencySymbol}${row.myAdr}` : '--'}
-                      </div>
-                      <div style={{ color: '#9ca3af', fontSize: '12px' }}>
-                        {row.segAdr != null ? `${currencySymbol}${row.segAdr}` : '--'}
-                      </div>
-                      <div style={{ color: '#e5e5e5', fontSize: '12px' }}>
-                        {row.myRevpar != null ? `${currencySymbol}${row.myRevpar}` : '--'}
-                      </div>
-                      <div style={{ color: '#9ca3af', fontSize: '12px' }}>
-                        {row.segRevpar != null ? `${currencySymbol}${row.segRevpar}` : '--'}
-                      </div>
-                      <div style={{ fontSize: '12px' }}>
-                        {row.occRank != null ? (
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            ...(row.occRank <= Math.ceil((row.occTotal || 1) * 0.33)
-                              ? { backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }
-                              : row.occRank <= Math.ceil((row.occTotal || 1) * 0.66)
-                              ? { backgroundColor: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
-                              : { backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }
-                            ),
-                          }}>
-                            #{row.occRank}/{row.occTotal}
-                          </span>
-                        ) : '--'}
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
+                    return (
+                      <tr
+                        key={row.hotelId}
+                        onClick={() => onPropertyChange(row.hotelId)}
+                        style={{ borderBottom: i < portfolioData.length - 1 ? `1px solid ${R.sep}` : 'none', cursor: 'pointer' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(56,198,186,0.04)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: R.accent, fontWeight: 500 }}>{row.hotelName}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 11, color: R.textDim, textAlign: 'right' }}>{row.category}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: occWinning ? R.green : R.text, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.myOcc != null ? `${row.myOcc}%` : '--'}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: R.textMid, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.segOcc != null ? `${row.segOcc}%` : '--'}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: R.accent, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.myAdr != null ? `${currencySymbol}${row.myAdr}` : '--'}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: R.textMid, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.segAdr != null ? `${currencySymbol}${row.segAdr}` : '--'}</td>
+                        <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                          {rankVal != null ? (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4, backgroundColor: rc.bg, color: rc.color, border: rc.border }}>#{rankVal}</span>
+                          ) : '--'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             ))}
           </div>
         )}
+
+        {/* Segment Toggle */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
+          <button
+            style={{
+              ...styles.toggleButton,
+              ...(comparison === 'my-segment' ? styles.toggleButtonActive : {}),
+            }}
+            onClick={() => setComparison('my-segment')}
+          >
+            My Segment{hotelCategory ? ` (${hotelCategory})` : ''}
+          </button>
+          <button
+            style={{
+              ...styles.toggleButton,
+              ...(comparison === 'total-market' ? styles.toggleButtonActive : {}),
+            }}
+            onClick={() => setComparison('total-market')}
+          >
+            Total Market
+          </button>
+        </div>
 
         {/* Scorecard Row */}
         {isLoading ? (
@@ -660,9 +535,9 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
             {[1, 2, 3, 4].map((i) => (
               <div key={i} style={{ ...styles.card, minHeight: '120px' }}>
                 <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ width: '60%', height: '10px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                  <div style={{ width: '40%', height: '28px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                  <div style={{ width: '50%', height: '10px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                  <div style={{ width: '60%', height: '10px', backgroundColor: R.border, borderRadius: '4px' }} />
+                  <div style={{ width: '40%', height: '28px', backgroundColor: R.border, borderRadius: '4px' }} />
+                  <div style={{ width: '50%', height: '10px', backgroundColor: R.border, borderRadius: '4px' }} />
                 </div>
               </div>
             ))}
@@ -676,7 +551,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
           const compRev = kpis.market?.revpar != null ? Math.round(Number(kpis.market.revpar)) : '--';
 
           const getRankColor = (rank: number, total: number) => {
-            if (!rank || !total) return { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', border: '1px solid rgba(107,114,128,0.3)' };
+            if (!rank || !total) return { bg: 'rgba(107,114,128,0.1)', color: R.textDim, border: '1px solid rgba(107,114,128,0.3)' };
             const pct = rank / total;
             if (pct <= 0.33) return { bg: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' };
             if (pct <= 0.66) return { bg: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' };
@@ -690,55 +565,55 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
           return (
             <div style={styles.scorecardGrid}>
               {/* Occupancy */}
-              <div style={styles.card}>
+              <div style={{ ...styles.card, backgroundColor: R.darkBand }}>
                 <div style={{ ...styles.rankBadge, backgroundColor: occRank.bg, color: occRank.color, border: occRank.border }}>
                   #{ranking.occupancy?.rank || '-'}
                 </div>
                 <div style={styles.metricLabel}>Occupancy</div>
                 <div style={styles.metricRow}>
                   <div>
-                    <div style={{ ...styles.metricValue, color: '#39BDF8' }}>{myOcc}{myOcc !== '--' && '%'}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>My Hotel</div>
+                    <div style={{ ...styles.metricValue, color: "#7BAFD4" }}>{myOcc}{myOcc !== '--' && '%'}</div>
+                    <div style={{ color: R.textDim, fontSize: '10px', marginTop: '4px' }}>My Hotel</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...styles.metricValue, color: '#9ca3af', fontSize: '20px' }}>{compOcc}{compOcc !== '--' && '%'}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: R.textMid }}>{compOcc}{compOcc !== '--' && '%'}</div>
+                    <div style={{ color: R.textDim, fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
                   </div>
                 </div>
               </div>
 
               {/* ADR */}
-              <div style={styles.card}>
+              <div style={{ ...styles.card, backgroundColor: R.darkBand }}>
                 <div style={{ ...styles.rankBadge, backgroundColor: adrRank.bg, color: adrRank.color, border: adrRank.border }}>
                   #{ranking.adr?.rank || '-'}
                 </div>
-                <div style={styles.metricLabel}>ADR (Average Daily Rate)</div>
+                <div style={styles.metricLabel}>ADR</div>
                 <div style={styles.metricRow}>
                   <div>
-                    <div style={{ ...styles.metricValue, color: '#39BDF8' }}>{myAdr !== '--' && currencySymbol}{myAdr}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>My Hotel</div>
+                    <div style={{ ...styles.metricValue, color: "#7BAFD4" }}>{myAdr !== '--' && currencySymbol}{myAdr}</div>
+                    <div style={{ color: R.textDim, fontSize: '10px', marginTop: '4px' }}>My Hotel</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...styles.metricValue, color: '#9ca3af', fontSize: '20px' }}>{compAdr !== '--' && currencySymbol}{compAdr}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: R.textMid }}>{compAdr !== '--' && currencySymbol}{compAdr}</div>
+                    <div style={{ color: R.textDim, fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
                   </div>
                 </div>
               </div>
 
               {/* RevPAR */}
-              <div style={styles.card}>
+              <div style={{ ...styles.card, backgroundColor: R.darkBand }}>
                 <div style={{ ...styles.rankBadge, backgroundColor: revRank.bg, color: revRank.color, border: revRank.border }}>
                   #{ranking.revpar?.rank || '-'}
                 </div>
                 <div style={styles.metricLabel}>RevPAR</div>
                 <div style={styles.metricRow}>
                   <div>
-                    <div style={{ ...styles.metricValue, color: '#39BDF8' }}>{myRev !== '--' && currencySymbol}{myRev}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>My Hotel</div>
+                    <div style={{ ...styles.metricValue, color: "#7BAFD4" }}>{myRev !== '--' && currencySymbol}{myRev}</div>
+                    <div style={{ color: R.textDim, fontSize: '10px', marginTop: '4px' }}>My Hotel</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...styles.metricValue, color: '#9ca3af', fontSize: '20px' }}>{compRev !== '--' && currencySymbol}{compRev}</div>
-                    <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: R.textMid }}>{compRev !== '--' && currencySymbol}{compRev}</div>
+                    <div style={{ color: R.textDim, fontSize: '10px', marginTop: '4px' }}>{comparison === 'total-market' ? 'Market Avg' : 'Segment Avg'}</div>
                   </div>
                 </div>
               </div>
@@ -746,24 +621,24 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
               {/* Sentinel Insight */}
               <div style={{
                 ...styles.card,
-                background: 'linear-gradient(135deg, rgba(57, 189, 248, 0.1), rgba(139, 92, 246, 0.1))',
-                border: '1px solid rgba(57, 189, 248, 0.3)'
+                background: 'linear-gradient(135deg, rgba(56, 198, 186, 0.08), rgba(200, 166, 110, 0.06))',
+                border: '1px solid rgba(56, 198, 186, 0.3)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Zap style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
-                  <div style={{ color: '#39BDF8', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
+                  <Zap style={{ width: '14px', height: '14px', color: '#7BAFD4' }} />
+                  <div style={{ color: '#7BAFD4', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Sentinel Insight
                   </div>
                 </div>
-                <div style={{ color: '#e5e5e5', fontSize: '13px', lineHeight: '1.6' }}>
+                <div style={{ color: R.text, fontSize: '13px', lineHeight: '1.65' }}>
                   {typeof myOcc === 'number' && typeof compOcc === 'number' && myOcc > compOcc
-                    ? <>Your occupancy is <span style={{ color: '#10b981', fontWeight: 600 }}>{myOcc - compOcc}pts above</span> the segment average.</>
+                    ? <>Your occupancy is <span style={{ color: '#7BAFD4', fontWeight: 600 }}>{myOcc - compOcc}pts above</span> the segment average.</>
                     : typeof myOcc === 'number' && typeof compOcc === 'number'
                     ? <>Your occupancy is <span style={{ color: '#ef4444', fontWeight: 600 }}>{compOcc - myOcc}pts below</span> the segment average.</>
                     : <>Select a date range to see competitive insights.</>
                   }
                   {typeof myAdr === 'number' && typeof compAdr === 'number' && myAdr < compAdr && (
-                    <> Compset ADR is <span style={{ color: '#39BDF8', fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr} higher</span> — consider raising rates.</>
+                    <> Compset ADR is <span style={{ color: '#7BAFD4', fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr} higher</span> — consider raising rates.</>
                   )}
                 </div>
               </div>
@@ -775,140 +650,118 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px' }}>
           {/* ── Left Column ── */}
           <div>
-            {/* Pacing Chart */}
-            <div style={styles.chartCard}>
-              <div style={styles.chartHeader}>
+            {/* Performance Chart */}
+            <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, marginBottom: 24 }}>
+              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${R.sep}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={styles.chartTitle}>Performance vs Market</div>
-                  <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: R.accent }}>Performance vs Market</div>
+                  <div style={{ fontSize: 11, color: R.textMid, marginTop: 2 }}>
                     Your hotel compared against {comparison === 'total-market' ? 'total market' : 'segment'} average
                   </div>
                 </div>
-                <div style={styles.chartControls}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showOccupancy}
-                      onChange={(e) => setShowOccupancy(e.target.checked)}
-                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                    />
-                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>Occupancy</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showADR}
-                      onChange={(e) => setShowADR(e.target.checked)}
-                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                    />
-                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>ADR</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showRevPAR}
-                      onChange={(e) => setShowRevPAR(e.target.checked)}
-                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
-                    />
-                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>RevPAR</span>
-                  </label>
-                </div>
-              </div>
-
-              {isLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#6b7280', gap: '8px' }}>
-                  <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
-                  <span style={{ fontSize: '13px' }}>Loading data...</span>
-                </div>
-              ) : pacingData.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#6b7280', fontSize: '13px' }}>
-                  No data available for this date range
-                </div>
-              ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={pacingData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#6b7280"
-                    fontSize={10}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    stroke="#6b7280"
-                    fontSize={10}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    wrapperStyle={{ fontSize: '11px', paddingTop: '16px' }}
-                    iconType="line"
-                  />
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                   {showOccupancy && (
                     <>
-                      <Line
-                        type="monotone"
-                        dataKey="myOccupancy"
-                        stroke="#39BDF8"
-                        strokeWidth={2.5}
-                        name="My Occupancy"
-                        dot={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="compsetOccupancy"
-                        stroke="#f59e0b"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        name="Compset Occupancy"
-                        dot={false}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 14, height: 2, backgroundColor: '#38C6BA', borderRadius: 1 }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>My Occupancy</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 14, height: 0, borderBottom: '2px dashed #38C6BA' }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>Segment Occ</span>
+                      </div>
                     </>
                   )}
                   {showADR && (
                     <>
-                      <Line
-                        type="monotone"
-                        dataKey="myADR"
-                        stroke="#8b5cf6"
-                        strokeWidth={2.5}
-                        name="My ADR"
-                        dot={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="compsetADR"
-                        stroke="#ec4899"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        name="Compset ADR"
-                        dot={false}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 14, height: 2, backgroundColor: R.gold, borderRadius: 1 }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>My ADR</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 14, height: 0, borderBottom: `2px dashed ${R.gold}` }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>Segment ADR</span>
+                      </div>
                     </>
                   )}
                   {showRevPAR && (
                     <>
-                      <Line
-                        type="monotone"
-                        dataKey="myRevPAR"
-                        stroke="#10b981"
-                        strokeWidth={2.5}
-                        name="My RevPAR"
-                        dot={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="compsetRevPAR"
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        name="Compset RevPAR"
-                        dot={false}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 14, height: 2, backgroundColor: R.green, borderRadius: 1 }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>My RevPAR</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 14, height: 0, borderBottom: `2px dashed ${R.green}` }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>Segment RevPAR</span>
+                      </div>
+                    </>
+                  )}
+                  <div style={{ width: 1, height: 16, backgroundColor: R.border, margin: '0 4px' }} />
+                  {['Occ', 'ADR', 'RevPAR'].map((label, i) => {
+                    const checked = i === 0 ? showOccupancy : i === 1 ? showADR : showRevPAR;
+                    const toggle = i === 0 ? setShowOccupancy : i === 1 ? setShowADR : setShowRevPAR;
+                    return (
+                      <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={checked} onChange={(e) => toggle(e.target.checked)} style={{ accentColor: '#38C6BA', width: 12, height: 12 }} />
+                        <span style={{ fontSize: 10, color: R.textDim }}>{label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: R.textDim, gap: '8px' }}>
+                  <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: '13px' }}>Loading data...</span>
+                </div>
+              ) : pacingData.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: R.textDim, fontSize: '13px' }}>
+                  No data available for this date range
+                </div>
+              ) : (
+              <div style={{ padding: '12px 20px 16px', height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={pacingData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="0" stroke={R.border} opacity={0.5} />
+                  <XAxis
+                    dataKey="date"
+                    stroke={R.border}
+                    tick={{ fill: R.textDim, fontSize: 10 }}
+                    tickLine={{ stroke: R.border }}
+                    interval={6}
+                  />
+                  <YAxis
+                    stroke={R.border}
+                    tick={{ fill: R.textDim, fontSize: 10 }}
+                    tickLine={{ stroke: R.border }}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'rgba(18,21,25,0.95)', border: `1px solid ${R.border}`, borderRadius: 6, padding: '10px 14px' }}
+                    labelStyle={{ color: R.textMid, fontSize: 11 }}
+                    itemStyle={{ fontSize: 12, color: R.accent }}
+                  />
+                  {showOccupancy && (
+                    <>
+                      <Line type="monotone" dataKey="myOccupancy" name="My Occupancy" stroke="#38C6BA" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="compsetOccupancy" name="Segment Occ" stroke="#38C6BA" strokeWidth={1.5} strokeDasharray="5 3" dot={false} strokeOpacity={0.5} />
+                    </>
+                  )}
+                  {showADR && (
+                    <>
+                      <Line type="monotone" dataKey="myADR" name="My ADR" stroke={R.gold} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="compsetADR" name="Segment ADR" stroke={R.gold} strokeWidth={1.5} strokeDasharray="5 3" dot={false} strokeOpacity={0.5} />
+                    </>
+                  )}
+                  {showRevPAR && (
+                    <>
+                      <Line type="monotone" dataKey="myRevPAR" name="My RevPAR" stroke={R.green} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="compsetRevPAR" name="Segment RevPAR" stroke={R.green} strokeWidth={1.5} strokeDasharray="5 3" dot={false} strokeOpacity={0.5} />
                     </>
                   )}
                 </LineChart>
               </ResponsiveContainer>
+              </div>
               )}
             </div>
 
@@ -917,16 +770,16 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
               <div style={{ ...styles.table, padding: '16px' }}>
                 <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ width: '200px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                    <div style={{ width: '120px', height: '14px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                    <div style={{ width: '200px', height: '14px', backgroundColor: R.border, borderRadius: '4px' }} />
+                    <div style={{ width: '120px', height: '14px', backgroundColor: R.border, borderRadius: '4px' }} />
                   </div>
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div key={i} style={{ display: 'flex', gap: '16px' }}>
-                      <div style={{ width: '80px', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
-                      <div style={{ flex: 1, height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                      <div style={{ width: '80px', height: '12px', backgroundColor: R.border, borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: R.border, borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: R.border, borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: R.border, borderRadius: '4px' }} />
+                      <div style={{ flex: 1, height: '12px', backgroundColor: R.border, borderRadius: '4px' }} />
                     </div>
                   ))}
                 </div>
@@ -935,10 +788,10 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div>
-                  <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
+                  <div style={{ color: R.accent, fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
                     Daily Performance Drill-Down
                   </div>
-                  <div style={{ color: '#6b7280', fontSize: '11px' }}>
+                  <div style={{ color: R.textDim, fontSize: '11px' }}>
                     Day-by-day comparison with configurable metrics
                   </div>
                 </div>
@@ -948,27 +801,27 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                       type="checkbox"
                       checked={showDrillOccupancy}
                       onChange={(e) => setShowDrillOccupancy(e.target.checked)}
-                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                      style={{ accentColor: R.warmTeal, width: '14px', height: '14px' }}
                     />
-                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>Occupancy</span>
+                    <span style={{ color: R.textMid, fontSize: '11px' }}>Occupancy</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={showDrillADR}
                       onChange={(e) => setShowDrillADR(e.target.checked)}
-                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                      style={{ accentColor: R.warmTeal, width: '14px', height: '14px' }}
                     />
-                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>ADR</span>
+                    <span style={{ color: R.textMid, fontSize: '11px' }}>ADR</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={showDrillRevPAR}
                       onChange={(e) => setShowDrillRevPAR(e.target.checked)}
-                      style={{ accentColor: '#39BDF8', width: '14px', height: '14px' }}
+                      style={{ accentColor: R.warmTeal, width: '14px', height: '14px' }}
                     />
-                    <span style={{ color: '#9ca3af', fontSize: '11px' }}>RevPAR</span>
+                    <span style={{ color: R.textMid, fontSize: '11px' }}>RevPAR</span>
                   </label>
                 </div>
               </div>
@@ -979,25 +832,25 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   gridTemplateColumns: `120px repeat(${(showDrillOccupancy ? 1 : 0) + (showDrillADR ? 1 : 0) + (showDrillRevPAR ? 1 : 0)}, 1fr 1fr)`,
                   gap: '12px',
                   padding: '12px 16px',
-                  borderBottom: '1px solid #2a2a2a',
-                  backgroundColor: '#1d1d1c'
+                  borderBottom: `1px solid ${R.sep}`,
+                  backgroundColor: R.bg
                 }}>
                   <div style={styles.tableHeaderCell}>Date</div>
                   {showDrillOccupancy && (
                     <>
-                      <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My Occ %</div>
+                      <div style={{ ...styles.tableHeaderCell, color: "#7BAFD4" }}>My Occ %</div>
                       <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp Occ %</div>
                     </>
                   )}
                   {showDrillADR && (
                     <>
-                      <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My ADR</div>
+                      <div style={{ ...styles.tableHeaderCell, color: "#7BAFD4" }}>My ADR</div>
                       <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp ADR</div>
                     </>
                   )}
                   {showDrillRevPAR && (
                     <>
-                      <div style={{ ...styles.tableHeaderCell, color: '#39BDF8' }}>My RevPAR</div>
+                      <div style={{ ...styles.tableHeaderCell, color: "#7BAFD4" }}>My RevPAR</div>
                       <div style={{ ...styles.tableHeaderCell, color: '#f59e0b' }}>Comp RevPAR</div>
                     </>
                   )}
@@ -1010,7 +863,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                       gridTemplateColumns: `120px repeat(${(showDrillOccupancy ? 1 : 0) + (showDrillADR ? 1 : 0) + (showDrillRevPAR ? 1 : 0)}, 1fr 1fr)`,
                       gap: '12px',
                       padding: '12px 16px',
-                      borderBottom: '1px solid #2a2a2a',
+                      borderBottom: `1px solid ${R.sep}`,
                       transition: 'background-color 0.2s'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(57, 189, 248, 0.05)'}
@@ -1020,21 +873,21 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                     {showDrillOccupancy && (
                       <>
                         <div style={styles.tableCell}>
-                          <span style={{ color: row.myOcc > row.compOcc ? '#10b981' : '#e5e5e5' }}>
+                          <span style={{ color: row.myOcc > row.compOcc ? '#10b981' : R.accent }}>
                             {row.myOcc}%
                           </span>
                         </div>
-                        <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{row.compOcc}%</div>
+                        <div style={{ ...styles.tableCell, color: R.textMid }}>{row.compOcc}%</div>
                       </>
                     )}
                     {showDrillADR && (
                       <>
                         <div style={styles.tableCell}>
-                          <span style={{ color: row.myRate > row.compRate ? '#10b981' : row.myRate < row.compRate - 10 ? '#ef4444' : '#e5e5e5' }}>
+                          <span style={{ color: row.myRate > row.compRate ? '#10b981' : row.myRate < row.compRate - 10 ? '#ef4444' : R.accent }}>
                             {currencySymbol}{row.myRate}
                           </span>
                         </div>
-                        <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{currencySymbol}{row.compRate}</div>
+                        <div style={{ ...styles.tableCell, color: R.textMid }}>{currencySymbol}{row.compRate}</div>
                       </>
                     )}
                     {showDrillRevPAR && (
@@ -1044,7 +897,7 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                             {currencySymbol}{row.myRevPAR}
                           </span>
                         </div>
-                        <div style={{ ...styles.tableCell, color: '#9ca3af' }}>{currencySymbol}{row.compRevPAR}</div>
+                        <div style={{ ...styles.tableCell, color: R.textMid }}>{currencySymbol}{row.compRevPAR}</div>
                       </>
                     )}
                   </div>
@@ -1070,16 +923,17 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
               const adrResult: 'win' | 'tie' | 'loss' = myAdr != null && compAdr != null ? (myAdr > compAdr ? 'win' : myAdr === compAdr ? 'tie' : 'loss') : 'tie';
               const revResult: 'win' | 'tie' | 'loss' = myRev != null && compRev != null ? (myRev > compRev ? 'win' : myRev === compRev ? 'tie' : 'loss') : 'tie';
 
+              const segLabel = comparison === 'total-market' ? 'market' : 'segment';
               const insights = [
                 {
                   label: 'Occupancy',
                   result: occResult,
                   detail: myOcc != null && compOcc != null
                     ? occResult === 'win'
-                      ? <>{comparison === 'total-market' ? 'Leading market' : 'Leading segment'} by <span style={{ color: '#10b981', fontWeight: 600 }}>+{myOcc - compOcc} pts</span></>
+                      ? <><span style={{ color: "#7BAFD4", fontWeight: 600 }}>+{myOcc - compOcc} pts</span> above {segLabel} average</>
                       : occResult === 'tie'
-                        ? <>Matching {comparison === 'total-market' ? 'market' : 'segment'} average</>
-                        : <>{comparison === 'total-market' ? 'Market' : 'Segment'} leads by <span style={{ color: '#ef4444', fontWeight: 600 }}>{compOcc - myOcc} pts</span></>
+                        ? <>Matching {segLabel} average</>
+                        : <><span style={{ color: R.gold, fontWeight: 600 }}>−{compOcc - myOcc} pts</span> below {segLabel} average</>
                     : <>No data</>
                 },
                 {
@@ -1087,10 +941,10 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   result: adrResult,
                   detail: myAdr != null && compAdr != null
                     ? adrResult === 'win'
-                      ? <>Pricing <span style={{ color: '#10b981', fontWeight: 600 }}>{currencySymbol}{myAdr - compAdr} above</span> average</>
+                      ? <><span style={{ color: "#7BAFD4", fontWeight: 600 }}>{currencySymbol}{myAdr - compAdr}</span> above {segLabel} average</>
                       : adrResult === 'tie'
-                        ? <>Matching {comparison === 'total-market' ? 'market' : 'segment'} average</>
-                        : <>{comparison === 'total-market' ? 'Market' : 'Segment'} pricing <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr} higher</span></>
+                        ? <>Matching {segLabel} average</>
+                        : <><span style={{ color: R.gold, fontWeight: 600 }}>{currencySymbol}{compAdr - myAdr}</span> below {segLabel} average</>
                     : <>No data</>
                 },
                 {
@@ -1098,64 +952,68 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
                   result: revResult,
                   detail: myRev != null && compRev != null
                     ? revResult === 'win'
-                      ? <>Outperforming by <span style={{ color: '#10b981', fontWeight: 600 }}>{currencySymbol}{myRev - compRev}</span> per room</>
+                      ? <><span style={{ color: "#7BAFD4", fontWeight: 600 }}>{currencySymbol}{myRev - compRev}</span> above {segLabel} average</>
                       : revResult === 'tie'
-                        ? <>Matching {comparison === 'total-market' ? 'market' : 'segment'} average</>
-                        : <>Trailing by <span style={{ color: '#ef4444', fontWeight: 600 }}>{currencySymbol}{compRev - myRev}</span> per room</>
+                        ? <>Matching {segLabel} average</>
+                        : <><span style={{ color: R.gold, fontWeight: 600 }}>{currencySymbol}{compRev - myRev}</span> below {segLabel} average</>
                     : <>No data</>
                 },
               ];
 
               return (
-                <div style={{ ...styles.card }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <Zap style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
-                    <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
-                      Key Insights
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>Key Insights</div>
+                  {isLoading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} style={{ height: 80, backgroundColor: R.darkBand, borderRadius: 8, border: `1px solid ${R.border}` }} />
+                      ))}
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {isLoading ? (
-                      <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} style={{ height: '56px', backgroundColor: '#1d1d1c', borderRadius: '6px' }} />
-                        ))}
-                      </div>
-                    ) : insights.map((item) => {
-                      const borderColor = item.result === 'win' ? '#10b981' : item.result === 'tie' ? '#f59e0b' : '#ef4444';
-                      const badgeBg = item.result === 'win' ? 'rgba(16,185,129,0.15)' : item.result === 'tie' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
-                      const badgeColor = item.result === 'win' ? '#10b981' : item.result === 'tie' ? '#f59e0b' : '#ef4444';
-                      const badgeBorder = item.result === 'win' ? 'rgba(16,185,129,0.3)' : item.result === 'tie' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)';
-                      const badgeLabel = item.result === 'win' ? 'WIN' : item.result === 'tie' ? 'TIE' : 'LOSS';
-                      return (
-                        <div key={item.label} style={{
-                          backgroundColor: '#1d1d1c',
-                          borderRadius: '6px',
-                          borderLeft: `2px solid ${borderColor}`,
-                          padding: '12px',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span style={{ color: '#e5e5e5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{item.label}</span>
-                            <span style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '10px',
-                              fontWeight: 600,
-                              backgroundColor: badgeBg,
-                              color: badgeColor,
-                              border: `1px solid ${badgeBorder}`,
-                            }}>
-                              {badgeLabel}
-                            </span>
-                          </div>
-                          <div style={{ color: '#9ca3af', fontSize: '11px' }}>{item.detail}</div>
+                  ) : insights.map((item) => {
+                    const winning = item.result === 'win';
+                    const accent = winning ? "#7BAFD4" : R.gold;
+                    const Icon = winning ? TrendingUp : TrendingDown;
+                    return (
+                      <div key={item.label} style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, padding: 18, marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                          <Icon size={15} color={accent} />
+                          <span style={{ fontSize: 14, fontWeight: 600, color: R.accent }}>{item.label}</span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <p style={{ fontSize: 12, color: R.textMid, margin: 0, lineHeight: 1.5 }}>
+                          {item.detail}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })()}
+
+            {/* Market Context */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>Market Context</div>
+              <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, padding: 18 }}>
+              {marketContext ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {[
+                    { label: "Segment Hotels", value: marketContext.segmentHotels.toLocaleString() },
+                    { label: "Segment Rooms", value: marketContext.segmentRooms.toLocaleString() },
+                    { label: "Market Hotels", value: marketContext.marketHotels.toLocaleString() },
+                    { label: "Market Rooms", value: marketContext.marketRooms.toLocaleString() },
+                  ].map(m => (
+                    <div key={m.label}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: R.accent }}>{m.value}</div>
+                      <div style={{ fontSize: 10, color: R.textDim, marginTop: 2 }}>{m.label}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: R.textDim, fontSize: 12, textAlign: 'center', padding: '20px 0' }}>
+                  Select a property to see market composition
+                </div>
+              )}
+              </div>
+            </div>
 
             {/* Market Position */}
             {(() => {
@@ -1167,160 +1025,92 @@ export function CompetitiveData({ propertyId, currencySymbol, hotelCategory, pro
               ];
 
               return (
-                <div style={{ ...styles.card }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                    <Target style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
-                    <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
-                      Market Position
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>Market Position</div>
+                  <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, padding: 18 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {isLoading ? (
-                      <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                         {[1, 2, 3].map((i) => (
                           <div key={i}>
-                            <div style={{ width: '80px', height: '10px', backgroundColor: '#2a2a2a', borderRadius: '4px', marginBottom: '8px' }} />
-                            <div style={{ height: '8px', backgroundColor: '#2a2a2a', borderRadius: '4px' }} />
+                            <div style={{ width: 80, height: 10, backgroundColor: R.border, borderRadius: 4, marginBottom: 8 }} />
+                            <div style={{ height: 6, backgroundColor: R.border, borderRadius: 3 }} />
                           </div>
                         ))}
                       </div>
                     ) : metrics.map((m) => {
                       const hasData = m.rank != null && m.total != null && m.total > 0;
-                      const pct = hasData ? Math.round(((m.total - m.rank + 1) / m.total) * 100) : 0;
-                      const rankPct = hasData ? m.rank / m.total : 1;
-                      const barColor = rankPct <= 0.33 ? '#10b981' : rankPct <= 0.66 ? '#f59e0b' : '#ef4444';
-                      const badgeLabel = rankPct <= 0.33 ? `Top ${Math.round(rankPct * 100)}%` : rankPct <= 0.66 ? `Mid ${Math.round(rankPct * 100)}%` : `Bottom ${Math.round((1 - rankPct) * 100)}%`;
+                      const pct = hasData ? Math.round(((m.total! - m.rank! + 1) / m.total!) * 100) : 0;
 
                       return (
                         <div key={m.label}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ color: '#9ca3af', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{m.label}</span>
-                            <span style={{ color: '#e5e5e5', fontSize: '12px', fontWeight: 500 }}>
-                              {hasData ? `#${m.rank} of ${m.total}` : '--'}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, color: R.textMid, fontWeight: 500 }}>{m.label}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: R.accent }}>
+                              {hasData ? `#${m.rank} of ${m.total}` : '—'}
                             </span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ flex: 1, height: '8px', backgroundColor: '#0d0d0d', borderRadius: '4px', overflow: 'hidden', border: '1px solid #2a2a2a' }}>
-                              <div style={{ height: '100%', borderRadius: '4px', backgroundColor: hasData ? barColor : '#2a2a2a', width: `${hasData ? pct : 0}%`, transition: 'width 0.4s ease' }} />
-                            </div>
-                            {hasData && (
-                              <span style={{
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                backgroundColor: `${barColor}15`,
-                                color: barColor,
-                                border: `1px solid ${barColor}4D`,
-                                whiteSpace: 'nowrap',
-                              }}>
-                                {badgeLabel}
-                              </span>
-                            )}
+                          <div style={{ height: 6, background: R.sidebar, borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${hasData ? pct : 0}%`, background: R.warmTeal, borderRadius: 3, opacity: 0.5, transition: 'width 0.4s ease' }} />
                           </div>
                         </div>
                       );
                     })}
                   </div>
+                  </div>
                 </div>
               );
             })()}
 
-            {/* Market Composition */}
-            <div style={{ ...styles.card }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <Building2 style={{ width: '16px', height: '16px', color: '#39BDF8' }} />
-                <div style={{ color: '#e5e5e5', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '-0.025em' }}>
-                  Market Composition
+            {/* Tier Distribution */}
+            {marketContext?.byTier && marketContext.byTier.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>Tier Distribution</div>
+                <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, padding: 18 }}>
+                  {marketContext.byTier.map((item) => {
+                    const pct = marketContext.marketHotels > 0 ? Math.round((item.count / marketContext.marketHotels) * 100) : 0;
+                    const tierLabel = item.tier.replace(/[★☆⭐]/g, '').trim();
+                    return (
+                      <div key={item.tier} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                        <div style={{ width: 100, flexShrink: 0, fontSize: 11, color: R.textMid, fontWeight: 500, whiteSpace: 'nowrap' }}>{tierLabel}</div>
+                        <div style={{ flex: 1, minWidth: 0, height: 6, background: R.sidebar, borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: R.warmTeal, borderRadius: 3, opacity: 0.5 }} />
+                        </div>
+                        <div style={{ width: 28, flexShrink: 0, fontSize: 10, color: R.textMid, textAlign: 'right' }}>{item.count}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              {marketContext ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Summary counts */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Segment Hotels</div>
-                      <div style={{ color: '#39BDF8', fontSize: '22px', fontWeight: 600 }}>{marketContext.segmentHotels}</div>
-                    </div>
-                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Segment Rooms</div>
-                      <div style={{ color: '#39BDF8', fontSize: '22px', fontWeight: 600 }}>{marketContext.segmentRooms.toLocaleString()}</div>
-                    </div>
-                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Market Hotels</div>
-                      <div style={{ color: '#e5e5e5', fontSize: '22px', fontWeight: 600 }}>{marketContext.marketHotels}</div>
-                    </div>
-                    <div style={{ backgroundColor: '#1d1d1c', borderRadius: '6px', padding: '12px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '4px' }}>Market Rooms</div>
-                      <div style={{ color: '#e5e5e5', fontSize: '22px', fontWeight: 600 }}>{marketContext.marketRooms.toLocaleString()}</div>
-                    </div>
+            )}
+
+            {/* Neighbourhoods */}
+            {marketContext?.byNeighborhood && marketContext.byNeighborhood.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>Neighbourhoods</div>
+                <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 8, padding: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 10, color: R.textDim, textTransform: 'uppercase', letterSpacing: 0.5 }}>Area</span>
+                    <span style={{ fontSize: 10, color: R.textDim, textTransform: 'uppercase', letterSpacing: 0.5 }}>Hotels</span>
                   </div>
-
-                  {/* By Quality Tier */}
-                  {marketContext.byTier && marketContext.byTier.length > 0 && (
-                    <div>
-                      <div style={{ color: '#9ca3af', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '10px', fontWeight: 600 }}>
-                        By Quality Tier
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {marketContext.byTier.map((item) => {
-                          const pct = marketContext.marketHotels > 0 ? Math.round((item.count / marketContext.marketHotels) * 100) : 0;
-                          return (
-                            <div key={item.tier}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <span style={{ color: '#e5e5e5', fontSize: '12px' }}>{item.tier}</span>
-                                <span style={{ color: '#9ca3af', fontSize: '10px' }}>{item.count} hotels</span>
-                              </div>
-                              <div style={{ height: '6px', backgroundColor: '#0d0d0d', borderRadius: '3px', overflow: 'hidden', border: '1px solid #2a2a2a' }}>
-                                <div style={{ height: '100%', borderRadius: '3px', backgroundColor: '#39BDF8', width: `${pct}%`, transition: 'width 0.4s ease' }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                  {(neighborhoodsExpanded ? marketContext.byNeighborhood : marketContext.byNeighborhood.slice(0, 5)).map((item, i, arr) => (
+                    <div key={item.area} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < arr.length - 1 ? `1px solid ${R.sep}` : 'none' }}>
+                      <span style={{ fontSize: 12, color: R.text }}>{item.area}</span>
+                      <span style={{ fontSize: 12, color: R.textMid, fontVariantNumeric: 'tabular-nums' }}>{item.count}</span>
                     </div>
-                  )}
-
-                  {/* By Location */}
-                  {marketContext.byNeighborhood && marketContext.byNeighborhood.length > 0 && (
-                    <div>
-                      <div style={{ color: '#9ca3af', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '10px', fontWeight: 600 }}>
-                        By Location
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {(neighborhoodsExpanded ? marketContext.byNeighborhood : marketContext.byNeighborhood.slice(0, 5)).map((item) => {
-                          const pct = marketContext.marketHotels > 0 ? Math.round((item.count / marketContext.marketHotels) * 100) : 0;
-                          return (
-                            <div key={item.area}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <span style={{ color: '#e5e5e5', fontSize: '12px' }}>{item.area}</span>
-                                <span style={{ color: '#9ca3af', fontSize: '10px' }}>{item.count} hotels</span>
-                              </div>
-                              <div style={{ height: '6px', backgroundColor: '#0d0d0d', borderRadius: '3px', overflow: 'hidden', border: '1px solid #2a2a2a' }}>
-                                <div style={{ height: '100%', borderRadius: '3px', backgroundColor: '#f59e0b', width: `${pct}%`, transition: 'width 0.4s ease' }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {marketContext.byNeighborhood.length > 5 && (
-                        <button
-                          onClick={() => setNeighborhoodsExpanded(!neighborhoodsExpanded)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '11px', padding: 0 }}
-                        >
-                          <span style={{ display: 'inline-block', transform: neighborhoodsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', fontSize: '10px' }}>&#9660;</span>
-                          {neighborhoodsExpanded ? 'Show less' : `Show all ${marketContext.byNeighborhood.length} areas`}
-                        </button>
-                      )}
-                    </div>
+                  ))}
+                  {marketContext.byNeighborhood.length > 5 && (
+                    <button
+                      onClick={() => setNeighborhoodsExpanded(!neighborhoodsExpanded)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', color: R.textMid, fontSize: 11, padding: 0 }}
+                    >
+                      <span style={{ display: 'inline-block', transform: neighborhoodsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', fontSize: 10 }}>&#9660;</span>
+                      {neighborhoodsExpanded ? 'Show less' : `Show all ${marketContext.byNeighborhood.length} areas`}
+                    </button>
                   )}
                 </div>
-              ) : (
-                <div style={{ color: '#6b7280', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
-                  Select a property to see market composition
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
           </div>
         </div>

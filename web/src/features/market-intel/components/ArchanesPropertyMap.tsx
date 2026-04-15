@@ -28,7 +28,7 @@ interface Props {
 const darkTileUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
 // ADR quintile palette: cheapest → most expensive
-const QUINTILE_COLORS = ["#10b981", "#39BDF8", "#a855f7", "#f59e0b", "#ef4444"];
+const QUINTILE_COLORS = ["#10b981", "#38C6BA", "#a855f7", "#f59e0b", "#ef4444"];
 const QUINTILE_LABELS = ["Q1", "Q2", "Q3", "Q4", "Q5"];
 
 function quintileBreaks(values: number[]): number[] {
@@ -113,7 +113,7 @@ export default function ArchanesPropertyMap({ registry, currencySymbol }: Props)
                   background:rgba(57,189,248,0.2);
                   border:2px solid rgba(57,189,248,0.6);
                   border-radius:50%;
-                  color:#39BDF8;font-size:12px;font-weight:600;
+                  color:#38C6BA;font-size:12px;font-weight:600;
                 ">${count}</div>`,
                 className: "",
                 iconSize: L.point(size, size),
@@ -155,7 +155,7 @@ export default function ArchanesPropertyMap({ registry, currencySymbol }: Props)
                         {p.beds ? ` · ${p.beds}` : ""}
                       </div>
                       <div>
-                        <span style={{ color: "#39BDF8", fontWeight: 600 }}>
+                        <span style={{ color: "#38C6BA", fontWeight: 600 }}>
                           {currencySymbol}
                           {Math.round(p.avgPrice)}
                         </span>
