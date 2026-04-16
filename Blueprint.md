@@ -1077,6 +1077,8 @@ The My Rates page (HotelRateWindow) requires both: (a) user_properties rows for 
 
 Sentinel endpoints (/api/sentinel/*) are behind a blanket requireAdminApi middleware. A router.use() bypass at line 225 of sentinel.router.js intercepts specific read-only paths (preview-rate, pms-property-ids, predictions, pace-curves, min-rates) and allows users with can_view_rates through via requireRatesAccess middleware.
 
+Demand Radar (opened April 2026): accessible to all roles. The UI lives inside SentinelHub but its data comes from /api/market/* (already user-accessible), not /api/sentinel/*. SentinelHub's useAllHotels hook originally only called admin-only /api/hotels — non-admins received a 403, the error body was mistakenly stored as the hotel list, and downstream .map() calls crashed under the misleading "Update Required" boundary. The hook now tries /api/hotels first and falls back to /api/hotels/mine on 403, landing an Array in state either way. Apply the same dual-endpoint fallback if any other SentinelHub sub-view is opened to non-admins in future.
+
 /api/hotels/assets is also gated — rate-view users only see assets for their linked hotels.
 
 To enable a user for My Rates: UPDATE users SET can_view_rates = true WHERE user_id = {id};
@@ -1943,6 +1945,8 @@ Data flow:
 4. Fetches `/api/market/events?citySlug=X` for PredictHQ events.
 5. Fetches `/api/market/booking-behavior?hotelIds=X` for lead time + LOS from reservations table.
 6. All dates parsed with `Date.UTC()` and formatted with `timeZone: "UTC"` to prevent timezone drift.
+
+Access: open to all roles (as of April 2026). The `allHotels` prop is populated by `SentinelHub`'s dual-endpoint fetch — `/api/hotels` first, `/api/hotels/mine` as fallback on 403 — so non-admin users see their linked hotels instead of crashing the view. See §4.8b for the full access-model note.
 
 13.3 Sections
 
