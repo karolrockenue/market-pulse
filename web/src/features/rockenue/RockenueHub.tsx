@@ -7,28 +7,10 @@ const CrmBoard = lazy(() => import("./components/CrmBoard").then(m => ({ default
 const ChannelPricingConcept = lazy(() => import("./components/ChannelPricingConcept").then(m => ({ default: m.ChannelPricingConcept })));
 const EmailSignatures = lazy(() => import("./components/EmailSignatures").then(m => ({ default: m.EmailSignatures })));
 const Canvas = lazy(() => import("./components/Canvas").then(m => ({ default: m.Canvas })));
-const MPConcept = lazy(() => import("./components/MPConcept").then(m => ({ default: m.MPConcept })));
-const MPConcept2 = lazy(() => import("./components/MPConcept2").then(m => ({ default: m.MPConcept2 })));
-const MPDash2 = lazy(() => import("./components/MPDash2").then(m => ({ default: m.MPDash2 })));
-const MPDash3 = lazy(() => import("./components/MPDash3").then(m => ({ default: m.MPDash3 })));
-const MPDash4 = lazy(() => import("./components/MPDash4").then(m => ({ default: m.MPDash4 })));
 const MPReportsHub = lazy(() => import("./components/MPReportsHub").then(m => ({ default: m.MPReportsHub })));
 const MPDemandRadar = lazy(() => import("./components/MPDemandRadar").then(m => ({ default: m.MPDemandRadar })));
-const MPCompsetIntel = lazy(() => import("./components/MPCompsetIntel").then(m => ({ default: m.MPCompsetIntel })));
-const MPCompsetView = lazy(() => import("./components/MPCompsetView").then(m => ({ default: m.MPCompsetView })));
-const MPCompsetViewV2 = lazy(() => import("./components/MPCompsetViewV2").then(m => ({ default: m.MPCompsetViewV2 })));
-const MPMyRates = lazy(() => import("./components/MPMyRates").then(m => ({ default: m.MPMyRates })));
-const MPCrmBoard = lazy(() => import("./components/MPCrmBoard").then(m => ({ default: m.MPCrmBoard })));
 const MPRiskOverview = lazy(() => import("./components/MPRiskOverview").then(m => ({ default: m.MPRiskOverview })));
-const MPControlPanel = lazy(() => import("./components/MPControlPanel").then(m => ({ default: m.MPControlPanel })));
-const MPControlPanelV2 = lazy(() => import("./components/MPControlPanelV2").then(m => ({ default: m.MPControlPanelV2 })));
-const MPAdminHub = lazy(() => import("./components/MPAdminHub").then(m => ({ default: m.MPAdminHub })));
-const MPChannelPricing = lazy(() => import("./components/MPChannelPricing").then(m => ({ default: m.MPChannelPricing })));
-const MPChannelPricingV2 = lazy(() => import("./components/MPChannelPricingV2").then(m => ({ default: m.MPChannelPricingV2 })));
-const MPChannelPricingV3 = lazy(() => import("./components/MPChannelPricingV3").then(m => ({ default: m.MPChannelPricingV3 })));
-const MPDistribution = lazy(() => import("./components/MPDistribution").then(m => ({ default: m.MPDistribution })));
 const MPLogin = lazy(() => import("./components/MPLogin").then(m => ({ default: m.MPLogin })));
-const MPLoginV2 = lazy(() => import("./components/MPLoginV2").then(m => ({ default: m.MPLoginV2 })));
 
 interface RockenueHubProps {
   activeView: string;
@@ -67,28 +49,10 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "channelPricing" && <ChannelPricingConcept />}
           {activeView === "emailSignatures" && <EmailSignatures />}
           {activeView === "canvas" && <Canvas />}
-          {activeView === "mpConcept" && <MPConcept />}
-          {activeView === "mpConcept2" && <MPConcept2 />}
-          {activeView === "mpDash2" && <MPDash2 />}
-          {activeView === "mpDash3" && <MPDash3 activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpDash4" && <MPDash4 />}
           {activeView === "mpReportsHub" && <MPReportsHub activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpDemandRadar" && <MPDemandRadar activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpCompsetIntel" && <MPCompsetIntel activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpCompsetView" && <MPCompsetView activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpCompsetViewV2" && <MPCompsetViewV2 activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpMyRates" && <MPMyRates activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpCrmBoard" && <MPCrmBoard activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpRiskOverview" && <MPRiskOverview activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpControlPanel" && <MPControlPanel activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpControlPanelV2" && <MPControlPanelV2 activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpAdminHub" && <MPAdminHub activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpChannelPricing" && <MPChannelPricing activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpChannelPricingV2" && <MPChannelPricingV2 activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpChannelPricingV3" && <MPChannelPricingV3 activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpDistribution" && <MPDistribution activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpLogin" && <MPLogin activeView={activeView} onNavigate={onNavigate} />}
-          {activeView === "mpLoginV2" && <MPLoginV2 activeView={activeView} onNavigate={onNavigate} />}
         </Suspense>
       </div>
     </div>

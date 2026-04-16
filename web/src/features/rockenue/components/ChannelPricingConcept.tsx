@@ -3,10 +3,8 @@
  * Wired to real API. Horizontal waterfall, channel tabs, per-hotel overrides.
  */
 
-import { useState, useEffect, useMemo } from "react";
-import {
-  ChevronDown, ChevronRight, Check, Pencil, Info, Loader2, Plus,
-} from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, Info, Loader2, Plus, GripVertical, Pencil, Trash2 } from "lucide-react";
 import {
   fetchPricingChannels, fetchChannelPricing, updateChannelPricingSteps,
   setHotelPricingOverride, deleteHotelPricingOverride, createChannel,
@@ -49,6 +47,12 @@ interface HotelOverride {
   overrides: Record<string, { value?: number; active?: boolean }>;
 }
 
+interface DraftOverride {
+  mode: "new" | "edit";
+  hotelId: number | null;          // null in "new" mode until a hotel is picked
+  steps: WaterfallStep[];          // full editable step set, seeded from global or existing override
+}
+
 // ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
@@ -88,7 +92,6 @@ function getEffectiveSteps(channel: ChannelDefaults, hotelId: number, hotelOverr
 
 export function ChannelPricingConcept() {
   const [selectedChannel, setSelectedChannel] = useState<string>("");
-  const [expandedHotel, setExpandedHotel] = useState<number | null>(null);
   const [simPmsRate, setSimPmsRate] = useState(185);
   const [showChannelInfo, setShowChannelInfo] = useState(false);
 
@@ -102,6 +105,27 @@ export function ChannelPricingConcept() {
   const [editedSteps, setEditedSteps] = useState<WaterfallStep[] | null>(null);
   const [savingSteps, setSavingSteps] = useState(false);
   const [editingStepKey, setEditingStepKey] = useState<string | null>(null);
+
+  // Override drafting state — powers inline D1 (empty row) → D2 (expanded two-row) → D3 (collapsed minimal) flow
+  const [draft, setDraft] = useState<DraftOverride | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [editingDraftStepKey, setEditingDraftStepKey] = useState<string | null>(null);
+
+  // Viewport width (used to compute adaptive waterfall box sizing)
+  const [vpWidth, setVpWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setVpWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Programs (channel structure editor) — visual mockup state, not persisted to backend yet
+  const [showProgramsForm, setShowProgramsForm] = useState(false);
+  const [newProgramLabel, setNewProgramLabel] = useState("");
+  const [newProgramType, setNewProgramType] = useState<"multiplier" | "discount">("discount");
+  const [newProgramValue, setNewProgramValue] = useState<number>(10);
+  const [newProgramActive, setNewProgramActive] = useState(true);
+  const [mockAddedPrograms, setMockAddedPrograms] = useState<WaterfallStep[]>([]);
 
   // Fetch channels
   function loadChannels(selectSlug?: string) {
@@ -152,6 +176,25 @@ export function ChannelPricingConcept() {
   const channelOverrides = overrides;
   const hasUnsavedChanges = editedSteps !== null;
 
+  // ── Adaptive waterfall sizing ────────────────────────────────────────
+  // Natural box/arrow sizes. Shrink uniformly when the pipeline can't fit.
+  // Enough viewport subtraction to clear sidebar + page padding on typical desktops.
+  const NATURAL_BOX = 148;
+  const NATURAL_ARROW = 56;
+  const NATURAL_LINE = 36;
+  const MIN_BOX = 100;
+  const MIN_ARROW = 36;
+  const MIN_LINE = 20;
+  const stepCount = activeSteps.length;
+  const nodeCount = stepCount + 2;        // PMS + steps + Guest Sees
+  const arrowCount = stepCount + 1;
+  const containerW = Math.max(640, vpWidth - 340); // rough content area minus sidebar + page padding
+  const naturalW = nodeCount * NATURAL_BOX + arrowCount * NATURAL_ARROW;
+  const sizeScale = naturalW > containerW ? Math.max(MIN_BOX / NATURAL_BOX, containerW / naturalW) : 1;
+  const BOX_W = Math.max(MIN_BOX, Math.round(NATURAL_BOX * sizeScale));
+  const ARROW_W = Math.max(MIN_ARROW, Math.round(NATURAL_ARROW * sizeScale));
+  const ARROW_LINE = Math.max(MIN_LINE, Math.round(NATURAL_LINE * sizeScale));
+
   function handleToggleStep(key: string) {
     const steps = [...(editedSteps || channel?.steps || [])];
     const idx = steps.findIndex(s => s.key === key);
@@ -178,6 +221,84 @@ export function ChannelPricingConcept() {
     } catch (err) { console.error("Save steps failed:", err); }
     finally { setSavingSteps(false); }
   }
+
+  // ── Override drafting ──────────────────────────────────────────────
+  function openAddOverride() {
+    if (!channel) return;
+    setDraft({ mode: "new", hotelId: null, steps: channel.steps.map(s => ({ ...s })) });
+  }
+
+  function openEditOverride(hotelId: number) {
+    if (!channel) return;
+    const effective = getEffectiveSteps(channel, hotelId, overrides);
+    setDraft({ mode: "edit", hotelId, steps: effective.map(s => ({ ...s })) });
+  }
+
+  function handleCancelDraft() {
+    if (savingDraft) return;
+    setDraft(null);
+    setEditingDraftStepKey(null);
+  }
+
+  function handleDraftHotelChange(hotelId: number) {
+    setDraft(d => d ? { ...d, hotelId } : d);
+  }
+
+  function handleDraftStepToggle(key: string) {
+    setDraft(d => d ? {
+      ...d,
+      steps: d.steps.map(s => s.key === key ? { ...s, active: !s.active } : s),
+    } : d);
+  }
+
+  function handleDraftStepValue(key: string, value: number) {
+    setDraft(d => d ? {
+      ...d,
+      steps: d.steps.map(s => s.key === key ? { ...s, value } : s),
+    } : d);
+  }
+
+  async function refreshOverridesAfterMutation() {
+    if (!channel) return;
+    const data = await fetchChannelPricing(channel.channelId);
+    const mapped: HotelOverride[] = (data.overrides ?? []).map((o: any) => ({
+      hotelId: o.hotel_id, hotelName: o.hotel_name, channelSlug: selectedChannel,
+      overrides: o.overrides ?? {},
+    }));
+    setOverrides(mapped);
+    setAllOverrides(prev => [...prev.filter(o => o.channelSlug !== selectedChannel), ...mapped]);
+  }
+
+  async function handleSaveDraft() {
+    if (!channel || !draft || draft.hotelId == null || savingDraft) return;
+    setSavingDraft(true);
+    try {
+      const payload: Record<string, { value: number; active: boolean }> = {};
+      for (const step of draft.steps) {
+        payload[step.key] = { value: step.value, active: step.active };
+      }
+      await setHotelPricingOverride(channel.channelId, draft.hotelId, payload);
+      await refreshOverridesAfterMutation();
+      setDraft(null);
+      setEditingDraftStepKey(null);
+    } catch (err) { console.error("Save override failed:", err); }
+    finally { setSavingDraft(false); }
+  }
+
+  async function handleDeleteDraft() {
+    if (!channel || !draft || draft.hotelId == null || draft.mode !== "edit" || savingDraft) return;
+    setSavingDraft(true);
+    try {
+      await deleteHotelPricingOverride(channel.channelId, draft.hotelId);
+      await refreshOverridesAfterMutation();
+      setDraft(null);
+      setEditingDraftStepKey(null);
+    } catch (err) { console.error("Delete override failed:", err); }
+    finally { setSavingDraft(false); }
+  }
+
+  // Hotels that don't yet have an override on this channel — used for the D1 picker
+  const availableHotelsForNew = allHotels.filter(h => !channelOverrides.some(o => o.hotelId === h.id));
 
   // Loading guard
   if (loadingChannels) {
@@ -206,7 +327,18 @@ export function ChannelPricingConcept() {
             const isActive = selectedChannel === ch.slug;
             const ovCount = allOverrides.filter(o => o.channelSlug === ch.slug).length;
             return (
-              <button key={ch.slug} onClick={() => { setSelectedChannel(ch.slug); setExpandedHotel(null); setShowChannelInfo(false); }}
+              <button key={ch.slug} onClick={() => {
+                setSelectedChannel(ch.slug);
+                setDraft(null);
+                setEditingDraftStepKey(null);
+                setShowChannelInfo(false);
+                setShowProgramsForm(false);
+                setMockAddedPrograms([]);
+                setNewProgramLabel("");
+                setNewProgramValue(10);
+                setNewProgramType("discount");
+                setNewProgramActive(true);
+              }}
                 style={{
                   padding: "14px 24px", border: "none",
                   borderBottom: isActive ? `2px solid ${R.warmTeal}` : "2px solid transparent",
@@ -279,6 +411,235 @@ export function ChannelPricingConcept() {
                   <span style={{ fontSize: 11, color: R.textMid, lineHeight: 1.5 }}>{channel.meta.notes}</span>
                 </div>
               )}
+
+              {/* ─── PROGRAMS (visual mockup) ────────────────────────────── */}
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${R.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase" }}>Programs</span>
+                    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${R.gold}15`, color: R.gold, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>Mockup</span>
+                  </div>
+                  <span style={{ fontSize: 10, color: R.textDim }}>Order = stacking order (top runs first)</span>
+                </div>
+
+                {/* Programs list */}
+                <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 6, overflow: "hidden" }}>
+                  {[...channel.steps, ...mockAddedPrograms].map((step, i, arr) => {
+                    const isMockAdded = i >= channel.steps.length;
+                    const suffix = step.type === "multiplier" ? "×" : "%";
+                    const display = step.active
+                      ? (step.type === "multiplier" ? `${step.value}${suffix}` : `−${step.value}${suffix}`)
+                      : "off";
+                    return (
+                      <div key={`${step.key}-${i}`} style={{
+                        display: "grid", gridTemplateColumns: "28px 1fr 110px 90px 64px",
+                        alignItems: "center", gap: 10,
+                        padding: "10px 14px",
+                        borderBottom: i < arr.length - 1 ? `1px solid ${R.sep}` : "none",
+                        background: isMockAdded ? `${R.gold}06` : "transparent",
+                      }}>
+                        <div style={{ cursor: "grab", color: R.textDim, display: "flex", alignItems: "center" }} title="Drag to reorder (not wired yet)">
+                          <GripVertical size={14} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, color: R.text, fontWeight: 400 }}>{step.label}</span>
+                          {isMockAdded && (
+                            <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${R.gold}15`, color: R.gold, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>New</span>
+                          )}
+                          {step.locked && (
+                            <span style={{ fontSize: 9, color: R.textDim, fontStyle: "italic" }}>locked</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 10, color: R.textDim, textTransform: "capitalize" }}>{step.type}</span>
+                        <span style={{ fontSize: 12, color: step.active ? (step.type === "multiplier" ? R.warmTeal : R.accent) : R.textDim, fontVariantNumeric: "tabular-nums", textAlign: "right", fontWeight: 500 }}>
+                          {display}
+                        </span>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <button
+                            title="Edit (not wired yet)"
+                            style={{
+                              width: 22, height: 22, borderRadius: 4, border: "none",
+                              background: "transparent", color: R.textDim,
+                              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = R.cardRaised)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            title={isMockAdded ? "Remove (mockup)" : "Delete (not wired yet)"}
+                            onClick={() => {
+                              if (isMockAdded) {
+                                const mockIdx = i - channel.steps.length;
+                                setMockAddedPrograms(prev => prev.filter((_, idx) => idx !== mockIdx));
+                              }
+                            }}
+                            style={{
+                              width: 22, height: 22, borderRadius: 4, border: "none",
+                              background: "transparent", color: isMockAdded ? R.red : R.textDim,
+                              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = isMockAdded ? `${R.red}10` : R.cardRaised)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* + Add Program row OR inline form */}
+                  {!showProgramsForm ? (
+                    <button
+                      onClick={() => setShowProgramsForm(true)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        width: "100%", padding: "10px 14px",
+                        background: "transparent", border: "none",
+                        color: R.textMid, fontSize: 12, cursor: "pointer",
+                        borderTop: `1px dashed ${R.border}`,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = R.cardRaised)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <Plus size={14} style={{ color: R.textDim }} />
+                      <span>Add program</span>
+                    </button>
+                  ) : (
+                    <div style={{ padding: "14px 14px 12px", borderTop: `1px dashed ${R.border}`, background: `${R.gold}04` }}>
+                      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>New program</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 150px 100px 80px auto", gap: 14, alignItems: "end" }}>
+                        {/* Label */}
+                        <div>
+                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Label</label>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={newProgramLabel}
+                            onChange={(e) => setNewProgramLabel(e.target.value)}
+                            placeholder="e.g. CUG Flights"
+                            style={{
+                              width: "100%", padding: "7px 10px", fontSize: 12, color: R.text,
+                              background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 5, outline: "none",
+                              fontFamily: "inherit",
+                            }}
+                          />
+                        </div>
+                        {/* Type */}
+                        <div>
+                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Type</label>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            {(["multiplier", "discount"] as const).map(t => (
+                              <button
+                                key={t}
+                                onClick={() => setNewProgramType(t)}
+                                style={{
+                                  flex: 1, padding: "7px 0", fontSize: 11, fontWeight: 500,
+                                  background: newProgramType === t ? `${R.warmTeal}15` : R.darkBand,
+                                  border: `1px solid ${newProgramType === t ? `${R.warmTeal}40` : R.border}`,
+                                  color: newProgramType === t ? R.warmTeal : R.textMid,
+                                  borderRadius: 5, cursor: "pointer", textTransform: "capitalize",
+                                }}
+                              >{t}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Value */}
+                        <div>
+                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Default value</label>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={newProgramValue}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                setNewProgramValue(isNaN(v) ? 0 : v);
+                              }}
+                              style={{
+                                flex: 1, padding: "7px 10px", fontSize: 12, color: R.text, textAlign: "right",
+                                background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 5, outline: "none",
+                                fontVariantNumeric: "tabular-nums", fontFamily: "inherit",
+                              }}
+                            />
+                            <span style={{ fontSize: 12, color: R.textDim, minWidth: 14 }}>
+                              {newProgramType === "multiplier" ? "×" : "%"}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Active toggle */}
+                        <div>
+                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Active</label>
+                          <button
+                            onClick={() => setNewProgramActive(!newProgramActive)}
+                            style={{
+                              width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                              background: newProgramActive ? R.warmTeal : R.border,
+                              position: "relative", padding: 0, transition: "all 0.15s",
+                            }}
+                          >
+                            <div style={{
+                              position: "absolute", top: 3, left: newProgramActive ? 23 : 3,
+                              width: 18, height: 18, borderRadius: "50%",
+                              background: newProgramActive ? R.darkBand : R.textDim, transition: "all 0.15s",
+                            }} />
+                          </button>
+                        </div>
+                        {/* Actions */}
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => {
+                              setShowProgramsForm(false);
+                              setNewProgramLabel("");
+                              setNewProgramValue(10);
+                              setNewProgramType("discount");
+                              setNewProgramActive(true);
+                            }}
+                            style={{
+                              padding: "7px 12px", fontSize: 11, fontWeight: 500, borderRadius: 5,
+                              background: "transparent", border: `1px solid ${R.border}`, color: R.textDim,
+                              cursor: "pointer",
+                            }}
+                          >Cancel</button>
+                          <button
+                            disabled={!newProgramLabel.trim()}
+                            onClick={() => {
+                              const label = newProgramLabel.trim();
+                              if (!label) return;
+                              const key = `mock_${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}_${Date.now()}`;
+                              setMockAddedPrograms(prev => [...prev, {
+                                key,
+                                label,
+                                type: newProgramType,
+                                value: newProgramValue,
+                                active: newProgramActive,
+                              }]);
+                              setShowProgramsForm(false);
+                              setNewProgramLabel("");
+                              setNewProgramValue(10);
+                              setNewProgramType("discount");
+                              setNewProgramActive(true);
+                            }}
+                            style={{
+                              padding: "7px 14px", fontSize: 11, fontWeight: 600, borderRadius: 5,
+                              background: !newProgramLabel.trim() ? R.border : R.warmTeal,
+                              border: "none",
+                              color: !newProgramLabel.trim() ? R.textDim : R.darkBand,
+                              cursor: !newProgramLabel.trim() ? "not-allowed" : "pointer",
+                            }}
+                          >Add</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: 10, fontSize: 10, color: R.textDim, lineHeight: 1.5 }}>
+                  Visual mockup only — adds persist while you're on this channel but aren't saved to the backend. Edit / drag-to-reorder / delete-existing are shown as affordances but not wired yet.
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -314,9 +675,9 @@ export function ChannelPricingConcept() {
           </div>
 
           <div style={{ padding: "32px 24px", overflowX: "auto" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 0, minWidth: "max-content" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, minWidth: "min-content" }}>
               {/* PMS node */}
-              <div style={{ width: 148, flexShrink: 0 }}>
+              <div style={{ width: BOX_W, flexShrink: 0 }}>
                 <div style={{
                   padding: "20px 14px", borderRadius: 8, background: R.cardRaised, border: `1px solid ${R.border}`,
                   textAlign: "center", height: 96, display: "flex", flexDirection: "column", justifyContent: "center",
@@ -331,13 +692,15 @@ export function ChannelPricingConcept() {
                 const result = selectedResult.steps[i];
                 return (
                   <div key={step.key} style={{ display: "flex", alignItems: "center" }}>
-                    <div style={{ width: 48, height: 1, background: step.active ? R.border : `${R.border}50`, position: "relative", flexShrink: 0 }}>
-                      <div style={{ position: "absolute", right: -4, top: -4, width: 0, height: 0,
-                        borderTop: "4px solid transparent", borderBottom: "4px solid transparent",
-                        borderLeft: `6px solid ${step.active ? R.border : `${R.border}50`}`,
-                      }} />
+                    <div style={{ width: ARROW_W, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: ARROW_LINE, height: 1, background: step.active ? R.border : `${R.border}50`, position: "relative" }}>
+                        <div style={{ position: "absolute", right: -6, top: -4, width: 0, height: 0,
+                          borderTop: "4px solid transparent", borderBottom: "4px solid transparent",
+                          borderLeft: `6px solid ${step.active ? R.border : `${R.border}50`}`,
+                        }} />
+                      </div>
                     </div>
-                    <div style={{ width: 148, flexShrink: 0, opacity: step.active ? 1 : 0.3, position: "relative" }}>
+                    <div style={{ width: BOX_W, flexShrink: 0, opacity: step.active ? 1 : 0.3, position: "relative" }}>
                       <div style={{
                         padding: "20px 14px", borderRadius: 8, textAlign: "center", height: 96,
                         display: "flex", flexDirection: "column", justifyContent: "center",
@@ -391,13 +754,15 @@ export function ChannelPricingConcept() {
 
               {/* Final */}
               <div style={{ display: "flex", alignItems: "center" }}>
-                <div style={{ width: 48, height: 1, background: R.warmTeal, position: "relative", flexShrink: 0 }}>
-                  <div style={{ position: "absolute", right: -4, top: -4, width: 0, height: 0,
-                    borderTop: "4px solid transparent", borderBottom: "4px solid transparent",
-                    borderLeft: `6px solid ${R.warmTeal}`,
-                  }} />
+                <div style={{ width: ARROW_W, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: ARROW_LINE, height: 1, background: R.warmTeal, position: "relative" }}>
+                    <div style={{ position: "absolute", right: -6, top: -4, width: 0, height: 0,
+                      borderTop: "4px solid transparent", borderBottom: "4px solid transparent",
+                      borderLeft: `6px solid ${R.warmTeal}`,
+                    }} />
+                  </div>
                 </div>
-                <div style={{ width: 148, flexShrink: 0 }}>
+                <div style={{ width: BOX_W, flexShrink: 0 }}>
                   <div style={{
                     padding: "20px 14px", borderRadius: 8, textAlign: "center", height: 96,
                     display: "flex", flexDirection: "column", justifyContent: "center",
@@ -415,204 +780,409 @@ export function ChannelPricingConcept() {
 
         {/* Per-Hotel Overrides */}
         <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, overflow: "hidden" }}>
+          {/* Header */}
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${R.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: R.text, fontSize: 13, fontWeight: 500 }}>Per-Hotel Overrides</span>
               <span style={{ color: R.textDim, fontSize: 11 }}>— {channel.channelName}</span>
             </div>
-            <button style={{
-              padding: "6px 14px", borderRadius: 6, border: `1px solid ${R.border}`,
-              background: R.cardRaised, color: R.textMid, fontSize: 11, fontWeight: 500, cursor: "pointer",
-            }}>
-              + Add Override
-            </button>
+            {(() => {
+              const addDisabled = draft !== null || availableHotelsForNew.length === 0;
+              const addTitle = draft !== null
+                ? "Finish the current draft first"
+                : (availableHotelsForNew.length === 0 ? "All hotels already have an override for this channel" : "");
+              return (
+                <button
+                  onClick={openAddOverride}
+                  disabled={addDisabled}
+                  title={addTitle}
+                  style={{
+                    padding: "6px 14px", borderRadius: 6, border: `1px solid ${R.border}`,
+                    background: R.cardRaised,
+                    color: addDisabled ? R.textDim : R.textMid,
+                    fontSize: 11, fontWeight: 500,
+                    cursor: addDisabled ? "not-allowed" : "pointer",
+                    opacity: addDisabled ? 0.5 : 1,
+                  }}
+                >+ Add Override</button>
+              );
+            })()}
           </div>
 
-          {channelOverrides.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center" }}>
-              <div style={{ color: R.textDim, fontSize: 12 }}>All hotels use the portfolio default for {channel.channelName}</div>
-            </div>
-          ) : (
-            <div>
-              {allHotels.map((hotel, hi) => {
-                const override = channelOverrides.find(o => o.hotelId === hotel.id);
-                const hasOverride = !!override;
-                const isExpanded = expandedHotel === hotel.id;
-                const effectiveSteps = getEffectiveSteps(channel, hotel.id, overrides);
-                const waterfallResult = calcWaterfall(effectiveSteps, simPmsRate);
+          {/* Body: D1 draft (if new) + list of overrides (D3 minimal or D2 expanded) */}
+          {(() => {
+            const isAdding = draft?.mode === "new";
+            const editingHotelId = draft?.mode === "edit" ? draft.hotelId : null;
+            const hasAnyRow = isAdding || channelOverrides.length > 0;
 
-                return (
-                  <div key={hotel.id} style={{ borderBottom: hi < allHotels.length - 1 ? `1px solid ${R.sep}` : "none" }}>
-                    <div
-                      onClick={() => hasOverride && setExpandedHotel(isExpanded ? null : hotel.id)}
-                      style={{
-                        display: "grid", gridTemplateColumns: "24px 1fr auto 120px",
-                        padding: "12px 20px", alignItems: "center", gap: 12,
-                        cursor: hasOverride ? "pointer" : "default",
-                      }}
-                    >
-                      {hasOverride ? (
-                        isExpanded ? <ChevronDown size={14} style={{ color: R.textDim }} /> : <ChevronRight size={14} style={{ color: R.textDim }} />
-                      ) : (
-                        <Check size={14} style={{ color: R.warmTeal, opacity: 0.4 }} />
-                      )}
+            if (!hasAnyRow) {
+              return (
+                <div style={{ padding: 40, textAlign: "center" }}>
+                  <div style={{ color: R.textDim, fontSize: 12 }}>No overrides — all hotels use Global for {channel.channelName}.</div>
+                </div>
+              );
+            }
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ color: hasOverride ? R.accent : R.textDim, fontSize: 13, fontWeight: 400 }}>{hotel.name}</span>
-                        {hasOverride && override && (
-                          <div style={{ display: "flex", gap: 4 }}>
-                            {Object.entries(override.overrides).map(([key, val]) => {
-                              const stepDef = channel.steps.find(s => s.key === key);
-                              if (!stepDef) return null;
-                              const isDisabled = val.active === false;
-                              return (
-                                <span key={key} style={{
-                                  fontSize: 9, padding: "2px 6px", borderRadius: 3,
-                                  background: isDisabled ? `${R.red}08` : `${R.gold}10`,
-                                  color: isDisabled ? R.red : R.gold, fontWeight: 500,
-                                }}>
-                                  {isDisabled ? `✕ ${stepDef.label}` : `${stepDef.label} → ${val.value}${stepDef.type === "multiplier" ? "×" : "%"}`}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
+            // Arrow connector between waterfall boxes — matches main pipeline (48px)
+            const renderArrow = (active: boolean, color?: string) => {
+              const c = color ?? (active ? R.border : `${R.border}50`);
+              return (
+                <div style={{ width: ARROW_W, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: ARROW_LINE, height: 1, background: c, position: "relative" }}>
+                    <div style={{
+                      position: "absolute", right: -6, top: -4, width: 0, height: 0,
+                      borderTop: "4px solid transparent", borderBottom: "4px solid transparent",
+                      borderLeft: `6px solid ${c}`,
+                    }} />
+                  </div>
+                </div>
+              );
+            };
 
-                      <span style={{ fontSize: 10, color: hasOverride ? R.gold : R.warmTeal }}>
-                        {hasOverride ? "Custom" : "Default"}
+            // A full-size waterfall box (148×96) — matches the Portfolio Default pipeline exactly
+            // Mode: "readonly" (Global row) or "editable" (Hotel row)
+            const renderBox = (args: {
+              label: string;
+              value: number;
+              type: "multiplier" | "discount" | "tax";
+              active: boolean;
+              mode: "readonly" | "editable";
+              stepKey?: string;
+              changed?: boolean;
+              locked?: boolean;
+            }) => {
+              const { label, value, type, active, mode, stepKey, changed, locked } = args;
+              const isEditing = mode === "editable" && stepKey != null && editingDraftStepKey === stepKey;
+              const valueColor = !active
+                ? R.textDim
+                : (changed ? R.gold : (type === "multiplier" ? R.warmTeal : R.accent));
+              const display = active
+                ? (type === "multiplier" ? `${value}×` : `−${value}%`)
+                : "off";
+
+              return (
+                <div style={{ width: BOX_W, flexShrink: 0, opacity: active ? 1 : 0.35, position: "relative" }}>
+                  <div
+                    onClick={() => {
+                      if (mode !== "editable" || !stepKey || locked) return;
+                      if (!isEditing) handleDraftStepToggle(stepKey);
+                    }}
+                    style={{
+                      padding: "20px 14px", borderRadius: 8, textAlign: "center", height: 96,
+                      display: "flex", flexDirection: "column", justifyContent: "center",
+                      background: changed ? `${R.gold}10` : R.card,
+                      border: `1px solid ${isEditing ? R.warmTeal : (changed ? `${R.gold}40` : R.border)}`,
+                      cursor: mode === "editable" && !locked ? "pointer" : "default",
+                      transition: "border-color 0.15s",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 400, color: R.textMid, marginBottom: 10 }}>{label}</div>
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        inputMode="decimal"
+                        defaultValue={value}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const v = parseFloat((e.target as HTMLInputElement).value);
+                            if (!isNaN(v) && stepKey) handleDraftStepValue(stepKey, v);
+                            setEditingDraftStepKey(null);
+                          }
+                          if (e.key === "Escape") setEditingDraftStepKey(null);
+                        }}
+                        onBlur={(e) => {
+                          const v = parseFloat(e.target.value);
+                          if (!isNaN(v) && stepKey) handleDraftStepValue(stepKey, v);
+                          setEditingDraftStepKey(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: 70, fontSize: 18, fontWeight: 500, textAlign: "center",
+                          background: "transparent", border: "none",
+                          borderBottom: `1px solid ${R.warmTeal}40`,
+                          color: changed ? R.gold : (type === "multiplier" ? R.warmTeal : R.gold),
+                          outline: "none", fontVariantNumeric: "tabular-nums", margin: "0 auto",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        onClick={(e) => {
+                          if (mode !== "editable" || !stepKey || !active) return;
+                          e.stopPropagation();
+                          setEditingDraftStepKey(stepKey);
+                        }}
+                        style={{
+                          fontSize: 18, fontWeight: 500, fontVariantNumeric: "tabular-nums",
+                          color: valueColor,
+                          cursor: mode === "editable" && active ? "text" : "inherit",
+                        }}
+                      >{display}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            };
+
+            // Renders a "terminal" box (PMS / Guest Sees) matching main pipeline
+            const renderTerminalBox = (label: string, value: string, accent: boolean) => (
+              <div style={{ width: BOX_W, flexShrink: 0 }}>
+                <div style={{
+                  padding: "20px 14px", borderRadius: 8,
+                  background: accent ? `${R.warmTeal}06` : R.cardRaised,
+                  border: `1px solid ${accent ? `${R.warmTeal}15` : R.border}`,
+                  textAlign: "center", height: 96,
+                  display: "flex", flexDirection: "column", justifyContent: "center",
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: 1, color: accent ? R.warmTeal : R.textDim, textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: accent ? R.warmTeal : R.accent, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+                </div>
+              </div>
+            );
+
+            // Renders the drafting row — header + (two-row comparison once a hotel is selected)
+            const renderDraftingRow = (isLast: boolean) => {
+              if (!draft) return null;
+              const { mode, hotelId, steps } = draft;
+              const hotelName = hotelId != null
+                ? (channelOverrides.find(o => o.hotelId === hotelId)?.hotelName
+                    ?? allHotels.find(h => h.id === hotelId)?.name
+                    ?? "—")
+                : null;
+
+              const globalFinal = calcWaterfall(channel.steps, simPmsRate).final;
+              const draftFinal = calcWaterfall(steps, simPmsRate).final;
+              const delta = draftFinal - globalFinal;
+
+              return (
+                <div style={{
+                  borderBottom: isLast ? "none" : `1px solid ${R.sep}`,
+                  background: R.card,
+                }}>
+                  {/* Drafting header — subtle top band, same dimensions as main pipeline header */}
+                  <div style={{
+                    padding: "14px 20px", borderBottom: `1px solid ${R.sep}`,
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: R.text }}>
+                        {mode === "edit"
+                          ? `Override — ${hotelName}`
+                          : (hotelId != null ? `New override — ${hotelName}` : "New override")}
                       </span>
+                      {mode === "new" && hotelId == null && (
+                        <span style={{ fontSize: 11, color: R.textDim }}>— pick a hotel to begin</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {mode === "edit" && (
+                        <button
+                          onClick={handleDeleteDraft}
+                          disabled={savingDraft}
+                          style={{
+                            fontSize: 11, padding: "5px 12px", borderRadius: 5,
+                            background: "transparent", border: `1px solid ${R.red}35`, color: R.red,
+                            cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 500,
+                          }}
+                        >Remove</button>
+                      )}
+                      <button
+                        onClick={handleSaveDraft}
+                        disabled={hotelId == null || savingDraft}
+                        style={{
+                          fontSize: 11, padding: "5px 14px", borderRadius: 5,
+                          background: (hotelId == null || savingDraft) ? R.border : R.warmTeal,
+                          border: "none",
+                          color: (hotelId == null || savingDraft) ? R.textDim : R.darkBand,
+                          cursor: (hotelId == null || savingDraft) ? "not-allowed" : "pointer",
+                          fontWeight: 600,
+                        }}
+                      >{savingDraft ? "Saving…" : "Save"}</button>
+                      <button
+                        onClick={handleCancelDraft}
+                        disabled={savingDraft}
+                        style={{
+                          fontSize: 11, padding: "5px 12px", borderRadius: 5,
+                          background: "transparent", border: `1px solid ${R.border}`, color: R.textDim,
+                          cursor: savingDraft ? "not-allowed" : "pointer",
+                        }}
+                      >Cancel</button>
+                    </div>
+                  </div>
 
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ color: R.warmTeal, fontSize: 12, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-                          {curr}{waterfallResult.final.toFixed(2)}
-                        </span>
-                        <span style={{ color: R.textDim, fontSize: 10, marginLeft: 4 }}>/ {curr}{simPmsRate}</span>
+                  {/* D1: hotel picker (only when new and no hotel picked) */}
+                  {mode === "new" && hotelId == null && (
+                    <div style={{ padding: "28px 24px", display: "flex", justifyContent: "center" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%", maxWidth: 420 }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.textDim, textTransform: "uppercase" }}>Choose a hotel to override</div>
+                        <div style={{ position: "relative", width: "100%" }}>
+                          <select
+                            autoFocus
+                            value=""
+                            onChange={(e) => handleDraftHotelChange(Number(e.target.value))}
+                            style={{
+                              width: "100%", padding: "12px 40px 12px 16px", fontSize: 14, color: R.text,
+                              background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 8,
+                              outline: "none", appearance: "none",
+                              WebkitAppearance: "none", MozAppearance: "none",
+                              fontFamily: "inherit", cursor: "pointer",
+                            }}
+                          >
+                            <option value="" disabled>Pick a hotel…</option>
+                            {availableHotelsForNew.map(h => (
+                              <option key={h.id} value={h.id}>{h.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={16} style={{
+                            position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
+                            color: R.textDim, pointerEvents: "none",
+                          }} />
+                        </div>
                       </div>
                     </div>
+                  )}
 
-                    {/* Expanded comparison */}
-                    {isExpanded && hasOverride && (() => {
-                      let runningRate = simPmsRate;
-                      const defaultResult = selectedResult;
-                      return (
-                        <div style={{ padding: "0 20px 16px 56px" }}>
-                          <div style={{ background: R.darkBand, borderRadius: 8, border: `1px solid ${R.border}`, overflow: "hidden" }}>
-                            <div style={{
-                              display: "grid", gridTemplateColumns: "28px 1fr 90px 90px 100px",
-                              padding: "8px 16px", gap: 8, background: R.cardRaised, borderBottom: `1px solid ${R.border}`,
-                            }}>
-                              <span />
-                              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: 1, color: R.textDim, textTransform: "uppercase" }}>Step</span>
-                              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", textAlign: "center" }}>Default</span>
-                              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: 1, color: R.gold, textTransform: "uppercase", textAlign: "center" }}>This Hotel</span>
-                              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", textAlign: "right" }}>Running Total</span>
-                            </div>
+                  {/* D2: two-row waterfall comparison (once a hotel is selected) — full width, big boxes */}
+                  {hotelId != null && (
+                    <div style={{ padding: "28px 24px 24px", overflowX: "auto" }}>
+                      {/* Row labels (sticky-style on the left) + pipelines */}
+                      <div style={{ minWidth: "min-content" }}>
+                        {/* Global row — read-only, slightly dimmed */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+                          <div style={{
+                            width: 84, flexShrink: 0,
+                            fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.textDim, textTransform: "uppercase",
+                          }}>Global</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 0, opacity: 0.75 }}>
+                            {renderTerminalBox("PMS Rate", `${curr}${simPmsRate}`, false)}
+                            {channel.steps.map(s => (
+                              <div key={s.key} style={{ display: "flex", alignItems: "center" }}>
+                                {renderArrow(s.active)}
+                                {renderBox({ label: s.label, value: s.value, type: s.type, active: s.active, mode: "readonly" })}
+                              </div>
+                            ))}
+                            {renderArrow(true, `${R.warmTeal}60`)}
+                            {renderTerminalBox("Guest Sees", `${curr}${globalFinal.toFixed(2)}`, true)}
+                          </div>
+                        </div>
 
-                            {effectiveSteps.map((step, i) => {
-                              const defaultStep = channel.steps.find(s => s.key === step.key)!;
-                              const isOverridden = step.value !== defaultStep.value || step.active !== defaultStep.active;
-                              const isDisabledOverride = isOverridden && !step.active;
-
-                              if (step.active) {
-                                if (step.type === "multiplier") runningRate *= step.value;
-                                else runningRate *= (1 - step.value / 100);
-                              }
-
-                              const suffix = step.type === "multiplier" ? "×" : "%";
-                              const defaultSuffix = defaultStep.type === "multiplier" ? "×" : "%";
-
+                        {/* Hotel row — editable */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <div style={{
+                            width: 84, flexShrink: 0,
+                            fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase",
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          }} title={hotelName ?? undefined}>{hotelName ?? "—"}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                            {renderTerminalBox("PMS Rate", `${curr}${simPmsRate}`, false)}
+                            {steps.map(s => {
+                              const globalStep = channel.steps.find(gs => gs.key === s.key);
+                              const changed = !!globalStep && (s.value !== globalStep.value || s.active !== globalStep.active);
                               return (
-                                <div key={step.key} style={{
-                                  display: "grid", gridTemplateColumns: "28px 1fr 90px 90px 100px",
-                                  padding: "10px 16px", gap: 8, alignItems: "center",
-                                  borderBottom: i < effectiveSteps.length - 1 ? `1px solid ${R.sep}` : "none",
-                                }}>
-                                  <div>
-                                    {isDisabledOverride ? (
-                                      <div style={{ width: 18, height: 18, borderRadius: 4, background: `${R.red}08`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <span style={{ color: R.red, fontSize: 11 }}>✕</span>
-                                      </div>
-                                    ) : isOverridden ? (
-                                      <div style={{ width: 18, height: 18, borderRadius: 4, background: `${R.gold}08`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <Pencil size={9} style={{ color: R.gold }} />
-                                      </div>
-                                    ) : (
-                                      <div style={{ width: 18, height: 18, borderRadius: 4, background: R.cardRaised, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <span style={{ color: R.textDim, fontSize: 9 }}>—</span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <span style={{ color: step.active ? R.text : R.textDim, fontSize: 12, fontWeight: 400 }}>
-                                    {step.label}
-                                    {isDisabledOverride && <span style={{ color: R.red, fontSize: 10, marginLeft: 8 }}>Disabled</span>}
-                                  </span>
-
-                                  <div style={{ textAlign: "center" }}>
-                                    <span style={{ color: R.textDim, fontSize: 12, textDecoration: isOverridden ? "line-through" : "none", opacity: isOverridden ? 0.5 : 1 }}>
-                                      {defaultStep.active ? `${defaultStep.value}${defaultSuffix}` : "off"}
-                                    </span>
-                                  </div>
-
-                                  <div style={{ textAlign: "center" }}>
-                                    {isOverridden ? (
-                                      <span style={{ color: isDisabledOverride ? R.red : R.gold, fontSize: 12, fontWeight: 500 }}>
-                                        {step.active ? `${step.value}${suffix}` : "off"}
-                                      </span>
-                                    ) : (
-                                      <span style={{ color: R.textDim, fontSize: 11 }}>—</span>
-                                    )}
-                                  </div>
-
-                                  <div style={{ textAlign: "right" }}>
-                                    {step.active ? (
-                                      <span style={{ color: R.text, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{curr}{runningRate.toFixed(2)}</span>
-                                    ) : (
-                                      <span style={{ color: R.textDim, fontSize: 11 }}>—</span>
-                                    )}
-                                  </div>
+                                <div key={s.key} style={{ display: "flex", alignItems: "center" }}>
+                                  {renderArrow(s.active)}
+                                  {renderBox({
+                                    label: s.label,
+                                    value: s.value,
+                                    type: s.type,
+                                    active: s.active,
+                                    mode: "editable",
+                                    stepKey: s.key,
+                                    changed,
+                                    locked: s.locked,
+                                  })}
                                 </div>
                               );
                             })}
-
-                            <div style={{
-                              display: "grid", gridTemplateColumns: "28px 1fr 90px 90px 100px",
-                              padding: "12px 16px", gap: 8, alignItems: "center",
-                              borderTop: `1px solid ${R.border}`, background: R.darkBand,
-                            }}>
-                              <span />
-                              <span style={{ color: R.text, fontSize: 12, fontWeight: 500 }}>Guest Sees</span>
-                              <div style={{ textAlign: "center" }}>
-                                <span style={{ color: R.textDim, fontSize: 12, textDecoration: "line-through", opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>
-                                  {curr}{defaultResult.final.toFixed(2)}
-                                </span>
-                              </div>
-                              <div style={{ textAlign: "center" }}>
-                                <span style={{ color: R.gold, fontSize: 13, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-                                  {curr}{waterfallResult.final.toFixed(2)}
-                                </span>
-                              </div>
-                              <div style={{ textAlign: "right" }}>
-                                {(() => {
-                                  const diff = waterfallResult.final - defaultResult.final;
-                                  return (
-                                    <span style={{ color: diff > 0 ? R.warmTeal : diff < 0 ? R.gold : R.textDim, fontSize: 11 }}>
-                                      {diff > 0 ? "+" : ""}{diff.toFixed(2)}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            </div>
+                            {renderArrow(true, R.warmTeal)}
+                            {renderTerminalBox("Guest Sees", `${curr}${draftFinal.toFixed(2)}`, true)}
                           </div>
                         </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+
+                        {/* Delta caption */}
+                        <div style={{ marginTop: 14, paddingLeft: 100, fontSize: 11, color: delta !== 0 ? R.gold : R.textDim }}>
+                          {delta !== 0
+                            ? `→ ${delta > 0 ? "+" : ""}${curr}${delta.toFixed(2)} vs Global`
+                            : "Matches Global"}
+                        </div>
+
+                        {/* Hint */}
+                        <div style={{ marginTop: 10, paddingLeft: 100, fontSize: 10, color: R.textDim, lineHeight: 1.5 }}>
+                          Click a box to toggle on/off · click a value to edit
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            return (
+              <div>
+                {/* New-draft row pinned at top */}
+                {isAdding && renderDraftingRow(channelOverrides.length === 0)}
+
+                {/* Existing overrides */}
+                {channelOverrides.map((ov, i) => {
+                  const isLast = i === channelOverrides.length - 1;
+
+                  // If this override is being edited, render D2 in place
+                  if (ov.hotelId === editingHotelId) {
+                    return <div key={ov.hotelId}>{renderDraftingRow(isLast)}</div>;
+                  }
+
+                  // Otherwise: D3 minimal row
+                  const effectiveSteps = getEffectiveSteps(channel, ov.hotelId, overrides);
+                  const finalRate = calcWaterfall(effectiveSteps, simPmsRate).final;
+                  const diverged = channel.steps.reduce<Array<{ label: string; type: "multiplier" | "discount" | "tax"; value: number; active: boolean }>>((acc, step) => {
+                    const ovStep = ov.overrides[step.key];
+                    if (!ovStep) return acc;
+                    const value = ovStep.value ?? step.value;
+                    const active = ovStep.active ?? step.active;
+                    if (value !== step.value || active !== step.active) {
+                      acc.push({ label: step.label, type: step.type, value, active });
+                    }
+                    return acc;
+                  }, []);
+
+                  return (
+                    <div
+                      key={ov.hotelId}
+                      onClick={() => openEditOverride(ov.hotelId)}
+                      style={{
+                        display: "grid", gridTemplateColumns: "1fr auto 110px",
+                        padding: "14px 20px", alignItems: "center", gap: 24,
+                        borderBottom: isLast ? "none" : `1px solid ${R.sep}`,
+                        cursor: "pointer",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = R.cardRaised; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{ color: R.accent, fontSize: 13 }}>{ov.hotelName}</span>
+                      <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        {diverged.length === 0 ? (
+                          <span style={{ fontSize: 11, color: R.textDim, fontStyle: "italic" }}>matches Global</span>
+                        ) : (
+                          diverged.map((d, idx) => (
+                            <span key={idx} style={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+                              <span style={{ color: R.textMid }}>{d.label} </span>
+                              <span style={{ color: R.gold, fontWeight: 500 }}>
+                                {d.active ? (d.type === "multiplier" ? `${d.value}×` : `−${d.value}%`) : "off"}
+                              </span>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <span style={{ textAlign: "right", color: R.warmTeal, fontSize: 13, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                        {curr}{finalRate.toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         </>)}

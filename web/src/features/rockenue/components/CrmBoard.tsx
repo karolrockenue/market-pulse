@@ -25,7 +25,6 @@ import {
   ClipboardList,
   Trash2,
   Repeat,
-  Zap,
   Users,
   BarChart3,
   CheckSquare,
@@ -51,11 +50,12 @@ import type {
 } from "../api/types";
 
 // ── Brand palette ──
-const BLUE = R.warmTeal;
+const BLUE = R.warmTeal;      // teal accent (greeny) used for hover, active toggles, pills
+const GOLD = R.gold;          // warm gold used for primary CTAs
 const GREEN = "#10b981";
 const AMBER = "#f59e0b";
 const RED = "#ef4444";
-const PURPLE = "#8b5cf6";
+const PURPLE = "#7A8AB8";
 const BG_PAGE = R.bg;
 const CARD_BG = R.darkBand;
 const INPUT_BG = R.card;
@@ -114,17 +114,9 @@ function useTeam() { return useContext(TeamContext); }
 type ViewMode = "board" | "hotel" | "user" | "timeline" | "my_work";
 
 // ── Mock data stores (mockup stage — local state only) ──
-type Automation = { id: string; name: string; trigger: string; action: string; enabled: boolean };
 type TaskDependency = { taskId: number; type: "blocks" | "blocked_by"; linkedTaskId: number };
 type TaskWatcher = { taskId: number; name: string };
 const DEFAULT_WIP_LIMITS: Record<TaskStatus, number> = { todo: 0, in_progress: 8, review: 5, done: 0 };
-
-const MOCK_AUTOMATIONS: Automation[] = [
-  { id: "a1", name: "Auto-assign reviewer", trigger: "When status changes to Review", action: "Set assignee to Karol", enabled: true },
-  { id: "a2", name: "Notify on overdue", trigger: "When task becomes overdue", action: "Send email to assignee + Karol", enabled: true },
-  { id: "a3", name: "Close stale tasks", trigger: "When task in Done for 14 days", action: "Archive task", enabled: false },
-  { id: "a4", name: "Escalate urgent", trigger: "When urgent task has no update for 24h", action: "Send Slack notification to #ops", enabled: true },
-];
 
 interface CrmBoardProps {
   initialFilter?: { hotel_id?: number; channel_id?: number } | null;
@@ -152,7 +144,6 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
   const [expandedHotel, setExpandedHotel] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [showAutomations, setShowAutomations] = useState(false);
 
   // ── WIP limits ──
   const [wipLimits, setWipLimits] = useState<Record<TaskStatus, number>>(DEFAULT_WIP_LIMITS);
@@ -167,7 +158,6 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
   // ── Mock stores (mockup — no backend) ──
   const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
   const [watchers, setWatchers] = useState<TaskWatcher[]>([]);
-  const [automations, setAutomations] = useState<Automation[]>(MOCK_AUTOMATIONS);
 
   // ── Drag-and-drop state ──
   const [dragTaskId, setDragTaskId] = useState<number | null>(null);
@@ -291,41 +281,44 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
     <div style={{ flex: 1, background: R.bg, color: R.accent, paddingBottom: 64 }}>
       <div style={{ padding: "24px 28px" }}>
 
-      {/* ── Page Header ── */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(57,189,248,0.12)" }}>
-              <ClipboardList size={18} style={{ color: BLUE }} />
-            </div>
-            <div>
-              <h1 style={{ color: TEXT, fontSize: 20, fontWeight: 600, margin: 0 }}>CRM</h1>
-              <p style={{ color: TEXT_MID, fontSize: 12, margin: 0 }}>Task management & operations</p>
-            </div>
-          </div>
+      {/* ── Page Header (MP Studio style) ── */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h1 style={{ color: TEXT, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.025em" }}>Task Board</h1>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setShowAutomations(true)} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8,
-              border: `1px solid ${BORDER}`, background: INPUT_BG, color: TEXT_MID,
-              fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}>
-              <Zap size={13} /> Automations
-            </button>
             <button onClick={() => { setBulkMode(!bulkMode); setSelectedTaskIds(new Set()); }} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8,
+              display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6,
               border: `1px solid ${bulkMode ? BLUE + "40" : BORDER}`, background: bulkMode ? `${BLUE}10` : INPUT_BG,
-              color: bulkMode ? BLUE : TEXT_MID, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              color: bulkMode ? BLUE : TEXT_MID, fontSize: 12, fontWeight: 500, cursor: "pointer",
             }}>
-              <CheckSquare size={13} /> Bulk
+              <CheckSquare size={12} /> Bulk
             </button>
             <button onClick={() => { setShowNewTask(true); setNewTaskDefaultStatus(null); }} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 8,
-              border: "none", background: BLUE, color: R.sidebar,
-              fontSize: 13, fontWeight: 600, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6,
+              border: "none", background: GOLD, color: R.sidebar,
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
             }}>
               <Plus size={14} /> New Task
             </button>
           </div>
+        </div>
+
+        {/* Status summary pills (counts reflect all tasks, unfiltered) */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {STATUS_COLUMNS.map((col) => {
+            const count = tasks.filter((t) => t.status === col.key).length;
+            return (
+              <div key={col.key} style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "5px 12px", borderRadius: 6,
+                background: `${col.color}10`, border: `1px solid ${col.color}25`,
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: 3, background: col.color }} />
+                <span style={{ fontSize: 11, color: TEXT }}>{col.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: col.color }}>{count}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -397,50 +390,50 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
         </div>
       )}
 
-      {/* ── Toolbar ── */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ display: "flex", background: INPUT_BG, borderRadius: 8, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
+      {/* ── Toolbar (MP Studio style — slim) ── */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 2, background: INPUT_BG, padding: 3, borderRadius: 6, border: `1px solid ${BORDER}` }}>
           {([
-            { key: "board" as ViewMode, label: "Board", icon: <LayoutIcon /> },
-            { key: "timeline" as ViewMode, label: "Timeline", icon: <BarChart3 size={12} /> },
-            { key: "my_work" as ViewMode, label: "My Work", icon: <User size={12} /> },
-            { key: "hotel" as ViewMode, label: "By Hotel", icon: <Building2 size={12} /> },
-            { key: "user" as ViewMode, label: "By Person", icon: <Users size={12} /> },
+            { key: "board" as ViewMode, label: "Board" },
+            { key: "timeline" as ViewMode, label: "Timeline" },
+            { key: "my_work" as ViewMode, label: "My Work" },
+            { key: "hotel" as ViewMode, label: "By Hotel" },
+            { key: "user" as ViewMode, label: "By Person" },
           ]).map((v) => (
             <button key={v.key} onClick={() => setViewMode(v.key)} style={{
-              display: "flex", alignItems: "center", gap: 5, padding: "7px 14px",
-              border: "none", background: viewMode === v.key ? `${BLUE}15` : "transparent",
-              color: viewMode === v.key ? BLUE : TEXT_DIM,
-              fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-              borderRight: `1px solid ${BORDER}`,
+              padding: "4px 12px", fontSize: 11, borderRadius: 4, border: "none", cursor: "pointer",
+              background: viewMode === v.key ? BLUE : "transparent",
+              color: viewMode === v.key ? R.sidebar : TEXT_DIM,
+              fontWeight: viewMode === v.key ? 600 : 500,
+              transition: "all 0.15s",
             }}>
-              {v.icon} {v.label}
+              {v.label}
             </button>
           ))}
         </div>
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ position: "relative", width: 200 }}>
+        <div style={{ position: "relative", width: 180 }}>
           <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: TEXT_DIM }} />
           <input type="text" placeholder="Search tasks..." value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "100%", padding: "7px 10px 7px 30px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }} />
+            style={{ width: "100%", padding: "6px 10px 6px 30px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }} />
         </div>
 
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)}
-          style={{ padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none", cursor: "pointer" }}>
+          style={{ padding: "6px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 11, outline: "none", cursor: "pointer" }}>
           <option value="all">All Categories</option>
           {Object.entries(CATEGORY_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
         <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}
-          style={{ padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none", cursor: "pointer" }}>
+          style={{ padding: "6px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 11, outline: "none", cursor: "pointer" }}>
           <option value="all">All People</option>
           {teamMembers.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
         </select>
 
         <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as any)}
-          style={{ padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none", cursor: "pointer" }}>
+          style={{ padding: "6px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 11, outline: "none", cursor: "pointer" }}>
           <option value="all">All Priorities</option>
           {Object.entries(PRIORITY_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
@@ -637,15 +630,6 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
         />
       )}
 
-      {/* ── Automations Panel ── */}
-      {showAutomations && (
-        <AutomationsPanel
-          automations={automations}
-          setAutomations={setAutomations}
-          onClose={() => setShowAutomations(false)}
-        />
-      )}
-
       </div>
     </div>
     </TeamContext.Provider>
@@ -708,38 +692,33 @@ function KanbanBoard({
           >
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: compact ? "12px 12px" : "18px 16px", marginBottom: compact ? 8 : 12, borderRadius: 10,
-              background: `${col.color}08`, border: `1px solid ${isOverWip ? RED + "50" : col.color + "20"}`,
+              marginBottom: compact ? 8 : 12, padding: "0 4px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color }} />
-                <span style={{ color: TEXT, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.01em" }}>{col.label}</span>
-                {wipLimit > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 4, background: col.color }} />
+                <span style={{ color: TEXT, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>{col.label}</span>
+                <span style={{ fontSize: 11, color: TEXT_DIM, fontWeight: 600 }}>{colTasks.length}</span>
+                {wipLimit > 0 && isOverWip && (
                   <span style={{
                     fontSize: 10, padding: "1px 6px", borderRadius: 4,
-                    background: isOverWip ? `${RED}15` : `${TEXT_DIM}15`,
-                    color: isOverWip ? RED : TEXT_DIM, fontWeight: 600,
-                  }}>
-                    {colTasks.length}/{wipLimit}
+                    background: `${RED}15`, border: `1px solid ${RED}30`,
+                    color: RED, fontWeight: 600,
+                  }} title={`Over WIP limit of ${wipLimit}`}>
+                    /{wipLimit}
                   </span>
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: col.color, fontSize: 13, fontWeight: 700, background: `${col.color}15`, padding: "4px 12px", borderRadius: 10 }}>
-                  {colTasks.length}
-                </span>
-                <button onClick={() => onQuickAdd(col.key)} style={{
-                  width: 24, height: 24, borderRadius: 6, border: `1px solid ${BORDER}`,
-                  background: "transparent", color: TEXT_DIM, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s",
-                }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = `${col.color}15`; e.currentTarget.style.color = col.color; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = TEXT_DIM; }}
-                >
-                  <Plus size={13} />
-                </button>
-              </div>
+              <button onClick={() => onQuickAdd(col.key)} style={{
+                width: 20, height: 20, borderRadius: 4, border: "none",
+                background: "transparent", color: TEXT_DIM, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "color 0.15s",
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = col.color; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_DIM; }}
+              >
+                <Plus size={14} />
+              </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {colTasks.map((task) => (
@@ -789,69 +768,34 @@ function HotelView({
   setExpandedHotel: (h: string | null) => void;
   onTaskClick: (id: number) => void;
 }) {
-  // Fetch hotels to get management_group info
-  const [hotelGroups, setHotelGroups] = useState<Record<string, string | null>>({});
-  useEffect(() => {
-    fetch("/api/hotels").then(r => r.json()).then(data => {
-      const map: Record<string, string | null> = {};
-      for (const h of data) {
-        if (h.property_name) map[h.property_name] = h.management_group || null;
-      }
-      setHotelGroups(map);
-    }).catch(console.error);
-  }, []);
-
   const activeTasks = tasks.filter((t) => t.status !== "done");
-
-  // Group tasks into sections: portfolio-wide (no hotel), per management group, individual hotels
   const portfolioTasks = activeTasks.filter((t) => !t.hotel_name);
 
-  // Build management group -> hotels map
-  const mgmtGroups = useMemo(() => {
-    const groups: Record<string, Set<string>> = {};
-    for (const [hotel, group] of Object.entries(hotelGroups)) {
-      if (group) {
-        if (!groups[group]) groups[group] = new Set();
-        groups[group].add(hotel);
-      }
-    }
-    return groups;
-  }, [hotelGroups]);
-
-  // Find tasks assigned to a management group (task has a hotel that belongs to a group)
-  // Group the individual hotels under their management group headers
-  type Section = { key: string; label: string; icon: "portfolio" | "group" | "hotel"; color: string; tasks: CrmTask[] };
+  // Sections: Entire Portfolio (tasks with no hotel) + one per distinct hotel_name.
+  // Management-group bucketing was removed — a task pinned to a single hotel like
+  // "Jubilee Kensington" must stay under that hotel, not fold into "Independent".
+  // A dedicated group bucket (e.g. "All Independents") should only exist once the
+  // task schema supports scoping to a management group explicitly.
+  type Section = { key: string; label: string; icon: "portfolio" | "hotel"; color: string; tasks: CrmTask[] };
 
   const sections = useMemo(() => {
     const result: Section[] = [];
 
-    // 1. Entire Portfolio (tasks with no hotel assigned)
     if (portfolioTasks.length > 0) {
       result.push({ key: "__portfolio__", label: "Entire Portfolio", icon: "portfolio", color: AMBER, tasks: portfolioTasks });
     }
 
-    // 2. Management groups (as parent sections containing hotel sub-rows)
-    const hotelsSeen = new Set<string>();
-    for (const [groupName, groupHotels] of Object.entries(mgmtGroups).sort(([a], [b]) => a.localeCompare(b))) {
-      const groupTasks = activeTasks.filter((t) => t.hotel_name && groupHotels.has(t.hotel_name));
-      if (groupTasks.length > 0) {
-        result.push({ key: `__group__${groupName}`, label: groupName, icon: "group", color: PURPLE, tasks: groupTasks });
-        groupHotels.forEach((h) => hotelsSeen.add(h));
-      }
+    const hotelTaskMap: Record<string, CrmTask[]> = {};
+    for (const t of activeTasks) {
+      if (!t.hotel_name) continue;
+      (hotelTaskMap[t.hotel_name] ||= []).push(t);
     }
-
-    // 3. Individual hotels not in any group
-    const ungroupedHotels = new Set<string>();
-    activeTasks.forEach((t) => { if (t.hotel_name && !hotelsSeen.has(t.hotel_name)) ungroupedHotels.add(t.hotel_name); });
-    for (const hotel of Array.from(ungroupedHotels).sort()) {
-      const hotelTasks = activeTasks.filter((t) => t.hotel_name === hotel);
-      if (hotelTasks.length > 0) {
-        result.push({ key: hotel, label: hotel, icon: "hotel", color: BLUE, tasks: hotelTasks });
-      }
+    for (const hotel of Object.keys(hotelTaskMap).sort((a, b) => a.localeCompare(b))) {
+      result.push({ key: hotel, label: hotel, icon: "hotel", color: BLUE, tasks: hotelTaskMap[hotel] });
     }
 
     return result;
-  }, [activeTasks, portfolioTasks, mgmtGroups]);
+  }, [activeTasks, portfolioTasks]);
 
   function renderTaskRow(task: CrmTask, i: number) {
     const pCfg = PRIORITY_CFG[task.priority];
@@ -859,35 +803,32 @@ function HotelView({
     const isOverdue = task.due_date ? task.due_date < todayStr : false;
     return (
       <div key={task.id} onClick={() => onTaskClick(task.id)} style={{
-        display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
-        padding: "10px 16px 10px 52px", alignItems: "center",
-        borderTop: `1px solid ${BORDER}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+        display: "grid", gridTemplateColumns: "90px 1fr 110px 100px 130px 90px",
+        padding: "10px 16px 10px 44px", alignItems: "center", gap: 8,
+        borderTop: `1px solid ${BORDER}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
         transition: "background 0.12s", cursor: "pointer",
       }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.03)")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)")}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: TEXT_DIM, fontSize: 11 }}>CRM-{task.id}</span>
-          {task.hotel_name && <span style={{ color: TEXT_DIM, fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${BLUE}10`, border: `1px solid ${BLUE}15` }}>{task.hotel_name.length > 22 ? task.hotel_name.slice(0, 22) + "\u2026" : task.hotel_name}</span>}
-        </div>
-        <div>
+        onMouseEnter={(e) => (e.currentTarget.style.background = `${BLUE}08`)}
+        onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)")}>
+        <span style={{ color: TEXT_DIM, fontSize: 10, fontFamily: "monospace" }}>CRM-{task.id}</span>
+        <div style={{ minWidth: 0 }}>
           <span style={{ color: TEXT, fontSize: 12, fontWeight: 500 }}>{task.title}</span>
           {task.tags.length > 0 && (
-            <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
-              {task.tags.slice(0, 2).map((tag) => <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: BORDER, color: TEXT_DIM }}>{tag}</span>)}
+            <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
+              {task.tags.slice(0, 2).map((tag) => <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: INPUT_BG, color: TEXT_DIM, border: `1px solid ${BORDER}` }}>{tag}</span>)}
             </div>
           )}
         </div>
-        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cCfg.color}15`, color: cCfg.color, fontWeight: 500, width: "fit-content" }}>{cCfg.label}</span>
+        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cCfg.color}15`, color: cCfg.color, fontWeight: 600, letterSpacing: "0.3px", width: "fit-content" }}>{cCfg.label}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color }} />
-          <span style={{ color: pCfg.color, fontSize: 11 }}>{pCfg.label}</span>
+          <Flag size={10} color={pCfg.color} fill={task.priority === "urgent" ? pCfg.color : "none"} />
+          <span style={{ color: pCfg.color, fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>{pCfg.label}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Avatar name={task.assignee || "?"} size={20} />
           <span style={{ color: TEXT_MID, fontSize: 11 }}>{task.assignee || "Unassigned"}</span>
         </div>
-        <span style={{ color: isOverdue ? RED : TEXT_DIM, fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={{ color: isOverdue ? RED : TEXT_DIM, fontSize: 11, display: "flex", alignItems: "center", gap: 4, fontWeight: isOverdue ? 600 : 400 }}>
           {isOverdue && <AlertTriangle size={10} />}
           {task.due_date ? formatDate(task.due_date) : "\u2014"}
         </span>
@@ -896,67 +837,82 @@ function HotelView({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <div style={{
-        display: "grid", gridTemplateColumns: "260px 1fr 100px 100px 110px 100px",
-        padding: "10px 16px", backgroundColor: R.card, borderRadius: "8px 8px 0 0",
-        border: `1px solid ${BORDER}`, borderBottom: "none",
-      }}>
-        {["Scope", "Task", "Category", "Priority", "Assignee", "Due Date"].map((h) => (
-          <span key={h} style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>{h}</span>
-        ))}
-      </div>
-
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {sections.map((section) => {
         const isExpanded = expandedHotel === section.key;
         const iconEl = section.icon === "portfolio"
           ? <Globe size={14} style={{ color: section.color }} />
-          : section.icon === "group"
-            ? <Users size={14} style={{ color: section.color }} />
-            : <Building2 size={14} style={{ color: section.color }} />;
+          : <Building2 size={14} style={{ color: section.color }} />;
 
         return (
-          <div key={section.key} style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, borderBottom: "none" }}>
+          <div key={section.key} style={{
+            backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden",
+          }}>
             <div onClick={() => setExpandedHotel(isExpanded ? null : section.key)}
-              style={{ display: "grid", gridTemplateColumns: "260px 1fr 100px", padding: "12px 16px", cursor: "pointer", transition: "background 0.12s", alignItems: "center" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.025)")}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+                cursor: "pointer", transition: "background 0.12s",
+                borderBottom: isExpanded ? `1px solid ${BORDER}` : "none",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = `${BLUE}06`)}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <ChevronDown size={14} style={{ color: TEXT_DIM, transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-                {iconEl}
-                <span style={{ color: TEXT, fontSize: 13, fontWeight: 600 }}>{section.label}</span>
-                {section.icon !== "hotel" && (
-                  <span style={{
-                    fontSize: 9, padding: "1px 8px", borderRadius: 10,
-                    background: `${section.color}15`, color: section.color, fontWeight: 600,
-                    textTransform: "uppercase", letterSpacing: "0.03em",
-                  }}>
-                    {section.icon === "portfolio" ? "Portfolio" : "Group"}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <ChevronDown size={14} style={{ color: TEXT_DIM, transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s", flexShrink: 0 }} />
+              {iconEl}
+              <span style={{ color: TEXT, fontSize: 13, fontWeight: 600 }}>{section.label}</span>
+              {section.icon === "portfolio" && (
+                <span style={{
+                  fontSize: 9, padding: "2px 8px", borderRadius: 10,
+                  background: `${section.color}15`, color: section.color, fontWeight: 600,
+                  textTransform: "uppercase", letterSpacing: "0.04em",
+                }}>
+                  Portfolio
+                </span>
+              )}
+              <div style={{ flex: 1 }} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 {Object.entries(CATEGORY_CFG).map(([cat, cfg]) => {
                   const count = section.tasks.filter((t) => t.category === cat).length;
                   if (!count) return null;
-                  return <span key={cat} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${cfg.color}15`, color: cfg.color, fontWeight: 500 }}>{cfg.label} {count}</span>;
+                  return (
+                    <span key={cat} style={{
+                      fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                      background: `${cfg.color}15`, color: cfg.color, fontWeight: 600, letterSpacing: "0.3px",
+                    }}>
+                      {cfg.label} {count}
+                    </span>
+                  );
                 })}
               </div>
-              <span style={{ color: TEXT_DIM, fontSize: 12, textAlign: "right" }}>
+              <span style={{
+                color: TEXT_MID, fontSize: 11, fontWeight: 600,
+                padding: "3px 10px", borderRadius: 10, background: INPUT_BG, minWidth: 56, textAlign: "center",
+              }}>
                 {section.tasks.length} task{section.tasks.length !== 1 ? "s" : ""}
               </span>
             </div>
-            {isExpanded && section.tasks.map((task, i) => renderTaskRow(task, i))}
+            {isExpanded && (
+              <div>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "90px 1fr 110px 100px 130px 90px",
+                  padding: "8px 16px 8px 44px", gap: 8,
+                  background: R.card, borderBottom: `1px solid ${BORDER}`,
+                }}>
+                  {["ID", "Task", "Category", "Priority", "Assignee", "Due"].map((h) => (
+                    <span key={h} style={{ color: TEXT_DIM, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</span>
+                  ))}
+                </div>
+                {section.tasks.map((task, i) => renderTaskRow(task, i))}
+              </div>
+            )}
           </div>
         );
       })}
 
       {sections.length === 0 && (
-        <div style={{ padding: "40px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12, backgroundColor: CARD_BG, border: `1px solid ${BORDER}` }}>
+        <div style={{ padding: "40px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12, backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 8 }}>
           No active tasks
         </div>
       )}
-      <div style={{ borderBottom: `1px solid ${BORDER}`, borderRadius: "0 0 8px 8px" }} />
     </div>
   );
 }
@@ -1052,11 +1008,11 @@ function TimelineView({
     .sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""));
 
   return (
-    <div style={{ background: CARD_BG, borderRadius: 10, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
+    <div style={{ background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
       {/* Header — dates */}
-      <div style={{ display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`, borderBottom: `1px solid ${BORDER}` }}>
-        <div style={{ padding: "10px 16px", background: R.card }}>
-          <span style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>Task</span>
+      <div style={{ display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`, borderBottom: `1px solid ${BORDER}`, background: R.card }}>
+        <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
+          <span style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Task</span>
         </div>
         {days.map((d) => {
           const ds = format(d, "yyyy-MM-dd");
@@ -1064,11 +1020,13 @@ function TimelineView({
           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
           return (
             <div key={ds} style={{
-              padding: "6px 2px", textAlign: "center", background: isToday ? `${BLUE}10` : isWeekend ? "rgba(255,255,255,0.015)" : R.card,
-              borderLeft: `1px solid ${BORDER}`, borderBottom: isToday ? `2px solid ${BLUE}` : "none",
+              padding: "8px 2px", textAlign: "center",
+              background: isToday ? `${BLUE}12` : isWeekend ? "rgba(255,255,255,0.015)" : "transparent",
+              borderLeft: `1px solid ${BORDER}`,
+              borderBottom: isToday ? `2px solid ${BLUE}` : "none",
             }}>
-              <div style={{ color: isToday ? BLUE : TEXT_DIM, fontSize: 9, fontWeight: 600 }}>{format(d, "EEE")}</div>
-              <div style={{ color: isToday ? BLUE : TEXT_MID, fontSize: 11, fontWeight: isToday ? 700 : 400 }}>{format(d, "d")}</div>
+              <div style={{ color: isToday ? BLUE : TEXT_DIM, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>{format(d, "EEE")}</div>
+              <div style={{ color: isToday ? BLUE : TEXT_MID, fontSize: 11, fontWeight: isToday ? 700 : 500, marginTop: 2 }}>{format(d, "d")}</div>
             </div>
           );
         })}
@@ -1076,17 +1034,19 @@ function TimelineView({
 
       {/* Rows */}
       {tasksWithDates.length === 0 && (
-        <div style={{ padding: "40px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12 }}>
+        <div style={{ padding: "48px 16px", textAlign: "center", color: TEXT_DIM, fontSize: 12 }}>
           No tasks with due dates in this period
         </div>
       )}
       {tasksWithDates.map((task, i) => {
         const pCfg = PRIORITY_CFG[task.priority];
+        const cCfg = CATEGORY_CFG[task.category];
         const dueDateObj = new Date(task.due_date! + "T00:00:00");
         const createdDateObj = new Date(task.created_at + "T00:00:00");
         const startCol = Math.max(0, differenceInCalendarDays(createdDateObj, start));
         const endCol = differenceInCalendarDays(dueDateObj, start);
         const isOverdue = task.due_date! < todayStr;
+        const barColor = isOverdue ? RED : cCfg.color;
 
         return (
           <div key={task.id} onClick={() => onTaskClick(task.id)} style={{
@@ -1094,14 +1054,21 @@ function TimelineView({
             borderTop: i > 0 ? `1px solid ${BORDER}` : "none",
             cursor: "pointer", transition: "background 0.12s",
           }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.02)")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = `${BLUE}06`)}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
-            <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderRight: `1px solid ${BORDER}` }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color, flexShrink: 0 }} />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: TEXT, fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
-                <div style={{ color: TEXT_DIM, fontSize: 10 }}>{task.assignee || "Unassigned"}</div>
+            <div style={{ padding: "10px 16px 10px 12px", display: "flex", alignItems: "center", gap: 10, borderRight: `1px solid ${BORDER}` }}>
+              {/* Category stripe */}
+              <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: cCfg.color, flexShrink: 0 }} />
+              <Avatar name={task.assignee || "?"} size={22} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ color: TEXT, fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: pCfg.color, flexShrink: 0 }} title={pCfg.label} />
+                  <span style={{ color: TEXT_DIM, fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {task.hotel_name || task.assignee || "Unassigned"}
+                  </span>
+                </div>
               </div>
             </div>
             {days.map((d, di) => {
@@ -1115,22 +1082,23 @@ function TimelineView({
               return (
                 <div key={ds} style={{
                   borderLeft: `1px solid ${BORDER}`,
-                  background: isWeekend ? "rgba(255,255,255,0.01)" : "transparent",
-                  position: "relative", padding: "4px 1px", display: "flex", alignItems: "center",
+                  background: isWeekend ? "rgba(255,255,255,0.015)" : "transparent",
+                  position: "relative", padding: "6px 1px", display: "flex", alignItems: "center",
                 }}>
                   {isInRange && (
                     <div style={{
                       height: 22, width: "100%",
-                      background: isOverdue ? `${RED}20` : `${pCfg.color}20`,
+                      background: `${barColor}22`,
                       borderRadius: isStart && isEnd ? 4 : isStart ? "4px 0 0 4px" : isEnd ? "0 4px 4px 0" : 0,
-                      border: isDueDay ? `1px solid ${isOverdue ? RED : pCfg.color}40` : "none",
+                      borderLeft: isStart ? `2px solid ${barColor}` : "none",
+                      borderRight: isEnd ? `2px solid ${barColor}` : "none",
                     }} />
                   )}
                   {isDueDay && (
                     <div style={{
                       position: "absolute", right: 2, top: "50%", transform: "translateY(-50%)",
                       width: 8, height: 8, borderRadius: "50%",
-                      background: isOverdue ? RED : pCfg.color,
+                      background: barColor, boxShadow: `0 0 0 2px ${CARD_BG}`,
                     }} />
                   )}
                 </div>
@@ -1262,140 +1230,6 @@ function MyWorkView({
 }
 
 
-// ═══════════════════════════════════════════════════
-// AUTOMATIONS PANEL
-// ═══════════════════════════════════════════════════
-
-function AutomationsPanel({
-  automations, setAutomations, onClose,
-}: {
-  automations: Automation[];
-  setAutomations: (a: Automation[]) => void;
-  onClose: () => void;
-}) {
-  const [showNewRule, setShowNewRule] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newTrigger, setNewTrigger] = useState("When status changes to Done");
-  const [newAction, setNewAction] = useState("Send email to assignee");
-
-  const triggers = [
-    "When status changes to Done",
-    "When status changes to Review",
-    "When status changes to In Progress",
-    "When task becomes overdue",
-    "When urgent task has no update for 24h",
-    "When task is created",
-    "When priority changes to Urgent",
-  ];
-
-  const actions = [
-    "Send email to assignee",
-    "Send email to assignee + Karol",
-    "Set assignee to Karol",
-    "Set assignee to Maya",
-    "Send Slack notification to #ops",
-    "Archive task",
-    "Set priority to Urgent",
-    "Move to Review column",
-  ];
-
-  function toggleEnabled(id: string) {
-    setAutomations(automations.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a));
-  }
-
-  function deleteAutomation(id: string) {
-    setAutomations(automations.filter((a) => a.id !== id));
-  }
-
-  function addAutomation() {
-    if (!newName.trim()) return;
-    setAutomations([...automations, {
-      id: `a${Date.now()}`,
-      name: newName.trim(),
-      trigger: newTrigger,
-      action: newAction,
-      enabled: true,
-    }]);
-    setNewName("");
-    setShowNewRule(false);
-  }
-
-  return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50 }} />
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: 560,
-        background: BG_PAGE, borderLeft: `1px solid ${BORDER}`, zIndex: 51,
-        display: "flex", flexDirection: "column", boxShadow: "-8px 0 40px rgba(0,0,0,0.4)",
-        animation: "slideInRight 0.2s ease-out",
-      }}>
-        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <Zap size={18} style={{ color: AMBER }} />
-          <span style={{ color: TEXT, fontSize: 16, fontWeight: 600, flex: 1 }}>Automations</span>
-          <button onClick={() => setShowNewRule(!showNewRule)} style={{
-            display: "flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 6,
-            border: "none", background: BLUE, color: R.sidebar, fontSize: 12, fontWeight: 600, cursor: "pointer",
-          }}>
-            <Plus size={13} /> New Rule
-          </button>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4 }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
-          {showNewRule && (
-            <div style={{ marginBottom: 20, padding: 16, background: CARD_BG, borderRadius: 10, border: `1px solid ${BLUE}30` }}>
-              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Rule name..."
-                style={{ width: "100%", padding: "8px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 13, outline: "none", marginBottom: 12 }} />
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Trigger</div>
-                  <select value={newTrigger} onChange={(e) => setNewTrigger(e.target.value)}
-                    style={{ width: "100%", padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }}>
-                    {triggers.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Action</div>
-                  <select value={newAction} onChange={(e) => setNewAction(e.target.value)}
-                    style={{ width: "100%", padding: "7px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }}>
-                    {actions.map((a) => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button onClick={() => setShowNewRule(false)} style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${BORDER}`, background: INPUT_BG, color: TEXT_MID, fontSize: 12, cursor: "pointer" }}>Cancel</button>
-                <button onClick={addAutomation} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: BLUE, color: R.sidebar, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add Rule</button>
-              </div>
-            </div>
-          )}
-
-          {automations.length === 0 && <div style={{ padding: "40px 0", textAlign: "center", color: TEXT_DIM, fontSize: 13 }}>No automation rules yet</div>}
-
-          {automations.map((a) => (
-            <div key={a.id} style={{
-              display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", marginBottom: 8,
-              background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`, opacity: a.enabled ? 1 : 0.5,
-            }}>
-              <Zap size={16} style={{ color: a.enabled ? AMBER : TEXT_DIM, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: TEXT, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{a.name}</div>
-                <div style={{ color: TEXT_DIM, fontSize: 11 }}>{a.trigger} &rarr; {a.action}</div>
-              </div>
-              <ToggleSwitch on={a.enabled} onToggle={() => toggleEnabled(a.id)} />
-              <button onClick={() => deleteAutomation(a.id)} style={{
-                background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 4,
-              }}><Trash2 size={14} /></button>
-            </div>
-          ))}
-        </div>
-      </div>
-      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-    </>
-  );
-}
-
 
 // ═══════════════════════════════════════════════════
 // TASK DETAIL PANEL (Jira-style slide-out)
@@ -1475,6 +1309,11 @@ function TaskDetailPanel({
   async function handleAssigneeChange(name: string) {
     setShowAssigneePicker(false);
     await onUpdateTask(task.id, { assignee: name, updated_by: userName });
+    await onRefresh();
+  }
+
+  async function handleDueDateChange(dateStr: string | null) {
+    await onUpdateTask(task.id, { due_date: dateStr, updated_by: userName });
     await onRefresh();
   }
 
@@ -1686,15 +1525,42 @@ function TaskDetailPanel({
               </div>
             </DetailField>
 
-            {/* Due Date */}
+            {/* Due Date — editable */}
             <DetailField label="Due Date">
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Calendar size={13} style={{ color: isOverdue ? RED : TEXT_DIM }} />
-                <span style={{ color: isOverdue ? RED : TEXT, fontSize: 12, fontWeight: isOverdue ? 600 : 400 }}>
-                  {task.due_date ? formatDateLong(task.due_date) : "No date"}
-                </span>
-                {isOverdue && <span style={{ color: RED, fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${RED}15` }}>OVERDUE</span>}
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button style={{
+                    display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px",
+                    borderRadius: 6, background: isOverdue ? `${RED}12` : INPUT_BG,
+                    border: `1px solid ${isOverdue ? `${RED}30` : BORDER}`,
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}>
+                    <Calendar size={13} style={{ color: isOverdue ? RED : TEXT_DIM }} />
+                    <span style={{ color: isOverdue ? RED : TEXT, fontSize: 12, fontWeight: isOverdue ? 600 : 400 }}>
+                      {task.due_date ? formatDateLong(task.due_date) : "No date"}
+                    </span>
+                    {isOverdue && <span style={{ color: RED, fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: `${RED}15` }}>OVERDUE</span>}
+                    <ChevronDown size={11} style={{ color: isOverdue ? RED : TEXT_DIM }} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[60]" align="start" style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, zIndex: 60 }}>
+                  <ShadcnCalendar
+                    mode="single"
+                    selected={task.due_date ? new Date(task.due_date + "T00:00:00") : undefined}
+                    onSelect={(d) => { if (d) handleDueDateChange(format(d, "yyyy-MM-dd")); }}
+                    initialFocus
+                  />
+                  {task.due_date && (
+                    <div style={{ padding: 8, borderTop: `1px solid ${BORDER}` }}>
+                      <button onClick={() => handleDueDateChange(null)} style={{
+                        width: "100%", padding: "6px 10px", borderRadius: 5,
+                        border: `1px solid ${BORDER}`, background: "transparent",
+                        color: TEXT_DIM, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      }}>Clear date</button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </DetailField>
 
             {/* Property */}
@@ -1738,7 +1604,7 @@ function TaskDetailPanel({
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}><Plus size={12} /></button>
                   </PopoverTrigger>
-                  <PopoverContent style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 160 }} align="start">
+                  <PopoverContent className="z-[60]" style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 160, zIndex: 60 }} align="start">
                     {team.filter((m) => !taskWatchers.find((w) => w.name === m.name)).map((m) => (
                       <button key={m.name} onClick={() => addWatcher(m.name)} style={{
                         display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 12px",
@@ -2163,7 +2029,7 @@ function CreateTaskPanel({
         position: "fixed", top: 0, right: 0, bottom: 0, width: 620,
         background: CARD_BG, borderLeft: `1px solid ${BORDER}`, zIndex: 51,
         display: "flex", flexDirection: "column",
-        boxShadow: "0 0 20px rgba(57,189,248,0.08), -8px 0 40px rgba(0,0,0,0.4)",
+        boxShadow: "-8px 0 40px rgba(0,0,0,0.4)",
         animation: "slideInRight 0.2s ease-out",
       }}>
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -2453,8 +2319,8 @@ function CreateTaskPanel({
             fontFamily: "system-ui, -apple-system, sans-serif",
             opacity: creating ? 0.7 : 1,
           }}
-            onMouseEnter={(e) => { if (!creating) e.currentTarget.style.background = "#29ADEE"; }}
-            onMouseLeave={(e) => { if (!creating) e.currentTarget.style.background = BLUE; }}
+            onMouseEnter={(e) => { if (!creating) e.currentTarget.style.opacity = "0.85"; }}
+            onMouseLeave={(e) => { if (!creating) e.currentTarget.style.opacity = "1"; }}
           >{creating ? "Creating..." : (splitByChannel && selChannels.length > 1) ? `Create ${selChannels.length} Tasks` : "Create"}</button>
         </div>
       </div>
@@ -2499,16 +2365,15 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
       onContextMenu={onContextMenu}
       style={{
         backgroundColor: bulkSelected ? `${BLUE}08` : CARD_BG,
-        borderRadius: 6, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
-        padding: "8px 10px", cursor: bulkMode ? "pointer" : "grab", transition: "all 0.15s",
-        borderLeft: `3px solid ${cCfg.color}`,
+        borderRadius: 8, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
+        padding: "14px 16px", cursor: bulkMode ? "pointer" : "grab", transition: "border-color 0.15s",
         opacity: isDragging ? 0.4 : 1,
       }}
-      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.borderColor = `${BLUE}30`; e.currentTarget.style.boxShadow = `0 2px 12px rgba(57,189,248,0.08)`; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderLeftColor = cCfg.color; }}>
-      {/* Row 1: ID + priority dot | assignee + badges */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.borderColor = `${BLUE}40`; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; }}>
+      {/* Row 1: Category pill + Priority flag */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {bulkMode && (
             <div style={{
               width: 14, height: 14, borderRadius: 3, flexShrink: 0,
@@ -2519,30 +2384,67 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
               {bulkSelected && <CheckCircle2 size={8} style={{ color: "#0d0d0d" }} />}
             </div>
           )}
-          <span style={{ color: TEXT_DIM, fontSize: 9, fontFamily: "monospace" }}>CRM-{task.id}</span>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", background: pCfg.color, flexShrink: 0 }} title={pCfg.label} />
-          {dueTier === "overdue" && <span style={{ color: RED, fontSize: 8, fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 2 }}><AlertTriangle size={8} /> Overdue</span>}
-          {dueTier === "today" && <span style={{ color: AMBER, fontSize: 8, fontWeight: 600, textTransform: "uppercase" }}>Today</span>}
+          <span style={{
+            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
+            background: `${cCfg.color}15`, color: cCfg.color, letterSpacing: "0.3px",
+          }}>
+            {cCfg.label}
+          </span>
+          {dueTier === "overdue" && <span style={{ color: RED, fontSize: 9, fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 2 }}><AlertTriangle size={9} /> Overdue</span>}
+          {dueTier === "today" && <span style={{ color: AMBER, fontSize: 9, fontWeight: 600, textTransform: "uppercase" }}>Today</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {task.subtask_total > 0 && <span style={{ color: task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM, fontSize: 9, display: "flex", alignItems: "center", gap: 2 }}><CheckCircle2 size={8} /> {task.subtask_done}/{task.subtask_total}</span>}
-          {task.comment_count > 0 && <span style={{ color: TEXT_DIM, fontSize: 9, display: "flex", alignItems: "center", gap: 2 }}><MessageSquare size={8} /> {task.comment_count}</span>}
-          <span style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>{task.assignee || "—"}</span>
-          <Avatar name={task.assignee || "?"} size={24} />
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <Flag size={10} color={pCfg.color} fill={task.priority === "urgent" ? pCfg.color : "none"} />
+          <span style={{ fontSize: 9, color: pCfg.color, fontWeight: 600, textTransform: "uppercase" }}>{task.priority}</span>
         </div>
       </div>
+
       {/* Row 2: Title */}
-      <div style={{ color: TEXT, fontSize: 12, fontWeight: 500, lineHeight: 1.4, marginBottom: 4 }}>{task.title}</div>
-      {/* Row 3: Properties */}
+      <div style={{ fontSize: 13, fontWeight: 500, color: TEXT, lineHeight: 1.4, marginBottom: 10 }}>
+        {task.title}
+      </div>
+
+      {/* Row 3: Hotel */}
       {hotelDisplay !== "\u2014" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-          <Building2 size={9} style={{ color: TEXT_DIM, flexShrink: 0 }} />
-          <span style={{ color: TEXT_MID, fontSize: 10, fontWeight: 500 }}>{hotelDisplay}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
+          <Building2 size={10} color={TEXT_DIM} />
+          <span style={{ fontSize: 11, color: TEXT_MID }}>{hotelDisplay}</span>
         </div>
       )}
-      {/* Row 4: Channel tags */}
+
+      {/* Row 4: Footer — avatar + CRM-ID | subtasks + comments + due */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Avatar name={task.assignee || "?"} size={22} />
+          <span style={{ color: TEXT_DIM, fontSize: 9, fontFamily: "monospace" }}>CRM-{task.id}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {task.subtask_total > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <CheckCircle2 size={10} color={task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM} />
+              <span style={{ fontSize: 10, color: task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM }}>{task.subtask_done}/{task.subtask_total}</span>
+            </div>
+          )}
+          {task.comment_count > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <MessageSquare size={10} color={TEXT_DIM} />
+              <span style={{ fontSize: 10, color: TEXT_DIM }}>{task.comment_count}</span>
+            </div>
+          )}
+          {task.due_date && (
+            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <Clock size={10} color={dueTier === "overdue" ? RED : TEXT_DIM} />
+              <span style={{ fontSize: 10, color: dueTier === "overdue" ? RED : TEXT_DIM, fontWeight: dueTier === "overdue" ? 600 : 400 }}>
+                {formatDate(task.due_date)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Optional: channel tags below footer */}
       {task.tags.length > 0 && (
-        <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 2 }}>
+        <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 10 }}>
           {task.tags.slice(0, 4).map((tag) => (
             <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: INPUT_BG, color: TEXT_DIM, border: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>{tag}</span>
           ))}

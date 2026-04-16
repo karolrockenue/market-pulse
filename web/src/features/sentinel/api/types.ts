@@ -91,15 +91,3 @@ export interface AssetConfig {
   calculator_settings?: any; // JSONB
 }
 
-// Shadowfax
-export interface ShadowfaxProperty {
-  property_id: string;
-  property_name: string;
-  genius_discount_pct: number;
-}
-
-export interface ShadowfaxScrapeResult {
-  price?: string;
-  roomName?: string;
-  error?: string;
-}

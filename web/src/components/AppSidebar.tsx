@@ -333,26 +333,14 @@ export function AppSidebar({
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDash3", "mpReportsHub", "mpDemandRadar", "mpCompsetIntel", "mpCompsetView", "mpMyRates", "mpChannelPricing", "mpChannelPricingV2", "mpChannelPricingV3", "mpDistribution", "mpCrmBoard", "mpRiskOverview", "mpControlPanel", "mpControlPanelV2", "mpAdminHub", "mpLogin", "mpLoginV2", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
                 {studioOpen && (
                   <>
-                    {navItem("MP Dashboard", "mpDash3", MonitorSmartphone, true)}
                     {navItem("MP Reports", "mpReportsHub", MonitorSmartphone, true)}
                     {navItem("MP Demand Radar", "mpDemandRadar", MonitorSmartphone, true)}
-                    {navItem("MP Compset", "mpCompsetView", MonitorSmartphone, true)}
-                    {navItem("MP Compset V2", "mpCompsetViewV2", MonitorSmartphone, true)}
-                    {navItem("MP My Rates", "mpMyRates", MonitorSmartphone, true)}
-                    {navItem("MP Channel Pricing", "mpChannelPricing", MonitorSmartphone, true)}
-                    {navItem("MP Channel Pricing V2", "mpChannelPricingV2", MonitorSmartphone,  true)}
-                    {navItem("MP Channel Pricing V3", "mpChannelPricingV3", MonitorSmartphone, true)}
-                    {navItem("MP Distribution", "mpDistribution", MonitorSmartphone, true)}
-                    {navItem("MP CRM", "mpCrmBoard", MonitorSmartphone, true)}
-                    {navItem("MP Control Panel", "mpControlPanel", MonitorSmartphone, true)}
-                    {navItem("MP Control Panel V2", "mpControlPanelV2", MonitorSmartphone, true)}
-                    {navItem("MP Admin Hub", "mpAdminHub", MonitorSmartphone, true)}
+                    {navItem("MP Risk Overview", "mpRiskOverview", MonitorSmartphone, true)}
                     {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
-                    {navItem("MP Login V2", "mpLoginV2", MonitorSmartphone, true)}
-                    {navItem("MP Concepts", "mpLoginConcepts", MonitorSmartphone, true)}
+                    {navItem("Email Signatures", "emailSignatures", MonitorSmartphone, true)}
                     {navItem("Deck V2", "deckV2", Presentation, true)}
                     {navItem("Shreeji Deck", "shreejiDeck", Presentation, true)}
                     {navItem("Canvas", "canvas", Palette, true)}

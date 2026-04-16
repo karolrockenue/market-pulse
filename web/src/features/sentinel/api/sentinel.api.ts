@@ -3,8 +3,6 @@ import {
   RateCalendarDay,
   RateOverride,
   AssetConfig,
-  ShadowfaxProperty,
-  ShadowfaxScrapeResult,
 } from "./types";
 
 // --- CONTROL PANEL (CONFIGURATION) ---
@@ -191,36 +189,6 @@ export const getDailyPickup = async (
   const res = await fetch(`/api/metrics/pickup?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch pickup data");
   return await res.json();
-};
-
-// --- SHADOWFAX (MARKET INTEL) ---
-
-export const getShadowfaxProperties = async (): Promise<
-  ShadowfaxProperty[]
-> => {
-  const res = await fetch("/api/market/shadowfax/properties");
-  if (!res.ok) throw new Error("Failed to fetch Shadowfax properties");
-  return await res.json();
-};
-
-export const runShadowfaxScrape = async (
-  hotelId: string,
-  checkinDate: string
-): Promise<ShadowfaxScrapeResult> => {
-  const res = await fetch("/api/market/shadowfax/price", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hotelId, checkinDate }),
-  });
-
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Scrape failed");
-
-  // Normalize response shape
-  if (json.price && typeof json.price === "object" && json.price.price) {
-    return json.price;
-  }
-  return { price: json.price, roomName: json.roomName };
 };
 
 // --- PROPERTY HUB (ASSETS) ---
