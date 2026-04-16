@@ -298,7 +298,7 @@ app.use("/api/mews", mewsOnboardingRoutes);
 // 2. Domain Engines (New Architecture)
 app.use("/api/metrics", metricsRoutes); // KPI, Dashboard, Reports, Portfolio
 app.use("/api/hotels", hotelsRoutes); // Config, Budgets, Assets, CompSets
-app.use("/api/market", marketRoutes); // Trends, Pace, Scraper, Shadowfax
+app.use("/api/market", marketRoutes); // Trends, Pace, Market Intel
 
 // 3. Operational Engines
 app.use("/api/sentinel", sentinelRoutes); // AI Pricing

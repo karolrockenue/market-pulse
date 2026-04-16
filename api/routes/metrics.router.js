@@ -412,9 +412,10 @@ router.get("/competitive-intel", requireUserApi, async (req, res) => {
       }
     }
 
-    // Fire KPI, ranking, and market-context queries in parallel
+    // Fire KPI, ranking, market-context, range, and competitor queries in parallel
     const totalHotels = competitorIds.length + 1;
-    const [kpiData, ranks, segRow, mktRow, tierRows, nbrRows] =
+    const granularity = req.query.granularity || 'daily';
+    const [kpiData, ranks, segRow, mktRow, tierRows, nbrRows, rangeMetrics, compData] =
       await Promise.all([
         MetricsService.getKPISummary(propertyId, startDate, endDate, competitorIds),
         competitorIds.length > 0
@@ -448,6 +449,10 @@ router.get("/competitive-intel", requireUserApi, async (req, res) => {
               [city],
             )
           : null,
+        // Own hotel metrics (replaces /range call)
+        MetricsService.getMetricsFromDB(propertyId, startDate, endDate, granularity),
+        // Competitor metrics (replaces /competitors call)
+        MetricsService.getCompetitorMetrics(competitorIds, startDate, endDate, granularity),
       ]);
 
     // Build ranking response
@@ -491,10 +496,90 @@ router.get("/competitive-intel", requireUserApi, async (req, res) => {
         : [],
     };
 
-    res.json({ kpis: kpiData, ranking, marketContext });
+    compData.source = scope === 'total-market'
+      ? "all hotels in the same city"
+      : "a comp set of local hotels in a similar quality class";
+
+    res.json({ kpis: kpiData, ranking, marketContext, range: { metrics: rangeMetrics }, competitors: compData });
   } catch (error) {
     console.error("Error in /competitive-intel:", error);
     res.status(500).json({ error: "Failed to fetch competitive intelligence." });
+  }
+});
+
+// Batch portfolio competitive — returns KPI + ranking for all properties in one call
+router.get("/portfolio-competitive", requireUserApi, async (req, res) => {
+  try {
+    const { propertyIds, startDate, endDate, scope } = req.query;
+    if (!propertyIds) return res.status(400).json({ error: "propertyIds is required." });
+
+    const ids = propertyIds.split(",").map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0) return res.json([]);
+
+    const rows = await Promise.all(
+      ids.map(async (propertyId) => {
+        // Resolve comp set once per property
+        let competitorIds = [];
+        if (scope === "total-market") {
+          const cityRes = await pgPool.query("SELECT city FROM hotels WHERE hotel_id = $1", [propertyId]);
+          if (cityRes.rows[0]?.city) {
+            const allCity = await pgPool.query(
+              "SELECT hotel_id FROM hotels WHERE city = $1 AND hotel_id != $2",
+              [cityRes.rows[0].city, propertyId],
+            );
+            competitorIds = allCity.rows.map((r) => r.hotel_id);
+          }
+        } else {
+          const compSetResult = await pgPool.query(
+            "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+            [propertyId],
+          );
+          competitorIds = compSetResult.rows.map((row) => row.competitor_hotel_id);
+          if (competitorIds.length === 0) {
+            const catRes = await pgPool.query(
+              "SELECT category, city FROM hotels WHERE hotel_id = $1",
+              [propertyId],
+            );
+            if (catRes.rows[0]?.category) {
+              const autoComp = await pgPool.query(
+                "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+                [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+              );
+              competitorIds = autoComp.rows.map((r) => r.hotel_id);
+            }
+          }
+        }
+
+        const totalHotels = competitorIds.length + 1;
+        const [kpiData, ranks, detailRes] = await Promise.all([
+          MetricsService.getKPISummary(propertyId, startDate, endDate, competitorIds),
+          competitorIds.length > 0
+            ? MetricsService.getMarketRanking(propertyId, competitorIds, startDate, endDate)
+            : null,
+          pgPool.query("SELECT category FROM hotels WHERE hotel_id = $1", [propertyId]),
+        ]);
+
+        let ranking;
+        if (competitorIds.length === 0) {
+          ranking = { occupancy: { rank: 1, total: 1 }, adr: { rank: 1, total: 1 }, revpar: { rank: 1, total: 1 } };
+        } else if (!ranks) {
+          ranking = { occupancy: { rank: totalHotels, total: totalHotels }, adr: { rank: totalHotels, total: totalHotels }, revpar: { rank: totalHotels, total: totalHotels } };
+        } else {
+          ranking = {
+            occupancy: { rank: parseInt(ranks.occupancy_rank, 10), total: totalHotels },
+            adr: { rank: parseInt(ranks.adr_rank, 10), total: totalHotels },
+            revpar: { rank: parseInt(ranks.revpar_rank, 10), total: totalHotels },
+          };
+        }
+
+        return { hotelId: propertyId, kpis: kpiData, ranking, category: detailRes.rows[0]?.category || null };
+      })
+    );
+
+    res.json(rows);
+  } catch (error) {
+    console.error("Error in /portfolio-competitive:", error);
+    res.status(500).json({ error: "Failed to fetch portfolio competitive data." });
   }
 });
 
