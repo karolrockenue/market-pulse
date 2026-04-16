@@ -19,19 +19,29 @@ import { ArchanesInvestorView } from "../market-intel/components/ArchanesInvesto
 
 
 // Admin Hook logic (simplified here to avoid circular dependency on Admin feature)
+// Demand Radar is now open to all users; /api/hotels is admin-only so a non-admin
+// gets 403 and the old code would set `hotels` to the error body, causing downstream
+// `.map is not a function` crashes inside DemandRadarView's useMemo. Fall back to
+// /api/hotels/mine for non-admins, and always land a real array in state.
 const useAllHotels = () => {
   const [hotels, setHotels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/hotels")
-      .then((res) => res.json())
-      .then((data) => setHotels(data))
-      .catch((err) => {
+    (async () => {
+      try {
+        let res = await fetch("/api/hotels");
+        if (!res.ok) res = await fetch("/api/hotels/mine");
+        const data = res.ok ? await res.json() : [];
+        setHotels(Array.isArray(data) ? data : []);
+      } catch (err) {
         console.error(err);
+        setHotels([]);
         toast.error("Failed to load hotel list");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   return { hotels, loading };

@@ -289,9 +289,10 @@ export function PortfolioRiskOverview() {
         const response = await fetch("/api/hotels");
         if (!response.ok) throw new Error("Failed to fetch hotel list for filters");
         const data = await response.json();
-        setAllHotels(data);
+        setAllHotels(Array.isArray(data) ? data : []);
       } catch (error: any) {
         console.error("Error fetching filter data:", error);
+        setAllHotels([]);
         toast.error("Failed to load filter options", { description: error.message });
       }
     };

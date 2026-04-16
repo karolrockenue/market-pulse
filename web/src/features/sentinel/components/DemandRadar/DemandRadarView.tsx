@@ -132,11 +132,13 @@ export function DemandRadarView({ allHotels, selectedProperty }: DemandRadarProp
   }, [cityName]);
 
   // Collect integer hotel IDs for portfolio-level queries
-  // Admin endpoint returns hotel_id AS property_id
+  // Admin endpoint returns hotel_id AS property_id; /api/hotels/mine returns hotel_id.
+  // Guarded against non-array values in case the upstream fetch failed/returned an error body.
   const hotelIds = useMemo(() => {
+    if (!Array.isArray(allHotels)) return [];
     return allHotels
-      ?.map((h: any) => parseInt(h.property_id || h.hotel_id))
-      .filter((id: number) => !isNaN(id) && id > 0) || [];
+      .map((h: any) => parseInt(h.property_id || h.hotel_id))
+      .filter((id: number) => !isNaN(id) && id > 0);
   }, [allHotels]);
   const hotelIdsParam = hotelIds.join(",");
 

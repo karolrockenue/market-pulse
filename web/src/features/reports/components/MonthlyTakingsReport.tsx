@@ -149,8 +149,9 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
     const fetchHotels = async () => {
       try {
         const res = await axios.get("/api/hotels");
-        // Robust mapping to handle variations in API response
-        const list = res.data.map((h: any) => ({
+        // Guard against non-array payloads (e.g. 403 error body for non-admin users)
+        const rows = Array.isArray(res.data) ? res.data : [];
+        const list = rows.map((h: any) => ({
           hotel_id: h.id || h.hotel_id,
           property_name: h.property_name || h.name || "Unknown Hotel",
           pms_property_id: h.pms_property_id,
@@ -158,6 +159,7 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
         setAvailableHotels(list);
       } catch (err) {
         console.error("Failed to fetch hotels", err);
+        setAvailableHotels([]);
       }
     };
     fetchHotels();
