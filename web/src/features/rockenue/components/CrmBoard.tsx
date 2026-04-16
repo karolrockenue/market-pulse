@@ -1738,7 +1738,7 @@ function TaskDetailPanel({
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}><Plus size={12} /></button>
                   </PopoverTrigger>
-                  <PopoverContent style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 160 }} align="start">
+                  <PopoverContent className="z-[60]" style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 160, zIndex: 60 }} align="start">
                     {team.filter((m) => !taskWatchers.find((w) => w.name === m.name)).map((m) => (
                       <button key={m.name} onClick={() => addWatcher(m.name)} style={{
                         display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 12px",
@@ -2356,7 +2356,7 @@ function CreateTaskPanel({
                     {dueDate ? format(new Date(dueDate + "T00:00:00"), "dd MMM yyyy") : "Select date..."}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}` }}>
+                <PopoverContent className="w-auto p-0 z-[60]" align="start" style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, zIndex: 60 }}>
                   <ShadcnCalendar mode="single" selected={dueDate ? new Date(dueDate + "T00:00:00") : undefined}
                     onSelect={(d) => d && setDueDate(format(d, "yyyy-MM-dd"))} initialFocus />
                 </PopoverContent>
