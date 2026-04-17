@@ -4,7 +4,10 @@ import { useState, lazy, Suspense } from "react";
 const RockenueDashboard = lazy(() => import("./components/RockenueDashboard").then(m => ({ default: m.RockenueDashboard })));
 const DistributionView = lazy(() => import("./components/DistributionView").then(m => ({ default: m.DistributionView })));
 const CrmBoard = lazy(() => import("./components/CrmBoard").then(m => ({ default: m.CrmBoard })));
-const ChannelPricingConcept = lazy(() => import("./components/ChannelPricingConcept").then(m => ({ default: m.ChannelPricingConcept })));
+// Channel Pricing page — MPChannels is the current implementation (row-based
+// Programs editor + smart add-channel flow). ChannelPricingConcept.tsx is the
+// previous horizontal-waterfall version kept on disk for easy rollback.
+const ChannelPricing = lazy(() => import("./components/MPChannels").then(m => ({ default: m.MPChannels })));
 const EmailSignatures = lazy(() => import("./components/EmailSignatures").then(m => ({ default: m.EmailSignatures })));
 const Canvas = lazy(() => import("./components/Canvas").then(m => ({ default: m.Canvas })));
 const MPReportsHub = lazy(() => import("./components/MPReportsHub").then(m => ({ default: m.MPReportsHub })));
@@ -46,7 +49,7 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
               userName={userName}
             />
           )}
-          {activeView === "channelPricing" && <ChannelPricingConcept />}
+          {activeView === "channelPricing" && <ChannelPricing />}
           {activeView === "emailSignatures" && <EmailSignatures />}
           {activeView === "canvas" && <Canvas />}
           {activeView === "mpReportsHub" && <MPReportsHub activeView={activeView} onNavigate={onNavigate} />}
