@@ -193,10 +193,12 @@ module.exports = async (request, response) => {
           const cloudbedsUserId =
             userResult.rows.length > 0 ? userResult.rows[0].user_id : null;
 
+          const todayIso = new Date().toISOString().slice(0, 10);
           const bulkInsertValues = datesToUpdate.map((date) => {
             const metrics = processedData[date];
             // This data structure matches what both adapters will return.
             return [
+              todayIso, // snapshot_taken_date
               date,
               hotel_id,
               metrics.rooms_sold || 0,
@@ -214,9 +216,10 @@ module.exports = async (request, response) => {
           // This single query works for both Cloudbeds and Mews data.
           // Note: occupancy_direct is no longer populated as it was a calculated field.
           const query = format(
-            `INSERT INTO daily_metrics_snapshots (stay_date, hotel_id, rooms_sold, capacity_count, cloudbeds_user_id, net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
+            `INSERT INTO daily_metrics_snapshots (snapshot_taken_date, stay_date, hotel_id, rooms_sold, capacity_count, cloudbeds_user_id, net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
              VALUES %L
              ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
+                 snapshot_taken_date = EXCLUDED.snapshot_taken_date,
                  rooms_sold = EXCLUDED.rooms_sold,
                  capacity_count = EXCLUDED.capacity_count,
                  cloudbeds_user_id = EXCLUDED.cloudbeds_user_id,

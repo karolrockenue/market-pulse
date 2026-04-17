@@ -604,6 +604,8 @@ web/src/guidelines/Guidelines.md – internal UI rules.
 3.0 LOGIC HUBS & FORMULAS
 3.1 Rate Replicator (OTA Sell-Rate Calculator)
 
+NOTE (2026-04-16): This per-hotel Booking.com-shaped waterfall is being superseded by the per-channel-with-overrides model on the Rockenue → Channel Pricing page (distribution_channel_pricing.steps JSONB + distribution_hotel_pricing_overrides). Both systems currently coexist; migration plan is documented in claude/todo.md under "Channel Pricing → Control Panel integration". My Rates (Current Sell Rate) will continue to use Booking.com's resolved stack after migration.
+
 Configured per hotel inside the Control Panel's "OTA Discount Stack" collapsible section. Settings are stored in rockenue_managed_assets (calculator_settings JSONB + strategic_multiplier + genius_discount_pct). The simulator (price waterfall) is available inline next to the settings.
 
 Sequential discount stack:

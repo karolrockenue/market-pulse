@@ -81,7 +81,11 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
     `[Mews Debug] ClientToken starts: ${body.ClientToken?.substring(0, 8)} | Endpoint: ${endpoint}`,
   );
 
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 4;
+  // Transient statuses worth retrying:
+  //   429  rate limit · 408 request timeout · 401 stale token
+  //   502/503/504 Cloudflare/edge transient · 520-524 Cloudflare-origin errors
+  const RETRYABLE = new Set([429, 408, 401, 502, 503, 504, 520, 521, 522, 523, 524]);
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -89,24 +93,39 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
       return response.data;
     } catch (error) {
       const status = error.response?.status;
+      const isNetErr = !error.response;
 
-      if ((status === 429 || status === 408 || status === 401) && attempt < MAX_RETRIES) {
+      if ((RETRYABLE.has(status) || isNetErr) && attempt < MAX_RETRIES) {
         const retryAfter =
           status === 429
             ? parseInt(error.response.headers["retry-after"] || "5", 10)
-            : Math.pow(2, attempt);
+            : Math.min(30, Math.pow(2, attempt)); // exponential: 2, 4, 8, 16, capped at 30s
 
         console.warn(
-          `[Mews API] ${status} on ${endpoint} — retry ${attempt}/${MAX_RETRIES} after ${retryAfter}s`,
+          `[Mews API] ${status || "network error"} on ${endpoint} — retry ${attempt}/${MAX_RETRIES} after ${retryAfter}s`,
         );
 
         await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
         continue;
       }
 
-      const errorMessage = error.response
-        ? JSON.stringify(error.response.data)
-        : error.message;
+      // Build a concise error message (Cloudflare responds with ~8kb of HTML
+      // that is useless in logs and poisons any UI toast).
+      let errorMessage;
+      if (error.response) {
+        const raw = error.response.data;
+        if (typeof raw === "string" && raw.includes("<html")) {
+          errorMessage = `HTTP ${status} (HTML response, truncated)`;
+        } else {
+          try {
+            errorMessage = JSON.stringify(raw).slice(0, 400);
+          } catch {
+            errorMessage = `HTTP ${status}`;
+          }
+        }
+      } else {
+        errorMessage = error.message;
+      }
 
       const maskedAccess = credentials.accessToken
         ? `${credentials.accessToken.substring(0, 4)}...${credentials.accessToken.slice(-4)}`
@@ -140,6 +159,30 @@ function toMewsUtc(dateString, timezone) {
   const localMidnight = `${dateString}T00:00:00`;
   const utcDate = fromZonedTime(localMidnight, timezone);
   return utcDate.toISOString();
+}
+
+/**
+ * Inverse of toMewsUtc: takes a Mews UTC timestamp (or ISO string) and
+ * returns the YYYY-MM-DD date it represents in the hotel's local timezone.
+ *
+ * IMPORTANT: do NOT use `new Date(utc).toISOString().split('T')[0]` — during
+ * BST (or any non-UTC zone) a local-midnight timestamp like
+ * `2026-04-16T23:00:00Z` resolves to the UTC date 2026-04-16, but the stay
+ * night it represents in London is 2026-04-17. Every downstream consumer
+ * that uses UTC-date slicing ends up with rows labelled one day off.
+ *
+ * @param {string} utcStr ISO-8601 UTC timestamp
+ * @param {string} timezone IANA timezone, e.g. 'Europe/London'
+ * @returns {string} 'YYYY-MM-DD' in the given timezone
+ */
+function utcToLocalDate(utcStr, timezone) {
+  // 'en-CA' locale reliably formats as YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(utcStr));
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -479,7 +522,9 @@ async function getOccupancyMetrics(
   const timeUnits = availabilityData.TimeUnitStartsUtc || [];
 
   timeUnits.forEach((utcStr, index) => {
-    const date = new Date(utcStr).toISOString().split("T")[0];
+    // Convert via hotel timezone — UTC-date slicing shifts every row off
+    // by one day during BST (midnight local = 23:00 UTC prev day).
+    const date = utcToLocalDate(utcStr, timezone);
     let availableRooms = 0;
 
     const categories = availabilityData.CategoryAvailabilities || [];
@@ -540,7 +585,7 @@ async function getRevenueMetrics(credentials, serviceId, startDate, endDate, tim
   const dailyTotals = {};
 
   allOrderItems.forEach((item) => {
-    const date = new Date(item.ConsumedUtc).toISOString().split("T")[0];
+    const date = utcToLocalDate(item.ConsumedUtc, timezone);
 
     if (!dailyTotals[date]) {
       dailyTotals[date] = { netRevenue: 0, grossRevenue: 0 };
@@ -643,6 +688,129 @@ async function probeCapacity(credentials, serviceId) {
   return total;
 }
 
+/**
+ * Per-service revenue aggregation via orderItems/getAll.
+ *
+ * Pulls every order item consumed in [startDate, endDate] local time,
+ * groups gross/net by ServiceId and by YYYY-MM. Used by the Mason Dashboard
+ * (on-demand reporting across Short/Mid/Long Stay) — no DB writes.
+ *
+ * @param {number} hotelId
+ * @param {string} startDate YYYY-MM-DD (hotel local)
+ * @param {string} endDate   YYYY-MM-DD (hotel local, inclusive)
+ * @param {string[]} [serviceIds] optional allowlist; if omitted returns all
+ * @returns {Promise<{
+ *   services: Array<{ id, name, type }>,
+ *   byServiceMonth: Record<string, Record<string, { gross, net, nights }>>,
+ *   months: string[]
+ * }>}
+ */
+async function getServiceRevenueByMonth(hotelId, startDate, endDate, serviceIds = null) {
+  const credentials = await getCredentials(hotelId);
+
+  // Hotel timezone for correct month boundaries
+  const hotelRow = await pgPool.query(
+    `SELECT pms_credentials FROM hotels WHERE hotel_id = $1`,
+    [hotelId],
+  );
+  const tz = hotelRow.rows[0]?.pms_credentials?.timezone || "Europe/London";
+
+  // 1. Service catalogue
+  const servicesResp = await _callMewsApi("services/getAll", credentials);
+  const allServices = (servicesResp.Services || []).map((s) => ({
+    id: s.Id,
+    name: s.Name,
+    type: s.Type,
+    isActive: s.IsActive,
+  }));
+  const want = serviceIds
+    ? new Set(serviceIds)
+    : new Set(allServices.map((s) => s.id));
+
+  // 2. orderItems window — Mews caps the interval at 3M1D, so split into
+  //    <=90-day chunks. Each chunk is itself paginated via Cursor.
+  const addDays = (isoDate, n) => {
+    const d = new Date(isoDate + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const chunks = [];
+  let cursorStart = startDate;
+  while (cursorStart <= endDate) {
+    const chunkEnd = addDays(cursorStart, 89); // 90-day window inclusive
+    const effectiveEnd = chunkEnd < endDate ? chunkEnd : endDate;
+    chunks.push({ from: cursorStart, to: effectiveEnd });
+    cursorStart = addDays(effectiveEnd, 1);
+  }
+
+  // Pull each chunk in parallel. Pagination within a chunk stays sequential
+  // (Mews only returns the next cursor from the prior response).
+  const pullChunk = async (chunk) => {
+    const startUtc = toMewsUtc(chunk.from, tz);
+    const endUtc = toMewsUtc(addDays(chunk.to, 1), tz);
+    const chunkItems = [];
+    let cursor = null;
+    let page = 0;
+    do {
+      const body = {
+        ConsumedUtc: { StartUtc: startUtc, EndUtc: endUtc },
+        AccountingStates: ["Open", "Closed"],
+        Limitation: { Count: 1000, Cursor: cursor },
+      };
+      // Server-side ServiceId filter — massive payload reduction vs pulling
+      // every service's items and filtering client-side.
+      if (serviceIds && serviceIds.length > 0) {
+        body.ServiceIds = serviceIds;
+      }
+      const resp = await _callMewsApi("orderItems/getAll", credentials, body);
+      chunkItems.push(...(resp.OrderItems || []));
+      cursor = resp.Cursor || null;
+      page += 1;
+      if (page > 100) break;
+    } while (cursor);
+    return chunkItems;
+  };
+
+  const chunkResults = await Promise.all(chunks.map(pullChunk));
+  const items = chunkResults.flat();
+
+  // 3. Group by ServiceId × YYYY-MM (local)
+  const monthFmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+  });
+
+  const byServiceMonth = {};
+  const monthSet = new Set();
+
+  for (const it of items) {
+    const sid = it.ServiceId;
+    if (!sid || !want.has(sid)) continue;
+    const consumed = it.ConsumedUtc || it.CreatedUtc;
+    if (!consumed) continue;
+    const dt = new Date(consumed);
+    const parts = monthFmt.formatToParts(dt);
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const monthKey = `${y}-${m}`;
+    monthSet.add(monthKey);
+    if (!byServiceMonth[sid]) byServiceMonth[sid] = {};
+    if (!byServiceMonth[sid][monthKey]) {
+      byServiceMonth[sid][monthKey] = { gross: 0, net: 0, items: 0 };
+    }
+    byServiceMonth[sid][monthKey].gross += it.Amount?.GrossValue || 0;
+    byServiceMonth[sid][monthKey].net += it.Amount?.NetValue || 0;
+    byServiceMonth[sid][monthKey].items += 1;
+  }
+
+  const services = allServices.filter((s) => want.has(s.id));
+  const months = [...monthSet].sort();
+
+  return { services, byServiceMonth, months, itemsScanned: items.length, timezone: tz };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════════════
@@ -666,4 +834,7 @@ module.exports = {
   getRevenueMetrics,
   getCombinedMetrics,
   probeCapacity,
+
+  // Reporting (Mason Dashboard)
+  getServiceRevenueByMonth,
 };

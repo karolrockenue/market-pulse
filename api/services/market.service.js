@@ -1978,7 +1978,7 @@ class MarketService {
         bedsDistribution: [],
         ratingHistogram: [],
         concentration: null,
-        topTen: [],
+        trophyProperties: [],
         caveats: {
           source: "Airbnb only",
           daysOfHistory: 0,
@@ -2228,8 +2228,8 @@ class MarketService {
       visibilityHistogram: Object.entries(visibilityBuckets).map(([bucket, count]) => ({ bucket, count })),
     };
 
-    // ---- Top 10 trophy properties (already sorted by avg_price DESC) ----
-    const topTen = registry.slice(0, 10).map((p) => ({
+    // ---- Top 100 trophy properties (already sorted by avg_price DESC) ----
+    const trophyProperties = registry.slice(0, 100).map((p) => ({
       propertyId: p.propertyId,
       name: p.name,
       type: p.type,
@@ -2283,7 +2283,7 @@ class MarketService {
       bedsDistribution,
       ratingHistogram,
       concentration,
-      topTen,
+      trophyProperties,
       caveats: {
         source: "Airbnb only",
         daysOfHistory,

@@ -4,8 +4,16 @@ import {
   useEffect,
   useRef,
   Component,
+  lazy,
+  Suspense,
   type ReactNode,
 } from "react";
+
+const LazyMasonDashboard = lazy(() =>
+  import("./features/rockenue/components/MasonDashboard").then((m) => ({
+    default: m.MasonDashboard,
+  })),
+);
 
 import { TopNav } from "./components/TopNav";
 import { AppSidebar } from "./components/AppSidebar";
@@ -68,6 +76,20 @@ interface Property {
 // shown a "no hotel connected" overlay everywhere else.
 const ARCHANES_HOTEL_ID = 318330;
 
+// Synthetic property ID for the Mason & Fifth multi-property dashboard.
+// When the user picks this entry from the property dropdown we route to the
+// Mason Dashboard view instead of changing the real selected hotel.
+const MASON_DASHBOARD_PSEUDO_ID = "MASON_DASHBOARD";
+
+// Real Mason & Fifth hotel IDs. Picking any of these routes the dashboard
+// view to MasonDashboard (service breakdown + YoY) instead of the generic
+// HotelDashboard.
+const MASON_HOTEL_IDS = [318329, 318341, 318343];
+function isMasonProperty(propertyStr: string): boolean {
+  const n = parseInt(propertyStr, 10);
+  return Number.isFinite(n) && MASON_HOTEL_IDS.includes(n);
+}
+
 export default function App() {
   // --- STATE DECLARATIONS ---
 
@@ -99,6 +121,9 @@ export default function App() {
   // Data State
   const [properties, setProperties] = useState<Property[]>([]);
   const [property, setProperty] = useState("");
+
+  // Mason Dashboard access — non-null once /api/mason/access resolves
+  const [hasMasonAccess, setHasMasonAccess] = useState<boolean>(false);
 
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [selectedPropertyDetails, setSelectedPropertyDetails] =
@@ -139,7 +164,7 @@ export default function App() {
     const fetchHotelDetails = async () => {
       // Don't run if the property ID (string) is empty
       // [FIX] Also skip if property is 'ALL' (Portfolio View)
-      if (!property || property === "ALL") {
+      if (!property || property === "ALL" || property === MASON_DASHBOARD_PSEUDO_ID) {
         setSelectedPropertyDetails(null);
         return;
       }
@@ -179,6 +204,55 @@ export default function App() {
 
     fetchHotelDetails();
   }, [property]); // This hook runs whenever the selected 'property' changes.
+
+  // Probe Mason Dashboard access. 200 → user qualifies; 403 → hide entry.
+  useEffect(() => {
+    fetch("/api/mason/access")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setHasMasonAccess(!!d?.hasAccess))
+      .catch(() => setHasMasonAccess(false));
+  }, []);
+
+  const isAdminUser =
+    userInfo?.role === "super_admin" || userInfo?.role === "admin";
+
+  // Inject the synthetic "Mason Dashboard" entry. Only admins get the
+  // aggregated cross-property view; regular M&F users just pick individual
+  // Mason hotels from their normal dropdown and get the scoped Mason view.
+  const propertiesWithMason: Property[] = useMemo(() => {
+    if (!hasMasonAccess || !isAdminUser) return properties;
+    // Don't duplicate if somehow already present
+    if (properties.some((p) => String(p.property_id) === MASON_DASHBOARD_PSEUDO_ID)) {
+      return properties;
+    }
+    return [
+      ...properties,
+      // Cast keeps TS happy — the sidebar treats property_id as a union of string|number
+      { property_id: MASON_DASHBOARD_PSEUDO_ID as unknown as number, property_name: "Mason Dashboard" },
+    ];
+  }, [properties, hasMasonAccess, isAdminUser]);
+
+  // When the user picks "Mason Dashboard" in the dropdown, route to the view.
+  useEffect(() => {
+    if (property === MASON_DASHBOARD_PSEUDO_ID && activeView !== "masonDashboard") {
+      setActiveView("masonDashboard");
+      sessionStorage.setItem("marketPulseActiveView", "masonDashboard");
+    }
+  }, [property, activeView]);
+
+  // When the user navigates away from Mason Dashboard while the synthetic
+  // property is still "selected", snap back to their first real property.
+  useEffect(() => {
+    if (
+      activeView !== "masonDashboard" &&
+      property === MASON_DASHBOARD_PSEUDO_ID
+    ) {
+      const firstReal = properties.find(
+        (p) => typeof p.property_id === "number",
+      );
+      if (firstReal) setProperty(firstReal.property_id.toString());
+    }
+  }, [activeView, properties, property]);
 
   useEffect(() => {
     const fetchProperties = async () => {
@@ -674,7 +748,7 @@ export default function App() {
             onViewChange={handleViewChange}
             property={property}
             onPropertyChange={setProperty}
-            properties={properties}
+            properties={propertiesWithMason}
             userInfo={userInfo}
             cityName={selectedPropertyDetails?.city}
             isArchanesOnly={isArchanesOnly}
@@ -700,17 +774,22 @@ export default function App() {
             <NoHotelConnected onBackToInvestor={() => setActiveView("demand-pace")} />
           ) : (
           <>
-          {activeView === "dashboard" && (
-            <DashboardHub
-              propertyId={
-                property === "ALL"
-                  ? "ALL"
-                  : selectedPropertyDetails?.hotel_id || null
-              }
-              city={selectedPropertyDetails?.city}
-              onNavigate={handleViewChange}
-            />
-          )}
+          {activeView === "dashboard" &&
+            (isMasonProperty(property) ? (
+              <Suspense fallback={null}>
+                <LazyMasonDashboard scopedHotelId={parseInt(property, 10)} />
+              </Suspense>
+            ) : (
+              <DashboardHub
+                propertyId={
+                  property === "ALL"
+                    ? "ALL"
+                    : selectedPropertyDetails?.hotel_id || null
+                }
+                city={selectedPropertyDetails?.city}
+                onNavigate={handleViewChange}
+              />
+            ))}
           {activeView === "reports" && (
             <ReportsHub
               key={initialReport || "hub"}
@@ -869,7 +948,8 @@ export default function App() {
             activeView === "mpReportsHub" ||
             activeView === "mpDemandRadar" ||
             activeView === "mpRiskOverview" ||
-            activeView === "mpLogin") && (
+            activeView === "mpLogin" ||
+            activeView === "masonDashboard") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}

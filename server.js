@@ -45,6 +45,7 @@ const metricsRoutes = require("./api/routes/metrics.router.js"); // Unified Metr
 const hotelsRoutes = require("./api/routes/hotels.router.js"); // Unified Hotel/Config Engine
 const marketRoutes = require("./api/routes/market.router.js"); // Unified Market/Planning Engine
 const distributionRoutes = require("./api/routes/distribution.router.js"); // Distribution & CRM
+const masonRoutes = require("./api/routes/mason.router.js"); // Mason & Fifth dashboard reporting
 
 // --- EXPRESS APP INITIALIZATION ---
 
@@ -305,6 +306,7 @@ app.use("/api/sentinel", sentinelRoutes); // AI Pricing
 app.use("/api/webhooks", webhooksRoutes); // PMS Events
 app.use("/api/bridge", bridgeRoutes); // Python AI Bridge
 app.use("/api/distribution", distributionRoutes); // Distribution & CRM
+app.use("/api/mason", masonRoutes); // Mason & Fifth dashboard reporting
 
 app.use("/api/mews-webhooks", mewsWebhooksRoutes);
 
