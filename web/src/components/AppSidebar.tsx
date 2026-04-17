@@ -246,52 +246,98 @@ export function AppSidebar({
                 />
               </div>
             )}
-            {properties.length > 1 && !propertySearch && (
-              <div
-                onClick={() => { onPropertyChange("ALL"); setPropertyDropdownOpen(false); setPropertySearch(""); }}
-                style={{
-                  padding: "10px 12px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: property === "ALL" ? `${R.warmTeal}08` : "transparent",
-                  borderBottom: `1px solid ${R.sep}`,
-                  fontWeight: 600,
-                }}
-              >
-                <div style={{ fontSize: 12, color: R.accent }}>All Properties (Portfolio)</div>
-                {property === "ALL" && <Check size={12} color={R.warmTeal} />}
-              </div>
-            )}
-            {properties
-              .filter((p) => !propertySearch || p.property_name.toLowerCase().includes(propertySearch.toLowerCase()))
-              .map((p) => {
-              const isSelected = property === p.property_id.toString();
+            {(() => {
+              const MASON_ID = "MASON_DASHBOARD";
+              const realProperties = properties.filter((p) => String(p.property_id) !== MASON_ID);
+              const masonEntry = properties.find((p) => String(p.property_id) === MASON_ID);
+              const filterMatch = (name: string) =>
+                !propertySearch || name.toLowerCase().includes(propertySearch.toLowerCase());
+              const filteredReal = realProperties.filter((p) => filterMatch(p.property_name));
+              const masonMatches = !!masonEntry && filterMatch(masonEntry.property_name);
+
               return (
-                <div
-                  key={p.property_id}
-                  onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); setPropertySearch(""); }}
-                  style={{
-                    padding: "10px 12px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: isSelected ? `${R.warmTeal}08` : "transparent",
-                    borderBottom: `1px solid rgba(255,255,255,0.03)`,
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: isSelected ? R.accent : R.text, fontWeight: isSelected ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.property_name}
-                  </div>
-                  {isSelected && <Check size={12} color={R.warmTeal} />}
-                </div>
+                <>
+                  {isAdmin && realProperties.length > 1 && !propertySearch && (
+                    <div
+                      onClick={() => { onPropertyChange("ALL"); setPropertyDropdownOpen(false); setPropertySearch(""); }}
+                      style={{
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: property === "ALL" ? `${R.warmTeal}08` : "transparent",
+                        borderBottom: `1px solid ${R.sep}`,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <div style={{ fontSize: 12, color: R.accent }}>All Properties (Portfolio)</div>
+                      {property === "ALL" && <Check size={12} color={R.warmTeal} />}
+                    </div>
+                  )}
+
+                  {/* Synthetic Mason Dashboard entry — fenced with dividers */}
+                  {masonEntry && masonMatches && (
+                    <div
+                      onClick={() => { onPropertyChange(MASON_ID); setPropertyDropdownOpen(false); setPropertySearch(""); }}
+                      style={{
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: property === MASON_ID ? `${R.warmTeal}08` : "transparent",
+                        borderBottom: `1px solid ${R.sep}`,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            background: R.gold,
+                          }}
+                        />
+                        <div style={{ fontSize: 12, color: property === MASON_ID ? R.accent : R.text }}>
+                          {masonEntry.property_name}
+                        </div>
+                      </div>
+                      {property === MASON_ID && <Check size={12} color={R.warmTeal} />}
+                    </div>
+                  )}
+
+                  {filteredReal.map((p) => {
+                    const isSelected = property === p.property_id.toString();
+                    return (
+                      <div
+                        key={p.property_id}
+                        onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); setPropertySearch(""); }}
+                        style={{
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: isSelected ? `${R.warmTeal}08` : "transparent",
+                          borderBottom: `1px solid rgba(255,255,255,0.03)`,
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: isSelected ? R.accent : R.text, fontWeight: isSelected ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {p.property_name}
+                        </div>
+                        {isSelected && <Check size={12} color={R.warmTeal} />}
+                      </div>
+                    );
+                  })}
+
+                  {propertySearch && filteredReal.length === 0 && !masonMatches && (
+                    <div style={{ padding: "16px 12px", fontSize: 12, color: R.textDim, textAlign: "center" }}>No properties found</div>
+                  )}
+                </>
               );
-            })}
-            {propertySearch && properties.filter((p) => p.property_name.toLowerCase().includes(propertySearch.toLowerCase())).length === 0 && (
-              <div style={{ padding: "16px 12px", fontSize: 12, color: R.textDim, textAlign: "center" }}>No properties found</div>
-            )}
+            })()}
           </div>
         )}
       </div>
@@ -333,13 +379,14 @@ export function AppSidebar({
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
                 {studioOpen && (
                   <>
                     {navItem("MP Reports", "mpReportsHub", MonitorSmartphone, true)}
                     {navItem("MP Demand Radar", "mpDemandRadar", MonitorSmartphone, true)}
                     {navItem("MP Risk Overview", "mpRiskOverview", MonitorSmartphone, true)}
                     {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
+                    {navItem("Mason Dashboard", "masonDashboard", MonitorSmartphone, true)}
                     {navItem("Email Signatures", "emailSignatures", MonitorSmartphone, true)}
                     {navItem("Deck V2", "deckV2", Presentation, true)}
                     {navItem("Shreeji Deck", "shreejiDeck", Presentation, true)}

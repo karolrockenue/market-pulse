@@ -122,7 +122,7 @@ interface InvestorPayload {
     maxNightlyRate: number;
     totalProperties: number;
   } | null;
-  topTen: Array<{
+  trophyProperties: Array<{
     propertyId: string;
     name: string;
     type: string | null;
@@ -297,7 +297,7 @@ export function ArchanesInvestorView({ citySlug, currencySymbol }: Props) {
     );
   }
 
-  const { tracking, kpis, demandCalendar, forwardAdrCurve, dowPremium, priceLadder, priceLadderByBeds, occupancyAnalysis, propertyMix, bedsDistribution, ratingHistogram, concentration, topTen, caveats, registry } = data;
+  const { tracking, kpis, demandCalendar, forwardAdrCurve, dowPremium, priceLadder, priceLadderByBeds, occupancyAnalysis, propertyMix, bedsDistribution, ratingHistogram, concentration, trophyProperties, caveats, registry } = data;
 
   return (
     <div style={{ minHeight: "100vh", background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
@@ -707,11 +707,11 @@ export function ArchanesInvestorView({ citySlug, currencySymbol }: Props) {
           </div>
         </div>
 
-        {/* ── TOP 10 TROPHY PROPERTIES ── */}
+        {/* ── TOP 100 TROPHY PROPERTIES ── */}
         <div style={cardStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
             <Award size={14} color={R.gold} />
-            <div style={titleStyle}>Top 10 Trophy Properties</div>
+            <div style={titleStyle}>Top 100 Trophy Properties</div>
           </div>
           <div style={subtitleStyle}>The highest-priced listings — your competitive set if you're building at the top of the market</div>
           <div style={{ overflowX: "auto" }}>
@@ -731,7 +731,7 @@ export function ArchanesInvestorView({ citySlug, currencySymbol }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {topTen.map((p, i) => (
+                {trophyProperties.map((p, i) => (
                   <tr key={p.propertyId} style={{ borderBottom: `1px solid ${R.border}50` }}>
                     <td style={{ color: R.textDim, fontSize: "11px", padding: "10px" }}>{i + 1}</td>
                     <td style={{ color: R.accent, fontSize: "12px", padding: "10px", maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name || "—"}</td>
