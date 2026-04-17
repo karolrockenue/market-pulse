@@ -2222,7 +2222,7 @@ function CreateTaskPanel({
                     {dueDate ? format(new Date(dueDate + "T00:00:00"), "dd MMM yyyy") : "Select date..."}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start" style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}` }}>
+                <PopoverContent className="w-auto p-0 z-[60]" align="start" style={{ backgroundColor: CARD_BG, border: `1px solid ${BORDER}`, zIndex: 60 }}>
                   <ShadcnCalendar mode="single" selected={dueDate ? new Date(dueDate + "T00:00:00") : undefined}
                     onSelect={(d) => d && setDueDate(format(d, "yyyy-MM-dd"))} initialFocus />
                 </PopoverContent>
