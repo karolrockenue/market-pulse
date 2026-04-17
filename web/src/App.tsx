@@ -866,28 +866,10 @@ export default function App() {
             activeView === "channelPricing" ||
             activeView === "emailSignatures" ||
             activeView === "canvas" ||
-            activeView === "mpConcept" ||
-            activeView === "mpConcept2" ||
-            activeView === "mpDash2" ||
-            activeView === "mpDash3" ||
-            activeView === "mpDash4" ||
             activeView === "mpReportsHub" ||
             activeView === "mpDemandRadar" ||
-            activeView === "mpCompsetIntel" ||
-            activeView === "mpCompsetView" ||
-            activeView === "mpCompsetViewV2" ||
-            activeView === "mpMyRates" ||
-            activeView === "mpCrmBoard" ||
             activeView === "mpRiskOverview" ||
-            activeView === "mpControlPanel" ||
-            activeView === "mpControlPanelV2" ||
-            activeView === "mpAdminHub" ||
-            activeView === "mpChannelPricing" ||
-            activeView === "mpChannelPricingV2" ||
-            activeView === "mpChannelPricingV3" ||
-            activeView === "mpDistribution" ||
-            activeView === "mpLogin" ||
-            activeView === "mpLoginV2") && (
+            activeView === "mpLogin") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}

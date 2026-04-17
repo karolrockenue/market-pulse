@@ -3,3 +3,26 @@ node_modules
 .env
 .DS_Store
 web/build
+
+# ── Local working files / research / dumps — never commit ──
+# Binary / research assets
+*.pdf
+*.xlsx
+*.log
+*.zip
+
+# Root-level one-off files
+/urgent.md
+/backfill.log
+/city-profile-queries.sql
+/elysee-analysis.sql
+
+# Data export / output directories
+/leads/
+/reports/
+
+# claude/ is for local working docs (todos, plans, research dumps, DB exports).
+# Only the DGX/Playwright code files are tracked.
+claude/*
+!claude/index.js
+!claude/sentinel_live.py

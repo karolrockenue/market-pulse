@@ -1,4 +1,3 @@
-import { Search, Bell } from "lucide-react";
 import { R } from "../styles/tokens";
 import { NotificationBell } from "./NotificationBell";
 
@@ -62,7 +61,44 @@ export function AppTopBar({ activeView, propertyName, userRole }: AppTopBarProps
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 8, height: 8, borderRadius: 4, background: R.green, boxShadow: `0 0 6px ${R.green}50` }} />
+        <div
+          title="All platform services are healthy"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "5px 10px 5px 9px",
+            background: R.card,
+            border: `1px solid ${R.border}`,
+            borderRadius: 999,
+          }}
+        >
+          <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
+            <span
+              className="animate-ping"
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                background: R.green,
+                opacity: 0.55,
+              }}
+            />
+            <span
+              style={{
+                position: "relative",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: R.green,
+                boxShadow: `0 0 6px ${R.green}80`,
+              }}
+            />
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: R.textMid }}>
+            All systems live
+          </span>
+        </div>
         {isAdmin && <NotificationBell />}
       </div>
     </div>

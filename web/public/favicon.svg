@@ -1,12 +1,5 @@
 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="32" height="32" fill="#1d1d1c"/>
-  
-  <!-- Diamond Shape - Premium Mark -->
-  <path d="M16 6 L22 12 L16 26 L10 12 Z" fill="none" stroke="#39BDF8" stroke-width="1.5" stroke-linejoin="miter"/>
-  
-  <!-- Inner facets for depth -->
-  <path d="M16 6 L16 26" stroke="#39BDF8" stroke-width="0.5" opacity="0.6"/>
-  <path d="M10 12 L22 12" stroke="#39BDF8" stroke-width="0.5" opacity="0.6"/>
-  <path d="M10 12 L16 18 L22 12" stroke="#39BDF8" stroke-width="0.5" opacity="0.4"/>
+  <rect width="32" height="32" rx="6" fill="#0C0E12"/>
+  <text x="4" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="300" fill="#38C6BA">(</text>
+  <text x="17" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="300" fill="#C8A66E">)</text>
 </svg>
