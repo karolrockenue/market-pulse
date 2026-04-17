@@ -31,6 +31,7 @@ import {
   Link2,
 } from "lucide-react";
 import { useCrmTasks } from "../hooks/useCrmTasks";
+import { useTaskReadState } from "../hooks/useTaskReadState";
 import {
   fetchComments,
   addComment,
@@ -95,6 +96,27 @@ const CATEGORY_CFG: Record<TaskCategory, { color: string; label: string }> = {
 
 const TEAM_COLORS = [BLUE, GREEN, PURPLE, AMBER, "#ec4899", "#f97316", RED];
 
+// ── Unread-dot context ──
+// Shared across every view (Kanban, List, Hotel, User, Timeline, MyWork) so
+// each task row can render its own unread indicator without prop drilling.
+const TaskReadContext = createContext<{ isUnread: (task: CrmTask) => boolean }>({ isUnread: () => false });
+function useIsTaskUnread() { return useContext(TaskReadContext).isUnread; }
+
+function UnreadDot({ task, size = 7 }: { task: CrmTask; size?: number }) {
+  const unread = useIsTaskUnread()(task);
+  if (!unread) return null;
+  return (
+    <span
+      title="Updated since last viewed"
+      aria-label="Unread update"
+      style={{
+        display: "inline-block", width: size, height: size, borderRadius: "50%",
+        background: BLUE, boxShadow: `0 0 0 3px ${BLUE}20`, flexShrink: 0,
+      }}
+    />
+  );
+}
+
 function buildTeamDisplay(members: TeamMember[]) {
   return members.map((m, i) => ({
     name: m.first_name,
@@ -129,6 +151,11 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
     initialFilter ? { hotel_id: initialFilter.hotel_id, channel_id: initialFilter.channel_id } : undefined
   );
 
+  // Per-user unread-dot state. Dot clears when a task is clicked or the user
+  // self-edits it. Stored in localStorage — first run seeds all existing
+  // tasks as read so we don't flood with dots.
+  const { isUnread, markRead } = useTaskReadState(tasks);
+
   const [teamMembers, setTeamMembers] = useState<ReturnType<typeof buildTeamDisplay>>([]);
   useEffect(() => {
     fetchTeam().then((members) => setTeamMembers(buildTeamDisplay(members))).catch(console.error);
@@ -144,6 +171,21 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
   const [expandedHotel, setExpandedHotel] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+
+  const openTask = useCallback((id: number) => {
+    markRead(id);
+    setSelectedTaskId(id);
+  }, [markRead]);
+
+  // Self-edit suppression: when you save a change yourself, bump the read
+  // timestamp past the server's new updated_at so your own edit doesn't
+  // re-flag the task as unread for you.
+  const updateTaskAndMarkRead = useCallback(async (id: number, data: Record<string, unknown>) => {
+    const result = await updateTask(id, data);
+    if (result?.updated_at) markRead(id, result.updated_at);
+    else markRead(id);
+    return result;
+  }, [updateTask, markRead]);
 
   // ── WIP limits ──
   const [wipLimits, setWipLimits] = useState<Record<TaskStatus, number>>(DEFAULT_WIP_LIMITS);
@@ -278,6 +320,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
 
   return (
     <TeamContext.Provider value={teamMembers}>
+    <TaskReadContext.Provider value={{ isUnread }}>
     <div style={{ flex: 1, background: R.bg, color: R.accent, paddingBottom: 64 }}>
       <div style={{ padding: "24px 28px" }}>
 
@@ -456,7 +499,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
           onColumnDragOver={handleColumnDragOver}
           onColumnDragLeave={handleColumnDragLeave}
           onColumnDrop={handleColumnDrop}
-          onTaskClick={(id) => setSelectedTaskId(id)}
+          onTaskClick={openTask}
           onTaskContext={handleContextMenu}
           onToggleBulk={toggleBulkSelect}
           onQuickAdd={(status) => { setNewTaskDefaultStatus(status); setShowNewTask(true); }}
@@ -468,7 +511,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
       {/* TIMELINE VIEW (Gantt-style)                 */}
       {/* ═══════════════════════════════════════════ */}
       {viewMode === "timeline" && (
-        <TimelineView tasks={filteredTasks} todayStr={todayStr} onTaskClick={(id) => setSelectedTaskId(id)} />
+        <TimelineView tasks={filteredTasks} todayStr={todayStr} onTaskClick={openTask} />
       )}
 
       {/* ═══════════════════════════════════════════ */}
@@ -478,7 +521,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
         <MyWorkView
           tasks={filteredTasks}
           todayStr={todayStr}
-          onTaskClick={(id) => setSelectedTaskId(id)}
+          onTaskClick={openTask}
           dueDateTier={dueDateTier}
           userName={userName}
         />
@@ -491,7 +534,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
           todayStr={todayStr}
           expandedHotel={expandedHotel}
           setExpandedHotel={setExpandedHotel}
-          onTaskClick={(id) => setSelectedTaskId(id)}
+          onTaskClick={openTask}
         />
       )}
 
@@ -543,7 +586,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
                         const sCfg = STATUS_COLUMNS.find((s) => s.key === task.status)!;
                         const hotelDisplay = task.hotel_names?.length > 1 ? `${task.hotel_names.length} properties` : task.hotel_names?.[0] || task.hotel_name || "\u2014";
                         return (
-                          <div key={task.id} onClick={() => setSelectedTaskId(task.id)} style={{
+                          <div key={task.id} onClick={() => openTask(task.id)} style={{
                             display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px",
                             padding: "10px 20px", alignItems: "center", borderTop: `1px solid ${BORDER}`,
                             background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
@@ -551,7 +594,10 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
                           }}
                             onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.03)")}
                             onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)")}>
-                            <span style={{ color: TEXT_DIM, fontSize: 11, fontFamily: "monospace" }}>CRM-{task.id}</span>
+                            <span style={{ color: TEXT_DIM, fontSize: 11, fontFamily: "monospace", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <UnreadDot task={task} />
+                              CRM-{task.id}
+                            </span>
                             <div>
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: sCfg.color, flexShrink: 0 }} />
@@ -594,7 +640,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
           x={contextMenu.x}
           y={contextMenu.y}
           task={tasks.find((t) => t.id === contextMenu.taskId)!}
-          onUpdateTask={updateTask}
+          onUpdateTask={updateTaskAndMarkRead}
           onDeleteTask={deleteTask}
           onClose={() => setContextMenu(null)}
         />
@@ -606,14 +652,14 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
           task={selectedTask}
           allTasks={tasks}
           onClose={() => setSelectedTaskId(null)}
-          onUpdateTask={updateTask}
+          onUpdateTask={updateTaskAndMarkRead}
           onDeleteTask={deleteTask}
           onRefresh={refresh}
           dependencies={dependencies}
           setDependencies={setDependencies}
           watchers={watchers}
           setWatchers={setWatchers}
-          onNavigateTask={(id) => setSelectedTaskId(id)}
+          onNavigateTask={openTask}
           userName={userName}
         />
       )}
@@ -632,6 +678,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
 
       </div>
     </div>
+    </TaskReadContext.Provider>
     </TeamContext.Provider>
   );
 }
@@ -810,7 +857,10 @@ function HotelView({
       }}
         onMouseEnter={(e) => (e.currentTarget.style.background = `${BLUE}08`)}
         onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)")}>
-        <span style={{ color: TEXT_DIM, fontSize: 10, fontFamily: "monospace" }}>CRM-{task.id}</span>
+        <span style={{ color: TEXT_DIM, fontSize: 10, fontFamily: "monospace", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <UnreadDot task={task} size={6} />
+          CRM-{task.id}
+        </span>
         <div style={{ minWidth: 0 }}>
           <span style={{ color: TEXT, fontSize: 12, fontWeight: 500 }}>{task.title}</span>
           {task.tags.length > 0 && (
@@ -1277,6 +1327,11 @@ function TaskDetailPanel({
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
 
+  // Description inline editor — local buffer, saves on blur when changed.
+  const [descDraft, setDescDraft] = useState<string>(task.description ?? "");
+  const [descSaving, setDescSaving] = useState(false);
+  useEffect(() => { setDescDraft(task.description ?? ""); }, [task.id, task.description]);
+
   const taskDeps = dependencies.filter((d) => d.taskId === task.id);
   const taskWatchers = watchers.filter((w) => w.taskId === task.id);
 
@@ -1315,6 +1370,24 @@ function TaskDetailPanel({
   async function handleDueDateChange(dateStr: string | null) {
     await onUpdateTask(task.id, { due_date: dateStr, updated_by: userName });
     await onRefresh();
+  }
+
+  const descDirty = (descDraft ?? "") !== (task.description ?? "");
+
+  async function handleDescriptionSave() {
+    if (!descDirty || descSaving) return;
+    const next = descDraft.trim() === "" ? null : descDraft;
+    setDescSaving(true);
+    try {
+      await onUpdateTask(task.id, { description: next, updated_by: userName });
+      await onRefresh();
+    } finally {
+      setDescSaving(false);
+    }
+  }
+
+  function handleDescriptionCancel() {
+    setDescDraft(task.description ?? "");
   }
 
   function handleCommentChange(value: string) {
@@ -1653,17 +1726,57 @@ function TaskDetailPanel({
           {/* Details Tab */}
           {activeTab === "details" && (
             <div>
-              {/* Description */}
-              {task.description && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Description</div>
-                  <div style={{
-                    color: TEXT_MID, fontSize: 13, lineHeight: 1.65, padding: "14px 16px",
-                    background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`,
-                    whiteSpace: "pre-wrap",
-                  }}>{task.description}</div>
+              {/* Description — inline editable with explicit Save / Cancel */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Description</span>
+                  {descSaving && <span style={{ color: TEXT_DIM, fontSize: 10 }}>Saving…</span>}
+                  {descDirty && !descSaving && <span style={{ color: AMBER, fontSize: 10 }}>Unsaved changes</span>}
                 </div>
-              )}
+                <textarea
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Cmd/Ctrl+Enter saves; Escape cancels.
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); handleDescriptionSave(); }
+                    if (e.key === "Escape" && descDirty) { e.preventDefault(); handleDescriptionCancel(); }
+                  }}
+                  placeholder="Add a description…"
+                  rows={Math.max(3, descDraft.split("\n").length + 1)}
+                  style={{
+                    width: "100%", padding: "14px 16px",
+                    background: CARD_BG, borderRadius: 8, border: `1px solid ${descDirty ? `${AMBER}40` : BORDER}`,
+                    color: TEXT_MID, fontSize: 13, lineHeight: 1.65,
+                    outline: "none", resize: "vertical",
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    transition: "border-color 0.15s",
+                  }}
+                />
+                {descDirty && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 8 }}>
+                    <button
+                      onClick={handleDescriptionCancel}
+                      disabled={descSaving}
+                      style={{
+                        padding: "5px 12px", borderRadius: 5,
+                        border: `1px solid ${BORDER}`, background: "transparent",
+                        color: TEXT_DIM, fontSize: 11, cursor: descSaving ? "not-allowed" : "pointer",
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={handleDescriptionSave}
+                      disabled={descSaving}
+                      style={{
+                        padding: "5px 14px", borderRadius: 5, border: "none",
+                        background: descSaving ? BORDER : BLUE,
+                        color: descSaving ? TEXT_DIM : "#0a0a0a",
+                        fontSize: 11, fontWeight: 600,
+                        cursor: descSaving ? "not-allowed" : "pointer",
+                      }}
+                    >{descSaving ? "Saving…" : "Save"}</button>
+                  </div>
+                )}
+              </div>
 
               {/* Dependencies */}
               <div style={{ marginBottom: 24 }}>
@@ -2355,6 +2468,7 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
   const hotelDisplay = task.hotel_names?.length > 1 ? `${task.hotel_names.length} properties` : task.hotel_names?.[0] || task.hotel_name || "\u2014";
   const dueDateColor = dueTier === "overdue" ? RED : dueTier === "today" ? AMBER : dueTier === "this_week" ? PURPLE : TEXT_DIM;
   const dueDateLabel = dueTier === "overdue" ? "Overdue" : dueTier === "today" ? "Due today" : dueTier === "this_week" ? "This week" : "";
+  const unread = useIsTaskUnread()(task);
 
   return (
     <div
@@ -2364,6 +2478,7 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
       onClick={(e) => { if (bulkMode) { e.stopPropagation(); onToggleBulk(); } else onClick(); }}
       onContextMenu={onContextMenu}
       style={{
+        position: "relative",
         backgroundColor: bulkSelected ? `${BLUE}08` : CARD_BG,
         borderRadius: 8, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
         padding: "14px 16px", cursor: bulkMode ? "pointer" : "grab", transition: "border-color 0.15s",
@@ -2371,6 +2486,18 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
       }}
       onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.borderColor = `${BLUE}40`; } }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; }}>
+      {/* Unread dot — top-right corner */}
+      {unread && (
+        <div
+          title="Updated since last viewed"
+          style={{
+            position: "absolute", top: 10, right: 10,
+            width: 8, height: 8, borderRadius: "50%",
+            background: BLUE, boxShadow: `0 0 0 3px ${BLUE}20`,
+            pointerEvents: "none",
+          }}
+        />
+      )}
       {/* Row 1: Category pill + Priority flag */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
