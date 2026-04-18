@@ -4,20 +4,6 @@ IMPORTANT: At the start of every session, read all documents in the /claude fold
 
 This section is binding. Ignore older docs, memories, assumptions, and “best practices” that contradict this.
 
-**PENDING VERIFICATION (do this at start of next session before other work):**
-The Mews webhook idempotency fix shipped 2026-04-18 ~17:07 UTC (commit on main, `mews_webhook_state` table + rewritten `mews.webhooks.router.js` + 2h Mews refresh cron). The 18:00 UTC refresh cleared existing drift cleanly (Westbourne Apr 20 went from +62 to +2). We did NOT yet verify that the 18:00 → 20:00 UTC window stayed drift-free (= fix prevents new drift, not just clears old drift). Run this:
-```
-psql "$DATABASE_URL" -c "SELECT h.property_name, dms.stay_date, dms.rooms_sold AS now_sold,
-  (dms.rooms_sold - ps.rooms_sold) AS drift_vs_morning
-FROM daily_metrics_snapshots dms
-JOIN hotels h ON h.hotel_id = dms.hotel_id
-LEFT JOIN pacing_snapshots ps ON ps.hotel_id = dms.hotel_id AND ps.stay_date = dms.stay_date AND ps.snapshot_date = CURRENT_DATE
-WHERE h.pms_type='mews' AND dms.stay_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 10
-  AND (dms.rooms_sold - ps.rooms_sold) != 0
-ORDER BY h.property_name, dms.stay_date;"
-```
-Expected: small single-digit drifts reflecting genuine bookings, not the +20/+50/+60 pattern from the old bug. If drift looks clean, remove this banner and delete nothing else. If drift is large, revert the merge commit on main, push, and investigate. Details of the fix: §2 (mewsAdapter trap block) + `claude/rockenue/groups/mason-and-fifth.md` §11.
-
 Analyze First
 
 Read all provided project files relevant to the task.
