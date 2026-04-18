@@ -23,21 +23,14 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
       const pickupValue = pickupPeriod === "24h" ? d.pickup24h : pickupPeriod === "3d" ? d.pickup3d : d.pickup7d;
-      const pickupLabel = pickupPeriod === "24h" ? "24h Pickup" : pickupPeriod === "3d" ? "3d Pickup" : "7d Pickup";
+      const pickupLabel = pickupPeriod === "24h" ? "Pickup 24h" : pickupPeriod === "3d" ? "Pickup 3d" : "Pickup 7d";
+      const sign = pickupValue >= 0 ? "+" : "";
       return (
         <div style={{ backgroundColor: "rgba(18,21,25,0.95)", border: `1px solid ${R.border}`, borderRadius: 6, padding: 12, boxShadow: "0 4px 6px -1px rgba(0,0,0,0.3)" }}>
           <div style={{ color: R.accent, fontSize: 11, marginBottom: 8, fontWeight: 500 }}>{d.fullDate}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: R.textDim }} />
-              <span style={{ color: R.textMid, fontSize: 10 }}>Occupancy:</span>
-              <span style={{ color: R.accent, fontSize: 11, fontWeight: 500 }}>{d.occupancy.toFixed(1)}%</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: "#7BAFD4" }} />
-              <span style={{ color: R.textMid, fontSize: 10 }}>{pickupLabel}:</span>
-              <span style={{ color: "#7BAFD4", fontSize: 11, fontWeight: 500 }}>{pickupValue.toFixed(1)}%</span>
-            </div>
+          <div style={{ color: R.text, fontSize: 13, fontWeight: 500 }}>Occupancy: {d.occupancy.toFixed(1)}%</div>
+          <div style={{ color: R.textDim, fontSize: 11, marginTop: 3 }}>
+            {pickupLabel}: {sign}{pickupValue.toFixed(1)}%
           </div>
         </div>
       );
