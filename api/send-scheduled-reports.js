@@ -89,12 +89,11 @@ function calculateDateRange(period) {
 
 async function getHotelMetrics(propertyId, startDate, endDate) {
   const query = `
-    SELECT 
-      stay_date::date, 
+    SELECT
+      stay_date::date,
       rooms_sold,
       capacity_count,
-      occupancy_direct,
-      -- THE FIX: Select all new gross and net columns instead of legacy ones
+      (rooms_sold::numeric / NULLIF(capacity_count, 0)) AS occupancy_direct,
       gross_revenue,
       net_revenue,
       gross_adr,
@@ -103,7 +102,7 @@ async function getHotelMetrics(propertyId, startDate, endDate) {
       net_revpar
     FROM daily_metrics_snapshots
     WHERE hotel_id = $1 AND stay_date::date >= $2 AND stay_date::date <= $3
-    GROUP BY stay_date::date, rooms_sold, capacity_count, occupancy_direct, gross_revenue, net_revenue, gross_adr, net_adr, gross_revpar, net_revpar
+    GROUP BY stay_date::date, rooms_sold, capacity_count, gross_revenue, net_revenue, gross_adr, net_adr, gross_revpar, net_revpar
     ORDER BY stay_date::date ASC;
   `;
   const { rows } = await pgPool.query(query, [propertyId, startDate, endDate]);
@@ -122,7 +121,7 @@ async function getMarketMetrics(propertyId, category, startDate, endDate) {
   let queryParams;
 
   const metricsToSelect = `
-    AVG(dms.occupancy_direct) as market_occupancy,
+    AVG(dms.rooms_sold::numeric / NULLIF(dms.capacity_count, 0)) as market_occupancy,
     -- THE FIX: Select all new gross and net market columns
     AVG(dms.gross_adr) as market_gross_adr,
     AVG(dms.net_adr) as market_net_adr,
