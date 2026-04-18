@@ -10,9 +10,16 @@
  * We process ServiceOrderUpdated events (= reservation changes) by:
  *   1. Looking up the hotel by EnterpriseId (= hotels.pms_property_id)
  *   2. Fetching full reservation details from Mews API
- *   3. Updating daily_metrics_snapshots and daily_bookings_record
+ *   3. Upserting daily_bookings_record + reservations (idempotent replace)
+ *   4. Applying rooms_sold delta only if this event actually changes state
+ *      (active-flag flip or date-range change) — idempotency tracked per
+ *      reservation in mews_webhook_state.
  *
- * This parallels webhooks.router.js (Cloudbeds) but is completely independent.
+ * Revenue is NOT written by this handler — Mews fires multiple webhook events
+ * per reservation lifecycle and rate amendments would drift gross_revenue
+ * in ways that are painful to unwind. Revenue is sourced exclusively from
+ * the periodic `daily-refresh` job which pulls authoritative figures from
+ * Mews `services/getAvailability` + `orderItems/getAll`.
  */
 
 const express = require("express");
@@ -20,13 +27,18 @@ const router = express.Router();
 const pgPool = require("../utils/db");
 const mewsAdapter = require("../adapters/mewsAdapter");
 
+// States that represent "this reservation currently holds inventory".
+// services/getAvailability (the refresh-job truth source) counts all of
+// these as unsellable, so the webhook path must too.
+const ACTIVE_STATES = new Set(["Optional", "Confirmed", "Started", "Processed"]);
+
 // ─── Helper: Find hotel context by Mews Enterprise ID ──────────────
 
 async function getHotelByEnterpriseId(enterpriseId) {
   const result = await pgPool.query(
-    `SELECT hotel_id, pms_credentials, total_rooms 
-     FROM hotels 
-     WHERE pms_property_id = $1 AND pms_type = 'mews' 
+    `SELECT hotel_id, pms_credentials, total_rooms
+     FROM hotels
+     WHERE pms_property_id = $1 AND pms_type = 'mews'
      LIMIT 1`,
     [enterpriseId],
   );
@@ -61,7 +73,8 @@ async function fetchReservationDetails(credentials, reservationId, serviceId) {
 
 /**
  * Fetches the total revenue for a reservation from Mews order items.
- * Returns { totalNet, totalGross } or { totalNet: 0, totalGross: 0 } on failure.
+ * Used only for the ledger/reservations tables (both upsert-replace,
+ * so safe to refresh on every webhook). Not used for daily_metrics_snapshots.
  */
 async function fetchReservationRevenue(credentials, reservationId) {
   try {
@@ -96,6 +109,32 @@ async function fetchReservationRevenue(credentials, reservationId) {
       err.message,
     );
     return { totalNet: 0, totalGross: 0 };
+  }
+}
+
+// ─── Helper: Apply a room-count delta across a date range ─────────
+
+async function applyRoomsDelta(hotelId, checkInDate, checkOutDate, delta) {
+  if (delta === 0) return;
+  const start = new Date(checkInDate);
+  const end = new Date(checkOutDate);
+  for (let d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const stayDateStr = d.toISOString().split("T")[0];
+    try {
+      await pgPool.query(
+        `INSERT INTO daily_metrics_snapshots (hotel_id, stay_date, rooms_sold)
+         VALUES ($1, $2, GREATEST(0::numeric, $3))
+         ON CONFLICT (hotel_id, stay_date)
+         DO UPDATE SET
+           rooms_sold = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.rooms_sold, 0::numeric) + $3)`,
+        [hotelId, stayDateStr, delta],
+      );
+    } catch (err) {
+      console.error(
+        `[Mews Webhook] rooms_sold delta failed for ${stayDateStr}:`,
+        err.message,
+      );
+    }
   }
 }
 
@@ -188,65 +227,42 @@ router.post("/", async (req, res) => {
         continue;
       }
 
-      const state = reservation.State; // Confirmed, Started, Processed, Canceled
-      const checkIn = reservation.ScheduledStartUtc;
-      const checkOut = reservation.ScheduledEndUtc;
+      const state = reservation.State;
+      const checkInUtc = reservation.ScheduledStartUtc;
+      const checkOutUtc = reservation.ScheduledEndUtc;
       const createdUtc = reservation.CreatedUtc;
-      const cancelledUtc = reservation.CancelledUtc;
 
       console.log(
-        `[Mews Webhook] Reservation ${reservationId}: State=${state}, CheckIn=${checkIn}, CheckOut=${checkOut}`,
+        `[Mews Webhook] Reservation ${reservationId}: State=${state}, CheckIn=${checkInUtc}, CheckOut=${checkOutUtc}`,
       );
 
-      // 5b. Determine direction (add or subtract)
-      let multiplier = 0;
+      const checkInDate = new Date(checkInUtc).toISOString().split("T")[0];
+      const checkOutDate = new Date(checkOutUtc).toISOString().split("T")[0];
+      const bookingDate = createdUtc
+        ? new Date(createdUtc).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
 
-      if (
-        state === "Confirmed" ||
-        state === "Started" ||
-        state === "Processed"
-      ) {
-        multiplier = 1;
-      } else if (state === "Canceled") {
-        multiplier = -1;
-      } else {
-        console.log(
-          `[Mews Webhook] State '${state}' does not affect metrics. Skipping.`,
-        );
-        continue;
-      }
-
-      // 5c. Service filter — already enforced at API level in fetchReservationDetails.
-      // If the reservation came back, it belongs to the correct service.
-
-      // 5d. Calculate room nights
-      const startDate = new Date(checkIn);
-      const endDate = new Date(checkOut);
+      const startDate = new Date(checkInUtc);
+      const endDate = new Date(checkOutUtc);
       const diffTime = Math.abs(endDate - startDate);
       const numNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
 
-      // 5c2. Fetch revenue for this reservation
+      const currentActive = ACTIVE_STATES.has(state);
+
+      // 5b. Refresh the ledger + reservations tables. Both use ON CONFLICT
+      // DO UPDATE SET = EXCLUDED so they are safe to call on every webhook.
       const revenue = await fetchReservationRevenue(credentials, reservationId);
       const totalRevenue = revenue.totalGross;
-      const dailyRevenue = numNights > 0 ? totalRevenue / numNights : 0;
+      const avgNightlyRate =
+        numNights > 0
+          ? Math.round((totalRevenue / numNights) * 100) / 100
+          : totalRevenue;
+      const rStatus = state.toLowerCase();
+      const rSource = reservation.Origin || "Mews";
 
-      console.log(
-        `[Mews Webhook] Revenue: Gross=${totalRevenue.toFixed(2)}, Per Night=${dailyRevenue.toFixed(2)}`,
-      );
-
-      // 5d. Update daily_bookings_record (Sales Ledger)
       try {
-        const bookingDate = createdUtc
-          ? new Date(createdUtc).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0];
-
-        const checkInDate = new Date(checkIn).toISOString().split("T")[0];
-
-        const rStatus = state.toLowerCase();
-        const rSource = reservation.Origin || "Mews";
-
         await pgPool.query(
-          `INSERT INTO daily_bookings_record 
+          `INSERT INTO daily_bookings_record
            (id, hotel_id, booking_date, check_in_date, revenue, status, source, room_nights)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            ON CONFLICT (id) DO UPDATE SET
@@ -267,10 +283,6 @@ router.post("/", async (req, res) => {
           ],
         );
 
-        // --- Upsert into reservations table (detailed booking data) ---
-        const checkOutDate = new Date(checkOut).toISOString().split("T")[0];
-        const avgNightlyRate = numNights > 0 ? Math.round((totalRevenue / numNights) * 100) / 100 : totalRevenue;
-
         await pgPool.query(
           `INSERT INTO reservations
            (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date)
@@ -285,8 +297,8 @@ router.post("/", async (req, res) => {
           [
             reservationId,
             hotel_id,
-            null, // guest_name — Mews requires separate customer lookup
-            null, // room_type — not in current reservation fetch
+            null,
+            null,
             checkInDate,
             checkOutDate,
             numNights,
@@ -297,57 +309,73 @@ router.post("/", async (req, res) => {
             bookingDate,
           ],
         );
-
-        console.log(
-          `[Mews Webhook] Ledger + Reservations updated for Res ${reservationId} (${rStatus}, Revenue: ${totalRevenue.toFixed(2)})`,
-        );
       } catch (ledgerErr) {
         console.error(
           "[Mews Webhook] Ledger Update Failed:",
           ledgerErr.message,
         );
-        // Continue — metrics update is more important
+        // Continue — the metrics update below is still useful.
       }
 
-      // 5e. Update daily_metrics_snapshots
-      const roomDelta = 1 * multiplier;
-      const revenueDelta = dailyRevenue * multiplier;
-
-      for (
-        let d = new Date(startDate);
-        d < endDate;
-        d.setUTCDate(d.getUTCDate() + 1)
-      ) {
-        const stayDateStr = d.toISOString().split("T")[0];
-
-        try {
-          await pgPool.query(
-            `INSERT INTO daily_metrics_snapshots (hotel_id, stay_date, rooms_sold, gross_revenue)
-             VALUES ($1, $2, GREATEST(0::numeric, $3), GREATEST(0::numeric, $4))
-             ON CONFLICT (hotel_id, stay_date)
-             DO UPDATE SET 
-               rooms_sold = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.rooms_sold, 0::numeric) + $5),
-               gross_revenue = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.gross_revenue, 0::numeric) + $6)`,
-            [
-              hotel_id,
-              stayDateStr,
-              Math.max(0, roomDelta),
-              Math.max(0, revenueDelta),
-              roomDelta,
-              revenueDelta,
-            ],
-          );
-        } catch (metricsErr) {
-          console.error(
-            `[Mews Webhook] Metrics update failed for ${stayDateStr}:`,
-            metricsErr.message,
-          );
-        }
-      }
-
-      console.log(
-        `[Mews Webhook] Metrics updated: ${numNights} nights (multiplier: ${multiplier}) for Res ${reservationId}`,
+      // 5c. Idempotent rooms_sold update via mews_webhook_state.
+      // The table remembers what this reservation has already contributed.
+      // We compute a delta vs prior state and apply it, then update the row.
+      const priorResult = await pgPool.query(
+        `SELECT last_applied_active, last_applied_check_in, last_applied_check_out
+         FROM mews_webhook_state WHERE reservation_id = $1`,
+        [reservationId],
       );
+      const prior = priorResult.rows[0] || null;
+
+      const priorActive = prior ? prior.last_applied_active : false;
+      const priorCheckIn = prior
+        ? new Date(prior.last_applied_check_in).toISOString().split("T")[0]
+        : null;
+      const priorCheckOut = prior
+        ? new Date(prior.last_applied_check_out).toISOString().split("T")[0]
+        : null;
+
+      const datesUnchanged =
+        prior &&
+        priorCheckIn === checkInDate &&
+        priorCheckOut === checkOutDate;
+
+      if (prior && priorActive === currentActive && datesUnchanged) {
+        // No material change. Still refresh updated_at so we can see traffic.
+        await pgPool.query(
+          `UPDATE mews_webhook_state SET updated_at = NOW() WHERE reservation_id = $1`,
+          [reservationId],
+        );
+        console.log(
+          `[Mews Webhook] ${reservationId}: no-op (state/dates unchanged).`,
+        );
+      } else {
+        // Subtract whatever we added previously (if anything).
+        if (prior && priorActive) {
+          await applyRoomsDelta(hotel_id, priorCheckIn, priorCheckOut, -1);
+        }
+        // Add current contribution (if active).
+        if (currentActive) {
+          await applyRoomsDelta(hotel_id, checkInDate, checkOutDate, +1);
+        }
+
+        await pgPool.query(
+          `INSERT INTO mews_webhook_state
+           (reservation_id, hotel_id, last_applied_active, last_applied_check_in, last_applied_check_out, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           ON CONFLICT (reservation_id) DO UPDATE SET
+             hotel_id = EXCLUDED.hotel_id,
+             last_applied_active = EXCLUDED.last_applied_active,
+             last_applied_check_in = EXCLUDED.last_applied_check_in,
+             last_applied_check_out = EXCLUDED.last_applied_check_out,
+             updated_at = NOW()`,
+          [reservationId, hotel_id, currentActive, checkInDate, checkOutDate],
+        );
+
+        console.log(
+          `[Mews Webhook] ${reservationId}: applied delta (prior=${priorActive}/${priorCheckIn}→${priorCheckOut}, now=${currentActive}/${checkInDate}→${checkOutDate}).`,
+        );
+      }
     } catch (resErr) {
       console.error(
         `[Mews Webhook] Error processing reservation ${reservationId}:`,

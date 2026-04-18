@@ -387,11 +387,24 @@ app.listen(PORT, () => {
       })
     );
 
-    // Every day at 06:00 UTC: daily metrics refresh
+    // Every day at 06:00 UTC: daily metrics refresh (all PMS types)
     cron.schedule("0 6 * * *", () =>
       cronRunner("daily-refresh", `http://localhost:${PORT}/api/cron/daily-refresh`, {
         headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
       })
+    );
+
+    // Every 2h between 08:00–22:00 UTC: Mews-only refresh.
+    // Webhooks keep rooms_sold idempotent in near-real-time, but they
+    // deliberately don't touch gross_revenue. Re-running the refresh for
+    // Mews hotels during the day keeps revenue KPIs fresh without
+    // re-hitting Cloudbeds or disturbing the morning pacing_snapshots row.
+    cron.schedule("0 8,10,12,14,16,18,20,22 * * *", () =>
+      cronRunner(
+        "daily-refresh-mews",
+        `http://localhost:${PORT}/api/cron/daily-refresh?pmsType=mews`,
+        { headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` } },
+      ),
     );
 
     // Every 5 minutes: send scheduled reports

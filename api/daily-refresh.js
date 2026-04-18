@@ -16,8 +16,13 @@ module.exports = async (request, response) => {
     let allProperties = []; // Define here to ensure it's in scope
 
     // Step 1: Get a list of hotels to process.
-    // Supports optional ?hotelId= query param for single-hotel refresh.
+    // Optional query params:
+    //   ?hotelId=N    — refresh a single hotel
+    //   ?pmsType=mews — refresh only hotels on a specific PMS (used by the
+    //                   intraday Mews cadence to keep revenue fresh without
+    //                   re-running Cloudbeds every 2h)
     const singleHotelId = request.query?.hotelId;
+    const pmsTypeFilter = request.query?.pmsType;
     const propertiesClient = await pgPool.connect();
     try {
       let propertiesResult;
@@ -25,6 +30,11 @@ module.exports = async (request, response) => {
         propertiesResult = await propertiesClient.query(
           "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE hotel_id = $1 AND is_disconnected = false",
           [singleHotelId],
+        );
+      } else if (pmsTypeFilter) {
+        propertiesResult = await propertiesClient.query(
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE pms_type = $1 AND is_disconnected = false",
+          [pmsTypeFilter],
         );
       } else {
         propertiesResult = await propertiesClient.query(
@@ -42,7 +52,12 @@ module.exports = async (request, response) => {
     } finally {
       propertiesClient.release();
     }
-    console.log(`Found ${allProperties.length} properties to process.${singleHotelId ? ` (filtered to hotel ${singleHotelId})` : ''}`);
+    const filterDesc = singleHotelId
+      ? ` (filtered to hotel ${singleHotelId})`
+      : pmsTypeFilter
+        ? ` (filtered to PMS=${pmsTypeFilter})`
+        : "";
+    console.log(`Found ${allProperties.length} properties to process.${filterDesc}`);
 
     // Step 2: Loop through each property.
     for (const hotel of allProperties) {
