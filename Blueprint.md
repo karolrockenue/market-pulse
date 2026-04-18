@@ -306,6 +306,8 @@ Mounts domain routers:
 
 /api/webhooks
 
+/api/mason   (Mason & Fifth dashboard reporting; access-gated by user_properties)
+
 Domain Services (Logic Owners)
 
 api/services/metrics.service.js
@@ -394,6 +396,19 @@ api/routes/bridge.router.js
 
 Machine-to-machine AI Bridge (Node <-> DGX). Protected by x-api-key.
 
+api/routes/mason.router.js
+
+Mason & Fifth dashboard reporting. Mounted at /api/mason. Two endpoints:
+GET /access (returns the M&F hotels the user can view) and
+GET /service-revenue?hotelId=&from=&to= (returns gross+net per service per
+month from Mews orderItems/getAll). All routes guarded by requireUserApi
+plus a custom requireMasonAccess middleware that allows admins/super_admins
+unconditionally and otherwise checks user_properties for any of the M&F
+hotel IDs (318329 Belsize, 318341 Westbourne, 318343 Primrose). The
+middleware compares against req.user.cloudbedsId (varchar), NOT
+req.user.internalId — user_properties.user_id stores cloudbeds_user_id.
+10-minute in-memory cache per (hotelId, from, to) tuple.
+
 Rule for AI:
 Never re-introduce deleted routers (dashboard/planning/reports/portfolio/rockenue/budgets/property-hub/scraper). All new work builds on the domain routers above.
 
@@ -425,9 +440,19 @@ Full Mews PMS adapter (rewritten March 2026).
 
 Auth: MEWS_CLIENT_TOKEN from env (shared) + per-hotel AccessToken from hotels.pms_credentials.
 
-Owns: getHotelDetails, getAccommodationServiceId, getResourceCategories, getRatePlans, buildMewsRateIdMap, getOccupancyMetrics, getRevenueMetrics, getCombinedMetrics.
+Owns: getHotelDetails, getAccommodationServiceId, getResourceCategories, getRatePlans, buildMewsRateIdMap, getOccupancyMetrics, getRevenueMetrics, getCombinedMetrics, getServiceRevenueByMonth (Mason Dashboard), utcToLocalDate (timezone helper, see trap below).
 
 API base URL controlled by MEWS_API_URL env var (defaults to demo, production is https://api.mews.com).
+
+**ADAPTER TRAP — read this before touching getOccupancyMetrics or getRevenueMetrics.**
+
+Both functions previously labelled rows by slicing the UTC timestamp string (`new Date(utc).toISOString().split('T')[0]`). During BST (or any non-UTC timezone), Mews's local-midnight timestamps look like `2026-04-16T23:00:00Z` for the Apr 17 stay night — UTC-date slicing produced "2026-04-16". Every Mews hotel's daily_metrics_snapshots row was labelled one day earlier than its real stay date, including pacing snapshots and the 90-day occupancy chart on every dashboard.
+
+Always use the new `utcToLocalDate(utcStr, timezone)` helper for any UTC → date conversion in the Mews path. It uses `Intl.DateTimeFormat('en-CA', { timeZone })` to extract the hotel-local date. Verified against Mews Availability Reports — every day matched within ±0–1 rooms after the fix.
+
+Retry behaviour also extended in `_callMewsApi`: now retries on 429/408/401 + Cloudflare 502/503/504/520-524 + any network error, with exponential backoff capped at 30s, 4 attempts total. Cloudflare HTML error bodies are truncated in logs and thrown errors so they don't poison the UI.
+
+**Known incident — Westbourne / Primrose 2026-04-17.** Operators noticed the Mason Dashboard occupancy chart showing impossible values (e.g. Primrose 105% occupancy on multiple days). Root cause was the timezone-slice bug above plus a separate `daily_metrics_snapshots.snapshot_taken_date` always landing on `1970-01-01` (the INSERT in `api/daily-refresh.js` omitted the column entirely, so it relied on a non-existent default). Both fixed in the same commit; daily-refresh now writes `snapshot_taken_date = CURRENT_DATE` and updates it on conflict so we can audit when each row was last refreshed.
 
 api/adapters/mews.sentinel.adapter.js
 
@@ -590,6 +615,33 @@ api/types.ts
 Rule for AI:
 All Sentinel pricing math and data orchestration comes from the backend (sentinel.service.js + sentinel.pricing.engine.js + sentinel.adapter.js).
 React components and hooks must not re-implement or diverge from those formulas.
+
+rockenue/components/MasonDashboard.tsx
+
+Mason & Fifth multi-property revenue dashboard. Lives under
+`web/src/features/rockenue/components/` because it was originally a Studio
+mockup that promoted into a real feature; sidebar nav entry is also in
+Studio for admin QA. Real users reach it via the property dropdown.
+
+Behaviour:
+- Admins (super_admin/admin) see a synthetic "Mason Dashboard" entry in
+  the property dropdown (App.tsx injects via propertiesWithMason). Picking
+  it opens the dashboard with an inner property-picker for the 3 M&F
+  hotels.
+- Regular M&F users (e.g. dph@mason-fifth.com, hh@mason-fifth.com) just
+  see their individual M&F hotels in the normal dropdown. Picking any of
+  them routes activeView=dashboard to MasonDashboard scoped to that
+  hotel — bypasses the standard HotelDashboard.
+- Routing intercept lives in App.tsx: `if (activeView === "dashboard"
+  && isMasonProperty(property))` → render `<MasonDashboard scopedHotelId>`
+  instead of `<DashboardHub>`.
+- Pulls live revenue from `/api/mason/service-revenue` (Mews orderItems);
+  pulls occupancy + market demand from the standard `useDashboardData`
+  hook (same source as every other dashboard).
+- Belsize Park is single-service in Mews (only "Accommodation"), mapped
+  into the `short` slot server-side; Mid + Long render as £0 — by design.
+- Per-service ADR + Occupancy values in KPI cards are still placeholder
+  (no per-service room-night data wired yet).
 
 Shared Components & Utilities
 
