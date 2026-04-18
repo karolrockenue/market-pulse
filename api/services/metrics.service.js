@@ -443,10 +443,10 @@ const MetricsService = {
       WITH AllData AS (
         SELECT
           ${period} AS period,
-          CASE WHEN hotel_id = $1 THEN occupancy_direct ELSE NULL END AS your_occupancy,
+          CASE WHEN hotel_id = $1 THEN (rooms_sold::numeric / NULLIF(capacity_count, 0)) ELSE NULL END AS your_occupancy,
           CASE WHEN hotel_id = $1 THEN gross_adr ELSE NULL END AS your_adr,
           CASE WHEN hotel_id = $1 THEN gross_revpar ELSE NULL END AS your_revpar,
-          CASE WHEN hotel_id != $1 THEN occupancy_direct ELSE NULL END AS market_occupancy,
+          CASE WHEN hotel_id != $1 THEN (rooms_sold::numeric / NULLIF(capacity_count, 0)) ELSE NULL END AS market_occupancy,
           CASE WHEN hotel_id != $1 THEN gross_adr ELSE NULL END AS market_adr,
           CASE WHEN hotel_id != $1 THEN gross_revpar ELSE NULL END AS market_revpar
         FROM daily_metrics_snapshots
@@ -609,7 +609,7 @@ const MetricsService = {
       const alias = isMarket ? `market-${metric}` : metric;
       switch (metric) {
         case "occupancy":
-          return `AVG(CASE WHEN ${hotelIdCheck} THEN occupancy_direct END) AS "${alias}"`;
+          return `AVG(CASE WHEN ${hotelIdCheck} THEN (rooms_sold::numeric / NULLIF(capacity_count, 0)) END) AS "${alias}"`;
         case "adr":
           return `AVG(CASE WHEN ${hotelIdCheck} THEN ${
             useTaxes ? "gross_adr" : "net_adr"
