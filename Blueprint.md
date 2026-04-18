@@ -4,6 +4,20 @@ IMPORTANT: At the start of every session, read all documents in the /claude fold
 
 This section is binding. Ignore older docs, memories, assumptions, and “best practices” that contradict this.
 
+**PENDING VERIFICATION (do this at start of next session before other work):**
+The Mews webhook idempotency fix shipped 2026-04-18 ~17:07 UTC (commit on main, `mews_webhook_state` table + rewritten `mews.webhooks.router.js` + 2h Mews refresh cron). The 18:00 UTC refresh cleared existing drift cleanly (Westbourne Apr 20 went from +62 to +2). We did NOT yet verify that the 18:00 → 20:00 UTC window stayed drift-free (= fix prevents new drift, not just clears old drift). Run this:
+```
+psql "$DATABASE_URL" -c "SELECT h.property_name, dms.stay_date, dms.rooms_sold AS now_sold,
+  (dms.rooms_sold - ps.rooms_sold) AS drift_vs_morning
+FROM daily_metrics_snapshots dms
+JOIN hotels h ON h.hotel_id = dms.hotel_id
+LEFT JOIN pacing_snapshots ps ON ps.hotel_id = dms.hotel_id AND ps.stay_date = dms.stay_date AND ps.snapshot_date = CURRENT_DATE
+WHERE h.pms_type='mews' AND dms.stay_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 10
+  AND (dms.rooms_sold - ps.rooms_sold) != 0
+ORDER BY h.property_name, dms.stay_date;"
+```
+Expected: small single-digit drifts reflecting genuine bookings, not the +20/+50/+60 pattern from the old bug. If drift looks clean, remove this banner and delete nothing else. If drift is large, revert the merge commit on main, push, and investigate. Details of the fix: §2 (mewsAdapter trap block) + `claude/rockenue/groups/mason-and-fifth.md` §11.
+
 Analyze First
 
 Read all provided project files relevant to the task.
@@ -453,6 +467,8 @@ Always use the new `utcToLocalDate(utcStr, timezone)` helper for any UTC → dat
 Retry behaviour also extended in `_callMewsApi`: now retries on 429/408/401 + Cloudflare 502/503/504/520-524 + any network error, with exponential backoff capped at 30s, 4 attempts total. Cloudflare HTML error bodies are truncated in logs and thrown errors so they don't poison the UI.
 
 **Known incident — Westbourne / Primrose 2026-04-17.** Operators noticed the Mason Dashboard occupancy chart showing impossible values (e.g. Primrose 105% occupancy on multiple days). Root cause was the timezone-slice bug above plus a separate `daily_metrics_snapshots.snapshot_taken_date` always landing on `1970-01-01` (the INSERT in `api/daily-refresh.js` omitted the column entirely, so it relied on a non-existent default). Both fixed in the same commit; daily-refresh now writes `snapshot_taken_date = CURRENT_DATE` and updates it on conflict so we can audit when each row was last refreshed.
+
+**Webhook idempotency (fixed 2026-04-18).** `mews.webhooks.router.js` no longer writes `gross_revenue` and no longer applies a blind `+1/-1` per `ServiceOrderUpdated`. A new table `mews_webhook_state` tracks `last_applied_active` and the applied stay range per reservation; the handler computes a delta vs prior state and no-ops when nothing material changed. `Optional` is treated as an active state (matches `services/getAvailability`). Revenue is sourced exclusively from the refresh job — which now runs every 2 hours for Mews hotels (`0 8,10,12,14,16,18,20,22 * * *` UTC, skipping 06:00 to preserve the morning `pacing_snapshots` row). Bootstrap script: `scripts/bootstrap-mews-webhook-state.js` (run before each future redeploy that resets the table). Pre-fix drift example on 2026-04-18 17:05 UTC: Westbourne Apr 20 `rooms_sold` was +62 vs morning truth; after 18:00 refresh with the new handler live, same date was +2 (genuine booking activity). Details: `claude/rockenue/groups/mason-and-fifth.md` §11.
 
 api/adapters/mews.sentinel.adapter.js
 
