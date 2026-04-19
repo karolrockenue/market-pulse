@@ -257,7 +257,7 @@ export function AppSidebar({
 
               return (
                 <>
-                  {isAdmin && realProperties.length > 1 && !propertySearch && (
+                  {realProperties.length > 1 && !propertySearch && (
                     <div
                       onClick={() => { onPropertyChange("ALL"); setPropertyDropdownOpen(false); setPropertySearch(""); }}
                       style={{
