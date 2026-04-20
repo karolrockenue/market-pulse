@@ -17,8 +17,16 @@ types.setTypeParser(TIMESTAMPTZ_OID, parseDate);
 // --- END FIX ---
 
 // This initializes the PostgreSQL connection pool.
+// Timeouts + keepAlive are required for Neon: its pooler silently drops idle
+// connections, and without these settings dead sockets stay in the pool and
+// hang every subsequent query (caused full site outage 2026-04-20).
 const pgPool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
+  query_timeout: 30_000,
+  keepAlive: true,
 });
 
 // --- [NEW] UNHANDLED ERROR FIX ---

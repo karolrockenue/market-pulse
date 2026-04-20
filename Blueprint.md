@@ -207,7 +207,6 @@ Core hotel & metrics tables remain part of Market Pulse.
 | The W14 Hotel | ee9f3ef4-9a88-46a9-aaf6-83a5c17bea4a | UUID |
 | House of Toby | 1fa4727c-eb1a-44ce-bf95-5bc4fe6dac7d | UUID |
 | The 29 London | bb9b3c42-4d0d-4c0d-9f74-efd32aea7d52 | UUID |
-| Astor Victoria | 2400 | Integer |
 | Jubilee Hotel Victoria | 230719 | Integer |
 | The Cleveland Hotel | 289618 | Integer |
 | The Melita | 308760 | Integer |
@@ -226,6 +225,8 @@ Core hotel & metrics tables remain part of Market Pulse.
 | Lancaster Court Hotel | 318302 | Integer |
 
 Missing Data (defined but no CSV history): St George Hotel Norfolk Square (318291), G Hotel Henderson (318303), St George's Inn Victoria (318305), Maiden Oval (318307), Aviator Bali (318310), The Pack and Carriage London (318312).
+
+Purged (external hotels removed 2026-04-20): Astor Victoria (2400, London), Brickell Apart Hotel (318318, Santo Domingo), Hotel Tano Guam (318320, Tumon). Cloudbeds OAuth went silent simultaneously on 2026-04-07; all three were confirmed external and fully removed. `daily_metrics_snapshots` rows retained (orphaned) for future market analysis; metadata archived in `deleted_hotels_archive`. See §4.13.
 
 Async Isolation
 
@@ -482,7 +483,9 @@ Present for future Opera PMS integration. Not yet active.
 
 Utils
 
-api/utils/db.js – shared PostgreSQL connection.
+api/utils/db.js – shared PostgreSQL connection pool (Neon). Pool is configured with `max: 10`, `idleTimeoutMillis: 30_000`, `connectionTimeoutMillis: 10_000`, `query_timeout: 30_000`, and `keepAlive: true`. These are load-bearing — without them Neon's pooler drops idle connections silently and the pg pool serves those dead sockets on the next query, hanging every subsequent request until the Node process is restarted.
+
+**Known incident — full site outage 2026-04-20.** Symptom: `/health` timed out (`SELECT 1` hung), `/api/*` returned 502 via Railway edge, static SPA routes served fine (`/` = HTTP 200). Neon Monitoring showed no active queries, no stuck sessions, compute healthy. Root cause was the pg pool above having no timeouts at all (`new Pool({ connectionString })` was the full config). Dead-socket connections from Neon's idle-drop accumulated in the pool after a day of heavy script activity (`bootstrap-mews-webhook-state.js` ran twice, `backfill-mews-history.js`, plus the new 2h Mews refresh cron) and wedged the process. Railway restart cleared the pool and restored service instantly. The pool-timeout config is the permanent fix; any future "Neon is up but site hangs" symptom should first check pool state via `/health`, then restart Node if still wedged.
 
 api/utils/benchmark.utils.js – pacing & benchmarking helpers.
 
@@ -1185,6 +1188,31 @@ event_name (varchar)
 impact_multiplier (numeric)
 created_at (timestamptz)
 
+4.13 deleted_hotels_archive
+
+Metadata preservation table for hotels that have been purged from the platform. Allows future joins against orphaned `daily_metrics_snapshots` rows (which outlive the hotel on purpose — see note below).
+
+Fields:
+
+hotel_id (PK, integer)
+property_name (text)
+city (text)
+country (text)
+total_rooms (integer)
+latitude (numeric)
+longitude (numeric)
+pms_type (text)
+pms_property_id (text)
+management_group (text)
+deleted_at (timestamptz, default NOW())
+deleted_reason (text)
+
+Migration: api/migration_007_deleted_hotels_archive.js. This migration also drops the FK `daily_metrics_snapshots.hotel_id → hotels.hotel_id` so time-series data survives hotel offboarding by design.
+
+Purge pattern (manual only, as of 2026-04-20): Use `scripts/purge-external-hotels.js` to fully remove an external hotel while retaining `daily_metrics_snapshots`. The script archives metadata → wipes all other hotel-scoped tables (reservations, pacing_snapshots, sentinel_*, bookings, comp sets, user links, rockenue asset, hotels row) → leaves daily_metrics_snapshots in place. Transactional; rolls back on any failure. Re-onboarding is clean because the `hotels` row is gone (no FK collision on OAuth callback).
+
+Known divergence: `POST /api/hotels/delete` (hotel.service.js:deleteHotel) still hard-deletes `daily_metrics_snapshots` for the target hotel. The admin-triggered endpoint is intentionally destructive for "offboarding our own hotel" cases; the script is the manual pattern for "external hotel that shouldn't have been here but whose market data is worth keeping". If both flows should preserve metrics in future, remove the `DELETE FROM daily_metrics_snapshots` line in hotel.service.js:387.
+
 4.11 Schema Traps
 
 CRITICAL: hotel_id is INTEGER across all tables. room_type_id is MIXED TYPE — INTEGER in sentinel_ai_predictions but TEXT (VARCHAR) in sentinel_rates_calendar. When writing UNNEST arrays or cross-table JOINs, always cast room_type_id to text (e.g., room_type_id::text = ANY($2::text[])). Never cast to $X::int[] when touching the calendar table.
@@ -1365,7 +1393,7 @@ POST /api/hotels/:hotelId/reconnect — sets is_disconnected = false. Restores h
 
 GET /api/hotels/mine?includeDisconnected=true — optional param to include disconnected hotels (used by Settings page).
 
-POST /api/hotels/delete — admin only. Hard delete: removes hotel from all tables, notifies Cloudbeds. Irreversible.
+POST /api/hotels/delete — admin only. Hard delete: removes hotel from all tables (including `daily_metrics_snapshots`), notifies Cloudbeds. Irreversible. For external hotels where the historical time-series should be retained, use `scripts/purge-external-hotels.js` instead — see §4.13.
 
 Disconnected hotels are filtered from: /api/hotels/mine (default), daily-refresh.js, sentinel queue worker, comp set fallback queries. Admin /api/hotels (GET /) still shows all hotels with is_disconnected flag.
 
@@ -1542,12 +1570,14 @@ market-pulse/
 │ ├── migration_002_fix_market_metrics.js
 │ ├── migration_004_daily_min_rates.js
 │ ├── migration_006_reservations.js
+│ ├── migration_007_deleted_hotels_archive.js
 │ ├── send-scheduled-reports.js
 │ └── sync-rockenue-assets.js
 ├── scripts
 │ ├── backfill-reservations.js
 │ ├── import-daily-history.js
-│ └── import-monthly-history.js
+│ ├── import-monthly-history.js
+│ └── purge-external-hotels.js
 ├── server.js
 ├── package.json
 ├── package-lock.json
