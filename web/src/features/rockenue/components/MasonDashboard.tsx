@@ -1640,8 +1640,15 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
       // labels it accordingly.
       const svcAdr = (key: ServiceKey) =>
         nightsByService[key] > 0 ? byService[key] / nightsByService[key] : 0;
-      const svcOcc = (key: ServiceKey) =>
-        capacityNights > 0 ? (nightsByService[key] / capacityNights) * 100 : 0;
+      // Long Stay SpaceOrders are monthly units — scale by ~30 to get
+      // approximate room-days for the occupancy share. Rough (±20%) but
+      // keeps the share visible instead of rounding to 0%.
+      const LONG_NIGHTS_PER_UNIT = 30;
+      const svcOcc = (key: ServiceKey) => {
+        if (capacityNights <= 0) return 0;
+        const scale = key === "long" ? LONG_NIGHTS_PER_UNIT : 1;
+        return (nightsByService[key] * scale / capacityNights) * 100;
+      };
       out.push({
         title: window.titles[i],
         label: monthLabel(m),
