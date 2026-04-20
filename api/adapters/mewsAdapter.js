@@ -798,11 +798,17 @@ async function getServiceRevenueByMonth(hotelId, startDate, endDate, serviceIds 
     monthSet.add(monthKey);
     if (!byServiceMonth[sid]) byServiceMonth[sid] = {};
     if (!byServiceMonth[sid][monthKey]) {
-      byServiceMonth[sid][monthKey] = { gross: 0, net: 0, items: 0 };
+      byServiceMonth[sid][monthKey] = { gross: 0, net: 0, items: 0, nights: 0 };
     }
     byServiceMonth[sid][monthKey].gross += it.Amount?.GrossValue || 0;
     byServiceMonth[sid][monthKey].net += it.Amount?.NetValue || 0;
     byServiceMonth[sid][monthKey].items += 1;
+    // SpaceOrder = one billing unit of accommodation. Daily-TimeUnit services
+    // (Short / Mid Stay) emit one per room-night; monthly-TimeUnit services
+    // (Long Stay) emit one per month. Frontend must interpret accordingly.
+    if (it.Type === "SpaceOrder") {
+      byServiceMonth[sid][monthKey].nights += 1;
+    }
   }
 
   const services = allServices.filter((s) => want.has(s.id));

@@ -234,8 +234,9 @@ router.get("/service-revenue", async (req, res) => {
               gross: 0,
               net: 0,
               items: 0,
+              nights: 0,
             }
-          : { gross: 0, net: 0, items: 0 };
+          : { gross: 0, net: 0, items: 0, nights: 0 };
         row.services[role] = {
           name: sid
             ? result.services.find((s) => s.id === sid)?.name || role
@@ -243,6 +244,7 @@ router.get("/service-revenue", async (req, res) => {
           gross: bucket.gross,
           net: bucket.net,
           items: bucket.items,
+          nights: bucket.nights,
         };
         row.totalGross += bucket.gross;
         row.totalNet += bucket.net;

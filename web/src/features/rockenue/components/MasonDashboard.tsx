@@ -82,39 +82,6 @@ function buildWindow() {
   };
 }
 
-// Static placeholders for Occupancy/ADR while we plumb room-night data in.
-// Per-service ADR values reflect typical M&F rate shapes: Short Stay near
-// hotel ADR, Mid Stay slightly higher (furnished-monthly premium), Long
-// Stay much higher when expressed monthly.
-const STATIC_KPI: Record<
-  string,
-  {
-    occupancy: number;
-    adr: number;
-    adrByService: { short: number; mid: number; long: number };
-    occByService: { short: number; mid: number; long: number };
-  }
-> = {
-  last: {
-    occupancy: 86.2,
-    adr: 198,
-    adrByService: { short: 176, mid: 210, long: 450 },
-    occByService: { short: 88, mid: 45, long: 72 },
-  },
-  current: {
-    occupancy: 78.5,
-    adr: 192,
-    adrByService: { short: 168, mid: 205, long: 440 },
-    occByService: { short: 82, mid: 38, long: 68 },
-  },
-  next: {
-    occupancy: 72.1,
-    adr: 215,
-    adrByService: { short: 192, mid: 230, long: 470 },
-    occByService: { short: 76, mid: 32, long: 64 },
-  },
-};
-
 const fmt = (v: number) =>
   `£${Math.round(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
@@ -299,6 +266,9 @@ function MonthCardView({ card }: { card: MonthCard }) {
                       }}
                     >
                       {fmt(svcAdr)}
+                      {svc.key === "long" && svcAdr > 0 && (
+                        <span style={{ color: R.textDim, fontSize: 10, marginLeft: 3 }}>/mo</span>
+                      )}
                     </span>
                   </div>
                 );
@@ -1290,6 +1260,7 @@ interface ApiServiceBucket {
   gross: number;
   net: number;
   items: number;
+  nights: number;
 }
 
 interface ApiMonthRow {
@@ -1632,7 +1603,6 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
 
   const cards: MonthCard[] = useMemo(() => {
     const out: MonthCard[] = [];
-    const kpiKeys = ["last", "current", "next"] as const;
     // Headline occupancy + headline ADR come from useDashboardData's monthly
     // snapshot. rooms_sold is property-wide (capacity − availability per
     // Blueprint §10); revenue there is Short-Stay only, so we recover
@@ -1648,22 +1618,30 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
     window.months.forEach((m, i) => {
       const row = apiData?.monthly.find((x) => x.month === m);
       const byService: ServiceSplit = { short: 0, mid: 0, long: 0 };
+      const nightsByService: ServiceSplit = { short: 0, mid: 0, long: 0 };
       for (const svc of SERVICES) {
         const bucket = row?.services?.[svc.key];
         byService[svc.key] = (vatMode === "net" ? bucket?.net : bucket?.gross) || 0;
+        nightsByService[svc.key] = bucket?.nights || 0;
       }
       const snapshot = snapshotForIndex(i);
       const occupancy = snapshot?.occupancy ?? 0;
       // Room nights = snapshot revenue / snapshot ADR (both DB-sourced, gross,
       // so the /1.2 cancels). Always gross on both sides.
       const roomNights = snapshot && snapshot.adr > 0 ? snapshot.revenue / snapshot.adr : 0;
+      // Property capacity = room nights ÷ occupancy fraction. Used as the
+      // denominator for per-service occupancy so the three service shares
+      // sum to the property-wide headline occupancy.
+      const capacityNights = occupancy > 0 ? roomNights / (occupancy / 100) : 0;
       const totalRevenue = byService.short + byService.mid + byService.long;
       const adr = roomNights > 0 ? totalRevenue / roomNights : 0;
-      // Per-service ADR/Occ stay as placeholders — per-service room nights
-      // aren't stored in our DB (Blueprint §4.7c). Drop only the ÷1.2 fudge
-      // for the headline; per-service placeholders still need it.
-      const kpi = STATIC_KPI[kpiKeys[i]];
-      const adjustAdr = (v: number) => (vatMode === "net" ? Math.round(v / 1.2) : v);
+      // Per-service ADR: Short/Mid = £/night (daily SpaceOrder). Long Stay
+      // SpaceOrders are monthly units, so its "ADR" is really £/month — UI
+      // labels it accordingly.
+      const svcAdr = (key: ServiceKey) =>
+        nightsByService[key] > 0 ? byService[key] / nightsByService[key] : 0;
+      const svcOcc = (key: ServiceKey) =>
+        capacityNights > 0 ? (nightsByService[key] / capacityNights) * 100 : 0;
       out.push({
         title: window.titles[i],
         label: monthLabel(m),
@@ -1671,14 +1649,14 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
         occupancy,
         adr,
         adrByService: {
-          short: adjustAdr(kpi.adrByService.short),
-          mid: adjustAdr(kpi.adrByService.mid),
-          long: adjustAdr(kpi.adrByService.long),
+          short: svcAdr("short"),
+          mid: svcAdr("mid"),
+          long: svcAdr("long"),
         },
         occByService: {
-          short: kpi.occByService.short,
-          mid: kpi.occByService.mid,
-          long: kpi.occByService.long,
+          short: svcOcc("short"),
+          mid: svcOcc("mid"),
+          long: svcOcc("long"),
         },
       });
     });
