@@ -946,7 +946,10 @@ async function recalculateRates(hotelId, startDate, endDate) {
   const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
   const rateIdMap = config.rate_id_map || {};
   const batchPayload = [];
-  const dbWrites = [];
+  const calHotelIds = [];
+  const calDates = [];
+  const calRoomTypes = [];
+  const calRates = [];
 
   for (const o of allOverrides) {
     const rateId = rateIdMap[o.room_type_id];
@@ -959,18 +962,26 @@ async function recalculateRates(hotelId, startDate, endDate) {
       categoryId: o.categoryId,
     });
 
-    dbWrites.push(
-      db.query(
-        `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
-         VALUES ($1, $2, $3, $4, 'SENTINEL', NOW())
-         ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
-         SET rate = EXCLUDED.rate, source = 'SENTINEL', last_updated_at = NOW()`,
-        [hotelId, o.date, o.room_type_id, o.rate],
-      ),
-    );
+    calHotelIds.push(hotelId);
+    calDates.push(o.date);
+    calRoomTypes.push(o.room_type_id);
+    calRates.push(o.rate);
   }
 
-  await Promise.all(dbWrites);
+  // Single UNNEST upsert instead of one INSERT per row. Previously this fired
+  // ~2,500 parallel INSERTs via Promise.all, which saturated the pg pool
+  // beyond its 10s checkout timeout and failed on big recalcs (hotel 318341
+  // Westbourne, 365-day range, 2026-04-20).
+  if (calHotelIds.length > 0) {
+    await db.query(
+      `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
+       SELECT t.hid, t.sdate, t.rid, t.rate, 'SENTINEL', NOW()
+       FROM UNNEST($1::int[], $2::date[], $3::text[], $4::numeric[]) AS t(hid, sdate, rid, rate)
+       ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
+       SET rate = EXCLUDED.rate, source = 'SENTINEL', last_updated_at = NOW()`,
+      [calHotelIds, calDates, calRoomTypes, calRates],
+    );
+  }
 
   let totalQueued = 0;
   if (batchPayload.length > 0) {
