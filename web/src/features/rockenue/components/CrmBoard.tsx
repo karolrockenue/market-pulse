@@ -1332,6 +1332,25 @@ function TaskDetailPanel({
   const [descSaving, setDescSaving] = useState(false);
   useEffect(() => { setDescDraft(task.description ?? ""); }, [task.id, task.description]);
 
+  // Title inline editor — click to edit, Enter/blur to save, Escape to cancel.
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState<string>(task.title);
+  const [titleSaving, setTitleSaving] = useState(false);
+  useEffect(() => { setTitleDraft(task.title); setTitleEditing(false); }, [task.id, task.title]);
+
+  async function handleTitleSave() {
+    const next = titleDraft.trim();
+    if (!next || next === task.title) { setTitleEditing(false); setTitleDraft(task.title); return; }
+    setTitleSaving(true);
+    try {
+      await onUpdateTask(task.id, { title: next, updated_by: userName });
+      await onRefresh();
+      setTitleEditing(false);
+    } finally {
+      setTitleSaving(false);
+    }
+  }
+
   const taskDeps = dependencies.filter((d) => d.taskId === task.id);
   const taskWatchers = watchers.filter((w) => w.taskId === task.id);
 
@@ -1485,8 +1504,41 @@ function TaskDetailPanel({
         {/* Scrollable Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
 
-          {/* Title */}
-          <h2 style={{ color: TEXT, fontSize: 18, fontWeight: 600, margin: "0 0 18px 0", lineHeight: 1.35 }}>{task.title}</h2>
+          {/* Title — click to edit */}
+          {titleEditing ? (
+            <input
+              autoFocus
+              value={titleDraft}
+              disabled={titleSaving}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); (e.currentTarget as HTMLInputElement).blur(); }
+                if (e.key === "Escape") { e.preventDefault(); setTitleDraft(task.title); setTitleEditing(false); }
+              }}
+              style={{
+                width: "100%", margin: "0 0 18px 0", padding: "4px 8px",
+                background: CARD_BG, border: `1px solid ${BLUE}40`, borderRadius: 6,
+                color: TEXT, fontSize: 18, fontWeight: 600, lineHeight: 1.35,
+                outline: "none", fontFamily: "system-ui, -apple-system, sans-serif",
+              }}
+            />
+          ) : (
+            <h2
+              onClick={() => setTitleEditing(true)}
+              title="Click to edit"
+              style={{
+                color: TEXT, fontSize: 18, fontWeight: 600, margin: "0 0 18px 0",
+                lineHeight: 1.35, cursor: "text", padding: "4px 8px",
+                borderRadius: 6, border: "1px solid transparent",
+                transition: "border-color 0.15s, background 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.background = INPUT_BG; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.background = "transparent"; }}
+            >
+              {task.title}
+            </h2>
+          )}
 
           {/* Status bar */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
@@ -1696,17 +1748,59 @@ function TaskDetailPanel({
             </div>
           </div>
 
-          {/* Tags */}
-          {task.tags.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Tags</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {task.tags.map((tag) => (
-                  <span key={tag} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: INPUT_BG, color: TEXT_MID, border: `1px solid ${BORDER}` }}>{tag}</span>
-                ))}
-              </div>
+          {/* Channels — editable */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Channels</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {task.tags.map((tag) => (
+                <div key={tag} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 6px 3px 10px", borderRadius: 5, background: INPUT_BG, color: TEXT_MID, border: `1px solid ${BORDER}`, fontSize: 11 }}>
+                  <span>{tag}</span>
+                  <button
+                    onClick={async () => {
+                      const next = task.tags.filter((t) => t !== tag);
+                      await onUpdateTask(task.id, { tags: next, updated_by: userName });
+                      await onRefresh();
+                    }}
+                    style={{ background: "none", border: "none", color: TEXT_DIM, cursor: "pointer", padding: 0, lineHeight: 1, display: "flex" }}
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button style={{
+                    height: 22, padding: "0 8px", borderRadius: 5, border: `1px dashed ${BORDER}`,
+                    background: "transparent", color: TEXT_DIM, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 4, fontSize: 11,
+                  }}><Plus size={11} /> Add channel</button>
+                </PopoverTrigger>
+                <PopoverContent className="z-[60]" style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 200, zIndex: 60, maxHeight: 280, overflowY: "auto" }} align="start">
+                  {OTA_CHANNELS_LIST.filter((ch) => !task.tags.includes(ch)).map((ch) => (
+                    <button
+                      key={ch}
+                      onClick={async () => {
+                        const next = [...task.tags, ch];
+                        await onUpdateTask(task.id, { tags: next, updated_by: userName });
+                        await onRefresh();
+                      }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 12px",
+                        background: "transparent", border: "none", cursor: "pointer", color: TEXT_MID, fontSize: 11, textAlign: "left",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(57,189,248,0.05)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                  {OTA_CHANNELS_LIST.filter((ch) => !task.tags.includes(ch)).length === 0 && (
+                    <div style={{ padding: "8px 12px", color: TEXT_DIM, fontSize: 11 }}>All channels added.</div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
-          )}
+          </div>
 
           {/* Tabs: Details / Activity */}
           <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
@@ -2045,7 +2139,7 @@ function CreateTaskPanel({
   const [showChannelPicker, setShowChannelPicker] = useState(false);
   const [channelSearch, setChannelSearch] = useState("");
   const [dueDate, setDueDate] = useState<string>("");
-  const [notifyAssignee, setNotifyAssignee] = useState(true);
+  const [notifyAssignee, setNotifyAssignee] = useState(false);
   const [reminder, setReminder] = useState<"none" | "morning" | "day_before">("morning");
   const [escalate, setEscalate] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -2108,6 +2202,7 @@ function CreateTaskPanel({
         due_date: dueDate || null,
         hotel_ids: hotelIds.length > 0 ? hotelIds : undefined,
         created_by: userName,
+        notify_assignee: notifyAssignee,
       };
 
       if (splitByChannel && selChannels.length > 1) {
@@ -2379,8 +2474,8 @@ function CreateTaskPanel({
             <div style={{ color: BLUE, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "-0.025em", marginBottom: 14 }}>Notifications</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div>
-                <div style={{ color: TEXT, fontSize: 13, fontWeight: 500 }}>Notify assignee</div>
-                <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 2 }}>Email sent when task is created</div>
+                <div style={{ color: TEXT, fontSize: 13, fontWeight: 500 }}>Email the assignee</div>
+                <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 2 }}>Off by default — tick to email on create, reassign, status change, and comments</div>
               </div>
               <ToggleSwitch on={notifyAssignee} onToggle={() => setNotifyAssignee(!notifyAssignee)} />
             </div>

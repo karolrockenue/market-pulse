@@ -27,6 +27,7 @@ export interface CrmTask {
   category: TaskCategory;
   due_date: string | null;
   tags: string[];
+  notify_assignee: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

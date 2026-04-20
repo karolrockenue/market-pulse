@@ -128,8 +128,8 @@ function slackTaskBlock(task, event) {
 async function notifyTaskCreated(task, createdBy) {
   const event = `📋 New task created by *${createdBy || 'System'}*`;
 
-  // Email to assignee (if not the creator)
-  if (task.assignee && task.assignee !== createdBy) {
+  // Email to assignee — opt-in via task.notify_assignee
+  if (task.notify_assignee && task.assignee && task.assignee !== createdBy) {
     const email = await lookupEmail(task.assignee);
     if (email) {
       const desc = task.description
@@ -160,8 +160,8 @@ async function notifyTaskCreated(task, createdBy) {
 async function notifyTaskAssigned(task, oldAssignee, updatedBy) {
   const event = `👤 Assigned to *${task.assignee}*${oldAssignee ? ` (was ${oldAssignee})` : ''} by *${updatedBy}*`;
 
-  // Email to new assignee (if not the updater)
-  if (task.assignee && task.assignee !== updatedBy) {
+  // Email to new assignee — opt-in via task.notify_assignee
+  if (task.notify_assignee && task.assignee && task.assignee !== updatedBy) {
     const email = await lookupEmail(task.assignee);
     if (email) {
       await sendTaskEmail(
@@ -188,8 +188,8 @@ async function notifyTaskAssigned(task, oldAssignee, updatedBy) {
 async function notifyStatusChanged(task, oldStatus, updatedBy) {
   const event = `🔄 Status: *${statusLabel(oldStatus)}* → *${statusLabel(task.status)}* by *${updatedBy}*`;
 
-  // Email assignee if someone else changed it
-  if (task.assignee && task.assignee !== updatedBy) {
+  // Email assignee — opt-in via task.notify_assignee
+  if (task.notify_assignee && task.assignee && task.assignee !== updatedBy) {
     const email = await lookupEmail(task.assignee);
     if (email) {
       const statusChange = `
@@ -219,7 +219,7 @@ async function notifyStatusChanged(task, oldStatus, updatedBy) {
  * Comment added — email assignee only (no Slack)
  */
 async function notifyCommentAdded(task, author, commentBody) {
-  if (task.assignee && task.assignee !== author) {
+  if (task.notify_assignee && task.assignee && task.assignee !== author) {
     const email = await lookupEmail(task.assignee);
     if (email) {
       const comment = `
@@ -245,7 +245,7 @@ async function notifyCommentAdded(task, author, commentBody) {
  */
 async function notifyTaskOverdue(task) {
   if (!task.assignee) return;
-  const email = await lookupEmail(task.assignee);
+  const email = task.notify_assignee ? await lookupEmail(task.assignee) : null;
   if (email) {
     const overdueBadge = `
       <div style="display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #ef4444; padding: 4px 12px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">Overdue</div>

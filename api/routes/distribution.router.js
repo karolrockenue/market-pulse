@@ -126,10 +126,10 @@ router.post("/tasks/bulk", async (req, res) => {
       const primaryHotelId = resolvedHotelIds[0] || null;
 
       const { rows } = await db.query(`
-        INSERT INTO crm_tasks (title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO crm_tasks (title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by, notify_assignee)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *
-      `, [t.title, t.description || null, primaryHotelId, resolvedHotelIds, t.channel_id || null, t.assignee || null, t.priority || 'medium', t.status || 'todo', t.category || 'operations', t.due_date || null, t.tags || [], t.created_by || null]);
+      `, [t.title, t.description || null, primaryHotelId, resolvedHotelIds, t.channel_id || null, t.assignee || null, t.priority || 'medium', t.status || 'todo', t.category || 'operations', t.due_date || null, t.tags || [], t.created_by || null, t.notify_assignee === true]);
 
       if (rows[0]) {
         await db.query(`
@@ -164,7 +164,7 @@ router.post("/tasks/bulk", async (req, res) => {
 // POST /tasks — create task
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by } = req.body;
+    const { title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by, notify_assignee } = req.body;
     if (!title) return res.status(400).json({ error: "Title is required." });
 
     // Support both hotel_ids (array) and legacy hotel_id (single)
@@ -172,10 +172,10 @@ router.post("/tasks", async (req, res) => {
     const primaryHotelId = resolvedHotelIds[0] || null;
 
     const { rows } = await db.query(`
-      INSERT INTO crm_tasks (title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      INSERT INTO crm_tasks (title, description, hotel_id, hotel_ids, channel_id, assignee, priority, status, category, due_date, tags, created_by, notify_assignee)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
-    `, [title, description || null, primaryHotelId, resolvedHotelIds, channel_id || null, assignee || null, priority || 'medium', status || 'todo', category || 'operations', due_date || null, tags || [], created_by || null]);
+    `, [title, description || null, primaryHotelId, resolvedHotelIds, channel_id || null, assignee || null, priority || 'medium', status || 'todo', category || 'operations', due_date || null, tags || [], created_by || null, notify_assignee === true]);
 
     // Auto-log creation activity
     if (rows[0]) {
@@ -222,7 +222,7 @@ router.patch("/tasks/:id", async (req, res) => {
     if (!old) return res.status(404).json({ error: "Task not found." });
 
     // Build dynamic SET clause
-    const allowed = ['title', 'description', 'hotel_id', 'hotel_ids', 'channel_id', 'assignee', 'priority', 'status', 'category', 'due_date', 'tags'];
+    const allowed = ['title', 'description', 'hotel_id', 'hotel_ids', 'channel_id', 'assignee', 'priority', 'status', 'category', 'due_date', 'tags', 'notify_assignee'];
     const sets = [];
     const params = [];
     let idx = 1;
