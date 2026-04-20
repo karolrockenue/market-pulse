@@ -1007,7 +1007,7 @@ export function PortfolioOverview() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.2fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
+                      gridTemplateColumns: "1.2fr 0.8fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
                       gap: "0.5rem",
                       padding: "0.75rem 1rem",
                       borderBottom: `1px solid ${R.border}`,
@@ -1021,6 +1021,16 @@ export function PortfolioOverview() {
                       }}
                     >
                       Month
+                    </div>
+                    <div
+                      style={{
+                        color: R.textDim,
+                        fontSize: "10px",
+                        textTransform: "uppercase",
+                        textAlign: "right",
+                      }}
+                    >
+                      {currentYear - 1} ADR
                     </div>
                     <div
                       style={{
@@ -1097,6 +1107,7 @@ export function PortfolioOverview() {
                         100
                       : 0;
                     const adrTY = parseFloat((thisYearData?.adr as any) || 0);
+                    const adrLY = parseFloat((lastYearData?.adr as any) || 0);
 
                     const delta = revTY - revLY;
                     const deltaPct = revLY > 0 ? (delta / revLY) * 100 : 0;
@@ -1113,7 +1124,7 @@ export function PortfolioOverview() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "1.2fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
+                            "1.2fr 0.8fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
                           gap: "0.5rem",
                           padding: "0.75rem 1rem",
                           borderBottom: `1px solid ${R.border}`,
@@ -1129,6 +1140,16 @@ export function PortfolioOverview() {
                           }}
                         >
                           {monthName}
+                        </div>
+                        <div
+                          style={{
+                            color: R.textDim,
+                            fontSize: "12px",
+                            textAlign: "right",
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          {adrLY > 0 ? `£${adrLY.toFixed(0)}` : "—"}
                         </div>
                         <div
                           style={{
