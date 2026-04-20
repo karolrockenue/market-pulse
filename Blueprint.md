@@ -400,8 +400,10 @@ api/routes/mason.router.js
 
 Mason & Fifth dashboard reporting. Mounted at /api/mason. Two endpoints:
 GET /access (returns the M&F hotels the user can view) and
-GET /service-revenue?hotelId=&from=&to= (returns gross+net per service per
-month from Mews orderItems/getAll). All routes guarded by requireUserApi
+GET /service-revenue?hotelId=&from=&to= (returns gross+net+nights per
+service per month from Mews orderItems/getAll — `nights` counts
+SpaceOrder items; daily-TimeUnit services emit 1 per room-night, Long
+Stay emits 1 per month-charge). All routes guarded by requireUserApi
 plus a custom requireMasonAccess middleware that allows admins/super_admins
 unconditionally and otherwise checks user_properties for any of the M&F
 hotel IDs (318329 Belsize, 318341 Westbourne, 318343 Primrose). The
@@ -642,8 +644,16 @@ Behaviour:
   hook (same source as every other dashboard).
 - Belsize Park is single-service in Mews (only "Accommodation"), mapped
   into the `short` slot server-side; Mid + Long render as £0 — by design.
-- Per-service ADR + Occupancy values in KPI cards are still placeholder
-  (no per-service room-night data wired yet).
+- Headline Occupancy + Avg ADR are live (2026-04-20): occupancy from
+  `useDashboardData` snapshot (property-wide per §10), ADR = live
+  3-service total revenue ÷ property-wide room nights recovered from
+  the snapshot as revenue ÷ adr.
+- Per-service ADR + Occupancy are live too: ADR = service_revenue ÷
+  service_nights (from `orderItems` SpaceOrder count), Occ share =
+  service_nights ÷ property capacity × 100. Three services' shares
+  sum to the headline occ. Long Stay is an approximation: its
+  SpaceOrder items are monthly units, so the UI labels its ADR `/mo`
+  and the occ share multiplies nights ×30 (accurate to ±20%).
 
 Shared Components & Utilities
 
