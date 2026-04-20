@@ -1633,6 +1633,18 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
   const cards: MonthCard[] = useMemo(() => {
     const out: MonthCard[] = [];
     const kpiKeys = ["last", "current", "next"] as const;
+    // Headline occupancy + headline ADR come from useDashboardData's monthly
+    // snapshot. rooms_sold is property-wide (capacity − availability per
+    // Blueprint §10); revenue there is Short-Stay only, so we recover
+    // property-wide room nights as revenue/adr and divide the live 3-service
+    // revenue by it to get a true property-wide ADR.
+    const snapshotForIndex = (i: number) => {
+      if (!dashboardData?.snapshot) return null;
+      if (i === 0) return dashboardData.snapshot.lastMonth;
+      if (i === 1) return dashboardData.snapshot.currentMonth;
+      if (i === 2) return dashboardData.snapshot.nextMonth;
+      return null;
+    };
     window.months.forEach((m, i) => {
       const row = apiData?.monthly.find((x) => x.month === m);
       const byService: ServiceSplit = { short: 0, mid: 0, long: 0 };
@@ -1640,15 +1652,24 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
         const bucket = row?.services?.[svc.key];
         byService[svc.key] = (vatMode === "net" ? bucket?.net : bucket?.gross) || 0;
       }
-      // ADR is stored as a gross placeholder; strip ~20% when net.
+      const snapshot = snapshotForIndex(i);
+      const occupancy = snapshot?.occupancy ?? 0;
+      // Room nights = snapshot revenue / snapshot ADR (both DB-sourced, gross,
+      // so the /1.2 cancels). Always gross on both sides.
+      const roomNights = snapshot && snapshot.adr > 0 ? snapshot.revenue / snapshot.adr : 0;
+      const totalRevenue = byService.short + byService.mid + byService.long;
+      const adr = roomNights > 0 ? totalRevenue / roomNights : 0;
+      // Per-service ADR/Occ stay as placeholders — per-service room nights
+      // aren't stored in our DB (Blueprint §4.7c). Drop only the ÷1.2 fudge
+      // for the headline; per-service placeholders still need it.
       const kpi = STATIC_KPI[kpiKeys[i]];
       const adjustAdr = (v: number) => (vatMode === "net" ? Math.round(v / 1.2) : v);
       out.push({
         title: window.titles[i],
         label: monthLabel(m),
         revenueBy: byService,
-        occupancy: kpi.occupancy,
-        adr: adjustAdr(kpi.adr),
+        occupancy,
+        adr,
         adrByService: {
           short: adjustAdr(kpi.adrByService.short),
           mid: adjustAdr(kpi.adrByService.mid),
@@ -1662,7 +1683,7 @@ export function MasonDashboard({ scopedHotelId = null }: MasonDashboardProps = {
       });
     });
     return out;
-  }, [apiData, window.months, window.titles, vatMode]);
+  }, [apiData, dashboardData, window.months, window.titles, vatMode]);
 
   const placeholderLabels = useMemo(() => {
     return window.months.map((m, i) => ({
