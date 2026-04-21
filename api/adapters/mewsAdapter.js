@@ -86,6 +86,12 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
   //   429  rate limit · 408 request timeout · 401 stale token
   //   502/503/504 Cloudflare/edge transient · 520-524 Cloudflare-origin errors
   const RETRYABLE = new Set([429, 408, 401, 502, 503, 504, 520, 521, 522, 523, 524]);
+  // Mews serializes writes per-rate. When a prior rates/updatePrice call is
+  // still finalizing on their side, concurrent writes hit a 403 with the
+  // body message "Conflicting operation is being performed at this time".
+  // Retry with a longer backoff — Mews explicitly asks for "a few seconds".
+  // Only this specific 403 is retried; auth/permission 403s still fail fast.
+  const CONFLICT_RE = /conflicting operation/i;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -94,15 +100,21 @@ async function _callMewsApi(endpoint, credentials, data = {}) {
     } catch (error) {
       const status = error.response?.status;
       const isNetErr = !error.response;
+      const mewsMsg = error.response?.data?.Message || "";
+      const isConflict = status === 403 && CONFLICT_RE.test(mewsMsg);
 
-      if ((RETRYABLE.has(status) || isNetErr) && attempt < MAX_RETRIES) {
-        const retryAfter =
-          status === 429
-            ? parseInt(error.response.headers["retry-after"] || "5", 10)
-            : Math.min(30, Math.pow(2, attempt)); // exponential: 2, 4, 8, 16, capped at 30s
+      if ((RETRYABLE.has(status) || isNetErr || isConflict) && attempt < MAX_RETRIES) {
+        let retryAfter;
+        if (status === 429) {
+          retryAfter = parseInt(error.response.headers["retry-after"] || "5", 10);
+        } else if (isConflict) {
+          retryAfter = Math.min(30, 3 * Math.pow(2, attempt - 1)); // 3, 6, 12, 24
+        } else {
+          retryAfter = Math.min(30, Math.pow(2, attempt)); // 2, 4, 8, 16, capped at 30s
+        }
 
         console.warn(
-          `[Mews API] ${status || "network error"} on ${endpoint} — retry ${attempt}/${MAX_RETRIES} after ${retryAfter}s`,
+          `[Mews API] ${status || "network error"}${isConflict ? " (Conflicting operation)" : ""} on ${endpoint} — retry ${attempt}/${MAX_RETRIES} after ${retryAfter}s`,
         );
 
         await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
