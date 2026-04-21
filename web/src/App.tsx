@@ -950,7 +950,8 @@ export default function App() {
           {(activeView === "sentinel" ||
             activeView === "rateManager" ||
             activeView === "riskOverview" ||
-            activeView === "demandRadar") && (
+            activeView === "demandRadar" ||
+            activeView === "sentinelHealth") && (
             <SentinelHub
               activeView={activeView}
               onNavigate={handleViewChange}

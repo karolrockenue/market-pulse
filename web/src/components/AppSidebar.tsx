@@ -22,6 +22,7 @@ import {
   Presentation,
   Pin,
   PinOff,
+  Activity,
 } from "lucide-react";
 import { R } from "../styles/tokens";
 import {
@@ -444,13 +445,14 @@ export function AppSidebar({
               <>
                 <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
 
-                {sectionToggle("Sentinel", Zap, sentinelOpen, setSentinelOpen, ["riskOverview", "sentinel", "rateManager", "marketProfile"], sentinelDotColor)}
+                {sectionToggle("Sentinel", Zap, sentinelOpen, setSentinelOpen, ["riskOverview", "sentinel", "rateManager", "marketProfile", "sentinelHealth"], sentinelDotColor)}
                 {sentinelOpen && (
                   <>
                     {navItem("Risk Overview", "riskOverview", Shield, true)}
                     {navItem("Control Panel", "sentinel", TerminalSquare, true)}
                     {navItem("Rate Manager", "rateManager", DollarSign, true)}
                     {navItem("Market Profile", "marketProfile", BarChart3, true)}
+                    {navItem("Health", "sentinelHealth", Activity, true)}
                   </>
                 )}
 

@@ -15,6 +15,7 @@ import { RateManagerView } from "./components/RateManager/RateManagerView";
 // PropertyHub merged into ControlPanel as PromoConfigSection
 import { PortfolioRiskOverview } from "./components/RiskOverview/PortfolioRiskOverview";
 import { DemandRadarView } from "./components/DemandRadar/DemandRadarView";
+import { HealthView } from "./components/Health/HealthView";
 import { ArchanesInvestorView } from "../market-intel/components/ArchanesInvestorView";
 
 
@@ -69,6 +70,7 @@ export function SentinelHub({ activeView, onNavigate, selectedProperty }: Sentin
       <div className="flex-1 relative">
         {activeView === "rateManager" && <RateManagerView allHotels={hotels} />}
         {activeView === "sentinel" && <ControlPanelView allHotels={hotels} />}
+        {activeView === "sentinelHealth" && <HealthView />}
 
         {activeView === "riskOverview" && <PortfolioRiskOverview />}
         {activeView === "demandRadar" && (

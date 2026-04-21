@@ -116,3 +116,40 @@ export interface FleetHealthSummary {
   worst_status: HealthStatus;
 }
 
+export interface FleetHealthRow {
+  hotel_id: number;
+  property_name: string;
+  pms_type: string | null;
+  is_disconnected: boolean;
+  autopilot: boolean;
+  last_success_at: string | null;
+  last_success_rates_count: number | null;
+  last_failure_at: string | null;
+  last_failure_error: string | null;
+  last_failure_job_id: string | null;
+  consecutive_failures: number;
+  status: HealthStatus;
+  failures_7d: number;
+}
+
+export type SparklineCell = "green" | "amber" | "red" | "none";
+
+// { [hotel_id]: { [YYYY-MM-DD]: "green" | "amber" | "red" } }
+export type SparklineMap = Record<string, Record<string, SparklineCell>>;
+
+export interface FailureCluster {
+  signature: string;
+  count: number;
+  hotel_count: number;
+  hotels: string[];
+  latest_at: string;
+  sample_error: string;
+  job_ids: string[];
+}
+
+export interface FleetHealthResponse {
+  fleet: FleetHealthRow[];
+  sparklines: SparklineMap;
+  clusters: FailureCluster[];
+}
+

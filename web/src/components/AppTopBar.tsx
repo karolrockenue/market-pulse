@@ -71,7 +71,12 @@ export function AppTopBar({ activeView, propertyName, hotelId, userRole, userEma
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        {hotelHealth && <SentinelHealthPill health={hotelHealth} />}
+        {hotelHealth && (
+          <SentinelHealthPill
+            health={hotelHealth}
+            onOpenHealth={onNavigate ? () => onNavigate("sentinelHealth") : undefined}
+          />
+        )}
         {showPins && (
           <>
             <PinnedPills activeView={activeView} onNavigate={onNavigate!} userKey={userEmail!} />

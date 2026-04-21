@@ -5,6 +5,7 @@ import {
   AssetConfig,
   HotelHealth,
   FleetHealthSummary,
+  FleetHealthResponse,
 } from "./types";
 
 // --- CONTROL PANEL (CONFIGURATION) ---
@@ -284,6 +285,12 @@ export const getHotelHealth = async (hotelId: number | string): Promise<HotelHea
 
 export const getFleetHealthSummary = async (): Promise<FleetHealthSummary> => {
   const res = await fetch("/api/sentinel/health/fleet/summary");
+  if (!res.ok) throw new Error(`Failed to fetch fleet health (${res.status})`);
+  return res.json();
+};
+
+export const getFleetHealth = async (): Promise<FleetHealthResponse> => {
+  const res = await fetch("/api/sentinel/health/fleet");
   if (!res.ok) throw new Error(`Failed to fetch fleet health (${res.status})`);
   return res.json();
 };
