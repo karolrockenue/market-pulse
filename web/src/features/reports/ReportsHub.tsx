@@ -1,7 +1,7 @@
 // web/src/features/reports/ReportsHub.tsx
 
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText, Table as TableIcon } from "lucide-react";
 import { R } from "../../styles/tokens";
 import { Button } from "../../components/ui/button"; // Stays global (up 2 levels)
 import { toast } from "sonner";
@@ -287,6 +287,64 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
     document.body.removeChild(link);
   };
 
+  // --- PDF / CSV buttons (PDF goes to the server; CSV is a stub for now) ---
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleLocalPdf = async () => {
+    if (!data || !data.rows || data.rows.length === 0) {
+      toast.error("No data available to export. Please run the report first.");
+      return;
+    }
+    setIsGeneratingPdf(true);
+    try {
+      const res = await fetch("/api/metrics/reports/performance-metrics/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          propertyId: hotelId,
+          startDate,
+          endDate,
+          granularity,
+          metrics: selectedMetrics,
+          includeTaxes: taxInclusive,
+          displayTotals,
+          currencySymbol,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`PDF request failed (${res.status}): ${text.slice(0, 200)}`);
+      }
+
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] || `Performance Metrics - ${startDate} to ${endDate}.pdf`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("PDF downloaded");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      toast.error("PDF export failed — see console for details");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleLocalCsv = () => {
+    toast.info("CSV export coming soon");
+  };
+
   const handleExport = (format: "csv" | "xlsx") => {
     if (!data || !data.rows || data.rows.length === 0) {
       toast.error("No data available to export. Please run the report first.");
@@ -432,12 +490,54 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
             </div>
           </div>
 
-          <ReportActions
-            onExportCSV={() => handleExport("csv")}
-            onExportExcel={() => handleExport("xlsx")}
-            onCreateSchedule={() => setShowCreateSchedule(true)}
-            onManageSchedules={() => setShowManageSchedules(true)}
-          />
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {/* Local prototype: PDF + CSV (client-side only, no backend) */}
+            <button
+              onClick={handleLocalPdf}
+              disabled={isGeneratingPdf}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: R.heroBg,
+                border: `1px solid ${R.gold}55`,
+                color: R.accent,
+                padding: "8px 14px",
+                fontSize: 13,
+                borderRadius: 4,
+                cursor: isGeneratingPdf ? "default" : "pointer",
+                opacity: isGeneratingPdf ? 0.55 : 1,
+                transition: "background 0.15s, border-color 0.15s",
+              }}
+              title="Download PDF (Archivo template)"
+            >
+              <FileText size={14} color={R.gold} />
+              {isGeneratingPdf ? "Generating…" : "PDF"}
+            </button>
+            <button
+              onClick={handleLocalCsv}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: R.heroBg,
+                border: `1px solid ${R.border}`,
+                color: R.textMid,
+                padding: "8px 14px",
+                fontSize: 13,
+                borderRadius: 4,
+                cursor: "pointer",
+                transition: "background 0.15s",
+              }}
+              title="CSV export (coming soon)"
+            >
+              <TableIcon size={14} color={R.textDim} />
+              CSV
+            </button>
+
+            <ReportActions
+              onExportCSV={() => handleExport("csv")}
+              onExportExcel={() => handleExport("xlsx")}
+              onCreateSchedule={() => setShowCreateSchedule(true)}
+              onManageSchedules={() => setShowManageSchedules(true)}
+            />
+          </div>
         </div>
 
         {/* Unified Canvas — single #1A1A1A card */}

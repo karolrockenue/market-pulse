@@ -15,6 +15,8 @@ const MPDemandRadar = lazy(() => import("./components/MPDemandRadar").then(m => 
 const MPRiskOverview = lazy(() => import("./components/MPRiskOverview").then(m => ({ default: m.MPRiskOverview })));
 const MPLogin = lazy(() => import("./components/MPLogin").then(m => ({ default: m.MPLogin })));
 const MasonDashboard = lazy(() => import("./components/MasonDashboard").then(m => ({ default: m.MasonDashboard })));
+const ReportsLab = lazy(() => import("./components/ReportsLab").then(m => ({ default: m.ReportsLab })));
+const TopNavPillsMockup = lazy(() => import("./components/TopNavPillsMockup").then(m => ({ default: m.TopNavPillsMockup })));
 
 interface RockenueHubProps {
   activeView: string;
@@ -58,6 +60,8 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "mpRiskOverview" && <MPRiskOverview activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpLogin" && <MPLogin activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "masonDashboard" && <MasonDashboard />}
+          {activeView === "reportsLab" && <ReportsLab />}
+          {activeView === "topnavPills" && <TopNavPillsMockup />}
         </Suspense>
       </div>
     </div>

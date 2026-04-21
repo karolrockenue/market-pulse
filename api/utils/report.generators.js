@@ -306,7 +306,81 @@ async function generateShreejiReport(hotelId, date) {
   }
 }
 
+/**
+ * Generates the Performance Metrics PDF for a given hotel/date range.
+ * Data comes from the same MetricsService.runDynamicReport() call that the
+ * on-screen report uses, so the PDF matches the UI exactly.
+ *
+ * @param {object} params
+ * @param {string|number} params.hotelId
+ * @param {string} params.startDate - 'YYYY-MM-DD'
+ * @param {string} params.endDate   - 'YYYY-MM-DD'
+ * @param {string} params.granularity - 'daily' | 'weekly' | 'monthly'
+ * @param {string[]} params.selectedMetrics - metric ids (e.g. ['occupancy', 'adr', ...])
+ * @param {boolean} params.includeTaxes
+ * @param {boolean} params.displayTotals
+ * @param {string} params.currencySymbol - e.g. '£', '$', '€'
+ * @param {string} params.propertyName
+ * @param {any[]} params.rows - pre-fetched data rows from runDynamicReport
+ * @returns {Promise<{ pdfBuffer: Buffer, fileName: string }>}
+ */
+async function generatePerformanceMetricsReport(params) {
+  const {
+    hotelId,
+    startDate,
+    endDate,
+    granularity,
+    selectedMetrics,
+    displayTotals,
+    currencySymbol,
+    propertyName,
+    rows,
+  } = params;
+
+  const generatedAt = format(new Date(), "dd MMM yyyy HH:mm");
+
+  const dataForPdf = {
+    propertyName: propertyName || `Hotel ${hotelId}`,
+    startDate,
+    endDate,
+    granularity,
+    selectedMetrics,
+    displayTotals: !!displayTotals,
+    currencySymbol: currencySymbol || "£",
+    generatedAt,
+    rows: Array.isArray(rows) ? rows : [],
+  };
+
+  const propertyNameSanitized = (propertyName || "Property")
+    .replace(/[\/\\:*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Page furniture (dark bar, gradient strip, page number) lives in the
+  // template via CSS paged-media (position:fixed + @page @bottom-right).
+  // Playwright's `margin` controls the body-content inset and MUST match the
+  // @page margin in the template, otherwise body content overlaps the fixed
+  // bars. Set them in lockstep here.
+  const pdfOptions = {
+    format: "A4",
+    scale: 1.0,
+    printBackground: true,
+    displayHeaderFooter: false,
+    margin: { top: "22mm", bottom: "18mm", left: "0mm", right: "0mm" },
+  };
+
+  const pdfBuffer = await generatePdfFromHtml(
+    "performance-metrics.template.html",
+    dataForPdf,
+    pdfOptions
+  );
+
+  const fileName = `Performance Metrics - ${propertyNameSanitized} - ${startDate} to ${endDate}.pdf`;
+  return { pdfBuffer, fileName };
+}
+
 module.exports = {
   fetchShreejiReportData,
   generateShreejiReport,
+  generatePerformanceMetricsReport,
 };

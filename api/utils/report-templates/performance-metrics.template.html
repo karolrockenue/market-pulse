@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Performance Metrics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* CSS paged-media approach: the dark bar and gradient strip live in the
+       body as position:fixed elements. In print media Chromium repeats these
+       on every page. @page provides the margin that the body content sits
+       inside so the fixed bars never overlap body text. Page number comes
+       from @page @bottom-right using counter(page). */
+    @page {
+      size: A4 portrait;
+      margin: 22mm 0 18mm 0; /* top = dark bar (18mm) + 4mm gap; bottom = strip (2mm) + page number + gap */
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        padding: 0 12mm 10mm 0;
+        color: #6B7280;
+        font-size: 8px;
+        font-family: 'Archivo', Helvetica, Arial, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      @bottom-left {
+        content: string(propname);
+        padding: 0 0 10mm 12mm;
+        color: #6B7280;
+        font-size: 8px;
+        font-family: 'Archivo', Helvetica, Arial, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      font-size: 10.5px;
+      line-height: 1.35;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* Dark header SVG — position:fixed renders on every page in print.
+       Chromium's print engine honors CSS backgrounds inconsistently on
+       position:fixed elements, but it DOES render SVG <rect> fills and
+       <text> fills reliably. Keep the whole header as an SVG. */
+    .page-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 18mm;
+      z-index: 100;
+      display: block;
+    }
+    .page-header svg { display: block; width: 100%; height: 100%; }
+
+    /* Gradient strip = SVG with two adjacent <rect>s (teal half + gold half) */
+    .page-strip {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      width: 100%;
+      z-index: 100;
+      display: block;
+    }
+    .page-strip svg { display: block; width: 100%; height: 100%; }
+
+    /* Body content — side gutters via inline padding; top/bottom handled by @page margin */
+    .content-wrap {
+      padding: 0 12mm;
+    }
+
+    /* Hidden element that feeds the property name into @page @bottom-left via string-set */
+    .propname-source {
+      string-set: propname content();
+      display: none;
+    }
+
+    /* Metadata block */
+    .meta-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 12px;
+      padding: 4px 0;
+      border-bottom: 1px solid #E5E5E0;
+      font-size: 11px;
+    }
+    .meta-row .k { color: #6B7280; }
+    .meta-row .v { color: #1A1A1A; }
+
+    .section-label {
+      font-size: 10px;
+      color: #6B7280;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 24px 0 8px 0;
+    }
+
+    /* Table */
+    table.report {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.report thead { display: table-header-group; }
+    table.report tr { break-inside: avoid; page-break-inside: avoid; }
+    table.report th {
+      text-align: right;
+      padding: 4px 8px;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6B7280;
+      font-weight: 500;
+      border-bottom: 1px solid #E5E5E0;
+      background: #FFFFFF;
+    }
+    table.report td {
+      text-align: right;
+      padding: 4px 8px;
+      font-size: 10.5px;
+      color: #1A1A1A;
+      font-variant-numeric: tabular-nums;
+      border-bottom: 1px solid #E5E5E0;
+    }
+    table.report th.l, table.report td.l { text-align: left; }
+    table.report tbody tr:nth-child(even) td { background: #F3F3EE; }
+    table.report tr.totals td { padding: 8px 8px; font-weight: 500; border-top: 2px solid #E5E5E0; border-bottom: none; background: #FFFFFF !important; }
+    .dow-muted { color: #6B7280; }
+    .dow-weekend { color: #1A1A1A; }
+
+    .empty {
+      padding: 48px 0;
+      text-align: center;
+      color: #6B7280;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Fixed page furniture — renders on every page via CSS paged-media.
+       SVG elements render reliably in Chromium print mode where CSS
+       background-color and linear-gradient on position:fixed elements are
+       intermittently dropped. -->
+  <div class="page-header">
+    <svg preserveAspectRatio="none" viewBox="0 0 794 68" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="794" height="68" fill="#14181D"/>
+      <g font-family="Helvetica, Arial, sans-serif">
+        <text x="45" y="42" font-size="26" font-weight="300" fill="#38C6BA">(</text>
+        <text x="65" y="40" font-size="13" font-weight="700" fill="#F3F5F7" letter-spacing="1.8">MARKET PULSE</text>
+        <text x="215" y="42" font-size="26" font-weight="300" fill="#C8A66E">)</text>
+        <text x="749" y="40" font-size="10" font-weight="500" fill="#7A8494" letter-spacing="0.8" text-anchor="end">PERFORMANCE METRICS</text>
+      </g>
+    </svg>
+  </div>
+  <div class="page-strip">
+    <svg preserveAspectRatio="none" viewBox="0 0 794 6" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="397" height="6" fill="#38C6BA"/>
+      <rect x="397" y="0" width="397" height="6" fill="#C8A66E"/>
+    </svg>
+  </div>
+
+  <!-- Hidden string source for @page @bottom-left (property name) -->
+  <span class="propname-source" id="propname-source"></span>
+
+  <!-- Body flow content — top/bottom margins are handled by @page -->
+  <div class="content-wrap">
+    <div id="meta"></div>
+    <div class="section-label">Performance Data</div>
+    <div id="table-wrap"></div>
+  </div>
+
+  <script>
+    const METRIC_LABELS = {
+      "occupancy": "Occupancy",
+      "adr": "ADR",
+      "revpar": "RevPAR",
+      "total-revenue": "Total Revenue",
+      "rooms-sold": "Rooms Sold",
+      "rooms-unsold": "Rooms Unsold",
+      "market-occupancy": "Market Occ",
+      "market-adr": "Market ADR"
+    };
+    const VOLUME_METRICS = new Set(["total-revenue", "rooms-sold", "rooms-unsold"]);
+
+    function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+    function formatValue(metric, value, symbol) {
+      const v = Number(value) || 0;
+      if (metric.indexOf("occupancy") !== -1) return (v * 100).toFixed(1) + "%";
+      if (metric.indexOf("adr") !== -1 || metric.indexOf("revenue") !== -1 || metric.indexOf("revpar") !== -1) {
+        return symbol + v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      return v.toLocaleString("en-GB");
+    }
+
+    function formatPeriod(period, granularity) {
+      if (!period) return { main: "—" };
+      if (granularity === "monthly") {
+        const d = new Date(period + "T12:00:00");
+        return { main: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) };
+      }
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(period);
+      if (!m) return { main: period };
+      const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+      const dow = d.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
+      return { main: m[3] + "/" + m[2] + "/" + m[1], dow: dow };
+    }
+
+    function formatDateRange(start, end) {
+      const opts = { day: "numeric", month: "short", year: "numeric" };
+      try {
+        const s = new Date(start + "T12:00:00").toLocaleDateString("en-GB", opts);
+        const e = new Date(end + "T12:00:00").toLocaleDateString("en-GB", opts);
+        return s + " — " + e;
+      } catch (_err) {
+        return start + " — " + end;
+      }
+    }
+
+    function computeTotals(rows, selectedMetrics) {
+      const out = {};
+      if (!rows || !rows.length) return out;
+      for (let i = 0; i < selectedMetrics.length; i++) {
+        const m = selectedMetrics[i];
+        let sum = 0;
+        for (let j = 0; j < rows.length; j++) sum += Number(rows[j][m]) || 0;
+        out[m] = VOLUME_METRICS.has(m) ? sum : (sum / rows.length);
+      }
+      return out;
+    }
+
+    window.renderReport = async function(data) {
+      try {
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+        const selectedMetrics = Array.isArray(data.selectedMetrics) ? data.selectedMetrics : [];
+        const granularity = data.granularity || "daily";
+        const symbol = data.currencySymbol || "£";
+        const displayTotals = !!data.displayTotals;
+        const showDow = granularity === "daily";
+        const propertyName = data.propertyName || "—";
+
+        // Feed property name into @page @bottom-left via CSS string-set
+        const propSrc = document.getElementById("propname-source");
+        if (propSrc) propSrc.textContent = propertyName;
+
+        // Meta
+        const meta = [
+          { k: "Property", v: propertyName },
+          { k: "Period", v: formatDateRange(data.startDate, data.endDate) },
+          { k: "Granularity", v: (granularity.charAt(0).toUpperCase() + granularity.slice(1)) },
+          { k: "Generated", v: data.generatedAt || "" }
+        ];
+        document.getElementById("meta").innerHTML = meta
+          .map((m) => "<div class=\"meta-row\"><div class=\"k\">" + esc(m.k) + "</div><div class=\"v\">" + esc(m.v) + "</div></div>")
+          .join("");
+
+        // Table
+        let html = "<table class=\"report\"><thead><tr>";
+        html += "<th class=\"l\">Date</th>";
+        if (showDow) html += "<th>DOW</th>";
+        for (let i = 0; i < selectedMetrics.length; i++) {
+          html += "<th>" + esc(METRIC_LABELS[selectedMetrics[i]] || selectedMetrics[i]) + "</th>";
+        }
+        html += "</tr></thead><tbody>";
+
+        if (!rows.length) {
+          html += "</tbody></table><div class=\"empty\">No data for the selected period.</div>";
+        } else {
+          for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
+            const p = formatPeriod(r.period, granularity);
+            const isWeekend = p.dow === "Sat" || p.dow === "Sun";
+            html += "<tr>";
+            html += "<td class=\"l\">" + esc(p.main) + "</td>";
+            if (showDow) html += "<td class=\"" + (isWeekend ? "dow-weekend" : "dow-muted") + "\">" + esc(p.dow || "") + "</td>";
+            for (let j = 0; j < selectedMetrics.length; j++) {
+              const m = selectedMetrics[j];
+              html += "<td>" + esc(formatValue(m, r[m], symbol)) + "</td>";
+            }
+            html += "</tr>";
+          }
+          if (displayTotals) {
+            const tot = computeTotals(rows, selectedMetrics);
+            html += "<tr class=\"totals\">";
+            html += "<td class=\"l\">Totals / Avg</td>";
+            if (showDow) html += "<td></td>";
+            for (let j = 0; j < selectedMetrics.length; j++) {
+              const m = selectedMetrics[j];
+              html += "<td>" + esc(formatValue(m, tot[m] || 0, symbol)) + "</td>";
+            }
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+        }
+        document.getElementById("table-wrap").innerHTML = html;
+
+        if (document.fonts && document.fonts.ready) {
+          try { await document.fonts.ready; } catch (_err) { /* ignore */ }
+        }
+        document.body.classList.add("ready");
+      } catch (e) {
+        console.error("Error in window.renderReport:", e);
+        document.body.classList.add("ready");
+      }
+    };
+
+    document.body.classList.add("script-ready");
+  </script>
+</body>
+</html>

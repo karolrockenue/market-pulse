@@ -11,9 +11,13 @@ const path = require("path");
  *
  * @param {string} templateName - The name of the template file in /api/utils/report-templates/
  * @param {object} data - The JSON data object to inject into the template.
+ * @param {object|null} [pdfOptionsOverride=null] - Optional Playwright page.pdf() option overrides.
+ *   When omitted, the Shreeji-compatible defaults are used (format A4, scale 0.7, 20px top/bottom
+ *   margins, 8px side margins, printBackground). Pass a partial object to override specific options
+ *   (e.g. { scale: 1.0, displayHeaderFooter: true, footerTemplate, margin }).
  * @returns {Promise<Buffer>} A promise that resolves with the PDF buffer.
  */
-async function generatePdfFromHtml(templateName, data) {
+async function generatePdfFromHtml(templateName, data, pdfOptionsOverride = null) {
   let browser = null;
   
   // Construct the full path to the HTML template
@@ -87,18 +91,21 @@ async function generatePdfFromHtml(templateName, data) {
     console.log("[pdf.utils.js] 'body.ready' detected. Generating PDF...");
 
     // Generate the PDF
-// Generate the PDF
-    const pdfBuffer = await page.pdf({
+    const defaultPdfOptions = {
       format: "A4",
-      scale: 0.7, // <-- [NEW] Scale the content to 80% to fit
- printBackground: true,
+      scale: 0.7, // Shreeji template is designed to fit at 70% scale.
+      printBackground: true,
       margin: {
         top: "20px",
         bottom: "20px",
-        left: "8px",  // <-- REDUCED
-        right: "8px", // <-- REDUCED
+        left: "8px",
+        right: "8px",
       },
-    });
+    };
+    const pdfOptions = pdfOptionsOverride
+      ? { ...defaultPdfOptions, ...pdfOptionsOverride }
+      : defaultPdfOptions;
+    const pdfBuffer = await page.pdf(pdfOptions);
 
     console.log("[pdf.utils.js] PDF generated successfully.");
     return pdfBuffer;

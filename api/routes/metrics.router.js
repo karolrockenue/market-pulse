@@ -14,6 +14,7 @@ const { calculatePacingStatus } = require("../utils/pacing.utils");
 const {
   fetchShreejiReportData,
   generateShreejiReport,
+  generatePerformanceMetricsReport,
 } = require("../utils/report.generators");
 const { format, subMonths, addMonths, parseISO } = require("date-fns");
 
@@ -1252,6 +1253,149 @@ router.post("/reports/run", requireUserApi, async (req, res) => {
   } catch (error) {
     console.error("Error running performance report:", error);
     res.status(500).json({ error: "Failed to run report." });
+  }
+});
+
+// Performance Metrics — PDF download. Mirrors the on-screen report's data flow:
+// fetch hotel metrics via getMetricsFromDB + competitor metrics via
+// getCompetitorMetrics, then merge per period using the same keys the client
+// uses (occupancy / adr / revpar / total-revenue / rooms-sold / rooms-unsold
+// / market-*). Matches the Performance Metrics screen exactly.
+router.post("/reports/performance-metrics/pdf", requireUserApi, async (req, res) => {
+  try {
+    const {
+      propertyId,
+      startDate,
+      endDate,
+      granularity = "daily",
+      metrics,
+      includeTaxes = false,
+      displayTotals = true,
+      currencySymbol = "£",
+    } = req.body;
+
+    if (!propertyId || !startDate || !endDate || !metrics) {
+      return res.status(400).json({ error: "Missing required parameters." });
+    }
+
+    const metricArr = Array.isArray(metrics) ? metrics : [];
+    const needsHotel =
+      metricArr.length === 0 || metricArr.some((m) => !m.startsWith("market-"));
+    const needsMarket = metricArr.some((m) => m.startsWith("market-"));
+
+    // Resolve competitor IDs only when market metrics are requested
+    let competitorIds = [];
+    if (needsMarket) {
+      const compRes = await pgPool.query(
+        "SELECT competitor_hotel_id FROM hotel_comp_sets WHERE hotel_id = $1",
+        [propertyId],
+      );
+      competitorIds = compRes.rows.map((r) => r.competitor_hotel_id);
+      if (competitorIds.length === 0) {
+        const catRes = await pgPool.query(
+          "SELECT category, city FROM hotels WHERE hotel_id = $1",
+          [propertyId],
+        );
+        if (catRes.rows[0]?.category) {
+          const autoComp = await pgPool.query(
+            "SELECT hotel_id FROM hotels WHERE category = $1 AND hotel_id != $2 AND city = $3",
+            [catRes.rows[0].category, propertyId, catRes.rows[0].city],
+          );
+          competitorIds = autoComp.rows.map((r) => r.hotel_id);
+        }
+      }
+    }
+
+    // Parallel fetch (matches the on-screen useReportData flow)
+    const [hotelRows, competitorData] = await Promise.all([
+      needsHotel
+        ? MetricsService.getMetricsFromDB(propertyId, startDate, endDate, granularity)
+        : Promise.resolve([]),
+      needsMarket
+        ? MetricsService.getCompetitorMetrics(competitorIds, startDate, endDate, granularity)
+        : Promise.resolve({ metrics: [] }),
+    ]);
+    const marketRows = Array.isArray(competitorData?.metrics) ? competitorData.metrics : [];
+
+    // Tax-aware aliases — identical to reports.api.ts
+    const hotelAdrAlias = includeTaxes ? "your_gross_adr" : "your_net_adr";
+    const hotelRevparAlias = includeTaxes ? "your_gross_revpar" : "your_net_revpar";
+    const hotelRevenueAlias = includeTaxes ? "your_gross_revenue" : "your_net_revenue";
+    const marketAdrAlias = includeTaxes ? "market_gross_adr" : "market_net_adr";
+    const marketRevparAlias = includeTaxes ? "market_gross_revpar" : "market_net_revpar";
+    const marketRevenueAlias = includeTaxes ? "market_gross_revenue" : "market_net_revenue";
+
+    // pg returns `period` as a Date when granularity='daily' (date column) and
+    // as a string for month/year truncs — normalise both to 'YYYY-MM-DD'.
+    const toPeriodKey = (p) => {
+      if (!p) return "";
+      if (p instanceof Date) {
+        const y = p.getUTCFullYear();
+        const m = String(p.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(p.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+      return String(p).substring(0, 10);
+    };
+
+    const dataMap = new Map();
+
+    for (const row of hotelRows) {
+      const key = toPeriodKey(row.period);
+      if (!key) continue;
+      if (!dataMap.has(key)) dataMap.set(key, { period: key });
+      const e = dataMap.get(key);
+      e["occupancy"] = parseFloat(row.your_occupancy_direct) || 0;
+      e["adr"] = parseFloat(row[hotelAdrAlias]) || 0;
+      e["revpar"] = parseFloat(row[hotelRevparAlias]) || 0;
+      e["total-revenue"] = parseFloat(row[hotelRevenueAlias]) || 0;
+      e["rooms-sold"] = parseInt(row.your_rooms_sold, 10) || 0;
+      const cap = parseInt(row.your_capacity_count, 10) || 0;
+      e["capacity-count"] = cap;
+      e["rooms-unsold"] = cap - e["rooms-sold"];
+    }
+
+    for (const row of marketRows) {
+      const key = toPeriodKey(row.period);
+      if (!key) continue;
+      if (!dataMap.has(key)) dataMap.set(key, { period: key });
+      const e = dataMap.get(key);
+      e["market-occupancy"] = parseFloat(row.market_occupancy) || 0;
+      e["market-adr"] = parseFloat(row[marketAdrAlias]) || 0;
+      e["market-revpar"] = parseFloat(row[marketRevparAlias]) || 0;
+      e["market-total-revenue"] = parseFloat(row[marketRevenueAlias]) || 0;
+    }
+
+    const rows = Array.from(dataMap.values()).sort(
+      (a, b) => new Date(a.period).getTime() - new Date(b.period).getTime(),
+    );
+
+    // Resolve property name for header + filename
+    const propRes = await pgPool.query(
+      "SELECT property_name FROM hotels WHERE hotel_id = $1",
+      [propertyId],
+    );
+    const propertyName = propRes.rows[0]?.property_name || `Hotel ${propertyId}`;
+
+    const { pdfBuffer, fileName } = await generatePerformanceMetricsReport({
+      hotelId: propertyId,
+      startDate,
+      endDate,
+      granularity,
+      selectedMetrics: metricArr,
+      displayTotals,
+      currencySymbol,
+      propertyName,
+      rows,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error generating performance-metrics PDF:", error);
+    res.status(500).json({ error: "Failed to generate PDF." });
   }
 });
 
