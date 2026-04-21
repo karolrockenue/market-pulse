@@ -1358,6 +1358,46 @@ router.post("/min-rates/:hotelId", async (req, res) => {
   }
 });
 /**
+ * Writes a heartbeat row for a hotel via a fresh pool connection so the
+ * write is independent of the worker's batch transaction. Errors are logged
+ * and swallowed — observability must never break the thing it is observing.
+ */
+async function writeSentinelHeartbeat(hotelId, outcome) {
+  try {
+    if (outcome.success) {
+      await db.query(
+        `INSERT INTO sentinel_hotel_heartbeat
+           (hotel_id, last_success_at, last_success_rates_count, consecutive_failures, updated_at)
+         VALUES ($1, NOW(), $2, 0, NOW())
+         ON CONFLICT (hotel_id) DO UPDATE SET
+           last_success_at          = NOW(),
+           last_success_rates_count = EXCLUDED.last_success_rates_count,
+           consecutive_failures     = 0,
+           updated_at               = NOW()`,
+        [hotelId, outcome.ratesCount ?? 0],
+      );
+    } else {
+      await db.query(
+        `INSERT INTO sentinel_hotel_heartbeat
+           (hotel_id, last_failure_at, last_failure_error, last_failure_job_id, consecutive_failures, updated_at)
+         VALUES ($1, NOW(), $2, $3, 1, NOW())
+         ON CONFLICT (hotel_id) DO UPDATE SET
+           last_failure_at      = NOW(),
+           last_failure_error   = EXCLUDED.last_failure_error,
+           last_failure_job_id  = EXCLUDED.last_failure_job_id,
+           consecutive_failures = sentinel_hotel_heartbeat.consecutive_failures + 1,
+           updated_at           = NOW()`,
+        [hotelId, (outcome.errorMessage || "").substring(0, 500), outcome.jobId || null],
+      );
+    }
+  } catch (hbErr) {
+    console.warn(
+      `[Sentinel Heartbeat] Write failed for hotel ${hotelId}: ${hbErr.message}`,
+    );
+  }
+}
+
+/**
  * [SHARED WORKER FUNCTION - SERVERLESS OPTIMIZED]
  * loops for up to 50 seconds processing small batches.
  * Commits progress frequently so timeouts don't rollback work.
@@ -1424,6 +1464,8 @@ async function runBackgroundWorker() {
           );
 
           // Success Update
+          const ratesCount = Array.isArray(job.payload?.rates) ? job.payload.rates.length : 0;
+          let heartbeatOutcome = null;
           if (
             result &&
             result.message === "All rates filtered out by safety checks."
@@ -1432,6 +1474,7 @@ async function runBackgroundWorker() {
               `UPDATE sentinel_job_queue SET status = 'SKIPPED', updated_at = NOW() WHERE id = $1`,
               [job.id],
             );
+            // SKIPPED is neither success nor failure — no heartbeat update.
           } else if (result && result.success === false) {
             // Cloudbeds accepted the HTTP request but rejected the rate update
             const cbError = JSON.stringify(result).substring(0, 500);
@@ -1440,13 +1483,21 @@ async function runBackgroundWorker() {
               `UPDATE sentinel_job_queue SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1`,
               [job.id, `PMS rejected: ${cbError}`],
             );
+            heartbeatOutcome = { success: false, errorMessage: `PMS rejected: ${cbError}`, jobId: job.id };
           } else {
             await client.query(
               `UPDATE sentinel_job_queue SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
               [job.id],
             );
+            heartbeatOutcome = ratesCount > 0 ? { success: true, ratesCount } : null;
           }
           await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+
+          // Heartbeat write runs on its own pool connection — isolated from
+          // this transaction so it cannot block rate pushes if it fails.
+          if (heartbeatOutcome) {
+            await writeSentinelHeartbeat(job.hotel_id, heartbeatOutcome);
+          }
 
           // Mews requires a delay between rate updates to avoid "Conflicting operation" errors
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -1460,6 +1511,11 @@ async function runBackgroundWorker() {
             `UPDATE sentinel_job_queue SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE id = $1`,
             [job.id, safeError],
           );
+          await writeSentinelHeartbeat(job.hotel_id, {
+            success: false,
+            errorMessage: safeError,
+            jobId: job.id,
+          });
         }
       }
 
@@ -1907,5 +1963,223 @@ router.delete("/market-events/:id", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  SENTINEL HEALTH — admin-only (inherits requireAdminApi from router.use above).
+//  Feeds the hotel header pill (L1) and the Sentinel Health page (L2).
+//  Only rockenue-managed, non-disconnected hotels are considered.
+// ═══════════════════════════════════════════════════════════════════
+
+// SQL fragment that derives status from a heartbeat row joined with hotel + config.
+// Kept as a fragment so all three endpoints stay consistent.
+const HEALTH_STATUS_SELECT = `
+  CASE
+    WHEN h.is_disconnected = true OR h.is_rockenue_managed IS NOT TRUE
+      THEN 'off'
+    WHEN hb.last_success_at IS NULL
+      THEN 'off'
+    WHEN (
+      EXTRACT(EPOCH FROM (NOW() - hb.last_success_at)) / 60
+    ) > (CASE WHEN sc.is_autopilot_enabled THEN 240 ELSE 1440 END)
+      THEN 'red'
+    WHEN hb.consecutive_failures >= 3
+      THEN 'red'
+    WHEN hb.last_failure_at IS NOT NULL AND hb.last_failure_at > hb.last_success_at
+      THEN 'amber'
+    ELSE 'green'
+  END
+`;
+
+/**
+ * GET /api/sentinel/health/fleet/summary
+ * Returns counts per status plus worst status. Used by the sidebar dot.
+ */
+router.get("/health/fleet/summary", async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT status, COUNT(*)::int AS n FROM (
+        SELECT ${HEALTH_STATUS_SELECT} AS status
+        FROM hotels h
+        LEFT JOIN sentinel_hotel_heartbeat hb ON hb.hotel_id = h.hotel_id
+        LEFT JOIN sentinel_configurations sc ON sc.hotel_id = h.hotel_id
+        WHERE h.is_rockenue_managed = true
+      ) s
+      GROUP BY status
+    `);
+    const counts = { green: 0, amber: 0, red: 0, off: 0 };
+    rows.forEach(r => { counts[r.status] = r.n; });
+    const worst = counts.red > 0 ? "red" : counts.amber > 0 ? "amber" : counts.green > 0 ? "green" : "off";
+    res.json({ ...counts, worst_status: worst });
+  } catch (err) {
+    console.error("[Sentinel Health] fleet/summary failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/sentinel/health/fleet
+ * One row per rockenue-managed hotel with status + heartbeat fields + 7d failure
+ * count + a 30-day sparkline of daily success/failure/none cells. Drives the
+ * Sentinel Health page fleet grid.
+ */
+router.get("/health/fleet", async (req, res) => {
+  try {
+    const { rows: fleet } = await db.query(`
+      SELECT
+        h.hotel_id,
+        h.property_name,
+        h.pms_type,
+        h.is_disconnected,
+        COALESCE(sc.is_autopilot_enabled, false) AS autopilot,
+        hb.last_success_at,
+        hb.last_success_rates_count,
+        hb.last_failure_at,
+        hb.last_failure_error,
+        hb.last_failure_job_id,
+        COALESCE(hb.consecutive_failures, 0) AS consecutive_failures,
+        ${HEALTH_STATUS_SELECT} AS status,
+        (SELECT COUNT(*)::int FROM sentinel_job_queue q
+          WHERE q.hotel_id = h.hotel_id
+            AND q.status = 'FAILED'
+            AND q.updated_at > NOW() - INTERVAL '7 days') AS failures_7d
+      FROM hotels h
+      LEFT JOIN sentinel_hotel_heartbeat hb ON hb.hotel_id = h.hotel_id
+      LEFT JOIN sentinel_configurations sc ON sc.hotel_id = h.hotel_id
+      WHERE h.is_rockenue_managed = true
+      ORDER BY
+        CASE ${HEALTH_STATUS_SELECT}
+          WHEN 'red' THEN 0 WHEN 'amber' THEN 1 WHEN 'green' THEN 2 ELSE 3
+        END,
+        hb.consecutive_failures DESC NULLS LAST,
+        hb.last_success_at ASC NULLS FIRST
+    `);
+
+    // 30-day sparkline: one cell per hotel per day for the last 30 days.
+    // 'green' = ≥1 COMPLETED with rates, 'red' = ≥1 FAILED and no success,
+    // 'amber' = mixed success + failure, 'none' = no job activity.
+    const hotelIds = fleet.map(r => r.hotel_id);
+    const sparklines = {};
+    if (hotelIds.length > 0) {
+      const { rows: cells } = await db.query(
+        `SELECT
+           hotel_id,
+           (updated_at AT TIME ZONE 'UTC')::date AS day,
+           SUM(CASE
+             WHEN status = 'COMPLETED'
+               AND jsonb_typeof(payload->'rates') = 'array'
+               AND jsonb_array_length(payload->'rates') > 0 THEN 1 ELSE 0
+           END)::int AS successes,
+           SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END)::int AS failures
+         FROM sentinel_job_queue
+         WHERE hotel_id = ANY($1::int[])
+           AND updated_at > NOW() - INTERVAL '30 days'
+         GROUP BY hotel_id, day`,
+        [hotelIds],
+      );
+      cells.forEach(c => {
+        const key = String(c.hotel_id);
+        if (!sparklines[key]) sparklines[key] = {};
+        const cellStatus =
+          c.successes > 0 && c.failures === 0 ? "green"
+          : c.successes > 0 && c.failures > 0 ? "amber"
+          : c.failures > 0 ? "red"
+          : "none";
+        sparklines[key][c.day.toISOString().slice(0, 10)] = cellStatus;
+      });
+    }
+
+    // Failure clusters across the fleet (last 24h) for the feed.
+    const { rows: rawFailures } = await db.query(`
+      SELECT q.id, q.hotel_id, h.property_name, q.last_error, q.updated_at
+      FROM sentinel_job_queue q
+      JOIN hotels h ON h.hotel_id = q.hotel_id
+      WHERE q.status = 'FAILED'
+        AND q.updated_at > NOW() - INTERVAL '24 hours'
+        AND h.is_rockenue_managed = true
+      ORDER BY q.updated_at DESC
+      LIMIT 500
+    `);
+    const clusters = clusterFailures(rawFailures);
+
+    res.json({ fleet, sparklines, clusters });
+  } catch (err) {
+    console.error("[Sentinel Health] fleet failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/sentinel/health/hotel/:hotelId
+ * Single hotel health payload used by the header pill popover.
+ */
+router.get("/health/hotel/:hotelId", async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    const { rows } = await db.query(
+      `SELECT
+         h.hotel_id,
+         h.property_name,
+         h.is_disconnected,
+         COALESCE(h.is_rockenue_managed, false) AS is_rockenue_managed,
+         COALESCE(sc.is_autopilot_enabled, false) AS autopilot,
+         hb.last_success_at,
+         hb.last_success_rates_count,
+         hb.last_failure_at,
+         hb.last_failure_error,
+         COALESCE(hb.consecutive_failures, 0) AS consecutive_failures,
+         ${HEALTH_STATUS_SELECT} AS status
+       FROM hotels h
+       LEFT JOIN sentinel_hotel_heartbeat hb ON hb.hotel_id = h.hotel_id
+       LEFT JOIN sentinel_configurations sc ON sc.hotel_id = h.hotel_id
+       WHERE h.hotel_id = $1`,
+      [hotelId],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Hotel not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("[Sentinel Health] hotel failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Groups failed jobs by a coarse error signature so the UI feed shows
+// "Mews 403 Conflicting operation · 4 hotels · ×12" instead of a long list.
+function clusterFailures(rows) {
+  const buckets = new Map();
+  for (const r of rows) {
+    const sig = failureSignature(r.last_error || "");
+    if (!buckets.has(sig)) {
+      buckets.set(sig, {
+        signature: sig,
+        count: 0,
+        hotels: new Set(),
+        latest_at: r.updated_at,
+        sample_error: (r.last_error || "").substring(0, 240),
+        job_ids: [],
+      });
+    }
+    const b = buckets.get(sig);
+    b.count += 1;
+    b.hotels.add(r.property_name);
+    if (r.updated_at > b.latest_at) b.latest_at = r.updated_at;
+    if (b.job_ids.length < 5) b.job_ids.push(r.id);
+  }
+  return [...buckets.values()]
+    .map(b => ({ ...b, hotel_count: b.hotels.size, hotels: [...b.hotels] }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function failureSignature(msg) {
+  const m = msg.toLowerCase();
+  if (/conflicting operation/.test(m)) return "Mews 403 Conflicting operation";
+  if (/401|unauthorized|invalid.*token|expired.*token/.test(m)) return "Auth failure";
+  if (/403/.test(m)) return "403 Forbidden";
+  if (/429|rate limit/.test(m)) return "Rate limited";
+  if (/timeout|etimedout|econnreset|socket hang up|enotfound/.test(m)) return "Network / timeout";
+  if (/pms rejected/.test(m)) return "PMS rejected";
+  const statusMatch = m.match(/\b(5\d{2})\b/);
+  if (statusMatch) return `HTTP ${statusMatch[1]}`;
+  return "Other";
+}
 
 module.exports = router;
