@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Printer, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { exportShreejiDeckWorkbook } from "./shreejiDeckExport";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -124,6 +125,14 @@ export function ShreejiDeck({ onBack }: ShreejiDeckProps) {
   }, []);
 
   const handlePrint = () => window.print();
+
+  const handleExportXlsx = () => {
+    exportShreejiDeckWorkbook({
+      shreejiHotels,
+      marketHotels,
+      monthlyAdr: monthlyADR,
+    });
+  };
 
   // ─── SHARED COMPONENTS ────────────────────────────────────────────
   const S = ({ children, pad = "0 80px" }: { children: React.ReactNode; pad?: string }) => (
@@ -643,9 +652,14 @@ export function ShreejiDeck({ onBack }: ShreejiDeckProps) {
             <ChevronRight size={20} />
           </button>
         </div>
-        <button onClick={handlePrint} style={{ display: "flex", alignItems: "center", gap: "8px", color: SHREEJI_GOLD, fontSize: "13px", background: "none", border: "none", cursor: "pointer" }}>
-          <Printer size={16} /> Export PDF
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <button onClick={handleExportXlsx} style={{ display: "flex", alignItems: "center", gap: "8px", color: GRAY, fontSize: "13px", background: "none", border: "none", cursor: "pointer" }}>
+            <Download size={16} /> Export Data (XLSX)
+          </button>
+          <button onClick={handlePrint} style={{ display: "flex", alignItems: "center", gap: "8px", color: SHREEJI_GOLD, fontSize: "13px", background: "none", border: "none", cursor: "pointer" }}>
+            <Printer size={16} /> Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Slides */}

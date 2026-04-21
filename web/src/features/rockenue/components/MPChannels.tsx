@@ -132,7 +132,7 @@ const STEP_ROLE_OPTIONS: { value: StepRole | ""; label: string }[] = [
   { value: "", label: "—" },
   { value: "multiplier", label: "Multiplier" },
   { value: "non_refundable", label: "Non-refundable" },
-  { value: "genius", label: "Genius" },
+  { value: "genius", label: "Loyalty / Member" },
   { value: "standard_campaign", label: "Standard Campaign" },
   { value: "deep_deal", label: "Deep Deal" },
   { value: "mobile", label: "Mobile" },
@@ -453,7 +453,7 @@ export function MPChannels() {
     // still reads existing flags on legacy data. See project_ota_stacking_rules.md.
     const presetMap: Record<string, { label: string; value: number; type: "multiplier" | "discount"; extras?: Partial<WaterfallStep> }> = {
       non_refundable:    { label: "Non-refundable", value: 10, type: "discount" },
-      genius:            { label: "Genius",         value: 15, type: "discount" },
+      genius:            { label: "Loyalty",        value: 15, type: "discount" },
       mobile:            { label: "Mobile",         value: 10, type: "discount" },
       country:           { label: "Country Rate",   value: 10, type: "discount" },
       standard_campaign: { label: "Campaign",       value: 20, type: "discount", extras: { isEvergreen: true } },

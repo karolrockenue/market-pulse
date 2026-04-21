@@ -156,12 +156,6 @@ interface ControlPanelViewProps {
   allHotels: any[];
 }
 
-interface WebhookStatus {
-  id: string;
-  propertyName: string;
-  status: "success" | "error";
-}
-
 export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
   // Hook Integration
   const {
@@ -389,13 +383,6 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     nov: "low",
     dec: "high",
   });
-
-  // [RESTORED] Webhook Mock State
-  const [webhooks] = useState<WebhookStatus[]>([
-    { id: "1", propertyName: "The Grand Hotel", status: "success" },
-    { id: "2", propertyName: "Seaside Luxury Resort", status: "error" },
-    { id: "3", propertyName: "Downtown Business Suites", status: "success" },
-  ]);
 
   // --- Helpers ---
 
@@ -3248,105 +3235,6 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
           )}
         </div>
 
-        {/* 4. PMS WEBHOOK MANAGEMENT (Restored Mock) */}
-        <Card style={{ backgroundColor: "#121519", borderColor: "#1E2330", borderRadius: "10px" }}>
-          <CardHeader>
-            <CardTitle style={{ color: "#F3F5F7", fontSize: "0.875rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em" }}>
-              PMS Webhook Management
-            </CardTitle>
-            <CardDescription style={{ color: "#7A8494" }}>
-              Monitor and manage PMS webhook integration status
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div
-              style={{
-                border: "1px solid #1E2330",
-                borderRadius: "0.5rem",
-                overflow: "hidden",
-              }}
-            >
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-[#1E2330] hover:bg-transparent">
-                    <TableHead style={{ color: "#7A8494" }}>
-                      Property Name
-                    </TableHead>
-                    <TableHead style={{ color: "#7A8494" }}>
-                      Webhook Status
-                    </TableHead>
-                    <TableHead style={{ color: "#7A8494", textAlign: "right" }}>
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {webhooks.map((webhook) => (
-                    <TableRow
-                      key={webhook.id}
-                      className="border-[#1E2330] hover:bg-[#121519]"
-                    >
-                      <TableCell style={{ color: "#F3F5F7" }}>
-                        {webhook.propertyName}
-                      </TableCell>
-                      <TableCell>
-                        {webhook.status === "success" ? (
-                          <Badge
-                            variant="outline"
-                            style={{
-                              backgroundColor: "rgba(56, 198, 186, 0.1)",
-                              color: "#38C6BA",
-                              borderColor: "rgba(56, 198, 186, 0.3)",
-                            }}
-                          >
-                            Active
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            style={{
-                              backgroundColor: "rgba(239, 68, 68, 0.1)",
-                              color: "#ef4444",
-                              borderColor: "rgba(239, 68, 68, 0.3)",
-                            }}
-                          >
-                            Error
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            gap: "0.5rem",
-                          }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            style={{ color: "#38C6BA" }}
-                            className="hover:text-[#2DB8AD] hover:bg-[#38C6BA]/10"
-                          >
-                            Register
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            style={{ color: "#38C6BA" }}
-                            className="hover:text-[#38C6BA]/80 hover:bg-[#38C6BA]/10"
-                          >
-                            Test
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Bulk Add Event Dialog */}
