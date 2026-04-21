@@ -220,16 +220,22 @@ export default function App() {
   // aggregated cross-property view; regular M&F users just pick individual
   // Mason hotels from their normal dropdown and get the scoped Mason view.
   const propertiesWithMason: Property[] = useMemo(() => {
-    if (!hasMasonAccess || !isAdminUser) return properties;
-    // Don't duplicate if somehow already present
-    if (properties.some((p) => String(p.property_id) === MASON_DASHBOARD_PSEUDO_ID)) {
-      return properties;
-    }
-    return [
-      ...properties,
-      // Cast keeps TS happy — the sidebar treats property_id as a union of string|number
-      { property_id: MASON_DASHBOARD_PSEUDO_ID as unknown as number, property_name: "Mason Dashboard" },
-    ];
+    const withMason = (() => {
+      if (!hasMasonAccess || !isAdminUser) return properties;
+      if (properties.some((p) => String(p.property_id) === MASON_DASHBOARD_PSEUDO_ID)) {
+        return properties;
+      }
+      return [
+        ...properties,
+        // Cast keeps TS happy — the sidebar treats property_id as a union of string|number
+        { property_id: MASON_DASHBOARD_PSEUDO_ID as unknown as number, property_name: "Mason Dashboard" },
+      ];
+    })();
+    // Pin Archanes Market Watch to the bottom of the property selector.
+    const archanes = withMason.filter((p) => p.property_id === ARCHANES_HOTEL_ID);
+    if (archanes.length === 0) return withMason;
+    const rest = withMason.filter((p) => p.property_id !== ARCHANES_HOTEL_ID);
+    return [...rest, ...archanes];
   }, [properties, hasMasonAccess, isAdminUser]);
 
   // When the user picks "Mason Dashboard" in the dropdown, route to the view.
@@ -762,7 +768,21 @@ export default function App() {
                   ? "Portfolio"
                   : properties.find((p) => p.property_id.toString() === property)?.property_name ?? ""
               }
+              hotelId={property === "ALL" ? null : parseInt(property, 10) || null}
               userRole={userInfo?.role}
+              userEmail={userInfo?.email}
+              onNavigate={(view: string) => {
+                const singlePropertyViews = [
+                  "reports", "settings", "hotelRates", "sentinel",
+                  "riskOverview", "rateManager",
+                  "competitive-intel", "demandRadar",
+                ];
+                if (property === "ALL" && singlePropertyViews.includes(view) && properties.length > 0) {
+                  setProperty(properties[0].property_id.toString());
+                }
+                handleViewChange(view);
+              }}
+              isArchanesOnly={isArchanesOnly}
             />
           {/* Landing View block is now removed and handled above */}
 
@@ -949,7 +969,9 @@ export default function App() {
             activeView === "mpDemandRadar" ||
             activeView === "mpRiskOverview" ||
             activeView === "mpLogin" ||
-            activeView === "masonDashboard") && (
+            activeView === "masonDashboard" ||
+            activeView === "reportsLab" ||
+            activeView === "topnavPills") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}

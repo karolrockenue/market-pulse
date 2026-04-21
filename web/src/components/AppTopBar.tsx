@@ -1,10 +1,17 @@
 import { R } from "../styles/tokens";
 import { NotificationBell } from "./NotificationBell";
+import { PinnedPills } from "./PinnedPills";
+import { SentinelHealthPill } from "../features/sentinel/components/SentinelHealthPill";
+import { useHotelSentinelHealth } from "../features/sentinel/hooks/useSentinelHealth";
 
 interface AppTopBarProps {
   activeView: string;
   propertyName: string;
+  hotelId?: number | null;
   userRole?: string;
+  userEmail?: string;
+  onNavigate?: (view: string) => void;
+  isArchanesOnly?: boolean;
 }
 
 const viewTitles: Record<string, string> = {
@@ -28,9 +35,12 @@ const viewTitles: Record<string, string> = {
   support: "Support",
 };
 
-export function AppTopBar({ activeView, propertyName, userRole }: AppTopBarProps) {
+export function AppTopBar({ activeView, propertyName, hotelId, userRole, userEmail, onNavigate, isArchanesOnly = false }: AppTopBarProps) {
   const title = viewTitles[activeView] || "Dashboard";
   const isAdmin = userRole === "super_admin" || userRole === "admin";
+  const showPins = isAdmin && !isArchanesOnly && !!userEmail && !!onNavigate;
+  const sentinelEligible = isAdmin && !isArchanesOnly && typeof hotelId === "number";
+  const hotelHealth = useHotelSentinelHealth(sentinelEligible ? hotelId! : null, sentinelEligible);
 
   return (
     <div
@@ -61,6 +71,13 @@ export function AppTopBar({ activeView, propertyName, userRole }: AppTopBarProps
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {hotelHealth && <SentinelHealthPill health={hotelHealth} />}
+        {showPins && (
+          <>
+            <PinnedPills activeView={activeView} onNavigate={onNavigate!} userKey={userEmail!} />
+            <div style={{ width: 1, height: 20, background: R.border }} />
+          </>
+        )}
         <div
           title="All platform services are healthy"
           style={{

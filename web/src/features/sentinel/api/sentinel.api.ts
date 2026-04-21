@@ -3,6 +3,8 @@ import {
   RateCalendarDay,
   RateOverride,
   AssetConfig,
+  HotelHealth,
+  FleetHealthSummary,
 } from "./types";
 
 // --- CONTROL PANEL (CONFIGURATION) ---
@@ -270,4 +272,18 @@ export const triggerSentinelRun = async (
   const json = await res.json();
   if (!res.ok) throw new Error(json.message || "Failed to trigger Sentinel AI");
   return json;
+};
+
+// --- SENTINEL HEALTH (admin-only) ---
+
+export const getHotelHealth = async (hotelId: number | string): Promise<HotelHealth> => {
+  const res = await fetch(`/api/sentinel/health/hotel/${hotelId}`);
+  if (!res.ok) throw new Error(`Failed to fetch hotel health (${res.status})`);
+  return res.json();
+};
+
+export const getFleetHealthSummary = async (): Promise<FleetHealthSummary> => {
+  const res = await fetch("/api/sentinel/health/fleet/summary");
+  if (!res.ok) throw new Error(`Failed to fetch fleet health (${res.status})`);
+  return res.json();
 };

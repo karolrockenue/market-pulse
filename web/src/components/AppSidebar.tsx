@@ -20,8 +20,18 @@ import {
   Palette,
   MonitorSmartphone,
   Presentation,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { R } from "../styles/tokens";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "./ui/context-menu";
+import { isPinnable, usePinnedShortcuts } from "./pinnedShortcuts";
+import { useFleetSentinelHealth } from "../features/sentinel/hooks/useSentinelHealth";
 
 interface Property {
   property_id: number;
@@ -62,6 +72,14 @@ export function AppSidebar({
   const [studioOpen, setStudioOpen] = useState(false);
 
   const isAdmin = userInfo?.role === "super_admin" || userInfo?.role === "admin";
+  const showPinAffordance = isAdmin && !isArchanesOnly;
+  const { isPinned, toggle, canPin, max } = usePinnedShortcuts(userInfo?.email || "");
+  const fleetHealth = useFleetSentinelHealth(isAdmin && !isArchanesOnly);
+  const sentinelDotColor =
+    fleetHealth?.worst_status === "red" ? R.red
+    : fleetHealth?.worst_status === "amber" ? R.amber
+    : fleetHealth?.worst_status === "green" ? R.green
+    : null;
 
   const getInitials = () => {
     if (!userInfo) return "..";
@@ -101,7 +119,10 @@ export function AppSidebar({
 
   const navItem = (label: string, value: string, Icon: any, indent = false) => {
     const isActive = activeView === value;
-    return (
+    const pinnable = showPinAffordance && isPinnable(value);
+    const pinned = pinnable && isPinned(value);
+
+    const row = (
       <div
         key={value}
         onClick={() => handleNav(value)}
@@ -120,12 +141,64 @@ export function AppSidebar({
         }}
       >
         <Icon size={indent ? 13 : 15} style={{ opacity: isActive ? 1 : 0.5, flexShrink: 0 }} />
-        {label}
+        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        {pinned && <Pin size={10} color={R.gold} style={{ opacity: 0.75, flexShrink: 0 }} />}
       </div>
+    );
+
+    if (!pinnable) return row;
+
+    const atMax = !pinned && !canPin;
+
+    return (
+      <ContextMenu key={value}>
+        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+        <ContextMenuContent
+          style={{
+            backgroundColor: R.card,
+            border: `1px solid ${R.border}`,
+            color: R.accent,
+            minWidth: 200,
+            padding: 4,
+          }}
+        >
+          <ContextMenuItem
+            disabled={atMax}
+            onSelect={() => toggle(value)}
+            style={{
+              cursor: atMax ? "not-allowed" : "pointer",
+              color: atMax ? R.textDim : R.accent,
+              fontSize: 12,
+              padding: "8px 10px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              borderRadius: 4,
+            }}
+          >
+            {pinned ? (
+              <>
+                <PinOff size={13} color={R.gold} />
+                <span>Unpin from top bar</span>
+              </>
+            ) : atMax ? (
+              <>
+                <Pin size={13} color={R.textDim} />
+                <span>Max {max} pinned — unpin one first</span>
+              </>
+            ) : (
+              <>
+                <Pin size={13} color={R.gold} />
+                <span>Pin to top bar</span>
+              </>
+            )}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   };
 
-  const sectionToggle = (label: string, Icon: any, open: boolean, setOpen: (v: boolean) => void, activeValues: string[]) => {
+  const sectionToggle = (label: string, Icon: any, open: boolean, setOpen: (v: boolean) => void, activeValues: string[], statusDotColor?: string | null) => {
     const isActive = activeValues.includes(activeView);
     return (
       <div
@@ -146,6 +219,19 @@ export function AppSidebar({
       >
         <Icon size={15} style={{ opacity: isActive ? 1 : 0.5, flexShrink: 0 }} />
         <span style={{ flex: 1 }}>{label}</span>
+        {statusDotColor && (
+          <span
+            title="Sentinel fleet health"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: statusDotColor,
+              boxShadow: `0 0 5px ${statusDotColor}80`,
+              flexShrink: 0,
+            }}
+          />
+        )}
         <ChevronRight size={12} style={{ opacity: 0.4, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
       </div>
     );
@@ -358,7 +444,7 @@ export function AppSidebar({
               <>
                 <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
 
-                {sectionToggle("Sentinel", Zap, sentinelOpen, setSentinelOpen, ["riskOverview", "sentinel", "rateManager", "marketProfile"])}
+                {sectionToggle("Sentinel", Zap, sentinelOpen, setSentinelOpen, ["riskOverview", "sentinel", "rateManager", "marketProfile"], sentinelDotColor)}
                 {sentinelOpen && (
                   <>
                     {navItem("Risk Overview", "riskOverview", Shield, true)}
@@ -379,7 +465,7 @@ export function AppSidebar({
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "emailSignatures", "deckV2", "shreejiDeck", "canvas"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "emailSignatures", "deckV2", "shreejiDeck", "canvas", "reportsLab", "topnavPills"])}
                 {studioOpen && (
                   <>
                     {navItem("MP Reports", "mpReportsHub", MonitorSmartphone, true)}
@@ -388,6 +474,8 @@ export function AppSidebar({
                     {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
                     {navItem("Mason Dashboard", "masonDashboard", MonitorSmartphone, true)}
                     {navItem("Email Signatures", "emailSignatures", MonitorSmartphone, true)}
+                    {navItem("Reports Lab", "reportsLab", FileText, true)}
+                    {navItem("TopNav Pills", "topnavPills", MonitorSmartphone, true)}
                     {navItem("Deck V2", "deckV2", Presentation, true)}
                     {navItem("Shreeji Deck", "shreejiDeck", Presentation, true)}
                     {navItem("Canvas", "canvas", Palette, true)}

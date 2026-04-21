@@ -91,3 +91,28 @@ export interface AssetConfig {
   calculator_settings?: any; // JSONB
 }
 
+// ── Sentinel Health (Phase A backend; consumed by admin-only L1 pill + L2 page) ──
+export type HealthStatus = "green" | "amber" | "red" | "off";
+
+export interface HotelHealth {
+  hotel_id: number;
+  property_name: string;
+  is_disconnected: boolean;
+  is_rockenue_managed: boolean;
+  autopilot: boolean;
+  last_success_at: string | null;
+  last_success_rates_count: number | null;
+  last_failure_at: string | null;
+  last_failure_error: string | null;
+  consecutive_failures: number;
+  status: HealthStatus;
+}
+
+export interface FleetHealthSummary {
+  green: number;
+  amber: number;
+  red: number;
+  off: number;
+  worst_status: HealthStatus;
+}
+
