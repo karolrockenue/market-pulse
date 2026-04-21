@@ -157,6 +157,8 @@ Rate Manager – grid with live vs AI vs guardrails, overrides.
 
 Risk Overview – portfolio risk lens inside Sentinel.
 
+Health (admin-only) – fleet freshness dashboard: per-hotel last-push status, 30-day sparklines, clustered failure feed (last 24h). Also drives an ambient pill in AppTopBar and a status dot on the Sentinel sidebar section. Backed by `sentinel_hotel_heartbeat` (§4.14) and `/api/sentinel/health/*` (§5.1).
+
 Connects to PMS via adapters (PMS-siloed architecture):
 
 Cloudbeds:
@@ -511,7 +513,7 @@ scripts/import-daily-history.js / scripts/import-monthly-history.js
 
 Backfill & import helpers for metrics.
 
-Sentinel async worker logic now lives inside sentinel.router.js as an internal background runner, not a separate worker file.
+Sentinel async worker logic now lives inside sentinel.router.js as an internal background runner, not a separate worker file. The worker also writes per-hotel health snapshots to `sentinel_hotel_heartbeat` on every job outcome via `writeSentinelHeartbeat` — see §4.14 for design (pool-direct writes, error swallowing, success taxonomy).
 
 2.2 Frontend Architecture
 
@@ -607,6 +609,10 @@ components/RateManager/OccupancyVisualizer.tsx
 
 components/RiskOverview/PortfolioRiskOverview.tsx
 
+components/Health/HealthView.tsx (admin-only — Sentinel Health page: freshness banner, fleet grid with 30-day sparklines, clustered failure feed. Wired to `/api/sentinel/health/*`. See §4.14.)
+
+components/SentinelHealthPill.tsx (admin-only per-hotel pill rendered in AppTopBar. Polls `/api/sentinel/health/hotel/:hotelId` every 60s. Hidden for `off` status.)
+
 Hooks:
 
 hooks/usePropertyHub.ts (exports math functions for OTA discount stack — used by useSentinelConfig and useRateGrid)
@@ -614,6 +620,8 @@ hooks/usePropertyHub.ts (exports math functions for OTA discount stack — used 
 hooks/useRateGrid.ts
 
 hooks/useSentinelConfig.ts (also loads rockenue_managed_assets for Promo Config)
+
+hooks/useSentinelHealth.ts — two polling hooks (`useHotelSentinelHealth`, `useFleetSentinelHealth`). 60s interval. Swallow fetch errors to null so a failing health endpoint just hides the UI rather than crashing the app.
 
 API layer:
 
@@ -1215,6 +1223,44 @@ Purge pattern (manual only, as of 2026-04-20): Use `scripts/purge-external-hotel
 
 Known divergence: `POST /api/hotels/delete` (hotel.service.js:deleteHotel) still hard-deletes `daily_metrics_snapshots` for the target hotel. The admin-triggered endpoint is intentionally destructive for "offboarding our own hotel" cases; the script is the manual pattern for "external hotel that shouldn't have been here but whose market data is worth keeping". If both flows should preserve metrics in future, remove the `DELETE FROM daily_metrics_snapshots` line in hotel.service.js:387.
 
+4.14 sentinel_hotel_heartbeat
+
+One row per hotel. Records the last successful rate push and the last failure so the admin Sentinel Health surface can derive status in a single lookup instead of scanning `sentinel_job_queue`.
+
+Fields:
+
+hotel_id (PK, integer)
+last_success_at (timestamptz)
+last_success_rates_count (integer) — size of the payload.rates array for the most recent successful push
+last_failure_at (timestamptz)
+last_failure_error (text, first 500 chars)
+last_failure_job_id (uuid)
+consecutive_failures (integer, default 0) — reset to 0 on every real success
+updated_at (timestamptz, default NOW())
+
+Migration: `api/migration_011_sentinel_heartbeat.js`.
+Backfill: `scripts/backfill-sentinel-heartbeat.js` (idempotent; seeds from `sentinel_job_queue`).
+
+Writer: `api/routes/sentinel.router.js → writeSentinelHeartbeat()`, called from `runBackgroundWorker` after each job completes. Two deliberate design choices:
+
+1. Writes go through the pg pool directly (not the worker's transaction client). Heartbeat writes are isolated from the job-processing transaction so a heartbeat failure cannot poison rate pushes.
+2. Any error inside `writeSentinelHeartbeat` is caught and only logged. Observability must never break the thing it is observing.
+
+**What counts as a "success" — load-bearing.** COMPLETED job with `payload.rates.length > 0`. SKIPPED jobs (disconnected hotels, or "all rates filtered out by safety checks") are NOT a success — heartbeat does not advance on them. This is the one definition behind every colour on the Health page; changing it changes the meaning of every downstream signal.
+
+**Freshness SLA (derived, not stored per-hotel).**
+- Autopilot ON → 4h (240 min)
+- Autopilot OFF but Sentinel configured → 24h
+- Disconnected or not rockenue-managed → status = `off` regardless of SLA
+
+**Status derivation (same CASE is used by all three `/health/*` endpoints):**
+- `off` — disconnected, not rockenue-managed, or no heartbeat row yet
+- `red` — `last_success_at` older than SLA, OR `consecutive_failures >= 3`
+- `amber` — within SLA but `last_failure_at > last_success_at` (most recent event was a failure)
+- `green` — within SLA, no recent failure
+
+Not to be confused with `sentinel_notifications` (§4.4) which is a user-facing alert feed. The heartbeat table is a per-hotel state snapshot for monitoring; notifications are individual events surfaced in the UI bell.
+
 4.11 Schema Traps
 
 CRITICAL: hotel_id is INTEGER across all tables. room_type_id is MIXED TYPE — INTEGER in sentinel_ai_predictions but TEXT (VARCHAR) in sentinel_rates_calendar. When writing UNNEST arrays or cross-table JOINs, always cast room_type_id to text (e.g., room_type_id::text = ANY($2::text[])). Never cast to $X::int[] when touching the calendar table.
@@ -1321,6 +1367,18 @@ Returns up to 20 most recent rows from sentinel_notifications.
 POST /notifications/mark-read
 
 Optionally accepts ids array.
+
+GET /health/fleet/summary
+
+Returns `{ green, amber, red, off, worst_status }` aggregated across all rockenue-managed hotels. Used by the admin-only sidebar Sentinel status dot. Cheap (one GROUP BY query).
+
+GET /health/fleet
+
+Returns `{ fleet: FleetHealthRow[], sparklines: SparklineMap, clusters: FailureCluster[] }`. One row per rockenue-managed hotel with status, heartbeat fields, 7d failure count, plus a 30-day per-day status map (`{ [hotel_id]: { [YYYY-MM-DD]: "green"|"amber"|"red"|"none" } }`) and failure clusters (last 24h, grouped by error signature — "Mews 403 Conflicting operation", "Auth failure", "Network / timeout", etc.). Used by the Sentinel → Health page.
+
+GET /health/hotel/:hotelId
+
+Single hotel HotelHealth payload. Used by the top-bar Sentinel pill popover.
 
 Marks relevant notifications as read (or entire set).
 
