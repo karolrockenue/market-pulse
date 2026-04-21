@@ -262,6 +262,26 @@ Production webhook URL: https://www.market-pulse.io/api/mews-webhooks
 
 Certification: Mews certification form submitted. Pending production ClientToken.
 
+Sentinel Health (Active — April 2026)
+
+Admin-only monitoring surface for the Sentinel rate-push engine. Solves the "Sentinel may fail for days without anyone knowing" problem — previously the only signal that a hotel had stopped pushing rates was manually inspecting `sentinel_job_queue`.
+
+Three layers, all admin-gated:
+
+- **L1 ambient** — hotel-header pill in AppTopBar (`SentinelHealthPill.tsx`) showing a coloured dot + "pushed Xm ago" + hover popover (last success, last failure, error excerpt, consecutive-failure streak). Plus a status dot on the Sentinel sidebar row aggregating the fleet's worst status.
+- **L2 dedicated** — `Sentinel → Health` page (`components/Health/HealthView.tsx`): freshness-violations banner, fleet grid with 30-day per-day sparklines, and a clustered failure feed (last 24h, grouped by error signature: "Mews 403 Conflicting operation", "Auth failure", "Network / timeout", etc.).
+- **Polling** — 60s interval via `useSentinelHealth.ts`; fetch errors degrade silently to null so a failing health endpoint hides the UI rather than crashing it.
+
+Data layer: new `sentinel_hotel_heartbeat` table (one row per hotel) written by the worker on every job outcome. See §4.14 for the load-bearing "what counts as a success" definition (COMPLETED job with >0 rates; SKIPPED / safety-filtered jobs don't advance the heartbeat), freshness SLA (autopilot=4h, otherwise 24h), and status derivation (off / red / amber / green).
+
+Architectural isolation: heartbeat writes go through the pg pool directly (not the worker's transaction client) and any error is caught and only logged. Observability must never break the thing it is observing.
+
+New endpoints (all admin-only, inherit `requireAdminApi`): `/api/sentinel/health/fleet/summary`, `/api/sentinel/health/fleet`, `/api/sentinel/health/hotel/:hotelId`. See §5.1.
+
+Frontend integration is additive: `AppTopBar`, `AppSidebar`, and `SentinelHub` each gained a single conditional render guarded by the admin role check. Non-admins see no change.
+
+Known trap (fixed 2026-04-21): pg returns `::date` columns as `"YYYY-MM-DD"` strings, not `Date` objects. The sparkline loop originally called `.toISOString()` on `c.day` and threw `TypeError`, 500'ing the fleet endpoint. Fixed by normalizing via `typeof c.day === "string"`. Worth remembering: the SQL working in a sanity check does not prove the consuming JS is correct — always simulate full endpoint payload serialization when adding DB-backed endpoints.
+
 2.0 ARCHITECTURE
 2.1 Backend Architecture
 
