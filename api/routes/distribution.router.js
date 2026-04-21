@@ -525,14 +525,27 @@ router.patch("/channels/:id", async (req, res) => {
   }
 });
 
-// DELETE /channels/:id
+// DELETE /channels/:id — wipes channel + its waterfall + per-hotel overrides
+// + grid connection rows. Contacts, notes, and crm_tasks.channel_id cascade
+// or null automatically via FKs. Wrapped in a transaction so a mid-delete
+// failure leaves no partial state.
 router.delete("/channels/:id", async (req, res) => {
+  const client = await db.connect();
   try {
-    await db.query("DELETE FROM distribution_channels WHERE id = $1", [req.params.id]);
+    const { id } = req.params;
+    await client.query("BEGIN");
+    await client.query("DELETE FROM distribution_hotel_pricing_overrides WHERE channel_id = $1", [id]);
+    await client.query("DELETE FROM distribution_channel_pricing WHERE channel_id = $1", [id]);
+    await client.query("DELETE FROM distribution_hotel_channels WHERE channel_id = $1", [id]);
+    await client.query("DELETE FROM distribution_channels WHERE id = $1", [id]);
+    await client.query("COMMIT");
     res.json({ success: true });
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("DELETE /channels/:id error:", error);
     res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
   }
 });
 

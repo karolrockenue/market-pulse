@@ -133,3 +133,39 @@ export interface TaskFilters {
   hotel_id?: number;
   channel_id?: number;
 }
+
+// ── Channel Pricing waterfall ──
+// Role encodes how a step participates in the Sell Rate resolver (resolveSellRate).
+// "null" or missing = informational step, not applied by the resolver.
+// See claude/channel-pricing-migration.md §3.1 for full semantics.
+export type StepRole =
+  | "multiplier"
+  | "non_refundable"
+  | "genius"
+  | "standard_campaign"
+  | "deep_deal"
+  | "mobile"
+  | "country"
+  | "tax";
+
+export interface WaterfallStep {
+  key: string;                 // unique within a channel
+  label: string;               // human-readable
+  type: "multiplier" | "discount" | "tax";
+  value: number;
+  active: boolean;
+  locked?: boolean;            // UI: user cannot remove
+  channelSpecific?: boolean;   // UI hint only
+  description?: string;        // UI hint only
+
+  // ── Sell Rate resolver metadata (all optional, JSONB backward-compatible) ──
+  role?: StepRole | null;
+  startDate?: string | null;   // ISO YYYY-MM-DD — applies only to standard_campaign / deep_deal
+  endDate?: string | null;     // ISO YYYY-MM-DD
+  blocksMobile?: boolean;      // role=standard_campaign: when active, disables mobile step
+  isEvergreen?: boolean;       // UI hint: campaign has no date range (always-on)
+}
+
+export interface HotelPricingOverride {
+  [stepKey: string]: { value?: number; active?: boolean };
+}

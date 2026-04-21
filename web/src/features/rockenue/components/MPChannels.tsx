@@ -3,13 +3,18 @@
  * Copied from ChannelPricingConcept.tsx on 2026-04-17. Wired to real API.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronDown, Info, Loader2, Plus, GripVertical, Pencil, Trash2, X } from "lucide-react";
 import {
   fetchPricingChannels, fetchChannelPricing, updateChannelPricingSteps,
   setHotelPricingOverride, deleteHotelPricingOverride, createChannel,
+  updateChannel, deleteChannel,
 } from "../api/distribution.api";
-import type { AgreementType, ChannelTier, IntegrationType, ChannelType, PaymentMethod } from "../api/types";
+import type {
+  AgreementType, ChannelTier, IntegrationType, ChannelType, PaymentMethod,
+  WaterfallStep, StepRole,
+} from "../api/types";
+import { explainRateFactor, type BreakdownEntry } from "../utils/waterfall";
 
 // ── Agreed token palette ──
 const R = {
@@ -24,12 +29,6 @@ const curr = "£";
 // ══════════════════════════════════════════
 // INTERFACES
 // ══════════════════════════════════════════
-
-interface WaterfallStep {
-  key: string; label: string; type: "multiplier" | "discount" | "tax";
-  value: number; active: boolean; locked?: boolean;
-  channelSpecific?: boolean; description?: string;
-}
 
 interface ChannelMeta {
   agreement: string; channelType: string; pricingModel: string;
@@ -58,23 +57,61 @@ interface DraftOverride {
 // HELPERS
 // ══════════════════════════════════════════
 
-function calcWaterfall(steps: WaterfallStep[], pmsRate: number) {
-  let rate = pmsRate;
-  const result: { label: string; rate: number; discount: string; active: boolean }[] = [];
-  for (const step of steps) {
-    if (!step.active) {
-      result.push({ label: step.label, rate, discount: step.type === "multiplier" ? `${step.value}×` : `${step.value}%`, active: false });
-      continue;
-    }
-    if (step.type === "multiplier") {
-      rate = rate * step.value;
-      result.push({ label: step.label, rate, discount: `${step.value}×`, active: true });
-    } else if (step.type === "discount") {
-      rate = rate * (1 - step.value / 100);
-      result.push({ label: step.label, rate, discount: `−${step.value}%`, active: true });
-    }
-  }
-  return { steps: result, final: Math.round(rate * 100) / 100 };
+// Infer a StepRole for legacy steps that predate the Channel Pricing migration
+// schema extension (Phase 1). New steps authored via the UI already include a
+// role; this runs on load so the simulator and resolver behave correctly even
+// before the data is re-saved. See claude/channel-pricing-migration.md §3.
+function inferStepRole(step: WaterfallStep): StepRole | null {
+  if (step.role !== undefined && step.role !== null) return step.role;
+  const k = (step.key || "").toLowerCase();
+  const l = (step.label || "").toLowerCase();
+  if (step.type === "multiplier") return "multiplier";
+  if (step.type === "tax" || /tax|vat|country rate/.test(l)) return null; // tax steps are hidden from editor; see §4.3
+  if (/non[_-]?ref/.test(k) || /non[-\s]?refund/.test(l)) return "non_refundable";
+  if (/genius/.test(k) || /genius/.test(l)) return "genius";
+  if (/mobile/.test(k) || /mobile/.test(l)) return "mobile";
+  if (/country/.test(k) || /country/.test(l)) return "country";
+  if (/black[_-]?friday|limited[_-]?time|deep[_-]?deal|flash/.test(k) || /black friday|limited time|deep deal|flash/.test(l)) return "deep_deal";
+  if (/campaign|long|early|late|escape|getaway|seasonal|promo/.test(k) || /campaign|long|early|late|escape|getaway|seasonal|promo/.test(l)) return "standard_campaign";
+  return null;
+}
+
+function applyInferredRoles(steps: WaterfallStep[]): WaterfallStep[] {
+  return steps.map(s => {
+    if (s.role !== undefined && s.role !== null) return s;
+    const inferred = inferStepRole(s);
+    // Long-campaign-shaped legacy step: mark evergreen + blocksMobile to match legacy semantics.
+    const isLegacyLongCampaign =
+      inferred === "standard_campaign" &&
+      (/long[_-]?campaign/.test((s.key || "").toLowerCase()) || /long campaign/.test((s.label || "").toLowerCase()));
+    return {
+      ...s,
+      role: inferred,
+      ...(isLegacyLongCampaign ? { isEvergreen: true, blocksMobile: true } : {}),
+    };
+  });
+}
+
+// Thin wrapper over `explainRateFactor` that preserves the legacy `{steps, final}`
+// shape consumed by the existing pipeline render, while running the full
+// role-aware resolver (deep-deal override, date gating, mobile blocking).
+function calcWaterfall(
+  steps: WaterfallStep[],
+  pmsRate: number,
+  dateStr: string,
+): { steps: Array<{ label: string; rate: number; discount: string; active: boolean; skipReason: BreakdownEntry["skipReason"] }>; final: number; entries: BreakdownEntry[] } {
+  const { factor, entries } = explainRateFactor(steps, dateStr);
+  return {
+    steps: entries.map(e => ({
+      label: e.step.label,
+      rate: pmsRate * e.factorAfter,
+      discount: e.step.type === "multiplier" ? `${e.step.value}×` : `−${e.step.value}%`,
+      active: e.applied,
+      skipReason: e.skipReason,
+    })),
+    final: Math.round(pmsRate * factor * 100) / 100,
+    entries,
+  };
 }
 
 function getEffectiveSteps(channel: ChannelDefaults, hotelId: number, hotelOverrides: HotelOverride[]): WaterfallStep[] {
@@ -86,6 +123,28 @@ function getEffectiveSteps(channel: ChannelDefaults, hotelId: number, hotelOverr
     return { ...step, value: ov.value ?? step.value, active: ov.active ?? step.active };
   });
 }
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const STEP_ROLE_OPTIONS: { value: StepRole | ""; label: string }[] = [
+  { value: "", label: "—" },
+  { value: "multiplier", label: "Multiplier" },
+  { value: "non_refundable", label: "Non-refundable" },
+  { value: "genius", label: "Genius" },
+  { value: "standard_campaign", label: "Standard Campaign" },
+  { value: "deep_deal", label: "Deep Deal" },
+  { value: "mobile", label: "Mobile" },
+  { value: "country", label: "Country" },
+];
+
+const SKIP_REASON_LABEL: Record<NonNullable<BreakdownEntry["skipReason"]>, string> = {
+  inactive: "inactive",
+  date_gated_out: "outside date range",
+  deep_deal_override: "superseded by deep deal",
+  mobile_blocked: "blocked by campaign",
+};
 
 // ══════════════════════════════════════════
 // MAIN COMPONENT
@@ -100,41 +159,44 @@ function getEffectiveSteps(channel: ChannelDefaults, hotelId: number, hotelOverr
 
 type PresetKey = "ota" | "wholesaler" | "flash_sale" | "direct" | "meta";
 
+// Commission is a bookkeeping step, not a Sell Rate factor — role is null so the
+// resolver leaves it untouched. The multiplier seeds carry role="multiplier"
+// so the resolver compounds them correctly.
 const PRESETS: Record<PresetKey, { label: string; steps: WaterfallStep[] }> = {
   ota: {
     label: "OTA",
     steps: [
-      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true },
-      { key: "seed_commission", label: "Commission", type: "discount", value: 15, active: true },
-      { key: "seed_non_refundable", label: "Non-refundable", type: "discount", value: 10, active: false },
+      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true, role: "multiplier", locked: true },
+      { key: "seed_commission", label: "Commission", type: "discount", value: 15, active: true, role: null },
+      { key: "seed_non_refundable", label: "Non-refundable", type: "discount", value: 10, active: false, role: "non_refundable" },
     ],
   },
   wholesaler: {
     label: "Wholesaler",
     steps: [
-      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 0.8, active: true },
-      { key: "seed_markup", label: "Markup", type: "multiplier", value: 1.0, active: false },
+      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 0.8, active: true, role: "multiplier", locked: true },
+      { key: "seed_markup", label: "Markup", type: "multiplier", value: 1.0, active: false, role: "multiplier" },
     ],
   },
   flash_sale: {
     label: "Flash Sale",
     steps: [
-      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true },
-      { key: "seed_commission", label: "Commission", type: "discount", value: 12, active: true },
-      { key: "seed_flash", label: "Flash Deal", type: "discount", value: 25, active: true },
+      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true, role: "multiplier", locked: true },
+      { key: "seed_commission", label: "Commission", type: "discount", value: 12, active: true, role: null },
+      { key: "seed_flash", label: "Flash Deal", type: "discount", value: 25, active: true, role: "deep_deal", isEvergreen: true },
     ],
   },
   direct: {
     label: "Direct Booking Engine",
     steps: [
-      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true },
+      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true, role: "multiplier", locked: true },
     ],
   },
   meta: {
     label: "Meta",
     steps: [
-      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true },
-      { key: "seed_ppa", label: "PPA Commission", type: "discount", value: 10, active: false },
+      { key: "seed_multiplier", label: "Multiplier", type: "multiplier", value: 1.0, active: true, role: "multiplier", locked: true },
+      { key: "seed_ppa", label: "PPA Commission", type: "discount", value: 10, active: false, role: null },
     ],
   },
 };
@@ -151,6 +213,19 @@ interface NewChannelDraft {
   notes: string;
   steps: WaterfallStep[];
   userEditedSteps: boolean;
+}
+
+interface EditChannelDraft {
+  channelId: number;
+  name: string;
+  channelType: PresetKey;
+  commission: number | "";
+  paymentMethod: PaymentMethod | "";
+  agreement: AgreementType;
+  tier: ChannelTier;
+  integration: IntegrationType;
+  contractExpiry: string;
+  notes: string;
 }
 
 function blankDraft(): NewChannelDraft {
@@ -172,13 +247,26 @@ function blankDraft(): NewChannelDraft {
 export function MPChannels() {
   const [selectedChannel, setSelectedChannel] = useState<string>("");
   const [simPmsRate, setSimPmsRate] = useState(185);
+  const [stayDate, setStayDate] = useState<string>(() => todayIso());
   const [showChannelInfo, setShowChannelInfo] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
 
   // Smart Add-Channel flow
   const [addOpen, setAddOpen] = useState(false);
   const [newCh, setNewCh] = useState<NewChannelDraft>(blankDraft());
   const [savingNew, setSavingNew] = useState(false);
   const [newChError, setNewChError] = useState<string | null>(null);
+
+  // Edit-channel flow (meta only; waterfall is edited in the main view)
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<EditChannelDraft | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete-channel confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<{ channelId: number; channelName: string; overrideCount: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // API state
   const [channels, setChannels] = useState<ChannelDefaults[]>([]);
@@ -204,13 +292,10 @@ export function MPChannels() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Programs (channel structure editor) — visual mockup state, not persisted to backend yet
-  const [showProgramsForm, setShowProgramsForm] = useState(false);
-  const [newProgramLabel, setNewProgramLabel] = useState("");
-  const [newProgramType, setNewProgramType] = useState<"multiplier" | "discount">("discount");
-  const [newProgramValue, setNewProgramValue] = useState<number>(10);
-  const [newProgramActive, setNewProgramActive] = useState(true);
-  const [mockAddedPrograms, setMockAddedPrograms] = useState<WaterfallStep[]>([]);
+  // Programs editor — inline label/value editing state. Live Programs rows
+  // read/write editedSteps directly; this tracks which row is in edit mode.
+  const [editingProgramKey, setEditingProgramKey] = useState<string | null>(null);
+  const [programDetailKey, setProgramDetailKey] = useState<string | null>(null);
 
   // Fetch channels
   function loadChannels(selectSlug?: string) {
@@ -224,7 +309,7 @@ export function MPChannels() {
           primaryContact: ch.primary_contact ?? null, contactEmail: ch.contact_email ?? null,
           notes: ch.notes ?? null,
         },
-        steps: ch.steps ?? [],
+        steps: applyInferredRoles(ch.steps ?? []),
       }));
       // Pin Booking.com as the first tab (biggest channel in our mix).
       // Backend returns alphabetical — we reorder client-side so "booking" lands at index 0.
@@ -248,7 +333,7 @@ export function MPChannels() {
     if (!ch) return;
     setLoadingDetail(true);
     fetchChannelPricing(ch.channelId).then(data => {
-      const detailSteps = data.channel?.steps ?? [];
+      const detailSteps = applyInferredRoles(data.channel?.steps ?? []);
       const mappedOverrides: HotelOverride[] = (data.overrides ?? []).map((o: any) => ({
         hotelId: o.hotel_id, hotelName: o.hotel_name, channelSlug: selectedChannel,
         overrides: o.overrides ?? {},
@@ -262,8 +347,18 @@ export function MPChannels() {
   }, [selectedChannel, channels.length]);
 
   const channel = channels.find(c => c.slug === selectedChannel);
-  const activeSteps = editedSteps || channel?.steps || [];
-  const selectedResult = calcWaterfall(activeSteps, simPmsRate);
+  // Editor hides tax steps (tax stays on Control Panel per Blueprint §3.1). Tax
+  // steps in existing data flow through save payloads untouched.
+  const channelSteps = channel?.steps || [];
+  const visibleChannelSteps = useMemo(() => channelSteps.filter(s => s.type !== "tax"), [channelSteps]);
+  useEffect(() => {
+    const hidden = channelSteps.filter(s => s.type === "tax");
+    if (hidden.length > 0) {
+      console.warn("[MPChannels] Hiding tax step(s) from editor (channel-level tax is out of scope — see claude/channel-pricing-migration.md §4.3):", hidden.map(s => s.key));
+    }
+  }, [channelSteps]);
+  const activeSteps = editedSteps ?? visibleChannelSteps;
+  const selectedResult = calcWaterfall(activeSteps, simPmsRate, stayDate);
   const channelOverrides = overrides;
   const hasUnsavedChanges = editedSteps !== null;
 
@@ -286,8 +381,20 @@ export function MPChannels() {
   const ARROW_W = Math.max(MIN_ARROW, Math.round(NATURAL_ARROW * sizeScale));
   const ARROW_LINE = Math.max(MIN_LINE, Math.round(NATURAL_LINE * sizeScale));
 
+  // Base accessor: always returns the current working copy (edited, if any,
+  // otherwise the loaded channel steps). Mutations pass the full working array
+  // through setEditedSteps so the "Unsaved changes" affordance fires.
+  function workingSteps(): WaterfallStep[] {
+    return editedSteps ?? (channel?.steps ?? []);
+  }
+
+  function patchStep(key: string, patch: Partial<WaterfallStep>) {
+    const steps = workingSteps().map(s => s.key === key ? { ...s, ...patch } : s);
+    setEditedSteps(steps);
+  }
+
   function handleToggleStep(key: string) {
-    const steps = [...(editedSteps || channel?.steps || [])];
+    const steps = [...workingSteps()];
     const idx = steps.findIndex(s => s.key === key);
     if (idx === -1 || steps[idx].locked) return;
     steps[idx] = { ...steps[idx], active: !steps[idx].active };
@@ -295,19 +402,91 @@ export function MPChannels() {
   }
 
   function handleChangeStepValue(key: string, value: number) {
-    const steps = [...(editedSteps || channel?.steps || [])];
+    const steps = [...workingSteps()];
     const idx = steps.findIndex(s => s.key === key);
     if (idx === -1) return;
     steps[idx] = { ...steps[idx], value };
     setEditedSteps(steps);
   }
 
+  function handleChangeStepRole(key: string, role: StepRole | null) {
+    patchStep(key, {
+      role,
+      // Leaving campaign roles: clear date/evergreen/blocksMobile so stale fields
+      // don't confuse the resolver.
+      ...(role !== "standard_campaign" && role !== "deep_deal"
+        ? { startDate: null, endDate: null, isEvergreen: false }
+        : {}),
+      ...(role !== "standard_campaign" ? { blocksMobile: false } : {}),
+    });
+  }
+
+  function handleChangeStepDate(key: string, field: "startDate" | "endDate", value: string) {
+    patchStep(key, { [field]: value || null } as Partial<WaterfallStep>);
+  }
+
+  function handleToggleEvergreen(key: string) {
+    const step = workingSteps().find(s => s.key === key);
+    if (!step) return;
+    const next = !step.isEvergreen;
+    patchStep(key, {
+      isEvergreen: next,
+      ...(next ? { startDate: null, endDate: null } : {}),
+    });
+  }
+
+  function handleRenameStep(key: string, label: string) {
+    patchStep(key, { label });
+  }
+
+  function handleRemoveStep(key: string) {
+    const step = workingSteps().find(s => s.key === key);
+    if (!step || step.locked) return;
+    setEditedSteps(workingSteps().filter(s => s.key !== key));
+  }
+
+  // Quick-add preset button: always appends a step with the fixed role.
+  // Duplicates are allowed (operator can remove if unwanted).
+  function handleQuickAdd(role: StepRole) {
+    // Stacking rules (e.g. campaign-blocks-mobile) are OTA-level system config,
+    // not a user-facing flag. New steps don't seed blocksMobile; the resolver
+    // still reads existing flags on legacy data. See project_ota_stacking_rules.md.
+    const presetMap: Record<string, { label: string; value: number; type: "multiplier" | "discount"; extras?: Partial<WaterfallStep> }> = {
+      non_refundable:    { label: "Non-refundable", value: 10, type: "discount" },
+      genius:            { label: "Genius",         value: 15, type: "discount" },
+      mobile:            { label: "Mobile",         value: 10, type: "discount" },
+      country:           { label: "Country Rate",   value: 10, type: "discount" },
+      standard_campaign: { label: "Campaign",       value: 20, type: "discount", extras: { isEvergreen: true } },
+      deep_deal:         { label: "Deep Deal",      value: 25, type: "discount" },
+      multiplier:        { label: "Multiplier",     value: 1.0, type: "multiplier" },
+    };
+    const preset = presetMap[role];
+    if (!preset) return;
+    const keyBase = `${role}_${Date.now().toString(36).slice(-5)}`;
+    const newStep: WaterfallStep = {
+      key: keyBase,
+      label: preset.label,
+      type: preset.type,
+      value: preset.value,
+      active: true,
+      role,
+      ...(preset.extras ?? {}),
+    };
+    setEditedSteps([...workingSteps(), newStep]);
+  }
+
   async function handleSaveSteps() {
     if (!channel || !editedSteps || savingSteps) return;
     setSavingSteps(true);
     try {
-      await updateChannelPricingSteps(channel.channelId, editedSteps);
-      setChannels(prev => prev.map(c => c.channelId === channel.channelId ? { ...c, steps: editedSteps } : c));
+      // Preserve any tax-type steps hidden from the editor by appending them
+      // back in their original positions in the channel's full step list.
+      const hiddenTaxSteps = channel.steps.filter(s => s.type === "tax");
+      const payload: WaterfallStep[] = hiddenTaxSteps.length === 0
+        ? editedSteps
+        : [...editedSteps, ...hiddenTaxSteps];
+      await updateChannelPricingSteps(channel.channelId, payload);
+      setChannels(prev => prev.map(c => c.channelId === channel.channelId ? { ...c, steps: payload } : c));
       setEditedSteps(null);
     } catch (err) { console.error("Save steps failed:", err); }
     finally { setSavingSteps(false); }
@@ -316,13 +495,13 @@ export function MPChannels() {
   // ── Override drafting ──────────────────────────────────────────────
   function openAddOverride() {
     if (!channel) return;
-    setDraft({ mode: "new", hotelId: null, steps: channel.steps.map(s => ({ ...s })) });
+    setDraft({ mode: "new", hotelId: null, steps: visibleChannelSteps.map(s => ({ ...s })) });
   }
 
   function openEditOverride(hotelId: number) {
     if (!channel) return;
     const effective = getEffectiveSteps(channel, hotelId, overrides);
-    setDraft({ mode: "edit", hotelId, steps: effective.map(s => ({ ...s })) });
+    setDraft({ mode: "edit", hotelId, steps: effective.filter(s => s.type !== "tax").map(s => ({ ...s })) });
   }
 
   function handleCancelDraft() {
@@ -467,6 +646,24 @@ export function MPChannels() {
     }));
   }
 
+  function changeNewStepRole(key: string, role: StepRole | null) {
+    setNewCh(prev => ({
+      ...prev,
+      userEditedSteps: true,
+      steps: prev.steps.map(s => {
+        if (s.key !== key) return s;
+        return {
+          ...s,
+          role,
+          ...(role !== "standard_campaign" && role !== "deep_deal"
+            ? { startDate: null, endDate: null, isEvergreen: false }
+            : {}),
+          ...(role !== "standard_campaign" ? { blocksMobile: false } : {}),
+        };
+      }),
+    }));
+  }
+
   async function handleSaveNewChannel() {
     if (savingNew) return;
     const name = newCh.name.trim();
@@ -503,7 +700,112 @@ export function MPChannels() {
     }
   }
 
-  const newChFinal = calcWaterfall(newCh.steps, simPmsRate).final;
+  const newChFinal = calcWaterfall(newCh.steps, simPmsRate, stayDate).final;
+
+  // ── Edit-channel handlers ─────────────────────────────────────────
+  async function openEditChannel() {
+    if (!channel) return;
+    setEditError(null);
+    try {
+      const data = await fetchChannelPricing(channel.channelId);
+      const c = data.channel ?? {};
+      setEditDraft({
+        channelId: channel.channelId,
+        name: c.name ?? channel.channelName,
+        channelType: (c.channel_type ?? "ota") as PresetKey,
+        commission: c.commission_pct ?? "",
+        paymentMethod: (c.payment_method ?? "") as PaymentMethod | "",
+        agreement: (c.agreement_type ?? "individual") as AgreementType,
+        tier: (c.tier ?? "experimental") as ChannelTier,
+        integration: (c.integration_type ?? "channel_manager") as IntegrationType,
+        contractExpiry: c.contract_expiry ? String(c.contract_expiry).slice(0, 10) : "",
+        notes: c.notes ?? "",
+      });
+      setEditOpen(true);
+      setAddOpen(false);
+      setDraft(null);
+    } catch (err: any) {
+      console.error("Load channel for edit failed:", err);
+      setEditError(err?.message || "Failed to load channel.");
+    }
+  }
+
+  function closeEditChannel() {
+    if (savingEdit) return;
+    setEditOpen(false);
+    setEditDraft(null);
+    setEditError(null);
+  }
+
+  function updateEditDraft<K extends keyof EditChannelDraft>(key: K, value: EditChannelDraft[K]) {
+    setEditDraft(prev => prev ? { ...prev, [key]: value } : prev);
+  }
+
+  async function handleSaveEditChannel() {
+    if (!editDraft || savingEdit) return;
+    const name = editDraft.name.trim();
+    if (!name) { setEditError("Channel name is required."); return; }
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated: any = await updateChannel(editDraft.channelId, {
+        name,
+        agreement_type: editDraft.agreement,
+        tier: editDraft.tier,
+        integration_type: editDraft.integration,
+        channel_type: editDraft.channelType as ChannelType,
+        payment_method: editDraft.paymentMethod === "" ? null : (editDraft.paymentMethod as PaymentMethod),
+        commission_pct: editDraft.commission === "" ? null : (editDraft.commission as number),
+        contract_expiry: editDraft.contractExpiry || null,
+        notes: editDraft.notes || null,
+      } as any);
+      await loadChannels(updated?.slug ?? selectedChannel);
+      setEditOpen(false);
+      setEditDraft(null);
+    } catch (err: any) {
+      console.error("Update channel failed:", err);
+      setEditError(err?.message || "Failed to save channel.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // ── Delete-channel handlers ───────────────────────────────────────
+  function openDeleteConfirm() {
+    if (!channel) return;
+    const overrideCount = allOverrides.filter(o => o.channelSlug === channel.slug).length;
+    setDeleteError(null);
+    setDeleteConfirm({ channelId: channel.channelId, channelName: channel.channelName, overrideCount });
+  }
+
+  function closeDeleteConfirm() {
+    if (deleting) return;
+    setDeleteConfirm(null);
+    setDeleteError(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteConfirm || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteChannel(deleteConfirm.channelId);
+      // Pick the next surviving tab (fall back to empty string → first tab auto-selects on reload)
+      const remaining = channels.filter(c => c.channelId !== deleteConfirm.channelId);
+      const nextSlug = remaining[0]?.slug ?? "";
+      setAllOverrides(prev => prev.filter(o => o.channelSlug !== channel?.slug));
+      setSelectedChannel(nextSlug);
+      setEditedSteps(null);
+      setDraft(null);
+      await loadChannels(nextSlug || undefined);
+      setDeleteConfirm(null);
+    } catch (err: any) {
+      console.error("Delete channel failed:", err);
+      setDeleteError(err?.message || "Failed to delete channel.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Loading guard
   if (loadingChannels) {
@@ -537,12 +839,8 @@ export function MPChannels() {
                 setDraft(null);
                 setEditingDraftStepKey(null);
                 setShowChannelInfo(false);
-                setShowProgramsForm(false);
-                setMockAddedPrograms([]);
-                setNewProgramLabel("");
-                setNewProgramValue(10);
-                setNewProgramType("discount");
-                setNewProgramActive(true);
+                setEditingProgramKey(null);
+                setProgramDetailKey(null);
                 setAddOpen(false);
               }}
                 style={{
@@ -583,6 +881,7 @@ export function MPChannels() {
             onToggleStep={toggleNewStep}
             onChangeStepValue={changeNewStepValue}
             onChangeStepType={changeNewStepType}
+            onChangeStepRole={changeNewStepRole}
             onRenameStep={renameNewStep}
             onRemoveStep={removeNewStep}
             onAddStep={addBlankNewStep}
@@ -595,11 +894,22 @@ export function MPChannels() {
           />
         )}
 
-        {!addOpen && (!channel || loadingDetail) ? (
+        {editOpen && editDraft && (
+          <EditChannelPanel
+            draft={editDraft}
+            onUpdate={updateEditDraft}
+            onSave={handleSaveEditChannel}
+            onCancel={closeEditChannel}
+            saving={savingEdit}
+            error={editError}
+          />
+        )}
+
+        {!addOpen && !editOpen && (!channel || loadingDetail) ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
             <Loader2 size={20} style={{ color: R.warmTeal, animation: "spin 1s linear infinite" }} />
           </div>
-        ) : addOpen ? null : (<>
+        ) : addOpen || editOpen ? null : (<>
 
         {/* Channel Info Bar */}
         <div style={{ marginBottom: 24 }}>
@@ -618,6 +928,30 @@ export function MPChannels() {
             <span style={{ fontSize: 10, color: R.textDim }}>·</span>
             <span style={{ fontSize: 10, color: R.textDim }}>{channel.meta.paymentMethod}</span>
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); openEditChannel(); }}
+                title="Edit channel"
+                style={{
+                  width: 24, height: 24, borderRadius: 4, border: "none", background: "transparent",
+                  color: R.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = R.cardRaised; e.currentTarget.style.color = R.warmTeal; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = R.textDim; }}
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); openDeleteConfirm(); }}
+                title="Delete channel"
+                style={{
+                  width: 24, height: 24, borderRadius: 4, border: "none", background: "transparent",
+                  color: R.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${R.red}12`; e.currentTarget.style.color = R.red; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = R.textDim; }}
+              >
+                <Trash2 size={12} />
+              </button>
               <Info size={10} color={R.textDim} />
               <ChevronDown size={12} color={R.textDim} style={{ transform: showChannelInfo ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
             </div>
@@ -644,232 +978,275 @@ export function MPChannels() {
                 </div>
               )}
 
-              {/* ─── PROGRAMS (visual mockup) ────────────────────────────── */}
+              {/* ─── PROGRAMS ─────────────────────────────────────────────
+                  Single source of truth for step role / dates / evergreen.
+                  Writes straight into editedSteps; the pipeline visualisation
+                  above renders the same data. */}
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${R.border}` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase" }}>Programs</span>
-                    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${R.gold}15`, color: R.gold, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>Mockup</span>
+                    <span style={{ fontSize: 10, color: R.textDim }}>— order = stacking order</span>
                   </div>
-                  <span style={{ fontSize: 10, color: R.textDim }}>Order = stacking order (top runs first)</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 9, color: R.textDim, marginRight: 2, textTransform: "uppercase", letterSpacing: 1 }}>Quick add</span>
+                    {(["non_refundable", "genius", "mobile", "country", "standard_campaign", "deep_deal"] as StepRole[]).map(r => (
+                      <button
+                        key={r}
+                        onClick={() => handleQuickAdd(r)}
+                        style={{
+                          padding: "4px 9px", borderRadius: 4, fontSize: 10, fontWeight: 500,
+                          border: `1px solid ${R.border}`, background: R.darkBand, color: R.textMid, cursor: "pointer",
+                        }}
+                      >+ {STEP_ROLE_OPTIONS.find(o => o.value === r)?.label}</button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Programs list */}
                 <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 6, overflow: "hidden" }}>
-                  {[...channel.steps, ...mockAddedPrograms].map((step, i, arr) => {
-                    const isMockAdded = i >= channel.steps.length;
-                    const suffix = step.type === "multiplier" ? "×" : "%";
-                    const display = step.active
-                      ? (step.type === "multiplier" ? `${step.value}${suffix}` : `−${step.value}${suffix}`)
-                      : "off";
-                    return (
-                      <div key={`${step.key}-${i}`} style={{
-                        display: "grid", gridTemplateColumns: "28px 1fr 110px 90px 64px",
-                        alignItems: "center", gap: 10,
-                        padding: "10px 14px",
-                        borderBottom: i < arr.length - 1 ? `1px solid ${R.sep}` : "none",
-                        background: isMockAdded ? `${R.gold}06` : "transparent",
-                      }}>
-                        <div style={{ cursor: "grab", color: R.textDim, display: "flex", alignItems: "center" }} title="Drag to reorder (not wired yet)">
-                          <GripVertical size={14} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 12, color: R.text, fontWeight: 400 }}>{step.label}</span>
-                          {isMockAdded && (
-                            <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: `${R.gold}15`, color: R.gold, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>New</span>
-                          )}
-                          {step.locked && (
-                            <span style={{ fontSize: 9, color: R.textDim, fontStyle: "italic" }}>locked</span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: 10, color: R.textDim, textTransform: "capitalize" }}>{step.type}</span>
-                        <span style={{ fontSize: 12, color: step.active ? (step.type === "multiplier" ? R.warmTeal : R.accent) : R.textDim, fontVariantNumeric: "tabular-nums", textAlign: "right", fontWeight: 500 }}>
-                          {display}
-                        </span>
-                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                          <button
-                            title="Edit (not wired yet)"
-                            style={{
-                              width: 22, height: 22, borderRadius: 4, border: "none",
-                              background: "transparent", color: R.textDim,
-                              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = R.cardRaised)}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          >
-                            <Pencil size={11} />
-                          </button>
-                          <button
-                            title={isMockAdded ? "Remove (mockup)" : "Delete (not wired yet)"}
-                            onClick={() => {
-                              if (isMockAdded) {
-                                const mockIdx = i - channel.steps.length;
-                                setMockAddedPrograms(prev => prev.filter((_, idx) => idx !== mockIdx));
-                              }
-                            }}
-                            style={{
-                              width: 22, height: 22, borderRadius: 4, border: "none",
-                              background: "transparent", color: isMockAdded ? R.red : R.textDim,
-                              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = isMockAdded ? `${R.red}10` : R.cardRaised)}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* + Add Program row OR inline form */}
-                  {!showProgramsForm ? (
-                    <button
-                      onClick={() => setShowProgramsForm(true)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        width: "100%", padding: "10px 14px",
-                        background: "transparent", border: "none",
-                        color: R.textMid, fontSize: 12, cursor: "pointer",
-                        borderTop: `1px dashed ${R.border}`,
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = R.cardRaised)}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      <Plus size={14} style={{ color: R.textDim }} />
-                      <span>Add program</span>
-                    </button>
-                  ) : (
-                    <div style={{ padding: "14px 14px 12px", borderTop: `1px dashed ${R.border}`, background: `${R.gold}04` }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1.5, color: R.gold, textTransform: "uppercase", marginBottom: 10 }}>New program</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 150px 100px 80px auto", gap: 14, alignItems: "end" }}>
-                        {/* Label */}
-                        <div>
-                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Label</label>
-                          <input
-                            autoFocus
-                            type="text"
-                            value={newProgramLabel}
-                            onChange={(e) => setNewProgramLabel(e.target.value)}
-                            placeholder="e.g. CUG Flights"
-                            style={{
-                              width: "100%", padding: "7px 10px", fontSize: 12, color: R.text,
-                              background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 5, outline: "none",
-                              fontFamily: "inherit",
-                            }}
-                          />
-                        </div>
-                        {/* Type */}
-                        <div>
-                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Type</label>
-                          <div style={{ display: "flex", gap: 4 }}>
-                            {(["multiplier", "discount"] as const).map(t => (
-                              <button
-                                key={t}
-                                onClick={() => setNewProgramType(t)}
-                                style={{
-                                  flex: 1, padding: "7px 0", fontSize: 11, fontWeight: 500,
-                                  background: newProgramType === t ? `${R.warmTeal}15` : R.darkBand,
-                                  border: `1px solid ${newProgramType === t ? `${R.warmTeal}40` : R.border}`,
-                                  color: newProgramType === t ? R.warmTeal : R.textMid,
-                                  borderRadius: 5, cursor: "pointer", textTransform: "capitalize",
-                                }}
-                              >{t}</button>
-                            ))}
-                          </div>
-                        </div>
-                        {/* Value */}
-                        <div>
-                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Default value</label>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={newProgramValue}
-                              onChange={(e) => {
-                                const v = parseFloat(e.target.value);
-                                setNewProgramValue(isNaN(v) ? 0 : v);
-                              }}
-                              style={{
-                                flex: 1, padding: "7px 10px", fontSize: 12, color: R.text, textAlign: "right",
-                                background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 5, outline: "none",
-                                fontVariantNumeric: "tabular-nums", fontFamily: "inherit",
-                              }}
-                            />
-                            <span style={{ fontSize: 12, color: R.textDim, minWidth: 14 }}>
-                              {newProgramType === "multiplier" ? "×" : "%"}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Active toggle */}
-                        <div>
-                          <label style={{ display: "block", fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase", marginBottom: 4 }}>Active</label>
-                          <button
-                            onClick={() => setNewProgramActive(!newProgramActive)}
-                            style={{
-                              width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
-                              background: newProgramActive ? R.warmTeal : R.border,
-                              position: "relative", padding: 0, transition: "all 0.15s",
-                            }}
-                          >
-                            <div style={{
-                              position: "absolute", top: 3, left: newProgramActive ? 23 : 3,
-                              width: 18, height: 18, borderRadius: "50%",
-                              background: newProgramActive ? R.darkBand : R.textDim, transition: "all 0.15s",
-                            }} />
-                          </button>
-                        </div>
-                        {/* Actions */}
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button
-                            onClick={() => {
-                              setShowProgramsForm(false);
-                              setNewProgramLabel("");
-                              setNewProgramValue(10);
-                              setNewProgramType("discount");
-                              setNewProgramActive(true);
-                            }}
-                            style={{
-                              padding: "7px 12px", fontSize: 11, fontWeight: 500, borderRadius: 5,
-                              background: "transparent", border: `1px solid ${R.border}`, color: R.textDim,
-                              cursor: "pointer",
-                            }}
-                          >Cancel</button>
-                          <button
-                            disabled={!newProgramLabel.trim()}
-                            onClick={() => {
-                              const label = newProgramLabel.trim();
-                              if (!label) return;
-                              const key = `mock_${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}_${Date.now()}`;
-                              setMockAddedPrograms(prev => [...prev, {
-                                key,
-                                label,
-                                type: newProgramType,
-                                value: newProgramValue,
-                                active: newProgramActive,
-                              }]);
-                              setShowProgramsForm(false);
-                              setNewProgramLabel("");
-                              setNewProgramValue(10);
-                              setNewProgramType("discount");
-                              setNewProgramActive(true);
-                            }}
-                            style={{
-                              padding: "7px 14px", fontSize: 11, fontWeight: 600, borderRadius: 5,
-                              background: !newProgramLabel.trim() ? R.border : R.warmTeal,
-                              border: "none",
-                              color: !newProgramLabel.trim() ? R.textDim : R.darkBand,
-                              cursor: !newProgramLabel.trim() ? "not-allowed" : "pointer",
-                            }}
-                          >Add</button>
-                        </div>
-                      </div>
+                  {activeSteps.length === 0 ? (
+                    <div style={{ padding: "16px 14px", color: R.textDim, fontSize: 12, fontStyle: "italic" }}>
+                      No programs — use a Quick Add button above.
                     </div>
-                  )}
-                </div>
+                  ) : (
+                    activeSteps.map((step, i) => {
+                      const role: StepRole | "" = (step.role ?? "") as any;
+                      const isCampaign = role === "standard_campaign" || role === "deep_deal";
+                      const suffix = step.type === "multiplier" ? "×" : "%";
+                      const display = step.active
+                        ? (step.type === "multiplier" ? `${step.value}${suffix}` : `−${step.value}${suffix}`)
+                        : "off";
+                      const isEditingLabel = editingProgramKey === `${step.key}:label`;
+                      const isEditingValue = editingProgramKey === `${step.key}:value`;
+                      const isDetailOpen = programDetailKey === step.key;
 
-                <div style={{ marginTop: 10, fontSize: 10, color: R.textDim, lineHeight: 1.5 }}>
-                  Visual mockup only — adds persist while you're on this channel but aren't saved to the backend. Edit / drag-to-reorder / delete-existing are shown as affordances but not wired yet.
+                      return (
+                        <div key={step.key}>
+                          {/* Summary row */}
+                          <div style={{
+                            display: "grid", gridTemplateColumns: "28px 1fr 140px 90px 64px 32px 32px",
+                            alignItems: "center", gap: 10,
+                            padding: "10px 14px",
+                            borderBottom: (i < activeSteps.length - 1 || isDetailOpen) ? `1px solid ${R.sep}` : "none",
+                          }}>
+                            <div style={{ cursor: "grab", color: R.textDim, display: "flex", alignItems: "center" }} title="Drag to reorder (not wired yet)">
+                              <GripVertical size={14} />
+                            </div>
+                            {/* Label — click to edit */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {isEditingLabel ? (
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  defaultValue={step.label}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      handleRenameStep(step.key, (e.target as HTMLInputElement).value);
+                                      setEditingProgramKey(null);
+                                    }
+                                    if (e.key === "Escape") setEditingProgramKey(null);
+                                  }}
+                                  onBlur={(e) => {
+                                    handleRenameStep(step.key, e.target.value);
+                                    setEditingProgramKey(null);
+                                  }}
+                                  style={{
+                                    flex: 1, padding: "4px 8px",
+                                    background: R.darkBand, border: `1px solid ${R.warmTeal}40`, borderRadius: 4,
+                                    color: R.text, fontSize: 12, outline: "none", fontFamily: "inherit",
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  onClick={() => !step.locked && setEditingProgramKey(`${step.key}:label`)}
+                                  style={{ fontSize: 12, color: R.text, fontWeight: 400, cursor: step.locked ? "default" : "text" }}
+                                >{step.label}</span>
+                              )}
+                              {step.locked && <span style={{ fontSize: 9, color: R.textDim, fontStyle: "italic" }}>locked</span>}
+                            </div>
+                            {/* Role */}
+                            <select
+                              value={role}
+                              onChange={(e) => handleChangeStepRole(step.key, (e.target.value || null) as StepRole | null)}
+                              style={{
+                                padding: "4px 6px", borderRadius: 4,
+                                background: R.darkBand, border: `1px solid ${R.border}`,
+                                color: R.textMid, fontSize: 11, fontFamily: "inherit",
+                                outline: "none", cursor: "pointer",
+                              }}
+                            >
+                              {STEP_ROLE_OPTIONS.map(o => (
+                                <option key={o.value || "null"} value={o.value}>{o.label}</option>
+                              ))}
+                            </select>
+                            {/* Type (read-only chip — changes via Details) */}
+                            <span style={{ fontSize: 10, color: R.textDim, textTransform: "capitalize", textAlign: "center" }}>{step.type}</span>
+                            {/* Value — click to edit */}
+                            {isEditingValue ? (
+                              <input
+                                autoFocus
+                                type="text"
+                                inputMode="decimal"
+                                defaultValue={step.value}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const v = parseFloat((e.target as HTMLInputElement).value);
+                                    if (!isNaN(v)) handleChangeStepValue(step.key, v);
+                                    setEditingProgramKey(null);
+                                  }
+                                  if (e.key === "Escape") setEditingProgramKey(null);
+                                }}
+                                onBlur={(e) => {
+                                  const v = parseFloat(e.target.value);
+                                  if (!isNaN(v)) handleChangeStepValue(step.key, v);
+                                  setEditingProgramKey(null);
+                                }}
+                                style={{
+                                  width: 58, padding: "3px 6px", fontSize: 12, textAlign: "right",
+                                  background: R.darkBand, border: `1px solid ${R.warmTeal}40`, borderRadius: 4,
+                                  color: R.text, fontVariantNumeric: "tabular-nums", outline: "none",
+                                  justifySelf: "end",
+                                }}
+                              />
+                            ) : (
+                              <span
+                                onClick={() => setEditingProgramKey(`${step.key}:value`)}
+                                style={{
+                                  fontSize: 12,
+                                  color: step.active ? (step.type === "multiplier" ? R.warmTeal : R.accent) : R.textDim,
+                                  fontVariantNumeric: "tabular-nums", textAlign: "right", fontWeight: 500,
+                                  cursor: "text",
+                                }}
+                              >{display}</span>
+                            )}
+                            {/* Active toggle */}
+                            <button
+                              onClick={() => handleToggleStep(step.key)}
+                              disabled={step.locked}
+                              title={step.active ? "Active — click to disable" : "Inactive — click to enable"}
+                              style={{
+                                width: 30, height: 18, borderRadius: 9, border: "none", padding: 0, position: "relative",
+                                background: step.active ? R.warmTeal : R.border,
+                                cursor: step.locked ? "not-allowed" : "pointer",
+                                opacity: step.locked ? 0.5 : 1,
+                                justifySelf: "center",
+                              }}
+                            >
+                              <div style={{
+                                position: "absolute", top: 3, left: step.active ? 15 : 3,
+                                width: 12, height: 12, borderRadius: "50%",
+                                background: step.active ? R.darkBand : R.textDim, transition: "all 0.15s",
+                              }} />
+                            </button>
+                            {/* Details / remove cluster */}
+                            <div style={{ display: "flex", gap: 2, justifySelf: "end" }}>
+                              <button
+                                title={isDetailOpen ? "Hide details" : "Details (dates, always-on)"}
+                                onClick={() => setProgramDetailKey(isDetailOpen ? null : step.key)}
+                                style={{
+                                  width: 22, height: 22, borderRadius: 4, border: "none",
+                                  background: isDetailOpen ? R.cardRaised : "transparent", color: isDetailOpen ? R.warmTeal : R.textDim,
+                                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                                }}
+                              >
+                                <ChevronDown size={13} style={{ transform: isDetailOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+                              </button>
+                              <button
+                                title={step.locked ? "Locked — cannot remove" : "Remove program"}
+                                onClick={() => handleRemoveStep(step.key)}
+                                disabled={step.locked}
+                                style={{
+                                  width: 22, height: 22, borderRadius: 4, border: "none",
+                                  background: "transparent", color: step.locked ? R.textDim : R.textMid,
+                                  cursor: step.locked ? "not-allowed" : "pointer",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}
+                                onMouseEnter={(e) => { if (!step.locked) { e.currentTarget.style.background = `${R.red}10`; e.currentTarget.style.color = R.red; } }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = step.locked ? R.textDim : R.textMid; }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expandable detail row — date range / evergreen for campaign roles */}
+                          {isDetailOpen && (
+                            <div style={{
+                              padding: "12px 14px 14px 52px",
+                              background: R.darkBand,
+                              borderBottom: i < activeSteps.length - 1 ? `1px solid ${R.sep}` : "none",
+                              display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18,
+                            }}>
+                              {/* Type switch */}
+                              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 1 }}>
+                                Type
+                                <div style={{ display: "flex", gap: 3 }}>
+                                  {(["multiplier", "discount"] as const).map(t => (
+                                    <button
+                                      key={t}
+                                      onClick={() => patchStep(step.key, { type: t, value: t === "multiplier" ? 1 : Math.max(step.value, 1) })}
+                                      style={{
+                                        padding: "3px 9px", fontSize: 10, fontWeight: 500, borderRadius: 4,
+                                        background: step.type === t ? `${R.warmTeal}15` : "transparent",
+                                        border: `1px solid ${step.type === t ? `${R.warmTeal}40` : R.border}`,
+                                        color: step.type === t ? R.warmTeal : R.textMid,
+                                        cursor: "pointer", textTransform: "capitalize",
+                                      }}
+                                    >{t}</button>
+                                  ))}
+                                </div>
+                              </label>
+
+                              {/* Campaign dates — only visible for campaign roles */}
+                              {isCampaign ? (
+                                <>
+                                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 1, cursor: "pointer" }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!step.isEvergreen}
+                                      onChange={() => handleToggleEvergreen(step.key)}
+                                      style={{ accentColor: R.warmTeal }}
+                                    />
+                                    Always-on
+                                  </label>
+                                  {!step.isEvergreen && (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span style={{ fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 1 }}>Dates</span>
+                                      <input
+                                        type="date"
+                                        value={step.startDate ?? ""}
+                                        onChange={(e) => handleChangeStepDate(step.key, "startDate", e.target.value)}
+                                        style={{
+                                          padding: "4px 7px", fontSize: 11, color: R.text,
+                                          background: R.card, border: `1px solid ${R.border}`, borderRadius: 4,
+                                          outline: "none", fontFamily: "inherit",
+                                        }}
+                                      />
+                                      <span style={{ fontSize: 10, color: R.textDim }}>→</span>
+                                      <input
+                                        type="date"
+                                        value={step.endDate ?? ""}
+                                        onChange={(e) => handleChangeStepDate(step.key, "endDate", e.target.value)}
+                                        style={{
+                                          padding: "4px 7px", fontSize: 11, color: R.text,
+                                          background: R.card, border: `1px solid ${R.border}`, borderRadius: 4,
+                                          outline: "none", fontFamily: "inherit",
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <span style={{ fontSize: 10, color: R.textDim, fontStyle: "italic" }}>
+                                  Date range applies to Standard Campaign and Deep Deal roles only.
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
@@ -1008,6 +1385,120 @@ export function MPChannels() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Simulator — per-step breakdown for a specific stay date */}
+        <div style={{ background: R.card, border: `1px solid ${R.border}`, borderRadius: 8, marginBottom: 24, overflow: "hidden" }}>
+          <div
+            onClick={() => setShowSimulator(!showSimulator)}
+            style={{ padding: "14px 20px", borderBottom: showSimulator ? `1px solid ${R.sep}` : "none",
+              display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: R.text }}>Simulator</span>
+              <span style={{ fontSize: 11, color: R.textDim }}>— applied/skipped breakdown for a stay date</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ fontSize: 11, color: R.textMid, fontVariantNumeric: "tabular-nums" }}>
+                {curr}{simPmsRate} → <span style={{ color: R.warmTeal, fontWeight: 600 }}>{curr}{selectedResult.final.toFixed(2)}</span>
+              </span>
+              <ChevronDown size={14} color={R.textDim} style={{ transform: showSimulator ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+            </div>
+          </div>
+
+          {showSimulator && (
+            <div style={{ padding: "18px 20px" }}>
+              {/* Inputs row */}
+              <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 1 }}>PMS Rate</span>
+                  <input
+                    type="number"
+                    value={simPmsRate}
+                    onChange={(e) => setSimPmsRate(Number(e.target.value) || 0)}
+                    style={{
+                      width: 110, padding: "6px 9px", fontSize: 12, color: R.text,
+                      background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 5,
+                      outline: "none", fontVariantNumeric: "tabular-nums",
+                    }}
+                  />
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: R.textDim, textTransform: "uppercase", letterSpacing: 1 }}>Stay Date</span>
+                  <input
+                    type="date"
+                    value={stayDate}
+                    onChange={(e) => setStayDate(e.target.value || todayIso())}
+                    style={{
+                      padding: "6px 9px", fontSize: 12, color: R.text,
+                      background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 5,
+                      outline: "none", fontFamily: "inherit",
+                    }}
+                  />
+                </label>
+                <button
+                  onClick={() => setStayDate(todayIso())}
+                  style={{
+                    padding: "6px 10px", borderRadius: 5,
+                    background: "transparent", border: `1px solid ${R.border}`, color: R.textDim,
+                    fontSize: 11, cursor: "pointer",
+                  }}
+                >Today</button>
+              </div>
+
+              {/* Breakdown list */}
+              <div style={{ border: `1px solid ${R.border}`, borderRadius: 6, overflow: "hidden" }}>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 150px 110px 130px",
+                  padding: "8px 12px", background: R.darkBand,
+                  fontSize: 9, fontWeight: 600, letterSpacing: 1, color: R.textDim, textTransform: "uppercase",
+                }}>
+                  <span>Step</span>
+                  <span style={{ textAlign: "center" }}>Role</span>
+                  <span style={{ textAlign: "right" }}>Factor After</span>
+                  <span style={{ textAlign: "right" }}>Status</span>
+                </div>
+                {selectedResult.entries.length === 0 ? (
+                  <div style={{ padding: 14, fontSize: 12, color: R.textDim, fontStyle: "italic" }}>No steps to simulate.</div>
+                ) : (
+                  selectedResult.entries.map((entry, i) => {
+                    const isLast = i === selectedResult.entries.length - 1;
+                    const roleLabel = entry.step.role
+                      ? (STEP_ROLE_OPTIONS.find(o => o.value === entry.step.role)?.label ?? entry.step.role)
+                      : "—";
+                    const statusColor = entry.applied ? R.green : R.textDim;
+                    const statusText = entry.applied
+                      ? `applied ${entry.step.type === "multiplier" ? `×${entry.step.value}` : `−${entry.step.value}%`}`
+                      : `skipped · ${entry.skipReason ? SKIP_REASON_LABEL[entry.skipReason] : "n/a"}`;
+                    return (
+                      <div key={entry.step.key} style={{
+                        display: "grid", gridTemplateColumns: "1fr 150px 110px 130px",
+                        padding: "9px 12px",
+                        borderBottom: isLast ? "none" : `1px solid ${R.sep}`,
+                        fontSize: 12, color: entry.applied ? R.text : R.textDim,
+                        opacity: entry.applied ? 1 : 0.65,
+                      }}>
+                        <span>{entry.step.label}</span>
+                        <span style={{ textAlign: "center", fontSize: 10, color: R.textMid, textTransform: "uppercase", letterSpacing: 0.5 }}>{roleLabel}</span>
+                        <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: R.textMid }}>{entry.factorAfter.toFixed(4)}</span>
+                        <span style={{ textAlign: "right", color: statusColor, fontSize: 11, fontWeight: 500 }}>{statusText}</span>
+                      </div>
+                    );
+                  })
+                )}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 150px 110px 130px",
+                  padding: "10px 12px", background: `${R.warmTeal}06`,
+                  fontSize: 12, color: R.warmTeal, fontWeight: 600,
+                }}>
+                  <span>Guest Sees</span>
+                  <span />
+                  <span />
+                  <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{curr}{selectedResult.final.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Per-Hotel Overrides */}
@@ -1182,8 +1673,8 @@ export function MPChannels() {
                     ?? "—")
                 : null;
 
-              const globalFinal = calcWaterfall(channel.steps, simPmsRate).final;
-              const draftFinal = calcWaterfall(steps, simPmsRate).final;
+              const globalFinal = calcWaterfall(channel.steps, simPmsRate, stayDate).final;
+              const draftFinal = calcWaterfall(steps, simPmsRate, stayDate).final;
               const delta = draftFinal - globalFinal;
 
               return (
@@ -1365,7 +1856,7 @@ export function MPChannels() {
 
                   // Otherwise: D3 minimal row
                   const effectiveSteps = getEffectiveSteps(channel, ov.hotelId, overrides);
-                  const finalRate = calcWaterfall(effectiveSteps, simPmsRate).final;
+                  const finalRate = calcWaterfall(effectiveSteps, simPmsRate, stayDate).final;
                   const diverged = channel.steps.reduce<Array<{ label: string; type: "multiplier" | "discount" | "tax"; value: number; active: boolean }>>((acc, step) => {
                     const ovStep = ov.overrides[step.key];
                     if (!ovStep) return acc;
@@ -1419,6 +1910,72 @@ export function MPChannels() {
 
         </>)}
       </div>
+
+      {deleteConfirm && (
+        <div
+          onClick={closeDeleteConfirm}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: R.card, border: `1px solid ${R.border}`, borderRadius: 10,
+              padding: "24px 28px", maxWidth: 480, width: "100%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, color: R.accent, marginBottom: 10 }}>
+              Delete {deleteConfirm.channelName}?
+            </div>
+            <div style={{ fontSize: 13, color: R.textMid, lineHeight: 1.55, marginBottom: 8 }}>
+              This removes the channel, its waterfall defaults, and all grid connections.
+            </div>
+            {deleteConfirm.overrideCount > 0 && (
+              <div style={{
+                fontSize: 12, color: R.gold, background: `${R.gold}10`,
+                border: `1px solid ${R.gold}30`, borderRadius: 6,
+                padding: "8px 12px", marginBottom: 12,
+              }}>
+                <strong>{deleteConfirm.overrideCount}</strong> per-hotel override{deleteConfirm.overrideCount === 1 ? "" : "s"} will also be deleted.
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: R.textDim, marginBottom: 20 }}>
+              This cannot be undone.
+            </div>
+            {deleteError && (
+              <div style={{
+                padding: "10px 14px", borderRadius: 6, marginBottom: 16,
+                background: `${R.red}10`, border: `1px solid ${R.red}30`,
+                color: R.red, fontSize: 12,
+              }}>{deleteError}</div>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={closeDeleteConfirm}
+                disabled={deleting}
+                style={{
+                  fontSize: 12, padding: "8px 14px", borderRadius: 5,
+                  background: "transparent", border: `1px solid ${R.border}`,
+                  color: R.textMid, cursor: deleting ? "not-allowed" : "pointer",
+                }}
+              >Cancel</button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                style={{
+                  fontSize: 12, padding: "8px 16px", borderRadius: 5,
+                  background: deleting ? R.border : R.red, border: "none",
+                  color: deleting ? R.textDim : "#fff",
+                  cursor: deleting ? "not-allowed" : "pointer", fontWeight: 600,
+                }}
+              >{deleting ? "Deleting…" : "Delete Channel"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1434,6 +1991,7 @@ interface AddChannelPanelProps {
   onToggleStep: (key: string) => void;
   onChangeStepValue: (key: string, value: number) => void;
   onChangeStepType: (key: string, type: "multiplier" | "discount") => void;
+  onChangeStepRole: (key: string, role: StepRole | null) => void;
   onRenameStep: (key: string, label: string) => void;
   onRemoveStep: (key: string) => void;
   onAddStep: () => void;
@@ -1447,7 +2005,7 @@ interface AddChannelPanelProps {
 
 function AddChannelPanel(props: AddChannelPanelProps) {
   const {
-    draft, onUpdate, onPickPreset, onToggleStep, onChangeStepValue, onChangeStepType,
+    draft, onUpdate, onPickPreset, onToggleStep, onChangeStepValue, onChangeStepType, onChangeStepRole,
     onRenameStep, onRemoveStep, onAddStep, onSave, onCancel, saving, error,
     simPmsRate, finalRate,
   } = props;
@@ -1639,7 +2197,7 @@ function AddChannelPanel(props: AddChannelPanelProps) {
             draft.steps.map((step, i) => (
               <div key={step.key} style={{
                 display: "grid",
-                gridTemplateColumns: "24px 1fr 90px 110px 60px 32px",
+                gridTemplateColumns: "24px 1fr 130px 90px 110px 60px 32px",
                 alignItems: "center", gap: 10,
                 padding: "10px 14px",
                 borderBottom: i < draft.steps.length - 1 ? `1px solid ${R.sep}` : "none",
@@ -1662,6 +2220,21 @@ function AddChannelPanel(props: AddChannelPanelProps) {
                   onFocus={(e) => { e.currentTarget.style.background = R.darkBand; e.currentTarget.style.borderColor = R.border; }}
                   onBlur={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}
                 />
+                <select
+                  value={(step.role ?? "") as string}
+                  onChange={(e) => onChangeStepRole(step.key, (e.target.value || null) as StepRole | null)}
+                  title="Waterfall role"
+                  style={{
+                    padding: "4px 6px", borderRadius: 4,
+                    background: R.darkBand, border: `1px solid ${R.border}`,
+                    color: R.textMid, fontSize: 11, fontFamily: "inherit",
+                    outline: "none", cursor: "pointer",
+                  }}
+                >
+                  {STEP_ROLE_OPTIONS.map(o => (
+                    <option key={o.value || "null"} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
                 <button
                   onClick={() => onChangeStepType(step.key, step.type === "multiplier" ? "discount" : "multiplier")}
                   title="Toggle between multiplier and discount"
@@ -1758,6 +2331,215 @@ function AddChannelPanel(props: AddChannelPanelProps) {
             <span style={{ color: R.textDim, fontSize: 11 }}>→</span>
             <span style={{ color: R.warmTeal, fontSize: 14, fontWeight: 600 }}>{curr}{finalRate.toFixed(2)}</span>
             <span style={{ color: R.textDim, fontSize: 11 }}>({Math.round((finalRate / simPmsRate) * 100)}% of PMS)</span>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{
+            marginTop: 16, padding: "10px 14px", borderRadius: 6,
+            background: `${R.red}10`, border: `1px solid ${R.red}30`,
+            color: R.red, fontSize: 12,
+          }}>{error}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+// EDIT-CHANNEL PANEL (meta-only; waterfall is edited in the main view)
+// ══════════════════════════════════════════
+
+interface EditChannelPanelProps {
+  draft: EditChannelDraft;
+  onUpdate: <K extends keyof EditChannelDraft>(key: K, value: EditChannelDraft[K]) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+  error: string | null;
+}
+
+function EditChannelPanel({ draft, onUpdate, onSave, onCancel, saving, error }: EditChannelPanelProps) {
+  const CHANNEL_TYPE_OPTS: { v: PresetKey; label: string }[] = [
+    { v: "ota", label: "OTA" },
+    { v: "wholesaler", label: "Wholesaler" },
+    { v: "flash_sale", label: "Flash Sale" },
+    { v: "direct", label: "Direct" },
+    { v: "meta", label: "Meta" },
+  ];
+  const AGREEMENT_OPTS: { v: AgreementType; label: string }[] = [
+    { v: "group", label: "Group" }, { v: "individual", label: "Individual" },
+    { v: "direct", label: "Direct" }, { v: "meta", label: "Meta" },
+  ];
+  const TIER_OPTS: { v: ChannelTier; label: string }[] = [
+    { v: "strategic", label: "Strategic" }, { v: "growth", label: "Growth" },
+    { v: "tactical", label: "Tactical" }, { v: "experimental", label: "Experimental" },
+  ];
+  const INTEGRATION_OPTS: { v: IntegrationType; label: string }[] = [
+    { v: "channel_manager", label: "Channel Manager" }, { v: "direct_api", label: "Direct API" },
+    { v: "extranet", label: "Extranet" }, { v: "meta_search", label: "Meta Search" },
+  ];
+  const PAYMENT_OPTS: { v: PaymentMethod; label: string }[] = [
+    { v: "guest_pays", label: "Guest Pays" }, { v: "vcc", label: "VCC" }, { v: "bacs", label: "BACS" },
+  ];
+
+  const chipStyle = (active: boolean): React.CSSProperties => ({
+    padding: "5px 11px", borderRadius: 5, fontSize: 11, fontWeight: 500,
+    border: `1px solid ${active ? `${R.warmTeal}40` : R.border}`,
+    background: active ? `${R.warmTeal}15` : R.darkBand,
+    color: active ? R.warmTeal : R.textMid,
+    cursor: "pointer",
+  });
+
+  const fieldLabelStyle: React.CSSProperties = {
+    width: 130, flexShrink: 0,
+    fontSize: 11, fontWeight: 600, letterSpacing: -0.02,
+    color: R.textMid, textTransform: "uppercase",
+  };
+
+  const fieldRowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "12px 0", borderBottom: `1px solid ${R.sep}`,
+  };
+
+  const smallInputStyle: React.CSSProperties = {
+    padding: "6px 10px", background: R.darkBand,
+    border: `1px solid ${R.border}`, borderRadius: 5,
+    color: R.text, fontSize: 12, outline: "none",
+    fontFamily: "inherit",
+  };
+
+  return (
+    <div style={{
+      background: R.card, border: `1px solid ${R.border}`, borderRadius: 8,
+      marginBottom: 24, overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "14px 20px", borderBottom: `1px solid ${R.sep}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: R.accent }}>Edit Channel</span>
+          <span style={{ fontSize: 11, color: R.textDim }}>— waterfall steps are edited in the main view</span>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={onSave}
+            disabled={saving || !draft.name.trim()}
+            style={{
+              fontSize: 11, padding: "6px 14px", borderRadius: 5,
+              background: saving || !draft.name.trim() ? R.border : R.warmTeal,
+              border: "none",
+              color: saving || !draft.name.trim() ? R.textDim : R.darkBand,
+              cursor: saving || !draft.name.trim() ? "not-allowed" : "pointer",
+              fontWeight: 600,
+            }}
+          >{saving ? "Saving…" : "Save Changes"}</button>
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            style={{
+              fontSize: 11, padding: "6px 10px", borderRadius: 5,
+              background: "transparent", border: `1px solid ${R.border}`, color: R.textDim,
+              cursor: saving ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", gap: 4,
+            }}
+          ><X size={12} /> Cancel</button>
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 24px" }}>
+        <input
+          autoFocus
+          type="text"
+          value={draft.name}
+          onChange={(e) => onUpdate("name", e.target.value)}
+          placeholder="Channel name"
+          style={{
+            width: "100%", padding: "10px 12px",
+            background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 6,
+            color: R.text, fontSize: 16, fontWeight: 500, outline: "none",
+            marginBottom: 20, fontFamily: "inherit",
+          }}
+        />
+
+        <div style={{ borderTop: `1px solid ${R.sep}` }}>
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Channel type</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {CHANNEL_TYPE_OPTS.map(o => (
+                <button key={o.v} onClick={() => onUpdate("channelType", o.v)} style={chipStyle(draft.channelType === o.v)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Agreement</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {AGREEMENT_OPTS.map(o => (
+                <button key={o.v} onClick={() => onUpdate("agreement", o.v)} style={chipStyle(draft.agreement === o.v)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Tier</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {TIER_OPTS.map(o => (
+                <button key={o.v} onClick={() => onUpdate("tier", o.v)} style={chipStyle(draft.tier === o.v)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Integration</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {INTEGRATION_OPTS.map(o => (
+                <button key={o.v} onClick={() => onUpdate("integration", o.v)} style={chipStyle(draft.integration === o.v)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Commission %</div>
+            <input
+              type="number"
+              value={draft.commission}
+              onChange={(e) => onUpdate("commission", e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder="e.g. 15"
+              style={{ ...smallInputStyle, width: 100 }}
+            />
+          </div>
+
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Payment method</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {PAYMENT_OPTS.map(o => (
+                <button key={o.v} onClick={() => onUpdate("paymentMethod", o.v)} style={chipStyle(draft.paymentMethod === o.v)}>{o.label}</button>
+              ))}
+              <button onClick={() => onUpdate("paymentMethod", "")} style={chipStyle(draft.paymentMethod === "")}>—</button>
+            </div>
+          </div>
+
+          <div style={fieldRowStyle}>
+            <div style={fieldLabelStyle}>Contract expiry</div>
+            <input
+              type="date"
+              value={draft.contractExpiry}
+              onChange={(e) => onUpdate("contractExpiry", e.target.value)}
+              style={{ ...smallInputStyle, width: 160 }}
+            />
+          </div>
+
+          <div style={{ ...fieldRowStyle, alignItems: "flex-start", borderBottom: "none" }}>
+            <div style={fieldLabelStyle}>Notes</div>
+            <textarea
+              value={draft.notes}
+              onChange={(e) => onUpdate("notes", e.target.value)}
+              placeholder="Internal notes"
+              rows={3}
+              style={{ ...smallInputStyle, flex: 1, resize: "vertical", fontSize: 12, lineHeight: 1.5 }}
+            />
           </div>
         </div>
 

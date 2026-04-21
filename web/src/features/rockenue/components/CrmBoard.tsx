@@ -31,6 +31,7 @@ import {
   Link2,
 } from "lucide-react";
 import { useCrmTasks } from "../hooks/useCrmTasks";
+import { useChannels } from "../hooks/useChannels";
 import { useTaskReadState } from "../hooks/useTaskReadState";
 import {
   fetchComments,
@@ -65,10 +66,8 @@ const TEXT = R.accent;
 const TEXT_MID = R.textMid;
 const TEXT_DIM = R.textDim;
 
-const OTA_CHANNELS_LIST = [
-  "Booking.com", "Expedia", "Agoda", "Hotelbeds", "Trip.com", "HRS",
-  "Stuba", "WebBeds", "CN Travel", "Direct", "Google Hotels", "Trivago",
-];
+const ChannelsListContext = createContext<string[]>([]);
+function useChannelsList() { return useContext(ChannelsListContext); }
 
 // ── Config ──
 const PRIORITY_CFG: Record<Priority, { color: string; label: string; order: number }> = {
@@ -160,6 +159,12 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
   useEffect(() => {
     fetchTeam().then((members) => setTeamMembers(buildTeamDisplay(members))).catch(console.error);
   }, []);
+
+  const { channels: allChannels } = useChannels();
+  const channelNames = useMemo(
+    () => allChannels.map((c) => c.name).sort((a, b) => a.localeCompare(b)),
+    [allChannels]
+  );
 
   const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [search, setSearch] = useState("");
@@ -320,6 +325,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
 
   return (
     <TeamContext.Provider value={teamMembers}>
+    <ChannelsListContext.Provider value={channelNames}>
     <TaskReadContext.Provider value={{ isUnread }}>
     <div style={{ flex: 1, background: R.bg, color: R.accent, paddingBottom: 64 }}>
       <div style={{ padding: "24px 28px" }}>
@@ -679,6 +685,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
       </div>
     </div>
     </TaskReadContext.Provider>
+    </ChannelsListContext.Provider>
     </TeamContext.Provider>
   );
 }
@@ -1307,6 +1314,7 @@ function TaskDetailPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const pCfg = PRIORITY_CFG[task.priority];
   const cCfg = CATEGORY_CFG[task.category];
+  const channelsList = useChannelsList();
   const sCfg = STATUS_COLUMNS.find((s) => s.key === task.status)!;
   const team = useTeam();
   const member = team.find((m) => m.name === task.assignee);
@@ -1776,7 +1784,7 @@ function TaskDetailPanel({
                   }}><Plus size={11} /> Add channel</button>
                 </PopoverTrigger>
                 <PopoverContent className="z-[60]" style={{ background: CARD_BG, border: `1px solid ${BORDER}`, padding: "4px 0", width: 200, zIndex: 60, maxHeight: 280, overflowY: "auto" }} align="start">
-                  {OTA_CHANNELS_LIST.filter((ch) => !task.tags.includes(ch)).map((ch) => (
+                  {channelsList.filter((ch) => !task.tags.includes(ch)).map((ch) => (
                     <button
                       key={ch}
                       onClick={async () => {
@@ -1794,7 +1802,7 @@ function TaskDetailPanel({
                       {ch}
                     </button>
                   ))}
-                  {OTA_CHANNELS_LIST.filter((ch) => !task.tags.includes(ch)).length === 0 && (
+                  {channelsList.filter((ch) => !task.tags.includes(ch)).length === 0 && (
                     <div style={{ padding: "8px 12px", color: TEXT_DIM, fontSize: 11 }}>All channels added.</div>
                   )}
                 </PopoverContent>
@@ -2094,6 +2102,7 @@ function CreateTaskPanel({
   userName: string;
 }) {
   const teamMembers = useTeam();
+  const channelsList = useChannelsList();
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -2228,7 +2237,7 @@ function CreateTaskPanel({
   }
 
   const filteredHotels = allHotelNames.filter((h) => !propertySearch || h.toLowerCase().includes(propertySearch.toLowerCase()));
-  const filteredChannels = OTA_CHANNELS_LIST.filter((ch) => !channelSearch || ch.toLowerCase().includes(channelSearch.toLowerCase()));
+  const filteredChannels = channelsList.filter((ch) => !channelSearch || ch.toLowerCase().includes(channelSearch.toLowerCase()));
 
   return (
     <>

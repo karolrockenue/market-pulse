@@ -1,18 +1,15 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import {
-  Globe,
   Search,
   ChevronDown,
   ChevronUp,
   ArrowUpDown,
-  Settings2,
   Loader2,
   Info,
   X,
   AlertTriangle,
   Bell,
 } from "lucide-react";
-import { ChannelsRegistry } from "./ChannelsRegistry";
 import { useDistributionGrid } from "../hooks/useDistributionGrid";
 import type { GridStatus, GridCell } from "../api/types";
 
@@ -235,8 +232,6 @@ function SuspensionInfoPopover({
 
 // ══════════════════════════════════════════
 
-type PageView = "grid" | "channels";
-
 interface DistributionViewProps {
   onPipelineNavigate?: (hotelId: number, channelId: number) => void;
 }
@@ -244,7 +239,6 @@ interface DistributionViewProps {
 export function DistributionView({ onPipelineNavigate }: DistributionViewProps) {
   const { hotels, channels, grid, loading, updateCellStatus } = useDistributionGrid();
 
-  const [pageView, setPageView] = useState<PageView>("grid");
   const [search, setSearch] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("All Properties");
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -311,47 +305,16 @@ export function DistributionView({ onPipelineNavigate }: DistributionViewProps) 
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 2, color: R.gold, textTransform: "uppercase", marginBottom: 8 }}>Operations</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: R.accent, margin: "0 0 6px", letterSpacing: -0.5 }}>Distribution</h1>
-              <p style={{ fontSize: 13, color: R.textMid, margin: 0 }}>
-                {pageView === "grid"
-                  ? `Channel connections across ${displayedHotels.length} properties`
-                  : "OTA partners, agreements, and commission structures"}
-              </p>
-            </div>
-
-            {/* View toggle */}
-            <div style={{ display: "flex", alignItems: "center", background: R.cardRaised, borderRadius: 8, border: `1px solid ${R.border}`, overflow: "hidden" }}>
-              {([
-                { key: "grid" as PageView, label: "Grid", icon: Globe },
-                { key: "channels" as PageView, label: "Channels", icon: Settings2 },
-              ] as const).map(v => {
-                const Icon = v.icon;
-                const isActive = pageView === v.key;
-                return (
-                  <button key={v.key} onClick={() => setPageView(v.key)} style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "8px 18px", border: "none",
-                    background: isActive ? `${R.warmTeal}12` : "transparent",
-                    color: isActive ? R.warmTeal : R.textDim,
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}>
-                    <Icon size={13} />
-                    {v.label}
-                  </button>
-                );
-              })}
-            </div>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: R.accent, margin: "0 0 6px", letterSpacing: -0.5 }}>Distribution</h1>
+            <p style={{ fontSize: 13, color: R.textMid, margin: 0 }}>
+              Channel connections across {displayedHotels.length} properties
+            </p>
           </div>
         </div>
 
-        {/* ══ CHANNELS VIEW ══ */}
-        {pageView === "channels" && <ChannelsRegistry />}
-
         {/* ══ GRID VIEW ══ */}
-        {pageView === "grid" && (
+        {(
           loading ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 80 }}>
               <Loader2 size={28} style={{ color: R.warmTeal, animation: "spin 1s linear infinite" }} />
