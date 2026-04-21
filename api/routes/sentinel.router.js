@@ -2084,7 +2084,9 @@ router.get("/health/fleet", async (req, res) => {
           : c.successes > 0 && c.failures > 0 ? "amber"
           : c.failures > 0 ? "red"
           : "none";
-        sparklines[key][c.day.toISOString().slice(0, 10)] = cellStatus;
+        // pg returns ::date as a string ("YYYY-MM-DD") — no conversion needed.
+        const dayKey = typeof c.day === "string" ? c.day : c.day.toISOString().slice(0, 10);
+        sparklines[key][dayKey] = cellStatus;
       });
     }
 
