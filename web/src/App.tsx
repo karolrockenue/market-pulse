@@ -671,7 +671,7 @@ export default function App() {
   // [NEW] Show a full-screen loader while checking the session
   if (isSessionLoading) {
     return (
-      <div className="min-h-screen bg-[#1a1a18] flex items-center justify-center">
+      <div className="min-h-screen bg-[#14181D] flex items-center justify-center">
         {/* Simple loader */}
         <div className="w-12 h-12 border-4 border-[#38C6BA] border-t-transparent border-solid rounded-full animate-spin"></div>
       </div>
