@@ -222,6 +222,8 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     clearOverride,
     submitChanges,
     saveMinRate,
+    rateOverrides, // [OVERRIDE v1]
+    removeRateOverride, // [OVERRIDE v1]
   } = useRateGrid();
 
   // --- INIT ---
@@ -913,6 +915,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             color = aiApprovedPending.has(day.date)
                               ? "#38C6BA"
                               : "#f59e0b";
+                          } else if (rateOverrides[day.date] !== undefined) {
+                            // [OVERRIDE v1] user-pinned rate wins over AI
+                            text = "OVERRIDE";
+                            color = "#f59e0b";
                           } else if (
                             currentSource === "SENTINEL" ||
                             currentSource === "AI_AUTO" ||
@@ -930,6 +936,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             text = "MANUAL";
                             color = "#7A8494";
                           }
+                          const isOverride = text === "OVERRIDE";
                           return (
                             <td
                               key={day.date}
@@ -947,12 +954,20 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               }}
                             >
                               <span
+                                onClick={
+                                  isOverride
+                                    ? () => removeRateOverride(selectedHotelId, day.date)
+                                    : undefined
+                                }
+                                title={isOverride ? "Click to clear override" : undefined}
                                 style={{
                                   color,
                                   fontSize: "9px",
                                   fontWeight: 600,
                                   letterSpacing: 0.3,
                                   textTransform: "uppercase",
+                                  cursor: isOverride ? "pointer" : "default",
+                                  textDecoration: isOverride ? "underline dotted" : "none",
                                 }}
                               >
                                 {text}

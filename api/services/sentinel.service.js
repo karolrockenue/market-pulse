@@ -1002,6 +1002,267 @@ async function recalculateRates(hotelId, startDate, endDate) {
   return { totalQueued };
 }
 
+/**
+ * [OVERRIDE MODEL v1 — see claude/rate-override-implementation.md]
+ *
+ * Save (upsert) one or more PMS overrides for a hotel.
+ * Writes to sentinel_rate_overrides (date-level, base-only), fans out
+ * base × differentials to every derived room, and enqueues PMS push jobs.
+ *
+ * Rules enforced here:
+ * - Past dates (stay_date < CURRENT_DATE) are rejected.
+ * - Non-positive prices rejected (CHECK at DB level too).
+ * - No guardrail clamp — override value goes through verbatim.
+ * - Every save triggers an immediate PMS push for base + all derived rooms.
+ *
+ * @param {number} hotelId
+ * @param {Array<{stayDate: string, price: number}>} overrides
+ * @param {number|null} userId — the user performing the save (for audit).
+ * @returns {Promise<{saved: number, queued: number, rejected: Array}>}
+ */
+async function saveRateOverrides(hotelId, overrides, userId = null) {
+  if (!Array.isArray(overrides) || overrides.length === 0) {
+    return { saved: 0, queued: 0, rejected: [] };
+  }
+
+  // 1. Load config + hotel metadata
+  const config = await getHotelConfig(hotelId);
+  if (!config) throw new Error(`No Sentinel configuration for hotel ${hotelId}`);
+
+  const baseRoomTypeId = String(config.base_room_type_id || "");
+  const rateIdMap = config.rate_id_map || {};
+  const roomDifferentials = config.room_differentials || [];
+  if (!baseRoomTypeId) throw new Error("base_room_type_id missing on config");
+  if (!rateIdMap || Object.keys(rateIdMap).length === 0) {
+    throw new Error("rate_id_map missing — please re-sync the hotel");
+  }
+
+  const hotelRes = await db.query(
+    "SELECT pms_property_id, pms_type FROM hotels WHERE hotel_id = $1",
+    [hotelId],
+  );
+  const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
+  const isMews = hotelRes.rows[0]?.pms_type === "mews";
+  if (!pmsPropertyId) throw new Error(`pms_property_id missing for hotel ${hotelId}`);
+
+  // 2. Validate inputs
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const validated = [];
+  const rejected = [];
+  for (const o of overrides) {
+    const date = String(o.stayDate || "");
+    const price = parseFloat(o.price);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      rejected.push({ date, price, reason: "invalid_date_format" });
+      continue;
+    }
+    if (date < todayIso) {
+      rejected.push({ date, price, reason: "past_date" });
+      continue;
+    }
+    if (isNaN(price) || price <= 0) {
+      rejected.push({ date, price, reason: "invalid_price" });
+      continue;
+    }
+    validated.push({ date, price });
+  }
+
+  if (validated.length === 0) {
+    return { saved: 0, queued: 0, rejected };
+  }
+
+  // 3. Upsert override rows + log history (old price diff)
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const datesArr = validated.map((v) => v.date);
+    const pricesArr = validated.map((v) => v.price);
+
+    const currentRatesRes = await client.query(
+      `SELECT stay_date::text AS stay_date, rate
+       FROM sentinel_rates_calendar
+       WHERE hotel_id = $1 AND room_type_id = $2 AND stay_date = ANY($3::date[])`,
+      [hotelId, baseRoomTypeId, datesArr],
+    );
+    const currentRateMap = {};
+    currentRatesRes.rows.forEach((r) => {
+      currentRateMap[r.stay_date.split("T")[0]] = parseFloat(r.rate);
+    });
+
+    await client.query(
+      `INSERT INTO sentinel_rate_overrides
+         (hotel_id, stay_date, base_override_price, set_by, updated_by, updated_at)
+       SELECT $1::int, t.d::date, t.p::numeric, $2::int, $2::int, NOW()
+       FROM UNNEST($3::date[], $4::numeric[]) AS t(d, p)
+       ON CONFLICT (hotel_id, stay_date) DO UPDATE
+       SET base_override_price = EXCLUDED.base_override_price,
+           updated_by = EXCLUDED.updated_by,
+           updated_at = NOW()`,
+      [hotelId, userId, datesArr, pricesArr],
+    );
+
+    // History ledger (only on actual price change)
+    for (const v of validated) {
+      const oldRate = currentRateMap[v.date] ?? null;
+      if (oldRate !== v.price) {
+        await client.query(
+          `INSERT INTO sentinel_price_history
+             (hotel_id, room_type_id, stay_date, old_price, new_price, source, changed_by, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'OVERRIDE', $6, NOW())`,
+          [hotelId, baseRoomTypeId, v.date, oldRate, v.price, userId],
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // 4. Fan out base × differentials into a PMS push payload
+  const batchPayload = [];
+  for (const v of validated) {
+    const baseRateId = rateIdMap[baseRoomTypeId];
+    if (baseRateId) {
+      const entry = { rateId: baseRateId, date: v.date, rate: v.price };
+      if (isMews) entry.categoryId = baseRoomTypeId;
+      batchPayload.push(entry);
+    }
+
+    if (Array.isArray(roomDifferentials)) {
+      for (const rule of roomDifferentials) {
+        if (!rule || rule.value === undefined) continue;
+        if (String(rule.roomTypeId) === baseRoomTypeId) continue;
+        const derivedRateId = rateIdMap[rule.roomTypeId];
+        if (!derivedRateId) continue;
+        const derivedRate = pricingEngine.calculateDifferential(
+          v.price,
+          rule.roomTypeId,
+          roomDifferentials,
+        );
+        if (derivedRate !== null && derivedRate > 0) {
+          const entry = {
+            rateId: derivedRateId,
+            date: v.date,
+            rate: derivedRate,
+          };
+          if (isMews) entry.categoryId = String(rule.roomTypeId);
+          batchPayload.push(entry);
+        }
+      }
+    }
+  }
+
+  // 5. Enqueue PMS push (chunked to 25 — Cloudbeds hard cap is 30)
+  const BATCH_SIZE = 25;
+  let queued = 0;
+  for (let i = 0; i < batchPayload.length; i += BATCH_SIZE) {
+    const chunk = batchPayload.slice(i, i + BATCH_SIZE);
+    await db.query(
+      `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
+      [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
+    );
+    queued += chunk.length;
+  }
+
+  console.log(
+    `[Overrides] Saved: hotel=${hotelId} count=${validated.length} queued=${queued} rejected=${rejected.length}`,
+  );
+
+  return { saved: validated.length, queued, rejected };
+}
+
+/**
+ * List overrides for a hotel in a date range.
+ * @returns {Promise<Array<{stayDate, basePrice, setBy, setAt, updatedBy, updatedAt}>>}
+ */
+async function getRateOverrides(hotelId, startDate = null, endDate = null) {
+  const params = [hotelId];
+  let whereExtra = "";
+  if (startDate) {
+    params.push(startDate);
+    whereExtra += ` AND stay_date >= $${params.length}`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    whereExtra += ` AND stay_date <= $${params.length}`;
+  }
+  const { rows } = await db.query(
+    `SELECT stay_date::text AS stay_date, base_override_price,
+            set_by, set_at, updated_by, updated_at
+     FROM sentinel_rate_overrides
+     WHERE hotel_id = $1${whereExtra}
+     ORDER BY stay_date ASC`,
+    params,
+  );
+  return rows.map((r) => ({
+    stayDate: r.stay_date.split("T")[0],
+    basePrice: parseFloat(r.base_override_price),
+    setBy: r.set_by,
+    setAt: r.set_at,
+    updatedBy: r.updated_by,
+    updatedAt: r.updated_at,
+  }));
+}
+
+/**
+ * Delete overrides for specific dates. Those dates become AI-managed again
+ * on the next DGX cycle. No PMS push is triggered on delete — Sentinel's
+ * next hourly run will emit whatever rate it chooses.
+ */
+async function deleteRateOverrides(hotelId, dates, userId = null) {
+  if (!Array.isArray(dates) || dates.length === 0) return { deleted: 0 };
+  const res = await db.query(
+    `DELETE FROM sentinel_rate_overrides
+     WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
+    [hotelId, dates],
+  );
+  console.log(
+    `[Overrides] Cleared: hotel=${hotelId} dates=${dates.length} user=${userId}`,
+  );
+  return { deleted: res.rowCount };
+}
+
+/**
+ * Load an override date-set for a hotel over a range of stay_dates.
+ * Used by bridge Phase 2 and the PMS-overlay paths to check
+ * "does this date have an override?" in O(1).
+ * @returns {Promise<Set<string>>} — Set of 'YYYY-MM-DD' strings.
+ */
+async function getRateOverrideDateSet(hotelId, stayDates = null) {
+  let sql = `SELECT to_char(stay_date, 'YYYY-MM-DD') AS d FROM sentinel_rate_overrides WHERE hotel_id = $1`;
+  const params = [hotelId];
+  if (Array.isArray(stayDates) && stayDates.length > 0) {
+    params.push(stayDates);
+    sql += ` AND stay_date = ANY($2::date[])`;
+  }
+  const { rows } = await db.query(sql, params);
+  return new Set(rows.map((r) => r.d));
+}
+
+/**
+ * Load a (hotel_id, date) → price map for multiple hotels. Used by the
+ * hourly re-push pass in bridge Phase 2 (one query per fleet slice, not
+ * per hotel). Dates are returned as 'YYYY-MM-DD' strings.
+ */
+async function getRateOverrideMapForHotel(hotelId) {
+  const { rows } = await db.query(
+    `SELECT to_char(stay_date, 'YYYY-MM-DD') AS d, base_override_price
+     FROM sentinel_rate_overrides
+     WHERE hotel_id = $1 AND stay_date >= CURRENT_DATE`,
+    [hotelId],
+  );
+  const map = {};
+  rows.forEach((r) => {
+    map[r.d] = parseFloat(r.base_override_price);
+  });
+  return map;
+}
+
 module.exports = {
   getHotelConfig,
   updateConfig,
@@ -1017,6 +1278,11 @@ module.exports = {
   buildRateIdMap,
   getRecentJobBatches,
   recalculateRates,
+  saveRateOverrides,
+  getRateOverrides,
+  deleteRateOverrides,
+  getRateOverrideDateSet,
+  getRateOverrideMapForHotel,
 };
 /**
  * [NEW] Get Sentinel Status (Last Run & Activity)

@@ -12,6 +12,7 @@ const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js"); // [Added f
 const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
 const db = require("../utils/db"); // <-- [NEW] Import database connection
 const pmsRegistry = require("../adapters/pmsRegistry.js"); // [MEWS] PMS adapter router
+const { isRateOverridesEnabled } = require("../utils/sentinelFlags.js"); // [OVERRIDE v1]
 
 // [MEWS] Helper: Returns the correct sentinel adapter for a hotel's PMS type.
 // Falls back to Cloudbeds adapter if pms_type is null (legacy hotels).
@@ -229,6 +230,7 @@ const RATES_VIEW_PATHS = new Set([
   "/predictions",
   "/pace-curves",
   "/min-rates",
+  "/rate-overrides",
 ]);
 
 router.use(async (req, res, next) => {
@@ -1615,6 +1617,80 @@ router.post("/overrides", async (req, res) => {
 });
 
 // [REMOVED] process-queue moved to top of file (Public Cron)
+
+// =============================================================================
+// [OVERRIDE MODEL v1] /rate-overrides/:hotelId  —  spec: claude/rate-override-implementation.md
+// Feature-flagged. Returns 503 when SENTINEL_OVERRIDES_ENABLED!='true' or when
+// the hotel is outside SENTINEL_OVERRIDES_HOTEL_ALLOWLIST (if set).
+// Access: admin unconditionally; otherwise requires can_view_rates + user_properties
+// (enforced by the RATES_VIEW_PATHS whitelist + requireRatesAccess middleware).
+// =============================================================================
+
+router.post("/rate-overrides/:hotelId", async (req, res) => {
+  const hotelId = Number(req.params.hotelId);
+  if (!Number.isInteger(hotelId)) {
+    return res.status(400).json({ success: false, message: "hotelId must be an integer" });
+  }
+  if (!isRateOverridesEnabled(hotelId)) {
+    return res.status(503).json({ success: false, message: "Overrides not enabled for this hotel" });
+  }
+  const { overrides } = req.body || {};
+  if (!Array.isArray(overrides) || overrides.length === 0) {
+    return res.status(400).json({ success: false, message: "overrides array required" });
+  }
+  try {
+    const userId = req.user?.internalId || null;
+    const result = await sentinelService.saveRateOverrides(hotelId, overrides, userId);
+    // Partial-success shape: 200 if any saved, 400 if all rejected.
+    if (result.saved === 0 && result.rejected.length > 0) {
+      return res.status(400).json({ success: false, ...result });
+    }
+    return res.status(202).json({ success: true, ...result });
+  } catch (err) {
+    console.error("[rate-overrides POST] Error:", err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get("/rate-overrides/:hotelId", async (req, res) => {
+  const hotelId = Number(req.params.hotelId);
+  if (!Number.isInteger(hotelId)) {
+    return res.status(400).json({ success: false, message: "hotelId must be an integer" });
+  }
+  if (!isRateOverridesEnabled(hotelId)) {
+    return res.status(503).json({ success: false, message: "Overrides not enabled for this hotel" });
+  }
+  try {
+    const { start, end } = req.query;
+    const overrides = await sentinelService.getRateOverrides(hotelId, start || null, end || null);
+    return res.status(200).json({ success: true, overrides });
+  } catch (err) {
+    console.error("[rate-overrides GET] Error:", err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete("/rate-overrides/:hotelId", async (req, res) => {
+  const hotelId = Number(req.params.hotelId);
+  if (!Number.isInteger(hotelId)) {
+    return res.status(400).json({ success: false, message: "hotelId must be an integer" });
+  }
+  if (!isRateOverridesEnabled(hotelId)) {
+    return res.status(503).json({ success: false, message: "Overrides not enabled for this hotel" });
+  }
+  const { dates } = req.body || {};
+  if (!Array.isArray(dates) || dates.length === 0) {
+    return res.status(400).json({ success: false, message: "dates array required" });
+  }
+  try {
+    const userId = req.user?.internalId || null;
+    const result = await sentinelService.deleteRateOverrides(hotelId, dates, userId);
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error("[rate-overrides DELETE] Error:", err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * [NEW & SIMPLIFIED] GET /api/sentinel/rates/:hotelId/:roomTypeId

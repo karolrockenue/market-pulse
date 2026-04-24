@@ -2,6 +2,8 @@ import {
   SentinelConfig,
   RateCalendarDay,
   RateOverride,
+  RateOverrideRow,
+  SaveRateOverrideInput,
   AssetConfig,
   HotelHealth,
   FleetHealthSummary,
@@ -174,6 +176,62 @@ export const submitOverrides = async (
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.message || "Failed to submit overrides");
+  return json;
+};
+
+// --- [OVERRIDE MODEL v1] PMS Override endpoints ----------------------------
+// Backend returns 503 when feature flag is off (SENTINEL_OVERRIDES_ENABLED!='true'
+// or hotel not in SENTINEL_OVERRIDES_HOTEL_ALLOWLIST). Callers should handle
+// that gracefully and fall back to the legacy flow.
+
+export const getRateOverrides = async (
+  hotelId: string | number,
+  start?: string,
+  end?: string
+): Promise<RateOverrideRow[]> => {
+  const qs = new URLSearchParams();
+  if (start) qs.set("start", start);
+  if (end) qs.set("end", end);
+  const res = await fetch(
+    `/api/sentinel/rate-overrides/${hotelId}${qs.toString() ? `?${qs}` : ""}`
+  );
+  if (res.status === 503) return []; // flag disabled — treat as no overrides
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Failed to fetch rate overrides");
+  return json.overrides || [];
+};
+
+export const saveRateOverrides = async (
+  hotelId: string | number,
+  overrides: SaveRateOverrideInput[]
+): Promise<{ saved: number; queued: number; rejected: any[] }> => {
+  const res = await fetch(`/api/sentinel/rate-overrides/${hotelId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ overrides }),
+  });
+  const json = await res.json();
+  if (res.status === 503) {
+    throw new Error("Overrides are not enabled for this hotel");
+  }
+  if (!res.ok) throw new Error(json.message || "Failed to save overrides");
+  return json;
+};
+
+export const deleteRateOverrides = async (
+  hotelId: string | number,
+  dates: string[]
+): Promise<{ deleted: number }> => {
+  const res = await fetch(`/api/sentinel/rate-overrides/${hotelId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dates }),
+  });
+  const json = await res.json();
+  if (res.status === 503) {
+    throw new Error("Overrides are not enabled for this hotel");
+  }
+  if (!res.ok) throw new Error(json.message || "Failed to delete overrides");
   return json;
 };
 

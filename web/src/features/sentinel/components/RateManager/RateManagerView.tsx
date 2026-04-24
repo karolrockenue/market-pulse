@@ -232,6 +232,8 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     bulkApplyAi, // [NEW]
     submitChanges,
     saveMinRate,
+    rateOverrides, // [OVERRIDE v1]
+    removeRateOverride, // [OVERRIDE v1]
   } = useRateGrid();
 
   // --- INIT ---
@@ -1085,6 +1087,10 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           } else if (pendingOverrides[day.date]) {
                             text = "PENDING";
                             color = R.gold;
+                          } else if (rateOverrides[day.date] !== undefined) {
+                            // [OVERRIDE v1] user-pinned rate wins over AI
+                            text = "OVERRIDE";
+                            color = R.gold;
                           } else if (
                             currentSource === "SENTINEL" ||
                             currentSource === "AI_AUTO" ||
@@ -1102,6 +1108,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                             text = "—";
                             color = R.textDim;
                           }
+                          const isOverride = text === "OVERRIDE";
                           return (
                             <td
                               key={day.date}
@@ -1116,11 +1123,19 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               }}
                             >
                               <span
+                                onClick={
+                                  isOverride
+                                    ? () => removeRateOverride(selectedHotelId, day.date)
+                                    : undefined
+                                }
+                                title={isOverride ? "Click to clear override" : undefined}
                                 style={{
                                   color,
                                   fontSize: "9px",
                                   fontWeight: 600,
                                   fontVariantNumeric: "tabular-nums",
+                                  cursor: isOverride ? "pointer" : "default",
+                                  textDecoration: isOverride ? "underline dotted" : "none",
                                 }}
                               >
                                 {text}

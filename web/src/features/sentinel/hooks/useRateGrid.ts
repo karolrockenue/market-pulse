@@ -9,6 +9,9 @@ import {
   getDailyPickup,
   getAiPredictions, // [NEW]
   saveDailyMinRates, // [NEW] Daily min rate overrides
+  getRateOverrides, // [OVERRIDE v1]
+  saveRateOverrides, // [OVERRIDE v1]
+  deleteRateOverrides, // [OVERRIDE v1]
 } from "../api/sentinel.api";
 import { RateCalendarDay, AssetConfig, RateOverride } from "../api/types";
 
@@ -174,6 +177,10 @@ export const useRateGrid = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // [OVERRIDE v1] Active PMS overrides keyed by stayDate. When present, these
+  // dates are user-pinned and Sentinel won't touch them on the next cycle.
+  // Empty when feature flag is off (backend returns [] on 503).
+  const [rateOverrides, setRateOverrides] = useState<Record<string, number>>({});
 
   // 1. Load Data (Backend Engine + Metrics)
   const loadRates = useCallback(
@@ -193,8 +200,8 @@ export const useRateGrid = () => {
         const startStr = utcToday.toISOString().split("T")[0];
         const endStr = endOfWindow.toISOString().split("T")[0];
 
-        // [MODIFIED] Fetch Preview, Metrics, Assets, Pickup AND AI Predictions
-        const [previewData, metricsRes, assets, pickupRes, aiRes] =
+        // [MODIFIED] Fetch Preview, Metrics, Assets, Pickup, AI Predictions AND PMS Overrides
+        const [previewData, metricsRes, assets, pickupRes, aiRes, overridesRes] =
           await Promise.all([
             getPreviewRates(hotelId, baseRoomTypeId, startStr, 365),
             fetch("/api/metrics/reports/run", {
@@ -212,7 +219,17 @@ export const useRateGrid = () => {
             getAssets(),
             getDailyPickup(hotelId, startStr, endStr, pickupWindow),
             getAiPredictions(hotelId),
+            // [OVERRIDE v1] Fetch active PMS overrides for this hotel+window.
+            // Returns [] if feature flag is off (503 handled in API client).
+            getRateOverrides(hotelId, startStr, endStr).catch(() => []),
           ]);
+
+        // [OVERRIDE v1] Build { date -> basePrice } map for quick lookups
+        const overridesMap: Record<string, number> = {};
+        (overridesRes || []).forEach((ov) => {
+          overridesMap[ov.stayDate] = ov.basePrice;
+        });
+        setRateOverrides(overridesMap);
 
         // A. Process Assets (for Context/UI flags)
         const asset = assets.find(
@@ -421,12 +438,20 @@ export const useRateGrid = () => {
 
     setIsSubmitting(true);
     const snapshot = { ...pendingOverrides };
-    // [MODIFIED] Attach source based on origin
-    const payload = Object.keys(snapshot).map((date) => ({
-      date,
-      rate: snapshot[date],
-      source: aiApprovedPending.has(date) ? "AI_SUGGESTED" : "MANUAL",
-    }));
+    const approvedSet = new Set(aiApprovedPending);
+
+    // [OVERRIDE v1] Split pending saves into two buckets:
+    //   - AI-accepted rates → legacy /overrides (push-only, no pin)
+    //   - User-typed rates  → new /rate-overrides (persistent pin)
+    const aiAcceptedPayload: { date: string; rate: number; source: string }[] = [];
+    const userOverridePayload: { stayDate: string; price: number }[] = [];
+    Object.keys(snapshot).forEach((date) => {
+      if (approvedSet.has(date)) {
+        aiAcceptedPayload.push({ date, rate: snapshot[date], source: "AI_SUGGESTED" });
+      } else {
+        userOverridePayload.push({ stayDate: date, price: snapshot[date] });
+      }
+    });
 
     // [FIX] Immediate UI update for Source Column to persist "AI SUGGESTED" status
     setCalendarData((prev) =>
@@ -443,13 +468,24 @@ export const useRateGrid = () => {
       })
     );
 
+    // [OVERRIDE v1] Optimistically add user-typed rows to the overrides map
+    // so the grid immediately shows "Override" badges without a refetch.
+    if (userOverridePayload.length > 0) {
+      setRateOverrides((prev) => {
+        const next = { ...prev };
+        userOverridePayload.forEach((o) => { next[o.stayDate] = o.price; });
+        return next;
+      });
+    }
+
     // Clear pending + saved overrides so PMS Override / Target Sell Rate rows go blank after submit
     setPendingOverrides({});
     setSavedOverrides({});
     setAiApprovedPending(new Set()); // Cleanup
 
+    const total = aiAcceptedPayload.length + userOverridePayload.length;
     toast.message("Syncing...", {
-      description: `Queuing ${payload.length} updates...`,
+      description: `Queuing ${total} update${total === 1 ? "" : "s"}...`,
       style: {
         backgroundColor: "#0f151a",
         border: "1px solid #2a2a2a",
@@ -458,7 +494,35 @@ export const useRateGrid = () => {
     });
 
     try {
-      await submitOverrides(hotelId, pmsPropertyId, roomTypeId, payload);
+      // Send each bucket to its respective endpoint. Run in parallel.
+      const jobs: Promise<any>[] = [];
+      if (aiAcceptedPayload.length > 0) {
+        jobs.push(submitOverrides(hotelId, pmsPropertyId, roomTypeId, aiAcceptedPayload));
+      }
+      if (userOverridePayload.length > 0) {
+        jobs.push(
+          saveRateOverrides(hotelId, userOverridePayload).catch(async (err) => {
+            // Fall back to legacy endpoint if feature flag disabled server-side.
+            // Ensures the save still works during the flag-off phase.
+            if (/not enabled|503/i.test(err.message || "")) {
+              const legacy = userOverridePayload.map((o) => ({
+                date: o.stayDate,
+                rate: o.price,
+                source: "MANUAL",
+              }));
+              // [OVERRIDE v1] Roll back optimistic override map — the row didn't become a persistent override.
+              setRateOverrides((prev) => {
+                const next = { ...prev };
+                userOverridePayload.forEach((o) => { delete next[o.stayDate]; });
+                return next;
+              });
+              return submitOverrides(hotelId, pmsPropertyId, roomTypeId, legacy);
+            }
+            throw err;
+          })
+        );
+      }
+      await Promise.all(jobs);
       toast.success("Updates Queued", {
         style: {
           backgroundColor: "#0f151a",
@@ -468,6 +532,12 @@ export const useRateGrid = () => {
       });
     } catch (err: any) {
       console.error(err);
+      // Roll back optimistic override map on failure
+      setRateOverrides((prev) => {
+        const next = { ...prev };
+        userOverridePayload.forEach((o) => { delete next[o.stayDate]; });
+        return next;
+      });
       toast.error("Queue Failed", {
         description: "Please refresh.",
         style: {
@@ -479,6 +549,32 @@ export const useRateGrid = () => {
       setPendingOverrides(snapshot);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // [OVERRIDE v1] Remove a persisted PMS override. After this resolves, the
+  // date is eligible for AI management again on the next hourly cycle.
+  const removeRateOverride = async (hotelId: string, date: string) => {
+    const prior = rateOverrides[date];
+    // Optimistic: remove from state first
+    setRateOverrides((prev) => {
+      const next = { ...prev };
+      delete next[date];
+      return next;
+    });
+    try {
+      await deleteRateOverrides(hotelId, [date]);
+      toast.success(`Override cleared for ${date}`, {
+        style: { backgroundColor: "#0f151a", border: "1px solid #38C6BA", color: "#38C6BA" },
+      });
+    } catch (err: any) {
+      // Roll back on failure
+      if (prior !== undefined) {
+        setRateOverrides((prev) => ({ ...prev, [date]: prior }));
+      }
+      toast.error(`Failed to clear override: ${err.message}`, {
+        style: { backgroundColor: "#0f151a", border: "1px solid #ef4444", color: "#ef4444" },
+      });
     }
   };
 
@@ -519,5 +615,7 @@ export const useRateGrid = () => {
     bulkApplyAi, // [NEW]
     submitChanges,
     saveMinRate,
+    rateOverrides, // [OVERRIDE v1] { [date]: basePrice } — active PMS overrides
+    removeRateOverride, // [OVERRIDE v1] Clear a persisted override
   };
 };

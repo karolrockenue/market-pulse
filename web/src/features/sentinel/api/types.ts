@@ -73,10 +73,26 @@ export interface RateCalendarDay {
   pickup?: number; // [NEW] Daily pickup (Live - Yesterday)
 }
 
-// Overrides
+// Overrides (legacy — calendar-level, retires after cutover)
 export interface RateOverride {
   date: string; // YYYY-MM-DD
   rate: number;
+}
+
+// [OVERRIDE MODEL v1] PMS Override row — matches sentinel_rate_overrides table.
+// Date-level, base-only. Derived rooms always follow via differentials.
+export interface RateOverrideRow {
+  stayDate: string; // YYYY-MM-DD
+  basePrice: number;
+  setBy: number | null;
+  setAt: string;
+  updatedBy: number | null;
+  updatedAt: string;
+}
+
+export interface SaveRateOverrideInput {
+  stayDate: string; // YYYY-MM-DD (must be >= today)
+  price: number; // must be > 0
 }
 
 // Property Hub Assets
