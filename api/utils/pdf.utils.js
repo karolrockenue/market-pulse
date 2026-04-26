@@ -44,10 +44,16 @@ async function generatePdfFromHtml(templateName, data, pdfOptionsOverride = null
         headless: chromium.headless,
       });
     } else if (isRailway) {
-      // FOR RAILWAY: Use system-installed Chromium
+      // FOR RAILWAY: Use system-installed Chromium.
+      // channel: "chromium" forces the full chromium binary instead of the
+      // separate chromium-headless-shell binary. PW 1.56 defaults
+      // headless: true to the headless_shell binary, which the nixpacks
+      // build doesn't install — without channel pinning, launch crashes
+      // with "Executable doesn't exist at .../chromium_headless_shell-*".
       console.log("[pdf.utils.js] Launching Railway browser...");
       browser = await playwright.chromium.launch({
         headless: true,
+        channel: "chromium",
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
     } else {
