@@ -2,7 +2,7 @@
 cmds = [
   "npm install",
   "cd web && npm install --legacy-peer-deps && npm run build && cd ..",
-  "npx playwright install --with-deps chromium"
+  "npx playwright install --with-deps chromium chromium-headless-shell"
 ]
 
 [start]
