@@ -1214,12 +1214,31 @@ router.post("/config/:hotelId", async (req, res) => {
   const { hotelId } = req.params;
 
   try {
+    // [FLOOD FIX 2026-04-26] Snapshot the current monthly_min_rates BEFORE
+    // updateConfig runs so we can detect "did the value actually change".
+    // Previously the autopilot recalc trigger fired whenever the request body
+    // included monthly_min_rates at all (even if values were identical to
+    // current), which produced 4× full-year recalcs on Park Hotel today
+    // (2,500 rates each, ~10,000 wasted PMS pushes). See claude/urgendedebug.md.
+    let priorMinsJson = null;
+    if (req.body.monthly_min_rates) {
+      try {
+        const prior = await sentinelService.getHotelConfig(hotelId);
+        priorMinsJson = JSON.stringify(prior?.monthly_min_rates || {});
+      } catch (e) {
+        // Non-fatal — if we can't fetch prior, fall through to old behaviour.
+        console.warn(`[Sentinel] Prior config fetch failed for ${hotelId}: ${e.message}`);
+      }
+    }
+
     // [REFACTOR] Delegate logic to Service
     const updatedConfig = await sentinelService.updateConfig(hotelId, req.body);
 
-    // [NEW] If autopilot is on and monthly_min_rates changed, trigger recalculate
-    // so updated floors are immediately enforced and pushed to PMS.
-    if (updatedConfig.is_autopilot_enabled && req.body.monthly_min_rates) {
+    // [NEW] If autopilot is on and monthly_min_rates ACTUALLY changed, trigger
+    // recalculate so updated floors are immediately enforced and pushed to PMS.
+    const newMinsJson = JSON.stringify(req.body.monthly_min_rates || {});
+    const minsChanged = priorMinsJson !== null && priorMinsJson !== newMinsJson;
+    if (updatedConfig.is_autopilot_enabled && minsChanged) {
       const today = new Date();
       const startDate = today.toISOString().split("T")[0];
       const endDate = new Date(today.getTime() + 365 * 86400000)
@@ -1240,6 +1259,10 @@ router.post("/config/:hotelId", async (req, res) => {
           );
         }
       });
+    } else if (updatedConfig.is_autopilot_enabled && req.body.monthly_min_rates) {
+      console.log(
+        `[Sentinel] Config save for ${hotelId}: monthly_min_rates unchanged — skipping recalc.`,
+      );
     }
 
     res.status(200).json({

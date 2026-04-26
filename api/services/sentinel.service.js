@@ -382,10 +382,12 @@ async function previewCalendar({
   startDate,
   endDate,
 }) {
-  // 1. Fetch Config, Asset Settings, AND Daily Max/Min Rates (SQL)
+  // 1. Fetch Config, Asset Settings, Daily Max/Min Rates, AND Override Map (SQL)
   // [FIX 2026-04-10] Use ISO-keyed daily-max map so applyGuardrails can find
   // it. The previous month-day map was silently invisible to the engine.
-  const [config, assetRes, dailyMaxRates, dailyMinRates] = await Promise.all([
+  // [OVERRIDE v1] Override map is overlaid in the day-build loop below so the
+  // UI grid + recalc see the user-pinned price as the canonical "final" rate.
+  const [config, assetRes, dailyMaxRates, dailyMinRates, overrideMap] = await Promise.all([
     getHotelConfig(hotelId),
     db.query(
       `SELECT * FROM rockenue_managed_assets WHERE market_pulse_hotel_id = $1`,
@@ -393,6 +395,7 @@ async function previewCalendar({
     ),
     getDailyMaxRatesIsoMap(hotelId, startDate, endDate),
     getDailyMinRates(hotelId, startDate, endDate),
+    getRateOverrideMapForHotel(hotelId),
   ]);
 
   if (!config) throw new Error("Sentinel config not found");
@@ -554,11 +557,19 @@ async function previewCalendar({
     );
 
     // Step C: Determine Final Display Data
+    // [OVERRIDE v1] PMS Override wins over everything — engine, MANUAL, freeze.
+    // The bridge's hourly re-push enforces this at PMS level; the UI grid and
+    // recalculateRates both consume this finalRate, so they must see the same
+    // truth as what's actually being shipped to the channel manager.
+    const overridePrice = overrideMap[dateStr];
+    const hasOverride = overridePrice !== undefined && overridePrice > 0;
     // If we have a Manual Override in DB, that takes precedence for the "Active" column
     const isManual = dbEntry && dbEntry.source.toUpperCase() === "MANUAL";
-    const finalRate = isManual
-      ? parseFloat(dbEntry.rate)
-      : guardrailResult.finalRate;
+    const finalRate = hasOverride
+      ? overridePrice
+      : isManual
+        ? parseFloat(dbEntry.rate)
+        : guardrailResult.finalRate;
 
     days.push({
       date: dateStr,
@@ -570,11 +581,14 @@ async function previewCalendar({
       guardrailMin: guardrailResult.minApplied,
       monthlyMinDefault: guardrailResult.monthlyMinDefault || guardrailResult.minApplied,
       isDailyMinOverride: guardrailResult.isDailyMinOverride || false,
-      source: isManual
-        ? "MANUAL"
-        : guardrailResult.isFrozen
-          ? "Frozen"
-          : dbEntry?.source || "SENTINEL",
+      isOverride: hasOverride,
+      source: hasOverride
+        ? "OVERRIDE"
+        : isManual
+          ? "MANUAL"
+          : guardrailResult.isFrozen
+            ? "Frozen"
+            : dbEntry?.source || "SENTINEL",
     });
 
     // [CRITICAL FIX] Use UTC setters to avoid DST "Spring Forward" loops (23h days)
@@ -849,11 +863,36 @@ async function getPaceCurves(hotelId) {
   const { rows } = await db.query(query, [hotelId]);
   return rows;
 }
+// [FLOOD FIX 2026-04-26] Per-hotel debounce for recalculateRates. Prevents
+// double-clicks of "Re-Push Rates" or rapid config saves from each firing a
+// fresh full-year push. Park Hotel saw 4 distinct recalcs in ~3 hours today
+// (12:27, 13:01, 14:01, 15:01) producing ~5,500 rates of redundant traffic.
+// Window of 60s is short enough that legitimate user-initiated retries (e.g.
+// after a transient PMS error) still go through, but tight enough to absorb
+// thrash. In-memory map — survives only as long as the Node process; a
+// Railway restart resets it (acceptable: the restart already broke any
+// in-flight push, so rerunning recalc post-restart is correct behaviour).
+const _recalcDebounceMap = new Map();
+const RECALC_DEBOUNCE_MS = 60_000;
+
 /**
  * Recalculate rates for a hotel and push to job queue.
  * Used by POST /recalculate endpoint and autopilot triggers.
  */
 async function recalculateRates(hotelId, startDate, endDate) {
+  // [FLOOD FIX 2026-04-26] Debounce rapid repeats per hotel.
+  const debounceKey = String(hotelId);
+  const lastRun = _recalcDebounceMap.get(debounceKey);
+  const now = Date.now();
+  if (lastRun && now - lastRun < RECALC_DEBOUNCE_MS) {
+    const skippedAgoSec = Math.round((now - lastRun) / 1000);
+    console.log(
+      `[Sentinel] recalculateRates DEBOUNCED for hotel ${hotelId} (last run ${skippedAgoSec}s ago, window ${RECALC_DEBOUNCE_MS / 1000}s). Skipping.`,
+    );
+    return { totalQueued: 0, debounced: true, lastRunSecondsAgo: skippedAgoSec };
+  }
+  _recalcDebounceMap.set(debounceKey, now);
+
   const configRes = await db.query(
     "SELECT * FROM sentinel_configurations WHERE hotel_id = $1",
     [hotelId],
@@ -903,6 +942,14 @@ async function recalculateRates(hotelId, startDate, endDate) {
     endDate,
   });
 
+  // [OVERRIDE v1] Load active override dates so recalculateRates does not
+  // overwrite user-pinned rates. The bridge's hourly re-push handles those
+  // dates separately (sentinel.bridge.service.js:882-940). Without this skip,
+  // any caller of recalculateRates (manual "Re-Push Rates" button or autopilot
+  // trigger after a min-rate save) would push engine prices over overrides
+  // AND tag the calendar source as 'SENTINEL', wiping the override badge truth.
+  const overrideDateSet = await getRateOverrideDateSet(hotelId);
+
   // Build overrides for all room types
   const allOverrides = [];
   for (const room of pmsRoomTypes) {
@@ -918,6 +965,8 @@ async function recalculateRates(hotelId, startDate, endDate) {
       // would re-push the snapshotted live PMS rate, which races with manual
       // PMS edits that land between snapshot and queue execution.
       if (day.isFrozen) return;
+      // [OVERRIDE v1] Skip override dates — the bridge re-push owns them.
+      if (overrideDateSet.has(day.date)) return;
       let finalRate = parseFloat(day.finalRate);
 
       if (!isBase && diffRule) {
@@ -973,10 +1022,17 @@ async function recalculateRates(hotelId, startDate, endDate) {
   // beyond its 10s checkout timeout and failed on big recalcs (hotel 318341
   // Westbourne, 365-day range, 2026-04-20).
   if (calHotelIds.length > 0) {
+    // [OVERRIDE v1] Belt-and-braces NOT EXISTS guard — even if the in-memory
+    // skip above misses (race window between override save and recalc), the
+    // DB-level guard prevents overwriting an override cell with SENTINEL.
     await db.query(
       `INSERT INTO sentinel_rates_calendar (hotel_id, stay_date, room_type_id, rate, source, last_updated_at)
        SELECT t.hid, t.sdate, t.rid, t.rate, 'SENTINEL', NOW()
        FROM UNNEST($1::int[], $2::date[], $3::text[], $4::numeric[]) AS t(hid, sdate, rid, rate)
+       WHERE NOT EXISTS (
+         SELECT 1 FROM sentinel_rate_overrides o
+         WHERE o.hotel_id = t.hid AND o.stay_date = t.sdate
+       )
        ON CONFLICT (hotel_id, stay_date, room_type_id) DO UPDATE
        SET rate = EXCLUDED.rate, source = 'SENTINEL', last_updated_at = NOW()`,
       [calHotelIds, calDates, calRoomTypes, calRates],
