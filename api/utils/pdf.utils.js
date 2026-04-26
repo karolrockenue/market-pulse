@@ -44,12 +44,11 @@ async function generatePdfFromHtml(templateName, data, pdfOptionsOverride = null
         headless: chromium.headless,
       });
     } else if (isRailway) {
-      // FOR RAILWAY: Use system-installed Chromium.
-      // channel: "chromium" forces the full chromium binary instead of the
-      // separate chromium-headless-shell binary. PW 1.56 defaults
-      // headless: true to the headless_shell binary, which the nixpacks
-      // build doesn't install — without channel pinning, launch crashes
-      // with "Executable doesn't exist at .../chromium_headless_shell-*".
+      // FOR RAILWAY: Use Playwright-installed Chromium. The binary lives at
+      // /app/.cache/ms-playwright (set via PLAYWRIGHT_BROWSERS_PATH in
+      // nixpacks.toml at both install and runtime). channel: "chromium"
+      // forces the full chromium binary so we don't need to install the
+      // separate chromium-headless-shell package.
       console.log("[pdf.utils.js] Launching Railway browser...");
       browser = await playwright.chromium.launch({
         headless: true,

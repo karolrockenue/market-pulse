@@ -1,8 +1,16 @@
+[variables]
+# Fixed path so the chromium binary installed at build time is found at
+# runtime. Without this, install lands in the build user's $HOME (e.g.
+# /builduser/.cache/...) but the runtime container looks at
+# /root/.cache/ms-playwright/ — different paths, "Executable doesn't exist"
+# crash on first PDF call.
+PLAYWRIGHT_BROWSERS_PATH = "/app/.cache/ms-playwright"
+
 [phases.build]
 cmds = [
   "npm install",
   "cd web && npm install --legacy-peer-deps && npm run build && cd ..",
-  "npx playwright install --with-deps chromium chromium-headless-shell"
+  "PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright npx playwright install --with-deps chromium"
 ]
 
 [start]
