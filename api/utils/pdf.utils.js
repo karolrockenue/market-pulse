@@ -78,16 +78,19 @@ async function generatePdfFromHtml(templateName, data, pdfOptionsOverride = null
     // --- [FIX 2] Reliable Wait Strategy ---
     // We wait for the 'script-ready' class, which the template
     // will add to the body *after* it defines window.renderReport.
-    await page.waitForSelector('body.script-ready', { timeout: 10000 });
+    await page.waitForSelector('body.script-ready', { timeout: 15000 });
     console.log("[pdf.utils.js] 'body.script-ready' detected. Injecting data...");
-    
+
     // Now it is safe to call the function
     await page.evaluate((data) => {
       window.renderReport(data);
     }, data);
 
-    // Wait for our script to signal it's done *rendering*
-    await page.waitForSelector("body.ready", { timeout: 10000 });
+    // Wait for our script to signal it's done *rendering*. 30s ceiling so
+    // a cold-start fonts/network stall on Railway has room to recover —
+    // the template itself races fonts.ready against a 1.5s timeout, so
+    // anything north of that is a real bug worth investigating in logs.
+    await page.waitForSelector("body.ready", { timeout: 30000 });
     console.log("[pdf.utils.js] 'body.ready' detected. Generating PDF...");
 
     // Generate the PDF
@@ -111,7 +114,12 @@ async function generatePdfFromHtml(templateName, data, pdfOptionsOverride = null
     return pdfBuffer;
     
   } catch (error) {
-    console.error("Error generating PDF:", error);
+    console.error("[pdf.utils.js] Error generating PDF:", {
+      template: templateName,
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
+    });
     throw new Error("Could not generate PDF.");
   } finally {
     if (browser) {

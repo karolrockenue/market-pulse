@@ -7,33 +7,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* CSS paged-media approach: the dark bar and gradient strip live in the
-       body as position:fixed elements. In print media Chromium repeats these
-       on every page. @page provides the margin that the body content sits
-       inside so the fixed bars never overlap body text. Page number comes
-       from @page @bottom-right using counter(page). */
-    @page {
-      size: A4 portrait;
-      margin: 22mm 0 18mm 0; /* top = dark bar (18mm) + 4mm gap; bottom = strip (2mm) + page number + gap */
-      @bottom-right {
-        content: "Page " counter(page) " of " counter(pages);
-        padding: 0 12mm 10mm 0;
-        color: #6B7280;
-        font-size: 8px;
-        font-family: 'Archivo', Helvetica, Arial, sans-serif;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      @bottom-left {
-        content: string(propname);
-        padding: 0 0 10mm 12mm;
-        color: #6B7280;
-        font-size: 8px;
-        font-family: 'Archivo', Helvetica, Arial, sans-serif;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-    }
+    /* All page furniture (dark bar, gradient strip, page number, property
+       name) is rendered by Playwright's header/footer templates — NOT in
+       this body. Margins are owned exclusively by Playwright's `margin`
+       option so there's nothing here that can conflict. */
+    @page { size: A4 portrait; }
 
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
@@ -45,46 +23,39 @@
       line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      position: relative;
     }
 
-    /* Dark header SVG — position:fixed renders on every page in print.
-       Chromium's print engine honors CSS backgrounds inconsistently on
-       position:fixed elements, but it DOES render SVG <rect> fills and
-       <text> fills reliably. Keep the whole header as an SVG. */
-    .page-header {
-      position: fixed;
-      top: 0;
+    /* Page-1 header overlay. The headerTemplate SVG repeats on every page
+       but leaves a 1px white sliver on the right edge (Chromium print
+       rasterizer asymmetric sub-pixel rounding — can't be fixed via DOM
+       tricks). This body-rendered overlay sits over the headerTemplate
+       area on page 1 and paints the dark bar edge-to-edge. It's absolute-
+       positioned at top:-22mm so it lands in the reserved header region.
+       Only renders on page 1 (body content, not per-page). */
+    .page1-header-overlay {
+      position: absolute;
+      top: -26mm;
       left: 0;
       right: 0;
-      height: 18mm;
-      z-index: 100;
-      display: block;
+      height: 22mm;
+      background-color: #14181D;
+      display: flex;
+      align-items: center;
+      padding: 0 18mm;
+      color: #F3F5F7;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
-    .page-header svg { display: block; width: 100%; height: 100%; }
+    .page1-header-overlay .logo { display: flex; align-items: center; flex: 0 0 auto; }
+    .page1-header-overlay .bracket-l { color: #38C6BA; font-size: 20px; font-weight: 300; line-height: 1; }
+    .page1-header-overlay .bracket-r { color: #C8A66E; font-size: 20px; font-weight: 300; line-height: 1; }
+    .page1-header-overlay .wordmark { font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; padding: 0 8px; line-height: 1; }
+    .page1-header-overlay .right-label { margin-left: auto; color: #7A8494; font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase; font-weight: 500; }
 
-    /* Gradient strip = SVG with two adjacent <rect>s (teal half + gold half) */
-    .page-strip {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 6px;
-      width: 100%;
-      z-index: 100;
-      display: block;
-    }
-    .page-strip svg { display: block; width: 100%; height: 100%; }
-
-    /* Body content — side gutters via inline padding; top/bottom handled by @page margin */
-    .content-wrap {
-      padding: 0 12mm;
-    }
-
-    /* Hidden element that feeds the property name into @page @bottom-left via string-set */
-    .propname-source {
-      string-set: propname content();
-      display: none;
-    }
+    /* Side gutters live inside body. Top padding guards against Chromium
+       letting the headerTemplate bleed into the body area — the first meta
+       row was being rendered behind the dark bar without this. */
+    .content-wrap { padding: 6mm 12mm 0 12mm; }
 
     /* Metadata block */
     .meta-row {
@@ -107,10 +78,7 @@
     }
 
     /* Table */
-    table.report {
-      width: 100%;
-      border-collapse: collapse;
-    }
+    table.report { width: 100%; border-collapse: collapse; }
     table.report thead { display: table-header-group; }
     table.report tr { break-inside: avoid; page-break-inside: avoid; }
     table.report th {
@@ -138,41 +106,18 @@
     .dow-muted { color: #6B7280; }
     .dow-weekend { color: #1A1A1A; }
 
-    .empty {
-      padding: 48px 0;
-      text-align: center;
-      color: #6B7280;
-      font-size: 12px;
-    }
+    .empty { padding: 48px 0; text-align: center; color: #6B7280; font-size: 12px; }
   </style>
 </head>
 <body>
-  <!-- Fixed page furniture — renders on every page via CSS paged-media.
-       SVG elements render reliably in Chromium print mode where CSS
-       background-color and linear-gradient on position:fixed elements are
-       intermittently dropped. -->
-  <div class="page-header">
-    <svg preserveAspectRatio="none" viewBox="0 0 794 68" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="794" height="68" fill="#14181D"/>
-      <g font-family="Helvetica, Arial, sans-serif">
-        <text x="45" y="42" font-size="26" font-weight="300" fill="#38C6BA">(</text>
-        <text x="65" y="40" font-size="13" font-weight="700" fill="#F3F5F7" letter-spacing="1.8">MARKET PULSE</text>
-        <text x="215" y="42" font-size="26" font-weight="300" fill="#C8A66E">)</text>
-        <text x="749" y="40" font-size="10" font-weight="500" fill="#7A8494" letter-spacing="0.8" text-anchor="end">PERFORMANCE METRICS</text>
-      </g>
-    </svg>
+  <div class="page1-header-overlay">
+    <div class="logo">
+      <span class="bracket-l">(</span>
+      <span class="wordmark">MARKET PULSE</span>
+      <span class="bracket-r">)</span>
+    </div>
+    <div class="right-label">PERFORMANCE METRICS</div>
   </div>
-  <div class="page-strip">
-    <svg preserveAspectRatio="none" viewBox="0 0 794 6" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="397" height="6" fill="#38C6BA"/>
-      <rect x="397" y="0" width="397" height="6" fill="#C8A66E"/>
-    </svg>
-  </div>
-
-  <!-- Hidden string source for @page @bottom-left (property name) -->
-  <span class="propname-source" id="propname-source"></span>
-
-  <!-- Body flow content — top/bottom margins are handled by @page -->
   <div class="content-wrap">
     <div id="meta"></div>
     <div class="section-label">Performance Data</div>
@@ -247,15 +192,9 @@
         const symbol = data.currencySymbol || "£";
         const displayTotals = !!data.displayTotals;
         const showDow = granularity === "daily";
-        const propertyName = data.propertyName || "—";
 
-        // Feed property name into @page @bottom-left via CSS string-set
-        const propSrc = document.getElementById("propname-source");
-        if (propSrc) propSrc.textContent = propertyName;
-
-        // Meta
         const meta = [
-          { k: "Property", v: propertyName },
+          { k: "Property", v: data.propertyName || "—" },
           { k: "Period", v: formatDateRange(data.startDate, data.endDate) },
           { k: "Granularity", v: (granularity.charAt(0).toUpperCase() + granularity.slice(1)) },
           { k: "Generated", v: data.generatedAt || "" }
@@ -264,7 +203,6 @@
           .map((m) => "<div class=\"meta-row\"><div class=\"k\">" + esc(m.k) + "</div><div class=\"v\">" + esc(m.v) + "</div></div>")
           .join("");
 
-        // Table
         let html = "<table class=\"report\"><thead><tr>";
         html += "<th class=\"l\">Date</th>";
         if (showDow) html += "<th>DOW</th>";
@@ -304,8 +242,18 @@
         }
         document.getElementById("table-wrap").innerHTML = html;
 
+        // Race fonts.ready against a hard 1500ms cap. On Railway, the
+        // outbound fetch to fonts.googleapis.com can stall and never
+        // resolve, hanging renderReport so pdf.utils.js times out waiting
+        // for body.ready and 500s. System fallbacks (Helvetica Neue, Arial)
+        // are acceptable — Archivo is a nice-to-have, not load-bearing.
         if (document.fonts && document.fonts.ready) {
-          try { await document.fonts.ready; } catch (_err) { /* ignore */ }
+          try {
+            await Promise.race([
+              document.fonts.ready,
+              new Promise((resolve) => setTimeout(resolve, 1500)),
+            ]);
+          } catch (_err) { /* ignore */ }
         }
         document.body.classList.add("ready");
       } catch (e) {

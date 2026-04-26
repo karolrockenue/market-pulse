@@ -6,6 +6,7 @@ const cloudbedsAdapter = require("../adapters/cloudbedsAdapter"); // Cloudbeds a
 const { generatePdfFromHtml } = require("./pdf.utils"); // PDF utility
 const fetch = require("node-fetch"); // Needed for access token helper
 const { format } = require("date-fns"); // For formatting the filename date
+const ExcelJS = require("exceljs"); // XLSX generation
 
 /**
  * A helper function to get a valid Cloudbeds access token for a given property.
@@ -356,17 +357,76 @@ async function generatePerformanceMetricsReport(params) {
     .replace(/\s+/g, " ")
     .trim();
 
-  // Page furniture (dark bar, gradient strip, page number) lives in the
-  // template via CSS paged-media (position:fixed + @page @bottom-right).
-  // Playwright's `margin` controls the body-content inset and MUST match the
-  // @page margin in the template, otherwise body content overlaps the fixed
-  // bars. Set them in lockstep here.
+  // All page furniture (dark bar, gradient strip, page number, property
+  // name) lives in Playwright's native header/footer templates. These are
+  // designed for repeating per-page page elements and are less prone to
+  // the position:fixed + @page layout bugs we were hitting. Body content
+  // has no page furniture — it's just metadata + table.
+  //
+  // Design sizing:
+  //   A4 portrait at 96dpi = 794 × 1123 px (210 × 297 mm)
+  //   Header = 18mm tall (dark bar). ViewBox 0 0 794 68.
+  //   Footer = 16mm tall (page-number row + 6px gradient strip). ViewBox 0 0 794 60.
+  //   Playwright margins match template heights exactly (no gaps, no stacking).
+  //
+  // Aggressive CSS resets on the wrapper divs override Chromium's default
+  // header/footer padding. SVG content with preserveAspectRatio="none"
+  // stretches to exactly fill the reserved margin area regardless of
+  // Chromium's internal scale factor.
+
+  const safePropName = propertyNameSanitized.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const RESET = "margin:0 !important; padding:0 !important; box-sizing:border-box;";
+  const BLEED_HEADER = "margin:-8mm -25mm 0 -25mm !important; padding:0 !important; box-sizing:border-box;";
+  const BLEED_FOOTER = "margin:0 -25mm -6mm -25mm !important; padding:0 !important; box-sizing:border-box;";
+
+  // Dark bar + logo painted inside one SVG (rect + <text> elements),
+  // rendered via headerTemplate so it repeats on every page. A thin 1px
+  // white sliver remains on the right edge — Chromium's headerTemplate
+  // container has an internal clip that no bleed/img trick could cross.
+  // Cosmetic only; accepted in favour of multi-page coverage.
+  const headerHtml = `
+    <div style="${BLEED_HEADER} width:calc(100% + 50mm); display:block;">
+      <svg width="100%" height="22mm" preserveAspectRatio="none" viewBox="0 0 794 68" xmlns="http://www.w3.org/2000/svg" style="display:block; ${RESET}">
+        <rect x="0" y="0" width="794" height="68" fill="#14181D"/>
+        <g font-family="Helvetica, Arial, sans-serif">
+          <text x="113" y="43" font-size="20" font-weight="300" fill="#38C6BA">(</text>
+          <text x="130" y="42" font-size="10.5" font-weight="700" fill="#F3F5F7" letter-spacing="1.4">MARKET PULSE</text>
+          <text x="230" y="43" font-size="20" font-weight="300" fill="#C8A66E">)</text>
+          <text x="681" y="42" font-size="9" font-weight="500" fill="#7A8494" letter-spacing="0.8" text-anchor="end">PERFORMANCE METRICS</text>
+        </g>
+      </svg>
+    </div>
+  `;
+
+  // Footer: "prop name + Page X of Y" HTML row, then a SVG gradient strip
+  // (two rects — teal left, gold right). Wrapper bleeds 25mm sides and 6mm
+  // below so the strip hugs the page bottom.
+  const footerHtml = `
+    <div style="${BLEED_FOOTER} width:calc(100% + 50mm); display:block; font-family:Helvetica, Arial, sans-serif;">
+      <div style="margin:0 !important; padding:4mm 37mm 0 37mm !important; box-sizing:border-box; display:flex; justify-content:space-between; align-items:baseline; color:#6B7280; font-size:8px; text-transform:uppercase; letter-spacing:0.08em;">
+        <span>${safePropName}</span>
+        <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+      </div>
+      <svg width="100%" preserveAspectRatio="none" viewBox="0 0 100 10" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:3mm 0 0 0 !important; padding:0 !important; height:6px; width:100%;">
+        <rect x="0" y="0" width="50" height="10" fill="#38C6BA"/>
+        <rect x="50" y="0" width="50" height="10" fill="#C8A66E"/>
+      </svg>
+    </div>
+  `;
+
   const pdfOptions = {
     format: "A4",
     scale: 1.0,
     printBackground: true,
-    displayHeaderFooter: false,
-    margin: { top: "22mm", bottom: "18mm", left: "0mm", right: "0mm" },
+    displayHeaderFooter: true,
+    headerTemplate: headerHtml,
+    footerTemplate: footerHtml,
+    margin: {
+      top: "26mm",     // 22mm dark bar + 4mm breathing gap before body content
+      bottom: "16mm",  // reserves space for footerTemplate
+      left: "0mm",
+      right: "0mm",
+    },
   };
 
   const pdfBuffer = await generatePdfFromHtml(
@@ -379,8 +439,148 @@ async function generatePerformanceMetricsReport(params) {
   return { pdfBuffer, fileName };
 }
 
+/**
+ * Generates the Performance Metrics XLSX for a given hotel/date range.
+ * Ships a clean, workable spreadsheet: column headers in row 1, data rows,
+ * totals/avg row at the bottom. No metadata / logo headers. Native Excel
+ * types (dates, percentages, currency) so user opens and is done.
+ *
+ * @param {object} params - same shape as generatePerformanceMetricsReport
+ * @returns {Promise<{ xlsxBuffer: Buffer, fileName: string }>}
+ */
+async function generatePerformanceMetricsXlsx(params) {
+  const {
+    startDate,
+    endDate,
+    granularity,
+    selectedMetrics,
+    displayTotals,
+    currencySymbol,
+    propertyName,
+    rows,
+  } = params;
+
+  const METRIC_LABELS = {
+    "occupancy": "Occupancy",
+    "adr": "ADR",
+    "revpar": "RevPAR",
+    "total-revenue": "Total Revenue",
+    "rooms-sold": "Rooms Sold",
+    "rooms-unsold": "Rooms Unsold",
+    "market-occupancy": "Market Occ",
+    "market-adr": "Market ADR",
+    "market-revpar": "Market RevPAR",
+    "market-total-revenue": "Market Total Revenue",
+  };
+  const VOLUME_METRICS = new Set([
+    "total-revenue",
+    "rooms-sold",
+    "rooms-unsold",
+    "market-total-revenue",
+  ]);
+
+  const selectedMetricsArr = Array.isArray(selectedMetrics) ? selectedMetrics : [];
+  const showDow = granularity === "daily";
+  const currency = currencySymbol || "£";
+  const currencyFmt = `"${currency}"#,##0.00`;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Market Pulse";
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet("Performance");
+
+  const columns = [];
+  if (granularity === "daily") {
+    columns.push({ header: "Date", key: "date", width: 14, style: { numFmt: "dd/mm/yyyy" } });
+  } else if (granularity === "monthly") {
+    columns.push({ header: "Month", key: "date", width: 16, style: { numFmt: "mmm yyyy" } });
+  } else {
+    columns.push({ header: "Period", key: "date", width: 16 });
+  }
+  if (showDow) columns.push({ header: "DOW", key: "dow", width: 8 });
+
+  for (const m of selectedMetricsArr) {
+    const col = { header: METRIC_LABELS[m] || m, key: m, width: 18 };
+    if (m.indexOf("occupancy") !== -1) {
+      col.style = { numFmt: "0.0%" };
+    } else if (
+      m.indexOf("adr") !== -1 ||
+      m.indexOf("revenue") !== -1 ||
+      m.indexOf("revpar") !== -1
+    ) {
+      col.style = { numFmt: currencyFmt };
+    } else {
+      col.style = { numFmt: "#,##0" };
+    }
+    columns.push(col);
+  }
+  sheet.columns = columns;
+
+  // Header row style
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FF1A1A1A" } };
+  headerRow.alignment = { horizontal: "center", vertical: "middle" };
+  headerRow.height = 18;
+
+  // Parse period -> Date object (for daily / monthly)
+  const parsePeriod = (period) => {
+    if (!period) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(period));
+    if (!m) return String(period);
+    return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+  };
+
+  const dowLabel = (dateObj) => {
+    if (!(dateObj instanceof Date)) return "";
+    return dateObj.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
+  };
+
+  for (const r of rows || []) {
+    const rowData = {};
+    rowData.date = parsePeriod(r.period);
+    if (showDow) rowData.dow = dowLabel(rowData.date);
+    for (const m of selectedMetricsArr) {
+      rowData[m] = Number(r[m]) || 0;
+    }
+    sheet.addRow(rowData);
+  }
+
+  // Totals / Avg row
+  if (displayTotals && rows && rows.length > 0) {
+    const totalsData = { date: "Totals / Avg" };
+    if (showDow) totalsData.dow = "";
+    for (const m of selectedMetricsArr) {
+      let sum = 0;
+      for (const r of rows) sum += Number(r[m]) || 0;
+      totalsData[m] = VOLUME_METRICS.has(m) ? sum : sum / rows.length;
+    }
+    const totalsRow = sheet.addRow(totalsData);
+    totalsRow.font = { bold: true };
+    totalsRow.eachCell((cell) => {
+      cell.border = { top: { style: "thin", color: { argb: "FF999999" } } };
+    });
+    // The 'date' cell holds the label 'Totals / Avg' as text — override its
+    // numFmt so Excel doesn't try to interpret the string as a date.
+    totalsRow.getCell(1).numFmt = "@";
+  }
+
+  // Freeze the header row
+  sheet.views = [{ state: "frozen", ySplit: 1 }];
+
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  const propertyNameSanitized = (propertyName || "Property")
+    .replace(/[\/\\:*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const fileName = `Performance Metrics - ${propertyNameSanitized} - ${startDate} to ${endDate}.xlsx`;
+
+  return { xlsxBuffer: Buffer.from(buffer), fileName };
+}
+
 module.exports = {
   fetchShreejiReportData,
   generateShreejiReport,
   generatePerformanceMetricsReport,
+  generatePerformanceMetricsXlsx,
 };

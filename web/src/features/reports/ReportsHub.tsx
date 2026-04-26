@@ -341,8 +341,57 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
     }
   };
 
-  const handleLocalCsv = () => {
-    toast.info("CSV export coming soon");
+  const [isGeneratingXlsx, setIsGeneratingXlsx] = useState(false);
+
+  const handleLocalXlsx = async () => {
+    if (!data || !data.rows || data.rows.length === 0) {
+      toast.error("No data available to export. Please run the report first.");
+      return;
+    }
+    setIsGeneratingXlsx(true);
+    try {
+      const res = await fetch("/api/metrics/reports/performance-metrics/xlsx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          propertyId: hotelId,
+          startDate,
+          endDate,
+          granularity,
+          metrics: selectedMetrics,
+          includeTaxes: taxInclusive,
+          displayTotals,
+          currencySymbol,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Excel request failed (${res.status}): ${text.slice(0, 200)}`);
+      }
+
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] || `Performance Metrics - ${startDate} to ${endDate}.xlsx`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("Excel downloaded");
+    } catch (err) {
+      console.error("Excel export failed:", err);
+      toast.error("Excel export failed — see console for details");
+    } finally {
+      setIsGeneratingXlsx(false);
+    }
   };
 
   const handleExport = (format: "csv" | "xlsx") => {
@@ -370,7 +419,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
       downloadCSV(data.rows, fileName);
       toast.success("CSV Export successful");
     } else {
-      toast.info("Excel (.xlsx) export coming soon. Please use CSV for now.");
+      handleLocalXlsx();
     }
   };
 
@@ -513,22 +562,24 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
               {isGeneratingPdf ? "Generating…" : "PDF"}
             </button>
             <button
-              onClick={handleLocalCsv}
+              onClick={handleLocalXlsx}
+              disabled={isGeneratingXlsx}
               style={{
                 display: "flex", alignItems: "center", gap: 8,
                 background: R.heroBg,
                 border: `1px solid ${R.border}`,
-                color: R.textMid,
+                color: R.accent,
                 padding: "8px 14px",
                 fontSize: 13,
                 borderRadius: 4,
-                cursor: "pointer",
+                cursor: isGeneratingXlsx ? "default" : "pointer",
+                opacity: isGeneratingXlsx ? 0.55 : 1,
                 transition: "background 0.15s",
               }}
-              title="CSV export (coming soon)"
+              title="Download as Excel (.xlsx)"
             >
               <TableIcon size={14} color={R.textDim} />
-              CSV
+              {isGeneratingXlsx ? "Generating…" : "Excel"}
             </button>
 
             <ReportActions
