@@ -198,7 +198,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
   const [editingEffectiveCell, setEditingEffectiveCell] = useState<
     string | null
   >(null);
-  const [editingMinCell, setEditingMinCell] = useState<string | null>(null);
   const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
   const [hoveredAiCell, setHoveredAiCell] = useState<string | null>(null);
   const [paceCurves, setPaceCurves] = useState<any[]>([]);
@@ -221,7 +220,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     setOverride,
     clearOverride,
     submitChanges,
-    saveMinRate,
     rateOverrides, // [OVERRIDE v1]
     removeRateOverride, // [OVERRIDE v1]
   } = useRateGrid();
@@ -1071,7 +1069,6 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                             return (
                               <td
                                 key={day.date}
-                                onClick={() => !day.isFrozen && setEditingMinCell(day.date)}
                                 style={{
                                   textAlign: "center",
                                   color: isBelowMonthly ? "#ef4444" : "#7A8494",
@@ -1080,53 +1077,14 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                   height: "44px",
                                   verticalAlign: "middle",
                                   fontVariantNumeric: "tabular-nums",
-                                  cursor: day.isFrozen ? "not-allowed" : "pointer",
-                                  backgroundColor:
-                                    editingMinCell === day.date
-                                      ? "transparent"
-                                      : isBelowMonthly
-                                        ? "rgba(239, 68, 68, 0.15)"
-                                        : getColBg(day.date),
+                                  backgroundColor: isBelowMonthly
+                                    ? "rgba(239, 68, 68, 0.15)"
+                                    : getColBg(day.date),
                                   borderBottom: isBelowMonthly ? "2px solid #ef4444" : "1px solid rgba(255,255,255,0.04)",
                                 }}
                                 title={isBelowMonthly ? `Monthly default: £${Math.round(day.monthlyMinDefault)}` : undefined}
                               >
-                                {editingMinCell === day.date ? (
-                                  <input
-                                    autoFocus
-                                    style={{
-                                      ...styles.input,
-                                      color: "#ef4444",
-                                      fontWeight: "bold",
-                                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                      border: "1px solid #ef4444",
-                                    }}
-                                    defaultValue={day.guardrailMin > 0 ? Math.round(day.guardrailMin) : ""}
-                                    onFocus={(e) => e.target.select()}
-                                    onBlur={(e) => {
-                                      const v = parseFloat(e.target.value);
-                                      if (!isNaN(v) && v > 0 && selectedHotelId) {
-                                        saveMinRate(selectedHotelId, day.date, v);
-                                        if (v < day.monthlyMinDefault) {
-                                          toast.warning(
-                                            `Min rate set to £${Math.round(v)} — below monthly default of £${Math.round(day.monthlyMinDefault)}. Make sure you know what you're doing.`,
-                                            { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
-                                          );
-                                        }
-                                      } else if (e.target.value === "" && selectedHotelId) {
-                                        saveMinRate(selectedHotelId, day.date, day.monthlyMinDefault);
-                                      }
-                                      setEditingMinCell(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") e.currentTarget.blur();
-                                    }}
-                                  />
-                                ) : (
-                                  day.guardrailMin > 0
-                                    ? `£${Math.round(day.guardrailMin)}`
-                                    : "-"
-                                )}
+                                {day.guardrailMin > 0 ? `£${Math.round(day.guardrailMin)}` : "-"}
                               </td>
                             );
                           })}
@@ -1460,12 +1418,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
 
                                         if (
                                           day.guardrailMin > 0 &&
-                                          roundedOverride < day.guardrailMin &&
-                                          selectedHotelId
+                                          roundedOverride < day.guardrailMin
                                         ) {
-                                          saveMinRate(selectedHotelId, day.date, roundedOverride);
                                           toast.warning(
-                                            `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                            `Base rate £${roundedOverride} is below min £${Math.round(day.guardrailMin)}. Sentinel may clamp this — ask an admin to adjust the min rate if needed.`,
                                             { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }
@@ -1554,12 +1510,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                     if (!isNaN(v) && v > 0) {
                                       if (
                                         day.guardrailMin > 0 &&
-                                        v < day.guardrailMin &&
-                                        selectedHotelId
+                                        v < day.guardrailMin
                                       ) {
-                                        saveMinRate(selectedHotelId, day.date, v);
                                         toast.warning(
-                                          `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted. Make sure you know what you're doing.`,
+                                          `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)}. Sentinel may clamp this — ask an admin to adjust the min rate if needed.`,
                                           { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                         );
                                       }
@@ -1582,12 +1536,10 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                       if (!isNaN(v) && v > 0) {
                                         if (
                                           day.guardrailMin > 0 &&
-                                          v < day.guardrailMin &&
-                                          selectedHotelId
+                                          v < day.guardrailMin
                                         ) {
-                                          saveMinRate(selectedHotelId, day.date, v);
                                           toast.warning(
-                                            `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)} — daily min auto-adjusted.`,
+                                            `Override £${Math.round(v)} is below min £${Math.round(day.guardrailMin)}. Sentinel may clamp this — ask an admin to adjust the min rate if needed.`,
                                             { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } }
                                           );
                                         }

@@ -1370,8 +1370,12 @@ router.get("/min-rates/:hotelId", async (req, res) => {
 /**
  * POST /api/sentinel/min-rates/:hotelId
  * Saves per-day min rate overrides. Pass null to revert to monthly default.
+ * Admin-only — non-admin rate-viewers can read min rates but cannot edit them.
  */
 router.post("/min-rates/:hotelId", async (req, res) => {
+  if (!["admin", "super_admin"].includes(req.session?.role)) {
+    return res.status(403).json({ success: false, message: "Admin access required to edit min rates." });
+  }
   const { hotelId } = req.params;
   const { rates } = req.body; // { "2026-04-01": 60, "2026-04-02": null }
   try {

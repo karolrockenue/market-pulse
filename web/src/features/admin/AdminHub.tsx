@@ -13,6 +13,7 @@ import { useAdminData } from "./hooks/useAdminData";
 
 // Components (These should now be in features/admin/components)
 import { HotelManagementTable } from "./components/HotelManagementTable";
+import { UserManagementTable } from "./components/UserManagementTable";
 import { ManageCompSetModal } from "./components/ManageCompSetModal";
 import { SystemHealth } from "./components/SystemHealth";
 import { ManualReportTrigger } from "./components/ManualReportTrigger";
@@ -131,6 +132,8 @@ export default function AdminHub() {
           }
           onHotelDeleted={refreshData}
         />
+
+        <UserManagementTable />
 
         <MewsOnboarding />
 

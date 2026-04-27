@@ -4,10 +4,11 @@ const crypto = require("crypto");
 
 // Import shared utilities
 const pgPool = require("../utils/db");
-const { 
-  requireUserApi, 
-  requireAccountOwner, 
-  requireManagePermission 
+const {
+  requireUserApi,
+  requireAdminApi,
+  requireAccountOwner,
+  requireManagePermission
 } = require("../utils/middleware");
 
 const sgMail = require("@sendgrid/mail");
@@ -529,6 +530,69 @@ if (req.session.role === "super_admin" || req.session.role === "admin") {
   } catch (error) {
     console.error("Error fetching owned properties:", error);
     res.status(500).json({ error: "Could not check ownership status." });
+  }
+});
+
+/**
+ * @route GET /api/users/all
+ * @description Lists all users with role, can_view_rates, and linked-property count.
+ * @access Admin
+ */
+router.get("/all", requireAdminApi, async (req, res) => {
+  try {
+    const result = await pgPool.query(`
+      SELECT
+        u.user_id,
+        u.cloudbeds_user_id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        COALESCE(u.can_view_rates, false) AS can_view_rates,
+        (
+          SELECT COUNT(*)::int
+          FROM user_properties up
+          WHERE up.user_id = u.cloudbeds_user_id
+             OR up.user_id = u.user_id::text
+        ) AS property_count
+      FROM users u
+      ORDER BY u.email
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("[GET /users/all] Error:", error);
+    res.status(500).json({ error: "Failed to fetch users." });
+  }
+});
+
+/**
+ * @route PATCH /api/users/:id/rates-access
+ * @description Toggles can_view_rates for a user.
+ * @access Admin
+ */
+router.patch("/:id/rates-access", requireAdminApi, async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  const { can_view_rates } = req.body;
+
+  if (!Number.isInteger(userId)) {
+    return res.status(400).json({ error: "Invalid user id." });
+  }
+  if (typeof can_view_rates !== "boolean") {
+    return res.status(400).json({ error: "can_view_rates must be a boolean." });
+  }
+
+  try {
+    const result = await pgPool.query(
+      "UPDATE users SET can_view_rates = $1 WHERE user_id = $2 RETURNING user_id, can_view_rates",
+      [can_view_rates, userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("[PATCH /users/:id/rates-access] Error:", error);
+    res.status(500).json({ error: "Failed to update rate access." });
   }
 });
 
