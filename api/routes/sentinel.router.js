@@ -12,7 +12,6 @@ const cloudbedsAdapter = require("../adapters/cloudbedsAdapter.js"); // [Added f
 const sentinelService = require("../services/sentinel.service.js"); // <-- NEW SERVICE IMPORT
 const db = require("../utils/db"); // <-- [NEW] Import database connection
 const pmsRegistry = require("../adapters/pmsRegistry.js"); // [MEWS] PMS adapter router
-const { isRateOverridesEnabled } = require("../utils/sentinelFlags.js"); // [OVERRIDE v1]
 
 // [MEWS] Helper: Returns the correct sentinel adapter for a hotel's PMS type.
 // Falls back to Cloudbeds adapter if pms_type is null (legacy hotels).
@@ -146,50 +145,6 @@ router.get("/hotel-config/:hotelId", requireUserApi, requireHotelRateAccess, asy
     if (!rows.length) return res.status(404).json({ error: "Not found" });
     res.json({ success: true, config: rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/sentinel/hotel-overrides - Submit rate overrides (hotel user)
-router.post("/hotel-overrides", requireUserApi, requireHotelRateAccess, async (req, res) => {
-  const { hotelId, overrides } = req.body;
-  if (!hotelId || !overrides?.length) {
-    return res.status(400).json({ error: "hotelId and overrides required" });
-  }
-  try {
-    // Auto-resolve pmsPropertyId and baseRoomTypeId
-    const hotelRes = await db.query(
-      "SELECT pms_property_id FROM hotels WHERE hotel_id = $1", [hotelId]
-    );
-    const configRes = await db.query(
-      "SELECT base_room_type_id FROM sentinel_configurations WHERE hotel_id = $1", [hotelId]
-    );
-    const pmsPropertyId = hotelRes.rows[0]?.pms_property_id;
-    const roomTypeId = configRes.rows[0]?.base_room_type_id;
-    if (!pmsPropertyId || !roomTypeId) {
-      return res.status(400).json({ error: "Hotel not properly configured" });
-    }
-
-    const changedBy = req.user?.internalId || req.user?.cloudbedsId || "unknown";
-
-    const batchPayload = await sentinelService.buildOverridePayload(
-      hotelId, pmsPropertyId, roomTypeId, overrides, "HOTEL_USER", changedBy
-    );
-
-    if (batchPayload?.length > 0) {
-      const CHUNK_SIZE = 30;
-      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
-        const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
-        await db.query(
-          `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
-          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })]
-        );
-      }
-    }
-
-    res.json({ success: true, message: `${batchPayload?.length || 0} rate changes queued.` });
-  } catch (err) {
-    console.error("[Hotel Overrides] Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1569,97 +1524,20 @@ async function runBackgroundWorker() {
   }
 }
 
-/**
- * [PRODUCER] POST /api/sentinel/overrides
- * 1. Uses Sentinel Service to build payload (DB + engine).
- * 2. Saves rates to Queue.
- * 3. "Kicks" the worker internally (Reliable).
- * 4. Returns OK instantly.
- */
-router.post("/overrides", async (req, res) => {
-  // [UPDATED] Now accepts optional 'source' (e.g., "AI_APPROVED")
-  const { hotelId, pmsPropertyId, roomTypeId, overrides, source } = req.body;
-
-  // Default to 'MANUAL' if not provided
-  const changeSource = source || "MANUAL";
-
-  console.log(
-    `[Sentinel Producer] Received overrides for hotel ${hotelId} (Source: ${changeSource})`,
-  );
-
-  if (
-    !hotelId ||
-    !pmsPropertyId ||
-    !roomTypeId ||
-    !overrides ||
-    !Array.isArray(overrides)
-  ) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Missing required fields." });
-  }
-
-  try {
-    // 1. Delegate all DB + pricing logic to Sentinel Service
-    // [UPDATED] Pass 'changeSource' to service
-    const batchPayload = await sentinelService.buildOverridePayload(
-      hotelId,
-      pmsPropertyId,
-      roomTypeId,
-      overrides,
-      changeSource,
-    );
-
-    // 2. Insert into Job Queue (Chunked)
-    // Cloudbeds has a strict limit of 30 items per API call.
-    // We split the payload into chunks to ensure success.
-    if (batchPayload && batchPayload.length > 0) {
-      const CHUNK_SIZE = 30;
-
-      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
-        const chunk = batchPayload.slice(i, i + CHUNK_SIZE);
-
-        await db.query(
-          `INSERT INTO sentinel_job_queue (hotel_id, payload, status) VALUES ($1, $2, 'PENDING')`,
-          [hotelId, JSON.stringify({ pmsPropertyId, rates: chunk })],
-        );
-      }
-
-      const jobCount = Math.ceil(batchPayload.length / CHUNK_SIZE);
-      console.log(
-        `[Sentinel Producer] Queued ${batchPayload.length} rates across ${jobCount} jobs.`,
-      );
-    }
-
-    // 3. [VERCEL OPTIMIZATION] Return Instantly
-    // The Cron job will pick up the PENDING jobs within 60 seconds.
-    res.status(200).json({
-      success: true,
-      message: "Updates queued for background processing.",
-    });
-  } catch (error) {
-    console.error(`[Sentinel Producer] Failed:`, error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// [REMOVED] process-queue moved to top of file (Public Cron)
-
 // =============================================================================
-// [OVERRIDE MODEL v1] /rate-overrides/:hotelId  —  spec: claude/rate-override-implementation.md
-// Feature-flagged. Returns 503 when SENTINEL_OVERRIDES_ENABLED!='true' or when
-// the hotel is outside SENTINEL_OVERRIDES_HOTEL_ALLOWLIST (if set).
-// Access: admin unconditionally; otherwise requires can_view_rates + user_properties
-// (enforced by the RATES_VIEW_PATHS whitelist + requireRatesAccess middleware).
+// /rate-overrides/:hotelId — single canonical save path for rate overrides.
+// Writes to sentinel_rate_overrides (date-level, base-only), fans out to all
+// derived rooms via differentials, and queues PMS push.
+//
+// Access: admin unconditionally; otherwise requires can_view_rates +
+// user_properties (enforced by the RATES_VIEW_PATHS whitelist + the
+// requireRatesAccess middleware).
 // =============================================================================
 
 router.post("/rate-overrides/:hotelId", async (req, res) => {
   const hotelId = Number(req.params.hotelId);
   if (!Number.isInteger(hotelId)) {
     return res.status(400).json({ success: false, message: "hotelId must be an integer" });
-  }
-  if (!isRateOverridesEnabled(hotelId)) {
-    return res.status(503).json({ success: false, message: "Overrides not enabled for this hotel" });
   }
   const { overrides } = req.body || {};
   if (!Array.isArray(overrides) || overrides.length === 0) {
@@ -1684,9 +1562,6 @@ router.get("/rate-overrides/:hotelId", async (req, res) => {
   if (!Number.isInteger(hotelId)) {
     return res.status(400).json({ success: false, message: "hotelId must be an integer" });
   }
-  if (!isRateOverridesEnabled(hotelId)) {
-    return res.status(503).json({ success: false, message: "Overrides not enabled for this hotel" });
-  }
   try {
     const { start, end } = req.query;
     const overrides = await sentinelService.getRateOverrides(hotelId, start || null, end || null);
@@ -1701,9 +1576,6 @@ router.delete("/rate-overrides/:hotelId", async (req, res) => {
   const hotelId = Number(req.params.hotelId);
   if (!Number.isInteger(hotelId)) {
     return res.status(400).json({ success: false, message: "hotelId must be an integer" });
-  }
-  if (!isRateOverridesEnabled(hotelId)) {
-    return res.status(503).json({ success: false, message: "Overrides not enabled for this hotel" });
   }
   const { dates } = req.body || {};
   if (!Array.isArray(dates) || dates.length === 0) {

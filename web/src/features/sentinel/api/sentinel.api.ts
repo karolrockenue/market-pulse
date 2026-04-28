@@ -1,7 +1,6 @@
 import {
   SentinelConfig,
   RateCalendarDay,
-  RateOverride,
   RateOverrideRow,
   SaveRateOverrideInput,
   AssetConfig,
@@ -158,31 +157,7 @@ export const getPreviewRates = async (
   return json.data || [];
 };
 
-export const submitOverrides = async (
-  hotelId: string | number,
-  pmsPropertyId: string,
-  roomTypeId: string,
-  overrides: RateOverride[]
-) => {
-  const res = await fetch("/api/sentinel/overrides", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      hotelId,
-      pmsPropertyId,
-      roomTypeId,
-      overrides,
-    }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message || "Failed to submit overrides");
-  return json;
-};
-
-// --- [OVERRIDE MODEL v1] PMS Override endpoints ----------------------------
-// Backend returns 503 when feature flag is off (SENTINEL_OVERRIDES_ENABLED!='true'
-// or hotel not in SENTINEL_OVERRIDES_HOTEL_ALLOWLIST). Callers should handle
-// that gracefully and fall back to the legacy flow.
+// --- PMS Override endpoints (single canonical save path) -------------------
 
 export const getRateOverrides = async (
   hotelId: string | number,
@@ -195,7 +170,6 @@ export const getRateOverrides = async (
   const res = await fetch(
     `/api/sentinel/rate-overrides/${hotelId}${qs.toString() ? `?${qs}` : ""}`
   );
-  if (res.status === 503) return []; // flag disabled — treat as no overrides
   const json = await res.json();
   if (!res.ok) throw new Error(json.message || "Failed to fetch rate overrides");
   return json.overrides || [];
@@ -211,9 +185,6 @@ export const saveRateOverrides = async (
     body: JSON.stringify({ overrides }),
   });
   const json = await res.json();
-  if (res.status === 503) {
-    throw new Error("Overrides are not enabled for this hotel");
-  }
   if (!res.ok) throw new Error(json.message || "Failed to save overrides");
   return json;
 };
@@ -228,9 +199,6 @@ export const deleteRateOverrides = async (
     body: JSON.stringify({ dates }),
   });
   const json = await res.json();
-  if (res.status === 503) {
-    throw new Error("Overrides are not enabled for this hotel");
-  }
   if (!res.ok) throw new Error(json.message || "Failed to delete overrides");
   return json;
 };
