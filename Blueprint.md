@@ -760,10 +760,12 @@ MinRate is resolved per-day with the following priority:
 
 Last-save-wins semantics: When monthly min rates are saved, all daily min overrides for the affected months are automatically deleted so the new monthly value takes effect. When per-day overrides are later set, they take precedence over the monthly default. If autopilot is enabled, saving monthly min rates triggers an immediate recalculation and PMS push.
 
-Daily min overrides can be set in two ways from the Rate Manager UI:
+Daily min overrides can be set in two ways from the **admin Rate Manager** UI (`RateManagerView.tsx`):
 
 - Editing the Min Rate row directly for a specific date.
 - Entering a PMS Override or Target Sell Rate below the current min — the system auto-lowers the daily min to match and shows a red warning toast.
+
+**Editing min rates is admin-only.** As of April 2026, the My Rates page (`HotelRateWindow.tsx`) renders the Min Rate row read-only, and `POST /api/sentinel/min-rates/:hotelId` returns 403 for non-admin roles even though the path is in the rates-view whitelist. The auto-lower-min side effects on the Effective Sell Rate / PMS Override handlers were also removed from My Rates: a non-admin who types an override below the min now gets a warning toast (no save) and is told to ask an admin to adjust the min rate. The admin Rate Manager retains the full set of behaviours described above.
 
 When a daily min override is below the monthly default, the UI signals this clearly:
 
@@ -980,6 +982,8 @@ is_read (boolean)
 
 created_at, updated_at
 
+Writers: (a) Sentinel job worker — inserts ERROR rows on PMS push failures (§4.3 → §4.14). (b) `notifyCommentAdded` in `api/utils/notification.service.js` — inserts an INFO row when a CRM task comment contains `@FirstName` mentions matching `admin`/`super_admin` users (one row per comment, regardless of mention count, with all mentioned names listed in the title). The bell (`web/src/components/NotificationBell.tsx`) polls `GET /api/sentinel/notifications` every 15s. The table is global (no `user_id` column); the bell is admin-only via `AppTopBar`, so this is fine for now — if a second admin needs separate inboxes later, add `user_id` and filter on read.
+
 4.5 sentinel_daily_max_rates
 
 Stores granular daily price ceilings (Dynamic Rate Caps).
@@ -1174,7 +1178,7 @@ My Rates Access (can_view_rates):
 
 The My Rates page (HotelRateWindow) requires both: (a) user_properties rows for each hotel, AND (b) can_view_rates = true on the users record.
 
-Sentinel endpoints (/api/sentinel/*) are behind a blanket requireAdminApi middleware. A router.use() bypass at line 225 of sentinel.router.js intercepts specific read-only paths (preview-rate, pms-property-ids, predictions, pace-curves, min-rates) and allows users with can_view_rates through via requireRatesAccess middleware.
+Sentinel endpoints (/api/sentinel/*) are behind a blanket requireAdminApi middleware. A router.use() bypass at line 225 of sentinel.router.js intercepts specific read-only paths (preview-rate, pms-property-ids, predictions, pace-curves, min-rates, rate-overrides) and allows users with can_view_rates through via requireRatesAccess middleware. The whitelist is path-based and method-blind, so writes on whitelisted paths must enforce admin-only access inline if needed — `POST /min-rates/:hotelId` does this (admin-only despite the path being whitelisted for GET); `POST /rate-overrides/:hotelId` is intentionally available to rate-viewers because pinning a per-day rate is a user action, not an admin one.
 
 Demand Radar (opened April 2026): accessible to all roles. The UI lives inside SentinelHub but its data comes from /api/market/* (already user-accessible), not /api/sentinel/*. SentinelHub's useAllHotels hook originally only called admin-only /api/hotels — non-admins received a 403, the error body was mistakenly stored as the hotel list, and downstream .map() calls crashed under the misleading "Update Required" boundary. The hook now tries /api/hotels first and falls back to /api/hotels/mine on 403, landing an Array in state either way. Apply the same dual-endpoint fallback if any other SentinelHub sub-view is opened to non-admins in future.
 
@@ -1281,6 +1285,97 @@ Writer: `api/routes/sentinel.router.js → writeSentinelHeartbeat()`, called fro
 
 Not to be confused with `sentinel_notifications` (§4.4) which is a user-facing alert feed. The heartbeat table is a per-hotel state snapshot for monitoring; notifications are individual events surfaced in the UI bell.
 
+4.15 sentinel_rate_overrides — canonical override model
+
+Single source of truth for "the user pinned this price". One row per (hotel_id, stay_date) at the **base room only** — derived rooms are fanned out via `room_differentials` at write time and at every hourly bridge re-push.
+
+Fields:
+
+hotel_id (PK, integer)
+stay_date (PK, date)
+base_override_price (numeric, NOT NULL, > 0)
+set_by (integer, nullable — internal user_id of the original saver)
+set_at (timestamptz, default NOW())
+updated_by (integer, nullable)
+updated_at (timestamptz, default NOW())
+
+**Rules — load-bearing.**
+
+- A row in this table means **AI is forbidden from touching that date** until the row is deleted. No re-yielding, no decay, no autopilot writes — period. This is the only protection model. Calendar `source = 'MANUAL' / 'AI_SUGGESTED' / 'HOTEL_USER'` is **not** protected and autopilot will overwrite it (see `sentinel.bridge.service.js:596`).
+- The override price is the **base** price. Derived room rates are computed via the hotel's `room_differentials` rules whenever the override is applied or re-pushed. Never store derived rates in this table.
+- No guardrail clamp. A user typing £0.01 (or anything > 0) goes through verbatim — guardrails only apply to engine-computed rates, not pinned ones.
+- Past dates rejected at the service layer (`saveRateOverrides` validates `stay_date >= CURRENT_DATE`).
+
+**Write paths (single endpoint):**
+
+`POST /api/sentinel/rate-overrides/:hotelId` → `sentinelService.saveRateOverrides()` → upserts the override row, fans out base × differentials, queues PMS push. Used by every save in the UI — both user-typed values and AI-accepted suggestions go through here. There is no other write path.
+
+**Read paths:**
+
+- `GET /api/sentinel/rate-overrides/:hotelId?start=&end=` — used by `useRateGrid.ts` to populate the "Override" badge column.
+- Bridge Phase 2 (`sentinel.bridge.service.js:549`) loads the date set into a `Set<string>` and skips any matching prediction — no engine writes for those dates.
+- `previewCalendar` in `sentinel.service.js:945-951` does the same skip in the manual `recalculateRates` path so "Re-Push Rates" never overwrites pins either.
+- `sentinel.bridge.service.js:875-944` — hourly safety-net re-push: emits the pinned base price (+ derivatives) for every active override row to PMS each cron tick. Catches drift if someone edits the rate directly in Cloudbeds/Mews between cycles.
+
+**Calendar protection (belt-and-braces):**
+
+Every SQL path that writes `sentinel_rates_calendar` with `source = 'SENTINEL'` is wrapped in `NOT EXISTS (SELECT 1 FROM sentinel_rate_overrides ...)`. See `sentinel.bridge.service.js:856` (Phase 2 calendar update) and `sentinel.service.js:1032` (recalculate fan-out). These guards run regardless of the in-memory skip — even if a race opens between override save and the next bridge cycle, the DB-level guard prevents the calendar from being silently re-tagged as SENTINEL.
+
+Migration: `api/migration_010_sentinel_rate_overrides.js` (table) + companion `sentinel_price_history` writes for audit.
+
+**KNOWN INCIDENT — silent UI fallback, Park Hotel 2026-04-28.**
+
+This is the canonical example of why "engine respects override rows" is necessary but not sufficient. Read this entire entry before touching any override code.
+
+Two override storage layers existed in parallel by accident:
+
+1. `sentinel_rate_overrides` — the new persistent-pin model (this section).
+2. `sentinel_rates_calendar.source = 'MANUAL'` — the legacy "save a rate" path. Visible in the grid, not protected by the bridge.
+
+Commit `5177dcf` (2026-04-26) shipped a fix titled "respect PMS overrides in recalc + debounce autopilot misfires". The fix correctly added the override skip to `previewCalendar` and `recalculateRates`, and the DB-level NOT EXISTS guard. It was tested against the engine path. **It was not tested against every UI save path.**
+
+What 5177dcf left intact:
+
+- A feature flag `SENTINEL_OVERRIDES_ENABLED` plus a per-hotel `SENTINEL_OVERRIDES_HOTEL_ALLOWLIST` env var, which gated whether `/api/sentinel/rate-overrides/:hotelId` was active for a given hotel. If the hotel was outside the allowlist, the new endpoint returned **HTTP 503 "Overrides not enabled for this hotel"**.
+- A silent catch in the React save handler (`web/src/features/sentinel/hooks/useRateGrid.ts:504-522`) that, on any 503 from the new endpoint, **silently retried against the legacy `POST /api/sentinel/overrides`** — which writes calendar `source = 'MANUAL'` only and never inserts into `sentinel_rate_overrides`. No error toast. The user saw a normal "Updates Queued" success.
+
+Symptom on Park Hotel (318326):
+
+- 2026-04-24: user pinned tonight (2026-04-28) at £54 via the new model. Row landed in `sentinel_rate_overrides`. Bridge respected it for 4 days.
+- 2026-04-28 11:57:26 UTC: bridge Phase 2 nonetheless pushed £69 (engine price = £54 × 1.28) to PMS for tonight. Job `99dd62bf` — single-date, 7 rates, off-cycle (between :00 cron ticks). The override-skip at `sentinel.bridge.service.js:580` is gated on `overridesEnabledForHotel`; the loader at line 549 caught the silent-fallback warning path and left `phaseOverrideDateSet` empty, so the skip didn't fire. Engine prices reached PMS for ~3 minutes until the next :00 re-push restored £54.
+- 14:08:43: user re-saved £65 via the UI (thinking they were re-applying the override). The save hit the new endpoint, got 503 because Park wasn't in the allowlist, fell back to legacy `/overrides`, which wrote calendar `source = 'MANUAL'` for the base room. The override row in `sentinel_rate_overrides` was **untouched** and still said £54. The grid badge read "SENTINEL" instead of "Override" because the badge logic correctly reads from `sentinel_rate_overrides` — there was no row at £65.
+- Outcome: two competing prices, two storage layers, the hourly bridge re-push would have pushed £54 (table truth) at the next 15:00 tick and overwritten the user's intended £65.
+
+Why the previous AI's fix didn't actually fix it:
+
+5177dcf protected **rows that exist in `sentinel_rate_overrides`** from the engine. It did nothing about **the silent fallback that prevented rows from being written in the first place** when the allowlist excluded a hotel. The protection was sound; the problem was upstream — saves were quietly downgrading to a path with no protection, and the UI lied about success. A reviewer testing override-protection on a hotel inside the allowlist saw it work; a reviewer testing on Park (outside the allowlist) saw "Updates Queued" and a MANUAL pin but no override row, and likely assumed that was correct because the allowlist was deliberately partial during the rollout.
+
+The fix in commit `32cd8fe` (2026-04-28) — what shipped:
+
+1. Deleted `api/utils/sentinelFlags.js`. The flag is gone, every hotel gets the override model.
+2. Removed every `if (overridesEnabledForHotel)` gate in `sentinel.bridge.service.js` (overlay loader, Phase-2 skip, hourly re-push). All three paths now run unconditionally fleet-wide.
+3. Removed the `503 "not enabled"` branches in `POST/GET/DELETE /api/sentinel/rate-overrides/:hotelId`.
+4. Deleted the legacy endpoints `POST /api/sentinel/overrides` and `POST /api/sentinel/hotel-overrides`. Calls to them now return 404. The calendar-MANUAL path is permanently gone.
+5. Deleted `sentinelService.buildOverridePayload` (only legacy callers).
+6. Removed `submitOverrides` from `web/src/features/sentinel/api/sentinel.api.ts`.
+7. Rewrote `useRateGrid.ts:submitChanges` as a single call to `saveRateOverrides`. No split between user-typed and AI-accepted, no fallback, no silent downgrade. Errors surface as a toast with the real message. Optimistic UI sets `source: 'OVERRIDE'` on the affected dates.
+8. Dropped `SENTINEL_OVERRIDES_ENABLED` and `SENTINEL_OVERRIDES_HOTEL_ALLOWLIST` from Railway env.
+
+Why every save now persists:
+
+The only save path the UI exposes (`saveRateOverrides`) writes directly to `sentinel_rate_overrides`. The bridge's hourly re-push iterates that table unconditionally. The bridge's autonomy gate skips any date in that table unconditionally. The calendar's NOT EXISTS guard refuses to overwrite a SENTINEL cell when an override row exists. There is no longer an alternative path that produces a "saved rate" without a protected row.
+
+Latent state at deploy time (intentionally not migrated):
+
+7 hotels had stale `MANUAL` / `AI_SUGGESTED` calendar pins from the silent-fallback era — 512 dates total across Whitechapel Grand, London Suites, Lancaster Court, Maiden Oval, Hyde Park Green, The Barkston, and Mason & Fifth Westbourne (1 date). On the user's instruction these are **not promoted** to override rows. Sentinel will overwrite them on the next yielding cycle, which is the expected behaviour going forward — those dates will be re-priced by AI unless the user re-pins them through the UI. Mason & Fifth Primrose Hill (318343) had 277 such pins and is also explicitly not migrated.
+
+Lessons for any AI editing override code:
+
+- "The engine respects override rows" is necessary but not sufficient. Verify every UI save path produces a row before claiming the override model works.
+- A 503 returned by a feature-flagged endpoint is not a benign "feature disabled" signal — if a UI catches it silently and retries against a different storage layer, you have two competing sources of truth and the user can't see the divergence.
+- Calendar `source = 'MANUAL'` is **not** an override. It is a one-shot rate write that autopilot will overwrite. If you see code or docs treating MANUAL as protected, that is a bug.
+- Before shipping any "fix" to override behaviour, run the full save flow on a hotel that is **not** in any allowlist and verify the row lands in `sentinel_rate_overrides`. If it doesn't, the fix isn't done.
+
 4.11 Schema Traps
 
 CRITICAL: hotel_id is INTEGER across all tables. room_type_id is MIXED TYPE — INTEGER in sentinel_ai_predictions but TEXT (VARCHAR) in sentinel_rates_calendar. When writing UNNEST arrays or cross-table JOINs, always cast room_type_id to text (e.g., room_type_id::text = ANY($2::text[])). Never cast to $X::int[] when touching the calendar table.
@@ -1340,19 +1435,23 @@ POST /config
 
 Creates or updates configuration (facts + rules) for a hotel.
 
-POST /overrides
+POST /rate-overrides/:hotelId
 
-Producer:
+Body: { overrides: [{ stayDate: "YYYY-MM-DD", price: number }, ...] }
 
-Validates payload { hotelId, pmsPropertyId, roomTypeId, overrides: [...] }.
+The single canonical save path for any user-pinned rate (typed OR AI-accepted). Delegates to `sentinelService.saveRateOverrides()` which upserts rows into `sentinel_rate_overrides` (§4.15), fans out base × differentials, and queues the PMS push. Past dates and non-positive prices are rejected at the service layer; partial-success returns 202 with `{saved, queued, rejected}`. Access: admin or `can_view_rates` (POST is intentionally available to rate-viewers — pinning is a user action, not an admin one).
 
-Delegates to sentinel.service.buildOverridePayload(...) which calls sentinel.pricing.engine.js.
+GET /rate-overrides/:hotelId?start=&end=
 
-Splits into chunks; writes to sentinel_job_queue.
+Returns the active override rows for the hotel in the given date range. Used by `useRateGrid.ts` to populate the "Override" badge column.
 
-Kicks background worker via internal call.
+DELETE /rate-overrides/:hotelId
 
-Returns immediately with success/failure.
+Body: { dates: ["YYYY-MM-DD", ...] }
+
+Removes override rows. After delete, the next bridge cycle is free to re-yield those dates.
+
+**Removed in commit `32cd8fe` (2026-04-28):** legacy `POST /overrides` and `POST /hotel-overrides`, plus the `SENTINEL_OVERRIDES_ENABLED` feature flag. See §4.15 incident notes — those endpoints wrote calendar `source = 'MANUAL'` only and were the silent-fallback path that broke override protection. Any caller still hitting them gets 404.
 
 POST /process-queue
 
@@ -1433,7 +1532,7 @@ POST /min-rates/:hotelId
 
 Body: { rates: { "YYYY-MM-DD": price, ... } }
 
-Saves per-day min rate overrides. Pass null for a date to revert to monthly default (deletes the row).
+Saves per-day min rate overrides. Pass null for a date to revert to monthly default (deletes the row). **Admin-only** — the path is in the rates-view whitelist (so non-admins can still GET), but the POST handler enforces an inline `admin`/`super_admin` role check and returns 403 otherwise. See §3.4.
 
 Rule:
 If you need new Sentinel functionality, extend the service and then expose a minimal API route here, instead of embedding logic in the router.
@@ -2105,6 +2204,18 @@ The trim is proportional and per-date — on high-demand days when luxury proper
 Result: returned as `segment_wap` from `getForwardView()`. The Demand Radar page uses it for all pricing displays. Other pages (DemandPace, Market Profile) still use the raw `weighted_avg_price`.
 
 Rule for AI: When building new market pricing features, prefer `segment_wap` over `weighted_avg_price` for user-facing metrics. The raw WAP is useful for full-market analysis but misleading for hotel revenue management.
+
+12.5 WAP Fallback for Transient Scrape Gaps (April 2026)
+
+Symptom: a checkin_date shows up empty on the Demand Radar "How busy is the market" chart even though every day around it has a bar. Root cause: that date's latest scrape row has `total_results` populated but `weighted_avg_price`, `min_price_anchor`, `max_price_anchor`, and `facet_price_histogram` all NULL. Most likely upstream cause is the malformed-histogram quirk noted in §12.3 — Booking.com occasionally returns a 100-bar duplicated array instead of 50, the WAP generator bails, and the row gets persisted with supply but no price fields.
+
+Why a missing WAP blanks the bar: `calculateMarketDemand` (`api/utils/market-codex.utils.js`) blends 50% supply scarcity + 50% price index (`mpss`). A NULL WAP makes `mpss` NaN; the blend falls through to `null`; the chart renders nothing. The supply-only fallback branches at lines 130–137 are intentionally commented out.
+
+Fix (2026-04-28): `MarketService.getForwardView` and `getPaceData` (`api/services/market.service.js`) now use a 2-CTE pattern: `latest` (latest snapshot per `checkin_date` for fresh `total_results` / `hotel_count`) LEFT JOIN `last_priced` (latest snapshot per `checkin_date` *with non-null `weighted_avg_price`* for the price fields and histogram). Dates with transient WAP gaps render using the last known price rather than going blank.
+
+Edge case unaddressed: if a date has *never* had a successful priced scrape, it still renders blank. The fallback only helps when *some* prior valid snapshot exists for that exact `checkin_date`.
+
+Known instance — 2026-04-28 scrape: London 2026-05-03 (Sun) and 2026-05-06 (Wed) had NULL WAP. After the fix, May 3 displayed using 2026-04-24's WAP (£206), May 6 using 2026-04-24's £217. Property aggregates (`getProfileOverview`, `getProfileSeasonal`) were not changed — those use SQL `AVG()` which already ignores nulls, so the impact there is just slightly less data, not blank rows.
 
 13.0 DEMAND RADAR (Market Intelligence Page)
 
