@@ -126,6 +126,7 @@ function slackTaskBlock(task, event) {
  * Task created — notify assignee + Slack
  */
 async function notifyTaskCreated(task, createdBy) {
+  if (typeof createdBy === 'string' && createdBy.startsWith('agent:')) return;
   const event = `📋 New task created by *${createdBy || 'System'}*`;
 
   // Email to assignee — opt-in via task.notify_assignee
@@ -158,6 +159,7 @@ async function notifyTaskCreated(task, createdBy) {
  * Task assigned / reassigned — notify new assignee + Slack
  */
 async function notifyTaskAssigned(task, oldAssignee, updatedBy) {
+  if (typeof updatedBy === 'string' && updatedBy.startsWith('agent:')) return;
   const event = `👤 Assigned to *${task.assignee}*${oldAssignee ? ` (was ${oldAssignee})` : ''} by *${updatedBy}*`;
 
   // Email to new assignee — opt-in via task.notify_assignee
@@ -186,6 +188,7 @@ async function notifyTaskAssigned(task, oldAssignee, updatedBy) {
  * Task status changed — notify assignee + Slack
  */
 async function notifyStatusChanged(task, oldStatus, updatedBy) {
+  if (typeof updatedBy === 'string' && updatedBy.startsWith('agent:')) return;
   const event = `🔄 Status: *${statusLabel(oldStatus)}* → *${statusLabel(task.status)}* by *${updatedBy}*`;
 
   // Email assignee — opt-in via task.notify_assignee
@@ -216,9 +219,10 @@ async function notifyStatusChanged(task, oldStatus, updatedBy) {
 }
 
 /**
- * Comment added — email assignee only (no Slack)
+ * Comment added — email assignee, write bell notification for @mentions
  */
 async function notifyCommentAdded(task, author, commentBody) {
+  if (typeof author === 'string' && author.startsWith('agent:')) return;
   if (task.notify_assignee && task.assignee && task.assignee !== author) {
     const email = await lookupEmail(task.assignee);
     if (email) {
@@ -237,6 +241,35 @@ async function notifyCommentAdded(task, author, commentBody) {
         `
       );
     }
+  }
+
+  // @mention → in-app notification bell (sentinel_notifications)
+  const mentions = [...new Set((commentBody.match(/@(\w+)/g) || []).map((m) => m.slice(1)))];
+  if (mentions.length === 0) return;
+
+  try {
+    const { rows: matches } = await db.query(
+      `SELECT first_name FROM users
+       WHERE LOWER(first_name) = ANY($1::text[])
+         AND role IN ('admin', 'super_admin')`,
+      [mentions.map((m) => m.toLowerCase())]
+    );
+    const realMentions = matches
+      .map((r) => r.first_name)
+      .filter((name) => name && name.toLowerCase() !== (author || '').toLowerCase());
+    if (realMentions.length === 0) return;
+
+    const excerpt = commentBody.length > 200 ? `${commentBody.slice(0, 200)}…` : commentBody;
+    const title = `${author || 'Someone'} mentioned ${realMentions.length === 1 ? realMentions[0] : realMentions.join(', ')} in CRM-${task.id}`;
+    const message = `${task.title}: "${excerpt}"`;
+
+    await db.query(
+      `INSERT INTO sentinel_notifications (type, title, message, is_read)
+       VALUES ($1, $2, $3, FALSE)`,
+      ['INFO', title, message]
+    );
+  } catch (err) {
+    logger.error({ err, taskId: task.id }, 'notification: mention bell write failed');
   }
 }
 
