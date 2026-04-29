@@ -800,6 +800,12 @@ async function getServiceRevenueByMonth(hotelId, startDate, endDate, serviceIds 
   for (const it of items) {
     const sid = it.ServiceId;
     if (!sid || !want.has(sid)) continue;
+    // Deposits are advance payments (balance-sheet liability), not earned
+    // revenue. Mews's own accounting export buckets them as "Transaction",
+    // not "Revenue". Including them dragged forward-looking months down by
+    // the deposit balance — verified against Mason's Apr-only / Apr-May /
+    // Mar-May exports for Primrose Hill (318343) on 2026-04-28.
+    if (it.Type === "Deposit") continue;
     const consumed = it.ConsumedUtc || it.CreatedUtc;
     if (!consumed) continue;
     const dt = new Date(consumed);
@@ -829,6 +835,141 @@ async function getServiceRevenueByMonth(hotelId, startDate, endDate, serviceIds 
   return { services, byServiceMonth, months, itemsScanned: items.length, timezone: tz };
 }
 
+/**
+ * Per-AccountingCategory revenue aggregation via orderItems/getAll.
+ *
+ * Mirrors getServiceRevenueByMonth but groups by AccountingCategoryId
+ * instead of ServiceId. Used by the Mason Dashboard from 2026-04-29
+ * onwards because Mason's finance team and Sales Flash both classify
+ * revenue by accounting category, not by booking-time service. At
+ * Westbourne in particular, very long Short-Stay reservations have their
+ * nights reposted to the Long Stay accounting category — grouping by
+ * Service mis-attributes that revenue. Grouping by Accounting Category
+ * mirrors what Mason sees in the Mews "Order Items Report" UI.
+ *
+ * Deposits are skipped (same rule as getServiceRevenueByMonth): they're
+ * a balance-sheet liability, not earned revenue.
+ *
+ * @param {number} hotelId
+ * @param {string} startDate YYYY-MM-DD (hotel local)
+ * @param {string} endDate   YYYY-MM-DD (hotel local, inclusive)
+ * @param {string[]} [accountingCategoryIds] optional allowlist; if omitted
+ *   returns every category present in window. The Mason router uses this
+ *   to enforce the per-property allowlist (Short/Mid/Long Accommodation
+ *   Income + Canal Breakfast at Westbourne).
+ * @returns {Promise<{
+ *   byAccountingCategoryMonth: Record<string, Record<string, { gross, net, items, nights }>>,
+ *   months: string[],
+ *   itemsScanned: number,
+ *   timezone: string,
+ * }>}
+ */
+async function getRevenueByAccountingCategoryByMonth(
+  hotelId,
+  startDate,
+  endDate,
+  accountingCategoryIds = null,
+) {
+  const credentials = await getCredentials(hotelId);
+
+  const hotelRow = await pgPool.query(
+    `SELECT pms_credentials FROM hotels WHERE hotel_id = $1`,
+    [hotelId],
+  );
+  const tz = hotelRow.rows[0]?.pms_credentials?.timezone || "Europe/London";
+
+  // Mews caps the orderItems window at 3M1D, so split into <=90-day chunks.
+  const addDays = (isoDate, n) => {
+    const d = new Date(isoDate + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const chunks = [];
+  let cursorStart = startDate;
+  while (cursorStart <= endDate) {
+    const chunkEnd = addDays(cursorStart, 89);
+    const effectiveEnd = chunkEnd < endDate ? chunkEnd : endDate;
+    chunks.push({ from: cursorStart, to: effectiveEnd });
+    cursorStart = addDays(effectiveEnd, 1);
+  }
+
+  // Note: Mews's orderItems/getAll has no AccountingCategoryIds filter, so
+  // we have to pull all items in window and filter client-side. Server-side
+  // ServiceIds filter would shrink the payload but doesn't apply here —
+  // the whole point is that ServiceId and AccountingCategoryId can differ.
+  const pullChunk = async (chunk) => {
+    const startUtc = toMewsUtc(chunk.from, tz);
+    const endUtc = toMewsUtc(addDays(chunk.to, 1), tz);
+    const chunkItems = [];
+    let cursor = null;
+    let page = 0;
+    do {
+      const body = {
+        ConsumedUtc: { StartUtc: startUtc, EndUtc: endUtc },
+        AccountingStates: ["Open", "Closed"],
+        Limitation: { Count: 1000, Cursor: cursor },
+      };
+      const resp = await _callMewsApi("orderItems/getAll", credentials, body);
+      chunkItems.push(...(resp.OrderItems || []));
+      cursor = resp.Cursor || null;
+      page += 1;
+      if (page > 100) break;
+    } while (cursor);
+    return chunkItems;
+  };
+
+  const chunkResults = await Promise.all(chunks.map(pullChunk));
+  const items = chunkResults.flat();
+
+  const want = accountingCategoryIds ? new Set(accountingCategoryIds) : null;
+
+  const monthFmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+  });
+
+  const byAccountingCategoryMonth = {};
+  const monthSet = new Set();
+
+  for (const it of items) {
+    // Same deposit-skip rule as getServiceRevenueByMonth (deposits are a
+    // liability, not revenue — see Mason 2026-04-28 reconciliation).
+    if (it.Type === "Deposit") continue;
+    const accCatId = it.AccountingCategoryId;
+    if (!accCatId) continue;
+    if (want && !want.has(accCatId)) continue;
+    const consumed = it.ConsumedUtc || it.CreatedUtc;
+    if (!consumed) continue;
+    const dt = new Date(consumed);
+    const parts = monthFmt.formatToParts(dt);
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const monthKey = `${y}-${m}`;
+    monthSet.add(monthKey);
+    if (!byAccountingCategoryMonth[accCatId]) byAccountingCategoryMonth[accCatId] = {};
+    if (!byAccountingCategoryMonth[accCatId][monthKey]) {
+      byAccountingCategoryMonth[accCatId][monthKey] = { gross: 0, net: 0, items: 0, nights: 0 };
+    }
+    byAccountingCategoryMonth[accCatId][monthKey].gross += it.Amount?.GrossValue || 0;
+    byAccountingCategoryMonth[accCatId][monthKey].net += it.Amount?.NetValue || 0;
+    byAccountingCategoryMonth[accCatId][monthKey].items += 1;
+    if (it.Type === "SpaceOrder") {
+      byAccountingCategoryMonth[accCatId][monthKey].nights += 1;
+    }
+  }
+
+  const months = [...monthSet].sort();
+
+  return {
+    byAccountingCategoryMonth,
+    months,
+    itemsScanned: items.length,
+    timezone: tz,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════════════
@@ -855,4 +996,5 @@ module.exports = {
 
   // Reporting (Mason Dashboard)
   getServiceRevenueByMonth,
+  getRevenueByAccountingCategoryByMonth,
 };

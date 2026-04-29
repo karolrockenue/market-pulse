@@ -56,36 +56,58 @@ async function requireMasonAccess(req, res, next) {
 // Every Mason route requires a logged-in user with Mason access.
 router.use(requireUserApi, requireMasonAccess);
 
-// Per-hotel catalogue of Reservable services we care about.
-// Mews assigns a unique UUID per hotel, even for identical logical services,
-// so we map each hotel's Short/Mid/Long Stay IDs explicitly.
+// Per-hotel mapping from Mews AccountingCategoryId → logical role
+// (short/mid/long). Mason flagged on 2026-04-29 that both his finance team
+// and his Sales Flash classify revenue by **Accounting Category**, not by
+// the booking-time Service. At Westbourne especially, very long Short-Stay
+// reservations get reposted into the Long Stay accounting category; if we
+// grouped by Service the Long Stay row would understate by ~£20k/month and
+// Short Stay would overstate by the same amount. Grouping by Accounting
+// Category mirrors what Mason sees in the Mews "Order Items Report" UI.
+//
+// AccCatIds were captured 2026-04-29 by enumerating distinct
+// AccountingCategoryIds in each property's orderItems for May–Aug 2026.
+// Names are cross-referenced from the user's Mews exports (the API token
+// in this integration lacks `accountingCategories/getAll` permission).
+//
+// Categories not present in the role map are intentionally excluded from
+// the dashboard total — that's the Mason rule: ignore everything outside
+// Short/Mid/Long Accommodation Income, with the Westbourne exception that
+// Canal – Breakfast Inclusive Rate folds into Short Stay.
 const MF_HOTELS = {
   318329: {
     name: "Mason & Fifth, Belsize Park",
     shortName: "Belsize Park",
-    // Belsize only has a single "Accommodation" Reservable service in Mews,
-    // not the Short/Mid/Long split used at the other properties. Mapped into
-    // the "short" slot; mid/long are intentionally absent and render as £0.
-    services: {
-      short: "c6267c3b-144c-40e2-baf3-b3e00110df1b",
+    // Belsize is a new property and currently posts everything to a single
+    // Accommodation Income category. Mid/Long render as £0 until Mews adds
+    // those categories — at which point we extend this map. The £151
+    // category `fd51d09b...` is a tiny ancillary line we exclude.
+    accountingCategories: {
+      short: ["d30087d1-9400-4550-9838-b3e900b73224"],
     },
   },
   318341: {
     name: "Mason & Fifth, Westbourne Park",
     shortName: "Westbourne Park",
-    services: {
-      short: "e810df20-baa7-4895-a964-b26b00b051b9",
-      mid: "3990f059-4fd8-47b3-ad48-b37600b41a91",
-      long: "72b82965-e525-4001-90d7-b26b00b26959",
+    // Canal – Breakfast Inclusive Rate (`66f3ede9...`) intentionally folds
+    // into Short Stay per Mason 2026-04-29. Cleaning Fee, Security Deposit
+    // £500, and Security Deposits £1500 are intentionally excluded.
+    accountingCategories: {
+      short: [
+        "69d71bed-2cf8-4abe-b7df-b26b00b80ae0", // Accommodation Income – Short Stay
+        "66f3ede9-311a-4032-8d7b-b37100cb5543", // Canal – Breakfast Inclusive Rate (folded in)
+      ],
+      mid: ["09f3c399-8ca0-4418-93bb-b2e400f31f27"], // Accommodation Income – Mid Stay
+      long: ["58dcdf67-55af-44b0-a847-b26b00b7ed18"], // Accommodation Income – Long Stay
     },
   },
   318343: {
     name: "Mason & Fifth, Primrose Hill",
     shortName: "Primrose Hill",
-    services: {
-      short: "b518b662-2504-4092-aa6a-b13400ade71e",
-      mid: "b17bc567-1252-4532-8399-b37e00aad8fd",
-      long: "270856f0-7b69-4425-a558-b14c0090c12d",
+    accountingCategories: {
+      short: ["92fa995e-8e72-40cf-9be8-b14b014a2e40"], // Accommodation Income – Short Stay
+      mid: ["ed8aec0c-5399-4bde-957a-b38000bb48fe"],   // Accommodation Income – Mid Stay
+      long: ["0885a203-9008-4254-a8d6-b39500c0fe2a"],  // Accommodation Income – Long Stay
     },
   },
 };
@@ -204,50 +226,54 @@ router.get("/service-revenue", async (req, res) => {
       return res.json({ ...cached.payload, cachedAt: cached.storedAt });
     }
 
-    // Only request the service IDs that are actually defined for this hotel
-    // (Belsize has only `short`, for example).
-    const serviceIds = ROLE_ORDER
-      .map((r) => hotel.services[r])
-      .filter(Boolean);
-    const idToRole = Object.fromEntries(
-      ROLE_ORDER.filter((r) => hotel.services[r]).map((r) => [hotel.services[r], r]),
-    );
+    // Flatten the per-role AccCatId allowlist into a single set passed to
+    // the adapter. Items in any other category (Cleaning Fee, Security
+    // Deposits, Stay adjustment, Management, Retail, etc.) are excluded.
+    const allowedAccCatIds = ROLE_ORDER
+      .flatMap((r) => hotel.accountingCategories[r] || []);
+    const accCatIdToRole = {};
+    for (const role of ROLE_ORDER) {
+      for (const id of hotel.accountingCategories[role] || []) {
+        accCatIdToRole[id] = role;
+      }
+    }
 
     const t0 = Date.now();
-    const result = await mewsAdapter.getServiceRevenueByMonth(
+    const result = await mewsAdapter.getRevenueByAccountingCategoryByMonth(
       hotelId,
       from,
       to,
-      serviceIds,
+      allowedAccCatIds,
     );
     const elapsedMs = Date.now() - t0;
 
-    // Pivot into a month-first shape keyed by role. Unmapped roles (e.g. Mid
-    // & Long at Belsize) yield zero buckets so the frontend render stays
-    // uniform across properties.
+    // Pivot into a month-first shape keyed by role. Multiple AccCatIds may
+    // map to the same role (e.g. at Westbourne `short` is the union of
+    // Accommodation Income – Short Stay + Canal Breakfast). Roles with no
+    // configured categories at this property (e.g. Mid/Long at Belsize)
+    // render as £0 so the frontend render stays uniform across properties.
     const monthly = result.months.map((month) => {
       const row = { month, services: {}, totalGross: 0, totalNet: 0 };
       for (const role of ROLE_ORDER) {
-        const sid = hotel.services[role];
-        const bucket = sid
-          ? result.byServiceMonth[sid]?.[month] || {
-              gross: 0,
-              net: 0,
-              items: 0,
-              nights: 0,
-            }
-          : { gross: 0, net: 0, items: 0, nights: 0 };
+        const accCatIds = hotel.accountingCategories[role] || [];
+        let gross = 0, net = 0, items = 0, nights = 0;
+        for (const accCatId of accCatIds) {
+          const bucket = result.byAccountingCategoryMonth[accCatId]?.[month];
+          if (!bucket) continue;
+          gross += bucket.gross;
+          net += bucket.net;
+          items += bucket.items;
+          nights += bucket.nights;
+        }
         row.services[role] = {
-          name: sid
-            ? result.services.find((s) => s.id === sid)?.name || role
-            : `${role} (not configured)`,
-          gross: bucket.gross,
-          net: bucket.net,
-          items: bucket.items,
-          nights: bucket.nights,
+          name: accCatIds.length ? role : `${role} (not configured)`,
+          gross,
+          net,
+          items,
+          nights,
         };
-        row.totalGross += bucket.gross;
-        row.totalNet += bucket.net;
+        row.totalGross += gross;
+        row.totalNet += net;
       }
       return row;
     });
@@ -262,7 +288,8 @@ router.get("/service-revenue", async (req, res) => {
       itemsScanned: result.itemsScanned,
       elapsedMs,
       roles: ROLE_ORDER,
-      idToRole,
+      accCatIdToRole,
+      groupedBy: "accountingCategory",
     };
     cache.set(key, { storedAt: Date.now(), payload });
     res.json(payload);
