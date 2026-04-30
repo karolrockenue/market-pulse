@@ -898,9 +898,22 @@ async function getRevenueByAccountingCategoryByMonth(
   // we have to pull all items in window and filter client-side. Server-side
   // ServiceIds filter would shrink the payload but doesn't apply here —
   // the whole point is that ServiceId and AccountingCategoryId can differ.
+  // 11:00 local cutoff matches Mews's Order Items Report day-boundary
+  // (their default property checkout time). End-of-stay items — rebates,
+  // adjustments, cancellation fees — commonly post the morning after the
+  // stay night ends (e.g. a stay ending Sep 30 has a NightRebate consumed
+  // Oct 1 09:00 local). Mews's Sep window catches it; a midnight window
+  // misses it. Verified against Sep 2025 Primrose (3 items netting
+  // -£4,330.20) and the Feb/Mar 2026 boundary swap (£516.78). Locked in
+  // 2026-04-30 after a 6-month Primrose verification (Jan 2025 → Nov 2026).
+  // Keep midnight in getOccupancyMetrics / getRevenueMetrics — those serve
+  // a different purpose (per-stay-night labelling for daily-refresh, not
+  // financial reporting).
+  const at11 = (isoDate) => fromZonedTime(`${isoDate}T11:00:00`, tz).toISOString();
+
   const pullChunk = async (chunk) => {
-    const startUtc = toMewsUtc(chunk.from, tz);
-    const endUtc = toMewsUtc(addDays(chunk.to, 1), tz);
+    const startUtc = at11(chunk.from);
+    const endUtc = at11(addDays(chunk.to, 1));
     const chunkItems = [];
     let cursor = null;
     let page = 0;
@@ -934,15 +947,22 @@ async function getRevenueByAccountingCategoryByMonth(
   const monthSet = new Set();
 
   for (const it of items) {
-    // Same deposit-skip rule as getServiceRevenueByMonth (deposits are a
-    // liability, not revenue — see Mason 2026-04-28 reconciliation).
+    // Mews's Order Items Report Revenue section excludes Type=Deposit items
+    // (they appear under the Transactions section, never in the Total
+    // Revenue header). Skip them globally to match. The earlier 2026-04-30
+    // "fix" that included them inside revenue AccCats was based on a
+    // misread of the May 2025 export — the Mews report keeps Revenue and
+    // Transactions in separate sections per AccCat.
     if (it.Type === "Deposit") continue;
     const accCatId = it.AccountingCategoryId;
     if (!accCatId) continue;
     if (want && !want.has(accCatId)) continue;
     const consumed = it.ConsumedUtc || it.CreatedUtc;
     if (!consumed) continue;
-    const dt = new Date(consumed);
+    // Subtract 11h before deriving the month so items consumed in the
+    // 00:00–10:59 morning window belong to the previous day's month —
+    // matches the 11:00 day-boundary above.
+    const dt = new Date(new Date(consumed).getTime() - 11 * 3600 * 1000);
     const parts = monthFmt.formatToParts(dt);
     const y = parts.find((p) => p.type === "year")?.value;
     const m = parts.find((p) => p.type === "month")?.value;

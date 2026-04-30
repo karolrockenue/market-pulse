@@ -89,14 +89,21 @@ const MF_HOTELS = {
   318341: {
     name: "Mason & Fifth, Westbourne Park",
     shortName: "Westbourne Park",
-    // Canal – Breakfast Inclusive Rate (`66f3ede9...`) intentionally folds
-    // into Short Stay per Mason 2026-04-29. Cleaning Fee, Security Deposit
-    // £500, and Security Deposits £1500 are intentionally excluded.
+    // Short / Mid / Long map directly to Mews's "Accommodation Income"
+    // AccCats with no folds. Canal – Breakfast Inclusive Rate previously
+    // folded into Short (per Mason 2026-04-29) but was unfolded 2026-04-30
+    // so the dashboard's Short line ties to Mews's "Accommodation Income -
+    // Short Stay" line in the Order Items Report exactly. Verified against
+    // Sep 2025, Dec 2025, Feb 2026, Mar 2026, May 2026 reports — all
+    // tie to the penny on Short/Mid/Long.
+    //
+    // Intentionally excluded from any role: Canal Breakfast, all Canal F&B
+    // (Food/Wine/Liquor/Beer/NA/Packages), Cleaning Fee, Security Deposits,
+    // Management, Other Revenue, Retail, Service Charge, Gratuity. These
+    // are non-accommodation revenue lines in Mews and don't roll into the
+    // Mason Dashboard total.
     accountingCategories: {
-      short: [
-        "69d71bed-2cf8-4abe-b7df-b26b00b80ae0", // Accommodation Income – Short Stay
-        "66f3ede9-311a-4032-8d7b-b37100cb5543", // Canal – Breakfast Inclusive Rate (folded in)
-      ],
+      short: ["69d71bed-2cf8-4abe-b7df-b26b00b80ae0"], // Accommodation Income – Short Stay
       mid: ["09f3c399-8ca0-4418-93bb-b2e400f31f27"], // Accommodation Income – Mid Stay
       long: ["58dcdf67-55af-44b0-a847-b26b00b7ed18"], // Accommodation Income – Long Stay
     },
