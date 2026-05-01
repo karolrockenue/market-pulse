@@ -817,6 +817,26 @@ function ProspectCard({ prospect, onClick, draggable, isDragging, onDragStart, o
                 {prospect.b2b_coverage_pct}% B2B
               </span>
             )}
+            {prospect.study_artifact_url && (
+              <a
+                href={prospect.study_artifact_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title="Open study in new tab"
+                style={{
+                  fontSize: 9, padding: "2px 6px", borderRadius: 4,
+                  background: `${PURPLE}18`, color: PURPLE,
+                  border: `1px solid ${PURPLE}30`,
+                  fontWeight: 600, letterSpacing: "0.3px",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  textDecoration: "none",
+                }}
+              >
+                <FileText size={9} />
+                Study
+              </a>
+            )}
           </div>
         )}
 
@@ -1188,7 +1208,7 @@ function ProspectDetailPanel({ prospect, onClose }: {
           </div>
 
           {/* KEY METRICS */}
-          {(prospect.parity_leak_pct !== undefined || prospect.b2b_coverage_pct !== undefined) && (
+          {(prospect.parity_leak_pct !== undefined || prospect.b2b_coverage_pct !== undefined || prospect.study_artifact_url) && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {prospect.parity_leak_pct !== undefined && (
                 <MetricChip label="Parity Leak" value={`${prospect.parity_leak_pct}%`} tone={prospect.parity_leak_pct >= 25 ? RED : AMBER} />
@@ -1197,14 +1217,21 @@ function ProspectDetailPanel({ prospect, onClose }: {
                 <MetricChip label="B2B Coverage" value={`${prospect.b2b_coverage_pct}%`} tone={BLUE} />
               )}
               {prospect.study_artifact_url && (
-                <button style={{
-                  ...btnSecondary, padding: "5px 10px", fontSize: 11,
-                  borderColor: `${PURPLE}40`, color: PURPLE,
-                }}>
+                <a
+                  href={prospect.study_artifact_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    ...btnSecondary, padding: "5px 10px", fontSize: 11,
+                    borderColor: `${PURPLE}40`, color: PURPLE,
+                    textDecoration: "none",
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                  }}
+                >
                   <FileText size={11} />
                   Open Study
                   <ExternalLink size={10} />
-                </button>
+                </a>
               )}
             </div>
           )}
