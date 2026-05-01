@@ -770,7 +770,7 @@ function ProspectCard({ prospect, onClick, draggable, isDragging, onDragStart, o
         </div>
 
         {/* Sub-state badges: researching / demo / metrics */}
-        {(prospect.agent_busy || prospect.demo_at || prospect.parity_leak_pct !== undefined || prospect.b2b_coverage_pct !== undefined) && (
+        {(prospect.agent_busy || prospect.demo_at || prospect.parity_leak_pct !== undefined || prospect.b2b_coverage_pct !== undefined || prospect.study_artifact_url) && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             {prospect.agent_busy && (
               <span style={{
