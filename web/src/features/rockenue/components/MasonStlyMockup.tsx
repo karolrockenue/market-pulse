@@ -20,10 +20,16 @@ import {
 } from "lucide-react";
 import { R } from "../../../styles/tokens";
 
-// ── Mason & Fifth Dashboard — Studio mockup ──
-// Mirrors HotelDashboard layout but KPI cards aggregate the three Mews
-// Reservable services (Short / Mid / Long Stay) and the Recent Bookings
-// panel is scoped to Short Stay only.
+// ── Mason & Fifth Dashboard — STLY MOCKUP ──
+// Exact copy of MasonDashboard with Same-Time-Last-Year additions:
+//   1. STLY delta chip on each of the 3 KPI cards
+//   2. Four stacked visualisation mockups for the new STLY section
+//      A. Atomize-style Pacing Grid (5 KPIs × 12 months × OTB/STLY/Δ rows)
+//      B. Heat-Grid (5 KPIs × 12 months, cells red→green by %vsSTLY)
+//      C. Pace Curve (single-month picker, TY vs LY cumulative OTB)
+//      D. Booking Pulse (last 8 weeks bookings vs same-week LY, by stay-month)
+// All STLY numbers are MOCK — we visualise first, then wire the backend
+// once Mason picks a layout.
 
 const SERVICES = [
   { key: "short", label: "Short Stay", color: "#7BAFD4" },
@@ -48,6 +54,12 @@ interface MonthCard {
   adr: number;
   adrByService: ServiceSplit;
   occByService: ServiceSplit;
+  // STLY mockup additions — synthetic deltas per metric vs Same Time LY
+  stlyDeltas?: {
+    revenue: number | null;
+    occupancy: number | null;
+    adr: number | null;
+  };
 }
 
 const MONTH_LABELS = [
@@ -193,12 +205,52 @@ function MonthCardView({ card }: { card: MonthCard }) {
               <div style={{ textAlign: "right" }}>
                 <div style={smallLabel}>Occupancy</div>
                 <div style={smallValue}>{card.occupancy.toFixed(1)}%</div>
+                {card.stlyDeltas && (
+                  <div style={{ marginTop: 4, display: "flex", justifyContent: "flex-end" }}>
+                    <StlyChip pct={card.stlyDeltas.occupancy} size="xs" />
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={smallLabel}>Avg ADR</div>
                 <div style={smallValue}>{fmt(card.adr)}</div>
+                {card.stlyDeltas && (
+                  <div style={{ marginTop: 4, display: "flex", justifyContent: "flex-end" }}>
+                    <StlyChip pct={card.stlyDeltas.adr} size="xs" />
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* STLY revenue chip — sits under the hero, full width */}
+            {card.stlyDeltas && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: -6,
+                  marginBottom: 14,
+                  padding: "6px 10px",
+                  background: "rgba(200,166,110,0.06)",
+                  border: "1px solid rgba(200,166,110,0.2)",
+                  borderRadius: 5,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: R.gold,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.6,
+                    fontWeight: 700,
+                  }}
+                >
+                  Total Revenue vs Same Time LY
+                </span>
+                <StlyChip pct={card.stlyDeltas.revenue} size="sm" />
+              </div>
+            )}
 
             {/* Service rows — Revenue / Occ / ADR */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
@@ -1182,7 +1234,467 @@ function aggregateRevenueResponses(
   };
 }
 
-interface MasonDashboardProps {
+// ════════════════════════════════════════════════════════════════════
+//  STLY MOCKUP — synthetic data + 4 visualisation candidates
+//  All numbers are illustrative. Real wiring comes after Mason picks a
+//  layout. Shape mirrors the Pacing Flash WB MASTER tab.
+// ════════════════════════════════════════════════════════════════════
+
+type StlyKpiKey = "revenue" | "roomNights" | "adr" | "revpar" | "occupancy";
+
+interface StlyKpiDef {
+  key: StlyKpiKey;
+  label: string;
+  format: (n: number) => string;
+}
+
+const STLY_KPIS: StlyKpiDef[] = [
+  { key: "revenue", label: "Revenue", format: (n) => `£${Math.round(n).toLocaleString()}` },
+  { key: "roomNights", label: "Room Nights", format: (n) => `${Math.round(n).toLocaleString()}` },
+  { key: "adr", label: "ADR", format: (n) => `£${Math.round(n)}` },
+  { key: "revpar", label: "RevPAR", format: (n) => `£${Math.round(n)}` },
+  { key: "occupancy", label: "Occupancy", format: (n) => `${Math.round(n)}%` },
+];
+
+interface StlyMonthRow {
+  monthKey: string;       // "2026-04"
+  monthLabel: string;     // "Apr 26"
+  currentOTB: Record<StlyKpiKey, number>;
+  sameTimeLY: Record<StlyKpiKey, number>;
+  finalLY: Record<StlyKpiKey, number>;
+  forecast: Record<StlyKpiKey, number>;
+}
+
+// Build a 12-month forward window of synthetic STLY pacing data anchored
+// on TODAY. Numbers loosely sized to a 60-key M&F property.
+function buildStlyMockData(): StlyMonthRow[] {
+  const now = new Date();
+  const rows: StlyMonthRow[] = [];
+  // Seed deterministic-ish pseudo-random so the mock looks the same on every reload
+  const seed = (n: number) => {
+    const x = Math.sin(n * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const monthLabel = d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+    const monthIdx = d.getMonth();
+
+    // Seasonal shape — London peaks Jun-Aug, dips Jan-Feb
+    const seasonalMultiplier = 0.65 + 0.45 * Math.sin(((monthIdx - 2) / 12) * Math.PI * 2);
+    // Lead-time decay — first month near full pace, far months pacing low
+    const paceFactor = i === 0 ? 0.92 : Math.max(0.05, 0.85 - i * 0.07);
+
+    const baseOcc = 70 * seasonalMultiplier;
+    const baseAdr = 145 * seasonalMultiplier;
+    const baseRoomsAvail = 60 * 30; // 60 keys × 30 days
+    const ly_occ_final = baseOcc * (0.9 + 0.2 * seed(i + 1));
+    const ly_adr_final = baseAdr * (0.92 + 0.15 * seed(i + 7));
+    const ly_rooms_final = baseRoomsAvail * (ly_occ_final / 100);
+    const ly_revenue_final = ly_rooms_final * ly_adr_final;
+    const ly_revpar_final = ly_revenue_final / baseRoomsAvail;
+
+    // SameTimeLY = LY's own pacing position at the same lead time
+    const sty_occ = ly_occ_final * paceFactor * (0.9 + 0.2 * seed(i + 13));
+    const sty_adr = ly_adr_final * (0.95 + 0.1 * seed(i + 19));
+    const sty_rooms = baseRoomsAvail * (sty_occ / 100);
+    const sty_revenue = sty_rooms * sty_adr;
+    const sty_revpar = sty_revenue / baseRoomsAvail;
+
+    // Current OTB — varying TY-vs-LY signal: some months ahead, some behind
+    const tyStrength = 0.85 + 0.4 * seed(i + 23);
+    const otb_occ = sty_occ * tyStrength;
+    const otb_adr = sty_adr * (0.95 + 0.15 * seed(i + 29));
+    const otb_rooms = baseRoomsAvail * (otb_occ / 100);
+    const otb_revenue = otb_rooms * otb_adr;
+    const otb_revpar = otb_revenue / baseRoomsAvail;
+
+    // Forecast = OTB + remaining-window pickup
+    const forecast_occ = Math.min(98, otb_occ + (1 - paceFactor) * baseOcc);
+    const forecast_adr = otb_adr * (1.0 + (1 - paceFactor) * 0.05);
+    const forecast_rooms = baseRoomsAvail * (forecast_occ / 100);
+    const forecast_revenue = forecast_rooms * forecast_adr;
+    const forecast_revpar = forecast_revenue / baseRoomsAvail;
+
+    rows.push({
+      monthKey,
+      monthLabel,
+      currentOTB: {
+        revenue: otb_revenue,
+        roomNights: otb_rooms,
+        adr: otb_adr,
+        revpar: otb_revpar,
+        occupancy: otb_occ,
+      },
+      sameTimeLY: {
+        revenue: sty_revenue,
+        roomNights: sty_rooms,
+        adr: sty_adr,
+        revpar: sty_revpar,
+        occupancy: sty_occ,
+      },
+      finalLY: {
+        revenue: ly_revenue_final,
+        roomNights: ly_rooms_final,
+        adr: ly_adr_final,
+        revpar: ly_revpar_final,
+        occupancy: ly_occ_final,
+      },
+      forecast: {
+        revenue: forecast_revenue,
+        roomNights: forecast_rooms,
+        adr: forecast_adr,
+        revpar: forecast_revpar,
+        occupancy: forecast_occ,
+      },
+    });
+  }
+  return rows;
+}
+
+function pctDelta(curr: number, prev: number): number | null {
+  if (!prev || prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
+}
+
+function StlyChip({ pct, size = "sm" }: { pct: number | null; size?: "xs" | "sm" }) {
+  if (pct === null || !isFinite(pct)) {
+    return (
+      <span style={{ fontSize: size === "xs" ? 9 : 10, color: R.textDim }}>—</span>
+    );
+  }
+  const up = pct >= 0;
+  const fontSize = size === "xs" ? 9 : 10;
+  const pad = size === "xs" ? "1px 4px" : "2px 6px";
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 2,
+        padding: pad,
+        fontSize,
+        fontWeight: 700,
+        borderRadius: 3,
+        color: up ? R.green : R.red,
+        background: up ? "rgba(52,208,104,0.10)" : "rgba(239,68,68,0.10)",
+        lineHeight: 1.1,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {up ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
+    </span>
+  );
+}
+
+// Heat colour scale: red at -25%, neutral at 0%, green at +25%
+
+// ════════════════════════════════════════════════════════════════════
+//  Pacing Grid — Per-property STLY view
+//  6 months (current + 5 forward). Per KPI: OTB (headline) / STLY (ref) / Δ%.
+//  Visual hierarchy: OTB row dominant, STLY secondary, Δ chips emphasised.
+//  Current month column highlighted with a left accent border.
+// ════════════════════════════════════════════════════════════════════
+function StlyMockupA_PacingGrid({ data }: { data: StlyMonthRow[] }) {
+  const months = data.slice(0, 6);
+  const cols = `170px repeat(${months.length}, 1fr)`;
+
+  // Period totals across the visible window — strip headline above the grid
+  const periodTotals = useMemo(() => {
+    const otbRev = months.reduce((s, r) => s + r.currentOTB.revenue, 0);
+    const stlyRev = months.reduce((s, r) => s + r.sameTimeLY.revenue, 0);
+    return {
+      otbRev,
+      stlyRev,
+      delta: pctDelta(otbRev, stlyRev),
+    };
+  }, [months]);
+
+  const fmtRev = (v: number) =>
+    v >= 1_000_000 ? `£${(v / 1_000_000).toFixed(2)}M` : `£${Math.round(v / 1000)}k`;
+
+  return (
+    <div
+      style={{
+        background: R.darkBand,
+        border: `1px solid ${R.border}`,
+        borderRadius: 10,
+        padding: 20,
+        marginBottom: 20,
+        fontVariantNumeric: "tabular-nums",
+        overflowX: "auto",
+      }}
+    >
+      {/* Section header */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 16,
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 9,
+              color: R.gold,
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              fontWeight: 700,
+              marginBottom: 4,
+            }}
+          >
+            Pacing vs Same Time Last Year
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: R.accent, letterSpacing: -0.2 }}>
+            {months.length}-Month Outlook · {months[0]?.monthLabel} → {months[months.length - 1]?.monthLabel}
+          </div>
+          <div style={{ fontSize: 10, color: R.textDim, marginTop: 3 }}>
+            Bold row = Current On-the-Books · Dim row = Same Time Last Year · Chip = Δ%
+          </div>
+        </div>
+
+        {/* Period revenue summary */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+            padding: "10px 16px",
+            background: "rgba(123,175,212,0.05)",
+            border: `1px solid ${R.border}`,
+            borderRadius: 8,
+          }}
+        >
+          <div style={{ textAlign: "right" }}>
+            <div
+              style={{
+                fontSize: 9,
+                color: R.textDim,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Period OTB
+            </div>
+            <div style={{ fontSize: 18, color: R.accent, fontWeight: 600, letterSpacing: -0.3 }}>
+              {fmtRev(periodTotals.otbRev)}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div
+              style={{
+                fontSize: 9,
+                color: R.textDim,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              vs STLY
+            </div>
+            <div style={{ fontSize: 14, color: R.textMid, fontWeight: 500 }}>
+              {fmtRev(periodTotals.stlyRev)}
+            </div>
+            <div style={{ marginTop: 3 }}>
+              <StlyChip pct={periodTotals.delta} size="sm" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ minWidth: 760 }}>
+        {/* Month header strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: cols,
+            padding: "8px 0 10px",
+            borderBottom: `1px solid ${R.border}`,
+            alignItems: "end",
+          }}
+        >
+          <div />
+          {months.map((r, i) => (
+            <div
+              key={r.monthKey}
+              style={{
+                fontSize: 10,
+                color: i === 0 ? R.warmTeal : R.textMid,
+                textTransform: "uppercase",
+                letterSpacing: 0.6,
+                fontWeight: 700,
+                textAlign: "right",
+                padding: "0 10px",
+                position: "relative",
+              }}
+            >
+              {r.monthLabel}
+              {i === 0 && (
+                <div
+                  style={{
+                    fontSize: 8,
+                    color: R.warmTeal,
+                    fontWeight: 600,
+                    marginTop: 2,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  · Current
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {STLY_KPIS.map((kpi, kIdx) => (
+          <div
+            key={kpi.key}
+            style={{
+              marginTop: kIdx > 0 ? 4 : 8,
+              padding: "10px 0 12px",
+              background: kIdx % 2 === 0 ? "rgba(255,255,255,0.012)" : "transparent",
+              borderRadius: 6,
+            }}
+          >
+            {/* KPI label header strip */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: cols,
+                alignItems: "center",
+                padding: "0 0 8px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  color: R.gold,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.6,
+                  paddingLeft: 4,
+                }}
+              >
+                {kpi.label}
+              </div>
+              {months.map((r, i) => (
+                <div
+                  key={r.monthKey}
+                  style={{
+                    textAlign: "right",
+                    padding: "0 10px",
+                    borderLeft: i === 0 ? `2px solid rgba(56,198,186,0.4)` : "none",
+                  }}
+                >
+                  <StlyChip
+                    pct={pctDelta(r.currentOTB[kpi.key], r.sameTimeLY[kpi.key])}
+                    size="sm"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* OTB — dominant row */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: cols,
+                padding: "3px 0",
+                alignItems: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  color: R.textMid,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  paddingLeft: 18,
+                  fontWeight: 600,
+                }}
+              >
+                On the Books
+              </div>
+              {months.map((r, i) => (
+                <div
+                  key={r.monthKey}
+                  style={{
+                    fontSize: 13,
+                    color: R.accent,
+                    fontWeight: 600,
+                    textAlign: "right",
+                    padding: "2px 10px",
+                    borderLeft: i === 0 ? `2px solid rgba(56,198,186,0.4)` : "none",
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {kpi.format(r.currentOTB[kpi.key])}
+                </div>
+              ))}
+            </div>
+
+            {/* STLY — secondary row */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: cols,
+                padding: "3px 0",
+                alignItems: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  color: R.textDim,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  paddingLeft: 18,
+                }}
+              >
+                Same Time LY
+              </div>
+              {months.map((r, i) => (
+                <div
+                  key={r.monthKey}
+                  style={{
+                    fontSize: 11,
+                    color: R.textMid,
+                    fontWeight: 400,
+                    textAlign: "right",
+                    padding: "0 10px",
+                    borderLeft: i === 0 ? `2px solid rgba(56,198,186,0.4)` : "none",
+                  }}
+                >
+                  {kpi.format(r.sameTimeLY[kpi.key])}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
+// ════════════════════════════════════════════════════════════════════
+//  STLY Section — Pacing Grid only (per-property, scoped)
+// ════════════════════════════════════════════════════════════════════
+function StlyMockupSection() {
+  const data = useMemo(buildStlyMockData, []);
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <StlyMockupA_PacingGrid data={data} />
+    </div>
+  );
+}
+
+interface MasonStlyMockupProps {
   /**
    * If set, the dashboard shows numbers for only this single Mason hotel.
    * If null/undefined, it aggregates across every Mason hotel the user has
@@ -1192,7 +1704,7 @@ interface MasonDashboardProps {
   onNavigate?: (view: string) => void;
 }
 
-export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashboardProps = {}) {
+export function MasonStlyMockup({ scopedHotelId = null, onNavigate }: MasonStlyMockupProps = {}) {
   const window = useMemo(buildWindow, []);
   const [accessibleHotels, setAccessibleHotels] = useState<MasonHotel[] | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -1364,6 +1876,19 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
         const scale = key === "long" ? LONG_NIGHTS_PER_UNIT : 1;
         return (nightsByService[key] * scale / capacityNights) * 100;
       };
+      // STLY mockup: deterministic synthetic delta per month so the chip
+      // values are stable across reloads. Real backend wires in here later.
+      const stlySeed = (n: number) => {
+        const x = Math.sin((n + 1) * 91.234) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      const monthIdx = parseInt(m.split("-")[1], 10);
+      const stlyDeltas = {
+        revenue: -18 + stlySeed(monthIdx + i * 3) * 36,    // -18% .. +18%
+        occupancy: -12 + stlySeed(monthIdx + 17 + i) * 24, // -12% .. +12%
+        adr: -8 + stlySeed(monthIdx + 31 + i) * 16,        //  -8% .. +8%
+      };
+
       out.push({
         title: window.titles[i],
         label: monthLabel(m),
@@ -1380,6 +1905,7 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
           mid: svcOcc("mid"),
           long: svcOcc("long"),
         },
+        stlyDeltas,
       });
     });
     return out;
@@ -1779,6 +2305,9 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
             />
           </div>
         </div>
+
+        {/* ── STLY Pacing Grid (mockup) — sits under the 90-day occ chart ── */}
+        <StlyMockupSection />
 
         {/* Market outlook + demand chart */}
         {(() => {

@@ -23,6 +23,7 @@ import {
   Pin,
   PinOff,
   Activity,
+  Briefcase,
 } from "lucide-react";
 import { R } from "../styles/tokens";
 import {
@@ -456,10 +457,11 @@ export function AppSidebar({
                   </>
                 )}
 
-                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["crm", "distribution", "channelPricing"])}
+                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["sales", "crm", "distribution", "channelPricing"])}
                 {rockenueOpen && (
                   <>
-                    {navItem("CRM", "crm", ClipboardList, true)}
+                    {navItem("Sales", "sales", Briefcase, true)}
+                    {navItem("Tasks", "crm", ClipboardList, true)}
                     {navItem("Distribution", "distribution", Globe, true)}
                     {navItem("Channel Pricing", "channelPricing", DollarSign, true)}
                   </>
@@ -467,19 +469,26 @@ export function AppSidebar({
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "emailSignatures", "deckV2", "shreejiDeck", "canvas", "reportsLab", "topnavPills"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDashboard", "mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "masonStlyMockup", "masonSalesFlash", "masonPacingFlash", "masonGOPCalculator", "emailSignatures", "deckV2", "shreejiDeck", "pitchDeck", "canvas", "reportsLab", "topnavPills", "salesCrmMockup"])}
                 {studioOpen && (
                   <>
+                    {navItem("MP Dashboard", "mpDashboard", MonitorSmartphone, true)}
                     {navItem("MP Reports", "mpReportsHub", MonitorSmartphone, true)}
                     {navItem("MP Demand Radar", "mpDemandRadar", MonitorSmartphone, true)}
                     {navItem("MP Risk Overview", "mpRiskOverview", MonitorSmartphone, true)}
                     {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
                     {navItem("Mason Dashboard", "masonDashboard", MonitorSmartphone, true)}
+                    {navItem("Mason STLY Mockup", "masonStlyMockup", MonitorSmartphone, true)}
+                    {navItem("Mason Sales Flash", "masonSalesFlash", MonitorSmartphone, true)}
+                    {navItem("Mason Pacing Flash", "masonPacingFlash", MonitorSmartphone, true)}
+                    {navItem("Mason GOP Calculator", "masonGOPCalculator", MonitorSmartphone, true)}
                     {navItem("Email Signatures", "emailSignatures", MonitorSmartphone, true)}
                     {navItem("Reports Lab", "reportsLab", FileText, true)}
                     {navItem("TopNav Pills", "topnavPills", MonitorSmartphone, true)}
+                    {navItem("Sales CRM", "salesCrmMockup", Briefcase, true)}
                     {navItem("Deck V2", "deckV2", Presentation, true)}
                     {navItem("Shreeji Deck", "shreejiDeck", Presentation, true)}
+                    {navItem("Pitch Deck", "pitchDeck", Presentation, true)}
                     {navItem("Canvas", "canvas", Palette, true)}
                   </>
                 )}

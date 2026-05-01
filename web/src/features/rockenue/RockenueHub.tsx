@@ -14,9 +14,16 @@ const MPReportsHub = lazy(() => import("./components/MPReportsHub").then(m => ({
 const MPDemandRadar = lazy(() => import("./components/MPDemandRadar").then(m => ({ default: m.MPDemandRadar })));
 const MPRiskOverview = lazy(() => import("./components/MPRiskOverview").then(m => ({ default: m.MPRiskOverview })));
 const MPLogin = lazy(() => import("./components/MPLogin").then(m => ({ default: m.MPLogin })));
+const MPDashboardMockup = lazy(() => import("./components/MPDashboardMockup").then(m => ({ default: m.MPDashboardMockup })));
 const MasonDashboard = lazy(() => import("./components/MasonDashboard").then(m => ({ default: m.MasonDashboard })));
+const MasonStlyMockup = lazy(() => import("./components/MasonStlyMockup").then(m => ({ default: m.MasonStlyMockup })));
+const MasonSalesFlash = lazy(() => import("./components/MasonSalesFlash").then(m => ({ default: m.MasonSalesFlash })));
+const MasonPacingFlash = lazy(() => import("./components/MasonPacingFlash").then(m => ({ default: m.MasonPacingFlash })));
+const MasonGOPCalculator = lazy(() => import("./components/MasonGOPCalculator").then(m => ({ default: m.MasonGOPCalculator })));
 const ReportsLab = lazy(() => import("./components/ReportsLab").then(m => ({ default: m.ReportsLab })));
 const TopNavPillsMockup = lazy(() => import("./components/TopNavPillsMockup").then(m => ({ default: m.TopNavPillsMockup })));
+const SalesCrmMockup = lazy(() => import("./components/SalesCrmMockup").then(m => ({ default: m.SalesCrmMockup })));
+const SalesHub = lazy(() => import("./components/SalesCrmMockup").then(m => ({ default: m.SalesHub })));
 
 interface RockenueHubProps {
   activeView: string;
@@ -59,9 +66,16 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "mpDemandRadar" && <MPDemandRadar activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpRiskOverview" && <MPRiskOverview activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpLogin" && <MPLogin activeView={activeView} onNavigate={onNavigate} />}
+          {activeView === "mpDashboard" && <MPDashboardMockup />}
           {activeView === "masonDashboard" && <MasonDashboard />}
+          {activeView === "masonStlyMockup" && <MasonStlyMockup />}
+          {activeView === "masonSalesFlash" && <MasonSalesFlash />}
+          {activeView === "masonPacingFlash" && <MasonPacingFlash />}
+          {activeView === "masonGOPCalculator" && <MasonGOPCalculator />}
           {activeView === "reportsLab" && <ReportsLab />}
           {activeView === "topnavPills" && <TopNavPillsMockup />}
+          {activeView === "salesCrmMockup" && <SalesCrmMockup />}
+          {activeView === "sales" && <SalesHub />}
         </Suspense>
       </div>
     </div>

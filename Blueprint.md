@@ -688,6 +688,34 @@ Behaviour:
   SpaceOrder items are monthly units, so the UI labels its ADR `/mo`
   and the occ share multiplies nights ×30 (accurate to ±20%).
 
+rockenue/components/MasonSalesFlash.tsx + MasonPacingFlash.tsx
+(Studio mockups, added 2026-04-30)
+
+Static design mockups for Mason & Fifth's investor reporting pack.
+Live under Studio in the sidebar — not yet a productized feature.
+
+- **Sales Flash** mirrors the WB Sales Flash spreadsheet layout:
+  Current Month Summary (Revenues + KPIs vs PM/PY/Budget), Annualised
+  vs Budget grid, BOB & Business Done split, Pacing Report by service,
+  Weekly Unit Pacing, Accommodation Bookings (SS weekly + LS new
+  deals by booking-window tier), Ancillaries (Canal/Meadow/Grounding).
+- **Pacing Flash** mirrors the Atomize-style pacing sheet: 13-month
+  grid (Jun → Jun) × 5 KPIs (Revenue, Room Nights, RevPAR, ADR, Occ)
+  with rows for Last Pacing Report, Current OTB, Forecast, Final Month
+  LY, Same Time LY, % vs LPR, % vs STLY. Property switcher across the
+  three M&F hotels. Plus a Booking Pulse block (8-week new bookings /
+  cancellations / revenue picked up, attributed to a stay month).
+
+Both pages use mock numbers seeded from the actual reports so users
+recognise the structure. Both have a placeholder "Export Excel"
+button (disabled, "coming soon") so the entry point exists for future
+wiring. Visual style is intentionally subtle — flat tabular grid,
+desaturated red/green deltas, no chips, no coloured lanes — matches
+the rest of MP's monochrome reporting surfaces.
+
+Backend wiring (live AccCat-grouped revenue + pacing snapshots +
+forecast) is the next step once Mason signs off on the layout.
+
 Shared Components & Utilities
 
 web/src/components/TopNav.tsx, LandingPage.tsx, InitialSyncScreen.tsx, NotificationBell.tsx, MarketVeil.tsx, SettingsPage.tsx, SupportPage.tsx, modal components, etc.

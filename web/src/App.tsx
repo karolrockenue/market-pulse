@@ -46,6 +46,7 @@ import { LandingPage } from "./components/LandingPage";
 import { Deck } from "./components/Deck";
 import { ShreejiDeck } from "./components/ShreejiDeck";
 import { DeckV2 } from "./components/DeckV2";
+import { PitchDeck } from "./components/PitchDeck";
 import { MarketProfile } from "./components/MarketProfile";
 import { MarketVeil } from "./components/MarketVeil";
 import { ArchanesInvestorView } from "./features/market-intel/components/ArchanesInvestorView";
@@ -735,6 +736,12 @@ export default function App() {
     );
   }
 
+  if (activeView === "pitchDeck") {
+    return (
+      <PitchDeck onBack={() => setActiveView(previousView || "dashboard")} />
+    );
+  }
+
   return (
     activeView && (
       // [MODIFIED] Wrap the entire app content with ActionListProvider (ErrorBoundary moved to main.tsx)
@@ -797,7 +804,7 @@ export default function App() {
           {activeView === "dashboard" &&
             (isMasonProperty(property) ? (
               <Suspense fallback={null}>
-                <LazyMasonDashboard scopedHotelId={parseInt(property, 10)} />
+                <LazyMasonDashboard scopedHotelId={parseInt(property, 10)} onNavigate={handleViewChange} />
               </Suspense>
             ) : (
               <DashboardHub
@@ -970,9 +977,16 @@ export default function App() {
             activeView === "mpDemandRadar" ||
             activeView === "mpRiskOverview" ||
             activeView === "mpLogin" ||
+            activeView === "mpDashboard" ||
             activeView === "masonDashboard" ||
+            activeView === "masonStlyMockup" ||
+            activeView === "masonSalesFlash" ||
+            activeView === "masonPacingFlash" ||
+            activeView === "masonGOPCalculator" ||
             activeView === "reportsLab" ||
-            activeView === "topnavPills") && (
+            activeView === "topnavPills" ||
+            activeView === "salesCrmMockup" ||
+            activeView === "sales") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
