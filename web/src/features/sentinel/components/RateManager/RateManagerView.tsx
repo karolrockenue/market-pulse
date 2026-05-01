@@ -950,7 +950,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                   className="h-9 text-sm"
                 >
                   <Zap className="w-4 h-4 mr-2" />
-                  Apply AI (
+                  Push AI Rates (
                   {
                     visibleData.filter(
                       (d) => !d.isFrozen && aiPredictions[d.date],

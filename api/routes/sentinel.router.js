@@ -186,6 +186,7 @@ const RATES_VIEW_PATHS = new Set([
   "/pace-curves",
   "/min-rates",
   "/rate-overrides",
+  "/apply-ai-rates",
 ]);
 
 router.use(async (req, res, next) => {
@@ -1587,6 +1588,77 @@ router.delete("/rate-overrides/:hotelId", async (req, res) => {
     return res.status(200).json({ success: true, ...result });
   } catch (err) {
     console.error("[rate-overrides DELETE] Error:", err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =============================================================================
+// /apply-ai-rates/:hotelId — accept AI predictions WITHOUT pinning.
+//
+// The bulk "Push AI Rates" button (Rate Manager) and the per-cell AI accept
+// affordance both land here. Semantics differ from /rate-overrides:
+//   1. ANY existing override row at the listed dates is DELETED — the user
+//      is explicitly handing pricing back to the engine.
+//   2. The engine recomputes (via recalculateRates) and queues the result to
+//      PMS. No row is written to sentinel_rate_overrides.
+//   3. Matching sentinel_ai_predictions rows are flagged is_applied=true so
+//      the UI's blue-dot badges clear.
+//
+// This is the path for "I changed the min rate, push the new AI rates" — it
+// will not freeze AI out of those dates the way /rate-overrides does. See
+// blueprint §4.15 for why the two paths must stay distinct.
+// =============================================================================
+
+router.post("/apply-ai-rates/:hotelId", async (req, res) => {
+  const hotelId = Number(req.params.hotelId);
+  if (!Number.isInteger(hotelId)) {
+    return res.status(400).json({ success: false, message: "hotelId must be an integer" });
+  }
+  const { dates } = req.body || {};
+  if (!Array.isArray(dates) || dates.length === 0) {
+    return res.status(400).json({ success: false, message: "dates array required" });
+  }
+  const validDates = dates.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (validDates.length === 0) {
+    return res.status(400).json({ success: false, message: "no valid YYYY-MM-DD dates" });
+  }
+
+  try {
+    // 1. Release any existing pins for these dates so the recalc actually pushes.
+    const releaseRes = await db.query(
+      `DELETE FROM sentinel_rate_overrides
+       WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
+      [hotelId, validDates],
+    );
+
+    // 2. Mark the matching predictions as applied (badge state for the UI).
+    const markRes = await db.query(
+      `UPDATE sentinel_ai_predictions
+       SET is_applied = true
+       WHERE hotel_id = $1 AND stay_date = ANY($2::date[])`,
+      [hotelId, validDates],
+    );
+
+    // 3. Recalculate over the spanning window. recalculateRates skips dates
+    //    that still have override rows (none of these do, by step 1) and
+    //    pushes engine prices via the job queue.
+    const sortedDates = [...validDates].sort();
+    const startDate = sortedDates[0];
+    const endDate = sortedDates[sortedDates.length - 1];
+    const recalcResult = await sentinelService.recalculateRates(
+      hotelId,
+      startDate,
+      endDate,
+    );
+
+    return res.status(202).json({
+      success: true,
+      released: releaseRes.rowCount,
+      predictionsMarked: markRes.rowCount,
+      ...recalcResult,
+    });
+  } catch (err) {
+    console.error("[apply-ai-rates POST] Error:", err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

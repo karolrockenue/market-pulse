@@ -11,6 +11,7 @@ import {
   getRateOverrides,
   saveRateOverrides,
   deleteRateOverrides,
+  applyAiRates,
 } from "../api/sentinel.api";
 import { RateCalendarDay, AssetConfig } from "../api/types";
 
@@ -368,9 +369,17 @@ export const useRateGrid = () => {
     [pickupWindow]
   );
 
-  // ... (setOverride, clearOverride, submitChanges Unchanged) ...
   const setOverride = (date: string, value: number) => {
     setPendingOverrides((prev) => ({ ...prev, [date]: value }));
+    // A typed value is a manual pin, not an AI accept. If this date had been
+    // staged via Apply AI, drop it from that set so submit routes it through
+    // saveRateOverrides (pin) instead of applyAiRates (engine push).
+    setAiApprovedPending((prev) => {
+      if (!prev.has(date)) return prev;
+      const next = new Set(prev);
+      next.delete(date);
+      return next;
+    });
   };
 
   const clearOverride = (date: string) => {
@@ -437,32 +446,52 @@ export const useRateGrid = () => {
 
     setIsSubmitting(true);
     const snapshot = { ...pendingOverrides };
-    const payload = Object.keys(snapshot).map((date) => ({
+    const aiSnapshot = new Set(aiApprovedPending);
+
+    // Partition: AI-accepted dates push through the engine without pinning;
+    // typed dates pin via sentinel_rate_overrides. The AI path also releases
+    // any prior pin so the recalc actually reaches PMS for those dates.
+    const typedDates = Object.keys(snapshot).filter((d) => !aiSnapshot.has(d));
+    const aiDates = Object.keys(snapshot).filter((d) => aiSnapshot.has(d));
+
+    const typedPayload = typedDates.map((date) => ({
       stayDate: date,
       price: snapshot[date],
     }));
 
-    // Optimistic UI: every save becomes a persistent override and pins
-    // the date as "Override" in the grid.
+    // Optimistic UI:
+    //  - typed → source "OVERRIDE", rateOverrides map updated (pinned).
+    //  - AI    → source "SENTINEL", rateOverrides map cleared for that date
+    //            (the engine now owns it; any prior pin is being released).
     setCalendarData((prev) =>
-      prev.map((d) =>
-        snapshot[d.date] !== undefined
-          ? { ...d, rate: snapshot[d.date], liveRate: snapshot[d.date], source: "OVERRIDE" }
-          : d
-      )
+      prev.map((d) => {
+        if (typedDates.includes(d.date)) {
+          return { ...d, rate: snapshot[d.date], liveRate: snapshot[d.date], source: "OVERRIDE" };
+        }
+        if (aiDates.includes(d.date)) {
+          return { ...d, rate: snapshot[d.date], source: "SENTINEL" };
+        }
+        return d;
+      })
     );
     setRateOverrides((prev) => {
       const next = { ...prev };
-      payload.forEach((o) => { next[o.stayDate] = o.price; });
+      typedPayload.forEach((o) => { next[o.stayDate] = o.price; });
+      aiDates.forEach((date) => { delete next[date]; });
       return next;
     });
+
+    // Snapshot the prior rateOverrides so a partial failure can roll back
+    // both directions of mutation (added pins / released pins).
+    const priorOverrides = { ...rateOverrides };
 
     setPendingOverrides({});
     setSavedOverrides({});
     setAiApprovedPending(new Set());
 
+    const totalCount = typedPayload.length + aiDates.length;
     toast.message("Syncing...", {
-      description: `Queuing ${payload.length} update${payload.length === 1 ? "" : "s"}...`,
+      description: `Queuing ${totalCount} update${totalCount === 1 ? "" : "s"}...`,
       style: {
         backgroundColor: "#0f151a",
         border: "1px solid #2a2a2a",
@@ -470,31 +499,84 @@ export const useRateGrid = () => {
       },
     });
 
+    const tasks: Array<Promise<{ kind: "typed" | "ai"; ok: boolean; error?: any }>> = [];
+    if (typedPayload.length > 0) {
+      tasks.push(
+        saveRateOverrides(hotelId, typedPayload)
+          .then(() => ({ kind: "typed" as const, ok: true }))
+          .catch((error) => ({ kind: "typed" as const, ok: false, error }))
+      );
+    }
+    if (aiDates.length > 0) {
+      tasks.push(
+        applyAiRates(hotelId, aiDates)
+          .then(() => ({ kind: "ai" as const, ok: true }))
+          .catch((error) => ({ kind: "ai" as const, ok: false, error }))
+      );
+    }
+
     try {
-      await saveRateOverrides(hotelId, payload);
-      toast.success("Updates Queued", {
-        style: {
-          backgroundColor: "#0f151a",
-          border: "1px solid #38C6BA",
-          color: "#38C6BA",
-        },
-      });
-    } catch (err: any) {
-      console.error(err);
+      const results = await Promise.all(tasks);
+      const failures = results.filter((r) => !r.ok);
+
+      if (failures.length === 0) {
+        const parts: string[] = [];
+        if (typedPayload.length) parts.push(`${typedPayload.length} pinned`);
+        if (aiDates.length) parts.push(`${aiDates.length} AI pushed`);
+        toast.success("Updates Queued", {
+          description: parts.join(" · "),
+          style: {
+            backgroundColor: "#0f151a",
+            border: "1px solid #38C6BA",
+            color: "#38C6BA",
+          },
+        });
+        return;
+      }
+
+      // Roll back state for whichever path failed.
+      const typedFailed = failures.some((f) => f.kind === "typed");
+      const aiFailed = failures.some((f) => f.kind === "ai");
+
       setRateOverrides((prev) => {
         const next = { ...prev };
-        payload.forEach((o) => { delete next[o.stayDate]; });
+        if (typedFailed) {
+          typedPayload.forEach((o) => { delete next[o.stayDate]; });
+        }
+        if (aiFailed) {
+          // Restore any pins we optimistically released.
+          aiDates.forEach((d) => {
+            if (priorOverrides[d] !== undefined) next[d] = priorOverrides[d];
+          });
+        }
         return next;
       });
-      toast.error("Save failed", {
-        description: err?.message || "Please refresh and try again.",
+      // Re-stage the failed entries so the user can retry.
+      setPendingOverrides((prev) => {
+        const next = { ...prev };
+        if (typedFailed) typedPayload.forEach((o) => { next[o.stayDate] = o.price; });
+        if (aiFailed) aiDates.forEach((d) => { next[d] = snapshot[d]; });
+        return next;
+      });
+      if (aiFailed) {
+        setAiApprovedPending((prev) => {
+          const next = new Set(prev);
+          aiDates.forEach((d) => next.add(d));
+          return next;
+        });
+      }
+
+      const msg = failures
+        .map((f) => `${f.kind === "typed" ? "Pinned saves" : "AI push"}: ${f.error?.message || "failed"}`)
+        .join(" · ");
+      toast.error("Save partially failed", {
+        description: msg,
         style: {
           backgroundColor: "#0f151a",
           border: "1px solid #ef4444",
           color: "#ef4444",
         },
       });
-      setPendingOverrides(snapshot);
     } finally {
       setIsSubmitting(false);
     }

@@ -203,6 +203,30 @@ export const deleteRateOverrides = async (
   return json;
 };
 
+// Accept AI predictions without pinning — releases any existing override rows
+// for these dates and triggers a recalc + PMS push at the engine's current
+// view. Use this when the user's intent is "let AI manage these dates", not
+// "freeze this price". See sentinel.router.js /apply-ai-rates handler.
+export const applyAiRates = async (
+  hotelId: string | number,
+  dates: string[]
+): Promise<{
+  released: number;
+  predictionsMarked: number;
+  totalQueued: number;
+  debounced?: boolean;
+  lastRunSecondsAgo?: number;
+}> => {
+  const res = await fetch(`/api/sentinel/apply-ai-rates/${hotelId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dates }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || json.error || "Failed to apply AI rates");
+  return json;
+};
+
 export const getDailyPickup = async (
   hotelId: string,
   startDate: string,
