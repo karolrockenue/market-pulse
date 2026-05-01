@@ -1,9 +1,25 @@
 const db = require("../utils/db");
+const path = require("path");
+const fs = require("fs");
 const {
   calculatePriceIndex,
   calculateMarketDemand,
   calculatePace,
 } = require("../utils/market-codex.utils");
+
+// Static PredictHQ exports per city. Trial expired April 2026; the lean events
+// snapshot is loaded once at boot and filtered on-demand by date.
+const STATIC_EVENTS_FILES = {
+  london: path.join(__dirname, "..", "data", "predicthq-london-2026.json"),
+};
+const STATIC_EVENTS_CACHE = {};
+function loadStaticEvents(slug) {
+  if (STATIC_EVENTS_CACHE[slug] !== undefined) return STATIC_EVENTS_CACHE[slug];
+  const file = STATIC_EVENTS_FILES[slug];
+  if (!file || !fs.existsSync(file)) return (STATIC_EVENTS_CACHE[slug] = null);
+  STATIC_EVENTS_CACHE[slug] = JSON.parse(fs.readFileSync(file, "utf8"));
+  return STATIC_EVENTS_CACHE[slug];
+}
 
 // Helper to ensure city names match DB slugs (e.g. "Las Vegas" -> "las-vegas")
 const slugify = (city) =>
@@ -356,23 +372,46 @@ class MarketService {
       return MarketService._getForwardViewAirbnb(citySlug);
     }
 
+    // Latest snapshot per checkin_date for fresh supply counts; LEFT JOIN
+    // the most recent non-null-WAP snapshot per date so transient price-
+    // histogram scrape failures don't blank the demand chart.
     const sql = `
-      SELECT DISTINCT ON (checkin_date)
-        checkin_date,
-        total_results,
-        weighted_avg_price,
-        facet_star_rating,
-        facet_price_histogram,
-        min_price_anchor,
-        max_price_anchor,
-        COALESCE(hotel_count, total_results) as hotel_count
-      FROM market_availability_snapshots
-      WHERE
-        LOWER(city_slug) = LOWER($1)
-        AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
-      ORDER BY
-        checkin_date ASC,
-        scraped_at DESC;
+      WITH latest AS (
+        SELECT DISTINCT ON (checkin_date)
+          checkin_date,
+          total_results,
+          hotel_count
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+        ORDER BY checkin_date ASC, scraped_at DESC
+      ),
+      last_priced AS (
+        SELECT DISTINCT ON (checkin_date)
+          checkin_date,
+          weighted_avg_price,
+          facet_star_rating,
+          facet_price_histogram,
+          min_price_anchor,
+          max_price_anchor
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+          AND weighted_avg_price IS NOT NULL
+        ORDER BY checkin_date ASC, scraped_at DESC
+      )
+      SELECT
+        l.checkin_date,
+        l.total_results,
+        p.weighted_avg_price,
+        p.facet_star_rating,
+        p.facet_price_histogram,
+        p.min_price_anchor,
+        p.max_price_anchor,
+        COALESCE(l.hotel_count, l.total_results) AS hotel_count
+      FROM latest l
+      LEFT JOIN last_priced p ON l.checkin_date = p.checkin_date
+      ORDER BY l.checkin_date ASC;
     `;
 
     const { rows } = await db.query(sql, [citySlug]);
@@ -497,16 +536,38 @@ class MarketService {
     }
 
     // --- Query 1: Get LATEST data for all 90 days ---
+    // Mirrors getForwardView: latest snapshot for supply, last non-null
+    // snapshot for WAP so transient histogram-scrape misses don't blank
+    // the pace chart.
     const latestSql = `
-      SELECT DISTINCT ON (checkin_date)
-        checkin_date, total_results, weighted_avg_price, 
-        COALESCE(hotel_count, total_results) as hotel_count
-      FROM market_availability_snapshots
-      WHERE
-        LOWER(city_slug) = LOWER($1)
-        AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
-      ORDER BY
-        checkin_date ASC, scraped_at DESC;
+      WITH latest AS (
+        SELECT DISTINCT ON (checkin_date)
+          checkin_date,
+          total_results,
+          hotel_count
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+        ORDER BY checkin_date ASC, scraped_at DESC
+      ),
+      last_priced AS (
+        SELECT DISTINCT ON (checkin_date)
+          checkin_date,
+          weighted_avg_price
+        FROM market_availability_snapshots
+        WHERE LOWER(city_slug) = LOWER($1)
+          AND checkin_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'
+          AND weighted_avg_price IS NOT NULL
+        ORDER BY checkin_date ASC, scraped_at DESC
+      )
+      SELECT
+        l.checkin_date,
+        l.total_results,
+        p.weighted_avg_price,
+        COALESCE(l.hotel_count, l.total_results) AS hotel_count
+      FROM latest l
+      LEFT JOIN last_priced p ON l.checkin_date = p.checkin_date
+      ORDER BY l.checkin_date ASC;
     `;
 
     const { rows: latestRowsRaw } = await db.query(latestSql, [citySlug]);
@@ -1557,119 +1618,23 @@ class MarketService {
   // ── PredictHQ Events ──
 
   static async getPredictHQEvents(citySlug) {
-    const PREDICTHQ_TOKEN = process.env.PREDICTHQ_ACCESS_TOKEN;
-    if (!PREDICTHQ_TOKEN) throw new Error("PREDICTHQ_ACCESS_TOKEN not configured");
-
-    const CACHE_TTL_HOURS = 24;
     const slug = slugify(citySlug);
-
-    // Check cache
-    const cached = await db.query(
-      `SELECT place_id, events, fetched_at FROM predicthq_events WHERE city_slug = $1`,
-      [slug]
-    );
-    if (cached.rows.length > 0) {
-      const age = (Date.now() - new Date(cached.rows[0].fetched_at).getTime()) / 3600000;
-      if (age < CACHE_TTL_HOURS) {
-        return { citySlug: slug, events: cached.rows[0].events, fetchedAt: cached.rows[0].fetched_at, source: "cache" };
-      }
+    const dataset = loadStaticEvents(slug);
+    if (!dataset) {
+      throw new Error(`No static event dataset for "${slug}". Only London is currently supported (PredictHQ trial expired April 2026).`);
     }
 
-    // Resolve place ID (use cached if available)
-    let placeId = cached.rows[0]?.place_id || null;
-    if (!placeId) {
-      const headers = { Authorization: `Bearer ${PREDICTHQ_TOKEN}`, Accept: "application/json" };
-      // Map city slug to a country for more accurate lookup
-      const cityName = slug.replace(/-/g, " ");
-      const placeRes = await fetch(
-        `https://api.predicthq.com/v1/places/?q=${encodeURIComponent(cityName)}&type=locality&limit=1`,
-        { headers }
-      );
-      if (!placeRes.ok) throw new Error(`PredictHQ Places API error: ${placeRes.status}`);
-      const placeData = await placeRes.json();
-      if (!placeData.results?.length) throw new Error(`No PredictHQ place found for "${cityName}"`);
-      placeId = placeData.results[0].id;
-    }
-
-    // Fetch events for next 180 days to cover mockup date ranges
+    // Same forward window the live path used: today → today + 180 days (UTC).
     const today = new Date().toISOString().slice(0, 10);
     const end = new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10);
-    const headers = { Authorization: `Bearer ${PREDICTHQ_TOKEN}`, Accept: "application/json" };
-
-    // Look up city coordinates from the Places API result for radius search
-    const placeLookup = await fetch(
-      `https://api.predicthq.com/v1/places/?id=${placeId}&limit=1`,
-      { headers }
-    );
-    const placeInfo = placeLookup.ok ? await placeLookup.json() : { results: [] };
-    const coords = placeInfo.results?.[0]?.location; // [lng, lat]
-    const withinParam = coords ? `30km@${coords[1]},${coords[0]}` : null;
-
-    // Use radius search (catches suburbs like Wimbledon) with place.scope fallback
-    const locationParam = withinParam ? { within: withinParam } : { "place.scope": placeId };
-
-    // Fetch in two tiers to get both major and notable events within API limits
-    const baseParams = {
-      ...locationParam,
-      "active.gte": today,
-      "active.lte": end,
-      category: "concerts,festivals,sports,conferences,expos,performing-arts",
-      sort: "-rank",
-      limit: "50",
-    };
-
-    // Tier 0: Blockbusters (rank >= 88) — guarantees Wimbledon, Pride, mega concerts
-    const params0 = new URLSearchParams({ ...baseParams, "rank.gte": "88" });
-    const res0 = await fetch(`https://api.predicthq.com/v1/events/?${params0}`, { headers });
-    const data0 = res0.ok ? await res0.json() : { results: [] };
-
-    // Tier 1: Major events (rank 80-87)
-    const params1 = new URLSearchParams({ ...baseParams, "rank.gte": "80", "rank.lte": "87" });
-    const res1 = await fetch(`https://api.predicthq.com/v1/events/?${params1}`, { headers });
-    const data1 = res1.ok ? await res1.json() : { results: [] };
-
-    // Tier 2: Notable events (rank 65-79) to fill in the mid-tier
-    const params2 = new URLSearchParams({ ...baseParams, "rank.gte": "65", "rank.lte": "79" });
-    const res2 = await fetch(`https://api.predicthq.com/v1/events/?${params2}`, { headers });
-    const data2 = res2.ok ? await res2.json() : { results: [] };
-
-    const allResults = [...(data0.results || []), ...(data1.results || []), ...(data2.results || [])];
-
-    // Deduplicate by event ID
-    const seen = new Set();
-    const deduped = allResults.filter((e) => {
-      if (seen.has(e.id)) return false;
-      seen.add(e.id);
-      return true;
+    const events = dataset.filter((e) => {
+      const startDate = e.start || e.end;
+      const endDate = e.end || e.start;
+      if (!startDate) return false;
+      return endDate >= today && startDate <= end;
     });
 
-    // Map to lean format
-    const events = deduped.map((e) => {
-      const localRank = e.local_rank || 0;
-      const tier = localRank >= 90 ? "Extreme" : localRank >= 75 ? "High" : "Medium";
-      return {
-        id: e.id,
-        title: e.title,
-        category: e.category,
-        start: e.start?.slice(0, 10) || e.start_local?.slice(0, 10) || null,
-        end: e.end?.slice(0, 10) || e.end_local?.slice(0, 10) || null,
-        rank: e.rank,
-        localRank: localRank,
-        attendance: e.phq_attendance || null,
-        accommodationSpend: e.predicted_event_spend_industries?.accommodation || null,
-        tier,
-      };
-    });
-
-    // Upsert cache
-    await db.query(
-      `INSERT INTO predicthq_events (city_slug, place_id, events, fetched_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (city_slug) DO UPDATE SET place_id = $2, events = $3, fetched_at = NOW()`,
-      [slug, placeId, JSON.stringify(events)]
-    );
-
-    return { citySlug: slug, events, fetchedAt: new Date().toISOString(), source: "predicthq" };
+    return { citySlug: slug, events, fetchedAt: new Date().toISOString(), source: "static" };
   }
 
   /**
