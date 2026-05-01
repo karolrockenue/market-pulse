@@ -267,7 +267,16 @@ export default function App() {
         const response = await fetch("/api/hotels/mine");
         if (!response.ok) throw new Error("Failed to fetch properties");
         const data: Property[] = await response.json();
-        setProperties(data);
+        // Pin Archanes Market Watch to the end of the list so every site that
+        // grabs `properties[0]` as a default (initial landing, ALL→single
+        // fallback, Mason Dashboard exit) naturally skips over it. The
+        // dropdown applies the same pin via `propertiesWithMason`.
+        const sorted = [...data].sort((a, b) => {
+          if (a.property_id === ARCHANES_HOTEL_ID) return 1;
+          if (b.property_id === ARCHANES_HOTEL_ID) return -1;
+          return 0;
+        });
+        setProperties(sorted);
 
         // Check the URL for a propertyId parameter.
         const urlParams = new URLSearchParams(window.location.search);
@@ -276,11 +285,11 @@ export default function App() {
         // If a valid propertyId is in the URL, use it. Otherwise, default to the first property.
         if (
           propertyIdFromUrl &&
-          data.some((p) => p.property_id.toString() === propertyIdFromUrl)
+          sorted.some((p) => p.property_id.toString() === propertyIdFromUrl)
         ) {
           setProperty(propertyIdFromUrl);
-        } else if (data.length > 0) {
-          setProperty(data[0].property_id.toString());
+        } else if (sorted.length > 0) {
+          setProperty(sorted[0].property_id.toString());
         }
       } catch (error) {
         console.error("Error fetching properties:", error);
