@@ -17,6 +17,9 @@ web/build
 /city-profile-queries.sql
 /elysee-analysis.sql
 
+# Playwright storage state — empty or contains session cookies
+scripts/.*-auth.json
+
 # Data export / output directories
 /leads/
 /reports/

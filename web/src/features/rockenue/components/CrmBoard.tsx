@@ -333,7 +333,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
       {/* ── Page Header (MP Studio style) ── */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h1 style={{ color: TEXT, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.025em" }}>Task Board</h1>
+          <h1 style={{ color: TEXT, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.025em" }}>Tasks</h1>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setBulkMode(!bulkMode); setSelectedTaskIds(new Set()); }} style={{
               display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6,

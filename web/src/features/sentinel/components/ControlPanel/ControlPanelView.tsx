@@ -2462,36 +2462,22 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     >
                                       Floor Rate
                                     </Label>
-                                    <div style={{ position: "relative" }}>
-                                      <span
-                                        style={{
-                                          position: "absolute",
-                                          left: "0.75rem",
-                                          top: "50%",
-                                          transform: "translateY(-50%)",
-                                          color: "#7A8494",
-                                          fontSize: "0.875rem",
-                                        }}
-                                      >
-                                        $
-                                      </span>
-                                      <Input
-                                        type="number"
-                                        value={
-                                          formState[hotel.hotel_id]
-                                            ?.last_minute_floor?.rate || ""
-                                        }
-                                        onChange={(e) =>
-                                          updateRule(
-                                            String(hotel.hotel_id),
-                                            "last_minute_floor.rate",
-                                            e.target.value,
-                                          )
-                                        }
-                                        style={{ backgroundColor: "#121519" }}
-                                        className="border-[#1E2330] text-[#F3F5F7] pl-7 h-9 text-sm"
-                                      />
-                                    </div>
+                                    <Input
+                                      type="number"
+                                      value={
+                                        formState[hotel.hotel_id]
+                                          ?.last_minute_floor?.rate || ""
+                                      }
+                                      onChange={(e) =>
+                                        updateRule(
+                                          String(hotel.hotel_id),
+                                          "last_minute_floor.rate",
+                                          e.target.value,
+                                        )
+                                      }
+                                      style={{ backgroundColor: "#121519" }}
+                                      className="border-[#1E2330] text-[#F3F5F7] h-9 text-sm"
+                                    />
                                   </div>
                                   <div
                                     style={{

@@ -276,7 +276,7 @@ export function TopNav({
       isDropdown: true,
       isAdmin: true,
       items: [
-        { label: "CRM", value: "crm", icon: ClipboardList },
+        { label: "Tasks", value: "crm", icon: ClipboardList },
         { label: "Distribution", value: "distribution", icon: Globe },
         { label: "Channel Pricing", value: "channelPricing", icon: DollarSign },
       ],

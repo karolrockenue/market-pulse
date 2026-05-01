@@ -27,7 +27,7 @@ export const VIEW_REGISTRY: Record<string, { label: string; icon: LucideIcon }> 
   sentinel: { label: "Control Panel", icon: TerminalSquare },
   rateManager: { label: "Rate Manager", icon: DollarSign },
   marketProfile: { label: "Market Profile", icon: BarChart3 },
-  crm: { label: "CRM", icon: ClipboardList },
+  crm: { label: "Task", icon: ClipboardList },
   distribution: { label: "Distribution", icon: Globe },
   channelPricing: { label: "Channel Pricing", icon: DollarSign },
   admin: { label: "Admin", icon: Zap },
