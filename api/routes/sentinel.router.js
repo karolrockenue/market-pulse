@@ -313,6 +313,14 @@ router.post("/recalculate", async (req, res) => {
 
     const result = await sentinelService.recalculateRates(hotelId, startDate, endDate);
 
+    if (result.debounced) {
+      return res.status(200).json({
+        success: true,
+        debounced: true,
+        message: `A recalculation is already in flight (started ${result.lastRunSecondsAgo}s ago) — your changes are being pushed. No new job queued.`,
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: `Recalculation queued. The background worker will process ${result.totalQueued} updates shortly.`,
