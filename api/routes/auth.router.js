@@ -203,7 +203,7 @@ router.post("/login", async (req, res) => {
     }
     const user = userResult.rows[0];
     const token = crypto.randomBytes(32).toString("hex");
-    const expires_at = new Date(Date.now() + 30 * 60 * 1000);
+    const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await pgPool.query(
       "INSERT INTO magic_login_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
       [token, user.user_id, expires_at]
@@ -318,10 +318,25 @@ router.get("/magic-link-callback", async (req, res) => {
               <tr><td style="padding: 40px 36px; text-align: center;">
                 <h1 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0 0 12px;">Welcome back</h1>
                 <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin: 0 0 28px;">Click below to securely log in to your dashboard.</p>
-                <form method="POST" action="/api/auth/magic-link-callback">
-                  <input type="hidden" name="token" value="${token}" />
-                  <button type="submit" style="font-size: 14px; font-weight: 600; color: #ffffff; background: #0f172a; border: none; padding: 12px 28px; border-radius: 8px; cursor: pointer; display: inline-block;">Log me in</button>
-                </form>
+                <button type="button" id="mp-login-btn" style="font-size: 14px; font-weight: 600; color: #ffffff; background: #0f172a; border: none; padding: 12px 28px; border-radius: 8px; cursor: pointer; display: inline-block;">Log me in</button>
+                <script>
+                  document.getElementById('mp-login-btn').addEventListener('click', async function () {
+                    var btn = this;
+                    btn.disabled = true;
+                    btn.textContent = 'Signing you in...';
+                    try {
+                      var token = new URLSearchParams(window.location.search).get('token');
+                      var res = await fetch('/api/auth/magic-link-callback', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'token=' + encodeURIComponent(token)
+                      });
+                      if (res.ok) { window.location.href = '/app/'; }
+                      else { btn.disabled = false; btn.textContent = 'Try again'; }
+                    } catch (e) { btn.disabled = false; btn.textContent = 'Try again'; }
+                  });
+                </script>
               </td></tr>
               <tr><td style="padding: 20px 36px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
                 <p style="font-size: 11px; color: #94a3b8; margin: 0;">&copy; 2026 Market Pulse</p>
