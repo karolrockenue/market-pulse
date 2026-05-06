@@ -895,7 +895,7 @@ router.get("/cloudbeds", (req, res) => {
     return res.status(500).send("Server configuration error.");
   }
   const scopes =
-    "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations offline_access";
+    "read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations read:dataInsightsFinancialTransactions offline_access";
   const params = new URLSearchParams({
     client_id: CLOUDBEDS_CLIENT_ID,
     redirect_uri: redirectUri,
