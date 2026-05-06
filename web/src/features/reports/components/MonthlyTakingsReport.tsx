@@ -148,11 +148,25 @@ export const MonthlyTakingsReport: React.FC<MonthlyTakingsReportProps> = ({
   useEffect(() => {
     const fetchHotels = async () => {
       try {
-        const res = await axios.get("/api/hotels");
-        // Guard against non-array payloads (e.g. 403 error body for non-admin users)
+        // Admins see the full fleet via /api/hotels (admin-only). Non-admin
+        // owners (e.g. property owners running their own takings audit) get
+        // 403 there and need /api/hotels/mine, which is scoped to the
+        // user's user_properties rows. Without this fallback, owners saw
+        // an empty hotel selector. Mirrors the SentinelHub fix in
+        // blueprint §4.8b.
+        let res;
+        try {
+          res = await axios.get("/api/hotels");
+        } catch (err: any) {
+          if (err?.response?.status === 403) {
+            res = await axios.get("/api/hotels/mine");
+          } else {
+            throw err;
+          }
+        }
         const rows = Array.isArray(res.data) ? res.data : [];
         const list = rows.map((h: any) => ({
-          hotel_id: h.id || h.hotel_id,
+          hotel_id: h.id || h.hotel_id || h.property_id,
           property_name: h.property_name || h.name || "Unknown Hotel",
           pms_property_id: h.pms_property_id,
         }));
