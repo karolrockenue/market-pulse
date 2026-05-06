@@ -467,6 +467,7 @@ export function CreateScheduleModal({
                         <label style={labelStyle}>Time</label>
                         <input
                           type="time"
+                          step={300}
                           value={timeOfDay}
                           onChange={(e) => setTimeOfDay(e.target.value)}
                           style={inputStyle}

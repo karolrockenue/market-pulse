@@ -3,14 +3,7 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 const exceljs = require("exceljs");
-// [MODIFIED] Added 'subMonths', 'startOfMonth', 'endOfMonth' for monthly audits
-const {
-  subDays,
-  format,
-  subMonths,
-  startOfMonth,
-  endOfMonth,
-} = require("date-fns");
+const { subDays, format } = require("date-fns");
 const { formatInTimeZone } = require("date-fns-tz");
 
 // [NEW] Import Takings Report Helpers
@@ -60,11 +53,15 @@ function calculateDateRange(period) {
       endDate = new Date(startDate);
       endDate.setUTCDate(startDate.getUTCDate() + 6);
       break;
-    case "previous-month": // [NEW] Added for Monthly Audits
-      const lastMonth = subMonths(today, 1);
-      startDate = startOfMonth(lastMonth);
-      endDate = endOfMonth(lastMonth);
+    case "previous-month": {
+      // UTC-safe: avoid date-fns helpers that operate in local time, which
+      // shifts the start/end by one day on non-UTC hosts (e.g. BST).
+      const y = today.getUTCFullYear();
+      const m = today.getUTCMonth();
+      startDate = new Date(Date.UTC(y, m - 1, 1));
+      endDate = new Date(Date.UTC(y, m, 0));
       break;
+    }
     case "current-month":
       startDate = new Date(
         Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)
