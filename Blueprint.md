@@ -1210,6 +1210,8 @@ Sentinel endpoints (/api/sentinel/*) are behind a blanket requireAdminApi middle
 
 Demand Radar (opened April 2026): accessible to all roles. The UI lives inside SentinelHub but its data comes from /api/market/* (already user-accessible), not /api/sentinel/*. SentinelHub's useAllHotels hook originally only called admin-only /api/hotels — non-admins received a 403, the error body was mistakenly stored as the hotel list, and downstream .map() calls crashed under the misleading "Update Required" boundary. The hook now tries /api/hotels first and falls back to /api/hotels/mine on 403, landing an Array in state either way. Apply the same dual-endpoint fallback if any other SentinelHub sub-view is opened to non-admins in future.
 
+**Same trap, second occurrence (2026-05-06, commit `b829305`).** `MonthlyTakingsReport.tsx` (Reports Hub → Monthly Takings) called the admin-only `/api/hotels` directly to populate its hotel selector. For non-admin owners (e.g. Sanchit @ Shreeji, role=`owner`, 12 properties linked) this returned 403, the array guard turned the error response into `[]`, and the selector rendered empty under a "Select hotels for group audit" header — the user couldn't pick anything to audit. Fixed with the same `/api/hotels` → `/api/hotels/mine` fallback. Field mapping also extended to read `h.property_id` because `/api/hotels/mine` returns `property_id` rather than `id`/`hotel_id`. **General rule: any UI surface that admins and non-admins both reach must use the dual-endpoint pattern; a single `/api/hotels` call will silently break for the non-admin half. Audit other Reports Hub / Sentinel screens for this when convenient.**
+
 /api/hotels/assets is also gated — rate-view users only see assets for their linked hotels.
 
 To enable a user for My Rates: toggle "Rate Access" in **Admin → User Management** (admin-only table directly under Hotel Management). The toggle calls `PATCH /api/users/:id/rates-access`. SQL fallback: `UPDATE users SET can_view_rates = true WHERE user_id = {id};`. Note: granting rate access alone is not sufficient — the user also needs a `user_properties` row for each hotel they need to view. The User Management table surfaces a "Properties" column so admins can spot users with `can_view_rates = true` but `0` linked properties.
@@ -2362,6 +2364,59 @@ Headline format: "Ellen makes £X.XM – £Y.YM annually at N% occupancy" — ra
 - Room-type sell-out pressure: for each room, count (missing dates + "1 left" + "2 left") as a near-sellout proxy
 - Rate-fence discipline: per-room discount depth (baseline → displayed %). Suites should hold tighter than standards
 - Forward-curve shape by lead-time: close-in vs far-out price spread tells you if they yield or hold rates
+
+15.0 SCHEDULED REPORTS, AUTH & CLOUDBEDS OAUTH SCOPES
+
+15.1 Scheduled Report Dispatcher
+
+Cron-driven email reports defined in the `scheduled_reports` table. Dispatcher entry: `GET /api/send-scheduled-reports` → `api/send-scheduled-reports.js`. The Railway cron fires every 5 minutes (`server.js:413-415`) and each invocation matches due rows by exact `time_of_day` equality. Three frequencies: Daily, Weekly (matched on `day_of_week::text`), Monthly (matched on `day_of_month::text`).
+
+Three report types are dispatched via `report_type`:
+- `shreeji` — daily Shreeji chart PDF (attachment).
+- `takings_audit` — multi-hotel cash/cards/BACS audit (HTML email body, no attachment). Uses `MetricsService.getGroupTakingsReport` + `generateTakingsEmailHTML`.
+- (default / NULL) — original per-hotel P&L report with CSV/XLSX attachments.
+
+**Cron-alignment trap (incident 2026-05-06).** Because the cron only fires at 5-minute boundaries (HH:00, HH:05, …) and the SQL match is `WHERE TRIM(time_of_day) = $1`, any user-picked `time_of_day` not on a 5-min boundary silently never fires. The Shreeji Monthly Takings Report (id 95) was set to `06:01` and missed every monthly trigger from creation (2026-02-26) until discovery in 2026-05-06 — three consecutive missed Mondays. Fixed at the source: `<input type="time" step={300}>` in `CreateScheduleModal.tsx:469` enforces 5-min increments going forward; existing rows audited and confirmed aligned. If you ever see "the schedule is set but nothing fired", check `time_of_day` minutes-mod-5 first.
+
+**`previous-month` date-range trap (fixed 2026-05-06).** The original `calculateDateRange("previous-month")` used date-fns `subMonths` / `startOfMonth` / `endOfMonth`, which operate in *local* time. On a non-UTC host (e.g. a BST dev machine triggering the report manually) the start date slipped back one day, producing `2026-03-31 to 2026-04-30` instead of `2026-04-01 to 2026-04-30`. Replaced with explicit `Date.UTC(y, m - 1, 1)` / `Date.UTC(y, m, 0)` — UTC-safe regardless of host timezone, including year-boundary and leap-Feb edges. Other branches (`current-month`, `current-week`, `last-week`) already used UTC accessors and are unaffected.
+
+**Manual trigger path.** `POST /api/admin/run-scheduled-report` with `{ reportId }` invokes the dispatcher synchronously for one row and ignores `time_of_day` / `day_of_month`. Useful for re-running a missed report or testing changes. Admin-only or internal-secret-gated.
+
+15.2 Cloudbeds OAuth Scope Model
+
+The Cloudbeds developer portal lists scopes the app *may* request — these are a ceiling, not auto-granted. The OAuth `scope=` parameter sent during `/api/auth/cloudbeds` (`auth.router.js:897-898`) determines what's actually issued to a property at consent time. If the code's scope string omits a portal-approved scope, every hotel that ever onboarded gets tokens without it, and refreshing those tokens cannot upgrade scopes — only a fresh consent grant can.
+
+**Currently requested scopes (`auth.router.js:898`):**
+`read:user read:hotel read:guest read:reservation read:room read:rate read:currency read:taxesAndFees read:dataInsightsGuests read:dataInsightsOccupancy read:dataInsightsReservations read:dataInsightsFinancialTransactions offline_access`
+
+**Data Insights `dataset_id` → required scope mapping (load-bearing).**
+- `dataset_id=1` (Financial Transactions: Daily Takings, Monthly Financials, payments) → requires `read:dataInsightsFinancialTransactions`.
+- `dataset_id=7` (Reservations / Occupancy: `getHistoricalMetrics`, `getUpcomingMetrics`) → covered by `read:dataInsightsReservations` (or `Guests`/`Occupancy` — Cloudbeds is lenient on this dataset).
+
+**Known incident — Shreeji Takings 403 (2026-05-06).** `getMonthlyFinancials` (dataset_id=1) was returning 403 for every Cloudbeds hotel — old (Cleveland 289618), new (Tudor Inn 318317), every era. Root cause: `read:dataInsightsFinancialTransactions` had been approved in the Cloudbeds developer portal at some earlier date, but the OAuth `scope=` string had never included it (verified by `git log -S` returning zero hits across all branches). Every hotel was issued tokens without the scope. The Shreeji Monthly Takings Report's email body landed with all-zero takings columns (cash/cards/BACS = £0, occupancy = 0%, ADR = £0) for the affected month before this was caught — only Total Revenue was correct because that comes from `daily_metrics_snapshots`, not the API. Fixed in commit `959d6fd` by adding the scope to the request string.
+
+**Required follow-up after any scope change: fleet-wide re-consent.** After deploy, every existing hotel must go through `/api/auth/cloudbeds` again to receive an upgraded token. The OAuth callback's existing-hotel path is credentials-only (`auth.router.js:1045-1095`) — it does *not* re-sync hotel details, tax info, or room types, and the initial-sync trigger explicitly skips hotels that already have `daily_metrics_snapshots` rows. Re-consent is therefore data-safe: the only mutation is `user_properties.pms_credentials` getting a new refresh_token. The 7 Shreeji hotels (318304 / 318305 / 318307 / 318308 / 318309 / 318316 / 318317) were re-consented on 2026-05-06 and verified.
+
+Other Cloudbeds Data Insights scopes available in the portal but **not currently requested** (add them with the same caveat — code change + fleet re-consent): `read:dataInsightsPayments`, `read:dataInsightsInvoices`. Also marketplace-approved but not requested: `read:roomblock`, `write:rate`.
+
+15.3 Magic Link Authentication
+
+Single source of truth for non-OAuth login. Used by invited users (no Cloudbeds account) and any user logging in by email rather than the Cloudbeds OAuth flow.
+
+**Issuance.** `POST /api/auth/login` with `{ email }` (`auth.router.js:191`). Looks up user by email, generates a 32-byte hex token (`crypto.randomBytes(32).toString("hex")`), inserts into `magic_login_tokens (token, user_id, expires_at, used_at)` with **24-hour expiry** (bumped from 30 minutes 2026-05-06 in commit `66f99cb`). Sends email via SendGrid containing `<baseUrl>/api/auth/magic-link-callback?token=<hex>`. Table has no `created_at` / IP / UA / attempt-count columns — issuance time is inferred from `expires_at - 24h`.
+
+**Click-through page.** `GET /api/auth/magic-link-callback` (`auth.router.js:258`). Validates `expires_at > NOW()`. **Does not consume the token.** Renders a branded HTML page with a "Log me in" button. The button is *not* a form submit — it's a `<button type="button">` whose click handler runs `fetch('/api/auth/magic-link-callback', { method: 'POST', credentials: 'same-origin', body: 'token=' + token })`. JS-only by design (commit `66f99cb`).
+
+This protects against three scanner classes:
+1. GET prefetchers (Mimecast preview, basic spam scanners) — they hit GET, the token isn't consumed, the human gets a working link.
+2. Form-submitting scanners (Microsoft Defender ATP, aggressive Proofpoint) — they don't run JS, so the button click handler never fires, the POST never happens, the token isn't consumed.
+3. Headless scanners that *do* run JS — they typically don't simulate UI clicks, so the click handler still doesn't fire.
+
+**Consume.** `POST /api/auth/magic-link-callback` (`auth.router.js:341`). Re-validates `expires_at > NOW()`. Importantly does NOT gate on `used_at IS NULL` — the token is reusable within its validity window. Intentional: if a scanner somehow does land a real POST with a session cookie, that scanner's session goes nowhere and the human's later POST still creates a fresh session. Sets `used_at = NOW()` for analytics, calls `req.session.regenerate()`, populates `userId` + `role`, returns redirect HTML targeting `/app/`.
+
+**Session.** pg-backed (table `user_sessions` via `connect-pg-simple`, `server.js:184-205`). Cookie maxAge **60 days**, httpOnly, sameSite=lax, secure on prod. Returning users almost never need a fresh magic link — long-lived sessions are the primary mitigation against magic-link-failure friction.
+
+**Failure rate baseline.** 2026-05-06, preceding 30 days: 27 of 42 issued tokens used (64.3%). Post-fix target: > 85%. Re-measure with `SELECT COUNT(*) AS issued, COUNT(used_at) AS used FROM magic_login_tokens WHERE expires_at > NOW() - INTERVAL '30 days'`. If the rate doesn't move into the 85%+ range after 30 days of the new TTL + JS-submit, the next move is to add a 6-digit numeric code in the email body that the user can paste into the login screen as a fallback (eliminates click-link failure modes entirely).
 
 End of Blueprint.
 Use this document as the only architectural reference when reasoning about Market Pulse + Sentinel.
