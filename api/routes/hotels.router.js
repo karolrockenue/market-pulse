@@ -53,13 +53,14 @@ router.get("/mine", requireUserApi, async (req, res) => {
   try {
     const userRole = req.session.role;
     const includeDisconnected = req.query.includeDisconnected === "true";
-    const disconnectedFilter = includeDisconnected ? "" : "WHERE is_disconnected = false";
-    const disconnectedFilterAnd = includeDisconnected ? "" : "AND h.is_disconnected = false";
+    // Prospect rows (Sales CRM) live in hotels alongside real properties — must never appear in the property dropdown.
+    const disconnectedClause = includeDisconnected ? "" : "AND is_disconnected = false";
+    const disconnectedClauseAlias = includeDisconnected ? "" : "AND h.is_disconnected = false";
     let query;
     let params = [];
 
     if (userRole === "super_admin" || userRole === "admin") {
-      query = `SELECT hotel_id AS property_id, property_name, city, is_disconnected FROM hotels ${disconnectedFilter} ORDER BY property_name;`;
+      query = `SELECT hotel_id AS property_id, property_name, city, is_disconnected FROM hotels WHERE (prospect_status IS NULL OR prospect_status = 'live') ${disconnectedClause} ORDER BY property_name;`;
     } else {
       // Get internal ID
       const userRes = await pool.query("SELECT user_id FROM users WHERE cloudbeds_user_id = $1", [req.session.userId]);
@@ -70,7 +71,7 @@ router.get("/mine", requireUserApi, async (req, res) => {
         SELECT up.property_id, h.property_name, h.city, h.is_disconnected
         FROM user_properties up
         JOIN hotels h ON up.property_id = h.hotel_id
-        WHERE (up.user_id = $1 OR up.user_id = $2::text) ${disconnectedFilterAnd}
+        WHERE (up.user_id = $1 OR up.user_id = $2::text) AND (h.prospect_status IS NULL OR h.prospect_status = 'live') ${disconnectedClauseAlias}
         ORDER BY h.property_name;
       `;
       params = [req.session.userId, internalId];
