@@ -238,15 +238,41 @@ def calculate_optimal_rate(day_data, config, constraints, market_data):
             final_rate = base_rate * (1.0 - discount_pct)
             reason_tag = f"Yield Down ({raw_delta:.1f}%)"
 
-    # --- DESPERATION DECAY (Sell Every Room) ---
-    pricing_mode = config.get('pricing_mode', 'maintain_profit').lower()
-    
-    if pricing_mode == 'sell_every_room' and lead_time <= 3 and raw_delta < 0 and current_rate > effective_min:
-        hours_remaining = max(1, (lead_time * 24))
-        decay_multiplier = (effective_min / current_rate) ** (1 / hours_remaining)
-        decayed_rate = current_rate * decay_multiplier
-        final_rate = max(effective_min, min(current_rate, decayed_rate))
-        reason_tag = f"Ruthless Decay (T-{hours_remaining}h)"
+    # --- SELL EVERY ROOM MODE (Close-In Override) ---
+    # When sell_every_room is active within 3 days of arrival AND we're behind
+    # target, this block REPLACES the standard tree's output. Four sub-rules:
+    #   (a) Pickup brake — bookings are filling the hotel, hold current rate
+    #   (b) Day-of (lead=0) — emit floor directly (avoids ping-pong with yield-down)
+    #   (c) Lead 1/2/3 — gradual exponential decay glide toward floor
+    #   (d) Already at floor — hold there
+    # NOTE: reads `strategy_mode` (the field the UI/DB actually writes), not
+    # the legacy `pricing_mode` name that was never wired through.
+    pricing_mode = config.get('strategy_mode', 'maintain').lower()
+
+    if pricing_mode == 'sell_every_room' and lead_time <= 3 and raw_delta < 0:
+        rooms_remaining = max(0, capacity - rooms_sold)
+        projected_fill = pickup_24h * lead_time if lead_time > 0 else pickup_24h
+        velocity_sufficient = projected_fill >= rooms_remaining
+
+        if pickup_24h > 0 and velocity_sufficient:
+            # (a) Pickup brake — hotel is filling itself, stop dropping
+            final_rate = current_rate
+            reason_tag = f"Sell Every Room (Hold @ pickup={pickup_24h})"
+        elif lead_time == 0:
+            # (b) Day-of slam: emit floor directly. No decay math, no oscillation.
+            final_rate = effective_min
+            reason_tag = "Sell Every Room (Floor T-0)"
+        elif current_rate > effective_min:
+            # (c) Gradual exponential decay glide
+            hours_remaining = max(1, (lead_time * 24))
+            decay_multiplier = (effective_min / current_rate) ** (1 / hours_remaining)
+            decayed_rate = current_rate * decay_multiplier
+            final_rate = max(effective_min, min(current_rate, decayed_rate))
+            reason_tag = f"Ruthless Decay (T-{hours_remaining}h)"
+        else:
+            # (d) Already at floor — hold
+            final_rate = effective_min
+            reason_tag = "Sell Every Room (At Floor)"
 
     # --- THE BOUNCER (Final Bounds) ---
     final_rate = max(effective_min, min(final_rate, dynamic_max))
@@ -269,7 +295,16 @@ def calculate_optimal_rate(day_data, config, constraints, market_data):
             reason_tag = "Velocity Guard (Hold)"
             diff = 0.0
 
-    if diff < 1.00 and not is_below_floor:
+    # Allow sub-£1 micro-drops through when Ruthless Decay is gliding the rate
+    # down. Otherwise the noise filter eats every step once the decay step size
+    # falls below £1, freezing the rate mid-glide.
+    in_decay_micro_drop = (
+        pricing_mode == 'sell_every_room'
+        and lead_time <= 3
+        and final_rate < current_rate
+    )
+
+    if diff < 1.00 and not is_below_floor and not in_decay_micro_drop:
        log(f"      [SKIP] {stay_date_str} | rate={current_rate} final={final_rate:.2f} diff={diff:.2f} pickup={pickup_24h} cap={capacity} occ={current_occupancy_pct:.1f}% delta={raw_delta:.1f} reason={reason_tag}")
        return None
 

@@ -886,8 +886,9 @@ The UI provides a "Seasonality Override" control to force a month into a differe
 
 - Low Season: Hold rate if HoursSinceLastChange < 12h.
 - High Season: Hold rate if HoursSinceLastChange < 24h.
-- Velocity Guard: Only activates when delta >= 0 (on or ahead of target) AND projected fill (pickup_24h × lead_time) covers remaining rooms. When behind target (delta < 0), rate drops are always allowed regardless of pickup — catch up first, then protect. Ruthless Decay mode also bypasses velocity guard.
-- Noise Filter: £1.00 minimum change threshold to allow Ruthless Decay micro-drops.
+- Velocity Guard (standard mode): Only activates when delta >= 0 (on or ahead of target) AND projected fill (pickup_24h × lead_time) covers remaining rooms. When behind target (delta < 0), rate drops are always allowed regardless of pickup — catch up first, then protect.
+- Pickup Brake (sell_every_room mode, added 2026-05-07): re-uses the same `velocity_sufficient` math but fires INSIDE the close-in override block (§3.12 Rule 5 sub-rule (a)) regardless of delta sign. When pickup is filling the hotel anyway, decay holds at current rate instead of dropping further. Reason tag: `Sell Every Room (Hold @ pickup=N)`.
+- Noise Filter: £1.00 minimum change threshold. **Bypassed** when `strategy_mode = sell_every_room` AND `lead_time ≤ 3` AND `final_rate < current_rate` — otherwise the filter eats decay micro-drops once steps fall below £1, freezing the rate mid-glide. See `claude/sentinel-decay-fix-2026-05-07.md` §2 Bug 3 for the incident that surfaced this.
 
 3.11 Navigator Zones (3-Zone Safety Protocol)
 
@@ -909,7 +910,16 @@ Rule 3 – Proportional Ratchet (Up): Positive delta → percentage premium on b
 
 Rule 4 – Deep Deficit Override (Down): Inside booking window and struggling → gentle decay. At −30% or worse → immediate drop to Min Rate.
 
-Rule 5 – Ruthless Decay ("Sell Every Room"): If enabled and lead time ≤ 3 days, exponential decay (~1.9%/hour) gliding to Min Rate by 24h before arrival.
+Rule 5 – Sell Every Room (Close-In Override): If `sentinel_configurations.rules.strategy_mode = "sell_every_room"` AND `lead_time ≤ 3 days` AND occupancy is behind pace target (`raw_delta < 0`), this rule **REPLACES** the standard tree's output (Rules 1–4) for that date. Four sub-rules, evaluated in order:
+
+  - **(a) Pickup Brake**: if `pickup_24h > 0` AND `pickup_24h × lead_time ≥ rooms_remaining`, hold `current_rate`. The hotel is filling itself; further drops would leak revenue. Reason tag: `Sell Every Room (Hold @ pickup=N)`.
+  - **(b) Day-of slam (lead=0)**: emit `effective_min` directly. Skips the decay math entirely to prevent the lead=0 oscillation bug (§4.16 / `claude/sentinel-decay-fix-2026-05-07.md` §2 Bug 2). Reason tag: `Sell Every Room (Floor T-0)`.
+  - **(c) Decay glide (lead 1/2/3, current > floor)**: exponential decay `current_rate × (effective_min / current_rate)^(1 / hours_remaining)` where `hours_remaining = lead_time × 24`. Reason tags: `Ruthless Decay (T-24h)` / `T-48h` / `T-72h`.
+  - **(d) Hold at floor (current ≤ floor)**: emit `effective_min`. Reason tag: `Sell Every Room (At Floor)`.
+
+  CRITICAL field-name note: the engine reads `strategy_mode` from the rules JSONB. The legacy field name `pricing_mode` referenced in pre-2026-05-07 Python code was a dead-end — it was never written by the UI or DB. Any new agent code that adds modes to this rule must read `strategy_mode`. See `claude/sentinel-decay-fix-2026-05-07.md` §2 Bug 1 for the failure mode (28 hotels had the toggle on for months with zero behavioral effect).
+
+  Outside the close-in window OR in `maintain` mode: standard tree (Rules 1–4) applies — unchanged from pre-fix behavior.
 
 4.0 DATABASE SCHEMA (SENTINEL + CONTEXT)
 4.1 sentinel_configurations
