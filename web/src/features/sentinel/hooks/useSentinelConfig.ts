@@ -267,6 +267,8 @@ export const useSentinelConfig = (allHotels: any[]) => {
 
           daily_max_rates: maxRates || {},
           pms_room_types: data.pms_room_types || { data: [] },
+          pms_rate_plans: data.pms_rate_plans || { data: [] },
+          rate_id_map: data.rate_id_map || {},
         };
       } else {
         rulesToSet = DEFAULT_RULES;
@@ -363,6 +365,8 @@ export const useSentinelConfig = (allHotels: any[]) => {
             sentinel_enabled:
               data.sentinel_enabled ?? existingRules.sentinel_enabled,
             pms_room_types: data.pms_room_types,
+            pms_rate_plans: data.pms_rate_plans || existingRules.pms_rate_plans,
+            rate_id_map: data.rate_id_map || existingRules.rate_id_map,
             base_room_type_id:
               data.base_room_type_id ||
               existingRules.base_room_type_id ||
