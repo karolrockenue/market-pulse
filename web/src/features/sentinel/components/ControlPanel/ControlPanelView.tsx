@@ -2872,117 +2872,96 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                     );
                                   }
 
-                                  // ── CLOUDBEDS: per-room mapping ──
+                                  // ── CLOUDBEDS: read-only summary ──
+                                  // Cloudbeds rate plan data doesn't include plan names and only
+                                  // exposes one non-derived plan per room — there's nothing to
+                                  // choose between. The auto-matcher (buildRateIdMap) has been
+                                  // reliable across the fleet (stricter exclude list, no
+                                  // descriptive plan names to silently match against). Show the
+                                  // current mapping for transparency; no editing UI.
                                   return (
                                     <div
                                       style={{
                                         background: "#121519",
                                         border: "1px solid #1E2330",
                                         borderRadius: "0.5rem",
-                                        padding: "0.5rem",
+                                        padding: "0.75rem",
                                         marginTop: "0.5rem",
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: "0.25rem",
+                                        gap: "0.5rem",
                                       }}
                                     >
-                                      {rooms.map((room: any) => {
-                                        const currentRateId =
-                                          rateIdMap[room.roomTypeID] || "";
-                                        const planOptions = rootPlans.filter(
-                                          (p: any) =>
-                                            String(p.roomTypeID) ===
-                                            String(room.roomTypeID),
-                                        );
-                                        return (
-                                          <div
-                                            key={room.roomTypeID}
-                                            style={{
-                                              display: "flex",
-                                              alignItems: "center",
-                                              justifyContent: "space-between",
-                                              gap: "0.5rem",
-                                              padding: "0.375rem",
-                                              background: "#121519",
-                                              border: "1px solid #1E2330",
-                                              borderRadius: "0.25rem",
-                                              minHeight: "48px",
-                                            }}
-                                          >
-                                            <Label
+                                      <div
+                                        style={{
+                                          color: "#7A8494",
+                                          fontSize: "0.7rem",
+                                          marginBottom: "0.25rem",
+                                        }}
+                                      >
+                                        Cloudbeds rate plans are auto-mapped
+                                        (one rate plan per room, picked by the
+                                        matcher's exclude list). Cloudbeds has
+                                        not exhibited the silent-flip pattern
+                                        seen on Mews, so manual override is not
+                                        currently surfaced.
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: "0.25rem",
+                                        }}
+                                      >
+                                        {rooms.map((room: any) => {
+                                          const currentRateId =
+                                            rateIdMap[room.roomTypeID] || "";
+                                          return (
+                                            <div
+                                              key={room.roomTypeID}
                                               style={{
-                                                color: "#F3F5F7",
-                                                fontSize: "0.75rem",
-                                                flex: 1,
-                                                minWidth: 0,
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent:
+                                                  "space-between",
+                                                gap: "0.5rem",
+                                                padding: "0.375rem 0.5rem",
+                                                background: "#0A0D11",
+                                                border: "1px solid #1E2330",
+                                                borderRadius: "0.25rem",
+                                                minHeight: "32px",
                                               }}
                                             >
-                                              {room.roomTypeName}
-                                            </Label>
-                                            <Select
-                                              value={currentRateId}
-                                              onValueChange={(newRateId) => {
-                                                const newMap = {
-                                                  ...rateIdMap,
-                                                  [room.roomTypeID]: newRateId,
-                                                };
-                                                updateRule(
-                                                  hid,
-                                                  "rate_id_map",
-                                                  newMap,
-                                                );
-                                              }}
-                                            >
-                                              <SelectTrigger
+                                              <Label
                                                 style={{
-                                                  background: "#0A0D11",
-                                                  border: "1px solid #1E2330",
                                                   color: "#F3F5F7",
                                                   fontSize: "0.7rem",
-                                                  width: "200px",
+                                                  flex: 1,
+                                                  minWidth: 0,
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                  whiteSpace: "nowrap",
                                                 }}
                                               >
-                                                <SelectValue placeholder="Select…" />
-                                              </SelectTrigger>
-                                              <SelectContent
+                                                {room.roomTypeName}
+                                              </Label>
+                                              <span
                                                 style={{
-                                                  background: "#0A0D11",
-                                                  border: "1px solid #1E2330",
+                                                  color: currentRateId
+                                                    ? "#7A8494"
+                                                    : "#ef4444",
+                                                  fontSize: "0.65rem",
+                                                  fontFamily: "monospace",
                                                 }}
                                               >
-                                                {planOptions.length === 0 ? (
-                                                  <div
-                                                    style={{
-                                                      padding: "0.5rem",
-                                                      color: "#7A8494",
-                                                      fontSize: "0.7rem",
-                                                    }}
-                                                  >
-                                                    No non-derived plans for
-                                                    this room.
-                                                  </div>
-                                                ) : (
-                                                  planOptions.map((p: any) => (
-                                                    <SelectItem
-                                                      key={p.rateID}
-                                                      value={p.rateID}
-                                                      style={{
-                                                        color: "#F3F5F7",
-                                                        fontSize: "0.7rem",
-                                                      }}
-                                                    >
-                                                      {p.ratePlanName}
-                                                    </SelectItem>
-                                                  ))
-                                                )}
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        );
-                                      })}
+                                                {currentRateId
+                                                  ? `→ ${currentRateId}`
+                                                  : "(unmapped)"}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
                                   );
                                 })()}
