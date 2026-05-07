@@ -534,6 +534,7 @@ async function updateConfig(hotelId, updates) {
     daily_max_rates,
     seasonality_profile,
     rules, // <--- 1. NEW FIELD EXTRACTED (Yield Strategy)
+    rate_id_map: userProvidedRateIdMap, // [NEW 2026-05-07] Explicit user choice from Control Panel
   } = updates;
 
   // 1. Fetch current config to ensure we have the Facts (for rebuilding map)
@@ -603,10 +604,13 @@ async function updateConfig(hotelId, updates) {
     }
   }
 
-  // 2. Rebuild Rate ID Map — PMS-aware
+  // 2. Resolve Rate ID Map — fill-only, never overwrite existing entries.
+  // Substring matchers can silently flip an existing mapping if a new rate plan is added
+  // that matches base|standard|rack|bar (e.g. "Mid Stay 29-59 (BASE)" flipped Belsize +
+  // Primrose 2026-04/05 — see claude/rockenue/groups/mason-and-fifth.md). Existing entries
+  // are sacred. The Control Panel rate-plan dropdown is the deliberate-edit path.
   const pmsRoomTypes = currentConfig.pms_room_types?.data || [];
   const pmsRatePlans = currentConfig.pms_rate_plans?.data || [];
-  let rateIdMap;
   // Check if this is a Mews hotel — use hotels.pms_type (definitive) with UUID fallback
   const pmsTypeRes = await db.query(
     "SELECT pms_type FROM hotels WHERE hotel_id = $1",
@@ -617,15 +621,35 @@ async function updateConfig(hotelId, updates) {
     (pmsRatePlans.length > 0 &&
       String(pmsRatePlans[0]?.rateID || "").includes("-"));
 
-  console.log(`[DEBUG] Hotel ${hotelId}: pms_type=${pmsTypeRes.rows[0]?.pms_type}, isMews=${isMewsHotel}, ratePlans=${pmsRatePlans.length}, roomTypes=${pmsRoomTypes.length}`);
-
-  if (isMewsHotel) {
-    const mewsAdapter = require("../adapters/mewsAdapter");
-    rateIdMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
+  // If the Control Panel sent an explicit rate_id_map, use it verbatim (deliberate user choice).
+  // Otherwise: preserve existing entries and only fill NEW room keys from the matcher.
+  const existingRateIdMap = currentConfig.rate_id_map || {};
+  let rateIdMap;
+  if (
+    userProvidedRateIdMap &&
+    typeof userProvidedRateIdMap === "object" &&
+    !Array.isArray(userProvidedRateIdMap) &&
+    Object.keys(userProvidedRateIdMap).length > 0
+  ) {
+    rateIdMap = userProvidedRateIdMap;
+    console.log(
+      `[Sentinel] Hotel ${hotelId}: rate_id_map set explicitly by user (${Object.keys(rateIdMap).length} entries)`,
+    );
   } else {
-    rateIdMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+    let candidateMap;
+    if (isMewsHotel) {
+      const mewsAdapter = require("../adapters/mewsAdapter");
+      candidateMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
+    } else {
+      candidateMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+    }
+    // Existing entries win over candidates. Candidate fills only NEW room keys.
+    rateIdMap = { ...candidateMap, ...existingRateIdMap };
+    const addedRoomKeys = Object.keys(rateIdMap).filter((k) => existingRateIdMap[k] === undefined);
+    console.log(
+      `[Sentinel] Hotel ${hotelId}: rate_id_map preserved (${Object.keys(existingRateIdMap).length} existing, ${addedRoomKeys.length} added${addedRoomKeys.length ? ": " + addedRoomKeys.join(", ") : ""})`,
+    );
   }
-  console.log(`[DEBUG] Hotel ${hotelId}: rebuilt rate_id_map =`, JSON.stringify(rateIdMap));
 
   // 2b. If monthly_min_rates changed, clear daily min overrides for affected months
   //     so the new monthly value takes effect (last-save-wins semantics)
@@ -763,21 +787,31 @@ async function recalculateRates(hotelId, startDate, endDate) {
   );
   const isMewsHotel = pmsTypeRes.rows[0]?.pms_type === "mews";
 
-  // Self-heal rate ID map — PMS-aware
+  // Self-heal rate ID map — fill-only, never overwrite existing entries.
+  // Substring matchers in buildRateIdMap / buildMewsRateIdMap will silently flip
+  // an existing mapping if a new rate plan is added that matches base|standard|rack|bar
+  // (e.g. "Mid Stay 29-59 (BASE)" flipped Belsize 2026-04-23 + Primrose 2026-05-06).
+  // Existing entries are sacred. Only fill in keys for newly-added rooms.
   const pmsRatePlans = config.pms_rate_plans?.data || [];
-  let freshMap;
+  let candidateMap;
   if (isMewsHotel) {
     const mewsAdapter = require("../adapters/mewsAdapter");
-    freshMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
+    candidateMap = mewsAdapter.buildMewsRateIdMap(pmsRatePlans, pmsRoomTypes);
   } else {
-    freshMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+    candidateMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
   }
-  if (JSON.stringify(config.rate_id_map || {}) !== JSON.stringify(freshMap)) {
+  const existingMap = config.rate_id_map || {};
+  const filledMap = { ...candidateMap, ...existingMap };
+  const addedKeys = Object.keys(filledMap).filter((k) => existingMap[k] === undefined);
+  if (addedKeys.length > 0) {
     await db.query(
       `UPDATE sentinel_configurations SET rate_id_map = $1, updated_at = NOW() WHERE hotel_id = $2`,
-      [JSON.stringify(freshMap), hotelId],
+      [JSON.stringify(filledMap), hotelId],
     );
-    config.rate_id_map = freshMap;
+    config.rate_id_map = filledMap;
+    console.log(
+      `[Sentinel] Hotel ${hotelId}: filled ${addedKeys.length} missing room mapping(s): ${addedKeys.join(", ")}`,
+    );
   }
 
   // Get calculated rates

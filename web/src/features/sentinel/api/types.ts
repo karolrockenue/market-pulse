@@ -48,6 +48,12 @@ export interface SentinelConfig {
   // Stored Facts for UI rendering
   pms_room_types?: { data: PMSRoomType[] };
   pms_rate_plans?: { data: PMSRatePlan[] };
+
+  // Rate Plan Mapping — { roomTypeID: rateID }
+  // Mews hotels typically point every roomTypeID at the same rateID (the OTA BASE
+  // master plan); Cloudbeds typically has one rateID per roomTypeID.
+  // Set explicitly via Control Panel to override the auto-matcher.
+  rate_id_map?: Record<string, string>;
 }
 
 // Rate Calendar (Merged DB + Live)

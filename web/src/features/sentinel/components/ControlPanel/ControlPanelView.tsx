@@ -189,6 +189,8 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
   const [activeMarket, setActiveMarket] = useState("london");
   const [roomDifferentialsExpanded, setRoomDifferentialsExpanded] =
     useState(false);
+  const [ratePlanMappingExpanded, setRatePlanMappingExpanded] =
+    useState(false);
   // [NEW] Repush Loading State
   const [isRepushing, setIsRepushing] = useState("");
   // Rate Plan Picker (Mews)
@@ -2599,6 +2601,393 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                 </div>
                               </div>
                             )}
+                          </div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
+                          {/* 2.5. Rate Plan Mapping (added 2026-05-07 — see claude/sentinel-mews-rate-mapping-2026-05-07.md) */}
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.75rem",
+                            }}
+                          >
+                            <button
+                              onClick={() =>
+                                setRatePlanMappingExpanded(
+                                  !ratePlanMappingExpanded,
+                                )
+                              }
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                background: "transparent",
+                                border: "none",
+                              }}
+                            >
+                              <h3
+                                style={{
+                                  color: "#F3F5F7",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                Rate Plan Mapping
+                              </h3>
+                              {ratePlanMappingExpanded ? (
+                                <ChevronUp
+                                  style={{
+                                    width: "1rem",
+                                    height: "1rem",
+                                    color: "#7A8494",
+                                  }}
+                                />
+                              ) : (
+                                <ChevronDown
+                                  style={{
+                                    width: "1rem",
+                                    height: "1rem",
+                                    color: "#7A8494",
+                                  }}
+                                />
+                              )}
+                            </button>
+
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateRows: ratePlanMappingExpanded
+                                  ? "1fr"
+                                  : "0fr",
+                                transition: "grid-template-rows 0.2s ease-out",
+                              }}
+                            >
+                              <div style={{ overflow: "hidden" }}>
+                                {(() => {
+                                  const hid = String(hotel.hotel_id);
+                                  const ratePlans: any[] =
+                                    formState[hotel.hotel_id]?.pms_rate_plans
+                                      ?.data || [];
+                                  const rooms: any[] =
+                                    formState[hotel.hotel_id]?.pms_room_types
+                                      ?.data || [];
+                                  const rateIdMap: Record<string, string> =
+                                    formState[hotel.hotel_id]?.rate_id_map ||
+                                    {};
+                                  // Mews uses UUID rate IDs (contain '-'); Cloudbeds uses numeric strings.
+                                  const isMewsHotel =
+                                    ratePlans.length > 0 &&
+                                    String(ratePlans[0]?.rateID || "").includes(
+                                      "-",
+                                    );
+                                  const rootPlans = ratePlans.filter(
+                                    (p: any) => !p.isDerived,
+                                  );
+
+                                  if (rooms.length === 0) {
+                                    return (
+                                      <div
+                                        style={{
+                                          background: "#121519",
+                                          border: "1px solid #1E2330",
+                                          borderRadius: "0.5rem",
+                                          padding: "0.75rem",
+                                          marginTop: "0.5rem",
+                                          color: "#7A8494",
+                                          fontSize: "0.75rem",
+                                        }}
+                                      >
+                                        No rooms loaded — sync with PMS first.
+                                      </div>
+                                    );
+                                  }
+
+                                  // ── MEWS: single dropdown applied to all rooms ──
+                                  if (isMewsHotel) {
+                                    // All Mews rooms typically point at the same master plan.
+                                    // Read from the base room's mapping; if rooms diverge, fall back to first.
+                                    const baseRoomId =
+                                      formState[hotel.hotel_id]
+                                        ?.base_room_type_id;
+                                    const currentRateId =
+                                      (baseRoomId && rateIdMap[baseRoomId]) ||
+                                      rateIdMap[rooms[0]?.roomTypeID] ||
+                                      "";
+                                    const currentPlan = ratePlans.find(
+                                      (p: any) =>
+                                        String(p.rateID) ===
+                                        String(currentRateId),
+                                    );
+                                    const currentName =
+                                      currentPlan?.ratePlanName || "";
+                                    const looksOk =
+                                      /^\s*OTA\b/i.test(currentName);
+                                    // Detect divergence — different rooms mapped to different rate IDs (suspicious)
+                                    const distinct = new Set(
+                                      rooms
+                                        .map(
+                                          (r: any) => rateIdMap[r.roomTypeID],
+                                        )
+                                        .filter(Boolean),
+                                    );
+                                    const diverged = distinct.size > 1;
+
+                                    return (
+                                      <div
+                                        style={{
+                                          background: "#121519",
+                                          border: "1px solid #1E2330",
+                                          borderRadius: "0.5rem",
+                                          padding: "0.75rem",
+                                          marginTop: "0.5rem",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: "0.5rem",
+                                        }}
+                                      >
+                                        <Label
+                                          style={{
+                                            color: "#7A8494",
+                                            fontSize: "0.7rem",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.05em",
+                                          }}
+                                        >
+                                          Distribution Rate Plan
+                                        </Label>
+                                        <div
+                                          style={{
+                                            color: "#7A8494",
+                                            fontSize: "0.7rem",
+                                            marginBottom: "0.25rem",
+                                          }}
+                                        >
+                                          One master plan applies to every room
+                                          in this property. Sentinel pushes to
+                                          this plan; all derived plans (Direct,
+                                          Genius, OTAs) flow from it.
+                                        </div>
+                                        <Select
+                                          value={currentRateId}
+                                          onValueChange={(newRateId) => {
+                                            const newMap: Record<
+                                              string,
+                                              string
+                                            > = {};
+                                            for (const room of rooms) {
+                                              newMap[room.roomTypeID] =
+                                                newRateId;
+                                            }
+                                            updateRule(
+                                              hid,
+                                              "rate_id_map",
+                                              newMap,
+                                            );
+                                          }}
+                                        >
+                                          <SelectTrigger
+                                            style={{
+                                              background: "#0A0D11",
+                                              border: "1px solid #1E2330",
+                                              color: "#F3F5F7",
+                                              fontSize: "0.75rem",
+                                            }}
+                                          >
+                                            <SelectValue placeholder="Select a rate plan…" />
+                                          </SelectTrigger>
+                                          <SelectContent
+                                            style={{
+                                              background: "#0A0D11",
+                                              border: "1px solid #1E2330",
+                                              maxHeight: "320px",
+                                            }}
+                                          >
+                                            {rootPlans.length === 0 ? (
+                                              <div
+                                                style={{
+                                                  padding: "0.5rem",
+                                                  color: "#7A8494",
+                                                  fontSize: "0.75rem",
+                                                }}
+                                              >
+                                                No non-derived plans available.
+                                              </div>
+                                            ) : (
+                                              rootPlans.map((p: any) => (
+                                                <SelectItem
+                                                  key={p.rateID}
+                                                  value={p.rateID}
+                                                  style={{
+                                                    color: "#F3F5F7",
+                                                    fontSize: "0.75rem",
+                                                  }}
+                                                >
+                                                  {p.ratePlanName}
+                                                </SelectItem>
+                                              ))
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                        {!looksOk && currentRateId && (
+                                          <Badge
+                                            variant="outline"
+                                            style={{
+                                              backgroundColor:
+                                                "rgba(239, 68, 68, 0.15)",
+                                              color: "#ef4444",
+                                              borderColor:
+                                                "rgba(239, 68, 68, 0.3)",
+                                              fontSize: "0.65rem",
+                                              alignSelf: "flex-start",
+                                            }}
+                                          >
+                                            ⚠ Selected plan name does not start
+                                            with "OTA" — verify this is the
+                                            intended master rate plan.
+                                          </Badge>
+                                        )}
+                                        {diverged && (
+                                          <Badge
+                                            variant="outline"
+                                            style={{
+                                              backgroundColor:
+                                                "rgba(245, 158, 11, 0.15)",
+                                              color: "#f59e0b",
+                                              borderColor:
+                                                "rgba(245, 158, 11, 0.3)",
+                                              fontSize: "0.65rem",
+                                              alignSelf: "flex-start",
+                                            }}
+                                          >
+                                            ⚠ Rooms currently point to
+                                            different rate plans — saving will
+                                            unify all rooms to the selected
+                                            plan.
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  // ── CLOUDBEDS: per-room mapping ──
+                                  return (
+                                    <div
+                                      style={{
+                                        background: "#121519",
+                                        border: "1px solid #1E2330",
+                                        borderRadius: "0.5rem",
+                                        padding: "0.5rem",
+                                        marginTop: "0.5rem",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "0.25rem",
+                                      }}
+                                    >
+                                      {rooms.map((room: any) => {
+                                        const currentRateId =
+                                          rateIdMap[room.roomTypeID] || "";
+                                        const planOptions = rootPlans.filter(
+                                          (p: any) =>
+                                            String(p.roomTypeID) ===
+                                            String(room.roomTypeID),
+                                        );
+                                        return (
+                                          <div
+                                            key={room.roomTypeID}
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "space-between",
+                                              gap: "0.5rem",
+                                              padding: "0.375rem",
+                                              background: "#121519",
+                                              border: "1px solid #1E2330",
+                                              borderRadius: "0.25rem",
+                                              minHeight: "48px",
+                                            }}
+                                          >
+                                            <Label
+                                              style={{
+                                                color: "#F3F5F7",
+                                                fontSize: "0.75rem",
+                                                flex: 1,
+                                                minWidth: 0,
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                              }}
+                                            >
+                                              {room.roomTypeName}
+                                            </Label>
+                                            <Select
+                                              value={currentRateId}
+                                              onValueChange={(newRateId) => {
+                                                const newMap = {
+                                                  ...rateIdMap,
+                                                  [room.roomTypeID]: newRateId,
+                                                };
+                                                updateRule(
+                                                  hid,
+                                                  "rate_id_map",
+                                                  newMap,
+                                                );
+                                              }}
+                                            >
+                                              <SelectTrigger
+                                                style={{
+                                                  background: "#0A0D11",
+                                                  border: "1px solid #1E2330",
+                                                  color: "#F3F5F7",
+                                                  fontSize: "0.7rem",
+                                                  width: "200px",
+                                                }}
+                                              >
+                                                <SelectValue placeholder="Select…" />
+                                              </SelectTrigger>
+                                              <SelectContent
+                                                style={{
+                                                  background: "#0A0D11",
+                                                  border: "1px solid #1E2330",
+                                                }}
+                                              >
+                                                {planOptions.length === 0 ? (
+                                                  <div
+                                                    style={{
+                                                      padding: "0.5rem",
+                                                      color: "#7A8494",
+                                                      fontSize: "0.7rem",
+                                                    }}
+                                                  >
+                                                    No non-derived plans for
+                                                    this room.
+                                                  </div>
+                                                ) : (
+                                                  planOptions.map((p: any) => (
+                                                    <SelectItem
+                                                      key={p.rateID}
+                                                      value={p.rateID}
+                                                      style={{
+                                                        color: "#F3F5F7",
+                                                        fontSize: "0.7rem",
+                                                      }}
+                                                    >
+                                                      {p.ratePlanName}
+                                                    </SelectItem>
+                                                  ))
+                                                )}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
                           </div>
                           <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
                           {/* 3. Room Differentials */}
