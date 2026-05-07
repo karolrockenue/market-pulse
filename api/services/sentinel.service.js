@@ -814,23 +814,56 @@ async function recalculateRates(hotelId, startDate, endDate) {
     );
   }
 
-  // Get calculated rates
-  const calendar = await previewCalendar({
-    hotelId,
-    baseRoomTypeId,
-    startDate,
-    endDate,
+  // [ARCH 2026-05-07] DGX is the ONLY pricing engine. recalculateRates
+  // reads the latest DGX prediction per stay_date for the BASE room, applies
+  // guardrails (min / max / freeze), and queues PMS pushes. The JS waterfall
+  // (calculateSellRate / previewCalendar) is a VIEW utility — it must NEVER
+  // produce values that get pushed to PMS. See claude/sentinel-mews-rate-mapping-2026-05-07.md
+  // for the incident that exposed the previous misuse.
+  //
+  // Dates without a DGX prediction are skipped — the next DGX cycle will
+  // produce one and the natural Phase 2 flow will push it.
+
+  // 1. Load latest DGX prediction per stay_date for the BASE room only.
+  //    DGX only predicts the base room; derived rooms follow via differentials.
+  const predictionsRes = await db.query(
+    `SELECT DISTINCT ON (stay_date)
+            to_char(stay_date,'YYYY-MM-DD') AS stay_date,
+            suggested_rate
+     FROM sentinel_ai_predictions
+     WHERE hotel_id = $1
+       AND room_type_id::text = $2
+       AND stay_date BETWEEN $3 AND $4
+     ORDER BY stay_date, created_at DESC`,
+    [hotelId, baseRoomTypeId, startDate, endDate],
+  );
+  const predictionByDate = {};
+  predictionsRes.rows.forEach((row) => {
+    const r = parseFloat(row.suggested_rate);
+    if (r > 0 && !isNaN(r)) predictionByDate[row.stay_date] = r;
   });
 
-  // [OVERRIDE v1] Load active override dates so recalculateRates does not
-  // overwrite user-pinned rates. The bridge's hourly re-push handles those
-  // dates separately (sentinel.bridge.service.js:882-940). Without this skip,
-  // any caller of recalculateRates (manual "Re-Push Rates" button or autopilot
-  // trigger after a min-rate save) would push engine prices over overrides
-  // AND tag the calendar source as 'SENTINEL', wiping the override badge truth.
+  if (Object.keys(predictionByDate).length === 0) {
+    console.log(
+      `[Sentinel] recalculateRates: no DGX predictions in range for hotel ${hotelId}. Nothing to push — DGX will produce on next cycle.`,
+    );
+    return { totalQueued: 0 };
+  }
+
+  // 2. Build guardrail-context (daily min/max + monthly_min_rates + LMF) so
+  //    applyGuardrails can clamp predictions consistently with Phase 2.
+  const dailyMaxIso = await getDailyMaxRatesIsoMap(hotelId, startDate, endDate);
+  const dailyMinIso = await getDailyMinRates(hotelId, startDate, endDate);
+  const guardrailConfig = {
+    ...config,
+    daily_max_rates: dailyMaxIso,
+    daily_min_rates: dailyMinIso,
+  };
+
+  // 3. Override skip set — pinned dates are off-limits to recalc.
   const overrideDateSet = await getRateOverrideDateSet(hotelId);
 
-  // Build overrides for all room types
+  // 4. Fan out predictions across all room types (base + derived via differentials).
   const allOverrides = [];
   for (const room of pmsRoomTypes) {
     const roomTypeId = room.roomTypeID;
@@ -839,16 +872,25 @@ async function recalculateRates(hotelId, startDate, endDate) {
       (r) => String(r.roomTypeId) === String(roomTypeId),
     );
 
-    calendar.forEach((day) => {
-      if (!day.finalRate || day.finalRate <= 0) return;
-      // [FREEZE] Skip frozen days entirely. Without this, recalculateRates
-      // would re-push the snapshotted live PMS rate, which races with manual
-      // PMS edits that land between snapshot and queue execution.
-      if (day.isFrozen) return;
-      // [OVERRIDE v1] Skip override dates — the bridge re-push owns them.
-      if (overrideDateSet.has(day.date)) return;
-      let finalRate = parseFloat(day.finalRate);
+    for (const [dateStr, predRate] of Object.entries(predictionByDate)) {
+      if (overrideDateSet.has(dateStr)) continue;
 
+      // Apply guardrails (min / max / freeze) to the DGX prediction.
+      // applyGuardrails handles freeze internally — we pass null livePmsRate
+      // because frozen dates fall back to resolvedMin which is correct here
+      // (we don't want to re-push old PMS values during freeze).
+      const guardrailResult = pricingEngine.applyGuardrails(
+        predRate,
+        null,
+        guardrailConfig,
+        dateStr,
+      );
+      if (guardrailResult.isFrozen) continue;
+
+      let finalRate = parseFloat(guardrailResult.finalRate);
+      if (isNaN(finalRate) || finalRate <= 0) continue;
+
+      // Apply differential for non-base rooms
       if (!isBase && diffRule) {
         const val = parseFloat(diffRule.value);
         if (diffRule.operator === "+") finalRate *= 1 + val / 100;
@@ -856,15 +898,15 @@ async function recalculateRates(hotelId, startDate, endDate) {
       }
 
       finalRate = Math.round(finalRate * 100) / 100;
-      if (isNaN(finalRate) || finalRate <= 0) return;
+      if (isNaN(finalRate) || finalRate <= 0) continue;
 
       allOverrides.push({
-        date: day.date,
+        date: dateStr,
         room_type_id: roomTypeId,
         rate: finalRate,
         categoryId: isMewsHotel ? roomTypeId : undefined,
       });
-    });
+    }
   }
 
   // Write to calendar + queue
