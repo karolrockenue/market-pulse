@@ -844,6 +844,12 @@ Rate Plan → Room Type mapping for base plan selection.
 
 Mapping is used to attach correct PMS rate IDs to override payloads (bridge between config and Cloudbeds).
 
+**rate_id_map (load-bearing — read this before touching mapping code).** `sentinel_configurations.rate_id_map` is `{ roomTypeID: rateID }`. For Mews hotels, every room typically points at the same rateID (the OTA distribution master plan, e.g. `OTA BASE: Flexible`); for Cloudbeds, one rateID per room. **Existing entries are sacred** — `sentinel.service.js:updateConfig` and `recalculateRates` apply a fill-only self-heal that only writes NEW room keys from `buildMewsRateIdMap` / `buildRateIdMap`. Never re-introduce code that overwrites the entire map from the matcher's output, or you reopen the silent-flip vector that misrouted Belsize for 14 days and Primrose for ~30 hours on 2026-04-23 / 2026-05-06. Full incident: `claude/sentinel-mews-rate-mapping-2026-05-07.md`.
+
+**Control Panel "Rate Plan Mapping" section** (added 2026-05-07): admins can set the rate plan target deliberately. Mews hotels get a single "Distribution Rate Plan" dropdown (one master plan applies to every room); Cloudbeds gets a read-only summary because Cloudbeds rate plan data has no `ratePlanName` field and only ever exposes one non-derived plan per room. When the Control Panel sends an explicit `rate_id_map` in the request body, the backend uses it verbatim (skips the auto-fill). Console logs `[Sentinel] Hotel X: rate_id_map preserved (N existing, M added)` on every config save — any future room additions are visible.
+
+**Audit:** `scripts/audit-fleet-rate-mapping.js` sweeps every active rockenue hotel and flags any base-room mapping whose name doesn't start with `OTA ` (Mews) or matches the Cloudbeds toxic exclude list. Run it as part of any future Sentinel health investigation — the standard health signals (`sentinel_hotel_heartbeat`, `sentinel_job_queue` status) measure activity, not routing correctness, and stayed green for 14 days during the misroute.
+
 3.7 Padlock / Priority Logic
 
 Priority of sources for any given date:
