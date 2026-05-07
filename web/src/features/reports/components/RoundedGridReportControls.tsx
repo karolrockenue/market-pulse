@@ -19,6 +19,7 @@ interface RoundedGridReportControlsProps {
   setGranularity: (granularity: string) => void;
   onRunReport: () => void;
   transparent?: boolean;
+  showGranularity?: boolean;
 }
 
 const monthNames = [
@@ -65,6 +66,7 @@ const formatDateDisplay = (dateStr: string) => {
 const presets = [
   { value: "last-week", label: "Last Week" },
   { value: "current-week", label: "Current Week" },
+  { value: "previous-month", label: "Previous Month" },
   { value: "current-month", label: "Current Month" },
   { value: "next-month", label: "Next Month" },
   { value: "year-to-date", label: "Year-to-Date" },
@@ -89,6 +91,7 @@ export function RoundedGridReportControls({
   setGranularity,
   onRunReport,
   transparent = false,
+  showGranularity = true,
 }: RoundedGridReportControlsProps) {
   const [openPicker, setOpenPicker] = useState<string | null>(null);
   const [fromViewMonth, setFromViewMonth] = useState(() => {
@@ -581,66 +584,70 @@ export function RoundedGridReportControls({
           renderCalendar(toViewMonth, selectedToDay, "to")}
       </div>
 
-      {/* Divider */}
-      <div
-        style={{
-          width: "1px",
-          height: "36px",
-          backgroundColor: R.border,
-          flexShrink: 0,
-        }}
-      />
+      {showGranularity && (
+        <>
+          {/* Divider */}
+          <div
+            style={{
+              width: "1px",
+              height: "36px",
+              backgroundColor: R.border,
+              flexShrink: 0,
+            }}
+          />
 
-      {/* Granularity Dropdown */}
-      <div style={{ position: "relative", minWidth: "120px" }}>
-        <label style={labelStyle}>View</label>
-        <div
-          onClick={() => {
-            setGranularityOpen(!granularityOpen);
-            setOpenPicker(null);
-            setPresetOpen(false);
-          }}
-          style={{
-            ...inputStyle,
-            backgroundColor: R.heroBg,
-            borderColor: granularityOpen ? "#38C6BA" : R.border,
-          }}
-        >
-          <span>{currentGranularityLabel}</span>
-          <ChevronDown size={12} style={{ color: R.textDim }} />
-        </div>
-        {granularityOpen && (
-          <div style={dropdownStyle}>
-            {granularityOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  setGranularity(opt.value);
-                  setGranularityOpen(false);
-                }}
-                style={{
-                  ...dropdownItemStyle,
-                  background:
-                    opt.value === granularity
-                      ? "rgba(57, 189, 248, 0.1)"
-                      : "transparent",
-                  color: opt.value === granularity ? "#38C6BA" : R.accent,
-                }}
-                onMouseEnter={(e) => {
-                  if (opt.value !== granularity)
-                    e.currentTarget.style.background = R.darkBand;
-                }}
-                onMouseLeave={(e) => {
-                  if (opt.value !== granularity)
-                    e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
+          {/* Granularity Dropdown */}
+          <div style={{ position: "relative", minWidth: "120px" }}>
+            <label style={labelStyle}>View</label>
+            <div
+              onClick={() => {
+                setGranularityOpen(!granularityOpen);
+                setOpenPicker(null);
+                setPresetOpen(false);
+              }}
+              style={{
+                ...inputStyle,
+                backgroundColor: R.heroBg,
+                borderColor: granularityOpen ? "#38C6BA" : R.border,
+              }}
+            >
+              <span>{currentGranularityLabel}</span>
+              <ChevronDown size={12} style={{ color: R.textDim }} />
+            </div>
+            {granularityOpen && (
+              <div style={dropdownStyle}>
+                {granularityOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setGranularity(opt.value);
+                      setGranularityOpen(false);
+                    }}
+                    style={{
+                      ...dropdownItemStyle,
+                      background:
+                        opt.value === granularity
+                          ? "rgba(57, 189, 248, 0.1)"
+                          : "transparent",
+                      color: opt.value === granularity ? "#38C6BA" : R.accent,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (opt.value !== granularity)
+                        e.currentTarget.style.background = R.darkBand;
+                    }}
+                    onMouseLeave={(e) => {
+                      if (opt.value !== granularity)
+                        e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />

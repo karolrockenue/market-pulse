@@ -1127,6 +1127,8 @@ API: GET /api/hotels/:hotelId/bookings?days=14
 
 UI: Reports Hub → Bookings Report (all users). Daily summary table with expandable accordion showing individual bookings per day. Cancelled bookings excluded from ADR/revenue totals, sorted to bottom. Dashboard Recent Bookings widget links to full report via "View Full Report" button.
 
+Also consumed by: Reports Hub → **Source Report** (all users, added 2026-05-07). Aggregates `reservations` by `LOWER(TRIM(source))` over a booking-date window and surfaces Bookings, Room Nights, Revenue, % of Revenue, ADR, ALOS, Avg Lead, Cancel %. NULL/empty source bucketed as `(no source)`. Display name uses `mode() WITHIN GROUP (ORDER BY source)` so case-variant rows (`Booking.com` vs `booking.com`) collapse but keep the most-frequent original casing. Cancelled reservations counted in Bookings/Cancel% only — excluded from revenue, room nights, ADR, ALOS, Avg Lead. Endpoint: `GET /api/hotels/:hotelId/source-report?start=&end=` (see §5.3).
+
 4.7c Mews Scope Limitations (as of April 2026)
 
 The current Mews integration (`MEWS_CLIENT_TOKEN`) lacks permissions for:
@@ -1612,6 +1614,10 @@ GET /api/hotels/:hotelId/bookings?days=14
 
 User-accessible (requireUserApi). Returns daily booking summaries with nested individual reservation details for the Bookings Report. Groups by booking_date (when reservation was created). Cancelled bookings excluded from ADR/revenue/room night totals but included in booking count. Details sorted: confirmed first, cancelled last. Falls back to reservation ID when guest name is unavailable (Mews).
 
+GET /api/hotels/:hotelId/source-report?start=YYYY-MM-DD&end=YYYY-MM-DD
+
+User-accessible (requireUserApi). Returns the Source Report payload `{ start, end, sources: [...], totals }`. Each `sources[]` row has `{ source, bookings, cancelled, roomNights, revenue, sharePct, adr, alos, avgLead, cancelPct }`. Grouping is case-insensitive on `reservations.source`; NULL/empty bucket as `(no source)`. Cancelled rows (`status ILIKE '%cancel%'`) counted in `bookings`/`cancelled`/`cancelPct` only — excluded from `revenue`, `roomNights`, `adr`, `alos`, `avgLead`. Totals row weights ALOS and Avg Lead by per-source active bookings. Validation rejects non-ISO dates and `start > end` with 400. See §4.7b for table spec.
+
 Budgets.
 
 Compsets.
@@ -1873,6 +1879,7 @@ market-pulse/
 │ │ │ ├── ReportSelector.tsx
 │ │ │ ├── ReportTable.tsx
 │ │ │ ├── ShreejiReport.tsx
+│ │ │ ├── SourceReport.tsx
 │ │ │ └── YearOnYearReport.tsx
 │ │ └── hooks
 │ │ ├── useReportData.ts

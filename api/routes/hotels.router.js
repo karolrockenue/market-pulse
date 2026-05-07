@@ -431,4 +431,142 @@ router.get("/:hotelId/bookings", requireUserApi, async (req, res) => {
   }
 });
 
+// GET /api/hotels/:hotelId/source-report?start=YYYY-MM-DD&end=YYYY-MM-DD
+// Aggregate reservations by booking source for the Source Report (Reports Hub).
+// Grouping: case-insensitive on `source`, NULL/empty bucketed as "(no source)".
+// Cancelled reservations are counted in `bookings` but excluded from
+// revenue, room_nights, ADR, ALOS and avg_lead.
+router.get("/:hotelId/source-report", requireUserApi, async (req, res) => {
+  try {
+    const hotelId = parseInt(req.params.hotelId);
+    if (Number.isNaN(hotelId)) {
+      return res.status(400).json({ error: "Invalid hotelId." });
+    }
+
+    const ISO = /^\d{4}-\d{2}-\d{2}$/;
+    const { start, end } = req.query;
+    if (!ISO.test(start) || !ISO.test(end)) {
+      return res
+        .status(400)
+        .json({ error: "start and end must be YYYY-MM-DD." });
+    }
+    if (start > end) {
+      return res.status(400).json({ error: "start must be <= end." });
+    }
+
+    const result = await pool.query(
+      `WITH normalized AS (
+         SELECT
+           NULLIF(TRIM(source), '') AS source,
+           nights,
+           total_rate,
+           status,
+           check_in,
+           booking_date
+         FROM reservations
+         WHERE hotel_id = $1
+           AND booking_date >= $2::date
+           AND booking_date <= $3::date
+       )
+       SELECT
+         LOWER(COALESCE(source, '__null__')) AS source_key,
+         COALESCE(mode() WITHIN GROUP (ORDER BY source), '(no source)')
+           AS display_source,
+         COUNT(*)::int AS bookings,
+         COUNT(*) FILTER (WHERE status NOT ILIKE '%cancel%')::int
+           AS active_bookings,
+         COUNT(*) FILTER (WHERE status ILIKE '%cancel%')::int
+           AS cancelled_bookings,
+         COALESCE(
+           SUM(nights) FILTER (WHERE status NOT ILIKE '%cancel%'), 0
+         )::int AS room_nights,
+         COALESCE(
+           SUM(total_rate) FILTER (WHERE status NOT ILIKE '%cancel%'), 0
+         )::numeric AS revenue,
+         AVG(nights) FILTER (WHERE status NOT ILIKE '%cancel%') AS alos_raw,
+         AVG((check_in - booking_date))
+           FILTER (WHERE status NOT ILIKE '%cancel%') AS avg_lead_raw
+       FROM normalized
+       GROUP BY LOWER(COALESCE(source, '__null__'))
+       ORDER BY revenue DESC, bookings DESC`,
+      [hotelId, start, end],
+    );
+
+    const rows = result.rows;
+    const totalRevenue = rows.reduce(
+      (acc, r) => acc + parseFloat(r.revenue || 0),
+      0,
+    );
+
+    const sources = rows.map((r) => {
+      const bookings = r.bookings;
+      const roomNights = r.room_nights;
+      const revenue = parseFloat(r.revenue) || 0;
+      const cancelled = r.cancelled_bookings;
+      return {
+        source: r.display_source,
+        bookings,
+        cancelled,
+        roomNights,
+        revenue: Math.round(revenue * 100) / 100,
+        sharePct:
+          totalRevenue > 0
+            ? Math.round((revenue / totalRevenue) * 1000) / 10
+            : 0,
+        adr: roomNights > 0 ? Math.round(revenue / roomNights) : 0,
+        alos: r.alos_raw != null ? Math.round(parseFloat(r.alos_raw) * 10) / 10 : 0,
+        avgLead:
+          r.avg_lead_raw != null ? Math.round(parseFloat(r.avg_lead_raw)) : 0,
+        cancelPct:
+          bookings > 0 ? Math.round((cancelled / bookings) * 1000) / 10 : 0,
+      };
+    });
+
+    // Totals row (weighted-avg for ADR/ALOS/Avg Lead, share% = 100 if any rev).
+    const totalBookings = rows.reduce((a, r) => a + r.bookings, 0);
+    const totalActive = rows.reduce((a, r) => a + r.active_bookings, 0);
+    const totalCancelled = rows.reduce((a, r) => a + r.cancelled_bookings, 0);
+    const totalRoomNights = rows.reduce((a, r) => a + r.room_nights, 0);
+
+    // Avg lead and ALOS for the totals row are weighted by active bookings.
+    let weightedLeadNumerator = 0;
+    let weightedAlosNumerator = 0;
+    for (const r of rows) {
+      const active = r.active_bookings || 0;
+      if (active > 0) {
+        if (r.avg_lead_raw != null) {
+          weightedLeadNumerator += parseFloat(r.avg_lead_raw) * active;
+        }
+        if (r.alos_raw != null) {
+          weightedAlosNumerator += parseFloat(r.alos_raw) * active;
+        }
+      }
+    }
+
+    const totals = {
+      bookings: totalBookings,
+      cancelled: totalCancelled,
+      roomNights: totalRoomNights,
+      revenue: Math.round(totalRevenue * 100) / 100,
+      sharePct: totalRevenue > 0 ? 100 : 0,
+      adr: totalRoomNights > 0 ? Math.round(totalRevenue / totalRoomNights) : 0,
+      alos:
+        totalActive > 0
+          ? Math.round((weightedAlosNumerator / totalActive) * 10) / 10
+          : 0,
+      avgLead:
+        totalActive > 0 ? Math.round(weightedLeadNumerator / totalActive) : 0,
+      cancelPct:
+        totalBookings > 0
+          ? Math.round((totalCancelled / totalBookings) * 1000) / 10
+          : 0,
+    };
+
+    res.json({ start, end, sources, totals });
+  } catch (error) {
+    console.error("Error fetching source report:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 module.exports = router;

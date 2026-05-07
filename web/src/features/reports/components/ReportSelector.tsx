@@ -7,6 +7,7 @@ import {
   FileText,
   Target,
   Wallet,
+  PieChart,
 } from "lucide-react";
 import { R } from "../../../styles/tokens";
 
@@ -51,6 +52,14 @@ export function ReportSelector({
       title: "Bookings Report",
       description: "Daily booking summary with guest details and sources",
       icon: Calendar,
+      category: "Core Analytics",
+      available: true,
+    },
+    {
+      id: "source-report",
+      title: "Source Report",
+      description: "Booking volume and revenue by acquisition channel",
+      icon: PieChart,
       category: "Core Analytics",
       available: true,
     },

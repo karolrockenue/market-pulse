@@ -18,6 +18,7 @@ import { ShreejiReport } from "./components/ShreejiReport";
 
 import { MonthlyTakingsReport } from "./components/MonthlyTakingsReport";
 import { BookingsReport } from "./components/BookingsReport";
+import { SourceReport } from "./components/SourceReport";
 
 // --- GLOBAL COMPONENTS (../../components) ---
 // These are shared components that live in src/components
@@ -147,6 +148,10 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
       case "current-month":
         newStart = new Date(Date.UTC(currentYear, currentMonth, 1));
         newEnd = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
+        break;
+      case "previous-month":
+        newStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
+        newEnd = new Date(Date.UTC(currentYear, currentMonth, 0));
         break;
       case "next-month":
         newStart = new Date(Date.UTC(currentYear, currentMonth + 1, 1));
@@ -476,6 +481,17 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
 
   if (activeReportType === "bookings-report") {
     return <BookingsReport hotelId={hotelId} currencySymbol={currencySymbol} onBack={handleBack} />;
+  }
+
+  if (activeReportType === "source-report") {
+    return (
+      <SourceReport
+        hotelId={hotelId}
+        propertyName={propertyName}
+        currencySymbol={currencySymbol}
+        onBack={handleBack}
+      />
+    );
   }
 
   // 3. Generic/Core Reports (Performance Metrics) - Managed by Hub State
