@@ -1053,11 +1053,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               >
                                 <User
                                   size={10}
-                                  color={
-                                    pendingOverrides[day.date]
-                                      ? R.gold
-                                      : R.textMid
-                                  }
+                                  color={R.gold}
                                 />
                               </div>
                             )}
@@ -1973,7 +1969,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               ) : (
                                 <span
                                   style={{
-                                    color: isPending ? R.gold : R.accent,
+                                    color: hasAny ? R.gold : R.accent,
                                     fontWeight: isPending ? "bold" : "normal",
                                     fontVariantNumeric: "tabular-nums",
                                     fontSize: "13px",
