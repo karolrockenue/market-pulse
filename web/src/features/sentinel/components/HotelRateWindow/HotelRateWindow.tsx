@@ -665,6 +665,7 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                 aiShadowRate: aiPredictions[d.date]?.rate
                   ? Math.max(aiPredictions[d.date].rate, d.guardrailMin || 0)
                   : undefined,
+                isOverride: rateOverrides[d.date] !== undefined, // [NEW] gold dot for override days
               }))}
             />
 

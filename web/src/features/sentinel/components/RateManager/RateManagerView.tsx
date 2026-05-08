@@ -769,6 +769,7 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                 aiShadowRate: aiPredictions[d.date]?.rate
                   ? Math.max(aiPredictions[d.date].rate, d.guardrailMin || 0)
                   : undefined, // Clamp AI rate to min rate floor
+                isOverride: rateOverrides[d.date] !== undefined, // [NEW] gold dot for override days
               }))}
             />
 

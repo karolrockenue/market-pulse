@@ -54,6 +54,7 @@ export function OccupancyVisualizer({
         pmsRate: d.liveRate || 0,
         isFrozen: d.isFrozen,
         pickup: d.pickup || 0,
+        isOverride: !!d.isOverride, // [NEW] override-aware dot coloring
       };
     });
   }, [data, startDate, viewMode]); // [FIX] Add viewMode dependency
@@ -554,8 +555,8 @@ export function OccupancyVisualizer({
                               <div style={{ color: "#38C6BA" }}>
                                 {Math.round(day.occupancy)}% occupied
                               </div>
-                              <div style={{ color: "white" }}>
-                                PMS Rate: £{day.pmsRate}
+                              <div style={{ color: day.isOverride ? "#C8A66E" : "white" }}>
+                                {day.isOverride ? "Override" : "PMS Rate"}: £{day.pmsRate}
                               </div>
                               {/* [NEW] AI Rate Tooltip */}
                               {day.sentinelRate > 0 && (
@@ -646,7 +647,7 @@ export function OccupancyVisualizer({
                           />
                         )}
 
-                        {/* PMS Rate (White Dot) - Rendered second to appear on top if equal */}
+                        {/* PMS Rate (White Dot, or Gold if Override) - Rendered second to appear on top if equal */}
                         {day.pmsRate > 0 && (
                           <div
                             style={{
@@ -654,7 +655,9 @@ export function OccupancyVisualizer({
                               left: "50%",
                               transform: "translateX(-50%)",
                               borderRadius: "9999px",
-                              backgroundColor: "white",
+                              backgroundColor: day.isOverride
+                                ? "#C8A66E"
+                                : "white",
                               border: "1px solid #0C0E12",
                               width: "0.375rem",
                               height: "0.375rem",
@@ -821,6 +824,32 @@ export function OccupancyVisualizer({
                     }}
                   >
                     Sentinel AI Rate
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "0.5rem",
+                      height: "0.5rem",
+                      backgroundColor: "#C8A66E",
+                      borderRadius: "50%",
+                      border: "1px solid #1E2330",
+                    }}
+                  ></div>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      color: "#7A8494",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Override
                   </span>
                 </div>
                 <div
