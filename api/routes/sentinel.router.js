@@ -1049,18 +1049,31 @@ router.post("/sync", async (req, res) => {
       candidateMap = sentinelService.buildRateIdMap(pmsRoomTypes, pmsRatePlans);
     }
 
-    // Apply fill-only merge — but if admin explicitly chose a rateId, that
-    // overrides existing entries (intent: "I want all rooms on this plan now").
+    // Apply validate-then-fill merge — but if admin explicitly chose a rateId,
+    // that overrides existing entries (intent: "I want all rooms on this plan now").
     let rateIdMap;
     if (selectedRateId) {
       rateIdMap = candidateMap;
     } else {
-      rateIdMap = { ...candidateMap, ...priorRateIdMap };
+      // Drop stale existing entries (rate plan deleted in PMS); preserve valid ones.
+      // sync_fleet.py runs nightly — without this, deleted plans leave dead mappings
+      // that would only be detected when Phase 2 push fails.
+      const validRateIdSet = new Set(pmsRatePlans.map((p) => String(p.rateID)));
+      const validatedExisting = {};
+      const droppedKeys = [];
+      for (const [roomTypeId, rateId] of Object.entries(priorRateIdMap)) {
+        if (validRateIdSet.has(String(rateId))) {
+          validatedExisting[roomTypeId] = rateId;
+        } else {
+          droppedKeys.push(roomTypeId);
+        }
+      }
+      rateIdMap = { ...candidateMap, ...validatedExisting };
       const addedRoomKeys = Object.keys(rateIdMap).filter(
-        (k) => priorRateIdMap[k] === undefined,
+        (k) => validatedExisting[k] === undefined,
       );
       console.log(
-        `[Sentinel /sync] Hotel ${hotelId}: rate_id_map preserved (${Object.keys(priorRateIdMap).length} existing, ${addedRoomKeys.length} added${addedRoomKeys.length ? ": " + addedRoomKeys.join(", ") : ""})`,
+        `[Sentinel /sync] Hotel ${hotelId}: rate_id_map preserved (${Object.keys(validatedExisting).length} existing, ${addedRoomKeys.length} added${addedRoomKeys.length ? ": " + addedRoomKeys.join(", ") : ""}${droppedKeys.length ? `, ${droppedKeys.length} stale dropped: ${droppedKeys.join(", ")}` : ""})`,
       );
     }
 

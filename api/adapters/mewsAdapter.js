@@ -433,19 +433,81 @@ function buildMewsRateIdMap(ratePlans, resourceCategories) {
     return {};
   }
 
-  // Prioritize: Public > Private, then by name keywords
-  const bestRoot =
-    rootRates.find((r) => {
-      const name = (r.ratePlanName || "").toLowerCase();
-      return (
-        name.includes("base") ||
-        name.includes("standard") ||
-        name.includes("rack") ||
-        name.includes("bar")
-      );
-    }) ||
-    rootRates.find((r) => r.isPublic) ||
-    rootRates[0];
+  // [SILENT-FLIP HARDENING 2026-05-08] Tightened matcher.
+  // Belsize+Primrose were silently flipped to "Mid Stay 29-59 (BASE)" because
+  // the old matcher's substring rule on `base|standard|rack|bar` had no
+  // exclude list and no prefix preference. The new tier order:
+  //
+  //   Tier 1 — Prefer plans whose name starts with "OTA " (e.g. "OTA BASE: Flexible").
+  //            This is the strongest signal — Mason & Fifth, Shreeji, and other
+  //            Mews properties consistently name their distribution master with
+  //            an "OTA " prefix.
+  //   Tier 2 — Substring match on base|standard|rack|bar, but ONLY on plans whose
+  //            name doesn't match an exclude pattern (length-tier rate plans,
+  //            voucher / corporate / channel-specific plans, archived plans).
+  //   Tier 3 — First public root rate.
+  //   Tier 4 — First root rate (last-resort fallback).
+  //
+  // Even with this tighter matcher, the matcher's output should never overwrite
+  // an existing rate_id_map entry — see fill-only protection in
+  // sentinel.service.js (updateConfig + recalculateRates) and
+  // sentinel.router.js /sync. The matcher is the seeder, the existing map is law.
+  const EXCLUDE_PATTERNS = [
+    /\bmid\s*stay\b/i,
+    /\blong\s*stay\b/i,
+    /\bextended\b/i,
+    /\bvoucher\b/i,
+    /\bcorporate\b/i,
+    /\bcorp\b/i,
+    /\bfriends?\b/i,
+    /\bstaff\b/i,
+    /\bmanagement\b/i,
+    /\bpartner\b/i,
+    /\bagent\b/i,
+    /\bnon[-\s]?refundable\b/i,
+    /\bnonref\b/i,
+    /\bagoda\b/i,
+    /\bbooking\.?com\b/i,
+    /\bexpedia\b/i,
+    /\bairbnb\b/i,
+    /\bhyper\s*guest\b/i,
+    /\bgds\b/i,
+    /\bclose\b/i,
+    /\barchive/i,
+    /\bdeactivated\b/i,
+    /\binsider\b/i,
+    /\bearly\s*bird\b/i,
+    /\bm\s*&\s*f\b/i,
+  ];
+  const isExcluded = (name) => {
+    const n = name || "";
+    for (const pat of EXCLUDE_PATTERNS) {
+      if (pat.test(n)) return true;
+    }
+    return false;
+  };
+
+  // Tier 1: prefer "OTA " prefix
+  const otaPrefixed = rootRates.find((r) =>
+    /^\s*OTA\b/i.test(r.ratePlanName || ""),
+  );
+
+  // Tier 2: substring base|standard|rack|bar, exclude noisy names
+  const substringMatch = rootRates.find((r) => {
+    const name = (r.ratePlanName || "").toLowerCase();
+    if (isExcluded(r.ratePlanName)) return false;
+    return (
+      name.includes("base") ||
+      name.includes("standard") ||
+      name.includes("rack") ||
+      name.includes("bar")
+    );
+  });
+
+  // Tier 3: first public root rate
+  const publicMatch = rootRates.find((r) => r.isPublic);
+
+  const bestRoot = otaPrefixed || substringMatch || publicMatch || rootRates[0];
 
   console.log(
     `[Mews] Selected root rate: "${bestRoot.ratePlanName}" (${bestRoot.rateID})`,

@@ -622,7 +622,9 @@ async function updateConfig(hotelId, updates) {
       String(pmsRatePlans[0]?.rateID || "").includes("-"));
 
   // If the Control Panel sent an explicit rate_id_map, use it verbatim (deliberate user choice).
-  // Otherwise: preserve existing entries and only fill NEW room keys from the matcher.
+  // Otherwise: validate-then-fill — preserve existing entries that still resolve to a valid
+  // rateID in current pms_rate_plans (silent-flip protection); drop stale entries (rate
+  // plan deleted in PMS) so the matcher can refill them.
   const existingRateIdMap = currentConfig.rate_id_map || {};
   let rateIdMap;
   if (
@@ -643,11 +645,22 @@ async function updateConfig(hotelId, updates) {
     } else {
       candidateMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
     }
-    // Existing entries win over candidates. Candidate fills only NEW room keys.
-    rateIdMap = { ...candidateMap, ...existingRateIdMap };
-    const addedRoomKeys = Object.keys(rateIdMap).filter((k) => existingRateIdMap[k] === undefined);
+    // Drop stale existing entries (rate plan deleted in PMS); preserve valid ones.
+    const validRateIdSet = new Set(pmsRatePlans.map((p) => String(p.rateID)));
+    const validatedExisting = {};
+    const droppedKeys = [];
+    for (const [roomTypeId, rateId] of Object.entries(existingRateIdMap)) {
+      if (validRateIdSet.has(String(rateId))) {
+        validatedExisting[roomTypeId] = rateId;
+      } else {
+        droppedKeys.push(roomTypeId);
+      }
+    }
+    // Existing entries win over candidates. Candidate fills only NEW room keys + stale-dropped keys.
+    rateIdMap = { ...candidateMap, ...validatedExisting };
+    const addedRoomKeys = Object.keys(rateIdMap).filter((k) => validatedExisting[k] === undefined);
     console.log(
-      `[Sentinel] Hotel ${hotelId}: rate_id_map preserved (${Object.keys(existingRateIdMap).length} existing, ${addedRoomKeys.length} added${addedRoomKeys.length ? ": " + addedRoomKeys.join(", ") : ""})`,
+      `[Sentinel] Hotel ${hotelId}: rate_id_map preserved (${Object.keys(validatedExisting).length} existing, ${addedRoomKeys.length} added${addedRoomKeys.length ? ": " + addedRoomKeys.join(", ") : ""}${droppedKeys.length ? `, ${droppedKeys.length} stale dropped: ${droppedKeys.join(", ")}` : ""})`,
     );
   }
 
@@ -787,11 +800,11 @@ async function recalculateRates(hotelId, startDate, endDate) {
   );
   const isMewsHotel = pmsTypeRes.rows[0]?.pms_type === "mews";
 
-  // Self-heal rate ID map — fill-only, never overwrite existing entries.
-  // Substring matchers in buildRateIdMap / buildMewsRateIdMap will silently flip
-  // an existing mapping if a new rate plan is added that matches base|standard|rack|bar
-  // (e.g. "Mid Stay 29-59 (BASE)" flipped Belsize 2026-04-23 + Primrose 2026-05-06).
-  // Existing entries are sacred. Only fill in keys for newly-added rooms.
+  // Self-heal rate ID map — validate-then-fill. Substring matchers can silently
+  // flip an existing mapping if a new rate plan matches base|standard|rack|bar
+  // (e.g. "Mid Stay 29-59 (BASE)" flipped Belsize 2026-04-23 + Primrose 2026-05-06
+  // + 2026-05-08 round 2). Valid existing entries are sacred. Stale entries
+  // (rate plan deleted in PMS) get dropped so the matcher refills them.
   const pmsRatePlans = config.pms_rate_plans?.data || [];
   let candidateMap;
   if (isMewsHotel) {
@@ -801,16 +814,26 @@ async function recalculateRates(hotelId, startDate, endDate) {
     candidateMap = buildRateIdMap(pmsRoomTypes, pmsRatePlans);
   }
   const existingMap = config.rate_id_map || {};
-  const filledMap = { ...candidateMap, ...existingMap };
-  const addedKeys = Object.keys(filledMap).filter((k) => existingMap[k] === undefined);
-  if (addedKeys.length > 0) {
+  const validRateIdSetA = new Set(pmsRatePlans.map((p) => String(p.rateID)));
+  const validatedExistingA = {};
+  const droppedKeysA = [];
+  for (const [roomTypeId, rateId] of Object.entries(existingMap)) {
+    if (validRateIdSetA.has(String(rateId))) {
+      validatedExistingA[roomTypeId] = rateId;
+    } else {
+      droppedKeysA.push(roomTypeId);
+    }
+  }
+  const filledMap = { ...candidateMap, ...validatedExistingA };
+  const addedKeys = Object.keys(filledMap).filter((k) => validatedExistingA[k] === undefined);
+  if (addedKeys.length > 0 || droppedKeysA.length > 0) {
     await db.query(
       `UPDATE sentinel_configurations SET rate_id_map = $1, updated_at = NOW() WHERE hotel_id = $2`,
       [JSON.stringify(filledMap), hotelId],
     );
     config.rate_id_map = filledMap;
     console.log(
-      `[Sentinel] Hotel ${hotelId}: filled ${addedKeys.length} missing room mapping(s): ${addedKeys.join(", ")}`,
+      `[Sentinel] Hotel ${hotelId}: rate_id_map self-heal — ${addedKeys.length} added${addedKeys.length ? `: ${addedKeys.join(", ")}` : ""}${droppedKeysA.length ? `, ${droppedKeysA.length} stale dropped: ${droppedKeysA.join(", ")}` : ""}`,
     );
   }
 
