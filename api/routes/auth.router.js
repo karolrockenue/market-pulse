@@ -195,7 +195,7 @@ router.post("/login", async (req, res) => {
   }
   try {
     const userResult = await pgPool.query(
-      "SELECT * FROM users WHERE email = $1",
+      "SELECT * FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
     );
     if (userResult.rows.length === 0) {
@@ -580,7 +580,7 @@ router.post("/mews/validate", async (req, res) => {
   try {
     // Check if a user with this email already exists in the database
     const existingUser = await pgPool.query(
-      "SELECT user_id, cloudbeds_user_id, role FROM users WHERE email = $1",
+      "SELECT user_id, cloudbeds_user_id, role FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
     );
     const userExists = existingUser.rows.length > 0;
@@ -681,7 +681,7 @@ router.post("/mews/create", async (req, res) => {
 
     // --- 2. Create the User (or use existing) ---
     const existingUser = await client.query(
-      "SELECT user_id, cloudbeds_user_id, role FROM users WHERE email = $1",
+      "SELECT user_id, cloudbeds_user_id, role FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
     );
 

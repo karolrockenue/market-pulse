@@ -105,7 +105,7 @@ router.post(
       }
 
       const existingUser = await pgPool.query(
-        "SELECT user_id FROM users WHERE email = $1",
+        "SELECT user_id FROM users WHERE LOWER(email) = LOWER($1)",
         [invitee_email]
       );
       if (existingUser.rows.length > 0) {
@@ -295,7 +295,7 @@ router.delete(
 
       // --- FIX: Fetch the user's role to check permissions ---
       const userToRemoveResult = await client.query(
-        "SELECT user_id, cloudbeds_user_id, role FROM users WHERE email = $1",
+        "SELECT user_id, cloudbeds_user_id, role FROM users WHERE LOWER(email) = LOWER($1)",
         [emailToRemove]
       );
 
@@ -456,7 +456,7 @@ router.post(
       // THE FIX: Fetch BOTH the internal user_id and the cloudbeds_user_id.
       // The cloudbeds_user_id is the consistent key we need to use.
       const userToLinkResult = await client.query(
-        "SELECT user_id, cloudbeds_user_id FROM users WHERE email = $1",
+        "SELECT user_id, cloudbeds_user_id FROM users WHERE LOWER(email) = LOWER($1)",
         [email]
       );
 
