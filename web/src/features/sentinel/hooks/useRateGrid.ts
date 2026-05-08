@@ -260,15 +260,20 @@ export const useRateGrid = () => {
         }
 
         // B. Process Metrics (Occupancy Map)
-        const statsMap: Record<string, { occupancy: number; adr: number }> = {};
+        const statsMap: Record<
+          string,
+          { occupancy: number; adr: number; roomsAvailable: number }
+        > = {};
         if (Array.isArray(metricsRes)) {
           metricsRes.forEach((row: any) => {
             const dateKey = row.period.substring(0, 10);
             const sold = parseFloat(row["rooms-sold"]) || 0;
-            const total = sold + (parseFloat(row["rooms-unsold"]) || 0);
+            const unsold = parseFloat(row["rooms-unsold"]) || 0;
+            const total = sold + unsold;
             statsMap[dateKey] = {
               occupancy: total > 0 ? (sold / total) * 100 : 0,
               adr: parseFloat(row["adr"]) || 0,
+              roomsAvailable: unsold,
             };
           });
         }
@@ -284,7 +289,11 @@ export const useRateGrid = () => {
 
         // C. Process Preview Data (The Canonical Source)
         const fullCalendar: RateCalendarDay[] = previewData.map((day: any) => {
-          const stats = statsMap[day.date] || { occupancy: 0, adr: 0 };
+          const stats = statsMap[day.date] || {
+            occupancy: 0,
+            adr: 0,
+            roomsAvailable: 0,
+          };
           const pickupVal = pickupMap[day.date] || 0; // [NEW] Inject pickup
 
           const dateObj = new Date(day.date);
@@ -328,6 +337,7 @@ export const useRateGrid = () => {
             occupancy: stats.occupancy,
             adr: stats.adr,
             pickup: pickupVal, // [NEW]
+            roomsAvailable: stats.roomsAvailable, // [NEW]
           };
         });
 

@@ -14,6 +14,7 @@ import {
   Target,
   ArrowDown,
   Check,
+  BedDouble,
 } from "lucide-react";
 import {
   Select,
@@ -816,6 +817,19 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                           <span>Occupancy</span>
                         </button>
                         <button
+                          onClick={() => toggleRow("roomsAvailable")}
+                          style={getToggleButtonStyle(
+                            hiddenRows.has("roomsAvailable"),
+                          )}
+                        >
+                          {hiddenRows.has("roomsAvailable") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Available</span>
+                        </button>
+                        <button
                           onClick={() => toggleRow("curveTier")}
                           style={getToggleButtonStyle(
                             hiddenRows.has("curveTier"),
@@ -1248,6 +1262,60 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               {Math.round(day.occupancy)}%
                             </td>
                           ))}
+                        </tr>
+                      )}
+
+                      {!hiddenRows.has("roomsAvailable") && (
+                        <tr style={{ borderBottom: `1px solid ${R.sep}` }}>
+                          <td style={{ ...styles.tdSticky, color: R.textMid, fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            <div
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <BedDouble size={16} color={R.textMid} /> Available{" "}
+                              <button
+                                onClick={() => toggleRow("roomsAvailable")}
+                                style={{
+                                  marginLeft: "auto",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Eye size={14} color={R.textDim} />
+                              </button>
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            const todayKey = (() => {
+                              const d = new Date();
+                              d.setHours(0, 0, 0, 0);
+                              return d.toISOString().substring(0, 10);
+                            })();
+                            const isPast = day.date < todayKey;
+                            return (
+                              <td
+                                key={day.date}
+                                style={{
+                                  borderBottom: `1px solid ${R.sep}`,
+                                  textAlign: "center",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
+                                  fontVariantNumeric: "tabular-nums",
+                                  backgroundColor: getColBg(day.date),
+                                  color: isPast ? R.textDim : R.text,
+                                }}
+                              >
+                                {isPast ? "—" : (day.roomsAvailable ?? 0)}
+                              </td>
+                            );
+                          })}
                         </tr>
                       )}
 

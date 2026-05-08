@@ -77,6 +77,7 @@ export interface RateCalendarDay {
   isDailyMinOverride: boolean;
   floorRateLMF: number | null;
   pickup?: number; // [NEW] Daily pickup (Live - Yesterday)
+  roomsAvailable?: number; // [NEW] Capacity − rooms_sold from daily_metrics_snapshots; nightly-fresh
 }
 
 // Overrides (legacy — calendar-level, retires after cutover)

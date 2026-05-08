@@ -12,6 +12,7 @@ import {
   Target,
   ArrowDown,
   Check,
+  BedDouble,
 } from "lucide-react";
 import {
   Select,
@@ -712,6 +713,19 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           <span>Occupancy</span>
                         </button>
                         <button
+                          onClick={() => toggleRow("roomsAvailable")}
+                          style={getToggleButtonStyle(
+                            hiddenRows.has("roomsAvailable"),
+                          )}
+                        >
+                          {hiddenRows.has("roomsAvailable") ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}{" "}
+                          <span>Available</span>
+                        </button>
+                        <button
                           onClick={() => toggleRow("minRate")}
                           style={getToggleButtonStyle(
                             hiddenRows.has("minRate"),
@@ -1047,6 +1061,44 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                               {Math.round(day.occupancy)}%
                             </td>
                           ))}
+                        </tr>
+                      )}
+
+                      {!hiddenRows.has("roomsAvailable") && (
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <BedDouble size={14} color="#7A8494" /> Available
+                            </div>
+                          </td>
+                          {visibleData.map((day) => {
+                            const todayKey = (() => {
+                              const d = new Date();
+                              d.setHours(0, 0, 0, 0);
+                              return d.toISOString().substring(0, 10);
+                            })();
+                            const isPast = day.date < todayKey;
+                            return (
+                              <td
+                                key={day.date}
+                                onMouseEnter={() => setHoveredColumn(day.date)}
+                                onMouseLeave={() => setHoveredColumn(null)}
+                                style={{
+                                  textAlign: "center",
+                                  fontSize: "13px",
+                                  padding: "0 4px",
+                                  height: "44px",
+                                  verticalAlign: "middle",
+                                  fontVariantNumeric: "tabular-nums",
+                                  borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                  backgroundColor: getColBg(day.date),
+                                  color: isPast ? "#5C6470" : "#B0B8C4",
+                                }}
+                              >
+                                {isPast ? "—" : (day.roomsAvailable ?? 0)}
+                              </td>
+                            );
+                          })}
                         </tr>
                       )}
 
