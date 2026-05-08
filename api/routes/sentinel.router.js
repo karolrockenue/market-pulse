@@ -1008,42 +1008,76 @@ router.post("/sync", async (req, res) => {
     const pmsRatePlans = ratePlansData.data || [];
 
     // 2. Build Rate Map — [MEWS] Use PMS-specific map builder
+    //
+    // [SILENT-FLIP FIX 2026-05-08] Fill-only behavior — preserve existing
+    // entries from sentinel_configurations.rate_id_map. The substring matchers
+    // (buildMewsRateIdMap / buildRateIdMap) can silently flip an existing
+    // mapping when a new rate plan is added that matches base|standard|rack|bar
+    // (Belsize+Primrose flipped to "Mid Stay 29-59 (BASE)" via this exact
+    // path overnight 2026-05-08 03:01 UTC, despite the same fill-only fix
+    // already being applied to updateConfig + recalculateRates yesterday).
+    // The /sync route was the third writer that escaped that earlier patch.
+    // Existing entries are sacred. selectedRateId override (admin explicit
+    // choice) still wins. See claude/sentinel-mews-rate-mapping-2026-05-07.md.
+    const priorConfigRes = await db.query(
+      "SELECT rate_id_map FROM sentinel_configurations WHERE hotel_id = $1",
+      [hotelId],
+    );
+    const priorRateIdMap = priorConfigRes.rows[0]?.rate_id_map || {};
+
     const hotelPmsType = await pmsRegistry.getPmsType(hotelId);
-    let rateIdMap;
+    let candidateMap;
     if (hotelPmsType === "mews") {
       if (selectedRateId) {
-        // Admin explicitly selected a rate plan — map all room types to it
-        rateIdMap = {};
+        // Admin explicitly selected a rate plan — map all room types to it.
+        // This still WINS over preserved entries: explicit user choice beats
+        // historical state.
+        candidateMap = {};
         for (const cat of pmsRoomTypes) {
-          rateIdMap[cat.roomTypeID] = selectedRateId;
+          candidateMap[cat.roomTypeID] = selectedRateId;
         }
         const selectedPlan = pmsRatePlans.find((r) => r.rateID === selectedRateId);
         console.log(`[Mews] Admin selected rate plan: "${selectedPlan?.ratePlanName || "?"}" (${selectedRateId})`);
       } else {
         const mewsAdapterLocal = require("../adapters/mewsAdapter");
-        rateIdMap = mewsAdapterLocal.buildMewsRateIdMap(
+        candidateMap = mewsAdapterLocal.buildMewsRateIdMap(
           pmsRatePlans,
           pmsRoomTypes,
         );
       }
     } else {
-      rateIdMap = sentinelService.buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+      candidateMap = sentinelService.buildRateIdMap(pmsRoomTypes, pmsRatePlans);
+    }
+
+    // Apply fill-only merge — but if admin explicitly chose a rateId, that
+    // overrides existing entries (intent: "I want all rooms on this plan now").
+    let rateIdMap;
+    if (selectedRateId) {
+      rateIdMap = candidateMap;
+    } else {
+      rateIdMap = { ...candidateMap, ...priorRateIdMap };
+      const addedRoomKeys = Object.keys(rateIdMap).filter(
+        (k) => priorRateIdMap[k] === undefined,
+      );
+      console.log(
+        `[Sentinel /sync] Hotel ${hotelId}: rate_id_map preserved (${Object.keys(priorRateIdMap).length} existing, ${addedRoomKeys.length} added${addedRoomKeys.length ? ": " + addedRoomKeys.join(", ") : ""})`,
+      );
     }
 
     // 3. Save Configuration to DB
     const { rows } = await db.query(
       `
       INSERT INTO sentinel_configurations (
-        hotel_id, 
-        pms_room_types, 
-        pms_rate_plans, 
+        hotel_id,
+        pms_room_types,
+        pms_rate_plans,
         rate_id_map,
-        sentinel_enabled, 
+        sentinel_enabled,
         last_pms_sync_at,
         config_drift
       )
       VALUES ($1, $2, $3, $4, true, NOW(), false)
-      ON CONFLICT (hotel_id) DO UPDATE 
+      ON CONFLICT (hotel_id) DO UPDATE
       SET
         pms_room_types = EXCLUDED.pms_room_types,
         pms_rate_plans = EXCLUDED.pms_rate_plans,
