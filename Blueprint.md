@@ -2207,8 +2207,14 @@ Service B – Public Tunnel (dgx-funnel.service): Runs /usr/bin/tailscale funnel
 
 11.4 Cron Schedule (DGX)
 
-0 5 * * * — Fleet Sync (refreshes facts & calendar for all hotels).
-0 * * * * — Sentinel Run (generates & uploads decisions, hourly).
+DGX server timezone is **CEST (UTC+2 in summer, UTC+1 in winter)** — cron times are local, not UTC. Convert when correlating with `sentinel_*` table timestamps which are UTC.
+
+| Cron (DGX local) | UTC equivalent (summer) | Script | Purpose |
+|---|---|---|---|
+| `0 * * * *` | `0 * * * *` (hourly, top of hour) | `/home/sentinel/sentinel-training-hub/trigger_all.py` | Sentinel Run — DGX yield engine, generates predictions for every rockenue hotel, uploads via `POST /api/bridge/decisions`. Fire-and-forget per hotel. |
+| `0 5 * * *` | `0 3 * * *` (03:00 UTC daily) | `/home/sentinel/sentinel-training-hub/sync_fleet.py` | Fleet Sync — POSTs to `https://www.market-pulse.io/api/sentinel/sync` for every `is_rockenue_managed = true` hotel. Refreshes `pms_room_types`, `pms_rate_plans`, `rate_id_map`, hydrates `sentinel_rates_calendar` with live PMS rates as `source = 'SYNC'`. Uses `x-internal-secret` header (env var `INTERNAL_API_SECRET`) to bypass session auth. |
+
+**`sync_fleet.py` is the most aggressive automated writer of `sentinel_configurations.rate_id_map` in the system** — it iterates 36+ hotels nightly and rebuilds the map via the matcher when no `selectedRateId` is provided. Before 2026-05-08 the `/sync` route's INSERT...ON CONFLICT...DO UPDATE was a pure overwrite, which silently re-flipped Belsize+Primrose to `Mid Stay 29-59 (BASE)` overnight despite yesterday's fill-only patches on `updateConfig` and `recalculateRates`. Commit `3d1de67` closed this third writer to fill-only as well — `priorRateIdMap` from DB is preserved, candidate from matcher fills only NEW room keys. **If you ever rewrite the `/sync` route, the fill-only behavior is load-bearing — preserve it or `sync_fleet.py` will silently misroute the fleet again.**
 
 11.5 Trigger Modes (Manual vs Cron)
 
