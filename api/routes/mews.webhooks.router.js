@@ -49,14 +49,16 @@ async function getHotelByEnterpriseId(enterpriseId) {
 
 // ─── Helper: Fetch reservation details from Mews ───────────────────
 
-async function fetchReservationDetails(credentials, reservationId, serviceId) {
+async function fetchReservationDetails(credentials, reservationId, _serviceId) {
+  // No ServiceIds filter — multi-service properties (Westbourne, Primrose) have
+  // Mid-Stay / Long-Stay / Management reservations under non-onboarded service
+  // IDs. Filtering by the single onboarded service silently dropped those
+  // (Blueprint §11). Now we accept whatever Mews returns and capture the
+  // actual ServiceId on the reservation row.
   const payload = {
     ReservationIds: [reservationId],
     Limitation: { Count: 1 },
   };
-  if (serviceId) {
-    payload.ServiceIds = [serviceId];
-  }
 
   const response = await mewsAdapter._callMewsApi(
     "reservations/getAll/2023-06-06",
@@ -285,14 +287,15 @@ router.post("/", async (req, res) => {
 
         await pgPool.query(
           `INSERT INTO reservations
-           (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date, mews_service_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT (id, hotel_id) DO UPDATE SET
              check_out = EXCLUDED.check_out,
              nights = EXCLUDED.nights,
              avg_nightly_rate = EXCLUDED.avg_nightly_rate,
              total_rate = EXCLUDED.total_rate,
              status = EXCLUDED.status,
+             mews_service_id = EXCLUDED.mews_service_id,
              updated_at = NOW()`,
           [
             reservationId,
@@ -307,6 +310,7 @@ router.post("/", async (req, res) => {
             totalRevenue,
             rStatus,
             bookingDate,
+            reservation.ServiceId || null,
           ],
         );
       } catch (ledgerErr) {

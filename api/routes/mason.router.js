@@ -14,6 +14,7 @@ const router = express.Router();
 const mewsAdapter = require("../adapters/mewsAdapter");
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
+const masonService = require("../services/mason.service");
 
 // Mason & Fifth hotel IDs that grant access to this dashboard.
 // Includes Belsize Park (318329) even though its service UUIDs aren't
@@ -74,6 +75,28 @@ router.use(requireUserApi, requireMasonAccess);
 // the dashboard total — that's the Mason rule: ignore everything outside
 // Short/Mid/Long Accommodation Income, with the Westbourne exception that
 // Canal – Breakfast Inclusive Rate folds into Short Stay.
+// Per-hotel Mews service IDs. Used for service-based reservation
+// classification (Sales Flash SS / MS / LS bookings panels). Discovered
+// 2026-05-11 via reservations/getAll/2023-06-06 backfill — see
+// scripts/backfill-mf-reservations-service-id.js. Source of truth for the
+// reservations table's mews_service_id column.
+const MF_SERVICE_IDS = {
+  318329: {
+    short: ["c6267c3b-144c-40e2-baf3-b3e00110df1b"],
+  },
+  318341: {
+    short: ["e810df20-baa7-4895-a964-b26b00b051b9"],
+    mid:   ["3990f059-4fd8-47b3-ad48-b37600b41a91"],
+    long:  ["72b82965-e525-4001-90d7-b26b00b26959"],
+    // Excluded: Management (38bdc698) and ancillaries (e20b19b7, 094bdcd1).
+  },
+  318343: {
+    short: ["b518b662-2504-4092-aa6a-b13400ade71e"],
+    mid:   ["b17bc567-1252-4532-8399-b37e00aad8fd"],
+    long:  ["270856f0-7b69-4425-a558-b14c0090c12d"],
+  },
+};
+
 const MF_HOTELS = {
   318329: {
     name: "Mason & Fifth, Belsize Park",
@@ -85,6 +108,7 @@ const MF_HOTELS = {
     accountingCategories: {
       short: ["d30087d1-9400-4550-9838-b3e900b73224"],
     },
+    serviceIds: MF_SERVICE_IDS[318329],
   },
   318341: {
     name: "Mason & Fifth, Westbourne Park",
@@ -107,6 +131,7 @@ const MF_HOTELS = {
       mid: ["09f3c399-8ca0-4418-93bb-b2e400f31f27"], // Accommodation Income – Mid Stay
       long: ["58dcdf67-55af-44b0-a847-b26b00b7ed18"], // Accommodation Income – Long Stay
     },
+    serviceIds: MF_SERVICE_IDS[318341],
   },
   318343: {
     name: "Mason & Fifth, Primrose Hill",
@@ -116,6 +141,7 @@ const MF_HOTELS = {
       mid: ["ed8aec0c-5399-4bde-957a-b38000bb48fe"],   // Accommodation Income – Mid Stay
       long: ["0885a203-9008-4254-a8d6-b39500c0fe2a"],  // Accommodation Income – Long Stay
     },
+    serviceIds: MF_SERVICE_IDS[318343],
   },
 };
 
@@ -302,6 +328,471 @@ router.get("/service-revenue", async (req, res) => {
     res.json(payload);
   } catch (err) {
     console.error("[Mason] service-revenue failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sales Flash + Pacing Flash are scoped to hotels with a full role map.
+// Belsize is excluded from v1 — opens mid-May 2026, no LY data.
+const FLASH_HOTEL_IDS = new Set([318341, 318343]);
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function thisMonthKey() {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+}
+
+function shiftMonth(mk, delta) {
+  const [y, m] = mk.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+}
+
+/**
+ * GET /api/mason/pacing?hotelId=318341&monthsBack=2&monthsForward=11
+ *
+ * Returns the 13-month grid for the Pacing Flash. STLY + LPR fields are null
+ * (deferred). Forecast = OTB for forward months, simple split for current.
+ */
+router.get("/pacing", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({
+      error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}`,
+    });
+  }
+  const hotel = MF_HOTELS[hotelId];
+  if (!hotel) return res.status(400).json({ error: "Hotel not configured" });
+
+  const monthsBack = Math.max(0, parseInt(req.query.monthsBack || "2", 10));
+  const monthsForward = Math.max(1, parseInt(req.query.monthsForward || "11", 10));
+  const startKey = shiftMonth(thisMonthKey(), -monthsBack);
+  const endKey = shiftMonth(thisMonthKey(), monthsForward);
+
+  try {
+    const otb = await masonService.getMonthlyKpis(
+      hotelId,
+      startKey,
+      endKey,
+      hotel.accountingCategories,
+    );
+
+    const lyMap = await masonService.getFinalLyKpis(
+      hotelId,
+      masonService.shiftYear(startKey, -1),
+      masonService.shiftYear(endKey, -1),
+    );
+
+    const dailyOcc = await masonService.getDailyOccRows(hotelId, startKey, endKey);
+    const today = masonService.todayIso();
+
+    const grid = otb.months.map((row) => {
+      const mk = row.monthKey;
+      const monthStart = `${mk}-01`;
+      const monthEnd = masonService.endOfMonth(mk);
+      const monthDailyOcc = dailyOcc.filter(
+        (r) => r.stay_date >= monthStart && r.stay_date <= monthEnd,
+      );
+      const finalLy = lyMap.get(masonService.shiftYear(mk, -1)) || null;
+      const forecast = masonService.computeForecast(mk, row, monthDailyOcc, today);
+      return {
+        monthKey: mk,
+        currentOTB: row,
+        forecast,
+        finalLY: finalLy,
+        sameTimeLY: null, // deferred
+        lastPacingReport: null, // deferred
+      };
+    });
+
+    res.json({
+      hotelId,
+      hotelName: hotel.name,
+      shortName: hotel.shortName,
+      windowStart: startKey,
+      windowEnd: endKey,
+      asOf: today,
+      grid,
+      stlyAvailable: false,
+      lprAvailable: false,
+      notes: {
+        stly: "Same-Time-LY reconstruction deferred to a separate workstream.",
+        lpr: "Last Pacing Report needs weekly snapshots; renders blank until pacing_snapshots accrues.",
+        forecast: "v1: realized + remaining-window pickup at realized ADR for current month; future months show booked OTB.",
+      },
+    });
+  } catch (err) {
+    console.error("[Mason] /pacing failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/mason/booking-pulse?hotelId=318341&weeksBack=8
+ */
+router.get("/booking-pulse", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({
+      error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}`,
+    });
+  }
+  const weeksBack = Math.min(52, Math.max(1, parseInt(req.query.weeksBack || "8", 10)));
+  try {
+    const pulse = await masonService.getBookingPulse(hotelId, weeksBack);
+    res.json({ hotelId, ...pulse });
+  } catch (err) {
+    console.error("[Mason] /booking-pulse failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/mason/sales-flash?hotelId=318341&monthKey=YYYY-MM
+ *
+ * One-shot endpoint that assembles every block on the Sales Flash:
+ * Current Month Summary, Annualised vs Budget, BOB & Business Done,
+ * Pacing Report by service, Weekly Unit Pacing, SS Weekly + LS New Deals.
+ *
+ * Excludes ancillary blocks (Canal/Meadow/Grounding) — out of v1 scope.
+ */
+router.get("/sales-flash", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({
+      error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}`,
+    });
+  }
+  const hotel = MF_HOTELS[hotelId];
+  if (!hotel) return res.status(400).json({ error: "Hotel not configured" });
+
+  const monthKeyParam = req.query.monthKey || shiftMonth(thisMonthKey(), -1);
+  if (!/^\d{4}-\d{2}$/.test(monthKeyParam)) {
+    return res.status(400).json({ error: "monthKey must be YYYY-MM" });
+  }
+
+  try {
+    const currentMK = monthKeyParam;
+    const priorMonthMK = shiftMonth(currentMK, -1);
+    const priorYearMK = masonService.shiftYear(currentMK, -1);
+    // Mason's fiscal year = Apr → Mar. For a reporting month in Jan/Feb/Mar,
+    // FY started the previous April; for Apr+ months it starts that April.
+    const [yearStr, monthStr] = currentMK.split("-");
+    const reportYear = parseInt(yearStr, 10);
+    const reportMonth = parseInt(monthStr, 10);
+    const fyStartYear = reportMonth >= 4 ? reportYear : reportYear - 1;
+    const fyStartMK = `${fyStartYear}-04`;
+    const fyEndMK = `${fyStartYear + 1}-03`;
+
+    // 1. KPIs across the FY window (Apr → Mar) plus priorMonth if it falls
+    // before FY start. Future months return OTB (book-on-the-books for
+    // forward stays) so the Annualised grid + Forward BOB populate. Single
+    // Mews fetch covers all sections.
+    const otbStart = priorMonthMK < fyStartMK ? priorMonthMK : fyStartMK;
+    const otbEnd = fyEndMK;
+    const otb = await masonService.getMonthlyKpis(
+      hotelId,
+      otbStart,
+      otbEnd,
+      hotel.accountingCategories,
+    );
+    const otbByMonth = new Map(otb.months.map((m) => [m.monthKey, m]));
+
+    // 2. Final LY for the FY (used in Annualised grid + prior-year column)
+    const lyMap = await masonService.getFinalLyKpis(
+      hotelId,
+      masonService.shiftYear(fyStartMK, -1),
+      masonService.shiftYear(fyEndMK, -1),
+    );
+
+    // 3. Per-service budgets for FY
+    const budgets = await masonService.getServiceBudgets(hotelId, fyStartYear);
+    const hasBudgetData = Object.values(budgets).some((b) => b.hasData);
+
+    // 4. Direct vs Indirect — current + prior month
+    const [directShare, directSharePM] = await Promise.all([
+      masonService.getDirectShareForMonth(hotelId, currentMK),
+      masonService.getDirectShareForMonth(hotelId, priorMonthMK),
+    ]);
+
+    // 5. In-house at month-end across FY (12 months)
+    const inHouseFY = await masonService.getInHouseAtMonthEnd(
+      hotelId,
+      fyStartMK,
+      fyEndMK,
+    );
+
+    // 6. Lead-time tiers + SS weekly bookings (last 8 weeks)
+    const tiers = await masonService.getLeadTimeTiers(hotelId, 8, hotel.serviceIds);
+
+    // 7. Weekly unit pacing — next 5 weeks anchored on this Monday
+    const today = new Date();
+    const dow = today.getUTCDay() || 7;
+    const monday = new Date(today);
+    monday.setUTCDate(today.getUTCDate() - (dow - 1));
+    monday.setUTCHours(0, 0, 0, 0);
+    const weekStarts = [];
+    for (let i = 0; i < 5; i++) {
+      const w = new Date(monday);
+      w.setUTCDate(monday.getUTCDate() + i * 7);
+      weekStarts.push(w.toISOString().slice(0, 10));
+    }
+    const unitPacing = await masonService.getWeeklyUnitPacing(hotelId, weekStarts);
+
+    // ─── Current Month Summary block ───────────────────────────────
+    const cur = otbByMonth.get(currentMK);
+    const pm = otbByMonth.get(priorMonthMK);
+    const py = lyMap.get(priorYearMK) || null;
+    const budgetCur = budgets[currentMK];
+
+    const summary = {
+      monthKey: currentMK,
+      revenue: {
+        short: {
+          actual: cur?.byRole.short.revenue ?? 0,
+          priorMonth: pm?.byRole.short.revenue ?? null,
+          priorYear: null, // no per-service LY scope from snapshots
+          budget: hasBudgetData ? (budgetCur?.short ?? null) : null,
+        },
+        mid: {
+          actual: cur?.byRole.mid.revenue ?? 0,
+          priorMonth: pm?.byRole.mid.revenue ?? null,
+          priorYear: null,
+          budget: hasBudgetData ? (budgetCur?.mid ?? null) : null,
+        },
+        long: {
+          actual: cur?.byRole.long.revenue ?? 0,
+          priorMonth: pm?.byRole.long.revenue ?? null,
+          priorYear: null,
+          budget: hasBudgetData ? (budgetCur?.long ?? null) : null,
+        },
+        totalAccom: {
+          actual: cur?.total.revenue ?? 0,
+          priorMonth: pm?.total.revenue ?? null,
+          priorYear: py ? py.revenue : null,
+          budget: hasBudgetData
+            ? ((budgetCur?.short || 0) + (budgetCur?.mid || 0) + (budgetCur?.long || 0))
+            : null,
+        },
+      },
+      kpis: {
+        occupancy: {
+          actual: cur?.total.occupancy ?? null,
+          priorMonth: pm?.total.occupancy ?? null,
+          priorYear: py ? py.occupancy : null,
+        },
+        adrBlended: {
+          actual: cur?.total.adr ?? null,
+          priorMonth: pm?.total.adr ?? null,
+          priorYear: py ? py.adr : null,
+        },
+        revpar: {
+          actual: cur?.total.revpar ?? null,
+          priorMonth: pm?.total.revpar ?? null,
+          priorYear: py ? py.revpar : null,
+        },
+        adrShort: {
+          actual: cur?.byRole.short.adr ?? null,
+          priorMonth: pm?.byRole.short.adr ?? null,
+          priorYear: null, // no per-service LY scope from snapshots
+        },
+        adrMid: {
+          actual: cur?.byRole.mid.adr ?? null,
+          priorMonth: pm?.byRole.mid.adr ?? null,
+          priorYear: null,
+        },
+        // Long Stay ADR renamed to "Avg Monthly Charge" in the UI per §15.1.
+        amrLong: {
+          actual: cur?.byRole.long.adr ?? null,
+          priorMonth: pm?.byRole.long.adr ?? null,
+          priorYear: null,
+        },
+        directShareNet: {
+          actual: directShare ? directShare.directPct : null,
+          priorMonth: directSharePM ? directSharePM.directPct : null,
+          priorYear: null,
+        },
+        indirectShareNet: {
+          actual: directShare ? directShare.indirectPct : null,
+          priorMonth: directSharePM ? directSharePM.indirectPct : null,
+          priorYear: null,
+        },
+      },
+    };
+
+    // ─── Annualised vs Budget grid (FY 12 months, Apr → Mar) ─────────
+    const annualised = [];
+    for (let i = 0; i < 12; i++) {
+      const monthN = ((3 + i) % 12) + 1;            // 4,5,...,12,1,2,3
+      const yearN = i < 9 ? fyStartYear : fyStartYear + 1;
+      const mk = `${yearN}-${pad2(monthN)}`;
+      const mRow = otbByMonth.get(mk);
+      const bRow = budgets[mk];
+      annualised.push({
+        monthKey: mk,
+        revenue: {
+          short: mRow?.byRole.short.revenue ?? 0,
+          mid: mRow?.byRole.mid.revenue ?? 0,
+          long: mRow?.byRole.long.revenue ?? 0,
+          total: mRow?.total.revenue ?? 0,
+        },
+        budget: hasBudgetData
+          ? {
+              short: bRow.short || 0,
+              mid: bRow.mid || 0,
+              long: bRow.long || 0,
+              total: (bRow.short || 0) + (bRow.mid || 0) + (bRow.long || 0),
+            }
+          : null,
+        occupancy: mRow?.total.occupancy ?? null,
+      });
+    }
+
+    // ─── Pacing Report by service (FY 12 months) ──────────────────
+    const pacing = ROLE_ORDER.map((role) => {
+      return {
+        role,
+        months: annualised.map((a) => ({
+          monthKey: a.monthKey,
+          actualRevenue: a.revenue[role],
+          actualNights: otbByMonth.get(a.monthKey)?.byRole[role].nights ?? 0,
+          actualAdr: otbByMonth.get(a.monthKey)?.byRole[role].adr ?? null,
+          budgetRevenue: hasBudgetData ? a.budget[role] : null,
+        })),
+      };
+    });
+
+    // ─── BOB & Business Done ──────────────────────────────────────
+    // FY-to-date "Business Done" = sum of consumed revenue per service
+    // for FY months that have already elapsed.
+    const todayIsoStr = masonService.todayIso();
+    const bob = { short: 0, mid: 0, long: 0, total: 0 };
+    const businessDone = { short: 0, mid: 0, long: 0, total: 0 };
+    for (const a of annualised) {
+      if (`${a.monthKey}-31` < todayIsoStr) {
+        // wholly past
+        businessDone.short += a.revenue.short;
+        businessDone.mid += a.revenue.mid;
+        businessDone.long += a.revenue.long;
+        businessDone.total += a.revenue.total;
+      } else {
+        bob.short += a.revenue.short;
+        bob.mid += a.revenue.mid;
+        bob.long += a.revenue.long;
+        bob.total += a.revenue.total;
+      }
+    }
+
+    res.json({
+      hotelId,
+      hotelName: hotel.name,
+      shortName: hotel.shortName,
+      monthKey: currentMK,
+      asOf: todayIsoStr,
+      hasBudgetData,
+      summary,
+      annualised,
+      pacing,
+      bob,
+      businessDone,
+      inHouseFY,
+      unitPacing,
+      ssWeekly: tiers.ssWeekly,
+      lsTierWeekly: tiers.lsTierWeekly,
+      notes: {
+        ancillaries: "Canal / Meadow / Grounding revenue is out of v1 scope (mostly sourced outside Mews).",
+        budgets: hasBudgetData
+          ? null
+          : "Per-service budgets not yet uploaded; Budget columns hidden.",
+        longStayAdr: "Long Stay ADR is renamed 'Avg Monthly Charge' — Mews bills LS in monthly units, not room-nights.",
+      },
+    });
+  } catch (err) {
+    console.error("[Mason] /sales-flash failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/mason/budgets/:hotelId?year=2026
+ * POST /api/mason/budgets/:hotelId — admin-only upload
+ *   body: { year, rows: [{ month, service_role, budget_revenue_net }, ...] }
+ */
+router.get("/budgets/:hotelId", async (req, res) => {
+  const hotelId = parseInt(req.params.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({ error: "Hotel not in flash scope" });
+  }
+  const year = parseInt(req.query.year || new Date().getUTCFullYear(), 10);
+  try {
+    const budgets = await masonService.getServiceBudgets(hotelId, year);
+    res.json({ hotelId, year, budgets });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/budgets/:hotelId", async (req, res) => {
+  const role = req.session?.role;
+  if (role !== "admin" && role !== "super_admin") {
+    return res.status(403).json({ error: "Admin only" });
+  }
+  const hotelId = parseInt(req.params.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({ error: "Hotel not in flash scope" });
+  }
+  const { year, rows } = req.body || {};
+  if (!year || !Array.isArray(rows)) {
+    return res.status(400).json({ error: "Body: { year, rows: [...] }" });
+  }
+  const userId = req.session?.userId;
+  try {
+    const client = await pgPool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const r of rows) {
+        const month = parseInt(r.month, 10);
+        const role = (r.service_role || "").toLowerCase();
+        const amt = Number(r.budget_revenue_net);
+        if (!month || month < 1 || month > 12) continue;
+        if (!["short", "mid", "long"].includes(role)) continue;
+        if (!Number.isFinite(amt) || amt < 0) continue;
+        await client.query(
+          `INSERT INTO hotel_service_budgets
+            (hotel_id, year, month, service_role, budget_revenue_net,
+             budget_room_nights, budget_occupancy_pct, notes, updated_by, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+           ON CONFLICT (hotel_id, year, month, service_role)
+           DO UPDATE SET
+             budget_revenue_net = EXCLUDED.budget_revenue_net,
+             budget_room_nights = EXCLUDED.budget_room_nights,
+             budget_occupancy_pct = EXCLUDED.budget_occupancy_pct,
+             notes = EXCLUDED.notes,
+             updated_by = EXCLUDED.updated_by,
+             updated_at = NOW()`,
+          [
+            hotelId,
+            year,
+            month,
+            role,
+            amt,
+            r.budget_room_nights ? parseInt(r.budget_room_nights, 10) : null,
+            r.budget_occupancy_pct ? Number(r.budget_occupancy_pct) : null,
+            r.notes || null,
+            userId || null,
+          ],
+        );
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+    res.json({ ok: true, written: rows.length });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

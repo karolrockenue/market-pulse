@@ -73,8 +73,13 @@ export function AppSidebar({
   const [sentinelOpen, setSentinelOpen] = useState(false);
   const [rockenueOpen, setRockenueOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
+  const [masonOpen, setMasonOpen] = useState(true); // Mason group expanded by default
 
   const isAdmin = userInfo?.role === "super_admin" || userInfo?.role === "admin";
+  // Mason staff: anyone with a user_properties row linked to a M&F hotel
+  // (Belsize / Westbourne / Primrose). Admins inherit access automatically.
+  const MASON_HOTEL_IDS = [318329, 318341, 318343];
+  const hasMasonAccess = isAdmin || properties.some((p) => MASON_HOTEL_IDS.includes(Number(p.property_id)));
   const showPinAffordance = isAdmin && !isArchanesOnly;
   const { isPinned, toggle, canPin, max } = usePinnedShortcuts(userInfo?.email || "");
   const fleetHealth = useFleetSentinelHealth(isAdmin && !isArchanesOnly);
@@ -443,6 +448,19 @@ export function AppSidebar({
             {navItem("Reports", "reports", FileText)}
             {navItem("My Rates", "hotelRates", DollarSign)}
 
+            {hasMasonAccess && (
+              <>
+                <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
+                {sectionToggle("Mason", Building2, masonOpen, setMasonOpen, ["masonSalesFlash", "masonPacingFlash"])}
+                {masonOpen && (
+                  <>
+                    {navItem("Sales Flash", "masonSalesFlash", FileText, true)}
+                    {navItem("Pacing Flash", "masonPacingFlash", BarChart3, true)}
+                  </>
+                )}
+              </>
+            )}
+
             {isAdmin && (
               <>
                 <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
@@ -458,7 +476,7 @@ export function AppSidebar({
                   </>
                 )}
 
-                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["sales", "crm", "distribution", "channelPricing", "iceland", "masonSalesFlash", "masonPacingFlash"])}
+                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["sales", "crm", "distribution", "channelPricing", "iceland"])}
                 {rockenueOpen && (
                   <>
                     {navItem("Sales", "sales", Briefcase, true)}
@@ -466,8 +484,6 @@ export function AppSidebar({
                     {navItem("Distribution", "distribution", Globe, true)}
                     {navItem("Channel Pricing", "channelPricing", DollarSign, true)}
                     {navItem("Iceland", "iceland", Snowflake, true)}
-                    {navItem("Mason Sales Flash", "masonSalesFlash", FileText, true)}
-                    {navItem("Mason Pacing Flash", "masonPacingFlash", BarChart3, true)}
                   </>
                 )}
 
