@@ -24,6 +24,7 @@ import {
   PinOff,
   Activity,
   Briefcase,
+  Snowflake,
 } from "lucide-react";
 import { R } from "../styles/tokens";
 import {
@@ -457,19 +458,22 @@ export function AppSidebar({
                   </>
                 )}
 
-                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["sales", "crm", "distribution", "channelPricing"])}
+                {sectionToggle("Rockenue", Building2, rockenueOpen, setRockenueOpen, ["sales", "crm", "distribution", "channelPricing", "iceland", "masonSalesFlash", "masonPacingFlash"])}
                 {rockenueOpen && (
                   <>
                     {navItem("Sales", "sales", Briefcase, true)}
                     {navItem("Tasks", "crm", ClipboardList, true)}
                     {navItem("Distribution", "distribution", Globe, true)}
                     {navItem("Channel Pricing", "channelPricing", DollarSign, true)}
+                    {navItem("Iceland", "iceland", Snowflake, true)}
+                    {navItem("Mason Sales Flash", "masonSalesFlash", FileText, true)}
+                    {navItem("Mason Pacing Flash", "masonPacingFlash", BarChart3, true)}
                   </>
                 )}
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDashboard", "mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "masonStlyMockup", "masonSalesFlash", "masonPacingFlash", "masonGOPCalculator", "emailSignatures", "deckV2", "shreejiDeck", "pitchDeck", "canvas", "reportsLab", "topnavPills", "salesCrmMockup"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDashboard", "mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "masonStlyMockup", "masonGOPCalculator", "emailSignatures", "deckV2", "shreejiDeck", "pitchDeck", "canvas", "reportsLab", "topnavPills", "salesCrmMockup"])}
                 {studioOpen && (
                   <>
                     {navItem("MP Dashboard", "mpDashboard", MonitorSmartphone, true)}
@@ -479,8 +483,6 @@ export function AppSidebar({
                     {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
                     {navItem("Mason Dashboard", "masonDashboard", MonitorSmartphone, true)}
                     {navItem("Mason STLY Mockup", "masonStlyMockup", MonitorSmartphone, true)}
-                    {navItem("Mason Sales Flash", "masonSalesFlash", MonitorSmartphone, true)}
-                    {navItem("Mason Pacing Flash", "masonPacingFlash", MonitorSmartphone, true)}
                     {navItem("Mason GOP Calculator", "masonGOPCalculator", MonitorSmartphone, true)}
                     {navItem("Email Signatures", "emailSignatures", MonitorSmartphone, true)}
                     {navItem("Reports Lab", "reportsLab", FileText, true)}

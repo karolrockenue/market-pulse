@@ -995,7 +995,8 @@ export default function App() {
             activeView === "reportsLab" ||
             activeView === "topnavPills" ||
             activeView === "salesCrmMockup" ||
-            activeView === "sales") && (
+            activeView === "sales" ||
+            activeView === "iceland") && (
             <RockenueHub
               activeView={activeView}
               onNavigate={handleViewChange}
