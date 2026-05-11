@@ -550,7 +550,8 @@ function WeeklyUnitPacing({ data }: { data: SalesFlashResponse }) {
         const v = get(w);
         return (
           <div key={w.weekStart} style={cellBase}>
-            <span style={{ color: R.text, fontWeight: 600 }}>{fmtNum(v.rooms, 1)}</span>
+            <span style={{ color: R.text, fontWeight: 600 }}>{fmtNum(v.rooms, 0)}</span>
+            <span style={{ color: R.textDim, marginLeft: 4, fontSize: 10 }}> rms</span>
             <span style={{ color: R.textDim, marginLeft: 8, fontSize: 10 }}>· {fmtPct(v.pct * 100, 0)}</span>
           </div>
         );
@@ -561,11 +562,11 @@ function WeeklyUnitPacing({ data }: { data: SalesFlashResponse }) {
     <Section title="Weekly Unit Pacing" subtitle="Average rooms occupied per service across the next 5 weeks">
       <div style={{ background: "rgba(56,198,186,0.04)", border: `1px solid rgba(56,198,186,0.18)`, borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: R.text, lineHeight: 1.5 }}>
         <strong style={{ color: R.warmTeal }}>How Weekly Unit Pacing is counted:</strong>{" "}
-        average rooms occupied per day across the 7-day week, broken out by Mews service (Short / Mid / Long Stay).
-        "Offline" = blocked + out-of-service rooms from daily metrics. "Vacant" = remaining capacity.
-        Each cell shows rooms + share of capacity. Reservation capture began 2026-04-13, plus historical
-        backfill of all Mews reservations from 2024-01-01 — so forward weeks reflect every active
-        reservation in Mews.
+        average <strong>rooms occupied per day</strong> across the 7-day week, broken out by Mews service
+        (Short / Mid / Long Stay). "Offline" = blocked + out-of-service rooms. "Vacant" = remaining capacity.
+        Rows sum to total room inventory (e.g. Westbourne = 332). Each cell reads "rooms · % of capacity".
+        Reservation capture began 2026-04-13, plus historical backfill of all Mews reservations from
+        2024-01-01 — so forward weeks reflect every active reservation in Mews.
       </div>
       <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
         <div style={{ minWidth: 800 }}>
