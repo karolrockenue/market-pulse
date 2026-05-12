@@ -296,6 +296,8 @@ export function PortfolioOverview() {
     let totalRevLY = 0;
     let totalSold = 0;
     let totalCap = 0;
+    let totalSoldLY = 0;
+    let totalCapLY = 0;
 
     processedHotels.forEach((h) => {
       // Find this year's data
@@ -314,10 +316,15 @@ export function PortfolioOverview() {
       }
       if (mDataLY) {
         totalRevLY += parseFloat(mDataLY.revenue as any);
+        totalSoldLY += parseInt(mDataLY.rooms_sold as any);
+        totalCapLY += parseInt(mDataLY.total_capacity as any);
       }
     });
 
     const occ = totalCap > 0 ? (totalSold / totalCap) * 100 : 0;
+    const occLY = totalCapLY > 0 ? (totalSoldLY / totalCapLY) * 100 : 0;
+    const adr = totalSold > 0 ? totalRev / totalSold : 0;
+    const adrLY = totalSoldLY > 0 ? totalRevLY / totalSoldLY : 0;
 
     return {
       label:
@@ -331,7 +338,11 @@ export function PortfolioOverview() {
         (monthOffset === 0 ? " (MTD)" : ""),
       revenue: totalRev,
       occupancy: occ,
+      adr,
       yoyRevenue: totalRevLY,
+      yoyOccupancy: occLY,
+      yoyAdr: adrLY,
+      hasLY: totalRevLY > 0 || totalCapLY > 0,
       change: totalRevLY > 0 ? ((totalRev - totalRevLY) / totalRevLY) * 100 : 0,
       trend: totalRev >= totalRevLY ? ("up" as const) : ("down" as const),
     };
@@ -457,38 +468,122 @@ export function PortfolioOverview() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: "20px" }}>
+              <div style={{ color: R.warmTeal, fontSize: "32px", marginBottom: 2 }}>
+                £{Math.round(period.revenue).toLocaleString()}
+              </div>
+              <div
+                style={{
+                  color: R.textDim,
+                  fontSize: "10px",
+                  textTransform: "uppercase",
+                  letterSpacing: "-0.025em",
+                  marginBottom: 14,
+                }}
+              >
+                Total Revenue
+              </div>
+
+              <div style={{ borderTop: `1px solid ${R.sep}`, paddingTop: 10 }}>
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: "12px",
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto auto",
+                    columnGap: 14,
+                    fontSize: 11,
                   }}
                 >
-                  <div style={{ color: R.warmTeal, fontSize: "32px" }}>
-                    £{Math.round(period.revenue).toLocaleString()}
+                  <div
+                    style={{
+                      color: R.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      paddingBottom: 6,
+                    }}
+                  />
+                  <div
+                    style={{
+                      color: R.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      paddingBottom: 6,
+                      textAlign: "right",
+                    }}
+                  >
+                    This Year
                   </div>
                   <div
                     style={{
                       color: R.textDim,
-                      fontSize: "12px",
-                      marginBottom: "6px",
+                      fontSize: 9,
                       textTransform: "uppercase",
-                      letterSpacing: "-0.025em",
+                      paddingBottom: 6,
+                      textAlign: "right",
                     }}
                   >
-                    {period.occupancy.toFixed(0)}% Occ
+                    Last Year
                   </div>
-                </div>
-                <div
-                  style={{
-                    color: R.textDim,
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    letterSpacing: "-0.025em",
-                  }}
-                >
-                  Total Revenue
+                  {[
+                    {
+                      label: "Revenue",
+                      ty: `£${Math.round(period.revenue).toLocaleString()}`,
+                      ly: period.hasLY
+                        ? `£${Math.round(period.yoyRevenue).toLocaleString()}`
+                        : "—",
+                    },
+                    {
+                      label: "Occupancy",
+                      ty: `${period.occupancy.toFixed(1)}%`,
+                      ly:
+                        period.hasLY && period.yoyOccupancy > 0
+                          ? `${period.yoyOccupancy.toFixed(1)}%`
+                          : "—",
+                    },
+                    {
+                      label: "ADR",
+                      ty: period.adr > 0
+                        ? `£${Math.round(period.adr).toLocaleString()}`
+                        : "—",
+                      ly:
+                        period.hasLY && period.yoyAdr > 0
+                          ? `£${Math.round(period.yoyAdr).toLocaleString()}`
+                          : "—",
+                    },
+                  ].map((row, ri) => (
+                    <div key={row.label} style={{ display: "contents" }}>
+                      <div
+                        style={{
+                          color: R.textMid,
+                          padding: "5px 0",
+                          borderTop:
+                            ri === 0 ? `1px solid ${R.sep}` : "none",
+                        }}
+                      >
+                        {row.label}
+                      </div>
+                      <div
+                        style={{
+                          color: R.accent,
+                          padding: "5px 0",
+                          textAlign: "right",
+                          borderTop:
+                            ri === 0 ? `1px solid ${R.sep}` : "none",
+                        }}
+                      >
+                        {row.ty}
+                      </div>
+                      <div
+                        style={{
+                          color: R.textDim,
+                          padding: "5px 0",
+                          textAlign: "right",
+                          borderTop:
+                            ri === 0 ? `1px solid ${R.sep}` : "none",
+                        }}
+                      >
+                        {row.ly}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
