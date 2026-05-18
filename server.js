@@ -46,6 +46,7 @@ const hotelsRoutes = require("./api/routes/hotels.router.js"); // Unified Hotel/
 const marketRoutes = require("./api/routes/market.router.js"); // Unified Market/Planning Engine
 const distributionRoutes = require("./api/routes/distribution.router.js"); // Distribution & CRM
 const masonRoutes = require("./api/routes/mason.router.js"); // Mason & Fifth dashboard reporting
+const shreejiRoutes = require("./api/routes/shreeji.router.js"); // Shreeji portfolio dashboard
 const salesRoutes = require("./api/routes/sales.router.js"); // Sales CRM (prospects, companies, people, activities)
 const icelandRoutes = require("./api/routes/iceland.router.js"); // Iceland market intelligence dashboard (Rockenue menu)
 
@@ -309,6 +310,7 @@ app.use("/api/webhooks", webhooksRoutes); // PMS Events
 app.use("/api/bridge", bridgeRoutes); // Python AI Bridge
 app.use("/api/distribution", distributionRoutes); // Distribution & CRM
 app.use("/api/mason", masonRoutes); // Mason & Fifth dashboard reporting
+app.use("/api/shreeji", shreejiRoutes); // Shreeji portfolio dashboard
 app.use("/api/iceland", icelandRoutes); // Iceland market intelligence dashboard (admin only)
 app.use("/api/sales", salesRoutes); // Sales CRM
 

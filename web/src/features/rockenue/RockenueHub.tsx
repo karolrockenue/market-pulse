@@ -25,6 +25,7 @@ const TopNavPillsMockup = lazy(() => import("./components/TopNavPillsMockup").th
 const SalesCrmMockup = lazy(() => import("./components/SalesCrmMockup").then(m => ({ default: m.SalesCrmMockup })));
 const SalesHub = lazy(() => import("./components/SalesCrmMockup").then(m => ({ default: m.SalesHub })));
 const IcelandDashboard = lazy(() => import("./components/IcelandDashboard").then(m => ({ default: m.IcelandDashboard })));
+const ShreejiDashboard = lazy(() => import("./components/ShreejiDashboard").then(m => ({ default: m.ShreejiDashboard })));
 
 interface RockenueHubProps {
   activeView: string;
@@ -78,6 +79,7 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "salesCrmMockup" && <SalesCrmMockup />}
           {activeView === "sales" && <SalesHub />}
           {activeView === "iceland" && <IcelandDashboard />}
+          {activeView === "shreejiDashboard" && <ShreejiDashboard />}
         </Suspense>
       </div>
     </div>

@@ -74,12 +74,22 @@ export function AppSidebar({
   const [rockenueOpen, setRockenueOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const [masonOpen, setMasonOpen] = useState(true); // Mason group expanded by default
+  const [shreejiOpen, setShreejiOpen] = useState(true); // Shreeji group expanded by default
 
   const isAdmin = userInfo?.role === "super_admin" || userInfo?.role === "admin";
   // Mason staff: anyone with a user_properties row linked to a M&F hotel
   // (Belsize / Westbourne / Primrose). Admins inherit access automatically.
   const MASON_HOTEL_IDS = [318329, 318341, 318343];
   const hasMasonAccess = isAdmin || properties.some((p) => MASON_HOTEL_IDS.includes(Number(p.property_id)));
+  // Shreeji staff: anyone linked to any of Sanchit's 12 Shreeji hotels.
+  // Admins inherit access. Source of truth on the backend is
+  // `hotels.management_group ILIKE 'shreeji'` — this list mirrors that snapshot
+  // (12 hotels as of 2026-05-15). Update both if a new Shreeji property onboards.
+  const SHREEJI_HOTEL_IDS = [
+    318291, 318304, 318305, 318307, 318308, 318309,
+    318311, 318312, 318313, 318314, 318316, 318317,
+  ];
+  const hasShreejiAccess = isAdmin || properties.some((p) => SHREEJI_HOTEL_IDS.includes(Number(p.property_id)));
   const showPinAffordance = isAdmin && !isArchanesOnly;
   const { isPinned, toggle, canPin, max } = usePinnedShortcuts(userInfo?.email || "");
   const fleetHealth = useFleetSentinelHealth(isAdmin && !isArchanesOnly);
@@ -456,6 +466,18 @@ export function AppSidebar({
                   <>
                     {navItem("Sales Flash", "masonSalesFlash", FileText, true)}
                     {navItem("Pacing Flash", "masonPacingFlash", BarChart3, true)}
+                  </>
+                )}
+              </>
+            )}
+
+            {hasShreejiAccess && (
+              <>
+                <div style={{ borderTop: `1px solid ${R.border}`, margin: "8px 0" }} />
+                {sectionToggle("Aaryan Capital", Building2, shreejiOpen, setShreejiOpen, ["shreejiDashboard"])}
+                {shreejiOpen && (
+                  <>
+                    {navItem("Dashboard", "shreejiDashboard", LayoutDashboard, true)}
                   </>
                 )}
               </>
