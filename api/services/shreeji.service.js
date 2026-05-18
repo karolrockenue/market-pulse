@@ -89,10 +89,59 @@ function resolveRanges(monthKey) {
 const SP_HOTEL_IDS = new Set([318311, 318312, 318313, 318314, 318291]);
 const NP_HOTEL_IDS = new Set([318304, 318305, 318307, 318308, 318309, 318316, 318317]);
 
+// Display order for each portfolio view, per Sanchit's WhatsApp screenshots
+// 2026-05-18. Three independent orderings — the "all" order is NOT just SP
+// then NP, and the SP relative order inside "all" intentionally differs from
+// the SP-only view. Any hotel ID not in the relevant list sorts to the end
+// (alphabetical fallback) so newly-onboarded properties don't break the page.
+const DISPLAY_ORDER_ALL = [
+  318304, // 1. The Portico Hotel London
+  318311, // 2. The House of Toby
+  318316, // 3. The House on Warwick
+  318309, // 4. W14 Hotel
+  318308, // 5. The 29 London Hotel
+  318314, // 6. Hyde Park Green Hotel
+  318291, // 7. St George Hotel Norfolk Square
+  318305, // 8. St George's Inn Victoria
+  318312, // 9. The Pack and Carriage London
+  318307, // 10. Maiden Oval
+  318317, // 11. The Tudor Inn Hotel
+  318313, // 12. The Duke Rooms London
+];
+const DISPLAY_ORDER_SP = [
+  318311, // 1. The House of Toby
+  318314, // 2. Hyde Park Green Hotel
+  318312, // 3. The Pack and Carriage London
+  318291, // 4. St George Hotel Norfolk Square
+  318313, // 5. The Duke Rooms London
+];
+const DISPLAY_ORDER_NP = [
+  318304, // 1. The Portico Hotel London
+  318316, // 2. The House on Warwick
+  318309, // 3. W14 Hotel
+  318308, // 4. The 29 London Hotel
+  318305, // 5. St George's Inn Victoria
+  318307, // 6. Maiden Oval
+  318317, // 7. The Tudor Inn Hotel
+];
+
 function filterByPortfolio(hotels, portfolio) {
   if (portfolio === "sp") return hotels.filter((h) => SP_HOTEL_IDS.has(h.hotelId));
   if (portfolio === "np") return hotels.filter((h) => NP_HOTEL_IDS.has(h.hotelId));
   return hotels;
+}
+
+function sortByDisplayOrder(rows, portfolio) {
+  const order = portfolio === "sp" ? DISPLAY_ORDER_SP
+    : portfolio === "np" ? DISPLAY_ORDER_NP
+    : DISPLAY_ORDER_ALL;
+  const idx = new Map(order.map((id, i) => [id, i]));
+  return [...rows].sort((a, b) => {
+    const ai = idx.has(Number(a.id)) ? idx.get(Number(a.id)) : Number.MAX_SAFE_INTEGER;
+    const bi = idx.has(Number(b.id)) ? idx.get(Number(b.id)) : Number.MAX_SAFE_INTEGER;
+    if (ai !== bi) return ai - bi;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 async function getShreejiHotels() {
@@ -341,7 +390,7 @@ async function getDashboard(monthKey, { includeFinancials = true, portfolio = "a
 
   const financialsArr = await financialsPromises;
 
-  const hotelRows = hotels.map((h, i) => {
+  const hotelRowsUnsorted = hotels.map((h, i) => {
     const fin = financialsArr[i] || {};
     return {
       id: String(h.hotelId),
@@ -361,6 +410,8 @@ async function getDashboard(monthKey, { includeFinancials = true, portfolio = "a
       financialsError: fin.error || null,
     };
   });
+  // Sort per Sanchit's display order for this portfolio view.
+  const hotelRows = sortByDisplayOrder(hotelRowsUnsorted, portfolio);
 
   // Portfolio totals.
   const sum = (arr, k) => arr.reduce((s, x) => s + (x || 0), 0);
