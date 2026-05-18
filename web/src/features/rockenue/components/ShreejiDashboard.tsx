@@ -421,11 +421,22 @@ function TopBar({
   );
 }
 
+// "MTD" is only accurate when the selected month is the current calendar
+// month AND hasn't closed yet. For any other view (default = last completed
+// month) we want plain "Revenue" / "Occupancy" labels.
+function isPartialMtdView(data: ShreejiDashboard | null): boolean {
+  if (!data?.ranges?.mtd?.end || !data?.monthKey) return false;
+  const [yy, mm] = data.monthKey.split("-").map(Number);
+  const lastOfMonth = `${yy}-${String(mm).padStart(2, "0")}-${String(new Date(Date.UTC(yy, mm, 0)).getUTCDate()).padStart(2, "0")}`;
+  return data.ranges.mtd.end < lastOfMonth;
+}
+
 // ── headline KPI strip ──
 function HeadlineStrip({ data, loading = false }: { data: ShreejiDashboard; loading?: boolean }) {
   const t = data.totals;
+  const cardsTotal = t.takings.visa + t.takings.mastercard + t.takings.amex + t.takings.otherCards;
   const totalTakings = t.takings.total;
-  const cardsShare = totalTakings > 0 ? (t.takings.visa + t.takings.mastercard + t.takings.amex + t.takings.otherCards) / totalTakings : 0;
+  const cardsShare = totalTakings > 0 ? cardsTotal / totalTakings : 0;
   const cashShare = totalTakings > 0 ? t.takings.cash / totalTakings : 0;
 
   // Defensive: a stale backend (pre-redeploy) may not include yoy / lastLy.
@@ -434,14 +445,33 @@ function HeadlineStrip({ data, loading = false }: { data: ShreejiDashboard; load
   const lastLabel = fmtRange(data.ranges?.last);
   const lastLyLabel = fmtRange(data.ranges?.lastLy);
 
+  // Partial-MTD only true if viewing the current calendar month before it
+  // closes. Past months always render as full periods.
+  const partial = isPartialMtdView(data);
+  const periodSuffix = partial ? "MTD" : "";
+
+  // Like-for-like portfolio LY aggregate (only hotels with prior-year data)
+  // for the RevPAR/ADR YoY card. Computed on the frontend because the
+  // backend totals.lastLy only exposes revenue, not roomsSold/capacity.
+  const lyMatched = data.hotels.filter((h) => h.stly && h.stly.rev > 0);
+  const lyRev = lyMatched.reduce((s, h) => s + h.stly.rev, 0);
+  const lySold = lyMatched.reduce((s, h) => s + h.stly.roomsSold, 0);
+  const lyCap = lyMatched.reduce((s, h) => s + h.stly.capacity, 0);
+  const lyAdr = lySold > 0 ? lyRev / lySold : 0;
+  const lyRevpar = lyCap > 0 ? lyRev / lyCap : 0;
+  const curRevpar = revpar(t.mtd);
+  const curAdr = t.mtd.adr;
+  const adrDelta = lyAdr > 0 ? ((curAdr - lyAdr) / lyAdr) * 100 : null;
+  const revparDelta = lyRevpar > 0 ? ((curRevpar - lyRevpar) / lyRevpar) * 100 : null;
+
   return (
     <div style={{ display: "flex", gap: 12, marginBottom: 24, opacity: loading ? 0.55 : 1, transition: "opacity 180ms ease-out" }}>
       <KpiTile
-        label="Revenue MTD"
+        label={periodSuffix ? "Revenue MTD" : "Revenue"}
         value={fmtMoney(t.mtd.rev)}
         sub={
           <span style={{ color: R.textDim }}>
-            Occ {fmtPct(t.mtd.occ, 0)} · ADR {fmtMoney(t.mtd.adr)} · {data.daysElapsed}d in
+            Occ {fmtPct(t.mtd.occ, 0)} · ADR {fmtMoney(t.mtd.adr)}{partial ? ` · ${data.daysElapsed}d in` : ""}
           </span>
         }
         accent
@@ -465,53 +495,82 @@ function HeadlineStrip({ data, loading = false }: { data: ShreejiDashboard; load
         }
       />
       <KpiTile
-        label="Occupancy MTD"
+        label={periodSuffix ? "Occupancy MTD" : "Occupancy"}
         value={fmtPct(t.mtd.occ, 0)}
         sub={
-          <span>
-            ADR {fmtMoney(t.mtd.adr)} · {data.daysElapsed}d in
-          </span>
-        }
-      />
-      <KpiTile
-        label="On The Books · Next 30d"
-        value={fmtMoney(t.pace.rev)}
-        sub={
           <span style={{ color: R.textDim }}>
-            Pickup 7d {t.pace.pickup7d > 0 ? `+${t.pace.pickup7d.toLocaleString("en-GB")} rooms` : "—"}
+            ADR {fmtMoney(t.mtd.adr)}{partial ? ` · ${data.daysElapsed}d in` : ""}
           </span>
         }
       />
-      <KpiTile
-        label="Total Takings MTD"
-        value={fmtMoney(totalTakings)}
-        sub={
-          <span style={{ color: R.textDim }}>
-            {totalTakings > 0 ? (
-              <>
-                Cards {fmtPct(cardsShare, 0)} · Cash {fmtPct(cashShare, 0)}
-              </>
-            ) : (
-              "Loading from Cloudbeds…"
-            )}
-          </span>
-        }
-      />
+
+      {/* RevPAR + ADR hybrid — current period vs same period last year. */}
+      <div style={{ background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 10, padding: "14px 16px", minWidth: 200, flex: 1.2 }}>
+        <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>
+          RevPAR &amp; ADR · vs LY
+        </div>
+        <div style={{ display: "flex", gap: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>RevPAR</div>
+            <div style={{ fontSize: 18, color: R.text, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtMoney(curRevpar)}</div>
+            <div style={{ fontSize: 11, color: R.textMid, marginTop: 4 }}>
+              vs {fmtMoney(lyRevpar)} {revparDelta !== null ? <DeltaText pct={revparDelta} /> : <span style={{ color: R.textDim }}>—</span>}
+            </div>
+          </div>
+          <div style={{ borderLeft: `1px solid ${R.border}`, marginLeft: 4 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>ADR</div>
+            <div style={{ fontSize: 18, color: R.text, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtMoney(curAdr)}</div>
+            <div style={{ fontSize: 11, color: R.textMid, marginTop: 4 }}>
+              vs {fmtMoney(lyAdr)} {adrDelta !== null ? <DeltaText pct={adrDelta} /> : <span style={{ color: R.textDim }}>—</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Total Takings — cards/cash split is the load-bearing breakdown. */}
+      <div style={{ background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 10, padding: "14px 16px", minWidth: 200, flex: 1.2 }}>
+        <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
+          Total Takings{periodSuffix ? " MTD" : ""}
+        </div>
+        <div style={{ fontSize: 22, color: R.text, fontWeight: 600, fontVariantNumeric: "tabular-nums", marginBottom: 12 }}>
+          {fmtMoney(totalTakings)}
+        </div>
+        {totalTakings > 0 ? (
+          <div style={{ display: "flex", gap: 14 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Cards</div>
+              <div style={{ fontSize: 15, color: R.text, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtMoney(cardsTotal)}</div>
+              <div style={{ fontSize: 10, color: R.textMid, marginTop: 2 }}>{fmtPct(cardsShare, 1)}</div>
+            </div>
+            <div style={{ borderLeft: `1px solid ${R.border}`, marginLeft: 4 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 9, color: R.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Cash</div>
+              <div style={{ fontSize: 15, color: R.text, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtMoney(t.takings.cash)}</div>
+              <div style={{ fontSize: 10, color: R.textMid, marginTop: 2 }}>{fmtPct(cashShare, 1)}</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: R.textDim }}>Loading from Cloudbeds…</div>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── performance table ──
 function PerformanceTable({ data, loading = false }: { data: ShreejiDashboard; loading?: boolean }) {
-  // 16 columns total:
-  //   name | rooms | <sp> | mtd[occ adr rvp rev] | mtdLY[occ adr rvp rev Δrev] | <sp>
-  //                       | pace[occ rvp rev]
+  // 17 columns total:
+  //   name | rooms | <sp> | mtd[occ adr rvp rev] | <sp> | mtdLY[occ adr rvp rev Δrev]
+  //                       | <sp> | pace[occ rvp rev]
   // The Δ Rev column shows ABSOLUTE £ delta (not %), which stays meaningful
   // even when MTD is partial vs full prior-year month — a % delta would be
   // misleading since the windows aren't the same length.
   // Widths tuned for fontSize 13 body cells + 12px horizontal padding.
+  // Three 48px spacer columns (Rms|MTD, MTD|LY, LY|Pace) so the four header
+  // groups read as distinct blocks rather than blending together.
   const cols =
-    "minmax(220px, 1.5fr) 64px 14px 76px 88px 78px 110px 70px 78px 70px 100px 100px 14px 80px 78px 110px";
+    "minmax(220px, 1.5fr) 64px 48px 76px 88px 78px 110px 48px 70px 78px 70px 100px 100px 48px 80px 78px 110px";
 
   const spacerCell: React.CSSProperties = {
     borderLeft: `1px solid ${R.border}`,
@@ -544,6 +603,7 @@ function PerformanceTable({ data, loading = false }: { data: ShreejiDashboard; l
         <div></div>
         <div></div>
         <div style={{ ...groupHeaderCell, gridColumn: "span 4" }}>{fmtRange(data.ranges?.mtd)} (MTD)</div>
+        <div></div>
         <div style={{ ...groupHeaderCell, gridColumn: "span 5", color: "rgba(255,255,255,0.32)" }}>vs {fmtRange(data.ranges?.stly)}</div>
         <div></div>
         <div style={{ ...groupHeaderCell, gridColumn: "span 3", color: R.warmTeal }}>Next 30d (OTB)</div>
@@ -558,6 +618,7 @@ function PerformanceTable({ data, loading = false }: { data: ShreejiDashboard; l
         <div style={headerCell}>ADR</div>
         <div style={headerCell}>RevPAR</div>
         <div style={headerCell}>Revenue</div>
+        <div style={spacerCell} />
         <div style={lyHeader}>Occ</div>
         <div style={lyHeader}>ADR</div>
         <div style={lyHeader}>RevPAR</div>
@@ -588,6 +649,7 @@ function PerformanceTable({ data, loading = false }: { data: ShreejiDashboard; l
             <div style={cellBase}>{fmtMoney(h.mtd.adr)}</div>
             <div style={cellBase}>{fmtMoney(revpar(h.mtd))}</div>
             <div style={{ ...cellBase, color: R.gold, fontWeight: 600 }}>{fmtMoney(h.mtd.rev)}</div>
+            <div style={spacerCell} />
             {/* MTD LY */}
             <div style={lyCell}>{stly.rev > 0 ? fmtPct(stly.occ, 0) : "—"}</div>
             <div style={lyCell}>{stly.rev > 0 ? fmtMoney(stly.adr) : "—"}</div>
@@ -629,6 +691,7 @@ function PerformanceTable({ data, loading = false }: { data: ShreejiDashboard; l
             <div style={{ ...cellBase, fontWeight: 700 }}>{fmtMoney(data.totals.mtd.adr)}</div>
             <div style={{ ...cellBase, fontWeight: 700 }}>{fmtMoney(revpar(data.totals.mtd))}</div>
             <div style={{ ...cellBase, fontWeight: 700, color: R.gold }}>{fmtMoney(data.totals.mtd.rev)}</div>
+            <div style={spacerCell} />
             <div style={lyCell}>{mtdMatchedCap > 0 ? fmtPct(mtdLyOcc, 0) : "—"}</div>
             <div style={lyCell}>{mtdMatchedSold > 0 ? fmtMoney(mtdLyAdr) : "—"}</div>
             <div style={lyCell}>{mtdMatchedCap > 0 ? fmtMoney(mtdMatchedLy / mtdMatchedCap) : "—"}</div>
@@ -1037,8 +1100,11 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 // ── main ──
 export function ShreejiDashboard() {
+  // Default to the previous (last closed) calendar month. The current month
+  // is still selectable from the Reporting dropdown when needed.
   const today = new Date();
-  const defaultMonth = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
+  const prevMonthDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+  const defaultMonth = `${prevMonthDate.getUTCFullYear()}-${String(prevMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
   const [monthKey, setMonthKey] = useState(defaultMonth);
   const [portfolio, setPortfolio] = useState<ShreejiPortfolio>("all");
   const [data, setData] = useState<ShreejiDashboard | null>(null);
