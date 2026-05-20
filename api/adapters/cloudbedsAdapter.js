@@ -384,10 +384,13 @@ async function getUpcomingMetrics(
   const startDate = startDateObj.toISOString().split("T")[0];
   const endDate = endDateObj.toISOString().split("T")[0];
 
+  // NOTE (2026-05-20): adr/occupancy/revpar removed. Cloudbeds' Data Insights
+  // API now rejects these as "dynamic CDFs" that don't support the `sum`
+  // aggregation, returning HTTP 400 for the entire query (broke the whole
+  // Cloudbeds fleet refresh from 2026-05-19). They were never consumed anyway —
+  // processUpcomingApiData computes occupancy/ADR/RevPAR locally from
+  // rooms_sold + capacity_count + room_revenue.
   const columnsToRequest = [
-    "adr",
-    "occupancy",
-    "revpar",
     "rooms_sold",
     "capacity_count",
     "total_revenue",
