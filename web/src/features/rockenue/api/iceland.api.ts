@@ -24,6 +24,87 @@ export interface IcelandProperty {
   lastSeen: string;
 }
 
+export interface IcelandOpportunity {
+  totalProperties: number;
+  totalHotels: number;
+  brandedCount: number;
+  independentCount: number;
+  chainCount: number;
+  peakMonth: { label: string; avgWap: number } | null;
+  troughMonth: { label: string; avgWap: number } | null;
+  seasonalUpliftPct: number | null;
+}
+
+export interface IcelandScrapeHealth {
+  scrapeDays: number;
+  lastScrape: string | null;
+  firstScrape: string | null;
+  totalSnapshots: number;
+}
+
+export interface IcelandTierChain {
+  name: string;
+  count: number;
+  properties: { name: string; reviewCount: number | null; score: number | null }[];
+}
+
+export interface IcelandSalesTargets {
+  tier1: {
+    label: string;
+    blurb: string;
+    count: number;
+    ids: string[];
+    chains: IcelandTierChain[];
+  };
+  tier2: {
+    label: string;
+    blurb: string;
+    count: number;
+    ids: string[];
+  };
+  tier3: {
+    label: string;
+    blurb: string;
+    count: number;
+    ids: string[];
+  };
+}
+
+export interface IcelandMonthlySeasonality {
+  ym: string;
+  label: string;
+  avgWap: number | null;
+  avgSupply: number | null;
+  samples: number;
+}
+
+export interface IcelandCompressionDay {
+  checkinDate: string;
+  wap: number;
+  totalProperties: number | null;
+}
+
+export interface IcelandCoverageCell {
+  checkinDate: string;
+  wap: number | null;
+  totalProperties: number | null;
+}
+
+export interface IcelandCoverageRow {
+  scrapeDay: string;
+  cells: IcelandCoverageCell[];
+}
+
+export interface IcelandCoverageMatrix {
+  scrapeDays: number;
+  columns: number;
+  totalCellsFilled: number;
+  rows: IcelandCoverageRow[];
+  wapCutoffs: number[];
+  minWap: number | null;
+  maxWap: number | null;
+}
+
 export interface IcelandDashboardPayload {
   citySlug: string;
   cityLabel: string;
@@ -35,6 +116,9 @@ export interface IcelandDashboardPayload {
     avgScore: number | null;
     medianHotelPrice: number | null;
   };
+  opportunity: IcelandOpportunity;
+  scrapeHealth: IcelandScrapeHealth;
+  coverageMatrix: IcelandCoverageMatrix;
   starDistribution: { stars: number; count: number }[];
   typeBreakdown: {
     type: string;
@@ -45,17 +129,20 @@ export interface IcelandDashboardPayload {
   }[];
   neighborhoods: { name: string; count: number; avgPrice: number | null }[];
   chainBreakdown: { name: string; count: number }[];
+  salesTargets: IcelandSalesTargets;
   topHotels: IcelandProperty[];
   inventory: IcelandProperty[];
   market: {
     hasData: boolean;
     forwardSnapshots: {
       checkinDate: string;
-      totalProperties: number;
+      totalProperties: number | null;
       wap: number | null;
       minPrice: number | null;
       maxPrice: number | null;
     }[];
+    monthlySeasonality: IcelandMonthlySeasonality[];
+    compressionDays: IcelandCompressionDay[];
   };
 }
 
