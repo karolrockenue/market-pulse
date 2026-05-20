@@ -25,7 +25,7 @@ import { R } from "../../../styles/tokens";
 // Reservable services (Short / Mid / Long Stay) and the Recent Bookings
 // panel is scoped to Short Stay only.
 
-const SERVICES = [
+export const SERVICES = [
   { key: "short", label: "Short Stay", color: "#7BAFD4" },
   { key: "mid", label: "Mid Stay", color: R.gold },
   { key: "long", label: "Long Stay", color: R.warmTeal },
@@ -37,10 +37,10 @@ interface MasonHotel {
   shortName: string;
 }
 
-type ServiceKey = (typeof SERVICES)[number]["key"];
-type ServiceSplit = Record<ServiceKey, number>;
+export type ServiceKey = (typeof SERVICES)[number]["key"];
+export type ServiceSplit = Record<ServiceKey, number>;
 
-interface MonthCard {
+export interface MonthCard {
   label: string;
   title: string;
   revenueBy: ServiceSplit;
@@ -59,13 +59,13 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function monthLabel(key: string) {
+export function monthLabel(key: string) {
   const [y, m] = key.split("-").map(Number);
   return `${MONTH_LABELS[m - 1]} ${y}`;
 }
 
 // Three-month window: last / current / next (relative to today)
-function buildWindow() {
+export function buildWindow() {
   const now = new Date();
   const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const current = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -91,7 +91,7 @@ const formatCompact = (value: number) => {
   return Math.round(value).toLocaleString();
 };
 
-function MonthCardView({ card }: { card: MonthCard }) {
+export function MonthCardView({ card }: { card: MonthCard }) {
   const total =
     card.revenueBy.short + card.revenueBy.mid + card.revenueBy.long;
 
@@ -289,13 +289,14 @@ function OccupancyChart({ data, loading }: { data: any[]; loading: boolean }) {
     const d = payload[0].payload;
     const pickupValue = pickup === "24h" ? d.pickup24h : pickup === "3d" ? d.pickup3d : d.pickup7d;
     const pickupLabel = pickup === "24h" ? "Pickup 24h" : pickup === "3d" ? "Pickup 3d" : "Pickup 7d";
-    const sign = pickupValue >= 0 ? "+" : "";
+    // pickupValue is null when the baseline snapshot for the window is missing.
+    const pickupText = pickupValue == null ? "n/a" : `${pickupValue >= 0 ? "+" : ""}${Number(pickupValue).toFixed(1)}%`;
     return (
       <div style={{ backgroundColor: "rgba(18,21,25,0.95)", border: `1px solid ${R.border}`, borderRadius: 6, padding: "10px 14px" }}>
         <div style={{ color: R.textMid, fontSize: 11, marginBottom: 6 }}>{d.fullDate}</div>
         <div style={{ color: R.text, fontSize: 13, fontWeight: 500 }}>Occupancy: {Number(d.occupancy).toFixed(1)}%</div>
         <div style={{ color: R.textDim, fontSize: 11, marginTop: 3 }}>
-          {pickupLabel}: {sign}{Number(pickupValue).toFixed(1)}%
+          {pickupLabel}: {pickupText}
         </div>
       </div>
     );
@@ -969,7 +970,7 @@ function YoYSkeleton() {
   );
 }
 
-interface ApiServiceBucket {
+export interface ApiServiceBucket {
   name: string;
   gross: number;
   net: number;
@@ -977,14 +978,14 @@ interface ApiServiceBucket {
   nights: number;
 }
 
-interface ApiMonthRow {
+export interface ApiMonthRow {
   month: string;
   services: Record<ServiceKey, ApiServiceBucket>;
   totalGross: number;
   totalNet: number;
 }
 
-interface ApiResponse {
+export interface ApiResponse {
   hotelId: number;
   hotelName: string;
   from: string;
@@ -996,10 +997,10 @@ interface ApiResponse {
   cachedAt?: number;
 }
 
-type VatMode = "gross" | "net";
+export type VatMode = "gross" | "net";
 
 // Classy pulse animation for skeletons
-const SKELETON_PULSE_KEYFRAMES = `
+export const SKELETON_PULSE_KEYFRAMES = `
 @keyframes masonPulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
@@ -1010,7 +1011,7 @@ const SKELETON_PULSE_KEYFRAMES = `
 }
 `;
 
-function SkeletonBar({
+export function SkeletonBar({
   width,
   height = 10,
   radius = 3,
@@ -1033,7 +1034,7 @@ function SkeletonBar({
   );
 }
 
-function MonthCardSkeleton({ title, label }: { title: string; label: string }) {
+export function MonthCardSkeleton({ title, label }: { title: string; label: string }) {
   return (
     <div
       style={{

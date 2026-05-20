@@ -341,13 +341,14 @@ function OccupancyChart({ data, loading }: { data: any[]; loading: boolean }) {
     const d = payload[0].payload;
     const pickupValue = pickup === "24h" ? d.pickup24h : pickup === "3d" ? d.pickup3d : d.pickup7d;
     const pickupLabel = pickup === "24h" ? "Pickup 24h" : pickup === "3d" ? "Pickup 3d" : "Pickup 7d";
-    const sign = pickupValue >= 0 ? "+" : "";
+    // pickupValue is null when the baseline snapshot for the window is missing.
+    const pickupText = pickupValue == null ? "n/a" : `${pickupValue >= 0 ? "+" : ""}${Number(pickupValue).toFixed(1)}%`;
     return (
       <div style={{ backgroundColor: "rgba(18,21,25,0.95)", border: `1px solid ${R.border}`, borderRadius: 6, padding: "10px 14px" }}>
         <div style={{ color: R.textMid, fontSize: 11, marginBottom: 6 }}>{d.fullDate}</div>
         <div style={{ color: R.text, fontSize: 13, fontWeight: 500 }}>Occupancy: {Number(d.occupancy).toFixed(1)}%</div>
         <div style={{ color: R.textDim, fontSize: 11, marginTop: 3 }}>
-          {pickupLabel}: {sign}{Number(pickupValue).toFixed(1)}%
+          {pickupLabel}: {pickupText}
         </div>
       </div>
     );

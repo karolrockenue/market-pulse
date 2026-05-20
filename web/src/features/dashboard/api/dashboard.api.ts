@@ -5,9 +5,11 @@ export interface FlowcastDay {
   date: string;
   fullDate: string;
   occupancy: number;
-  pickup24h: number;
-  pickup3d: number;
-  pickup7d: number;
+  // null when the baseline pacing snapshot for the window is missing (unknown
+  // pickup) — must not be treated as 0, which would invert into an all-pickup bar.
+  pickup24h: number | null;
+  pickup3d: number | null;
+  pickup7d: number | null;
   baseOccupancy24h: number;
   baseOccupancy3d: number;
   baseOccupancy7d: number;

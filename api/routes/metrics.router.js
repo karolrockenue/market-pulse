@@ -939,16 +939,25 @@ router.get("/summary", requireUserApi, async (req, res) => {
 
       const capacity = parseInt(row.capacity_count || 0, 10);
       const sold = parseInt(row.rooms_sold || 0, 10);
-      const sold1d = parseInt(row.rooms_sold_1d_ago || 0, 10);
-      const sold3d = parseInt(row.rooms_sold_3d_ago || 0, 10);
-      const sold7d = parseInt(row.rooms_sold_7d_ago || 0, 10);
+      // NULL-aware baselines: a missing pacing snapshot must stay null, NOT 0.
+      // Coalescing to 0 made the entire current occupancy look like it was booked
+      // in the window (the 2026-05-20 "all blue 24h pickup" bug).
+      const sold1d = row.rooms_sold_1d_ago == null ? null : parseInt(row.rooms_sold_1d_ago, 10);
+      const sold3d = row.rooms_sold_3d_ago == null ? null : parseInt(row.rooms_sold_3d_ago, 10);
+      const sold7d = row.rooms_sold_7d_ago == null ? null : parseInt(row.rooms_sold_7d_ago, 10);
 
       const occupancy = capacity > 0 ? (sold / capacity) * 100 : 0;
 
-      // Calculate pickup relative to capacity (percentage points)
-      const pickup24h = capacity > 0 ? ((sold - sold1d) / capacity) * 100 : 0;
-      const pickup3d = capacity > 0 ? ((sold - sold3d) / capacity) * 100 : 0;
-      const pickup7d = capacity > 0 ? ((sold - sold7d) / capacity) * 100 : 0;
+      // Pickup relative to capacity (percentage points); null when the baseline is
+      // unknown so the UI shows no pickup (base = full occupancy) and self-heals
+      // once the snapshot exists — never inverts into an all-pickup bar.
+      const calcPickup = (baseline) =>
+        capacity > 0 && baseline != null ? ((sold - baseline) / capacity) * 100 : null;
+      const pickup24h = calcPickup(sold1d);
+      const pickup3d = calcPickup(sold3d);
+      const pickup7d = calcPickup(sold7d);
+      const baseFor = (pickup) =>
+        pickup == null ? occupancy : Math.max(0, occupancy - pickup);
 
       return {
         date: `${monthLabel} ${dayLabel}`, // Always send date for chart axis
@@ -957,9 +966,9 @@ router.get("/summary", requireUserApi, async (req, res) => {
         pickup24h,
         pickup3d,
         pickup7d,
-        baseOccupancy24h: Math.max(0, occupancy - pickup24h),
-        baseOccupancy3d: Math.max(0, occupancy - pickup3d),
-        baseOccupancy7d: Math.max(0, occupancy - pickup7d),
+        baseOccupancy24h: baseFor(pickup24h),
+        baseOccupancy3d: baseFor(pickup3d),
+        baseOccupancy7d: baseFor(pickup7d),
         isWeekend,
       };
     });

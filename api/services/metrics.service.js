@@ -859,9 +859,12 @@ const MetricsService = {
         d.stay_date,
         d.rooms_sold,
         d.capacity_count,
-        COALESCE(p1.rooms_sold, 0) as rooms_sold_1d_ago,
-        COALESCE(p3.rooms_sold, 0) as rooms_sold_3d_ago,
-        COALESCE(p7.rooms_sold, 0) as rooms_sold_7d_ago
+        -- NULL (not 0) when no snapshot exists for the window: do NOT COALESCE.
+        -- A missing baseline must read as "unknown pickup", else the whole
+        -- current occupancy renders as window pickup (the all-blue 24h bug).
+        p1.rooms_sold as rooms_sold_1d_ago,
+        p3.rooms_sold as rooms_sold_3d_ago,
+        p7.rooms_sold as rooms_sold_7d_ago
       FROM daily_metrics_snapshots d
       LEFT JOIN pacing_snapshots p1 ON d.hotel_id = p1.hotel_id 
            AND d.stay_date = p1.stay_date 

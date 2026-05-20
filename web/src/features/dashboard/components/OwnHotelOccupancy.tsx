@@ -24,13 +24,14 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
       const d = payload[0].payload;
       const pickupValue = pickupPeriod === "24h" ? d.pickup24h : pickupPeriod === "3d" ? d.pickup3d : d.pickup7d;
       const pickupLabel = pickupPeriod === "24h" ? "Pickup 24h" : pickupPeriod === "3d" ? "Pickup 3d" : "Pickup 7d";
-      const sign = pickupValue >= 0 ? "+" : "";
+      // pickupValue is null when the baseline snapshot for the window is missing.
+      const pickupText = pickupValue == null ? "n/a" : `${pickupValue >= 0 ? "+" : ""}${pickupValue.toFixed(1)}%`;
       return (
         <div style={{ backgroundColor: "rgba(18,21,25,0.95)", border: `1px solid ${R.border}`, borderRadius: 6, padding: 12, boxShadow: "0 4px 6px -1px rgba(0,0,0,0.3)" }}>
           <div style={{ color: R.accent, fontSize: 11, marginBottom: 8, fontWeight: 500 }}>{d.fullDate}</div>
           <div style={{ color: R.text, fontSize: 13, fontWeight: 500 }}>Occupancy: {d.occupancy.toFixed(1)}%</div>
           <div style={{ color: R.textDim, fontSize: 11, marginTop: 3 }}>
-            {pickupLabel}: {sign}{pickupValue.toFixed(1)}%
+            {pickupLabel}: {pickupText}
           </div>
         </div>
       );
@@ -82,10 +83,10 @@ export function OwnHotelOccupancy({ data }: OwnHotelOccupancyProps) {
       {/* Chart */}
       <div style={{ padding: "20px 20px 16px", flex: 1, minHeight: 360 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={occupancyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+          <ComposedChart data={occupancyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="0" stroke={R.border} opacity={0.25} vertical={false} />
             <XAxis dataKey="date" stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={{ stroke: R.border, strokeOpacity: 0.3 }} interval={6} />
-            <YAxis stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} width={30} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
+            <YAxis stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} width={40} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
             <Tooltip content={<CustomTooltip />} />
             <Bar
               dataKey={pickupPeriod === "24h" ? "baseOccupancy24h" : pickupPeriod === "3d" ? "baseOccupancy3d" : "baseOccupancy7d"}

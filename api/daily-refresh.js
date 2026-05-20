@@ -4,6 +4,8 @@ const cloudbedsAdapter = require("./adapters/cloudbedsAdapter.js");
 // Import the mewsAdapter so we can use its functions.
 const mewsAdapter = require("./adapters/mewsAdapter.js");
 const format = require("pg-format");
+const logger = require("./utils/logger");
+const Sentry = require("@sentry/node");
 
 module.exports = async (request, response) => {
   // ** REFACTORED LOGIC **
@@ -14,6 +16,8 @@ module.exports = async (request, response) => {
     console.log("Starting daily forecast refresh job for all properties...");
     let totalRecordsUpdated = 0;
     let allProperties = []; // Define here to ensure it's in scope
+    const failures = []; // per-hotel hard fetch failures (previously swallowed by catch->continue)
+    const emptyData = []; // hotels that returned 0 forecast rows
 
     // Step 1: Get a list of hotels to process.
     // Optional query params:
@@ -102,6 +106,7 @@ module.exports = async (request, response) => {
             `-- Failed to fetch Cloudbeds data for ${property_name}. Error: --`,
             err.message,
           );
+          failures.push({ hotel_id, property_name, pms_type: "cloudbeds", error: err.message });
           continue; // Skip to the next hotel.
         }
       } else if (pms_type === "mews") {
@@ -183,6 +188,7 @@ module.exports = async (request, response) => {
             `-- Failed to fetch Mews forecast for ${property_name}. Error: --`,
             err.message,
           );
+          failures.push({ hotel_id, property_name, pms_type: "mews", error: err.message });
           continue;
         }
       } else {
@@ -282,6 +288,71 @@ module.exports = async (request, response) => {
         console.log(
           `-- No new forecast records to update for ${property_name}. --`,
         );
+        emptyData.push({ hotel_id, property_name, pms_type });
+      }
+    }
+
+    // --- FLEET REFRESH ALERTING ---
+    // A per-hotel fetch failure used to be console.error'd then silently skipped
+    // (catch -> continue), so a fleet-wide PMS/API breakage still finished as a
+    // "Success" with system_state updated — exactly how the Cloudbeds dynamic-CDF
+    // 400 outage went unnoticed from 2026-05-19. Aggregate failures and raise a
+    // real alert (structured log + Sentry), escalating when an entire PMS is down.
+    if (failures.length > 0 || emptyData.length > 0) {
+      const processed = allProperties.length;
+      const failedByPms = failures.reduce(
+        (acc, f) => ((acc[f.pms_type] = (acc[f.pms_type] || 0) + 1), acc),
+        {},
+      );
+      const processedByPms = allProperties.reduce(
+        (acc, h) => ((acc[h.pms_type] = (acc[h.pms_type] || 0) + 1), acc),
+        {},
+      );
+      const bySignature = failures.reduce((acc, f) => {
+        const sig = String(f.error || "unknown").split("\n")[0].slice(0, 80);
+        (acc[sig] = acc[sig] || []).push(f.property_name);
+        return acc;
+      }, {});
+      // Fleet-wide = >=50% of processed hotels failed, or every hotel of some PMS failed.
+      const wholePmsDown = Object.entries(failedByPms).some(
+        ([pms, n]) => processedByPms[pms] && n >= processedByPms[pms],
+      );
+      const isCritical =
+        processed > 0 && (failures.length / processed >= 0.5 || wholePmsDown);
+      const summary = {
+        type: "cron",
+        job: "daily-refresh",
+        event: "refresh_failures",
+        processed,
+        failed: failures.length,
+        emptyData: emptyData.length,
+        failedByPms,
+        signatures: Object.fromEntries(
+          Object.entries(bySignature).map(([sig, hotels]) => [sig, hotels.length]),
+        ),
+        sample: failures.slice(0, 5),
+      };
+      if (failures.length > 0) {
+        logger.error(
+          summary,
+          `[daily-refresh] ${failures.length}/${processed} hotels failed to refresh${isCritical ? " (FLEET-WIDE)" : ""}`,
+        );
+        try {
+          Sentry.withScope((scope) => {
+            scope.setLevel(isCritical ? "fatal" : "warning");
+            scope.setContext("daily_refresh", summary);
+            Sentry.captureMessage(
+              `daily-refresh: ${failures.length}/${processed} hotels failed${isCritical ? " — FLEET-WIDE outage" : ""}`,
+            );
+          });
+        } catch (sentryErr) {
+          console.error("Sentry capture failed:", sentryErr.message);
+        }
+      } else {
+        logger.warn(
+          summary,
+          `[daily-refresh] ${emptyData.length}/${processed} hotels returned 0 forecast rows`,
+        );
       }
     }
 
@@ -313,6 +384,14 @@ module.exports = async (request, response) => {
       status: "Success",
       processedProperties: allProperties.length,
       totalRecordsUpdated: totalRecordsUpdated,
+      failed: failures.length,
+      emptyData: emptyData.length,
+      failedHotels: failures.map((f) => ({
+        hotel_id: f.hotel_id,
+        property_name: f.property_name,
+        pms_type: f.pms_type,
+        error: f.error,
+      })),
     });
   } catch (error) {
     console.error("CRON JOB FAILED:", error);
