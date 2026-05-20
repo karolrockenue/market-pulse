@@ -90,6 +90,11 @@ export function AppSidebar({
     318311, 318312, 318313, 318314, 318316, 318317,
   ];
   const hasShreejiAccess = isAdmin || properties.some((p) => SHREEJI_HOTEL_IDS.includes(Number(p.property_id)));
+  // Per-portfolio property order for the Aaryan Capital sectioned dropdown.
+  // Mirrors DISPLAY_ORDER_SP / DISPLAY_ORDER_NP in api/services/shreeji.service.js
+  // (SP = Sanchit Patel, NP = Nalin Patel). Keep both in sync.
+  const AARYAN_ORDER_SP = [318311, 318314, 318312, 318291, 318313];
+  const AARYAN_ORDER_NP = [318304, 318316, 318309, 318308, 318305, 318307, 318317];
   const showPinAffordance = isAdmin && !isArchanesOnly;
   const { isPinned, toggle, canPin, max } = usePinnedShortcuts(userInfo?.email || "");
   const fleetHealth = useFleetSentinelHealth(isAdmin && !isArchanesOnly);
@@ -359,6 +364,54 @@ export function AppSidebar({
               const filteredReal = realProperties.filter((p) => filterMatch(p.property_name));
               const masonMatches = !!masonEntry && filterMatch(masonEntry.property_name);
 
+              const renderPropertyRow = (p: Property) => {
+                const isSelected = property === p.property_id.toString();
+                return (
+                  <div
+                    key={p.property_id}
+                    onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); setPropertySearch(""); }}
+                    style={{
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: isSelected ? `${R.warmTeal}08` : "transparent",
+                      borderBottom: `1px solid rgba(255,255,255,0.03)`,
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: isSelected ? R.accent : R.text, fontWeight: isSelected ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.property_name}
+                    </div>
+                    {isSelected && <Check size={12} color={R.warmTeal} />}
+                  </div>
+                );
+              };
+
+              const sectionHeaderRow = (label: string) => (
+                <div
+                  key={`aaryan-hdr-${label}`}
+                  style={{ padding: "8px 12px 4px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: R.textDim, fontWeight: 600 }}
+                >
+                  {label}
+                </div>
+              );
+
+              // Aaryan Capital owners (non-admin) get a sectioned dropdown:
+              // "Aaryan Capital SP" then "Aaryan Capital NP", each in portfolio
+              // order. Admins keep the flat fleet list; searching collapses to flat.
+              const orderByIds = (ids: number[]) =>
+                ids
+                  .map((id) => filteredReal.find((p) => Number(p.property_id) === id))
+                  .filter((p): p is Property => Boolean(p));
+              const aaryanSectioned = hasShreejiAccess && !isAdmin && !propertySearch;
+              const aaryanSP = aaryanSectioned ? orderByIds(AARYAN_ORDER_SP) : [];
+              const aaryanNP = aaryanSectioned ? orderByIds(AARYAN_ORDER_NP) : [];
+              const aaryanSectionIds = new Set([...AARYAN_ORDER_SP, ...AARYAN_ORDER_NP]);
+              const aaryanOther = aaryanSectioned
+                ? filteredReal.filter((p) => !aaryanSectionIds.has(Number(p.property_id)))
+                : [];
+
               return (
                 <>
                   {realProperties.length > 1 && !propertySearch && (
@@ -412,29 +465,18 @@ export function AppSidebar({
                     </div>
                   )}
 
-                  {filteredReal.map((p) => {
-                    const isSelected = property === p.property_id.toString();
-                    return (
-                      <div
-                        key={p.property_id}
-                        onClick={() => { onPropertyChange(p.property_id.toString()); setPropertyDropdownOpen(false); setPropertySearch(""); }}
-                        style={{
-                          padding: "10px 12px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          background: isSelected ? `${R.warmTeal}08` : "transparent",
-                          borderBottom: `1px solid rgba(255,255,255,0.03)`,
-                        }}
-                      >
-                        <div style={{ fontSize: 12, color: isSelected ? R.accent : R.text, fontWeight: isSelected ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {p.property_name}
-                        </div>
-                        {isSelected && <Check size={12} color={R.warmTeal} />}
-                      </div>
-                    );
-                  })}
+                  {aaryanSectioned ? (
+                    <>
+                      {aaryanSP.length > 0 && sectionHeaderRow("Aaryan Capital SP")}
+                      {aaryanSP.map(renderPropertyRow)}
+                      {aaryanNP.length > 0 && sectionHeaderRow("Aaryan Capital NP")}
+                      {aaryanNP.map(renderPropertyRow)}
+                      {aaryanOther.length > 0 && sectionHeaderRow("Other")}
+                      {aaryanOther.map(renderPropertyRow)}
+                    </>
+                  ) : (
+                    filteredReal.map(renderPropertyRow)
+                  )}
 
                   {propertySearch && filteredReal.length === 0 && !masonMatches && (
                     <div style={{ padding: "16px 12px", fontSize: 12, color: R.textDim, textAlign: "center" }}>No properties found</div>
