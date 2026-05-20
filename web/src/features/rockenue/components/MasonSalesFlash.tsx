@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Download, ChevronDown, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, createContext, useContext } from "react";
+import { Download, ChevronDown, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { R } from "../../../styles/tokens";
 import {
   fetchMasonSalesFlash,
@@ -7,6 +7,22 @@ import {
   type RevenueCell,
   type KpiCell,
 } from "../api/mason.api";
+import { useDashboardData } from "../../dashboard/hooks/useDashboardData";
+import { MasonOccupancyByService } from "./MasonOccupancyByService";
+import { MasonRateCharts } from "./MasonRateCharts";
+import {
+  MonthCardView,
+  MonthCardSkeleton,
+  SkeletonBar,
+  SKELETON_PULSE_KEYFRAMES,
+  buildWindow,
+  monthLabel as cardMonthLabel,
+  SERVICES,
+  type MonthCard,
+  type ServiceKey,
+  type ServiceSplit,
+  type ApiResponse as ServiceRevenueResponse,
+} from "./MasonDashboard";
 
 // ── Mason & Fifth — Sales Flash (live) ──
 // Wired to /api/mason/sales-flash. v1 scope: Westbourne (318341) + Primrose
@@ -20,7 +36,13 @@ type Property = { id: string; name: string; hotelId: number };
 const PROPERTIES: Property[] = [
   { id: "wb", name: "Westbourne Park", hotelId: 318341 },
   { id: "ph", name: "Primrose Hill", hotelId: 318343 },
+  { id: "bp", name: "Belsize Park", hotelId: 318329 },
 ];
+
+// True while presentation (fullscreen) mode is active — sections hide their
+// temporary dev chrome (the "✓ verified" pills + green tint) for a clean,
+// investor-facing view.
+const PresentCtx = createContext(false);
 
 const fmtGbp = (v: number | null | undefined, dp = 0) => {
   if (v === null || v === undefined || !isFinite(v as number)) return "—";
@@ -106,6 +128,8 @@ function TopBar({
   asOf,
   loading,
   onRefresh,
+  presenting,
+  onTogglePresent,
 }: {
   property: Property;
   onChange: (p: Property) => void;
@@ -115,6 +139,8 @@ function TopBar({
   asOf: string | null;
   loading: boolean;
   onRefresh: () => void;
+  presenting: boolean;
+  onTogglePresent: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
@@ -234,6 +260,18 @@ function TopBar({
           <RefreshCw size={14} className={loading ? "spin" : ""} /> Refresh
         </button>
         <button
+          onClick={onTogglePresent}
+          title={presenting ? "Exit presentation mode (Esc)" : "Presentation mode — full screen, no sidebar"}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+            background: presenting ? R.warmTeal : R.cardRaised,
+            border: `1px solid ${presenting ? R.warmTeal : R.border}`, borderRadius: 6,
+            color: presenting ? R.darkBand : R.warmTeal, fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}
+        >
+          {presenting ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {presenting ? "Exit" : "Present"}
+        </button>
+        <button
           disabled
           title="Excel export — coming soon"
           style={{
@@ -253,7 +291,9 @@ function Section({ title, subtitle, done, children }: { title: string; subtitle?
   // `done` is a temporary visual marker: tints the whole section green so
   // verified-working areas are easy to skip when scanning for things that
   // still need work. Remove the prop (and these styles) once Sales Flash
-  // is fully signed off.
+  // is fully signed off. Hidden in presentation mode for a clean view.
+  const presenting = useContext(PresentCtx);
+  done = done && !presenting;
   const doneWrap = done
     ? {
         background: "rgba(16,185,129,0.06)",
@@ -278,6 +318,120 @@ function Section({ title, subtitle, done, children }: { title: string; subtitle?
   );
 }
 
+// Placeholder for report areas that depend on a file Mason still owes us
+// (amenity-space revenue, prior-year-by-segment). Reserves the layout space
+// and shows the awaiting-upload note so the section reads as "pending data"
+// rather than missing.
+function PendingUploadSection({ title, subtitle, detail }: { title: string; subtitle?: string; detail: string }) {
+  return (
+    <Section title={title} subtitle={subtitle}>
+      <div
+        style={{
+          border: `1px dashed ${R.gold}55`,
+          borderRadius: 10,
+          background: "rgba(200,166,110,0.04)",
+          padding: "22px 20px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 12, color: R.textMid, maxWidth: 640, lineHeight: 1.55 }}>{detail}</div>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: R.gold,
+            textTransform: "uppercase",
+            letterSpacing: 0.6,
+            padding: "6px 14px",
+            background: "rgba(200,166,110,0.10)",
+            border: `1px solid ${R.gold}44`,
+            borderRadius: 999,
+          }}
+        >
+          Need the standard upload template to proceed
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function ThreeMonthCards({ hotelId }: { hotelId: number }) {
+  // Three-month KPI cards (Last / Current / Next) reused from MasonDashboard.
+  // Always relative to today regardless of the Sales Flash reporting month.
+  const window = useMemo(buildWindow, []);
+  const [apiData, setApiData] = useState<ServiceRevenueResponse | null>(null);
+  const { data: dashboardData } = useDashboardData(hotelId, "london");
+
+  useEffect(() => {
+    setApiData(null);
+    let cancelled = false;
+    fetch(`/api/mason/service-revenue?hotelId=${hotelId}&from=${window.from}&to=${window.to}`)
+      .then((r) => (r.ok ? r.json() : r.json().then((j) => Promise.reject(j.error || r.statusText))))
+      .then((d: ServiceRevenueResponse) => { if (!cancelled) setApiData(d); })
+      .catch(() => { /* silent — cards just stay in skeleton */ });
+    return () => { cancelled = true; };
+  }, [hotelId, window.from, window.to]);
+
+  const cards: MonthCard[] | null = useMemo(() => {
+    if (!apiData || !dashboardData?.snapshot) return null;
+    const snapshotForIndex = (i: number) => {
+      if (i === 0) return dashboardData.snapshot.lastMonth;
+      if (i === 1) return dashboardData.snapshot.currentMonth;
+      if (i === 2) return dashboardData.snapshot.nextMonth;
+      return null;
+    };
+    return window.months.map((m, i) => {
+      const row = apiData.monthly.find((x) => x.month === m);
+      const byService: ServiceSplit = { short: 0, mid: 0, long: 0 };
+      const nightsByService: ServiceSplit = { short: 0, mid: 0, long: 0 };
+      for (const svc of SERVICES) {
+        const bucket = row?.services?.[svc.key];
+        byService[svc.key] = bucket?.gross || 0;
+        nightsByService[svc.key] = bucket?.nights || 0;
+      }
+      const snapshot = snapshotForIndex(i);
+      const occupancy = snapshot?.occupancy ?? 0;
+      const roomNights = snapshot && snapshot.adr > 0 ? snapshot.revenue / snapshot.adr : 0;
+      const capacityNights = occupancy > 0 ? roomNights / (occupancy / 100) : 0;
+      const totalRevenue = byService.short + byService.mid + byService.long;
+      const adr = roomNights > 0 ? totalRevenue / roomNights : 0;
+      const svcAdr = (key: ServiceKey) =>
+        nightsByService[key] > 0 ? byService[key] / nightsByService[key] : 0;
+      const LONG_NIGHTS_PER_UNIT = 30;
+      const svcOcc = (key: ServiceKey) => {
+        if (capacityNights <= 0) return 0;
+        const scale = key === "long" ? LONG_NIGHTS_PER_UNIT : 1;
+        return (nightsByService[key] * scale / capacityNights) * 100;
+      };
+      return {
+        title: window.titles[i],
+        label: cardMonthLabel(m),
+        revenueBy: byService,
+        occupancy,
+        adr,
+        adrByService: { short: svcAdr("short"), mid: svcAdr("mid"), long: svcAdr("long") },
+        occByService: { short: svcOcc("short"), mid: svcOcc("mid"), long: svcOcc("long") },
+      } as MonthCard;
+    });
+  }, [apiData, dashboardData, window.months, window.titles]);
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+        {cards
+          ? cards.map((c) => <MonthCardView key={c.title} card={c} impliedAmr />)
+          : window.months.map((m, i) => (
+              <MonthCardSkeleton key={m} title={window.titles[i]} label={cardMonthLabel(m)} />
+            ))}
+      </div>
+    </div>
+  );
+}
+
 function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse; hasBudgetData: boolean }) {
   const r = data.summary.revenue;
   const k = data.summary.kpis;
@@ -298,15 +452,18 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
     );
   }
 
+  const KPI_GRID = "minmax(200px, 2fr) 110px 110px 100px 140px 90px 90px 90px";
   function KpiRow({ label, cell, fmt }: { label: string; cell: KpiCell; fmt: (v: number | null | undefined) => string }) {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 2fr) 110px 110px 140px 90px 90px", borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: KPI_GRID, borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
         <div style={labelCell}>{label}</div>
         <div style={{ ...cellBase, color: R.textMid }}>{fmt(cell.priorMonth)}</div>
         <div style={{ ...cellBase, color: R.textMid }}>{fmt(cell.priorYear)}</div>
+        <div style={{ ...cellBase, color: R.textMid }}>{hasBudgetData ? fmt(cell.budget) : <span style={{ color: R.textDim }}>—</span>}</div>
         <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmt(cell.actual)}</div>
         <div style={cellBase}><DeltaText pct={pctDelta(cell.actual, cell.priorMonth)} /></div>
         <div style={cellBase}><DeltaText pct={pctDelta(cell.actual, cell.priorYear)} /></div>
+        <div style={cellBase}>{hasBudgetData ? <DeltaText pct={pctDelta(cell.actual, cell.budget)} /> : <span style={{ color: R.textDim }}>—</span>}</div>
       </div>
     );
   }
@@ -325,44 +482,51 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
   );
 
   const kpiHeader = (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 2fr) 110px 110px 140px 90px 90px", borderBottom: `1px solid ${R.border}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: KPI_GRID, borderBottom: `1px solid ${R.border}` }}>
       <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>KPI</div>
       <div style={headerCell}>Prior Month</div>
       <div style={headerCell}>Prior Year</div>
+      <div style={headerCell}>Budget</div>
       <div style={{ ...headerCell, color: R.gold }}>Actuals (current month)</div>
       <div style={headerCell}>vs PM</div>
       <div style={headerCell}>vs PY</div>
+      <div style={headerCell}>vs Bud</div>
     </div>
   );
 
   return (
     <Section title="Current Month Summary" subtitle={`${monthLabel(data.monthKey)} — consumed scope (matches Mews Order Items Report)`} done>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
-        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
           {revHeader}
           <RevenueRow label="Short Stay Revenue" cell={r.short} />
           <RevenueRow label="Mid Stay Revenue" cell={r.mid} />
           <RevenueRow label="Long Stay Revenue" cell={r.long} />
           <RevenueRow label="Total Accommodation Revenue" cell={r.totalAccom} emphasis />
+          <div style={{ fontSize: 9, color: R.textDim, padding: "8px 12px 2px" }}>
+            Prior-Year by segment sourced from Mason's monthly summary (analyst basis); current month is Mews-consumed scope.
+          </div>
         </div>
 
-        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14 }}>
+        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
           {kpiHeader}
           <KpiRow label="Occupancy (blended)" cell={k.occupancy} fmt={(v) => fmtPct(v)} />
           <KpiRow label="ADR (blended)" cell={k.adrBlended} fmt={(v) => fmtGbp(v)} />
-          <KpiRow label="RevPAR" cell={k.revpar} fmt={(v) => fmtGbp(v)} />
+          <KpiRow label="RevPAR (blended)" cell={k.revpar} fmt={(v) => fmtGbp(v)} />
           <KpiRow label="SS ADR" cell={k.adrShort} fmt={(v) => fmtGbp(v)} />
           <KpiRow label="MS ADR" cell={k.adrMid} fmt={(v) => fmtGbp(v)} />
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 2fr) 110px 110px 140px 90px 90px", borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: KPI_GRID, borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
             <div style={{ ...labelCell, color: R.text }}>
               LS Avg Monthly Charge
               <span style={{ color: R.textDim, fontSize: 9, marginLeft: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>· /mo</span>
             </div>
             <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(k.amrLong.priorMonth)}</div>
             <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(k.amrLong.priorYear)}</div>
+            <div style={{ ...cellBase, color: R.textDim }}>—</div>
             <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtGbp(k.amrLong.actual)}</div>
             <div style={cellBase}><DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.priorMonth)} /></div>
             <div style={cellBase}><DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.priorYear)} /></div>
+            <div style={{ ...cellBase, color: R.textDim }}>—</div>
           </div>
           {(k.directShareNet.actual !== null || k.indirectShareNet.actual !== null) && (
             <>
@@ -376,9 +540,43 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
   );
 }
 
+function AlosTable({ data }: { data: SalesFlashResponse }) {
+  const a = data.alos;
+  const fmtD = (v: number | null | undefined) =>
+    v === null || v === undefined || !isFinite(v) ? "—" : `${v.toFixed(1)}d`;
+  const grid = "minmax(160px, 1.5fr) 110px 110px 140px 90px 90px";
+  const Row = ({ label, cell }: { label: string; cell: KpiCell }) => (
+    <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
+      <div style={labelCell}>{label}</div>
+      <div style={{ ...cellBase, color: R.textMid }}>{fmtD(cell.priorMonth)}</div>
+      <div style={{ ...cellBase, color: R.textMid }}>{fmtD(cell.priorYear)}</div>
+      <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtD(cell.actual)}</div>
+      <div style={cellBase}><DeltaText pct={pctDelta(cell.actual, cell.priorMonth)} /></div>
+      <div style={cellBase}><DeltaText pct={pctDelta(cell.actual, cell.priorYear)} /></div>
+    </div>
+  );
+  return (
+    <Section title="Average Length of Stay" subtitle="Days per service — guests staying during the month (full-contract length)">
+      <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
+          <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>ALOS</div>
+          <div style={headerCell}>Prior Month</div>
+          <div style={headerCell}>Prior Year</div>
+          <div style={{ ...headerCell, color: R.gold }}>Actuals (current month)</div>
+          <div style={headerCell}>vs PM</div>
+          <div style={headerCell}>vs PY</div>
+        </div>
+        <Row label="Short Stay" cell={a.short} />
+        <Row label="Mid Stay" cell={a.mid} />
+        <Row label="Long Stay" cell={a.long} />
+      </div>
+    </Section>
+  );
+}
+
 function AnnualisedTable({ data, hasBudgetData }: { data: SalesFlashResponse; hasBudgetData: boolean }) {
   const months = data.annualised;
-  const grid = `minmax(180px, 1.5fr) repeat(${months.length}, minmax(78px, 1fr)) 110px`;
+  const grid = `minmax(140px, 1.2fr) repeat(${months.length}, minmax(60px, 1fr)) 96px`;
 
   const totals = {
     short: months.reduce((s, m) => s + m.revenue.short, 0),
@@ -392,7 +590,7 @@ function AnnualisedTable({ data, hasBudgetData }: { data: SalesFlashResponse; ha
   return (
     <Section title="Annualised vs Budget" subtitle={`${monthLabel(months[0]?.monthKey ?? "")} → ${monthLabel(months[months.length - 1]?.monthKey ?? "")}`} done>
       <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
-        <div style={{ minWidth: 1100 }}>
+        <div style={{ minWidth: 1016 }}>
           <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
             <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Line</div>
             {months.map((m) => <div key={m.monthKey} style={headerCell}>{monthLabel(m.monthKey)}</div>)}
@@ -428,6 +626,14 @@ function AnnualisedTable({ data, hasBudgetData }: { data: SalesFlashResponse; ha
                   return <div key={m.monthKey} style={cellBase}><DeltaText pct={m.budget && m.budget.total > 0 ? (v! / m.budget.total) * 100 : null} /></div>;
                 })}
                 <div style={cellBase}>{variance !== null ? <span style={{ color: variance >= 0 ? R.green : R.red, fontWeight: 600 }}>{fmtGbp(variance, 0)}</span> : "—"}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                <div style={{ ...labelCell, color: R.textMid }}>Variance £</div>
+                {months.map((m) => {
+                  const v = m.budget ? m.revenue.total - m.budget.total : null;
+                  return <div key={m.monthKey} style={{ ...cellBase, color: v == null ? R.textDim : v >= 0 ? R.green : R.red }}>{v == null ? "—" : fmtGbp(v, 0)}</div>;
+                })}
+                <div style={{ ...cellBase, fontWeight: 600, color: variance == null ? R.textDim : variance >= 0 ? R.green : R.red }}>{variance == null ? "—" : fmtGbp(variance, 0)}</div>
               </div>
             </>
           )}
@@ -476,7 +682,7 @@ function BobBusinessDone({ data }: { data: SalesFlashResponse }) {
   );
   return (
     <Section title="BOB & Business Done" subtitle="Forward Book of Business (booked future stays) vs FY-to-date Business Done (realised revenue from past months)" done>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Card title="Business Done — realised" subtitle={`Past months: ${doneRange}`} totals={data.businessDone} accent={R.gold} />
         <Card title="Forward BOB — booked future stays" subtitle={`Current + future months: ${bobRange}`} totals={data.bob} accent={R.warmTeal} />
       </div>
@@ -486,12 +692,12 @@ function BobBusinessDone({ data }: { data: SalesFlashResponse }) {
 
 function PacingByService({ data, hasBudgetData }: { data: SalesFlashResponse; hasBudgetData: boolean }) {
   const months = data.annualised.map((a) => a.monthKey);
-  const grid = `minmax(170px, 1.4fr) repeat(${months.length}, minmax(72px, 1fr)) 100px`;
+  const grid = `minmax(140px, 1.2fr) repeat(${months.length}, minmax(58px, 1fr)) 96px`;
 
   return (
     <Section title="Pacing Report — by Service" subtitle="Revenue + nights + ADR per service across the FY" done>
       <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
-        <div style={{ minWidth: 1200 }}>
+        <div style={{ minWidth: 1000 }}>
           <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
             <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Service / Metric</div>
             {months.map((mk) => <div key={mk} style={headerCell}>{monthLabel(mk)}</div>)}
@@ -524,11 +730,21 @@ function PacingByService({ data, hasBudgetData }: { data: SalesFlashResponse; ha
                   <div style={{ ...cellBase, color: R.text }}>{fmtGbp(blendedAdr, 0)}</div>
                 </div>
                 {hasBudgetData && totalBudget !== null && (
-                  <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
-                    <div style={{ ...labelCell, color: R.textDim }}>Budget Revenue</div>
-                    {p.months.map((m) => <div key={m.monthKey} style={{ ...cellBase, color: R.textDim }}>{fmtGbp(m.budgetRevenue, 0)}</div>)}
-                    <div style={{ ...cellBase, color: R.textDim }}>{fmtGbp(totalBudget, 0)}</div>
-                  </div>
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                      <div style={{ ...labelCell, color: R.textDim }}>Budget Revenue</div>
+                      {p.months.map((m) => <div key={m.monthKey} style={{ ...cellBase, color: R.textDim }}>{fmtGbp(m.budgetRevenue, 0)}</div>)}
+                      <div style={{ ...cellBase, color: R.textDim }}>{fmtGbp(totalBudget, 0)}</div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                      <div style={{ ...labelCell, color: R.textMid }}>Variance £</div>
+                      {p.months.map((m) => {
+                        const v = m.budgetRevenue != null ? m.actualRevenue - m.budgetRevenue : null;
+                        return <div key={m.monthKey} style={{ ...cellBase, color: v == null ? R.textDim : v >= 0 ? R.green : R.red }}>{v == null ? "—" : fmtGbp(v, 0)}</div>;
+                      })}
+                      <div style={{ ...cellBase, fontWeight: 600, color: totalRev - totalBudget >= 0 ? R.green : R.red }}>{fmtGbp(totalRev - totalBudget, 0)}</div>
+                    </div>
+                  </>
                 )}
               </div>
             );
@@ -596,7 +812,7 @@ function SsLsBookings({ data }: { data: SalesFlashResponse }) {
     : `minmax(180px, 1.5fr)`;
 
   return (
-    <Section title="Accommodation Bookings" subtitle="Last 8 weeks — Short Stay weekly + Long Stay new deals by lead-time tier" done>
+    <Section title="Accommodation Bookings" subtitle="By booking-created week — Short Stay + all-segment Reservations Created" done>
       <div style={{ background: "rgba(56,198,186,0.04)", border: `1px solid rgba(56,198,186,0.18)`, borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: R.text, lineHeight: 1.5 }}>
         <strong style={{ color: R.warmTeal }}>How Short Stay is counted:</strong>{" "}
         reservations under Mews's Short Stay Accommodation service, excluding cancellations. Ties to Mews's Reservation Report exactly for any week. Capture began 2026-04-13.
@@ -630,25 +846,42 @@ function SsLsBookings({ data }: { data: SalesFlashResponse }) {
         )}
       </div>
 
-      <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
-        <div style={{ fontSize: 10, color: R.warmTeal, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 12px 8px" }}>Long Stay — new deals by lead-time tier</div>
-        <div style={{ minWidth: 800 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1.4fr) 90px 110px 90px", borderBottom: `1px solid ${R.border}` }}>
-            <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Lead-time tier</div>
-            <div style={headerCell}>Bookings</div>
-            <div style={headerCell}>Revenue (gross)</div>
-            <div style={headerCell}>Nights</div>
+      {(() => {
+        const all = data.allWeekly;
+        const agrid = all.length
+          ? `minmax(180px, 1.5fr) ${all.map(() => "minmax(76px, 1fr)").join(" ")}`
+          : `minmax(180px, 1.5fr)`;
+        return (
+          <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
+            <div style={{ fontSize: 10, color: R.warmTeal, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 12px 8px" }}>Reservations Created — weekly (all segments)</div>
+            {all.length === 0 ? (
+              <div style={{ color: R.textDim, fontSize: 11, padding: 12 }}>No reservations captured yet.</div>
+            ) : (
+              <div style={{ minWidth: 800 }}>
+                <div style={{ display: "grid", gridTemplateColumns: agrid, borderBottom: `1px solid ${R.border}` }}>
+                  <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week ending</div>
+                  {all.map((w) => {
+                    const d = new Date(w.weekStart + "T00:00:00Z");
+                    const lbl = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
+                    return <div key={w.weekStart} style={headerCell}>{lbl}</div>;
+                  })}
+                </div>
+                {[
+                  { label: "Bookings", get: (w: typeof all[number]) => w.bookings, fmt: (v: number) => fmtNum(v, 0) },
+                  { label: "Room nights", get: (w: typeof all[number]) => w.roomNights, fmt: (v: number) => fmtNum(v, 0) },
+                  { label: "Revenue (gross)", get: (w: typeof all[number]) => w.revenue, fmt: (v: number) => fmtGbp(v, 0) },
+                  { label: "Avg ADR", get: (w: typeof all[number]) => w.avgAdr, fmt: (v: number | null | undefined) => fmtGbp(v, 0) },
+                ].map((r) => (
+                  <div key={r.label} style={{ display: "grid", gridTemplateColumns: agrid, borderBottom: `1px solid ${R.sep}` }}>
+                    <div style={labelCell}>{r.label}</div>
+                    {all.map((w) => <div key={w.weekStart} style={cellBase}>{r.fmt(r.get(w) as any)}</div>)}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          {data.lsTierWeekly.map((t) => (
-            <div key={t.tier} style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1.4fr) 90px 110px 90px", borderBottom: `1px solid ${R.sep}` }}>
-              <div style={labelCell}>{t.label}</div>
-              <div style={cellBase}>{fmtNum(t.total.bookings, 0)}</div>
-              <div style={cellBase}>{fmtGbp(t.total.revenue, 0)}</div>
-              <div style={cellBase}>{fmtNum(t.total.nights, 0)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+        );
+      })()}
     </Section>
   );
 }
@@ -667,6 +900,37 @@ function getMonthOptions(): { value: string; label: string; tag: string }[] {
   ];
 }
 
+// Skeleton placeholders shown UNDER the 3-month cards while the live Mews
+// fetch resolves (~20-30s). Each block mirrors the size/shape of a real
+// section so the layout doesn't jump when data swaps in.
+function SkeletonSection({ titleWidth = 160, rows = 4 }: { titleWidth?: number; rows?: number }) {
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ marginBottom: 14 }}>
+        <SkeletonBar width={titleWidth} height={12} radius={4} />
+      </div>
+      <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        {Array.from({ length: rows }).map((_, i) => (
+          <SkeletonBar key={i} width="100%" height={14} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SalesFlashSkeleton() {
+  return (
+    <>
+      <SkeletonSection titleWidth={170} rows={5} />
+      <SkeletonSection titleWidth={150} rows={6} />
+      <SkeletonSection titleWidth={160} rows={3} />
+      <SkeletonSection titleWidth={185} rows={6} />
+      <SkeletonSection titleWidth={150} rows={5} />
+      <SkeletonSection titleWidth={175} rows={4} />
+    </>
+  );
+}
+
 export function MasonSalesFlash() {
   const [property, setProperty] = useState<Property>(PROPERTIES[0]);
   const monthOptions = useMemo(getMonthOptions, []);
@@ -675,6 +939,21 @@ export function MasonSalesFlash() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [presenting, setPresenting] = useState(false);
+
+  // Presentation mode = fullscreen the report container (sidebar + browser
+  // chrome disappear). Sync state with the browser so Esc / the OS exit also
+  // updates the button.
+  useEffect(() => {
+    const onFs = () => setPresenting(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+  const togglePresent = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else rootRef.current?.requestFullscreen?.();
+  };
 
   // Clear stale data when property or month changes so the full-page "Loading…"
   // placeholder shows during the fetch (live Mews API is slow, ~20-30s). Refresh
@@ -695,7 +974,18 @@ export function MasonSalesFlash() {
   }, [property, monthKey, tick]);
 
   return (
-    <div style={{ flex: 1, background: R.bg, color: R.accent, fontFamily: "'Inter', system-ui, sans-serif", minHeight: "100vh" }}>
+    <PresentCtx.Provider value={presenting}>
+    <div
+      ref={rootRef}
+      style={{
+        flex: 1,
+        background: R.bg,
+        color: R.accent,
+        fontFamily: "'Inter', system-ui, sans-serif",
+        minHeight: "100vh",
+        ...(presenting ? { height: "100vh", overflowY: "auto" as const } : {}),
+      }}
+    >
       <TopBar
         property={property}
         onChange={setProperty}
@@ -705,28 +995,48 @@ export function MasonSalesFlash() {
         asOf={data?.asOf ?? null}
         loading={loading}
         onRefresh={() => setTick((t) => t + 1)}
+        presenting={presenting}
+        onTogglePresent={togglePresent}
       />
 
       <div style={{ padding: "24px 28px" }}>
+        <style>{SKELETON_PULSE_KEYFRAMES}</style>
         {error && (
           <div style={{ padding: "10px 14px", marginBottom: 22, background: "rgba(239,68,68,0.10)", border: `1px solid ${R.red}33`, borderRadius: 6, color: R.red, fontSize: 11 }}>
             {error}
           </div>
         )}
 
-        {data && !data.hasBudgetData && (
+        {data && !data.hasBudgetData && !presenting && (
           <div style={{ padding: "10px 14px", marginBottom: 22, background: "rgba(200,166,110,0.06)", border: `1px solid ${R.gold}33`, borderRadius: 6, color: R.gold, fontSize: 11, letterSpacing: 0.3 }}>
             Per-service budgets not yet uploaded — Budget columns are hidden. Upload via <code>POST /api/mason/budgets/{property.hotelId}</code> with rows {"{ year, rows: [{ month, service_role, budget_revenue_net }, …] }"} to enable.
           </div>
         )}
 
-        {loading && !data && (
-          <div style={{ color: R.textDim, fontSize: 12, padding: "40px 0", textAlign: "center" }}>Loading sales flash…</div>
-        )}
+        <ThreeMonthCards hotelId={property.hotelId} />
+
+        <MasonOccupancyByService hotelId={property.hotelId} />
+
+        {loading && !data && <SalesFlashSkeleton />}
 
         {data && (
           <>
-            <CurrentMonthSummary data={data} hasBudgetData={data.hasBudgetData} />
+            <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 16, alignItems: "start" }}>
+              <div style={{ minWidth: 0 }}>
+                <CurrentMonthSummary data={data} hasBudgetData={data.hasBudgetData} />
+                <AlosTable data={data} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <MasonRateCharts data={data.rateCharts} />
+              </div>
+            </div>
+            {property.hotelId === 318341 && (
+              <PendingUploadSection
+                title="Amenity & Building Revenue"
+                subtitle="Westbourne Park — Canal / Meadow / Grounding + total building revenue"
+                detail="Amenity-space revenue runs on external systems (Toast etc.), not Mews, so it can't be pulled automatically. Once Dom provides the figures we'll show them here alongside total building revenue."
+              />
+            )}
             <AnnualisedTable data={data} hasBudgetData={data.hasBudgetData} />
             <BobBusinessDone data={data} />
             <PacingByService data={data} hasBudgetData={data.hasBudgetData} />
@@ -736,5 +1046,6 @@ export function MasonSalesFlash() {
         )}
       </div>
     </div>
+    </PresentCtx.Provider>
   );
 }

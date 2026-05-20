@@ -926,6 +926,67 @@ async function getServiceRevenueByMonth(hotelId, startDate, endDate, serviceIds 
  *   timezone: string,
  * }>}
  */
+/**
+ * SpaceOrder (accommodation) revenue per reservation for [startDate, endDate].
+ * Keyed by ServiceOrderId (= our reservations.id). Used by the Mason rate
+ * charts so per-reservation rates come from penny-perfect order items rather
+ * than the sparse reservations.avg_nightly_rate column. Same 11:00-local
+ * consumed window + 89-day chunking as getRevenueByAccountingCategoryByMonth.
+ * Returns { [reservationId]: { gross, net, count } }.
+ */
+async function getSpaceOrderRevenueByReservation(hotelId, startDate, endDate) {
+  const credentials = await getCredentials(hotelId);
+  const hotelRow = await pgPool.query(
+    `SELECT pms_credentials FROM hotels WHERE hotel_id = $1`,
+    [hotelId],
+  );
+  const tz = hotelRow.rows[0]?.pms_credentials?.timezone || "Europe/London";
+  const addDays = (isoDate, n) => {
+    const d = new Date(isoDate + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const at11 = (isoDate) => fromZonedTime(`${isoDate}T11:00:00`, tz).toISOString();
+  const chunks = [];
+  let cursorStart = startDate;
+  while (cursorStart <= endDate) {
+    const chunkEnd = addDays(cursorStart, 89);
+    const effectiveEnd = chunkEnd < endDate ? chunkEnd : endDate;
+    chunks.push({ from: cursorStart, to: effectiveEnd });
+    cursorStart = addDays(effectiveEnd, 1);
+  }
+  const pullChunk = async (chunk) => {
+    const startUtc = at11(chunk.from);
+    const endUtc = at11(addDays(chunk.to, 1));
+    const items = [];
+    let cursor = null, page = 0;
+    do {
+      const resp = await _callMewsApi("orderItems/getAll", credentials, {
+        ConsumedUtc: { StartUtc: startUtc, EndUtc: endUtc },
+        AccountingStates: ["Open", "Closed"],
+        Limitation: { Count: 1000, Cursor: cursor },
+      });
+      items.push(...(resp.OrderItems || []));
+      cursor = resp.Cursor || null;
+      page += 1;
+      if (page > 100) break;
+    } while (cursor);
+    return items;
+  };
+  const all = (await Promise.all(chunks.map(pullChunk))).flat();
+  const byRes = {};
+  for (const it of all) {
+    if (it.Type !== "SpaceOrder") continue;
+    const rid = it.ServiceOrderId;
+    if (!rid) continue;
+    if (!byRes[rid]) byRes[rid] = { gross: 0, net: 0, count: 0 };
+    byRes[rid].gross += it.Amount?.GrossValue || 0;
+    byRes[rid].net += it.Amount?.NetValue || 0;
+    byRes[rid].count += 1;
+  }
+  return byRes;
+}
+
 async function getRevenueByAccountingCategoryByMonth(
   hotelId,
   startDate,
@@ -1079,4 +1140,5 @@ module.exports = {
   // Reporting (Mason Dashboard)
   getServiceRevenueByMonth,
   getRevenueByAccountingCategoryByMonth,
+  getSpaceOrderRevenueByReservation,
 };

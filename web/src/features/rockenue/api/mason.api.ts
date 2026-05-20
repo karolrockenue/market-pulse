@@ -74,6 +74,7 @@ export interface KpiCell {
   actual: number | null;
   priorMonth: number | null;
   priorYear: number | null;
+  budget?: number | null;
 }
 
 export interface SalesFlashSummary {
@@ -147,6 +148,12 @@ export interface SalesFlashResponse {
   asOf: string;
   hasBudgetData: boolean;
   summary: SalesFlashSummary;
+  alos: { short: KpiCell; mid: KpiCell; long: KpiCell };
+  rateCharts: {
+    ssAdrByCategory: { name: string; value: number }[];
+    amrBySegment: { name: string; value: number }[];
+    lsAmrByCategory: { name: string; value: number }[];
+  };
   annualised: SalesFlashAnnualisedRow[];
   pacing: SalesFlashPacingRow[];
   bob: { short: number; mid: number; long: number; total: number };
@@ -154,8 +161,26 @@ export interface SalesFlashResponse {
   inHouseFY: Array<{ monthKey: string; short: number; mid: number; long: number }>;
   unitPacing: UnitPacingRow[];
   ssWeekly: SsWeeklyRow[];
+  allWeekly: SsWeeklyRow[];
   lsTierWeekly: LsTierRow[];
   notes: Record<string, string | null>;
+}
+
+export interface OccByServiceRow {
+  date: string;
+  capacity: number;
+  sold: number;
+  short: number;
+  mid: number;
+  long: number;
+  other: number;
+}
+
+export interface OccByServiceResponse {
+  hotelId: number;
+  shortName: string;
+  days: number;
+  rows: OccByServiceRow[];
 }
 
 async function jsonFetch<T>(url: string): Promise<T> {
@@ -183,6 +208,13 @@ export function fetchMasonBookingPulse(
   weeksBack = 8,
 ): Promise<BookingPulseResponse> {
   return jsonFetch(`/api/mason/booking-pulse?hotelId=${hotelId}&weeksBack=${weeksBack}`);
+}
+
+export function fetchMasonOccByService(
+  hotelId: number,
+  days = 120,
+): Promise<OccByServiceResponse> {
+  return jsonFetch(`/api/mason/occupancy-by-service?hotelId=${hotelId}&days=${days}`);
 }
 
 export function fetchMasonSalesFlash(

@@ -85,10 +85,24 @@ const MF_SERVICE_IDS = {
     short: ["c6267c3b-144c-40e2-baf3-b3e00110df1b"],
   },
   318341: {
-    short: ["e810df20-baa7-4895-a964-b26b00b051b9"],
-    mid:   ["3990f059-4fd8-47b3-ad48-b37600b41a91"],
-    long:  ["72b82965-e525-4001-90d7-b26b00b26959"],
-    // Excluded: Management (38bdc698) and ancillaries (e20b19b7, 094bdcd1).
+    // Mews migrated Long Stay onto a nightly service ~2026-05-20 (Dom's PDF:
+    // "moving Long Stay into a nightly Service"). The old monthly service was
+    // renamed "Long Stay Accommodation DO NOT USE" and long stays are draining
+    // onto "LongStay Accommodation NEW". Roles are now the UNION of every
+    // service of that stay-type so the migration is invisible on reports — a
+    // long stay stays "long" whether it sits on the legacy, NEW or canonical
+    // service. Re-verify with services/getAll if counts look off.
+    // (Old/wrong mapping: long=72b82965, mid=3990f059 — 3990f059 is actually
+    //  "LongStay Accommodation NEW", NOT Mid.)
+    short: ["e810df20-baa7-4895-a964-b26b00b051b9"], // Short Stay Accommodation
+    mid:   ["4d036740-d62c-41d8-bcb6-b2e400f348b3"], // Mid Stay Accommodation (currently unused → Mid ≈ 0)
+    long: [
+      "c65e3632-af72-4b7a-8f64-b26b00b23336", // Long Stay Accommodation (canonical, currently empty)
+      "3990f059-4fd8-47b3-ad48-b37600b41a91", // LongStay Accommodation NEW (nightly, filling up)
+      "72b82965-e525-4001-90d7-b26b00b26959", // Long Stay Accommodation DO NOT USE (legacy, draining)
+    ],
+    // Excluded: Management (38bdc698), Accommodation (c0ddfe17), Stay
+    // (3e203f4e), TEST SINGLE SERVICE (094bdcd1), ARCHIVE Mid (e20b19b7).
   },
   318343: {
     short: ["b518b662-2504-4092-aa6a-b13400ade71e"],
@@ -332,9 +346,11 @@ router.get("/service-revenue", async (req, res) => {
   }
 });
 
-// Sales Flash + Pacing Flash are scoped to hotels with a full role map.
-// Belsize is excluded from v1 — opens mid-May 2026, no LY data.
-const FLASH_HOTEL_IDS = new Set([318341, 318343]);
+// Sales Flash + Pacing Flash hotels. Belsize (318329) added 2026-05-20 per
+// Dom's request now that it has opened — note it is Short-Stay-only (no Mid/
+// Long services or AccCats yet) and has NO prior-year history, so Mid/Long
+// lines render £0 and all Prior-Year / STLY columns stay blank by design.
+const FLASH_HOTEL_IDS = new Set([318341, 318343, 318329]);
 
 function pad2(n) { return String(n).padStart(2, "0"); }
 
@@ -424,6 +440,35 @@ router.get("/pacing", async (req, res) => {
     });
   } catch (err) {
     console.error("[Mason] /pacing failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/mason/occupancy-by-service?hotelId=318341&days=120
+ *
+ * Daily occupancy split by service (Long/Mid/Short + Other residual) for the
+ * Sales Flash stacked occupancy chart. See mason.service.getDailyOccupancyByService.
+ */
+router.get("/occupancy-by-service", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({
+      error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}`,
+    });
+  }
+  const hotel = MF_HOTELS[hotelId];
+  if (!hotel) return res.status(400).json({ error: "Hotel not configured" });
+  const days = Math.min(540, Math.max(7, parseInt(req.query.days || "120", 10)));
+  try {
+    const rows = await masonService.getDailyOccupancyByService(
+      hotelId,
+      hotel.serviceIds,
+      days,
+    );
+    res.json({ hotelId, shortName: hotel.shortName, days, rows });
+  } catch (err) {
+    console.error("[Mason] /occupancy-by-service failed:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -544,7 +589,44 @@ router.get("/sales-flash", async (req, res) => {
     const cur = otbByMonth.get(currentMK);
     const pm = otbByMonth.get(priorMonthMK);
     const py = lyMap.get(priorYearMK) || null;
+    // Prior-year revenue split by service (Mason monthly-summary basis). null
+    // when unavailable (Belsize / pre-history) → segment PY renders "—".
+    const pySeg = await masonService.getSegmentRevenueActuals(hotelId, priorYearMK);
     const budgetCur = budgets[currentMK];
+
+    // Average Length of Stay (days) per service — reservations staying in the
+    // month, current vs prior month vs prior year. Full-contract nights.
+    const [alosCur, alosPM, alosPY] = await Promise.all([
+      masonService.getAlosByService(hotelId, currentMK, hotel.serviceIds),
+      masonService.getAlosByService(hotelId, priorMonthMK, hotel.serviceIds),
+      masonService.getAlosByService(hotelId, priorYearMK, hotel.serviceIds),
+    ]);
+    const alos = {
+      short: { actual: alosCur.short, priorMonth: alosPM.short, priorYear: alosPY.short },
+      mid: { actual: alosCur.mid, priorMonth: alosPM.mid, priorYear: alosPY.mid },
+      long: { actual: alosCur.long, priorMonth: alosPM.long, priorYear: alosPY.long },
+    };
+
+    // Rate-by-studio-category + AMR-by-segment charts (current month).
+    const rateCharts = await masonService.getRateBreakdowns(hotelId, currentMK, hotel.serviceIds);
+
+    // Budget KPI derivations for the current month. Budget revenue is loaded;
+    // budget room-nights + occupancy were added 2026-05-20 so we can derive
+    // budgeted Occupancy / ADR / RevPAR. null when nights aren't loaded (e.g.
+    // Belsize) so the UI renders "—".
+    const bNights = budgetCur?.nights || { short: 0, mid: 0, long: 0 };
+    const bRevShort = budgetCur?.short || 0;
+    const bRevMid = budgetCur?.mid || 0;
+    const bRevLong = budgetCur?.long || 0;
+    const bTotRev = bRevShort + bRevMid + bRevLong;
+    const bTotNights = (bNights.short || 0) + (bNights.mid || 0) + (bNights.long || 0);
+    const curCapacity = cur?.total.capacity || 0; // rooms × days in month
+    const hasBN = !!budgetCur?.hasNights;
+    const budgetOccPct = hasBN && curCapacity > 0 ? (bTotNights / curCapacity) * 100 : null;
+    const budgetAdrBlended = hasBN && bTotNights > 0 ? bTotRev / bTotNights : null;
+    const budgetRevpar = budgetCur?.hasData && curCapacity > 0 ? bTotRev / curCapacity : null;
+    const budgetAdrShort = hasBN && bNights.short > 0 ? bRevShort / bNights.short : null;
+    const budgetAdrMid = hasBN && bNights.mid > 0 ? bRevMid / bNights.mid : null;
 
     const summary = {
       monthKey: currentMK,
@@ -552,25 +634,27 @@ router.get("/sales-flash", async (req, res) => {
         short: {
           actual: cur?.byRole.short.revenue ?? 0,
           priorMonth: pm?.byRole.short.revenue ?? null,
-          priorYear: null, // no per-service LY scope from snapshots
+          priorYear: pySeg ? pySeg.short : null, // Mason monthly-summary basis
           budget: hasBudgetData ? (budgetCur?.short ?? null) : null,
         },
         mid: {
           actual: cur?.byRole.mid.revenue ?? 0,
           priorMonth: pm?.byRole.mid.revenue ?? null,
-          priorYear: null,
+          priorYear: pySeg ? pySeg.mid : null,
           budget: hasBudgetData ? (budgetCur?.mid ?? null) : null,
         },
         long: {
           actual: cur?.byRole.long.revenue ?? 0,
           priorMonth: pm?.byRole.long.revenue ?? null,
-          priorYear: null,
+          priorYear: pySeg ? pySeg.long : null,
           budget: hasBudgetData ? (budgetCur?.long ?? null) : null,
         },
         totalAccom: {
           actual: cur?.total.revenue ?? 0,
           priorMonth: pm?.total.revenue ?? null,
-          priorYear: py ? py.revenue : null,
+          // Use the segment-summed PY total when available so the table foots;
+          // else fall back to the property-wide snapshot total.
+          priorYear: pySeg ? pySeg.total : (py ? py.revenue : null),
           budget: hasBudgetData
             ? ((budgetCur?.short || 0) + (budgetCur?.mid || 0) + (budgetCur?.long || 0))
             : null,
@@ -581,42 +665,51 @@ router.get("/sales-flash", async (req, res) => {
           actual: cur?.total.occupancy ?? null,
           priorMonth: pm?.total.occupancy ?? null,
           priorYear: py ? py.occupancy : null,
+          budget: budgetOccPct,
         },
         adrBlended: {
           actual: cur?.total.adr ?? null,
           priorMonth: pm?.total.adr ?? null,
           priorYear: py ? py.adr : null,
+          budget: budgetAdrBlended,
         },
         revpar: {
           actual: cur?.total.revpar ?? null,
           priorMonth: pm?.total.revpar ?? null,
           priorYear: py ? py.revpar : null,
+          budget: budgetRevpar,
         },
         adrShort: {
           actual: cur?.byRole.short.adr ?? null,
           priorMonth: pm?.byRole.short.adr ?? null,
           priorYear: null, // no per-service LY scope from snapshots
+          budget: budgetAdrShort,
         },
         adrMid: {
           actual: cur?.byRole.mid.adr ?? null,
           priorMonth: pm?.byRole.mid.adr ?? null,
           priorYear: null,
+          budget: budgetAdrMid,
         },
         // Long Stay ADR renamed to "Avg Monthly Charge" in the UI per §15.1.
+        // No budget AMR available (file gives per-night LS budget, not AMR).
         amrLong: {
           actual: cur?.byRole.long.adr ?? null,
           priorMonth: pm?.byRole.long.adr ?? null,
           priorYear: null,
+          budget: null,
         },
         directShareNet: {
           actual: directShare ? directShare.directPct : null,
           priorMonth: directSharePM ? directSharePM.directPct : null,
           priorYear: null,
+          budget: null,
         },
         indirectShareNet: {
           actual: directShare ? directShare.indirectPct : null,
           priorMonth: directSharePM ? directSharePM.indirectPct : null,
           priorYear: null,
+          budget: null,
         },
       },
     };
@@ -692,6 +785,8 @@ router.get("/sales-flash", async (req, res) => {
       asOf: todayIsoStr,
       hasBudgetData,
       summary,
+      alos,
+      rateCharts,
       annualised,
       pacing,
       bob,
@@ -699,6 +794,7 @@ router.get("/sales-flash", async (req, res) => {
       inHouseFY,
       unitPacing,
       ssWeekly: tiers.ssWeekly,
+      allWeekly: tiers.allWeekly,
       lsTierWeekly: tiers.lsTierWeekly,
       notes: {
         ancillaries: "Canal / Meadow / Grounding revenue is out of v1 scope (mostly sourced outside Mews).",

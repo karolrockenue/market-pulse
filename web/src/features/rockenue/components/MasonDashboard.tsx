@@ -91,9 +91,19 @@ const formatCompact = (value: number) => {
   return Math.round(value).toLocaleString();
 };
 
-export function MonthCardView({ card }: { card: MonthCard }) {
+export function MonthCardView({ card, impliedAmr = false }: { card: MonthCard; impliedAmr?: boolean }) {
   const total =
     card.revenueBy.short + card.revenueBy.mid + card.revenueBy.long;
+  // Implied AMR (Average Monthly Rate) = nightly ADR × 30.44 (avg days/month).
+  // Long Stay's ADR is already a monthly figure (§15.1 monthly billing), so it
+  // IS the AMR — don't multiply it. Used on the Sales Flash cards per Dom's
+  // request to replace per-segment occupancy with implied AMR.
+  const AMR_DAYS = 30.44;
+  const amrByService = {
+    short: card.adrByService.short * AMR_DAYS,
+    mid: card.adrByService.mid * AMR_DAYS,
+    long: card.adrByService.long,
+  };
 
   return (
     <div
@@ -200,12 +210,20 @@ export function MonthCardView({ card }: { card: MonthCard }) {
               </div>
             </div>
 
-            {/* Service rows — Revenue / Occ / ADR */}
+            {/* Service rows — Revenue / (Occ | Implied AMR) / ADR */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+              {impliedAmr && (
+                <div style={{ display: "grid", gridTemplateColumns: grid, columnGap: 18 }}>
+                  <span /><span /><span />
+                  <span style={{ ...smallLabel, textAlign: "right", marginBottom: 0 }}>Implied AMR</span>
+                  <span style={{ ...smallLabel, textAlign: "right", marginBottom: 0 }}>ADR</span>
+                </div>
+              )}
               {SERVICES.map((svc) => {
                 const value = card.revenueBy[svc.key];
                 const svcAdr = card.adrByService[svc.key];
                 const svcOcc = card.occByService[svc.key];
+                const svcAmr = amrByService[svc.key];
                 return (
                   <div
                     key={svc.key}
@@ -254,7 +272,7 @@ export function MonthCardView({ card }: { card: MonthCard }) {
                         textAlign: "right",
                       }}
                     >
-                      {svcOcc.toFixed(0)}%
+                      {impliedAmr ? fmt(svcAmr) : `${svcOcc.toFixed(0)}%`}
                     </span>
                     <span
                       style={{
@@ -264,9 +282,15 @@ export function MonthCardView({ card }: { card: MonthCard }) {
                         textAlign: "right",
                       }}
                     >
-                      {fmt(svcAdr)}
-                      {svc.key === "long" && svcAdr > 0 && (
-                        <span style={{ color: R.textDim, fontSize: 10, marginLeft: 3 }}>/mo</span>
+                      {impliedAmr && svc.key === "long" ? (
+                        <span style={{ color: R.textDim }}>—</span>
+                      ) : (
+                        <>
+                          {fmt(svcAdr)}
+                          {svc.key === "long" && svcAdr > 0 && !impliedAmr && (
+                            <span style={{ color: R.textDim, fontSize: 10, marginLeft: 3 }}>/mo</span>
+                          )}
+                        </>
                       )}
                     </span>
                   </div>

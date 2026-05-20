@@ -22,6 +22,7 @@ type Property = { id: string; name: string; hotelId: number };
 const PROPERTIES: Property[] = [
   { id: "wb", name: "Westbourne Park", hotelId: 318341 },
   { id: "ph", name: "Primrose Hill", hotelId: 318343 },
+  { id: "bp", name: "Belsize Park", hotelId: 318329 },
 ];
 
 const KPIS = [
