@@ -270,8 +270,12 @@ router.get("/assets", requireUserApi, async (req, res) => {
       "SELECT property_id FROM user_properties WHERE user_id = $1 OR user_id = $2::text",
       [req.user.cloudbedsId, req.user.internalId]
     );
-    const allowedIds = new Set(rows.map(r => r.property_id));
-    res.json(allAssets.filter(a => allowedIds.has(a.market_pulse_hotel_id)));
+    // market_pulse_hotel_id is TEXT; user_properties.property_id is INTEGER.
+    // Normalize both to strings so Set.has matches (a number Set never matches
+    // a string id — that silently emptied assets for every non-admin
+    // rate-viewer and left My Rates' calcState null).
+    const allowedIds = new Set(rows.map(r => String(r.property_id)));
+    res.json(allAssets.filter(a => allowedIds.has(String(a.market_pulse_hotel_id))));
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
   }

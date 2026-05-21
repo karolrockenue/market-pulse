@@ -1484,6 +1484,11 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                         );
                                       } else if (e.target.value === "") {
                                         clearOverride(day.date);
+                                      } else if (!isNaN(v) && v > 0 && !calcState) {
+                                        toast.error(
+                                          "Rate calculator isn't configured for this hotel, so a target sell rate can't be converted. Use the PMS Override row instead, or contact an admin.",
+                                          { style: { backgroundColor: "#121519", border: "1px solid #ef4444", color: "#ef4444" } },
+                                        );
                                       }
                                       setEditingEffectiveCell(null);
                                     }}
