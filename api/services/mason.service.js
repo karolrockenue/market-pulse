@@ -61,6 +61,53 @@ function todayIso() {
 }
 
 /**
+ * Actual occupied room-nights per month × service-role, from the reservations
+ * table (each reservation's check-in/out clipped to the month), classified by
+ * Mews service. This is the ADR DENOMINATOR used across the Sales Flash / Pacing
+ * / cards — "the real nights people stayed" — replacing the SpaceOrder item
+ * count (which over/under-counts vs true nights: rate-change lines, the 28-night
+ * VAT split, multi-night items, comp nights). Uses the IDENTICAL clip as
+ * getRateBreakdowns so per-service ADR ties to the rate-by-category charts.
+ * Returns Map<"YYYY-MM", { short, mid, long }>.
+ */
+async function getRoomNightsByMonthRole(hotelId, monthFrom, monthTo, serviceIds) {
+  const sets = {
+    short: new Set(serviceIds?.short || []),
+    mid: new Set(serviceIds?.mid || []),
+    long: new Set(serviceIds?.long || []),
+  };
+  const allIds = [...sets.short, ...sets.mid, ...sets.long];
+  const out = new Map();
+  if (allIds.length === 0) return out;
+  const { rows } = await pgPool.query(
+    `WITH spine AS (
+       SELECT generate_series($2::date, $3::date, '1 month')::date AS m0
+     )
+     SELECT to_char(s.m0, 'YYYY-MM') AS mk,
+            r.mews_service_id AS sid,
+            SUM(GREATEST(0,
+              LEAST(r.check_out, (s.m0 + INTERVAL '1 month - 1 day')::date)
+              - GREATEST(r.check_in, s.m0)
+            ))::int AS rn
+       FROM spine s
+       JOIN reservations r
+         ON r.hotel_id = $1
+        AND r.status NOT ILIKE '%cancel%'
+        AND r.check_in <= (s.m0 + INTERVAL '1 month - 1 day')::date
+        AND r.check_out > s.m0
+        AND r.mews_service_id = ANY($4::text[])
+      GROUP BY 1, 2`,
+    [hotelId, startOfMonth(monthFrom), startOfMonth(monthTo), allIds],
+  );
+  for (const r of rows) {
+    if (!out.has(r.mk)) out.set(r.mk, { short: 0, mid: 0, long: 0 });
+    const o = out.get(r.mk);
+    for (const role of ROLES) if (sets[role].has(r.sid)) o[role] += Number(r.rn) || 0;
+  }
+  return out;
+}
+
+/**
  * Per-service revenue + nights + ADR + occupancy share, plus blended
  * property-wide totals, for each month in [monthFrom, monthTo].
  *
@@ -71,7 +118,7 @@ function todayIso() {
  * service-level occ share is a soft signal; the headline blended occ is
  * the truth.
  */
-async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories) {
+async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories, serviceIds = null) {
   const allowedAccCatIds = ROLES.flatMap((r) => accountingCategories[r] || []);
   const accCatIdToRole = {};
   for (const role of ROLES) {
@@ -108,6 +155,12 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories)
   );
   const occByMonth = new Map(occRows.rows.map((r) => [r.month_key, r]));
 
+  // Per-service ACTUAL room-nights (date-derived) — the ADR denominator.
+  // Falls back to the SpaceOrder item count when serviceIds aren't supplied.
+  const rnMap = serviceIds
+    ? await getRoomNightsByMonthRole(hotelId, monthFrom, monthTo, serviceIds)
+    : null;
+
   // Build month list inclusive
   const months = [];
   let cursor = monthFrom;
@@ -125,21 +178,25 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories)
     for (const role of ROLES) {
       const accCatIds = accountingCategories[role] || [];
       let net = 0;
-      let nights = 0;
+      let itemCount = 0;
       for (const accCatId of accCatIds) {
         const bucket = result.byAccountingCategoryMonth[accCatId]?.[mk];
         if (!bucket) continue;
         net += bucket.net;
-        nights += bucket.nights;
+        itemCount += bucket.nights; // SpaceOrder item count (legacy fallback)
       }
+      // Denominator = ACTUAL occupied room-nights from reservation dates (per
+      // Mews service), not the SpaceOrder item count — so per-service ADR ties
+      // to the rate-by-category charts. Revenue numerator stays AccCat-net.
+      const roomNights = rnMap ? (rnMap.get(mk)?.[role] ?? 0) : itemCount;
       byRole[role] = {
         revenue: net,
-        nights,
-        adr: nights > 0 ? net / nights : null,
+        nights: roomNights,
+        adr: roomNights > 0 ? net / roomNights : null,
         configured: accCatIds.length > 0,
       };
       totalRev += net;
-      totalServiceNights += nights;
+      totalServiceNights += roomNights;
     }
 
     const occRow = occByMonth.get(mk);
@@ -1021,6 +1078,7 @@ module.exports = {
   getSegmentRevenueActuals,
   getAlosByService,
   getLeadTimeByService,
+  getRoomNightsByMonthRole,
   getRateBreakdowns,
   monthKey,
   shiftYear,

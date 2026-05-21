@@ -95,14 +95,13 @@ export function MonthCardView({ card, impliedAmr = false }: { card: MonthCard; i
   const total =
     card.revenueBy.short + card.revenueBy.mid + card.revenueBy.long;
   // Implied AMR (Average Monthly Rate) = nightly ADR × 30.44 (avg days/month).
-  // Long Stay's ADR is already a monthly figure (§15.1 monthly billing), so it
-  // IS the AMR — don't multiply it. Used on the Sales Flash cards per Dom's
-  // request to replace per-segment occupancy with implied AMR.
+  // All services (incl. Long Stay) now carry a true nightly ADR — denominator
+  // is actual occupied room-nights — so LS is multiplied like the others.
   const AMR_DAYS = 30.44;
   const amrByService = {
     short: card.adrByService.short * AMR_DAYS,
     mid: card.adrByService.mid * AMR_DAYS,
-    long: card.adrByService.long,
+    long: card.adrByService.long * AMR_DAYS,
   };
 
   return (
@@ -282,16 +281,7 @@ export function MonthCardView({ card, impliedAmr = false }: { card: MonthCard; i
                         textAlign: "right",
                       }}
                     >
-                      {impliedAmr && svc.key === "long" ? (
-                        <span style={{ color: R.textDim }}>—</span>
-                      ) : (
-                        <>
-                          {fmt(svcAdr)}
-                          {svc.key === "long" && svcAdr > 0 && !impliedAmr && (
-                            <span style={{ color: R.textDim, fontSize: 10, marginLeft: 3 }}>/mo</span>
-                          )}
-                        </>
-                      )}
+                      {fmt(svcAdr)}
                     </span>
                   </div>
                 );
@@ -999,7 +989,8 @@ export interface ApiServiceBucket {
   gross: number;
   net: number;
   items: number;
-  nights: number;
+  nights: number;       // SpaceOrder item count (legacy)
+  roomNights?: number;  // actual occupied room-nights (date-derived) — ADR denominator
 }
 
 export interface ApiMonthRow {
@@ -1362,7 +1353,8 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
       for (const svc of SERVICES) {
         const bucket = row?.services?.[svc.key];
         byService[svc.key] = (vatMode === "net" ? bucket?.net : bucket?.gross) || 0;
-        nightsByService[svc.key] = bucket?.nights || 0;
+        // Actual occupied room-nights (date-derived) — true ADR denominator.
+        nightsByService[svc.key] = bucket?.roomNights ?? bucket?.nights ?? 0;
       }
       const snapshot = snapshotForIndex(i);
       const occupancy = snapshot?.occupancy ?? 0;
@@ -1375,20 +1367,13 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
       const capacityNights = occupancy > 0 ? roomNights / (occupancy / 100) : 0;
       const totalRevenue = byService.short + byService.mid + byService.long;
       const adr = roomNights > 0 ? totalRevenue / roomNights : 0;
-      // Per-service ADR: Short/Mid = £/night (daily SpaceOrder). Long Stay
-      // SpaceOrders are monthly units, so its "ADR" is really £/month — UI
-      // labels it accordingly.
+      // Per-service ADR = revenue ÷ ACTUAL occupied room-nights (£/night for
+      // all services, Long Stay included now that nights are date-derived).
       const svcAdr = (key: ServiceKey) =>
         nightsByService[key] > 0 ? byService[key] / nightsByService[key] : 0;
-      // Long Stay SpaceOrders are monthly units — scale by ~30 to get
-      // approximate room-days for the occupancy share. Rough (±20%) but
-      // keeps the share visible instead of rounding to 0%.
-      const LONG_NIGHTS_PER_UNIT = 30;
-      const svcOcc = (key: ServiceKey) => {
-        if (capacityNights <= 0) return 0;
-        const scale = key === "long" ? LONG_NIGHTS_PER_UNIT : 1;
-        return (nightsByService[key] * scale / capacityNights) * 100;
-      };
+      // Per-service occupancy share = actual room-nights ÷ capacity-nights.
+      const svcOcc = (key: ServiceKey) =>
+        capacityNights > 0 ? (nightsByService[key] / capacityNights) * 100 : 0;
       out.push({
         title: window.titles[i],
         label: monthLabel(m),

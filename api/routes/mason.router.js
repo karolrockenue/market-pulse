@@ -294,6 +294,13 @@ router.get("/service-revenue", async (req, res) => {
     );
     const elapsedMs = Date.now() - t0;
 
+    // Actual occupied room-nights per service per month (date-derived) — the
+    // ADR denominator used by the dashboard/sales-flash cards. Falls back to
+    // SpaceOrder item count when serviceIds aren't mapped.
+    const rnMap = hotel.serviceIds
+      ? await masonService.getRoomNightsByMonthRole(hotelId, from.slice(0, 7), to.slice(0, 7), hotel.serviceIds)
+      : null;
+
     // Pivot into a month-first shape keyed by role. Multiple AccCatIds may
     // map to the same role (e.g. at Westbourne `short` is the union of
     // Accommodation Income – Short Stay + Canal Breakfast). Roles with no
@@ -318,6 +325,9 @@ router.get("/service-revenue", async (req, res) => {
           net,
           items,
           nights,
+          // Actual occupied room-nights (date-derived) — preferred ADR
+          // denominator; `nights` (SpaceOrder count) kept for back-compat.
+          roomNights: rnMap ? (rnMap.get(month)?.[role] ?? 0) : nights,
         };
         row.totalGross += gross;
         row.totalNet += net;
@@ -392,6 +402,7 @@ router.get("/pacing", async (req, res) => {
       startKey,
       endKey,
       hotel.accountingCategories,
+      hotel.serviceIds,
     );
 
     const lyMap = await masonService.getFinalLyKpis(
@@ -541,6 +552,7 @@ router.get("/sales-flash", async (req, res) => {
       otbStart,
       otbEnd,
       hotel.accountingCategories,
+      hotel.serviceIds,
     );
     const otbByMonth = new Map(otb.months.map((m) => [m.monthKey, m]));
 
@@ -705,8 +717,9 @@ router.get("/sales-flash", async (req, res) => {
           priorYear: null,
           budget: budgetAdrMid,
         },
-        // Long Stay ADR renamed to "Avg Monthly Charge" in the UI per §15.1.
-        // No budget AMR available (file gives per-night LS budget, not AMR).
+        // Long Stay ADR — now a true nightly ADR (net ÷ actual occupied
+        // room-nights), since LS migrated to a nightly Mews service. Field name
+        // kept as `amrLong` for back-compat; UI labels it "LS ADR".
         amrLong: {
           actual: cur?.byRole.long.adr ?? null,
           priorMonth: pm?.byRole.long.adr ?? null,
@@ -822,7 +835,7 @@ router.get("/sales-flash", async (req, res) => {
         budgets: hasBudgetData
           ? null
           : "Per-service budgets not yet uploaded; Budget columns hidden.",
-        longStayAdr: "Long Stay ADR is renamed 'Avg Monthly Charge' — Mews bills LS in monthly units, not room-nights.",
+        longStayAdr: "Per-service ADR = revenue ÷ actual occupied room-nights (from reservation dates). Long Stay now shows a true nightly ADR following its migration to a nightly Mews service.",
       },
     });
   } catch (err) {

@@ -29,8 +29,9 @@ import {
 // (318343). Budget columns are hidden until per-service budgets are uploaded
 // via POST /api/mason/budgets/:hotelId. Ancillary blocks (Canal/Meadow/
 // Grounding) are deferred — those revenue streams sit largely outside Mews.
-// Long Stay ADR is rendered as "Avg Monthly Charge" per Blueprint §15.1
-// (Mews bills LS in monthly units, not room-nights).
+// Per-service ADR = revenue ÷ ACTUAL occupied room-nights (date-derived, per
+// Mews service). Long Stay shows a true nightly ADR after its nightly-service
+// migration (was "Avg Monthly Charge" while LS billed monthly).
 
 type Property = { id: string; name: string; hotelId: number };
 const PROPERTIES: Property[] = [
@@ -393,7 +394,8 @@ function ThreeMonthCards({ hotelId }: { hotelId: number }) {
         // Net of VAT per Dom's V2 comment ("top section be Net VAT"). Revenue
         // + the implied AMR/ADR derived below both follow from this.
         byService[svc.key] = bucket?.net || 0;
-        nightsByService[svc.key] = bucket?.nights || 0;
+        // Actual occupied room-nights (date-derived) — true ADR denominator.
+        nightsByService[svc.key] = bucket?.roomNights ?? bucket?.nights ?? 0;
       }
       const snapshot = snapshotForIndex(i);
       const occupancy = snapshot?.occupancy ?? 0;
@@ -403,12 +405,8 @@ function ThreeMonthCards({ hotelId }: { hotelId: number }) {
       const adr = roomNights > 0 ? totalRevenue / roomNights : 0;
       const svcAdr = (key: ServiceKey) =>
         nightsByService[key] > 0 ? byService[key] / nightsByService[key] : 0;
-      const LONG_NIGHTS_PER_UNIT = 30;
-      const svcOcc = (key: ServiceKey) => {
-        if (capacityNights <= 0) return 0;
-        const scale = key === "long" ? LONG_NIGHTS_PER_UNIT : 1;
-        return (nightsByService[key] * scale / capacityNights) * 100;
-      };
+      const svcOcc = (key: ServiceKey) =>
+        capacityNights > 0 ? (nightsByService[key] / capacityNights) * 100 : 0;
       return {
         title: window.titles[i],
         label: cardMonthLabel(m),
@@ -518,10 +516,7 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
           <KpiRow label="SS ADR" cell={k.adrShort} fmt={(v) => fmtGbp(v)} />
           <KpiRow label="MS ADR" cell={k.adrMid} fmt={(v) => fmtGbp(v)} />
           <div style={{ display: "grid", gridTemplateColumns: KPI_GRID, borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
-            <div style={{ ...labelCell, color: R.text }}>
-              LS Avg Monthly Charge
-              <span style={{ color: R.textDim, fontSize: 9, marginLeft: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>· /mo</span>
-            </div>
+            <div style={{ ...labelCell, color: R.text }}>LS ADR</div>
             <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(k.amrLong.priorMonth)}</div>
             <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(k.amrLong.priorYear)}</div>
             <div style={{ ...cellBase, color: R.textDim }}>—</div>
@@ -753,7 +748,6 @@ function PacingByService({ data, hasBudgetData }: { data: SalesFlashResponse; ha
             const totalNights = p.months.reduce((s, m) => s + m.actualNights, 0);
             const totalBudget = hasBudgetData ? p.months.reduce((s, m) => s + (m.budgetRevenue || 0), 0) : null;
             const blendedAdr = totalNights > 0 ? totalRev / totalNights : null;
-            const isLong = p.role === "long";
             return (
               <div key={p.role} style={{ marginTop: 6 }}>
                 <div style={{ ...labelCell, color: R.warmTeal, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 10 }}>
@@ -765,12 +759,12 @@ function PacingByService({ data, hasBudgetData }: { data: SalesFlashResponse; ha
                   <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtGbp(totalRev, 0)}</div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
-                  <div style={labelCell}>{isLong ? "Month-Charges" : "Room Nights"}</div>
+                  <div style={labelCell}>Room Nights</div>
                   {p.months.map((m) => <div key={m.monthKey} style={cellBase}>{fmtNum(m.actualNights, 0)}</div>)}
                   <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtNum(totalNights, 0)}</div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
-                  <div style={labelCell}>{isLong ? "Avg Monthly Charge" : "ADR (net)"}</div>
+                  <div style={labelCell}>ADR (net)</div>
                   {p.months.map((m) => <div key={m.monthKey} style={cellBase}>{fmtGbp(m.actualAdr, 0)}</div>)}
                   <div style={{ ...cellBase, color: R.text }}>{fmtGbp(blendedAdr, 0)}</div>
                 </div>
