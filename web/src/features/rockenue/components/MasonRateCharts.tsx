@@ -109,13 +109,13 @@ export function MasonRateCharts({ data }: { data?: RateChartsData }) {
   const d = data ?? SAMPLE;
   return (
     <div>
-      <ChartCard title="Short Stay — ADR by Studio Category" subtitle="Avg nightly rate per room type" empty={d.ssAdrByCategory.length === 0}>
+      <ChartCard title="Short Stay — ADR by Studio Category" subtitle="Avg nightly rate per room type · net of VAT" empty={d.ssAdrByCategory.length === 0}>
         <VBars data={d.ssAdrByCategory} color="#7BAFD4" fmt={GBP} />
       </ChartCard>
-      <ChartCard title="Average Monthly Rate by Segment" subtitle="AMR across Mid & Long length-of-stay tiers" empty={d.amrBySegment.length === 0}>
+      <ChartCard title="Average Monthly Rate by Segment" subtitle="AMR across Mid & Long length-of-stay tiers · net of VAT" empty={d.amrBySegment.length === 0}>
         <HBars data={d.amrBySegment} color={R.warmTeal} fmt={GBP_K} />
       </ChartCard>
-      <ChartCard title="Long Stay — Rate by Studio Category" subtitle="AMR per room type" empty={d.lsAmrByCategory.length === 0}>
+      <ChartCard title="Long Stay — Rate by Studio Category" subtitle="AMR per room type · net of VAT" empty={d.lsAmrByCategory.length === 0}>
         <HBars data={d.lsAmrByCategory} color={R.gold} fmt={GBP_K} />
       </ChartCard>
     </div>

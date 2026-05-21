@@ -390,7 +390,9 @@ function ThreeMonthCards({ hotelId }: { hotelId: number }) {
       const nightsByService: ServiceSplit = { short: 0, mid: 0, long: 0 };
       for (const svc of SERVICES) {
         const bucket = row?.services?.[svc.key];
-        byService[svc.key] = bucket?.gross || 0;
+        // Net of VAT per Dom's V2 comment ("top section be Net VAT"). Revenue
+        // + the implied AMR/ADR derived below both follow from this.
+        byService[svc.key] = bucket?.net || 0;
         nightsByService[svc.key] = bucket?.nights || 0;
       }
       const snapshot = snapshotForIndex(i);
@@ -528,10 +530,11 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
             <div style={cellBase}><DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.priorYear)} /></div>
             <div style={{ ...cellBase, color: R.textDim }}>—</div>
           </div>
-          {(k.directShareNet.actual !== null || k.indirectShareNet.actual !== null) && (
+          {(k.directBookingEngine.actual !== null || k.directManual.actual !== null || k.ota.actual !== null) && (
             <>
-              <KpiRow label="Direct Booking %" cell={k.directShareNet} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
-              <KpiRow label="Indirect (OTA) Booking %" cell={k.indirectShareNet} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
+              <KpiRow label="Direct — Booking Engine %" cell={k.directBookingEngine} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
+              <KpiRow label="Direct — Manual %" cell={k.directManual} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
+              <KpiRow label="OTA %" cell={k.ota} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
             </>
           )}
         </div>
@@ -569,6 +572,40 @@ function AlosTable({ data }: { data: SalesFlashResponse }) {
         <Row label="Short Stay" cell={a.short} />
         <Row label="Mid Stay" cell={a.mid} />
         <Row label="Long Stay" cell={a.long} />
+      </div>
+    </Section>
+  );
+}
+
+function LeadTimeTable({ data }: { data: SalesFlashResponse }) {
+  const l = data.leadTime;
+  const fmtD = (v: number | null | undefined) =>
+    v === null || v === undefined || !isFinite(v) ? "—" : `${v.toFixed(1)}d`;
+  const grid = "minmax(160px, 1.5fr) 110px 110px 140px 90px 90px";
+  const Row = ({ label, cell }: { label: string; cell: KpiCell }) => (
+    <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
+      <div style={labelCell}>{label}</div>
+      <div style={{ ...cellBase, color: R.textMid }}>{fmtD(cell.priorMonth)}</div>
+      <div style={{ ...cellBase, color: R.textMid }}>{fmtD(cell.priorYear)}</div>
+      <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtD(cell.actual)}</div>
+      <div style={cellBase}><DeltaText pct={pctDelta(cell.actual, cell.priorMonth)} /></div>
+      <div style={cellBase}><DeltaText pct={pctDelta(cell.actual, cell.priorYear)} /></div>
+    </div>
+  );
+  return (
+    <Section title="Lead Time to Reservation" subtitle="Avg days from booking-create to check-in — guests staying during the month">
+      <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
+          <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Lead Time</div>
+          <div style={headerCell}>Prior Month</div>
+          <div style={headerCell}>Prior Year</div>
+          <div style={{ ...headerCell, color: R.gold }}>Actuals (current month)</div>
+          <div style={headerCell}>vs PM</div>
+          <div style={headerCell}>vs PY</div>
+        </div>
+        <Row label="Short Stay" cell={l.short} />
+        <Row label="Mid Stay" cell={l.mid} />
+        <Row label="Long Stay" cell={l.long} />
       </div>
     </Section>
   );
@@ -620,12 +657,12 @@ function AnnualisedTable({ data, hasBudgetData }: { data: SalesFlashResponse; ha
                 <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(totals.budgetTotal, 0)}</div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: grid }}>
-                <div style={{ ...labelCell, color: R.warmTeal }}>vs Budget</div>
+                <div style={{ ...labelCell, color: R.warmTeal }}>vs Budget %</div>
                 {months.map((m) => {
                   const v = m.budget ? m.revenue.total - m.budget.total : null;
                   return <div key={m.monthKey} style={cellBase}><DeltaText pct={m.budget && m.budget.total > 0 ? (v! / m.budget.total) * 100 : null} /></div>;
                 })}
-                <div style={cellBase}>{variance !== null ? <span style={{ color: variance >= 0 ? R.green : R.red, fontWeight: 600 }}>{fmtGbp(variance, 0)}</span> : "—"}</div>
+                <div style={cellBase}><DeltaText pct={totals.budgetTotal > 0 ? (variance! / totals.budgetTotal) * 100 : null} /></div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
                 <div style={{ ...labelCell, color: R.textMid }}>Variance £</div>
@@ -634,6 +671,14 @@ function AnnualisedTable({ data, hasBudgetData }: { data: SalesFlashResponse; ha
                   return <div key={m.monthKey} style={{ ...cellBase, color: v == null ? R.textDim : v >= 0 ? R.green : R.red }}>{v == null ? "—" : fmtGbp(v, 0)}</div>;
                 })}
                 <div style={{ ...cellBase, fontWeight: 600, color: variance == null ? R.textDim : variance >= 0 ? R.green : R.red }}>{variance == null ? "—" : fmtGbp(variance, 0)}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                <div style={{ ...labelCell, color: R.textMid }}>Budget achievement %</div>
+                {months.map((m) => {
+                  const pct = m.budget && m.budget.total > 0 ? (m.revenue.total / m.budget.total) * 100 : null;
+                  return <div key={m.monthKey} style={{ ...cellBase, color: pct == null ? R.textDim : pct >= 100 ? R.green : R.textMid }}>{pct == null ? "—" : `${Math.round(pct)}%`}</div>;
+                })}
+                <div style={{ ...cellBase, fontWeight: 700, color: totals.budgetTotal > 0 && totals.total / totals.budgetTotal >= 1 ? R.green : R.gold }}>{totals.budgetTotal > 0 ? `${Math.round((totals.total / totals.budgetTotal) * 100)}%` : "—"}</div>
               </div>
             </>
           )}
@@ -1025,6 +1070,7 @@ export function MasonSalesFlash() {
               <div style={{ minWidth: 0 }}>
                 <CurrentMonthSummary data={data} hasBudgetData={data.hasBudgetData} />
                 <AlosTable data={data} />
+                <LeadTimeTable data={data} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <MasonRateCharts data={data.rateCharts} />

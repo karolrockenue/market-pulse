@@ -607,6 +607,20 @@ router.get("/sales-flash", async (req, res) => {
       long: { actual: alosCur.long, priorMonth: alosPM.long, priorYear: alosPY.long },
     };
 
+    // Lead Time (days from booking-create to check-in) per service — same
+    // staying-in-month cohort as ALOS so the two tables read consistently.
+    // Dom's V2 request. Sits directly below the ALOS table.
+    const [ltCur, ltPM, ltPY] = await Promise.all([
+      masonService.getLeadTimeByService(hotelId, currentMK, hotel.serviceIds),
+      masonService.getLeadTimeByService(hotelId, priorMonthMK, hotel.serviceIds),
+      masonService.getLeadTimeByService(hotelId, priorYearMK, hotel.serviceIds),
+    ]);
+    const leadTime = {
+      short: { actual: ltCur.short, priorMonth: ltPM.short, priorYear: ltPY.short },
+      mid: { actual: ltCur.mid, priorMonth: ltPM.mid, priorYear: ltPY.mid },
+      long: { actual: ltCur.long, priorMonth: ltPM.long, priorYear: ltPY.long },
+    };
+
     // Rate-by-studio-category + AMR-by-segment charts (current month).
     const rateCharts = await masonService.getRateBreakdowns(hotelId, currentMK, hotel.serviceIds);
 
@@ -699,15 +713,21 @@ router.get("/sales-flash", async (req, res) => {
           priorYear: null,
           budget: null,
         },
-        directShareNet: {
-          actual: directShare ? directShare.directPct : null,
-          priorMonth: directSharePM ? directSharePM.directPct : null,
+        directBookingEngine: {
+          actual: directShare ? directShare.bookingEnginePct : null,
+          priorMonth: directSharePM ? directSharePM.bookingEnginePct : null,
           priorYear: null,
           budget: null,
         },
-        indirectShareNet: {
-          actual: directShare ? directShare.indirectPct : null,
-          priorMonth: directSharePM ? directSharePM.indirectPct : null,
+        directManual: {
+          actual: directShare ? directShare.manualPct : null,
+          priorMonth: directSharePM ? directSharePM.manualPct : null,
+          priorYear: null,
+          budget: null,
+        },
+        ota: {
+          actual: directShare ? directShare.otaPct : null,
+          priorMonth: directSharePM ? directSharePM.otaPct : null,
           priorYear: null,
           budget: null,
         },
@@ -786,6 +806,7 @@ router.get("/sales-flash", async (req, res) => {
       hasBudgetData,
       summary,
       alos,
+      leadTime,
       rateCharts,
       annualised,
       pacing,

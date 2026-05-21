@@ -664,43 +664,49 @@ async function getServiceBudgets(hotelId, fyStartYear) {
 }
 
 /**
- * Direct vs Indirect booking percentages from reservations.source.
- * Mews maps:
- *   Distributor  → Direct (Mews Booking Engine)
- *   Commander    → Direct (manual entry, treat as direct)
- *   ChannelManager → Indirect (any OTA via channel manager)
- *   anything else → Other
+ * Booking-source split for the month's arrivals (check-in in month, all
+ * services, non-cancelled). Three buckets from Mews Origin
+ * (reservations.source):
+ *   Distributor    → Direct (Booking Engine)
+ *   Commander      → Direct (Manual)
+ *   ChannelManager → OTA (Booking.com / Expedia / Agoda / … — brand-level
+ *                    resolution via companies/getAll is a separate workstream)
+ *   anything else  → other (excluded from the displayed pcts)
+ *
+ * Weighted by BOOKING COUNT, matching the "Booking %" label. Previously this
+ * weighted by reservations.total_rate, which is NULL/sparse for Mid/Long and
+ * collapsed the split toward Short Stay — making it read far too Direct. Count
+ * weighting is NULL-proof and reflects all services. Verified 2026-05-21:
+ * Westbourne realised arrivals ≈ 57% OTA / 17% Direct-BE / 25% Manual.
  */
 async function getDirectShareForMonth(hotelId, monthKey) {
   const start = startOfMonth(monthKey);
   const end = endOfMonth(monthKey);
   const { rows } = await pgPool.query(
-    `SELECT source,
-            COUNT(*) AS bookings,
-            SUM(COALESCE(total_rate, 0)) AS revenue,
-            SUM(COALESCE(nights, 0)) AS room_nights
+    `SELECT LOWER(COALESCE(source, '')) AS src, COUNT(*)::int AS n
       FROM reservations
       WHERE hotel_id = $1
         AND check_in BETWEEN $2 AND $3
         AND status NOT ILIKE '%cancel%'
-      GROUP BY source`,
+      GROUP BY 1`,
     [hotelId, start, end],
   );
-  let direct = 0, indirect = 0, other = 0, total = 0;
+  let be = 0, manual = 0, ota = 0, other = 0, total = 0;
   for (const r of rows) {
-    const rev = Number(r.revenue) || 0;
-    total += rev;
-    const src = (r.source || "").toLowerCase();
-    if (src === "distributor" || src === "commander") direct += rev;
-    else if (src === "channelmanager") indirect += rev;
-    else other += rev;
+    const n = Number(r.n) || 0;
+    total += n;
+    if (r.src === "distributor") be += n;
+    else if (r.src === "commander") manual += n;
+    else if (r.src === "channelmanager") ota += n;
+    else other += n;
   }
   if (total === 0) return null;
   return {
-    directPct: direct / total,
-    indirectPct: indirect / total,
+    bookingEnginePct: be / total,
+    manualPct: manual / total,
+    otaPct: ota / total,
     otherPct: other / total,
-    revenueTotal: total,
+    total,
   };
 }
 
@@ -807,6 +813,51 @@ async function getAlosByService(hotelId, monthKey, serviceIds) {
   };
 }
 
+/**
+ * Average Lead Time (days) per service — mean of (check_in − booking_date)
+ * for reservations STAYING during the month (same cohort as getAlosByService,
+ * so the two tables sit side-by-side consistently). Dom's V2 request: "average
+ * days between the Booking Create Date and the Check-in Date, split by Service."
+ * Excludes cancellations and rows with no booking_date. Returns { short, mid,
+ * long } avg days, null per role when no qualifying stays.
+ */
+async function getLeadTimeByService(hotelId, monthKey, serviceIds) {
+  const start = startOfMonth(monthKey);
+  const end = endOfMonth(monthKey);
+  const sets = {
+    short: new Set(serviceIds?.short || []),
+    mid: new Set(serviceIds?.mid || []),
+    long: new Set(serviceIds?.long || []),
+  };
+  const allIds = [...sets.short, ...sets.mid, ...sets.long];
+  if (allIds.length === 0) return { short: null, mid: null, long: null };
+  const { rows } = await pgPool.query(
+    `SELECT mews_service_id AS sid,
+            SUM(check_in - booking_date)::numeric AS s,
+            COUNT(*) AS c
+       FROM reservations
+      WHERE hotel_id = $1
+        AND status NOT ILIKE '%cancel%'
+        AND check_in <= $3::date AND check_out > $2::date
+        AND mews_service_id = ANY($4::text[])
+        AND booking_date IS NOT NULL
+        AND check_in >= booking_date
+      GROUP BY 1`,
+    [hotelId, start, end, allIds],
+  );
+  const acc = { short: { s: 0, c: 0 }, mid: { s: 0, c: 0 }, long: { s: 0, c: 0 } };
+  for (const r of rows) {
+    for (const role of ROLES) {
+      if (sets[role].has(r.sid)) { acc[role].s += Number(r.s) || 0; acc[role].c += Number(r.c) || 0; }
+    }
+  }
+  return {
+    short: acc.short.c > 0 ? acc.short.s / acc.short.c : null,
+    mid: acc.mid.c > 0 ? acc.mid.s / acc.mid.c : null,
+    long: acc.long.c > 0 ? acc.long.s / acc.long.c : null,
+  };
+}
+
 // Normalise a Mews resource-category name into a short chart label. Strips the
 // "(All You Need)" style parentheticals and drops "do not use" categories.
 function cleanCategory(rt) {
@@ -834,10 +885,14 @@ const RATE_TIERS = [
  * Per-reservation rate comes from PENNY-PERFECT order items (SpaceOrder
  * revenue consumed in the month ÷ that reservation's nights-in-month), NOT
  * the reservations.avg_nightly_rate column (which is NULL for ~95% of long
- * stays). nightly = month_gross / nights_in_month; AMR = nightly × 30.44.
+ * stays). nightly = month_net / nights_in_month; AMR = nightly × 30.44.
  * Dividing by nights-in-month normalises monthly-billed vs nightly-billed
  * long stays AND partial-month stays uniformly. Studio category from
  * reservations.room_type (backfilled from Mews).
+ *
+ * Rates are NET of VAT (Dom's V2 comment "all graphs be Net VAT"). The SS
+ * chart is ADR (nightly); the segment + LS-studio charts stay AMR (× 30.44)
+ * — that is how Mason's analyst presents them.
  */
 async function getRateBreakdowns(hotelId, monthKey, serviceIds) {
   const start = startOfMonth(monthKey);
@@ -882,19 +937,19 @@ async function getRateBreakdowns(hotelId, monthKey, serviceIds) {
 
   for (const r of rows) {
     const rev = revByRes[r.id];
-    if (!rev || rev.gross <= 0) continue; // no accommodation revenue this month
+    if (!rev || rev.net <= 0) continue; // no accommodation revenue this month
     const nim = nightsInMonth(r.check_in, r.check_out);
     if (nim <= 0) continue;
-    const nightly = rev.gross / nim;
+    const nightly = rev.net / nim;
     if (nightly <= 0) continue;
     const cat = cleanCategory(r.room_type);
     const contractNights = Number(r.nights) || 0;
 
     if (shortSet.has(r.sid)) {
-      ssAllRate += rev.gross; ssAllNights += nim;
+      ssAllRate += rev.net; ssAllNights += nim;
       if (cat) {
         ssCat[cat] = ssCat[cat] || { rate: 0, nights: 0 };
-        ssCat[cat].rate += rev.gross; ssCat[cat].nights += nim;
+        ssCat[cat].rate += rev.net; ssCat[cat].nights += nim;
       }
     }
     const isLong = longSet.has(r.sid);
@@ -965,6 +1020,7 @@ module.exports = {
   getDailyOccupancyByService,
   getSegmentRevenueActuals,
   getAlosByService,
+  getLeadTimeByService,
   getRateBreakdowns,
   monthKey,
   shiftYear,

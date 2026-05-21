@@ -92,8 +92,9 @@ export interface SalesFlashSummary {
     adrShort: KpiCell;
     adrMid: KpiCell;
     amrLong: KpiCell;
-    directShareNet: KpiCell;
-    indirectShareNet: KpiCell;
+    directBookingEngine: KpiCell;
+    directManual: KpiCell;
+    ota: KpiCell;
   };
 }
 
@@ -149,6 +150,7 @@ export interface SalesFlashResponse {
   hasBudgetData: boolean;
   summary: SalesFlashSummary;
   alos: { short: KpiCell; mid: KpiCell; long: KpiCell };
+  leadTime: { short: KpiCell; mid: KpiCell; long: KpiCell };
   rateCharts: {
     ssAdrByCategory: { name: string; value: number }[];
     amrBySegment: { name: string; value: number }[];
