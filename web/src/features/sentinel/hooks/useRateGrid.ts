@@ -14,6 +14,11 @@ import {
   applyAiRates,
 } from "../api/sentinel.api";
 import { RateCalendarDay, AssetConfig } from "../api/types";
+import {
+  CHANNEL_PRICING_ENABLED,
+  fetchResolvedBookingSteps,
+  stepsToCalculatorState,
+} from "./channelPricingBridge";
 
 // --- Calculator Logic (Unchanged) ---
 interface Campaign {
@@ -257,6 +262,29 @@ export const useRateGrid = () => {
             countryRatePercent: s.country?.percent ?? 5,
           });
           setGeniusPct(asset.genius_discount_pct || 0);
+        }
+
+        // A2. [Phase 4] If enabled, source the Booking.com waterfall from
+        // Channel Pricing instead of the asset. Runs even when `asset` is not
+        // found (e.g. non-admin rate-viewers with an empty assets list), so the
+        // Sell Rate calc still works. Display + reverse-calc only — pushes
+        // nothing. Any failure falls back to the legacy asset-derived state set
+        // above. Flag: VITE_USE_CHANNEL_PRICING_SELL_RATE.
+        if (CHANNEL_PRICING_ENABLED) {
+          try {
+            const steps = await fetchResolvedBookingSteps(hotelId);
+            if (steps.length > 0) {
+              const { calcState: cpState, geniusPct: cpGenius } =
+                stepsToCalculatorState(steps);
+              setCalcState(cpState);
+              setGeniusPct(cpGenius);
+            }
+          } catch (e) {
+            console.warn(
+              "[Phase 4] Channel Pricing resolve failed; using legacy waterfall:",
+              e
+            );
+          }
         }
 
         // B. Process Metrics (Occupancy Map)

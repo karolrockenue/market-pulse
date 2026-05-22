@@ -187,6 +187,7 @@ const RATES_VIEW_PATHS = new Set([
   "/min-rates",
   "/rate-overrides",
   "/apply-ai-rates",
+  "/channel-pricing", // [Phase 4] resolved Booking.com waterfall steps for My Rates / Rate Manager
 ]);
 
 router.use(async (req, res, next) => {
@@ -195,6 +196,63 @@ router.use(async (req, res, next) => {
     return requireUserApi(req, res, () => requireRatesAccess(req, res, next));
   }
   return requireAdminApi(req, res, next);
+});
+
+// =============================================================================
+// [Phase 4] CHANNEL PRICING — resolved Sell Rate waterfall steps.
+// Returns the merged (channel default + per-hotel override) Booking.com step
+// list for a hotel, so My Rates / Rate Manager can compute the Sell Rate from
+// Channel Pricing instead of rockenue_managed_assets. Read-only; pushes nothing.
+// Rate-viewer accessible (path is in RATES_VIEW_PATHS).
+// Migration: claude/channel-pricing-migration.md Phase 4.
+// =============================================================================
+const CHANNEL_PRICING_BOOKING_SLUGS = ["booking-com", "booking.com", "bookingcom", "booking_com", "booking"];
+
+router.get("/channel-pricing/resolved/:hotelId", async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    const slug = (req.query.channel || "booking").toString().toLowerCase();
+    const slugCandidates = slug === "booking" ? CHANNEL_PRICING_BOOKING_SLUGS : [slug];
+
+    const channel = (await db.query(
+      `SELECT id, name, slug FROM distribution_channels
+       WHERE LOWER(slug) = ANY($1::text[]) OR LOWER(name) LIKE '%booking%'
+       ORDER BY id LIMIT 1`,
+      [slugCandidates]
+    )).rows[0];
+    if (!channel) return res.status(404).json({ error: "Channel not found." });
+
+    const def = (await db.query(
+      `SELECT steps FROM distribution_channel_pricing WHERE channel_id = $1`,
+      [channel.id]
+    )).rows[0];
+    const defaults = Array.isArray(def?.steps) ? def.steps : [];
+
+    const ov = (await db.query(
+      `SELECT overrides FROM distribution_hotel_pricing_overrides
+       WHERE channel_id = $1 AND hotel_id::text = $2::text`,
+      [channel.id, hotelId]
+    )).rows[0];
+    const overrides = ov?.overrides || null;
+
+    // Merge: override may change value/active of a default step by key (mirrors
+    // mergeStepsWithOverride in web/.../utils/waterfall.ts). Role/dates/flags
+    // always come from the default.
+    const steps = defaults.map((step) => {
+      const o = overrides && overrides[step.key];
+      if (!o) return { ...step };
+      return {
+        ...step,
+        value: o.value !== undefined ? o.value : step.value,
+        active: o.active !== undefined ? o.active : step.active,
+      };
+    });
+
+    res.json({ channelId: channel.id, slug: channel.slug, hasOverride: !!overrides, steps });
+  } catch (error) {
+    console.error("[Sentinel Router] channel-pricing/resolved failed:", error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 // ... existing imports ...
 // [REPLACEMENT] Full "Export Reservations" Route
