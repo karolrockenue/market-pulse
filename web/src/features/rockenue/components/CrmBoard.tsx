@@ -1,5 +1,4 @@
 import { useState, useMemo, useRef, useEffect, useCallback, createContext, useContext } from "react";
-import { R } from "../../../styles/tokens";
 import {
   Search,
   Plus,
@@ -51,20 +50,36 @@ import type {
   TeamMember,
 } from "../api/types";
 
-// ── Brand palette ──
-const BLUE = R.warmTeal;      // teal accent (greeny) used for hover, active toggles, pills
-const GOLD = R.gold;          // warm gold used for primary CTAs
-const GREEN = "#10b981";
+// ── Rockenue.com brand palette ──
+// Sourced from /Users/karolmarcu/Documents/rockenue-web/src/theme.ts.
+// Intentionally overrides the inherited MP tokens so this mockup feels
+// like a Rockenue product, not a Market Pulse one.
+const ROCK_BG = "#14181D";       // page bg
+const ROCK_HERO = "#111519";     // alt band (hero / inputs)
+const ROCK_DARK = "#0F1215";     // deepest band (top bar, cards)
+const ROCK_CARD = "#1C2228";     // card surface
+const ROCK_BORDER = "#2A3240";   // hairline borders
+const ROCK_IVORY = "#F4F2EC";    // headings (warm)
+const ROCK_WHITE = "#F3F5F7";    // body white
+const ROCK_TEXT = "#B0B8C4";     // body text
+const ROCK_MID = "#7A8494";      // secondary text
+const ROCK_DIM = "#4E5868";      // tertiary / labels
+const ROCK_TEAL = "#38C6BA";     // primary accent
+const ROCK_GOLD = "#C8A66E";     // secondary accent
+
+const BLUE = ROCK_TEAL;
+const GOLD = ROCK_GOLD;
+const GREEN = "#34D068";         // Rockenue green
 const AMBER = "#f59e0b";
-const RED = "#ef4444";
+const RED = "#D17570";
 const PURPLE = "#7A8AB8";
-const BG_PAGE = R.bg;
-const CARD_BG = R.darkBand;
-const INPUT_BG = R.card;
-const BORDER = R.border;
-const TEXT = R.accent;
-const TEXT_MID = R.textMid;
-const TEXT_DIM = R.textDim;
+const BG_PAGE = ROCK_BG;
+const CARD_BG = ROCK_DARK;
+const INPUT_BG = ROCK_HERO;
+const BORDER = ROCK_BORDER;
+const TEXT = ROCK_WHITE;
+const TEXT_MID = ROCK_MID;
+const TEXT_DIM = ROCK_DIM;
 
 const ChannelsListContext = createContext<string[]>([]);
 function useChannelsList() { return useContext(ChannelsListContext); }
@@ -327,58 +342,77 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
     <TeamContext.Provider value={teamMembers}>
     <ChannelsListContext.Provider value={channelNames}>
     <TaskReadContext.Provider value={{ isUnread }}>
-    <div style={{ flex: 1, background: R.bg, color: R.accent, paddingBottom: 64 }}>
-      <div style={{ padding: "24px 28px" }}>
+    <div style={{ flex: 1, background: ROCK_BG, color: ROCK_WHITE, paddingBottom: 96, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
 
-      {/* ── Page Header (MP Studio style) ── */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h1 style={{ color: TEXT, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.025em" }}>Tasks</h1>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setBulkMode(!bulkMode); setSelectedTaskIds(new Set()); }} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6,
-              border: `1px solid ${bulkMode ? BLUE + "40" : BORDER}`, background: bulkMode ? `${BLUE}10` : INPUT_BG,
-              color: bulkMode ? BLUE : TEXT_MID, fontSize: 12, fontWeight: 500, cursor: "pointer",
+      {/* ── Header (quiet, generous whitespace, single accent reserved for CTA) ── */}
+      <div style={{ padding: "56px 56px 40px" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 32, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: ROCK_DIM, marginBottom: 18 }}>
+              Operations
+            </div>
+            <h1 style={{
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              fontWeight: 300,
+              color: ROCK_IVORY,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.08,
+              fontSize: "clamp(32px, 4vw, 48px)",
+              margin: 0,
             }}>
-              <CheckSquare size={12} /> Bulk
+              Tasks
+            </h1>
+          </div>
+          <div style={{ display: "flex", gap: 12, flexShrink: 0, alignItems: "center" }}>
+            <button onClick={() => { setBulkMode(!bulkMode); setSelectedTaskIds(new Set()); }} style={{
+              display: "inline-flex", alignItems: "center", gap: 7, padding: "11px 20px", borderRadius: 8,
+              border: `1px solid ${bulkMode ? ROCK_TEAL : "transparent"}`,
+              background: "transparent",
+              color: bulkMode ? ROCK_TEAL : ROCK_MID,
+              fontSize: 13, fontWeight: 500, letterSpacing: 0.2, cursor: "pointer",
+            }}>
+              <CheckSquare size={13} /> Bulk
             </button>
             <button onClick={() => { setShowNewTask(true); setNewTaskDefaultStatus(null); }} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6,
-              border: "none", background: GOLD, color: R.sidebar,
-              fontSize: 12, fontWeight: 600, cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 26px", borderRadius: 8,
+              border: `1px solid ${ROCK_TEAL}`,
+              background: ROCK_TEAL,
+              color: "#0F1215",
+              fontSize: 13, fontWeight: 700, letterSpacing: 0.2, cursor: "pointer",
             }}>
-              <Plus size={14} /> New Task
+              <Plus size={14} /> New task
             </button>
           </div>
         </div>
 
-        {/* Status summary pills (counts reflect all tasks, unfiltered) */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {/* Status totals — single-line monochrome strip, color reserved for the tiny dot */}
+        <div style={{ margin: "32px 0 0", display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
           {STATUS_COLUMNS.map((col) => {
             const count = tasks.filter((t) => t.status === col.key).length;
             return (
-              <div key={col.key} style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "5px 12px", borderRadius: 6,
-                background: `${col.color}10`, border: `1px solid ${col.color}25`,
-              }}>
-                <div style={{ width: 6, height: 6, borderRadius: 3, background: col.color }} />
-                <span style={{ fontSize: 11, color: TEXT }}>{col.label}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: col.color }}>{count}</span>
+              <div key={col.key} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: col.color, display: "inline-block" }} />
+                <span style={{ fontSize: 11, color: ROCK_MID, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 500 }}>{col.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: ROCK_IVORY }}>{count}</span>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── Pipeline filter banner ── */}
+      {/* Hairline below header for breathing room without a heavy band */}
+      <div style={{ height: 1, background: ROCK_BORDER, margin: "0 56px" }} />
+
+      <div style={{ padding: "32px 56px 0" }}>
+
+      {/* ── Pipeline filter banner (hairline only, no tinted fill) ── */}
       {initialFilter && (
         <div style={{
-          display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", marginBottom: 16,
-          background: `${BLUE}08`, border: `1px solid ${BLUE}25`, borderRadius: 8,
+          display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", marginBottom: 24,
+          background: "transparent", border: `1px solid ${ROCK_BORDER}`, borderRadius: 8,
         }}>
-          <Filter size={13} style={{ color: BLUE }} />
-          <span style={{ color: TEXT_MID, fontSize: 12 }}>
+          <Filter size={13} style={{ color: ROCK_TEAL }} />
+          <span style={{ color: ROCK_TEXT, fontSize: 12 }}>
             Filtered from pipeline view
             {initialFilter.hotel_id && <> &middot; Hotel #{initialFilter.hotel_id}</>}
             {initialFilter.channel_id && <> &middot; Channel #{initialFilter.channel_id}</>}
@@ -386,8 +420,8 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
           {onClearFilter && (
             <button onClick={onClearFilter} style={{
               marginLeft: "auto", display: "flex", alignItems: "center", gap: 4,
-              padding: "4px 10px", borderRadius: 5, border: `1px solid ${BORDER}`,
-              background: INPUT_BG, color: TEXT_DIM, fontSize: 11, cursor: "pointer",
+              padding: "5px 12px", borderRadius: 6, border: "none",
+              background: "transparent", color: ROCK_MID, fontSize: 11, cursor: "pointer",
             }}>
               <X size={11} /> Clear
             </button>
@@ -395,95 +429,130 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
         </div>
       )}
 
-      {/* ── Bulk action bar ── */}
+      {/* ── Bulk action bar (hairline only, ghost buttons, single accent on count) ── */}
       {bulkMode && selectedTaskIds.size > 0 && (
         <div style={{
-          display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", marginBottom: 16,
-          background: `${BLUE}08`, border: `1px solid ${BLUE}25`, borderRadius: 8,
+          display: "flex", alignItems: "center", gap: 14, padding: "12px 18px", marginBottom: 24,
+          background: "transparent", border: `1px solid ${ROCK_BORDER}`, borderRadius: 8, flexWrap: "wrap",
         }}>
-          <span style={{ color: BLUE, fontSize: 12, fontWeight: 600 }}>{selectedTaskIds.size} selected</span>
-          <div style={{ width: 1, height: 20, background: BORDER }} />
-          <span style={{ color: TEXT_DIM, fontSize: 11 }}>Move to:</span>
+          <span style={{ color: ROCK_TEAL, fontSize: 12, fontWeight: 600 }}>{selectedTaskIds.size} selected</span>
+          <div style={{ width: 1, height: 18, background: ROCK_BORDER }} />
+          <span style={{ color: ROCK_DIM, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Move</span>
           {STATUS_COLUMNS.map((s) => (
             <button key={s.key} onClick={() => bulkUpdate({ status: s.key })} style={{
-              padding: "4px 10px", borderRadius: 5, border: `1px solid ${s.color}30`,
-              background: `${s.color}10`, color: s.color, fontSize: 11, fontWeight: 600, cursor: "pointer",
-            }}>{s.label}</button>
+              padding: "5px 10px", borderRadius: 6, border: "none",
+              background: "transparent", color: ROCK_TEXT, fontSize: 11, fontWeight: 500, cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color }} />
+              {s.label}
+            </button>
           ))}
-          <div style={{ width: 1, height: 20, background: BORDER }} />
-          <span style={{ color: TEXT_DIM, fontSize: 11 }}>Assign:</span>
+          <div style={{ width: 1, height: 18, background: ROCK_BORDER }} />
+          <span style={{ color: ROCK_DIM, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Assign</span>
           {teamMembers.slice(0, 4).map((m) => (
             <button key={m.name} onClick={() => bulkUpdate({ assignee: m.name })} style={{
-              padding: "4px 10px", borderRadius: 5, border: `1px solid ${BORDER}`,
-              background: INPUT_BG, color: TEXT_MID, fontSize: 11, cursor: "pointer",
+              padding: "5px 10px", borderRadius: 6, border: "none",
+              background: "transparent", color: ROCK_TEXT, fontSize: 11, cursor: "pointer",
             }}>{m.name}</button>
           ))}
-          <div style={{ width: 1, height: 20, background: BORDER }} />
-          <span style={{ color: TEXT_DIM, fontSize: 11 }}>Priority:</span>
+          <div style={{ width: 1, height: 18, background: ROCK_BORDER }} />
+          <span style={{ color: ROCK_DIM, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Priority</span>
           {(Object.entries(PRIORITY_CFG) as [Priority, typeof PRIORITY_CFG["urgent"]][]).map(([k, v]) => (
             <button key={k} onClick={() => bulkUpdate({ priority: k })} style={{
-              padding: "4px 10px", borderRadius: 5, border: `1px solid ${v.color}30`,
-              background: `${v.color}10`, color: v.color, fontSize: 11, fontWeight: 600, cursor: "pointer",
-            }}>{v.label}</button>
+              padding: "5px 10px", borderRadius: 6, border: "none",
+              background: "transparent", color: ROCK_TEXT, fontSize: 11, cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: v.color }} />
+              {v.label}
+            </button>
           ))}
-          <div style={{ width: 1, height: 20, background: BORDER }} />
+          <div style={{ width: 1, height: 18, background: ROCK_BORDER }} />
           <button onClick={bulkDeleteTasks} style={{
-            padding: "4px 10px", borderRadius: 5, border: `1px solid ${RED}30`,
-            background: `${RED}10`, color: RED, fontSize: 11, fontWeight: 600, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 4,
+            padding: "5px 10px", borderRadius: 6, border: "none",
+            background: "transparent", color: RED, fontSize: 11, fontWeight: 500, cursor: "pointer",
+            display: "inline-flex", alignItems: "center", gap: 5,
           }}><Trash2 size={11} /> Delete</button>
           <button onClick={() => { setSelectedTaskIds(new Set()); setBulkMode(false); }} style={{
-            marginLeft: "auto", padding: "4px 10px", borderRadius: 5, border: `1px solid ${BORDER}`,
-            background: INPUT_BG, color: TEXT_DIM, fontSize: 11, cursor: "pointer",
+            marginLeft: "auto", padding: "5px 12px", borderRadius: 6, border: "none",
+            background: "transparent", color: ROCK_MID, fontSize: 11, cursor: "pointer",
           }}>Cancel</button>
         </div>
       )}
 
-      {/* ── Toolbar (MP Studio style — slim) ── */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 2, background: INPUT_BG, padding: 3, borderRadius: 6, border: `1px solid ${BORDER}` }}>
+      {/* ── Toolbar (quiet — underlined tabs, transparent filters) ── */}
+      <div style={{ display: "flex", gap: 28, marginBottom: 32, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 4 }}>
           {([
             { key: "board" as ViewMode, label: "Board" },
             { key: "timeline" as ViewMode, label: "Timeline" },
             { key: "my_work" as ViewMode, label: "My Work" },
             { key: "hotel" as ViewMode, label: "By Hotel" },
             { key: "user" as ViewMode, label: "By Person" },
-          ]).map((v) => (
-            <button key={v.key} onClick={() => setViewMode(v.key)} style={{
-              padding: "4px 12px", fontSize: 11, borderRadius: 4, border: "none", cursor: "pointer",
-              background: viewMode === v.key ? BLUE : "transparent",
-              color: viewMode === v.key ? R.sidebar : TEXT_DIM,
-              fontWeight: viewMode === v.key ? 600 : 500,
-              transition: "all 0.15s",
-            }}>
-              {v.label}
-            </button>
-          ))}
+          ]).map((v) => {
+            const active = viewMode === v.key;
+            return (
+              <button key={v.key} onClick={() => setViewMode(v.key)} style={{
+                padding: "8px 4px", marginRight: 16,
+                fontSize: 13, fontWeight: active ? 600 : 500, letterSpacing: 0.1,
+                background: "transparent", border: "none", cursor: "pointer",
+                color: active ? ROCK_IVORY : ROCK_MID,
+                borderBottom: `1px solid ${active ? ROCK_TEAL : "transparent"}`,
+                transition: "color 0.15s",
+              }}>
+                {v.label}
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ position: "relative", width: 180 }}>
-          <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: TEXT_DIM }} />
-          <input type="text" placeholder="Search tasks..." value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "100%", padding: "6px 10px 6px 30px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 12, outline: "none" }} />
+        <div style={{ position: "relative", width: 200, borderBottom: `1px solid ${ROCK_BORDER}` }}>
+          <Search size={13} style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", color: ROCK_DIM }} />
+          <input type="text" placeholder="Search tasks" value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: "100%", padding: "8px 0 8px 22px",
+              background: "transparent", border: "none",
+              color: ROCK_WHITE, fontSize: 12, outline: "none",
+              fontFamily: "inherit",
+            }} />
         </div>
 
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)}
-          style={{ padding: "6px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 11, outline: "none", cursor: "pointer" }}>
-          <option value="all">All Categories</option>
+          style={{
+            padding: "8px 6px", background: "transparent", border: "none",
+            borderBottom: `1px solid ${ROCK_BORDER}`,
+            color: categoryFilter === "all" ? ROCK_MID : ROCK_WHITE,
+            fontSize: 12, outline: "none", cursor: "pointer",
+            fontFamily: "inherit",
+          }}>
+          <option value="all">All categories</option>
           {Object.entries(CATEGORY_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
         <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)}
-          style={{ padding: "6px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 11, outline: "none", cursor: "pointer" }}>
-          <option value="all">All People</option>
+          style={{
+            padding: "8px 6px", background: "transparent", border: "none",
+            borderBottom: `1px solid ${ROCK_BORDER}`,
+            color: assigneeFilter === "all" ? ROCK_MID : ROCK_WHITE,
+            fontSize: 12, outline: "none", cursor: "pointer",
+            fontFamily: "inherit",
+          }}>
+          <option value="all">All people</option>
           {teamMembers.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
         </select>
 
         <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as any)}
-          style={{ padding: "6px 10px", background: INPUT_BG, border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT, fontSize: 11, outline: "none", cursor: "pointer" }}>
-          <option value="all">All Priorities</option>
+          style={{
+            padding: "8px 6px", background: "transparent", border: "none",
+            borderBottom: `1px solid ${ROCK_BORDER}`,
+            color: priorityFilter === "all" ? ROCK_MID : ROCK_WHITE,
+            fontSize: 12, outline: "none", cursor: "pointer",
+            fontFamily: "inherit",
+          }}>
+          <option value="all">All priorities</option>
           {Object.entries(PRIORITY_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
       </div>
@@ -578,7 +647,7 @@ export function CrmBoard({ initialFilter, onClearFilter, userName }: CrmBoardPro
                 </div>
                 {isExpanded && memberTasks.length > 0 && (
                   <div>
-                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px", padding: "8px 20px", background: R.card }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 100px 90px 90px", padding: "8px 20px", background: ROCK_CARD }}>
                       {["ID", "Task", "Property", "Category", "Priority", "Due"].map((h) => (
                         <span key={h} style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>{h}</span>
                       ))}
@@ -774,7 +843,7 @@ function KanbanBoard({
                 <Plus size={14} />
               </button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {colTasks.map((task) => (
                 <TaskCard
                   key={task.id}
@@ -952,7 +1021,7 @@ function HotelView({
                 <div style={{
                   display: "grid", gridTemplateColumns: "90px 1fr 110px 100px 130px 90px",
                   padding: "8px 16px 8px 44px", gap: 8,
-                  background: R.card, borderBottom: `1px solid ${BORDER}`,
+                  background: ROCK_CARD, borderBottom: `1px solid ${BORDER}`,
                 }}>
                   {["ID", "Task", "Category", "Priority", "Assignee", "Due"].map((h) => (
                     <span key={h} style={{ color: TEXT_DIM, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</span>
@@ -1067,7 +1136,7 @@ function TimelineView({
   return (
     <div style={{ background: CARD_BG, borderRadius: 8, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
       {/* Header — dates */}
-      <div style={{ display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`, borderBottom: `1px solid ${BORDER}`, background: R.card }}>
+      <div style={{ display: "grid", gridTemplateColumns: `240px repeat(${days.length}, 1fr)`, borderBottom: `1px solid ${BORDER}`, background: ROCK_CARD }}>
         <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
           <span style={{ color: TEXT_DIM, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Task</span>
         </div>
@@ -2252,7 +2321,7 @@ function CreateTaskPanel({
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 4, background: BLUE, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Plus size={18} style={{ color: R.sidebar }} />
+              <Plus size={18} style={{ color: "#0F1215" }} />
             </div>
             <div>
               <div style={{ color: TEXT, fontSize: 20, fontWeight: 600, letterSpacing: "-0.025em", textTransform: "uppercase" }}>New Task</div>
@@ -2531,7 +2600,7 @@ function CreateTaskPanel({
           >Cancel</button>
           <button onClick={handleCreate} disabled={creating} style={{
             height: 40, padding: "0 24px", borderRadius: 6, border: "none",
-            background: BLUE, color: R.sidebar,
+            background: BLUE, color: "#0F1215",
             fontSize: 13, fontWeight: 600, cursor: creating ? "wait" : "pointer",
             fontFamily: "system-ui, -apple-system, sans-serif",
             opacity: creating ? 0.7 : 1,
@@ -2583,105 +2652,111 @@ function TaskCard({ task, onClick, onContextMenu, onDragStart, onDragEnd, isDrag
       onContextMenu={onContextMenu}
       style={{
         position: "relative",
-        backgroundColor: bulkSelected ? `${BLUE}08` : CARD_BG,
-        borderRadius: 8, border: `1px solid ${bulkSelected ? `${BLUE}30` : BORDER}`,
-        padding: "14px 16px", cursor: bulkMode ? "pointer" : "grab", transition: "border-color 0.15s",
+        background: bulkSelected ? `${BLUE}10` : "#181D23",
+        borderRadius: 10, border: bulkSelected ? `1px solid ${BLUE}40` : "1px solid rgba(255, 255, 255, 0.06)",
+        padding: "12px 14px", cursor: bulkMode ? "pointer" : "grab", transition: "background-color 0.15s, border-color 0.15s",
         opacity: isDragging ? 0.4 : 1,
       }}
-      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.borderColor = `${BLUE}40`; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = bulkSelected ? `${BLUE}30` : BORDER; }}>
-      {/* Unread dot — top-right corner */}
+      onMouseEnter={(e) => { if (!isDragging && !bulkSelected) { e.currentTarget.style.background = "#1C2229"; } }}
+      onMouseLeave={(e) => { if (!bulkSelected) e.currentTarget.style.background = "#181D23"; }}>
+      {/* Unread dot */}
       {unread && (
         <div
           title="Updated since last viewed"
           style={{
             position: "absolute", top: 10, right: 10,
-            width: 8, height: 8, borderRadius: "50%",
-            background: BLUE, boxShadow: `0 0 0 3px ${BLUE}20`,
+            width: 7, height: 7, borderRadius: "50%",
+            background: BLUE, boxShadow: `0 0 0 3px ${BLUE}25`,
             pointerEvents: "none",
           }}
         />
       )}
-      {/* Row 1: Category pill + Priority flag */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {bulkMode && (
-            <div style={{
-              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-              border: `1.5px solid ${bulkSelected ? BLUE : "#444"}`,
-              background: bulkSelected ? BLUE : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {bulkSelected && <CheckCircle2 size={8} style={{ color: "#0d0d0d" }} />}
-            </div>
-          )}
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
-            background: `${cCfg.color}15`, color: cCfg.color, letterSpacing: "0.3px",
-          }}>
-            {cCfg.label}
-          </span>
-          {dueTier === "overdue" && <span style={{ color: RED, fontSize: 9, fontWeight: 700, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 2 }}><AlertTriangle size={9} /> Overdue</span>}
-          {dueTier === "today" && <span style={{ color: AMBER, fontSize: 9, fontWeight: 600, textTransform: "uppercase" }}>Today</span>}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <Flag size={10} color={pCfg.color} fill={task.priority === "urgent" ? pCfg.color : "none"} />
-          <span style={{ fontSize: 9, color: pCfg.color, fontWeight: 600, textTransform: "uppercase" }}>{task.priority}</span>
-        </div>
-      </div>
 
-      {/* Row 2: Title */}
-      <div style={{ fontSize: 13, fontWeight: 500, color: TEXT, lineHeight: 1.4, marginBottom: 10 }}>
+      {/* Bulk select checkbox - only in bulk mode */}
+      {bulkMode && (
+        <div style={{
+          width: 14, height: 14, borderRadius: 3, marginBottom: 8,
+          border: `1.5px solid ${bulkSelected ? BLUE : TEXT_DIM}`,
+          background: bulkSelected ? BLUE : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {bulkSelected && <CheckCircle2 size={8} style={{ color: "#0d0d0d" }} />}
+        </div>
+      )}
+
+      {/* Overdue / Today badge - only when relevant */}
+      {(dueTier === "overdue" || dueTier === "today") && (
+        <div style={{
+          marginBottom: 6, display: "inline-flex", alignItems: "center", gap: 4,
+          fontSize: 9, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase",
+          color: dueTier === "overdue" ? RED : AMBER,
+        }}>
+          {dueTier === "overdue" && <AlertTriangle size={9} />}
+          {dueTier === "overdue" ? "Overdue" : "Due today"}
+        </div>
+      )}
+
+      {/* Title - 2 lines max with ellipsis */}
+      <div style={{
+        color: ROCK_IVORY,
+        fontSize: 13,
+        fontWeight: 500,
+        lineHeight: 1.35,
+        display: "-webkit-box",
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }}>
         {task.title}
       </div>
 
-      {/* Row 3: Hotel */}
-      {hotelDisplay !== "\u2014" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
-          <Building2 size={10} color={TEXT_DIM} />
-          <span style={{ fontSize: 11, color: TEXT_MID }}>{hotelDisplay}</span>
-        </div>
-      )}
+      {/* Meta line - category dot + label + hotel, single row */}
+      <div style={{
+        marginTop: 6, fontSize: 11, color: ROCK_MID,
+        display: "flex", alignItems: "center", gap: 6, minWidth: 0,
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: cCfg.color, flexShrink: 0 }} />
+        <span style={{
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+        }}>
+          {cCfg.label}
+          {hotelDisplay !== "\u2014" && (
+            <>
+              <span style={{ color: ROCK_DIM, margin: "0 5px" }}>{"\u00b7"}</span>
+              {hotelDisplay}
+            </>
+          )}
+        </span>
+      </div>
 
-      {/* Row 4: Footer — avatar + CRM-ID | subtasks + comments + due */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Avatar name={task.assignee || "?"} size={22} />
-          <span style={{ color: TEXT_DIM, fontSize: 9, fontFamily: "monospace" }}>CRM-{task.id}</span>
+      {/* Footer - priority dot + due date (left) / counts + avatar (right) */}
+      <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: dueDateColor, minWidth: 0, overflow: "hidden" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: pCfg.color, flexShrink: 0 }} title={pCfg.label} />
+          {task.due_date ? (
+            <span style={{ whiteSpace: "nowrap", fontWeight: dueTier === "overdue" ? 600 : 400 }}>
+              {formatDate(task.due_date)}
+            </span>
+          ) : (
+            <span style={{ color: ROCK_DIM }}>No date</span>
+          )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           {task.subtask_total > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <CheckCircle2 size={10} color={task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM} />
-              <span style={{ fontSize: 10, color: task.subtask_done === task.subtask_total ? GREEN : TEXT_DIM }}>{task.subtask_done}/{task.subtask_total}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: task.subtask_done === task.subtask_total ? GREEN : ROCK_MID }}>
+              <CheckCircle2 size={10} />
+              <span>{task.subtask_done}/{task.subtask_total}</span>
             </div>
           )}
           {task.comment_count > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <MessageSquare size={10} color={TEXT_DIM} />
-              <span style={{ fontSize: 10, color: TEXT_DIM }}>{task.comment_count}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: ROCK_MID }}>
+              <MessageSquare size={10} />
+              <span>{task.comment_count}</span>
             </div>
           )}
-          {task.due_date && (
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <Clock size={10} color={dueTier === "overdue" ? RED : TEXT_DIM} />
-              <span style={{ fontSize: 10, color: dueTier === "overdue" ? RED : TEXT_DIM, fontWeight: dueTier === "overdue" ? 600 : 400 }}>
-                {formatDate(task.due_date)}
-              </span>
-            </div>
-          )}
+          <Avatar name={task.assignee || "?"} size={22} />
         </div>
       </div>
-
-      {/* Optional: channel tags below footer */}
-      {task.tags.length > 0 && (
-        <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 10 }}>
-          {task.tags.slice(0, 4).map((tag) => (
-            <span key={tag} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: INPUT_BG, color: TEXT_DIM, border: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>{tag}</span>
-          ))}
-          {task.tags.length > 4 && <span style={{ fontSize: 9, color: TEXT_DIM }}>+{task.tags.length - 4}</span>}
-        </div>
-      )}
     </div>
   );
 }

@@ -268,7 +268,7 @@ export function AppSidebar({
     <div
       style={{
         width: 220,
-        background: R.sidebar,
+        background: "#0F1215",
         borderRight: `1px solid ${R.border}`,
         display: "flex",
         flexDirection: "column",
