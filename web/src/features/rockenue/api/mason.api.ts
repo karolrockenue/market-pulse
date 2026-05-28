@@ -141,6 +141,16 @@ export interface LsTierRow {
   total: { bookings: number; revenue: number; nights: number };
 }
 
+export interface SalesFlashMonthCard {
+  title: string;
+  label: string;
+  revenueBy: { short: number; mid: number; long: number };
+  occupancy: number;
+  adr: number;
+  adrByService: { short: number; mid: number; long: number };
+  occByService: { short: number; mid: number; long: number };
+}
+
 export interface SalesFlashResponse {
   hotelId: number;
   hotelName: string;
@@ -160,6 +170,7 @@ export interface SalesFlashResponse {
   pacing: SalesFlashPacingRow[];
   bob: { short: number; mid: number; long: number; total: number };
   businessDone: { short: number; mid: number; long: number; total: number };
+  fytdOccupancy: number | null;
   inHouseFY: Array<{ monthKey: string; short: number; mid: number; long: number }>;
   unitPacing: UnitPacingRow[];
   ssWeekly: SsWeeklyRow[];
@@ -214,9 +225,11 @@ export function fetchMasonBookingPulse(
 
 export function fetchMasonOccByService(
   hotelId: number,
+  monthKey?: string,
   days = 120,
 ): Promise<OccByServiceResponse> {
-  return jsonFetch(`/api/mason/occupancy-by-service?hotelId=${hotelId}&days=${days}`);
+  const mk = monthKey ? `&monthKey=${monthKey}` : "";
+  return jsonFetch(`/api/mason/occupancy-by-service?hotelId=${hotelId}&days=${days}${mk}`);
 }
 
 export function fetchMasonSalesFlash(
@@ -227,4 +240,20 @@ export function fetchMasonSalesFlash(
     ? `?hotelId=${hotelId}&monthKey=${monthKey}`
     : `?hotelId=${hotelId}`;
   return jsonFetch(`/api/mason/sales-flash${qs}`);
+}
+
+export interface MasonCardsResponse {
+  hotelId: number;
+  monthKey: string;
+  cards: SalesFlashMonthCard[];
+}
+
+export function fetchMasonCards(
+  hotelId: number,
+  monthKey?: string,
+): Promise<MasonCardsResponse> {
+  const qs = monthKey
+    ? `?hotelId=${hotelId}&monthKey=${monthKey}`
+    : `?hotelId=${hotelId}`;
+  return jsonFetch(`/api/mason/cards${qs}`);
 }

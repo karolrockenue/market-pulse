@@ -70,21 +70,17 @@ function todayIso() {
  * getRateBreakdowns so per-service ADR ties to the rate-by-category charts.
  * Returns Map<"YYYY-MM", { short, mid, long }>.
  */
-async function getRoomNightsByMonthRole(hotelId, monthFrom, monthTo, serviceIds) {
-  const sets = {
-    short: new Set(serviceIds?.short || []),
-    mid: new Set(serviceIds?.mid || []),
-    long: new Set(serviceIds?.long || []),
-  };
-  const allIds = [...sets.short, ...sets.mid, ...sets.long];
+async function getRoomNightsByMonthRole(hotelId, monthFrom, monthTo, _serviceIds) {
+  // Classifies by reservations.rate_segment (rate-group based, backfilled) so
+  // Mid pulled out of the Short service + Long on the new nightly service land
+  // in the right bucket. 'exclude' (comp/management) is omitted everywhere here.
   const out = new Map();
-  if (allIds.length === 0) return out;
   const { rows } = await pgPool.query(
     `WITH spine AS (
        SELECT generate_series($2::date, $3::date, '1 month')::date AS m0
      )
      SELECT to_char(s.m0, 'YYYY-MM') AS mk,
-            r.mews_service_id AS sid,
+            r.rate_segment AS seg,
             SUM(GREATEST(0,
               LEAST(r.check_out, (s.m0 + INTERVAL '1 month - 1 day')::date)
               - GREATEST(r.check_in, s.m0)
@@ -95,14 +91,13 @@ async function getRoomNightsByMonthRole(hotelId, monthFrom, monthTo, serviceIds)
         AND r.status NOT ILIKE '%cancel%'
         AND r.check_in <= (s.m0 + INTERVAL '1 month - 1 day')::date
         AND r.check_out > s.m0
-        AND r.mews_service_id = ANY($4::text[])
+        AND r.rate_segment IN ('short', 'mid', 'long')
       GROUP BY 1, 2`,
-    [hotelId, startOfMonth(monthFrom), startOfMonth(monthTo), allIds],
+    [hotelId, startOfMonth(monthFrom), startOfMonth(monthTo)],
   );
   for (const r of rows) {
     if (!out.has(r.mk)) out.set(r.mk, { short: 0, mid: 0, long: 0 });
-    const o = out.get(r.mk);
-    for (const role of ROLES) if (sets[role].has(r.sid)) o[role] += Number(r.rn) || 0;
+    if (ROLES.includes(r.seg)) out.get(r.mk)[r.seg] += Number(r.rn) || 0;
   }
   return out;
 }
@@ -434,19 +429,14 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
         total_rate,
         avg_nightly_rate,
         status,
-        mews_service_id
+        rate_segment
       FROM reservations
       WHERE hotel_id = $1
         AND created_at >= $2
       ORDER BY 1`,
     [hotelId, effectiveFrom],
   );
-
-  // Resolve service-id sets per role (short / mid / long). serviceIds shape:
-  // { short: [...], mid: [...], long: [...] } — passed in from the router.
-  const shortSet = new Set(serviceIds?.short || []);
-  const midSet   = new Set(serviceIds?.mid   || []);
-  const longSet  = new Set(serviceIds?.long  || []);
+  // Classification now reads reservations.rate_segment (rate-group based).
 
   // Bucket each booking by tier and service classification
   const ssWeekly = new Map();   // weekStart -> { bookings, roomNights, revenue }
@@ -464,7 +454,7 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
     const nights = Number(r.nights) || 0;
     const totalRate = Number(r.total_rate) || 0;
     const adr = Number(r.avg_nightly_rate) || (nights > 0 ? totalRate / nights : 0);
-    const sid = r.mews_service_id || null;
+    const seg = r.rate_segment || null;
 
     // All Reservations Created — every non-cancelled reservation in the week,
     // all services (Dom's PDF: "weekly Reservations Created… not split by LOS").
@@ -481,7 +471,7 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
     // service. Classification mirrors Mews exactly (ties to Mews Reservation
     // Report for any given created-window). Cancelled reservations excluded.
     // Verified 2026-05-11 against Mews's Apr 13-19 export.
-    if (shortSet.has(sid) && !isCancelled) {
+    if (seg === "short" && !isCancelled) {
       if (!ssWeekly.has(week)) ssWeekly.set(week, { bookings: 0, roomNights: 0, revenue: 0, adrSum: 0, adrCount: 0 });
       const slot = ssWeekly.get(week);
       slot.bookings += 1;
@@ -496,9 +486,7 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
     // Long-stay / mid-stay tier bucket — by lead time. Bucket on Mews
     // service first (Long Stay or Mid Stay services); fall back to the
     // `nights > 28` heuristic for hotels without service IDs configured.
-    const isLongOrMid = serviceIds
-      ? (longSet.has(sid) || midSet.has(sid))
-      : nights > 28;
+    const isLongOrMid = seg === "long" || seg === "mid";
     if (isLongOrMid) {
       const leadDays = Number(r.lead_days) || 0;
       const tier = LEAD_TIME_TIERS.find(
@@ -564,7 +552,8 @@ async function getWeeklyUnitPacing(hotelId, weekStarts) {
         check_in::text AS check_in,
         check_out::text AS check_out,
         nights,
-        status
+        status,
+        rate_segment
       FROM reservations
       WHERE hotel_id = $1
         AND check_in <= $3::date
@@ -607,10 +596,12 @@ async function getWeeklyUnitPacing(hotelId, weekStarts) {
       const overlapEnd = co < new Date(weDate.getTime() + 86400000) ? co : new Date(weDate.getTime() + 86400000);
       const overlapDays = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
       if (overlapDays === 0) continue;
-      const n = Number(r.nights) || 0;
-      if (n <= 28) ssDays += overlapDays;
-      else if (n <= 90) msDays += overlapDays;
-      else lsDays += overlapDays;
+      // Rate-group segment. Management/comp ('exclude') + anything unclassified
+      // fold into Short here only (Dom's rule: comp rooms appear nowhere else,
+      // but Weekly Unit Pacing must still reconcile occupied vs vacant rooms).
+      if (r.rate_segment === "mid") msDays += overlapDays;
+      else if (r.rate_segment === "long") lsDays += overlapDays;
+      else ssDays += overlapDays;
     }
 
     const sub = ssDays + msDays + lsDays;
@@ -779,15 +770,15 @@ async function getDirectShareForMonth(hotelId, monthKey) {
  * Returns one row per day: { date, capacity, sold, short, mid, long, other }
  * (all room counts; the frontend converts to % of capacity).
  */
-async function getDailyOccupancyByService(hotelId, serviceIds, days = 120) {
-  const shortSet = serviceIds?.short || [];
-  const midSet = serviceIds?.mid || [];
-  const longSet = serviceIds?.long || [];
-
+async function getDailyOccupancyByService(hotelId, _serviceIds, days = 120, startDate = null) {
+  // Anchor the window on startDate (the reporting month's 1st) so the chart
+  // follows the month picker + shows the whole month, even past today. Falls
+  // back to today when no startDate is given.
+  const start = startDate || new Date().toISOString().slice(0, 10);
   const { rows } = await pgPool.query(
     `WITH spine AS (
         SELECT generate_series(
-          CURRENT_DATE, CURRENT_DATE + ($2 || ' days')::interval, '1 day'
+          $3::date, $3::date + ($2 || ' days')::interval, '1 day'
         )::date AS d
       )
       SELECT
@@ -796,14 +787,14 @@ async function getDailyOccupancyByService(hotelId, serviceIds, days = 120) {
         COALESCE(dm.rooms_sold, 0) AS sold,
         -- Short Stay: standard hotel semantics — the check-out night is NOT
         -- occupied, so exclusive end (check_out > day).
-        COUNT(*) FILTER (WHERE r.mews_service_id = ANY($3::text[]) AND r.check_out > spine.d) AS short_n,
+        COUNT(*) FILTER (WHERE r.rate_segment = 'short' AND r.check_out > spine.d) AS short_n,
         -- Mid / Long Stay: monthly-billed (Blueprint §15.1). The reservation
         -- row ends on the billing period's last day (e.g. check_out = 31 May)
         -- but the room IS occupied that night and Mews counts it in rooms_sold.
         -- Use inclusive end (check_out >= day, via the join) so the month-end
         -- rollover doesn't dump a cohort into the "other" residual for one day.
-        COUNT(*) FILTER (WHERE r.mews_service_id = ANY($4::text[])) AS mid_n,
-        COUNT(*) FILTER (WHERE r.mews_service_id = ANY($5::text[])) AS long_n
+        COUNT(*) FILTER (WHERE r.rate_segment = 'mid') AS mid_n,
+        COUNT(*) FILTER (WHERE r.rate_segment = 'long') AS long_n
       FROM spine
       LEFT JOIN daily_metrics_snapshots dm
         ON dm.hotel_id = $1 AND dm.stay_date = spine.d
@@ -813,15 +804,20 @@ async function getDailyOccupancyByService(hotelId, serviceIds, days = 120) {
        AND r.status NOT ILIKE '%cancel%'
       GROUP BY spine.d, dm.capacity_count, dm.rooms_sold
       ORDER BY spine.d`,
-    [hotelId, String(days), shortSet, midSet, longSet],
+    [hotelId, String(days), start],
   );
 
   return rows.map((r) => {
     const capacity = Number(r.capacity) || 0;
-    const sold = Number(r.sold) || 0;
+    const rawSold = Number(r.sold) || 0;
     const short = Number(r.short_n) || 0;
     const mid = Number(r.mid_n) || 0;
     const long = Number(r.long_n) || 0;
+    // Mews can report rooms_sold > capacity during the Long Stay migration (a
+    // stay briefly lives on BOTH the old monthly + new nightly service, double-
+    // consuming inventory → oversold). Cap at capacity so occupancy never
+    // exceeds 100%. Self-resolves once the old service drains (~mid-June 2026).
+    const sold = capacity > 0 ? Math.min(rawSold, capacity) : rawSold;
     // Residual: everything occupied that isn't a guest segment (management,
     // comp, house-use / OOO blocks). Floored at 0.
     const other = Math.max(0, sold - (short + mid + long));
@@ -836,32 +832,23 @@ async function getDailyOccupancyByService(hotelId, serviceIds, days = 120) {
  * orderItems, §15.1), so a year-long stay counts as one ~365-night row.
  * Returns { short, mid, long } avg nights, null per role when no stays.
  */
-async function getAlosByService(hotelId, monthKey, serviceIds) {
+async function getAlosByService(hotelId, monthKey, _serviceIds) {
   const start = startOfMonth(monthKey);
   const end = endOfMonth(monthKey);
-  const sets = {
-    short: new Set(serviceIds?.short || []),
-    mid: new Set(serviceIds?.mid || []),
-    long: new Set(serviceIds?.long || []),
-  };
-  const allIds = [...sets.short, ...sets.mid, ...sets.long];
-  if (allIds.length === 0) return { short: null, mid: null, long: null };
   const { rows } = await pgPool.query(
-    `SELECT mews_service_id AS sid, SUM(nights)::numeric AS s, COUNT(*) AS c
+    `SELECT rate_segment AS seg, SUM(nights)::numeric AS s, COUNT(*) AS c
        FROM reservations
       WHERE hotel_id = $1
         AND status NOT ILIKE '%cancel%'
         AND check_in <= $3::date AND check_out > $2::date
-        AND mews_service_id = ANY($4::text[])
+        AND rate_segment IN ('short', 'mid', 'long')
         AND nights > 0
       GROUP BY 1`,
-    [hotelId, start, end, allIds],
+    [hotelId, start, end],
   );
   const acc = { short: { s: 0, c: 0 }, mid: { s: 0, c: 0 }, long: { s: 0, c: 0 } };
   for (const r of rows) {
-    for (const role of ROLES) {
-      if (sets[role].has(r.sid)) { acc[role].s += Number(r.s) || 0; acc[role].c += Number(r.c) || 0; }
-    }
+    if (acc[r.seg]) { acc[r.seg].s += Number(r.s) || 0; acc[r.seg].c += Number(r.c) || 0; }
   }
   return {
     short: acc.short.c > 0 ? acc.short.s / acc.short.c : null,
@@ -878,35 +865,26 @@ async function getAlosByService(hotelId, monthKey, serviceIds) {
  * Excludes cancellations and rows with no booking_date. Returns { short, mid,
  * long } avg days, null per role when no qualifying stays.
  */
-async function getLeadTimeByService(hotelId, monthKey, serviceIds) {
+async function getLeadTimeByService(hotelId, monthKey, _serviceIds) {
   const start = startOfMonth(monthKey);
   const end = endOfMonth(monthKey);
-  const sets = {
-    short: new Set(serviceIds?.short || []),
-    mid: new Set(serviceIds?.mid || []),
-    long: new Set(serviceIds?.long || []),
-  };
-  const allIds = [...sets.short, ...sets.mid, ...sets.long];
-  if (allIds.length === 0) return { short: null, mid: null, long: null };
   const { rows } = await pgPool.query(
-    `SELECT mews_service_id AS sid,
+    `SELECT rate_segment AS seg,
             SUM(check_in - booking_date)::numeric AS s,
             COUNT(*) AS c
        FROM reservations
       WHERE hotel_id = $1
         AND status NOT ILIKE '%cancel%'
         AND check_in <= $3::date AND check_out > $2::date
-        AND mews_service_id = ANY($4::text[])
+        AND rate_segment IN ('short', 'mid', 'long')
         AND booking_date IS NOT NULL
         AND check_in >= booking_date
       GROUP BY 1`,
-    [hotelId, start, end, allIds],
+    [hotelId, start, end],
   );
   const acc = { short: { s: 0, c: 0 }, mid: { s: 0, c: 0 }, long: { s: 0, c: 0 } };
   for (const r of rows) {
-    for (const role of ROLES) {
-      if (sets[role].has(r.sid)) { acc[role].s += Number(r.s) || 0; acc[role].c += Number(r.c) || 0; }
-    }
+    if (acc[r.seg]) { acc[r.seg].s += Number(r.s) || 0; acc[r.seg].c += Number(r.c) || 0; }
   }
   return {
     short: acc.short.c > 0 ? acc.short.s / acc.short.c : null,
@@ -951,25 +929,19 @@ const RATE_TIERS = [
  * chart is ADR (nightly); the segment + LS-studio charts stay AMR (× 30.44)
  * — that is how Mason's analyst presents them.
  */
-async function getRateBreakdowns(hotelId, monthKey, serviceIds) {
+async function getRateBreakdowns(hotelId, monthKey, _serviceIds, anchors = null) {
   const start = startOfMonth(monthKey);
   const end = endOfMonth(monthKey);
-  const shortSet = new Set(serviceIds?.short || []);
-  const midSet = new Set(serviceIds?.mid || []);
-  const longSet = new Set(serviceIds?.long || []);
-  const all = [...shortSet, ...midSet, ...longSet];
-  const empty = { ssAdrByCategory: [], amrBySegment: [], lsAmrByCategory: [] };
-  if (all.length === 0) return empty;
 
   const [{ rows }, revByRes] = await Promise.all([
     pgPool.query(
-      `SELECT id, mews_service_id AS sid, room_type, nights,
+      `SELECT id, rate_segment AS seg, room_type, nights,
               check_in::text AS check_in, check_out::text AS check_out
          FROM reservations
         WHERE hotel_id = $1 AND status NOT ILIKE '%cancel%'
           AND check_in <= $3::date AND check_out > $2::date
-          AND mews_service_id = ANY($4::text[]) AND nights > 0`,
-      [hotelId, start, end, all],
+          AND rate_segment IN ('short', 'mid', 'long') AND nights > 0`,
+      [hotelId, start, end],
     ),
     mewsAdapter.getSpaceOrderRevenueByReservation(hotelId, start, end),
   ]);
@@ -1002,15 +974,15 @@ async function getRateBreakdowns(hotelId, monthKey, serviceIds) {
     const cat = cleanCategory(r.room_type);
     const contractNights = Number(r.nights) || 0;
 
-    if (shortSet.has(r.sid)) {
+    if (r.seg === "short") {
       ssAllRate += rev.net; ssAllNights += nim;
       if (cat) {
         ssCat[cat] = ssCat[cat] || { rate: 0, nights: 0 };
         ssCat[cat].rate += rev.net; ssCat[cat].nights += nim;
       }
     }
-    const isLong = longSet.has(r.sid);
-    if (isLong || midSet.has(r.sid)) {
+    const isLong = r.seg === "long";
+    if (isLong || r.seg === "mid") {
       const t = RATE_TIERS.find((x) => contractNights >= x.min && contractNights < x.max);
       if (t) { tierAcc[t.k].sum += nightly * AMR_DAYS; tierAcc[t.k].n += 1; }
     }
@@ -1023,20 +995,46 @@ async function getRateBreakdowns(hotelId, monthKey, serviceIds) {
     }
   }
 
+  // Reconcile to the finance-grade card ADRs. The chart's raw basis is
+  // service + SpaceOrder scope; the KPI card is AccountingCategory scope. The
+  // two slices overlap ~96% but never equal (and the gap flips sign month to
+  // month with the booking mix), so the chart "All" bar would not match the
+  // card. When the caller passes the card's {net, nights} anchors, we pin the
+  // "All" bar to the card ADR and scale the per-category bars by the same
+  // factor — preserving each category's shape while tying the blended level to
+  // the number on the KPI card. Without anchors we fall back to the raw basis.
+  const ssCardAdr = anchors?.short?.nights > 0 ? anchors.short.net / anchors.short.nights : null;
+  let ssCatRate = 0, ssCatNights = 0;
+  for (const v of Object.values(ssCat)) { ssCatRate += v.rate; ssCatNights += v.nights; }
+  const ssScale = ssCardAdr != null && ssCatRate > 0 && ssCatNights > 0
+    ? ssCardAdr / (ssCatRate / ssCatNights)
+    : 1;
   const ssAdrByCategory = [
-    ...(ssAllNights > 0 ? [{ name: "All", value: ssAllRate / ssAllNights }] : []),
+    ...(ssCardAdr != null
+      ? [{ name: "All", value: ssCardAdr }]
+      : ssAllNights > 0 ? [{ name: "All", value: ssAllRate / ssAllNights }] : []),
     ...Object.entries(ssCat)
-      .map(([name, v]) => ({ name, value: v.nights > 0 ? v.rate / v.nights : 0 }))
+      .map(([name, v]) => ({ name, value: v.nights > 0 ? (v.rate / v.nights) * ssScale : 0 }))
       .filter((x) => x.value > 0)
       .sort((a, b) => b.value - a.value),
   ];
   const amrBySegment = RATE_TIERS
     .map((t) => ({ name: t.k, value: tierAcc[t.k].n > 0 ? tierAcc[t.k].sum / tierAcc[t.k].n : 0 }))
     .filter((x) => x.value > 0);
+  // Long Stay charts are AMR (× 30.44) but the card shows nightly LS ADR; the
+  // reconciled "All" AMR is therefore the card LS ADR × AMR_DAYS.
+  const lsCardAmr = anchors?.long?.nights > 0 ? (anchors.long.net / anchors.long.nights) * AMR_DAYS : null;
+  let lsCatSum = 0, lsCatN = 0;
+  for (const v of Object.values(lsCat)) { lsCatSum += v.sum; lsCatN += v.n; }
+  const lsScale = lsCardAmr != null && lsCatSum > 0 && lsCatN > 0
+    ? lsCardAmr / (lsCatSum / lsCatN)
+    : 1;
   const lsAmrByCategory = [
-    ...(lsAllN > 0 ? [{ name: "All", value: lsAllSum / lsAllN }] : []),
+    ...(lsCardAmr != null
+      ? [{ name: "All", value: lsCardAmr }]
+      : lsAllN > 0 ? [{ name: "All", value: lsAllSum / lsAllN }] : []),
     ...Object.entries(lsCat)
-      .map(([name, v]) => ({ name, value: v.n > 0 ? v.sum / v.n : 0 }))
+      .map(([name, v]) => ({ name, value: v.n > 0 ? (v.sum / v.n) * lsScale : 0 }))
       .filter((x) => x.value > 0)
       .sort((a, b) => b.value - a.value),
   ];

@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState, createContext, useContext } from "react";
+import { useEffect, useMemo, useRef, useState, createContext, useContext, type ChangeEvent } from "react";
 import { Download, ChevronDown, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { R } from "../../../styles/tokens";
 import {
   fetchMasonSalesFlash,
+  fetchMasonCards,
   type SalesFlashResponse,
+  type SalesFlashMonthCard,
   type RevenueCell,
   type KpiCell,
 } from "../api/mason.api";
-import { useDashboardData } from "../../dashboard/hooks/useDashboardData";
 import { MasonOccupancyByService } from "./MasonOccupancyByService";
 import { MasonRateCharts } from "./MasonRateCharts";
 import {
@@ -15,13 +16,6 @@ import {
   MonthCardSkeleton,
   SkeletonBar,
   SKELETON_PULSE_KEYFRAMES,
-  buildWindow,
-  monthLabel as cardMonthLabel,
-  SERVICES,
-  type MonthCard,
-  type ServiceKey,
-  type ServiceSplit,
-  type ApiResponse as ServiceRevenueResponse,
 } from "./MasonDashboard";
 
 // ── Mason & Fifth — Sales Flash (live) ──
@@ -323,110 +317,182 @@ function Section({ title, subtitle, done, children }: { title: string; subtitle?
 // (amenity-space revenue, prior-year-by-segment). Reserves the layout space
 // and shows the awaiting-upload note so the section reads as "pending data"
 // rather than missing.
-function PendingUploadSection({ title, subtitle, detail }: { title: string; subtitle?: string; detail: string }) {
+// ── Amenity & Building Revenue (Westbourne) ──
+// Reads Dom's "Ancillary Upload" CSV client-side and renders Revenue / Budget /
+// vs Budget % per amenity. Persisted in localStorage so it survives reloads.
+// (Mews can't supply this — amenity revenue runs on Toast etc.)
+interface AmenityData {
+  months: string[];
+  fyLabel: string;
+  rows: { name: string; revenue: number[]; budget: number[]; revenueFY: number; budgetFY: number }[];
+  uploadedAt: string;
+}
+
+// Minimal CSV row parser — handles quoted fields with embedded commas (the £
+// values are quoted, e.g. "£131,156 ").
+function parseCsvRow(line: string): string[] {
+  const out: string[] = [];
+  let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { out.push(cur); cur = ""; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseAmenityCsv(text: string): AmenityData | null {
+  const num = (s: string) => { const n = Number((s || "").replace(/[^0-9.\-]/g, "")); return isFinite(n) ? n : 0; };
+  let months: string[] = [], fyLabel = "Full Year", headerFound = false;
+  const order: string[] = [];
+  const map = new Map<string, { revenue?: number[]; budget?: number[]; revenueFY?: number; budgetFY?: number }>();
+  for (const line of text.split(/\r?\n/)) {
+    const cells = parseCsvRow(line);
+    const head = (cells[0] || "").trim();
+    if (!head) continue;
+    if (head.toUpperCase() === "ANCILLARY UPLOAD") {
+      months = cells.slice(1, 13).map((c) => c.trim());
+      fyLabel = (cells[13] || "Full Year").trim();
+      headerFound = true;
+      continue;
+    }
+    const m = head.toUpperCase().match(/^(.*)\s+(REVENUE|BUDGET)$/);
+    if (!m) continue;
+    const name = head.slice(0, head.length - m[2].length).trim();
+    const vals = cells.slice(1, 13).map(num);
+    const fy = num(cells[13]);
+    if (!map.has(name)) { map.set(name, {}); order.push(name); }
+    const rec = map.get(name)!;
+    if (m[2] === "REVENUE") { rec.revenue = vals; rec.revenueFY = fy; }
+    else { rec.budget = vals; rec.budgetFY = fy; }
+  }
+  if (!headerFound || order.length === 0) return null;
+  const rows = order.map((name) => {
+    const r = map.get(name)!;
+    return {
+      name: name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()),
+      revenue: r.revenue || Array(12).fill(0),
+      budget: r.budget || Array(12).fill(0),
+      revenueFY: r.revenueFY || 0,
+      budgetFY: r.budgetFY || 0,
+    };
+  });
+  return { months, fyLabel, rows, uploadedAt: new Date().toISOString() };
+}
+
+function AmenityRevenue({ hotelId }: { hotelId: number }) {
+  const storeKey = `mf_amenity_${hotelId}`;
+  const [data, setData] = useState<AmenityData | null>(() => {
+    try { const s = localStorage.getItem(storeKey); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [err, setErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseAmenityCsv(String(reader.result || ""));
+      if (!parsed) { setErr("Couldn't read that file — expected the Ancillary Upload CSV."); return; }
+      setErr(null);
+      setData(parsed);
+      try { localStorage.setItem(storeKey, JSON.stringify(parsed)); } catch { /* quota — display only */ }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const grid = data ? `minmax(150px, 1.4fr) repeat(${data.months.length}, minmax(58px, 1fr)) 96px` : "";
+
   return (
-    <Section title={title} subtitle={subtitle}>
-      <div
-        style={{
-          border: `1px dashed ${R.gold}55`,
-          borderRadius: 10,
-          background: "rgba(200,166,110,0.04)",
-          padding: "22px 20px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 12,
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: 12, color: R.textMid, maxWidth: 640, lineHeight: 1.55 }}>{detail}</div>
-        <div
+    <Section title="Amenity & Building Revenue" subtitle="Westbourne Park — Canal / Meadow / Grounding (uploaded from Dom's Ancillary CSV)">
+      <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} style={{ display: "none" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <button
+          onClick={() => fileRef.current?.click()}
           style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: R.gold,
-            textTransform: "uppercase",
-            letterSpacing: 0.6,
-            padding: "6px 14px",
-            background: "rgba(200,166,110,0.10)",
-            border: `1px solid ${R.gold}44`,
-            borderRadius: 999,
+            fontSize: 11, fontWeight: 700, color: R.gold, textTransform: "uppercase", letterSpacing: 0.6,
+            padding: "7px 16px", background: "rgba(200,166,110,0.10)", border: `1px solid ${R.gold}66`,
+            borderRadius: 999, cursor: "pointer",
           }}
         >
-          Need the standard upload template to proceed
-        </div>
+          {data ? "Replace Ancillary CSV" : "Upload Ancillary CSV"}
+        </button>
+        {data && <span style={{ fontSize: 11, color: R.textDim }}>{data.rows.length} amenities · uploaded {new Date(data.uploadedAt).toLocaleString()}</span>}
+        {err && <span style={{ fontSize: 11, color: R.red }}>{err}</span>}
       </div>
+      {!data ? (
+        <div style={{ border: `1px dashed ${R.gold}55`, borderRadius: 10, background: "rgba(200,166,110,0.04)", padding: "22px 20px", textAlign: "center", fontSize: 12, color: R.textMid, lineHeight: 1.55 }}>
+          Amenity revenue runs on external systems (Toast etc.), not Mews. Upload Dom's
+          "Ancillary Upload" CSV to show Canal / Meadow / Grounding revenue vs budget here.
+        </div>
+      ) : (
+        <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
+          <div style={{ minWidth: 1000 }}>
+            <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
+              <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Amenity / Metric</div>
+              {data.months.map((m) => <div key={m} style={headerCell}>{m}</div>)}
+              <div style={{ ...headerCell, color: R.gold }}>{data.fyLabel}</div>
+            </div>
+            {data.rows.map((row) => (
+              <div key={row.name} style={{ marginTop: 6 }}>
+                <div style={{ ...labelCell, color: R.warmTeal, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 10 }}>{row.name}</div>
+                <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                  <div style={labelCell}>Revenue (net)</div>
+                  {row.revenue.map((v, i) => <div key={i} style={cellBase}>{fmtGbp(v, 0)}</div>)}
+                  <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtGbp(row.revenueFY, 0)}</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                  <div style={{ ...labelCell, color: R.textDim }}>Budget</div>
+                  {row.budget.map((v, i) => <div key={i} style={{ ...cellBase, color: R.textDim }}>{fmtGbp(v, 0)}</div>)}
+                  <div style={{ ...cellBase, color: R.textDim }}>{fmtGbp(row.budgetFY, 0)}</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+                  <div style={{ ...labelCell, color: R.textMid }}>vs Budget %</div>
+                  {row.revenue.map((v, i) => {
+                    const b = row.budget[i];
+                    const pct = b > 0 ? (v / b) * 100 : null;
+                    return <div key={i} style={{ ...cellBase, color: pct == null ? R.textDim : pct >= 100 ? R.green : R.textMid }}>{pct == null ? "—" : `${Math.round(pct)}%`}</div>;
+                  })}
+                  <div style={{ ...cellBase, fontWeight: 700, color: row.budgetFY > 0 && row.revenueFY / row.budgetFY >= 1 ? R.green : R.gold }}>{row.budgetFY > 0 ? `${Math.round((row.revenueFY / row.budgetFY) * 100)}%` : "—"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </Section>
   );
 }
 
-function ThreeMonthCards({ hotelId }: { hotelId: number }) {
-  // Three-month KPI cards (Last / Current / Next) reused from MasonDashboard.
-  // Always relative to today regardless of the Sales Flash reporting month.
-  const window = useMemo(buildWindow, []);
-  const [apiData, setApiData] = useState<ServiceRevenueResponse | null>(null);
-  const { data: dashboardData } = useDashboardData(hotelId, "london");
+function ThreeMonthCards({ hotelId, monthKey }: { hotelId: number; monthKey: string }) {
+  // Prior / reporting / next month, centred on the dropdown-selected reporting
+  // month. Own lightweight fetch (/api/mason/cards — 3-month window, cached) so
+  // the cards load fast and follow the month picker, independent of the heavy
+  // /sales-flash call. Reporting-month card ties to the KPI rows + chart "All".
+  const [cards, setCards] = useState<SalesFlashMonthCard[] | null>(null);
 
   useEffect(() => {
-    setApiData(null);
+    setCards(null);
     let cancelled = false;
-    fetch(`/api/mason/service-revenue?hotelId=${hotelId}&from=${window.from}&to=${window.to}`)
-      .then((r) => (r.ok ? r.json() : r.json().then((j) => Promise.reject(j.error || r.statusText))))
-      .then((d: ServiceRevenueResponse) => { if (!cancelled) setApiData(d); })
-      .catch(() => { /* silent — cards just stay in skeleton */ });
+    fetchMasonCards(hotelId, monthKey)
+      .then((d) => { if (!cancelled) setCards(d.cards); })
+      .catch(() => { /* silent — cards stay in skeleton */ });
     return () => { cancelled = true; };
-  }, [hotelId, window.from, window.to]);
-
-  const cards: MonthCard[] | null = useMemo(() => {
-    if (!apiData || !dashboardData?.snapshot) return null;
-    const snapshotForIndex = (i: number) => {
-      if (i === 0) return dashboardData.snapshot.lastMonth;
-      if (i === 1) return dashboardData.snapshot.currentMonth;
-      if (i === 2) return dashboardData.snapshot.nextMonth;
-      return null;
-    };
-    return window.months.map((m, i) => {
-      const row = apiData.monthly.find((x) => x.month === m);
-      const byService: ServiceSplit = { short: 0, mid: 0, long: 0 };
-      const nightsByService: ServiceSplit = { short: 0, mid: 0, long: 0 };
-      for (const svc of SERVICES) {
-        const bucket = row?.services?.[svc.key];
-        // Net of VAT per Dom's V2 comment ("top section be Net VAT"). Revenue
-        // + the implied AMR/ADR derived below both follow from this.
-        byService[svc.key] = bucket?.net || 0;
-        // Actual occupied room-nights (date-derived) — true ADR denominator.
-        nightsByService[svc.key] = bucket?.roomNights ?? bucket?.nights ?? 0;
-      }
-      const snapshot = snapshotForIndex(i);
-      const occupancy = snapshot?.occupancy ?? 0;
-      const roomNights = snapshot && snapshot.adr > 0 ? snapshot.revenue / snapshot.adr : 0;
-      const capacityNights = occupancy > 0 ? roomNights / (occupancy / 100) : 0;
-      const totalRevenue = byService.short + byService.mid + byService.long;
-      const adr = roomNights > 0 ? totalRevenue / roomNights : 0;
-      const svcAdr = (key: ServiceKey) =>
-        nightsByService[key] > 0 ? byService[key] / nightsByService[key] : 0;
-      const svcOcc = (key: ServiceKey) =>
-        capacityNights > 0 ? (nightsByService[key] / capacityNights) * 100 : 0;
-      return {
-        title: window.titles[i],
-        label: cardMonthLabel(m),
-        revenueBy: byService,
-        occupancy,
-        adr,
-        adrByService: { short: svcAdr("short"), mid: svcAdr("mid"), long: svcAdr("long") },
-        occByService: { short: svcOcc("short"), mid: svcOcc("mid"), long: svcOcc("long") },
-      } as MonthCard;
-    });
-  }, [apiData, dashboardData, window.months, window.titles]);
+  }, [hotelId, monthKey]);
 
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         {cards
           ? cards.map((c) => <MonthCardView key={c.title} card={c} impliedAmr />)
-          : window.months.map((m, i) => (
-              <MonthCardSkeleton key={m} title={window.titles[i]} label={cardMonthLabel(m)} />
-            ))}
+          : [0, 1, 2].map((i) => <MonthCardSkeleton key={i} title="" label="" />)}
       </div>
     </div>
   );
@@ -680,7 +746,7 @@ function AnnualisedTable({ data, hasBudgetData }: { data: SalesFlashResponse; ha
           <div style={{ display: "grid", gridTemplateColumns: grid, borderTop: `1px solid ${R.border}` }}>
             <div style={{ ...labelCell, color: R.textDim, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4 }}>Occupancy (blended)</div>
             {months.map((m) => <div key={m.monthKey} style={{ ...cellBase, color: R.textDim }}>{fmtPct(m.occupancy, 0)}</div>)}
-            <div style={cellBase} />
+            <div style={{ ...cellBase, color: R.gold, fontWeight: 600 }}>{data.fytdOccupancy == null ? "—" : fmtPct(data.fytdOccupancy, 0)}</div>
           </div>
         </div>
       </div>
@@ -722,7 +788,7 @@ function BobBusinessDone({ data }: { data: SalesFlashResponse }) {
   );
   return (
     <Section title="BOB & Business Done" subtitle="Forward Book of Business (booked future stays) vs FY-to-date Business Done (realised revenue from past months)" done>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Card title="Business Done — realised" subtitle={`Past months: ${doneRange}`} totals={data.businessDone} accent={R.gold} />
         <Card title="Forward BOB — booked future stays" subtitle={`Current + future months: ${bobRange}`} totals={data.bob} accent={R.warmTeal} />
       </div>
@@ -751,7 +817,7 @@ function PacingByService({ data, hasBudgetData }: { data: SalesFlashResponse; ha
             return (
               <div key={p.role} style={{ marginTop: 6 }}>
                 <div style={{ ...labelCell, color: R.warmTeal, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 10 }}>
-                  {p.role === "short" ? "Short Stay (<1 month)" : p.role === "mid" ? "Mid Stay (1-3 months)" : "Long Stay (3+ months)"}
+                  {p.role === "short" ? "Short Stay (<1 month)" : p.role === "mid" ? "Mid Stay (1-6 months)" : "Long Stay (6+ months)"}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
                   <div style={labelCell}>Revenue (net)</div>
@@ -854,7 +920,7 @@ function SsLsBookings({ data }: { data: SalesFlashResponse }) {
     <Section title="Accommodation Bookings" subtitle="By booking-created week — Short Stay + all-segment Reservations Created" done>
       <div style={{ background: "rgba(56,198,186,0.04)", border: `1px solid rgba(56,198,186,0.18)`, borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: R.text, lineHeight: 1.5 }}>
         <strong style={{ color: R.warmTeal }}>How Short Stay is counted:</strong>{" "}
-        reservations under Mews's Short Stay Accommodation service, excluding cancellations. Ties to Mews's Reservation Report exactly for any week. Capture began 2026-04-13.
+        reservations classified as Short Stay by rate group, excluding cancellations. Mid Stay is now split out via its own rate groups. Capture began 2026-04-13.
       </div>
       <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto", marginBottom: 16 }}>
         <div style={{ fontSize: 10, color: R.warmTeal, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 12px 8px" }}>Short Stay — weekly bookings</div>
@@ -1052,9 +1118,9 @@ export function MasonSalesFlash() {
           </div>
         )}
 
-        <ThreeMonthCards hotelId={property.hotelId} />
+        <ThreeMonthCards hotelId={property.hotelId} monthKey={monthKey} />
 
-        <MasonOccupancyByService hotelId={property.hotelId} />
+        <MasonOccupancyByService hotelId={property.hotelId} monthKey={monthKey} />
 
         {loading && !data && <SalesFlashSkeleton />}
 
@@ -1070,13 +1136,7 @@ export function MasonSalesFlash() {
                 <MasonRateCharts data={data.rateCharts} />
               </div>
             </div>
-            {property.hotelId === 318341 && (
-              <PendingUploadSection
-                title="Amenity & Building Revenue"
-                subtitle="Westbourne Park — Canal / Meadow / Grounding + total building revenue"
-                detail="Amenity-space revenue runs on external systems (Toast etc.), not Mews, so it can't be pulled automatically. Once Dom provides the figures we'll show them here alongside total building revenue."
-              />
-            )}
+            {property.hotelId === 318341 && <AmenityRevenue hotelId={property.hotelId} />}
             <AnnualisedTable data={data} hasBudgetData={data.hasBudgetData} />
             <BobBusinessDone data={data} />
             <PacingByService data={data} hasBudgetData={data.hasBudgetData} />

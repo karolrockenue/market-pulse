@@ -471,13 +471,18 @@ router.get("/occupancy-by-service", async (req, res) => {
   const hotel = MF_HOTELS[hotelId];
   if (!hotel) return res.status(400).json({ error: "Hotel not configured" });
   const days = Math.min(540, Math.max(7, parseInt(req.query.days || "120", 10)));
+  // Anchor on the 1st of the reporting month so the chart follows the picker +
+  // shows the whole month (even past today). Falls back to today.
+  const mk = /^\d{4}-\d{2}$/.test(req.query.monthKey || "") ? req.query.monthKey : null;
+  const startDate = mk ? `${mk}-01` : null;
   try {
     const rows = await masonService.getDailyOccupancyByService(
       hotelId,
       hotel.serviceIds,
       days,
+      startDate,
     );
-    res.json({ hotelId, shortName: hotel.shortName, days, rows });
+    res.json({ hotelId, shortName: hotel.shortName, days, startDate, rows });
   } catch (err) {
     console.error("[Mason] /occupancy-by-service failed:", err.message);
     res.status(500).json({ error: err.message });
@@ -500,6 +505,78 @@ router.get("/booking-pulse", async (req, res) => {
     res.json({ hotelId, ...pulse });
   } catch (err) {
     console.error("[Mason] /booking-pulse failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/mason/cards?hotelId=318341&monthKey=YYYY-MM
+ *
+ * Lightweight 3-month KPI cards (prior / reporting / next of the dropdown
+ * month), from getMonthlyKpis over just that window so the top of the Sales
+ * Flash loads fast and follows the month picker — decoupled from the heavy
+ * /sales-flash assembly (which made the cards wait ~17s + risked rate limits).
+ * Cached 10 min. Reporting-month card ties to the /sales-flash KPI rows.
+ */
+router.get("/cards", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({ error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}` });
+  }
+  const hotel = MF_HOTELS[hotelId];
+  if (!hotel) return res.status(400).json({ error: "Hotel not configured" });
+  const monthKey = req.query.monthKey || shiftMonth(thisMonthKey(), -1);
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    return res.status(400).json({ error: "monthKey must be YYYY-MM" });
+  }
+  try {
+    const key = cacheKey(hotelId, "cards", monthKey);
+    const cached = req.query.refresh === "1" ? null : getCached(key);
+    if (cached) return res.json({ ...cached.payload, cachedAt: cached.storedAt });
+
+    const priorMK = shiftMonth(monthKey, -1);
+    const nextMK = shiftMonth(monthKey, 1);
+    const otb = await masonService.getMonthlyKpis(
+      hotelId, priorMK, nextMK, hotel.accountingCategories, hotel.serviceIds,
+    );
+    const byMonth = new Map(otb.months.map((m) => [m.monthKey, m]));
+    const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const cardTitle = (mk) => { const [y, m] = mk.split("-").map(Number); return `${MONTH_ABBR[m - 1]} ${y}`; };
+    const cards = [
+      { mk: priorMK, label: "prior month" },
+      { mk: monthKey, label: "reporting month" },
+      { mk: nextMK, label: "next · on the books" },
+    ].map(({ mk, label }) => {
+      const r = byMonth.get(mk);
+      const cap = r?.total.capacity || 0;
+      const occShare = (role) => (cap > 0 ? ((r?.byRole[role].nights ?? 0) / cap) * 100 : 0);
+      return {
+        title: cardTitle(mk),
+        label,
+        revenueBy: {
+          short: r?.byRole.short.revenue ?? 0,
+          mid: r?.byRole.mid.revenue ?? 0,
+          long: r?.byRole.long.revenue ?? 0,
+        },
+        occupancy: r?.total.occupancy ?? 0,
+        adr: r?.total.adr ?? 0,
+        adrByService: {
+          short: r?.byRole.short.adr ?? 0,
+          mid: r?.byRole.mid.adr ?? 0,
+          long: r?.byRole.long.adr ?? 0,
+        },
+        occByService: {
+          short: occShare("short"),
+          mid: occShare("mid"),
+          long: occShare("long"),
+        },
+      };
+    });
+    const payload = { hotelId, monthKey, cards };
+    cache.set(key, { storedAt: Date.now(), payload });
+    res.json(payload);
+  } catch (err) {
+    console.error("[Mason] /cards failed:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -633,8 +710,13 @@ router.get("/sales-flash", async (req, res) => {
       long: { actual: ltCur.long, priorMonth: ltPM.long, priorYear: ltPY.long },
     };
 
-    // Rate-by-studio-category + AMR-by-segment charts (current month).
-    const rateCharts = await masonService.getRateBreakdowns(hotelId, currentMK, hotel.serviceIds);
+    // Rate-by-studio-category + AMR-by-segment charts (current month). Pass the
+    // card's SS/LS {net, nights} so the chart "All" bars tie to the KPI card
+    // ADRs (finance-grade AccCat scope) instead of the chart's raw service scope.
+    const rateCharts = await masonService.getRateBreakdowns(hotelId, currentMK, hotel.serviceIds, {
+      short: { net: cur?.byRole?.short?.revenue ?? 0, nights: cur?.byRole?.short?.nights ?? 0 },
+      long: { net: cur?.byRole?.long?.revenue ?? 0, nights: cur?.byRole?.long?.nights ?? 0 },
+    });
 
     // Budget KPI derivations for the current month. Budget revenue is loaded;
     // budget room-nights + occupancy were added 2026-05-20 so we can derive
@@ -795,6 +877,10 @@ router.get("/sales-flash", async (req, res) => {
     const todayIsoStr = masonService.todayIso();
     const bob = { short: 0, mid: 0, long: 0, total: 0 };
     const businessDone = { short: 0, mid: 0, long: 0, total: 0 };
+    // FYTD occupancy = capacity-weighted occupancy across wholly-elapsed FY
+    // months (room-nights ÷ capacity), so it doesn't get diluted by forward OTB.
+    let fytdNights = 0;
+    let fytdCapacity = 0;
     for (const a of annualised) {
       if (`${a.monthKey}-31` < todayIsoStr) {
         // wholly past
@@ -802,6 +888,9 @@ router.get("/sales-flash", async (req, res) => {
         businessDone.mid += a.revenue.mid;
         businessDone.long += a.revenue.long;
         businessDone.total += a.revenue.total;
+        const mRow = otbByMonth.get(a.monthKey);
+        fytdNights += mRow?.total.roomNights ?? 0;
+        fytdCapacity += mRow?.total.capacity ?? 0;
       } else {
         bob.short += a.revenue.short;
         bob.mid += a.revenue.mid;
@@ -809,6 +898,7 @@ router.get("/sales-flash", async (req, res) => {
         bob.total += a.revenue.total;
       }
     }
+    const fytdOccupancy = fytdCapacity > 0 ? (fytdNights / fytdCapacity) * 100 : null;
 
     res.json({
       hotelId,
@@ -825,6 +915,7 @@ router.get("/sales-flash", async (req, res) => {
       pacing,
       bob,
       businessDone,
+      fytdOccupancy,
       inHouseFY,
       unitPacing,
       ssWeekly: tiers.ssWeekly,

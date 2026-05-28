@@ -6,6 +6,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { R } from "../../../styles/tokens";
@@ -66,7 +67,7 @@ function ChartTooltip({ active, payload }: any) {
   );
 }
 
-export function MasonOccupancyByService({ hotelId }: { hotelId: number }) {
+export function MasonOccupancyByService({ hotelId, monthKey }: { hotelId: number; monthKey?: string }) {
   const [resp, setResp] = useState<OccByServiceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,27 +77,35 @@ export function MasonOccupancyByService({ hotelId }: { hotelId: number }) {
     setResp(null);
     setLoading(true);
     setError(null);
-    fetchMasonOccByService(hotelId, DAYS)
+    fetchMasonOccByService(hotelId, monthKey, DAYS)
       .then((d) => { if (!cancelled) setResp(d); })
       .catch((e) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [hotelId]);
+  }, [hotelId, monthKey]);
 
-  const data = useMemo(() => {
-    if (!resp) return [];
-    return resp.rows.map((r) => {
+  const { data, monthMarks } = useMemo(() => {
+    if (!resp) return { data: [], monthMarks: [] as { x: string; label: string }[] };
+    const rows = resp.rows.map((r) => {
+      const dt = new Date(r.date);
       const cap = r.capacity || 1;
       const pct = (n: number) => (n / cap) * 100;
       return {
-        date: new Date(r.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
-        fullDate: new Date(r.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        date: dt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }),
+        fullDate: dt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }),
+        dom: dt.getUTCDate(),
         long: pct(r.long),
         mid: pct(r.mid),
         short: pct(r.short),
         other: pct(r.other),
       };
     });
+    // Vertical split at the 1st of each month (after the first point) — divides
+    // the window into months. Label with the month abbreviation.
+    const monthMarks = rows
+      .filter((d, i) => i > 0 && d.dom === 1)
+      .map((d) => ({ x: d.date, label: d.date.split(" ")[1] }));
+    return { data: rows, monthMarks };
   }, [resp]);
 
   const xInterval = Math.max(6, Math.floor(data.length / 13));
@@ -139,12 +148,24 @@ export function MasonOccupancyByService({ hotelId }: { hotelId: number }) {
               <ComposedChart data={data} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="0" stroke={R.border} opacity={0.25} vertical={false} />
                 <XAxis dataKey="date" stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={{ stroke: R.border, strokeOpacity: 0.3 }} interval={xInterval} />
-                <YAxis stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} width={42} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
+                <YAxis stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} width={42} domain={[0, 110]} allowDataOverflow ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} />
                 <Tooltip cursor={{ fill: "rgba(123,175,212,0.05)" }} content={<ChartTooltip />} />
                 <Bar dataKey="long" stackId="o" name="Long Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.long} fillOpacity={0.9} />
                 <Bar dataKey="mid" stackId="o" name="Mid Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.mid} fillOpacity={0.9} />
                 <Bar dataKey="short" stackId="o" name="Short Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.short} fillOpacity={0.9} />
                 <Bar dataKey="other" stackId="o" name="Other" radius={[2, 2, 0, 0]} maxBarSize={8} fill={PALETTE.other} fillOpacity={0.9} />
+                {/* Month-boundary dividers — rendered after the bars so they sit on top of tall spikes. */}
+                {monthMarks.map((m) => (
+                  <ReferenceLine
+                    key={m.x}
+                    x={m.x}
+                    stroke={R.text}
+                    strokeOpacity={0.55}
+                    strokeDasharray="3 3"
+                    ifOverflow="visible"
+                    label={{ value: m.label, position: "insideTopLeft", fill: R.textDim, fontSize: 9 }}
+                  />
+                ))}
               </ComposedChart>
             </ResponsiveContainer>
           )}
