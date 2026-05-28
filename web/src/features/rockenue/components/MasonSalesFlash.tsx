@@ -591,11 +591,10 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
             <div style={cellBase}><DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.priorYear)} /></div>
             <div style={{ ...cellBase, color: R.textDim }}>—</div>
           </div>
-          {(k.directBookingEngine.actual !== null || k.directManual.actual !== null || k.ota.actual !== null) && (
+          {(k.direct.actual !== null || k.indirect.actual !== null) && (
             <>
-              <KpiRow label="Direct — Booking Engine %" cell={k.directBookingEngine} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
-              <KpiRow label="Direct — Manual %" cell={k.directManual} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
-              <KpiRow label="OTA %" cell={k.ota} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
+              <KpiRow label="Direct Booking % (Short Stay)" cell={k.direct} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
+              <KpiRow label="Indirect (OTA) % (Short Stay)" cell={k.indirect} fmt={(v) => v !== null && v !== undefined ? fmtPct(v * 100) : "—"} />
             </>
           )}
         </div>

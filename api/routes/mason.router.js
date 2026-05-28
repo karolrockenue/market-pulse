@@ -605,6 +605,13 @@ router.get("/sales-flash", async (req, res) => {
     return res.status(400).json({ error: "monthKey must be YYYY-MM" });
   }
 
+  // 10-min cache (this endpoint fires ~14-20 Mews calls; reloads otherwise 429).
+  const cacheK = cacheKey(hotelId, "sales-flash", monthKeyParam);
+  if (req.query.refresh !== "1") {
+    const cached = getCached(cacheK);
+    if (cached) return res.json({ ...cached.payload, cachedAt: cached.storedAt });
+  }
+
   try {
     const currentMK = monthKeyParam;
     const priorMonthMK = shiftMonth(currentMK, -1);
@@ -808,21 +815,17 @@ router.get("/sales-flash", async (req, res) => {
           priorYear: null,
           budget: null,
         },
-        directBookingEngine: {
-          actual: directShare ? directShare.bookingEnginePct : null,
-          priorMonth: directSharePM ? directSharePM.bookingEnginePct : null,
+        // Direct vs Indirect, Short Stays only (Dom V3). Prior-year comes from
+        // Dom's hardcoded file (not wired yet) → priorYear stays null.
+        direct: {
+          actual: directShare ? directShare.directPct : null,
+          priorMonth: directSharePM ? directSharePM.directPct : null,
           priorYear: null,
           budget: null,
         },
-        directManual: {
-          actual: directShare ? directShare.manualPct : null,
-          priorMonth: directSharePM ? directSharePM.manualPct : null,
-          priorYear: null,
-          budget: null,
-        },
-        ota: {
-          actual: directShare ? directShare.otaPct : null,
-          priorMonth: directSharePM ? directSharePM.otaPct : null,
+        indirect: {
+          actual: directShare ? directShare.indirectPct : null,
+          priorMonth: directSharePM ? directSharePM.indirectPct : null,
           priorYear: null,
           budget: null,
         },
@@ -900,7 +903,7 @@ router.get("/sales-flash", async (req, res) => {
     }
     const fytdOccupancy = fytdCapacity > 0 ? (fytdNights / fytdCapacity) * 100 : null;
 
-    res.json({
+    const payload = {
       hotelId,
       hotelName: hotel.name,
       shortName: hotel.shortName,
@@ -928,7 +931,9 @@ router.get("/sales-flash", async (req, res) => {
           : "Per-service budgets not yet uploaded; Budget columns hidden.",
         longStayAdr: "Per-service ADR = revenue ÷ actual occupied room-nights (from reservation dates). Long Stay now shows a true nightly ADR following its migration to a nightly Mews service.",
       },
-    });
+    };
+    cache.set(cacheK, { storedAt: Date.now(), payload });
+    res.json(payload);
   } catch (err) {
     console.error("[Mason] /sales-flash failed:", err.message);
     res.status(500).json({ error: err.message });

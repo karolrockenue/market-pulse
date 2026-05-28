@@ -712,20 +712,18 @@ async function getServiceBudgets(hotelId, fyStartYear) {
 }
 
 /**
- * Booking-source split for the month's arrivals (check-in in month, all
- * services, non-cancelled). Three buckets from Mews Origin
- * (reservations.source):
+ * Direct-vs-Indirect booking-source split for the month's arrivals — SHORT
+ * STAYS ONLY (Dom: source is a Short-Stay distribution metric). Non-cancelled,
+ * weighted by booking COUNT. From Mews Origin (reservations.source):
  *   Distributor    → Direct (Booking Engine)
- *   Commander      → Direct (Manual)
- *   ChannelManager → OTA (Booking.com / Expedia / Agoda / … — brand-level
- *                    resolution via companies/getAll is a separate workstream)
- *   anything else  → other (excluded from the displayed pcts)
+ *   Commander      → Direct (Manual entry)
+ *   ChannelManager → Indirect (OTA)
+ *   anything else  → unknown (excluded from the denominator)
  *
- * Weighted by BOOKING COUNT, matching the "Booking %" label. Previously this
- * weighted by reservations.total_rate, which is NULL/sparse for Mid/Long and
- * collapsed the split toward Short Stay — making it read far too Direct. Count
- * weighting is NULL-proof and reflects all services. Verified 2026-05-21:
- * Westbourne realised arrivals ≈ 57% OTA / 17% Direct-BE / 25% Manual.
+ * Reports a 2-way Direct vs Indirect split (Dom V3: "compare Direct % vs
+ * Indirect %, not specific OTA labels"). Mews granted the source-attribution
+ * permissions, so brand-level OTA breakout is now possible as a later add — the
+ * granular be/manual/ota pcts are kept for that.
  */
 async function getDirectShareForMonth(hotelId, monthKey) {
   const start = startOfMonth(monthKey);
@@ -736,25 +734,26 @@ async function getDirectShareForMonth(hotelId, monthKey) {
       WHERE hotel_id = $1
         AND check_in BETWEEN $2 AND $3
         AND status NOT ILIKE '%cancel%'
+        AND rate_segment = 'short'
       GROUP BY 1`,
     [hotelId, start, end],
   );
-  let be = 0, manual = 0, ota = 0, other = 0, total = 0;
+  let be = 0, manual = 0, ota = 0;
   for (const r of rows) {
     const n = Number(r.n) || 0;
-    total += n;
     if (r.src === "distributor") be += n;
     else if (r.src === "commander") manual += n;
     else if (r.src === "channelmanager") ota += n;
-    else other += n;
   }
-  if (total === 0) return null;
+  const classified = be + manual + ota;
+  if (classified === 0) return null;
   return {
-    bookingEnginePct: be / total,
-    manualPct: manual / total,
-    otaPct: ota / total,
-    otherPct: other / total,
-    total,
+    directPct: (be + manual) / classified,
+    indirectPct: ota / classified,
+    bookingEnginePct: be / classified,
+    manualPct: manual / classified,
+    otaPct: ota / classified,
+    total: classified,
   };
 }
 

@@ -92,9 +92,8 @@ export interface SalesFlashSummary {
     adrShort: KpiCell;
     adrMid: KpiCell;
     amrLong: KpiCell;
-    directBookingEngine: KpiCell;
-    directManual: KpiCell;
-    ota: KpiCell;
+    direct: KpiCell;
+    indirect: KpiCell;
   };
 }
 
