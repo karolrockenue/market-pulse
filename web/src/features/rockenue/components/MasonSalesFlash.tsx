@@ -11,6 +11,7 @@ import {
 } from "../api/mason.api";
 import { MasonOccupancyByService } from "./MasonOccupancyByService";
 import { MasonRateCharts } from "./MasonRateCharts";
+import { MasonWeeklyBookingsChart } from "./MasonWeeklyBookingsChart";
 import {
   MonthCardView,
   MonthCardSkeleton,
@@ -949,6 +950,8 @@ function SsLsBookings({ data }: { data: SalesFlashResponse }) {
           </div>
         )}
       </div>
+
+      <MasonWeeklyBookingsChart ssWeekly={data.ssWeekly} lsTiers={data.lsTierWeekly} />
 
       {(() => {
         const all = data.allWeekly;
