@@ -205,8 +205,11 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
     monthly_min_rates = {},
     rate_freeze_period = "0",
     guardrail_max = "400",
-    weak_day_pricing = {},
   } = config;
+  // NB: a destructuring default only fills `undefined`, NOT `null`. The
+  // weak_day_pricing column is null for hotels that haven't enabled it, so
+  // coalesce explicitly or `weak_day_pricing.enabled` throws (broke rate load).
+  const weak_day_pricing = config.weak_day_pricing || {};
 
   // A. MONTHLY MIN RATE (Calculated early for fallback usage)
   const monthNames = [
