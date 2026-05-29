@@ -49,6 +49,7 @@ const masonRoutes = require("./api/routes/mason.router.js"); // Mason & Fifth da
 const shreejiRoutes = require("./api/routes/shreeji.router.js"); // Shreeji portfolio dashboard
 const salesRoutes = require("./api/routes/sales.router.js"); // Sales CRM (prospects, companies, people, activities)
 const icelandRoutes = require("./api/routes/iceland.router.js"); // Iceland market intelligence dashboard (Rockenue menu)
+const exportsRoutes = require("./api/routes/exports.router.js"); // Login-gated CSV downloads
 
 // --- EXPRESS APP INITIALIZATION ---
 
@@ -313,6 +314,7 @@ app.use("/api/mason", masonRoutes); // Mason & Fifth dashboard reporting
 app.use("/api/shreeji", shreejiRoutes); // Shreeji portfolio dashboard
 app.use("/api/iceland", icelandRoutes); // Iceland market intelligence dashboard (admin only)
 app.use("/api/sales", salesRoutes); // Sales CRM
+app.use("/api/exports", exportsRoutes); // Login-gated CSV downloads
 
 app.use("/api/mews-webhooks", mewsWebhooksRoutes);
 
