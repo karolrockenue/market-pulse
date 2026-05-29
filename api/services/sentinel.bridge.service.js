@@ -390,7 +390,7 @@ class SentinelBridgeService {
         // --- GATE 1: PERMISSION (Is Autopilot ON?) ---
         // [FIX] Also fetch rate_id_map to build the PMS payload later
         const configRes = await client.query(
-          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map, room_differentials, last_minute_floor
+          `SELECT is_autopilot_enabled, monthly_min_rates, rate_freeze_period, rate_id_map, room_differentials, last_minute_floor, weak_day_pricing
            FROM sentinel_configurations WHERE hotel_id = $1::int`,
           [hotelId],
         );
@@ -429,6 +429,21 @@ class SentinelBridgeService {
             minRates = {};
           }
         }
+
+        // Weak Day Pricing config (may arrive as object or stringified JSONB).
+        let weakCfg = config.weak_day_pricing || {};
+        if (typeof weakCfg === "string") {
+          try {
+            weakCfg = JSON.parse(weakCfg);
+          } catch (e) {
+            weakCfg = {};
+          }
+        }
+        const weakEnabled =
+          weakCfg.enabled === true ||
+          String(weakCfg.enabled).toLowerCase() === "true";
+        const weakDays = Array.isArray(weakCfg.days) ? weakCfg.days : [];
+        const weakFloors = weakCfg.floors || {};
 
         const freezeDays = parseInt(config.rate_freeze_period || 0);
         const today = new Date();
@@ -614,21 +629,34 @@ class SentinelBridgeService {
 
           // Daily min override takes precedence over monthly default
           const dailyMinOverride = dailyMinsMap[dateStr];
-          let minRate = (dailyMinOverride !== undefined && dailyMinOverride > 0)
-            ? dailyMinOverride
-            : monthlyMin;
+          const hasDailyOverride =
+            dailyMinOverride !== undefined && dailyMinOverride > 0;
+          let minRate = hasDailyOverride ? dailyMinOverride : monthlyMin;
 
-          // Last-Minute Floor: if active for this date, it REPLACES both monthly and daily min
+          const dayNamesLmf = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+          const dowStr = dayNamesLmf[stayDateObj.getUTCDay()];
+
+          // Weak Day Pricing: explicit per-DOW £ floor wins over the monthly
+          // default (a daily override still wins over the weak floor). Mirrors
+          // the DGX engine so Node does not clamp the weak floor back up to the
+          // monthly min. See pricing-formulas.md §13.
+          const isWeakDay = weakEnabled && weakDays.includes(dowStr);
+          if (isWeakDay && !hasDailyOverride) {
+            const wf = parseFloat(weakFloors[dowStr]);
+            if (Number.isFinite(wf) && wf > 0) minRate = wf;
+          }
+
+          // Last-Minute Floor: if active for this date, it REPLACES the resolved
+          // min — EXCEPT for a weak day, which keeps the LOWER of (weak floor,
+          // LMF rate) so a quiet day can still discount deeper close-in.
           const lmf = config.last_minute_floor || {};
           const lmfEnabled = lmf.enabled || false;
           const lmfDays = parseInt(lmf.days || "0", 10);
           const lmfRate = parseFloat(lmf.rate || "0");
           const lmfDow = new Set(lmf.dow || []);
-          const dayNamesLmf = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-          const dowStr = dayNamesLmf[stayDateObj.getUTCDay()];
 
           if (lmfEnabled && daysUntilStay <= lmfDays && lmfDow.has(dowStr)) {
-            minRate = lmfRate; // LMF floor replaces all other mins
+            minRate = isWeakDay ? Math.min(minRate, lmfRate) : lmfRate;
           }
 
           if (safeRate < minRate) safeRate = minRate;

@@ -205,6 +205,7 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
     monthly_min_rates = {},
     rate_freeze_period = "0",
     guardrail_max = "400",
+    weak_day_pricing = {},
   } = config;
 
   // A. MONTHLY MIN RATE (Calculated early for fallback usage)
@@ -276,11 +277,29 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
   let activeFloor = false;
   let activeMinToEnforce = resolvedMin; // Daily override > monthly default
 
+  // WEAK DAY PRICING: explicit per-DOW £ floor wins over the monthly default
+  // (a daily override still wins). Mirrors the DGX engine so we don't clamp the
+  // weak floor back up to the monthly min. See pricing-formulas.md §13.
+  const weakEnabled =
+    weak_day_pricing.enabled === true ||
+    String(weak_day_pricing.enabled).toLowerCase() === "true";
+  const weakDays = Array.isArray(weak_day_pricing.days)
+    ? weak_day_pricing.days
+    : [];
+  const isWeakDay = weakEnabled && weakDays.includes(dowStr);
+  if (isWeakDay && !isDailyMinOverride) {
+    const wf = parseFloat((weak_day_pricing.floors || {})[dowStr]);
+    if (Number.isFinite(wf) && wf > 0) activeMinToEnforce = wf;
+  }
+
   if (lmfEnabled && daysFromNow <= lmfDays && lmfDow.has(dowStr)) {
     // [FIX] Priority Logic:
     // If LMF is active, it REPLACES the Monthly Minimum for this specific day.
     // This allows the rate to DROP below the standard min (e.g. 100) to the floor (e.g. 60).
-    activeMinToEnforce = lmfRate;
+    // For a weak day, keep the LOWER of (weak floor, LMF rate).
+    activeMinToEnforce = isWeakDay
+      ? Math.min(activeMinToEnforce, lmfRate)
+      : lmfRate;
     activeFloor = true;
   }
 
