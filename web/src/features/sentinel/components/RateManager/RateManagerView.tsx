@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Lock,
   User,
@@ -15,6 +16,7 @@ import {
   ArrowDown,
   Check,
   BedDouble,
+  History,
 } from "lucide-react";
 import {
   Select,
@@ -39,7 +41,9 @@ import {
   getPmsPropertyIds,
   getSentinelStatus,
   triggerSentinelRun,
+  getRateHistory,
 } from "../../api/sentinel.api";
+import type { RateHistoryEntry } from "../../api/types";
 
 // --- STYLES ---
 const styles: { [key: string]: React.CSSProperties } = {
@@ -183,6 +187,31 @@ const styles: { [key: string]: React.CSSProperties } = {
 
 interface RateManagerViewProps {
   allHotels: any[];
+}
+
+// [RATE HISTORY] compact relative-time label for the audit popover.
+function relTimeFrom(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return "";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.round(hrs / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+// [RATE HISTORY] map sentinel_price_history.source -> [label, colour].
+function rateSourceBadge(src: string): [string, string] {
+  const s = (src || "").toUpperCase();
+  if (s === "OVERRIDE") return ["Override", R.gold];
+  if (s === "MANUAL" || s === "HOTEL_USER") return ["Manual", R.textMid];
+  if (s === "SYNC" || s === "IMPORT") return ["PMS", R.textDim];
+  return ["AI", R.warmTeal];
 }
 
 export function RateManagerView({ allHotels }: RateManagerViewProps) {
@@ -446,6 +475,54 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
     color: isHidden ? R.textDim : R.warmTeal,
   });
 
+  // [RATE HISTORY] read-only audit popover for a single PMS-rate cell.
+  // Display-only: reads sentinel_price_history; never writes, queues, or pushes.
+  const [historyCell, setHistoryCell] = useState<{
+    date: string;
+    label: string;
+    liveRate: number;
+    floor: number;
+    rect: { left: number; bottom: number; width: number };
+  } | null>(null);
+  const [historyRows, setHistoryRows] = useState<RateHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyReqRef = useRef(0);
+
+  const openRateHistory = async (day: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(day.liveRate > 0) || !selectedHotel.baseRoomTypeId) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setHistoryCell({
+      date: day.date,
+      label: `${day.dayOfWeek} ${day.dayNumber} ${day.month}`,
+      liveRate: day.liveRate,
+      floor: day.guardrailMin || day.monthlyMinDefault || 0,
+      rect: { left: r.left, bottom: r.bottom, width: r.width },
+    });
+    setHistoryRows([]);
+    setHistoryLoading(true);
+    const reqId = ++historyReqRef.current;
+    const rows = await getRateHistory(
+      selectedHotelId,
+      String(selectedHotel.baseRoomTypeId),
+      day.date,
+      10,
+    );
+    if (historyReqRef.current === reqId) {
+      setHistoryRows(rows);
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!historyCell) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHistoryCell(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [historyCell]);
+
   // --- RENDER ---
   return (
     <div style={styles.page}>
@@ -454,7 +531,278 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
         ::-webkit-scrollbar-track { background: ${R.darkBand}; border-top: 1px solid ${R.border}; }
         ::-webkit-scrollbar-thumb { background: ${R.border}; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: ${R.warmTeal}; }
+        .rm-hist-cell:hover { background: ${R.warmTeal}1f !important; }
+        .rm-hist-cell:hover .rm-hist-ic { opacity: 0.55 !important; }
       `}</style>
+
+      {/* [RATE HISTORY] read-only audit popover (display-only, no push impact) */}
+      {historyCell &&
+        createPortal(
+        (() => {
+          const W = 240;
+          const rect = historyCell.rect;
+          const left = Math.max(
+            8,
+            Math.min(
+              rect.left + window.scrollX + rect.width / 2 - W / 2,
+              window.scrollX + window.innerWidth - W - 8,
+            ),
+          );
+          // Anchor to the cell in *document* coords so the box scrolls with the
+          // grid; flip above when there isn't room below.
+          const estH = 340;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceAbove = rect.top;
+          const openAbove = spaceBelow < estH && spaceAbove > spaceBelow;
+          const top = openAbove
+            ? rect.top + window.scrollY - 8
+            : rect.bottom + window.scrollY + 8;
+          const availH = openAbove ? spaceAbove : spaceBelow;
+          const listMax = Math.min(260, Math.max(120, availH - 130));
+          const vals = historyRows.map((r) => r.newPrice).slice().reverse();
+          const floor = historyCell.floor;
+          const base = vals.length ? vals : [historyCell.liveRate];
+          const sw = W - 28;
+          const sh = 38;
+          const sp = 4;
+          const lo = Math.min(floor > 0 ? floor : Infinity, ...base);
+          const hi = Math.max(historyCell.liveRate, ...base);
+          const span = hi - lo || 1;
+          const spx = (i: number) =>
+            sp + (vals.length > 1 ? (i * (sw - 2 * sp)) / (vals.length - 1) : 0);
+          const spy = (v: number) =>
+            sp + (sh - 2 * sp) * (1 - (v - lo) / span);
+          const poly = vals
+            .map((v, i) => `${spx(i).toFixed(1)},${spy(v).toFixed(1)}`)
+            .join(" ");
+          return (
+            <>
+              <div
+                onClick={() => setHistoryCell(null)}
+                style={{ position: "fixed", inset: 0, zIndex: 90 }}
+              />
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  top,
+                  left,
+                  width: W,
+                  transform: openAbove ? "translateY(-100%)" : undefined,
+                  zIndex: 100,
+                  background: R.card,
+                  border: "1px solid #2A323D",
+                  borderRadius: 10,
+                  boxShadow: "0 16px 48px rgba(0,0,0,0.55)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "10px 12px 9px",
+                    borderBottom: `1px solid ${R.sep}`,
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 8.5,
+                      fontWeight: 700,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      color: R.gold,
+                    }}
+                  >
+                    Live PMS Rate · last 10 changes
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 3,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: R.accent,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>{historyCell.label}</span>
+                    <span style={{ color: R.warmTeal }}>
+                      £{Math.round(historyCell.liveRate)}
+                    </span>
+                  </div>
+                  <span
+                    onClick={() => setHistoryCell(null)}
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 10,
+                      color: R.textDim,
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    ✕
+                  </span>
+                </div>
+
+                {historyLoading ? (
+                  <div
+                    style={{
+                      padding: "16px 12px",
+                      textAlign: "center",
+                      color: R.textDim,
+                      fontSize: 11,
+                    }}
+                  >
+                    Loading…
+                  </div>
+                ) : historyRows.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "16px 12px",
+                      textAlign: "center",
+                      color: R.textDim,
+                      fontSize: 11,
+                    }}
+                  >
+                    No changes recorded.
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: listMax, overflowY: "auto" }}>
+                    {historyRows.map((row, k) => {
+                      const older = historyRows[k + 1]?.newPrice;
+                      const dir =
+                        older == null
+                          ? ""
+                          : row.newPrice < older
+                            ? "dn"
+                            : row.newPrice > older
+                              ? "up"
+                              : "";
+                      const arr = dir === "dn" ? "▼" : dir === "up" ? "▲" : "";
+                      const [stxt, scol] = rateSourceBadge(row.source);
+                      return (
+                        <div
+                          key={k}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "44px 1fr auto",
+                            gap: 6,
+                            alignItems: "center",
+                            padding: "6px 12px",
+                            borderBottom: `1px solid ${R.sep}`,
+                            fontSize: 11,
+                          }}
+                        >
+                          <span style={{ color: R.textDim }}>
+                            {relTimeFrom(row.createdAt)}
+                          </span>
+                          <span
+                            style={{
+                              color: R.accent,
+                              fontWeight: 600,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            £{Math.round(row.newPrice)}
+                            {arr && (
+                              <span
+                                style={{
+                                  fontSize: 8,
+                                  marginLeft: 4,
+                                  fontWeight: 400,
+                                  color:
+                                    dir === "dn"
+                                      ? "rgba(239,68,68,0.8)"
+                                      : "rgba(52,208,104,0.85)",
+                                }}
+                              >
+                                {arr}
+                              </span>
+                            )}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 7.5,
+                              fontWeight: 700,
+                              letterSpacing: 0.3,
+                              textTransform: "uppercase",
+                              padding: "2px 6px",
+                              borderRadius: 999,
+                              color: scol,
+                              background: `${scol}1f`,
+                              border: `1px solid ${scol}44`,
+                              justifySelf: "end",
+                            }}
+                          >
+                            {stxt}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!historyLoading && vals.length > 1 && (
+                  <div
+                    style={{
+                      padding: "9px 12px 11px",
+                      borderTop: `1px solid ${R.sep}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 8.5,
+                        color: R.textDim,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.4,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <span>trend</span>
+                      {floor > 0 && <span>floor £{Math.round(floor)}</span>}
+                    </div>
+                    <svg
+                      width="100%"
+                      height={sh}
+                      viewBox={`0 0 ${sw} ${sh}`}
+                      preserveAspectRatio="none"
+                    >
+                      {floor > 0 && (
+                        <line
+                          x1={sp}
+                          y1={spy(floor).toFixed(1)}
+                          x2={sw - sp}
+                          y2={spy(floor).toFixed(1)}
+                          stroke={R.gold}
+                          strokeWidth={1}
+                          strokeDasharray="3 3"
+                          opacity={0.5}
+                        />
+                      )}
+                      <polyline
+                        points={poly}
+                        fill="none"
+                        stroke={R.warmTeal}
+                        strokeWidth={1.6}
+                      />
+                      <circle
+                        cx={spx(vals.length - 1).toFixed(1)}
+                        cy={spy(vals[vals.length - 1]).toFixed(1)}
+                        r={2.4}
+                        fill={R.accent}
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })(),
+          document.body,
+        )}
 
       <div style={styles.container}>
         {/* Header */}
@@ -1707,9 +2055,23 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                               </button>
                             </div>
                           </td>
-                          {visibleData.map((day) => (
+                          {visibleData.map((day) => {
+                            const histClickable = day.liveRate > 0;
+                            const histActive = historyCell?.date === day.date;
+                            return (
                             <td
                               key={day.date}
+                              className={histClickable ? "rm-hist-cell" : undefined}
+                              onClick={
+                                histClickable
+                                  ? (e) => openRateHistory(day, e)
+                                  : undefined
+                              }
+                              title={
+                                histClickable
+                                  ? "Click for last 10 rate changes"
+                                  : undefined
+                              }
                               style={{
                                 borderBottom: `1px solid ${R.sep}`,
                                 textAlign: "center",
@@ -1719,15 +2081,44 @@ export function RateManagerView({ allHotels }: RateManagerViewProps) {
                                 height: "44px",
                                 verticalAlign: "middle",
                                 fontVariantNumeric: "tabular-nums",
-                                backgroundColor:
-                                  getColBg(day.date),
+                                position: "relative",
+                                cursor: histClickable ? "pointer" : "default",
+                                backgroundColor: histActive
+                                  ? `${R.warmTeal}26`
+                                  : getColBg(day.date),
+                                boxShadow: histActive
+                                  ? `inset 0 0 0 1px ${R.warmTeal}66`
+                                  : undefined,
                               }}
                             >
-                              {day.liveRate > 0
-                                ? `£${Math.round(day.liveRate)}`
-                                : "-"}
+                              {histClickable ? (
+                                <span
+                                  style={{
+                                    borderBottom: `1px dotted ${R.textDim}`,
+                                    paddingBottom: 1,
+                                  }}
+                                >
+                                  £{Math.round(day.liveRate)}
+                                </span>
+                              ) : (
+                                "-"
+                              )}
+                              {histClickable && (
+                                <History
+                                  size={9}
+                                  color={R.textDim}
+                                  className="rm-hist-ic"
+                                  style={{
+                                    position: "absolute",
+                                    top: 4,
+                                    right: 5,
+                                    opacity: 0,
+                                  }}
+                                />
+                              )}
                             </td>
-                          ))}
+                            );
+                          })}
                         </tr>
                       )}
 

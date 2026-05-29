@@ -39,6 +39,21 @@ const CITY_CONFIGS = {
       zoom: 13,
     },
   },
+  "tarnawa-dolna": {
+    name: "Tarnawa Dolna, Małopolska",
+    slug: "tarnawa-dolna",
+    currency: "PLN",
+    query: "Sucha-Beskidzka--Poland",
+    center: { lat: 49.7297, lng: 19.6094 },
+    radiusKm: 10,
+    bbox: {
+      swLat: "49.63961",
+      neLat: "49.81979",
+      swLng: "19.47003",
+      neLng: "19.74877",
+      zoom: 13,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------

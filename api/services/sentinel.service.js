@@ -534,6 +534,7 @@ async function updateConfig(hotelId, updates) {
     daily_max_rates,
     seasonality_profile,
     rules, // <--- 1. NEW FIELD EXTRACTED (Yield Strategy)
+    weak_day_pricing, // [NEW] Weak Day Pricing (per-DOW floor-default config)
     rate_id_map: userProvidedRateIdMap, // [NEW 2026-05-07] Explicit user choice from Control Panel
   } = updates;
 
@@ -712,6 +713,7 @@ async function updateConfig(hotelId, updates) {
       seasonality_profile = COALESCE($12, seasonality_profile),
       rules = COALESCE($13, rules),
       is_autopilot_enabled = COALESCE($14, is_autopilot_enabled),
+      weak_day_pricing = COALESCE($15, weak_day_pricing),
       updated_at = NOW()
     WHERE hotel_id = $11
     RETURNING *;
@@ -731,6 +733,7 @@ async function updateConfig(hotelId, updates) {
       updates.seasonality_profile ? JSON.stringify(seasonality_profile) : null,
       updates.rules ? JSON.stringify(rules) : null,
       is_autopilot_enabled, // [NEW] $14
+      updates.weak_day_pricing ? JSON.stringify(weak_day_pricing) : null, // [NEW] $15
     ],
   );
 

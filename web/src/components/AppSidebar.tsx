@@ -553,17 +553,20 @@ export function AppSidebar({
 
                 {navItem("Admin", "admin", Zap)}
 
-                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDashboard", "mpReportsHub", "mpDemandRadar", "mpRiskOverview", "mpLogin", "masonDashboard", "masonStlyMockup", "masonGOPCalculator", "emailSignatures", "deckV2", "shreejiDeck", "pitchDeck", "canvas", "reportsLab", "topnavPills", "salesCrmMockup"])}
+                {sectionToggle("Studio", Palette, studioOpen, setStudioOpen, ["mpDashboard", "mpReportsHub", "mpDemandRadar", "mpDemandRadarV2", "mpRiskOverview", "mpLogin", "masonDashboard", "masonStlyMockup", "masonGOPCalculator", "masonOccStack", "masonRateCharts", "emailSignatures", "deckV2", "shreejiDeck", "pitchDeck", "canvas", "reportsLab", "topnavPills", "salesCrmMockup"])}
                 {studioOpen && (
                   <>
                     {navItem("MP Dashboard", "mpDashboard", MonitorSmartphone, true)}
                     {navItem("MP Reports", "mpReportsHub", MonitorSmartphone, true)}
                     {navItem("MP Demand Radar", "mpDemandRadar", MonitorSmartphone, true)}
+                    {navItem("MP Demand Radar v2", "mpDemandRadarV2", MonitorSmartphone, true)}
                     {navItem("MP Risk Overview", "mpRiskOverview", MonitorSmartphone, true)}
                     {navItem("MP Login", "mpLogin", MonitorSmartphone, true)}
                     {navItem("Mason Dashboard", "masonDashboard", MonitorSmartphone, true)}
                     {navItem("Mason STLY Mockup", "masonStlyMockup", MonitorSmartphone, true)}
                     {navItem("Mason GOP Calculator", "masonGOPCalculator", MonitorSmartphone, true)}
+                    {navItem("Mason Occ Stack", "masonOccStack", MonitorSmartphone, true)}
+                    {navItem("Mason Rate Charts", "masonRateCharts", MonitorSmartphone, true)}
                     {navItem("Email Signatures", "emailSignatures", MonitorSmartphone, true)}
                     {navItem("Reports Lab", "reportsLab", FileText, true)}
                     {navItem("TopNav Pills", "topnavPills", MonitorSmartphone, true)}

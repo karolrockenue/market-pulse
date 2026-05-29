@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Lock,
   User,
@@ -13,6 +14,7 @@ import {
   ArrowDown,
   Check,
   BedDouble,
+  History,
 } from "lucide-react";
 import {
   Select,
@@ -31,7 +33,8 @@ import {
   calculateSellRate,
   calculateRequiredOverride,
 } from "../../hooks/useRateGrid";
-import { getPmsPropertyIds } from "../../api/sentinel.api";
+import { getPmsPropertyIds, getRateHistory } from "../../api/sentinel.api";
+import type { RateHistoryEntry } from "../../api/types";
 
 // --- STYLES ---
 const styles: { [key: string]: React.CSSProperties } = {
@@ -182,6 +185,31 @@ const styles: { [key: string]: React.CSSProperties } = {
 interface HotelRateWindowProps {
   allHotels: any[];
   userHotels: any[];
+}
+
+// [RATE HISTORY] compact relative-time label for the audit popover.
+function relTimeFrom(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return "";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.round(hrs / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+// [RATE HISTORY] map sentinel_price_history.source -> [label, colour].
+function rateSourceBadge(src: string): [string, string] {
+  const s = (src || "").toUpperCase();
+  if (s === "OVERRIDE") return ["Override", "#C8A66E"];
+  if (s === "MANUAL" || s === "HOTEL_USER") return ["Manual", "#7A8494"];
+  if (s === "SYNC" || s === "IMPORT") return ["PMS", "#4E5868"];
+  return ["AI", "#38C6BA"];
 }
 
 export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps) {
@@ -451,6 +479,60 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
     color: isHidden ? "#4E5868" : "#38C6BA",
   });
 
+  // [RATE HISTORY] read-only audit popover for a single PMS-rate cell.
+  // Display-only: reads sentinel_price_history; never writes, queues, or pushes.
+  const [historyCell, setHistoryCell] = useState<{
+    date: string;
+    label: string;
+    liveRate: number;
+    floor: number;
+    rect: { left: number; right: number; top: number; bottom: number; width: number };
+  } | null>(null);
+  const [historyRows, setHistoryRows] = useState<RateHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyReqRef = useRef(0);
+
+  const openRateHistory = async (day: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(day.liveRate > 0) || !selectedHotel.baseRoomTypeId) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setHistoryCell({
+      date: day.date,
+      label: `${day.dayOfWeek} ${day.dayNumber} ${day.month}`,
+      liveRate: day.liveRate,
+      floor: day.guardrailMin || day.monthlyMinDefault || 0,
+      rect: {
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        width: r.width,
+      },
+    });
+    setHistoryRows([]);
+    setHistoryLoading(true);
+    const reqId = ++historyReqRef.current;
+    const rows = await getRateHistory(
+      selectedHotelId,
+      String(selectedHotel.baseRoomTypeId),
+      day.date,
+      10,
+    );
+    if (historyReqRef.current === reqId) {
+      setHistoryRows(rows);
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!historyCell) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHistoryCell(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [historyCell]);
+
   // --- RENDER ---
   return (
     <div style={styles.page}>
@@ -459,7 +541,277 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
         ::-webkit-scrollbar-track { background: #121519; border-top: 1px solid #1E2330; }
         ::-webkit-scrollbar-thumb { background: #1E2330; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #38C6BA; }
+        .rm-hist-cell:hover { background: rgba(56,198,186,0.12) !important; }
+        .rm-hist-cell:hover .rm-hist-ic { opacity: 0.55 !important; }
       `}</style>
+
+      {/* [RATE HISTORY] read-only audit popover (display-only, no push impact) */}
+      {historyCell &&
+        createPortal(
+          (() => {
+            const W = 240;
+            const rect = historyCell.rect;
+            const left = Math.max(
+              8,
+              Math.min(
+                rect.left + window.scrollX + rect.width / 2 - W / 2,
+                window.scrollX + window.innerWidth - W - 8,
+              ),
+            );
+            const estH = 340;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const openAbove = spaceBelow < estH && spaceAbove > spaceBelow;
+            const top = openAbove
+              ? rect.top + window.scrollY - 8
+              : rect.bottom + window.scrollY + 8;
+            const availH = openAbove ? spaceAbove : spaceBelow;
+            const listMax = Math.min(260, Math.max(120, availH - 130));
+            const vals = historyRows.map((r) => r.newPrice).slice().reverse();
+            const floor = historyCell.floor;
+            const base = vals.length ? vals : [historyCell.liveRate];
+            const sw = W - 28;
+            const sh = 38;
+            const sp = 4;
+            const lo = Math.min(floor > 0 ? floor : Infinity, ...base);
+            const hi = Math.max(historyCell.liveRate, ...base);
+            const span = hi - lo || 1;
+            const spx = (i: number) =>
+              sp + (vals.length > 1 ? (i * (sw - 2 * sp)) / (vals.length - 1) : 0);
+            const spy = (v: number) =>
+              sp + (sh - 2 * sp) * (1 - (v - lo) / span);
+            const poly = vals
+              .map((v, i) => `${spx(i).toFixed(1)},${spy(v).toFixed(1)}`)
+              .join(" ");
+            return (
+              <>
+                <div
+                  onClick={() => setHistoryCell(null)}
+                  style={{ position: "fixed", inset: 0, zIndex: 90 }}
+                />
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: "absolute",
+                    top,
+                    left,
+                    width: W,
+                    transform: openAbove ? "translateY(-100%)" : undefined,
+                    zIndex: 100,
+                    background: "#1C2228",
+                    border: "1px solid #2A323D",
+                    borderRadius: 10,
+                    boxShadow: "0 16px 48px rgba(0,0,0,0.55)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "10px 12px 9px",
+                      borderBottom: "1px solid rgba(255,255,255,0.05)",
+                      position: "relative",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 8.5,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        textTransform: "uppercase",
+                        color: "#C8A66E",
+                      }}
+                    >
+                      Live PMS Rate · last 10 changes
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 3,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#F3F5F7",
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span>{historyCell.label}</span>
+                      <span style={{ color: "#38C6BA" }}>
+                        £{Math.round(historyCell.liveRate)}
+                      </span>
+                    </div>
+                    <span
+                      onClick={() => setHistoryCell(null)}
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 10,
+                        color: "#4E5868",
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      ✕
+                    </span>
+                  </div>
+
+                  {historyLoading ? (
+                    <div
+                      style={{
+                        padding: "16px 12px",
+                        textAlign: "center",
+                        color: "#4E5868",
+                        fontSize: 11,
+                      }}
+                    >
+                      Loading…
+                    </div>
+                  ) : historyRows.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "16px 12px",
+                        textAlign: "center",
+                        color: "#4E5868",
+                        fontSize: 11,
+                      }}
+                    >
+                      No changes recorded.
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: listMax, overflowY: "auto" }}>
+                      {historyRows.map((row, k) => {
+                        const older = historyRows[k + 1]?.newPrice;
+                        const dir =
+                          older == null
+                            ? ""
+                            : row.newPrice < older
+                              ? "dn"
+                              : row.newPrice > older
+                                ? "up"
+                                : "";
+                        const arr =
+                          dir === "dn" ? "▼" : dir === "up" ? "▲" : "";
+                        const [stxt, scol] = rateSourceBadge(row.source);
+                        return (
+                          <div
+                            key={k}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "44px 1fr auto",
+                              gap: 6,
+                              alignItems: "center",
+                              padding: "6px 12px",
+                              borderBottom: "1px solid rgba(255,255,255,0.05)",
+                              fontSize: 11,
+                            }}
+                          >
+                            <span style={{ color: "#4E5868" }}>
+                              {relTimeFrom(row.createdAt)}
+                            </span>
+                            <span
+                              style={{
+                                color: "#F3F5F7",
+                                fontWeight: 600,
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              £{Math.round(row.newPrice)}
+                              {arr && (
+                                <span
+                                  style={{
+                                    fontSize: 8,
+                                    marginLeft: 4,
+                                    fontWeight: 400,
+                                    color:
+                                      dir === "dn"
+                                        ? "rgba(239,68,68,0.8)"
+                                        : "rgba(52,208,104,0.85)",
+                                  }}
+                                >
+                                  {arr}
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 7.5,
+                                fontWeight: 700,
+                                letterSpacing: 0.3,
+                                textTransform: "uppercase",
+                                padding: "2px 6px",
+                                borderRadius: 999,
+                                color: scol,
+                                background: `${scol}1f`,
+                                border: `1px solid ${scol}44`,
+                                justifySelf: "end",
+                              }}
+                            >
+                              {stxt}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!historyLoading && vals.length > 1 && (
+                    <div
+                      style={{
+                        padding: "9px 12px 11px",
+                        borderTop: "1px solid rgba(255,255,255,0.05)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 8.5,
+                          color: "#4E5868",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.4,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span>trend</span>
+                        {floor > 0 && <span>floor £{Math.round(floor)}</span>}
+                      </div>
+                      <svg
+                        width="100%"
+                        height={sh}
+                        viewBox={`0 0 ${sw} ${sh}`}
+                        preserveAspectRatio="none"
+                      >
+                        {floor > 0 && (
+                          <line
+                            x1={sp}
+                            y1={spy(floor).toFixed(1)}
+                            x2={sw - sp}
+                            y2={spy(floor).toFixed(1)}
+                            stroke="#C8A66E"
+                            strokeWidth={1}
+                            strokeDasharray="3 3"
+                            opacity={0.5}
+                          />
+                        )}
+                        <polyline
+                          points={poly}
+                          fill="none"
+                          stroke="#38C6BA"
+                          strokeWidth={1.6}
+                        />
+                        <circle
+                          cx={spx(vals.length - 1).toFixed(1)}
+                          cy={spy(vals[vals.length - 1]).toFixed(1)}
+                          r={2.4}
+                          fill="#F3F5F7"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })(),
+          document.body,
+        )}
 
       <div style={styles.container}>
         {/* Header */}
@@ -1178,9 +1530,23 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                           <td style={{ ...styles.tdSticky, color: "#7A8494", fontWeight: 400, borderLeft: "3px solid transparent" }}>
                             Live PMS Rate
                           </td>
-                          {visibleData.map((day) => (
+                          {visibleData.map((day) => {
+                            const histClickable = day.liveRate > 0;
+                            const histActive = historyCell?.date === day.date;
+                            return (
                             <td
                               key={day.date}
+                              className={histClickable ? "rm-hist-cell" : undefined}
+                              onClick={
+                                histClickable
+                                  ? (e) => openRateHistory(day, e)
+                                  : undefined
+                              }
+                              title={
+                                histClickable
+                                  ? "Click for last 10 rate changes"
+                                  : undefined
+                              }
                               style={{
                                 textAlign: "center",
                                 color: "#F3F5F7",
@@ -1190,15 +1556,44 @@ export function HotelRateWindow({ allHotels, userHotels }: HotelRateWindowProps)
                                 verticalAlign: "middle",
                                 fontVariantNumeric: "tabular-nums",
                                 borderBottom: "1px solid rgba(255,255,255,0.04)",
-                                backgroundColor:
-                                  getColBg(day.date),
+                                position: "relative",
+                                cursor: histClickable ? "pointer" : "default",
+                                backgroundColor: histActive
+                                  ? "rgba(56,198,186,0.15)"
+                                  : getColBg(day.date),
+                                boxShadow: histActive
+                                  ? "inset 0 0 0 1px rgba(56,198,186,0.4)"
+                                  : undefined,
                               }}
                             >
-                              {day.liveRate > 0
-                                ? `£${Math.round(day.liveRate)}`
-                                : "-"}
+                              {histClickable ? (
+                                <span
+                                  style={{
+                                    borderBottom: "1px dotted #4E5868",
+                                    paddingBottom: 1,
+                                  }}
+                                >
+                                  £{Math.round(day.liveRate)}
+                                </span>
+                              ) : (
+                                "-"
+                              )}
+                              {histClickable && (
+                                <History
+                                  size={9}
+                                  color="#4E5868"
+                                  className="rm-hist-ic"
+                                  style={{
+                                    position: "absolute",
+                                    top: 4,
+                                    right: 5,
+                                    opacity: 0,
+                                  }}
+                                />
+                              )}
                             </td>
-                          ))}
+                            );
+                          })}
                         </tr>
                       )}
 

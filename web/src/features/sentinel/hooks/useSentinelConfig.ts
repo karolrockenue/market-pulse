@@ -64,6 +64,13 @@ const DEFAULT_RULES: Partial<SentinelConfig> = {
   },
   seasonality_profile: {}, // <--- ADD THIS
   rules: { strategy_mode: "maintain" }, // [NEW] Yield Strategy Defaults
+  weak_day_pricing: {
+    enabled: false,
+    days: ["sun", "mon"],
+    floors: {},
+    lift_margin_pts: "15",
+    lift_pickup_hours: "24",
+  },
   daily_max_rates: {},
   pms_room_types: { data: [] },
 };
@@ -265,6 +272,18 @@ export const useSentinelConfig = (allHotels: any[]) => {
           // [NEW] Capture Yield Strategy Rules
           rules: data.rules || DEFAULT_RULES.rules,
 
+          // [NEW] Capture Weak Day Pricing (merge over defaults so the shape is
+          // always complete, even for hotels saved before this column existed)
+          weak_day_pricing: {
+            ...DEFAULT_RULES.weak_day_pricing,
+            ...(data.weak_day_pricing || {}),
+            floors: data.weak_day_pricing?.floors || {},
+            days:
+              data.weak_day_pricing?.days ||
+              DEFAULT_RULES.weak_day_pricing?.days ||
+              [],
+          },
+
           daily_max_rates: maxRates || {},
           pms_room_types: data.pms_room_types || { data: [] },
           pms_rate_plans: data.pms_rate_plans || { data: [] },
@@ -415,6 +434,25 @@ export const useSentinelConfig = (allHotels: any[]) => {
           rules.last_minute_floor.rate = "0";
         if (rules.last_minute_floor.days === "")
           rules.last_minute_floor.days = "0";
+      }
+
+      // [NEW] Weak Day Pricing sanitize. Drop blank/invalid floors entirely so a
+      // missing value means "fall back to the monthly min" — NEVER £0. Default
+      // the lift gates if cleared.
+      if (rules.weak_day_pricing) {
+        const wdp = { ...rules.weak_day_pricing };
+        const cleanFloors: Record<string, string> = {};
+        Object.entries(wdp.floors || {}).forEach(([d, v]) => {
+          const n = parseFloat(String(v));
+          if (Number.isFinite(n) && n > 0) cleanFloors[d] = String(n);
+        });
+        wdp.floors = cleanFloors;
+        if (!wdp.lift_margin_pts || wdp.lift_margin_pts === "")
+          wdp.lift_margin_pts = "15";
+        if (!wdp.lift_pickup_hours || wdp.lift_pickup_hours === "")
+          wdp.lift_pickup_hours = "24";
+        if (!Array.isArray(wdp.days)) wdp.days = [];
+        rules.weak_day_pricing = wdp;
       }
 
       // -----------------------------------------------------------------------

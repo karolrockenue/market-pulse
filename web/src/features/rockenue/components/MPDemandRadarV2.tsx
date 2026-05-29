@@ -153,7 +153,7 @@ const ZONES = [
 // selectedProperty / allHotels context. Everything else is a verbatim clone.
 interface DemandRadarProps { activeView?: string; onNavigate?: (view: string) => void }
 
-export function MPDemandRadar(_props: DemandRadarProps) {
+export function MPDemandRadarV2(_props: DemandRadarProps) {
   const cityName = "London";
   const citySlug = useMemo(() => {
     return cityName ? cityName.toLowerCase().replace(/\s+/g, "-") : "";
@@ -416,6 +416,19 @@ export function MPDemandRadar(_props: DemandRadarProps) {
     return { bg: "rgba(234,179,8,0.08)", border: "rgba(234,179,8,0.3)", icon: MP.amber, text: "#fde047", Icon };
   })();
 
+  // CONCEPT (Idea 5): near-term (actionable) vs horizon (early-booking) split.
+  // A single 90-day average buries the fact that far-out months look soft only
+  // because they haven't filled yet — split them so the headline stays honest.
+  const split = useMemo(() => {
+    const band = (v: number) => v >= 70 ? "peak" : v >= 58 ? "strong" : v >= 45 ? "steady" : v >= 30 ? "soft" : "weak";
+    const lvl = (arr: any[]) => arr.length ? Math.round(arr.reduce((s, d) => s + d.absScore, 0) / arr.length) : 0;
+    const near = days.slice(0, 14), horizon = days.slice(14);
+    const n = lvl(near), h = lvl(horizon);
+    return { near: n, horizon: h, nearBand: band(n), horizonBand: band(h),
+      nearStrong: near.filter((d) => d.absScore >= 60).length,
+      horizonStrong: horizon.filter((d) => d.absScore >= 60).length };
+  }, [days]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: MP.bg }}>
@@ -473,7 +486,7 @@ export function MPDemandRadar(_props: DemandRadarProps) {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
           <Activity style={{ width: "24px", height: "24px", color: MP.accent }} />
           <h1 style={{ color: MP.text, fontSize: "24px", margin: 0, fontWeight: 600 }}>Demand Radar</h1>
-          <span style={{ fontSize: "10px", color: "#7BAFD4", backgroundColor: "rgba(123,175,212,0.08)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2</span>
+          <span style={{ fontSize: "10px", color: "#7BAFD4", backgroundColor: "rgba(123,175,212,0.08)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2 · calendar</span>
         </div>
         <p style={{ color: MP.textSec, margin: "0 0 20px", fontSize: "13px" }}>
           90-day forward market intelligence for {cityName || citySlug} • Live {citySlug === "archanes" ? "Airbnb" : "Booking.com"} data
@@ -535,6 +548,23 @@ export function MPDemandRadar(_props: DemandRadarProps) {
           ))}
         </div>
 
+        {/* ── NEAR-TERM vs HORIZON (Idea 5) ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px" }}>
+          {[
+            { tag: "NEXT 14 DAYS", note: "actionable window", lvl: split.near, band: split.nearBand, strong: split.nearStrong, n: 14 },
+            { tag: "HORIZON · DAYS 15–90", note: "still booking — reads soft because it hasn't filled", lvl: split.horizon, band: split.horizonBand, strong: split.horizonStrong, n: Math.max(0, days.length - 14) },
+          ].map((s) => (
+            <div key={s.tag} style={{ backgroundColor: MP.card, border: `1px solid ${MP.border}`, borderRadius: "8px", padding: "14px 18px", display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{ fontSize: "30px", fontWeight: 700, color: absColor(s.lvl), lineHeight: 1 }}>{s.lvl}<span style={{ fontSize: "14px", color: MP.textSec, fontWeight: 600 }}>/100</span></div>
+              <div>
+                <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.tag}</div>
+                <div style={{ fontSize: "15px", fontWeight: 600, color: absColor(s.lvl), textTransform: "capitalize" }}>{s.band}</div>
+                <div style={{ fontSize: "11px", color: MP.textSec, marginTop: "1px" }}>{s.strong} strong days · {s.note}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* ── SIGNALS ── */}
         {(stats.risingDemandFlatPrice > 0 || stats.compressed > 0 || stats.lowDemand > 0) && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "24px" }}>
@@ -561,12 +591,12 @@ export function MPDemandRadar(_props: DemandRadarProps) {
             ══════════════════════════════════════════════════════════════════ */}
         <div style={{ backgroundColor: MP.card, borderRadius: "8px 8px 0 0", border: `1px solid ${MP.border}`, borderBottom: "none" }}>
           <div style={{ padding: "16px 20px", borderBottom: `1px solid ${MP.border}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "10px" }}>
               <div>
                 <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>90-DAY FORWARD VIEW</div>
-                <h3 style={{ color: MP.text, fontSize: "18px", fontWeight: 600, margin: 0 }}>How Busy Is the Market?</h3>
+                <h3 style={{ color: MP.text, fontSize: "18px", fontWeight: 600, margin: 0 }}>Demand Calendar</h3>
                 <p style={{ color: MP.textSec, fontSize: "11px", margin: "2px 0 0" }}>
-                  Demand anchored to the all-history range (WAP {curr}{ANCHORS.wapLo}–{curr}{ANCHORS.wapHi}, supply {ANCHORS.supLo.toLocaleString()}–{ANCHORS.supHi.toLocaleString()}) — a score means the same every day
+                  Same absolute demand, laid out the way you read a month — colour = strength, number = score, {curr} = rate, ▲▼ = pace. The strong clusters jump out
                 </p>
               </div>
               <div style={{ display: "flex", gap: "14px", fontSize: "11px", alignItems: "center" }}>
@@ -577,40 +607,8 @@ export function MPDemandRadar(_props: DemandRadarProps) {
               </div>
             </div>
           </div>
-          <div style={{ padding: "8px 20px 0" }}>
-            <div style={{ position: "relative" }}>
-              {/* Top labels — rotated */}
-              <EventLabels days={days} curr={curr} />
-              {/* Background event columns */}
-              <div style={{ position: "absolute", top: "160px", left: "20px", right: "10px", bottom: 0, display: "flex", pointerEvents: "none" }}>
-                {days.map((d) => (
-                  <div key={d.i} style={{ flex: 1, backgroundColor: d.event ? "#7BAFD4" : "transparent", opacity: d.event ? (d.event.localRank >= 95 ? 0.08 : 0.04) : 0 }} />
-                ))}
-              </div>
-              {/* Chart */}
-              <div style={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={days} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} syncId="dr">
-                    <XAxis dataKey="xLabel" {...axisStyle} interval={0} tickLine={false} height={20} tick={({ x, y, payload }: any) => payload?.value ? <text x={x} y={y + 12} textAnchor="middle" fill={MP.textMuted} fontSize={9}>{payload.value}</text> : null} />
-                    <YAxis {...axisStyle} width={35} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip {...tipStyle} cursor={{ stroke: MP.accent, strokeOpacity: 0.15, strokeWidth: 1 }}
-                      labelFormatter={(_l, p) => { const d = p?.[0]?.payload; return d ? d.shortLabel : _l; }}
-                      formatter={(v: number, name: string) => [`${v}%`, name]} />
-                    <Bar dataKey="absScore" name="Demand" radius={[2, 2, 0, 0]} maxBarSize={10}>
-                      {days.map((d, i) => <Cell key={i} fill={absColor(d.absScore)} fillOpacity={0.85} />)}
-                      {/* CONCEPT: pace ▲/▼ above each bar (supply tightening vs 7d ago) */}
-                      <LabelList dataKey="paceTighten" content={(props: any) => {
-                        const { x, y, width, value } = props;
-                        if (value == null || Math.abs(value) < 3) return null;
-                        const up = value > 0;
-                        return <text x={x + width / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={700} fill={up ? MP.green : MP.red}>{up ? "▲" : "▼"}</text>;
-                      }} />
-                    </Bar>
-                    <Line type="monotone" dataKey="absScoreMa" name="7d trend" stroke={MP.accent} strokeWidth={2} strokeDasharray="6 3" dot={false} strokeOpacity={0.7} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          <div style={{ padding: "18px 20px 6px" }}>
+            <CalendarHeatmap days={days} curr={curr} />
           </div>
         </div>
 
@@ -1201,6 +1199,80 @@ function Signal({ icon, color, title, detail }: { icon: React.ReactNode; color: 
         <span style={{ fontSize: "13px", fontWeight: 600, color: MP.text }}>{title}</span>
       </div>
       <p style={{ fontSize: "11px", color: MP.textSec, margin: 0, lineHeight: 1.4 }}>{detail}</p>
+    </div>
+  );
+}
+
+// ── CONCEPT: alternative display — demand as a month calendar heatmap ──
+function hexToRgba(hex: string, a: number) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function CalendarHeatmap({ days, curr }: { days: any[]; curr: string }) {
+  const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  // Group forward days by calendar month (UTC, matching the rest of the page)
+  const months = new Map<string, any[]>();
+  days.forEach((d) => {
+    const key = `${d.d.getUTCFullYear()}-${d.d.getUTCMonth()}`;
+    if (!months.has(key)) months.set(key, []);
+    months.get(key)!.push(d);
+  });
+  const monthName = (y: number, m: number) =>
+    new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "22px" }}>
+      {[...months.values()].map((mdays) => {
+        const y = mdays[0].d.getUTCFullYear();
+        const m = mdays[0].d.getUTCMonth();
+        const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+        const firstWd = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7; // Mon=0
+        const lookup = new Map(mdays.map((d) => [d.d.getUTCDate(), d]));
+        const cells: any[] = [];
+        for (let i = 0; i < firstWd; i++) cells.push(null);
+        for (let dn = 1; dn <= daysInMonth; dn++) cells.push(lookup.get(dn) || { empty: true, dayNum: dn });
+        return (
+          <div key={`${y}-${m}`}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: MP.text, marginBottom: "8px" }}>{monthName(y, m)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
+              {WD.map((w) => (
+                <div key={w} style={{ fontSize: "9px", color: MP.textMuted, textAlign: "center", paddingBottom: "2px" }}>{w}</div>
+              ))}
+              {cells.map((c, idx) => {
+                if (c === null) return <div key={idx} />;
+                if (c.empty)
+                  return <div key={idx} style={{ height: "46px", borderRadius: "4px", border: `1px dashed ${MP.border}`, opacity: 0.4, display: "flex", alignItems: "flex-start", padding: "3px 5px" }}>
+                    <span style={{ fontSize: "9px", color: MP.textMuted }}>{c.dayNum}</span>
+                  </div>;
+                const col = absColor(c.absScore);
+                const up = c.paceTighten >= 3, down = c.paceTighten <= -3;
+                const isWeekend = c.dow === 0 || c.dow === 6;
+                return (
+                  <div key={idx}
+                    title={`${c.shortLabel} — demand ${c.absScore}/100 · ${curr}${c.segmentWap} · supply ${c.supply.toLocaleString()}`}
+                    style={{
+                      height: "46px", borderRadius: "4px", padding: "3px 5px",
+                      background: hexToRgba(col, 0.16 + (c.absScore / 100) * 0.6),
+                      border: isWeekend ? `1px solid ${hexToRgba(col, 0.55)}` : "1px solid transparent",
+                      display: "flex", flexDirection: "column", justifyContent: "space-between", cursor: "default",
+                    }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "10px", color: MP.text, fontWeight: 600 }}>{c.dayNum}</span>
+                      {(up || down) && <span style={{ fontSize: "8px", fontWeight: 700, color: up ? MP.green : MP.red }}>{up ? "▲" : "▼"}</span>}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: MP.accent }}>{c.absScore}</span>
+                      <span style={{ fontSize: "8px", color: MP.textSec }}>{curr}{c.segmentWap}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

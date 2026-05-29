@@ -12,6 +12,7 @@ const EmailSignatures = lazy(() => import("./components/EmailSignatures").then(m
 const Canvas = lazy(() => import("./components/Canvas").then(m => ({ default: m.Canvas })));
 const MPReportsHub = lazy(() => import("./components/MPReportsHub").then(m => ({ default: m.MPReportsHub })));
 const MPDemandRadar = lazy(() => import("./components/MPDemandRadar").then(m => ({ default: m.MPDemandRadar })));
+const MPDemandRadarV2 = lazy(() => import("./components/MPDemandRadarV2").then(m => ({ default: m.MPDemandRadarV2 })));
 const MPRiskOverview = lazy(() => import("./components/MPRiskOverview").then(m => ({ default: m.MPRiskOverview })));
 const MPLogin = lazy(() => import("./components/MPLogin").then(m => ({ default: m.MPLogin })));
 const MPDashboardMockup = lazy(() => import("./components/MPDashboardMockup").then(m => ({ default: m.MPDashboardMockup })));
@@ -20,6 +21,8 @@ const MasonStlyMockup = lazy(() => import("./components/MasonStlyMockup").then(m
 const MasonSalesFlash = lazy(() => import("./components/MasonSalesFlash").then(m => ({ default: m.MasonSalesFlash })));
 const MasonPacingFlash = lazy(() => import("./components/MasonPacingFlash").then(m => ({ default: m.MasonPacingFlash })));
 const MasonGOPCalculator = lazy(() => import("./components/MasonGOPCalculator").then(m => ({ default: m.MasonGOPCalculator })));
+const MasonOccStackMockup = lazy(() => import("./components/MasonOccupancyStackMockup").then(m => ({ default: m.MasonOccupancyStackMockup })));
+const MasonRateChartsMockup = lazy(() => import("./components/MasonRateChartsMockup").then(m => ({ default: m.MasonRateChartsMockup })));
 const ReportsLab = lazy(() => import("./components/ReportsLab").then(m => ({ default: m.ReportsLab })));
 const TopNavPillsMockup = lazy(() => import("./components/TopNavPillsMockup").then(m => ({ default: m.TopNavPillsMockup })));
 const SalesCrmMockup = lazy(() => import("./components/SalesCrmMockup").then(m => ({ default: m.SalesCrmMockup })));
@@ -66,6 +69,7 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "canvas" && <Canvas />}
           {activeView === "mpReportsHub" && <MPReportsHub activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpDemandRadar" && <MPDemandRadar activeView={activeView} onNavigate={onNavigate} />}
+          {activeView === "mpDemandRadarV2" && <MPDemandRadarV2 activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpRiskOverview" && <MPRiskOverview activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpLogin" && <MPLogin activeView={activeView} onNavigate={onNavigate} />}
           {activeView === "mpDashboard" && <MPDashboardMockup />}
@@ -74,6 +78,8 @@ export function RockenueHub({ activeView, onNavigate, userName }: RockenueHubPro
           {activeView === "masonSalesFlash" && <MasonSalesFlash />}
           {activeView === "masonPacingFlash" && <MasonPacingFlash />}
           {activeView === "masonGOPCalculator" && <MasonGOPCalculator />}
+          {activeView === "masonOccStack" && <MasonOccStackMockup />}
+          {activeView === "masonRateCharts" && <MasonRateChartsMockup />}
           {activeView === "reportsLab" && <ReportsLab />}
           {activeView === "topnavPills" && <TopNavPillsMockup />}
           {activeView === "salesCrmMockup" && <SalesCrmMockup />}

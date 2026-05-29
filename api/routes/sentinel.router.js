@@ -188,6 +188,7 @@ const RATES_VIEW_PATHS = new Set([
   "/rate-overrides",
   "/apply-ai-rates",
   "/channel-pricing", // [Phase 4] resolved Booking.com waterfall steps for My Rates / Rate Manager
+  "/rate-history", // read-only rate change audit popover (My Rates + Rate Manager)
 ]);
 
 router.use(async (req, res, next) => {
@@ -1297,11 +1298,27 @@ router.post("/config/:hotelId", async (req, res) => {
     const stableMinsJson = (obj) =>
       JSON.stringify(obj || {}, Object.keys(obj || {}).sort());
 
+    // Deep order-stable serializer for nested config (e.g. weak_day_pricing,
+    // which has a nested `floors` map). The flat array-replacer above can't be
+    // reused — it would drop nested keys. Recurses, sorts object keys, keeps
+    // array order.
+    const canonical = (v) => {
+      if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+      if (v && typeof v === "object")
+        return `{${Object.keys(v)
+          .sort()
+          .map((k) => JSON.stringify(k) + ":" + canonical(v[k]))
+          .join(",")}}`;
+      return JSON.stringify(v ?? null);
+    };
+
     let priorMinsJson = null;
-    if (req.body.monthly_min_rates) {
+    let priorWeakJson = null;
+    if (req.body.monthly_min_rates || req.body.weak_day_pricing) {
       try {
         const prior = await sentinelService.getHotelConfig(hotelId);
         priorMinsJson = stableMinsJson(prior?.monthly_min_rates);
+        priorWeakJson = canonical(prior?.weak_day_pricing);
       } catch (e) {
         // Non-fatal — if we can't fetch prior, fall through to old behaviour.
         console.warn(`[Sentinel] Prior config fetch failed for ${hotelId}: ${e.message}`);
@@ -1315,7 +1332,11 @@ router.post("/config/:hotelId", async (req, res) => {
     // recalculate so updated floors are immediately enforced and pushed to PMS.
     const newMinsJson = stableMinsJson(req.body.monthly_min_rates);
     const minsChanged = priorMinsJson !== null && priorMinsJson !== newMinsJson;
-    if (updatedConfig.is_autopilot_enabled && minsChanged) {
+    const weakChanged =
+      req.body.weak_day_pricing !== undefined &&
+      priorWeakJson !== null &&
+      priorWeakJson !== canonical(req.body.weak_day_pricing);
+    if (updatedConfig.is_autopilot_enabled && (minsChanged || weakChanged)) {
       const today = new Date();
       const startDate = today.toISOString().split("T")[0];
       const endDate = new Date(today.getTime() + 365 * 86400000)
@@ -1326,7 +1347,9 @@ router.post("/config/:hotelId", async (req, res) => {
       setImmediate(async () => {
         try {
           console.log(
-            `[Sentinel] Autopilot: recalculating rates for hotel ${hotelId} after min rate change`,
+            `[Sentinel] Autopilot: recalculating rates for hotel ${hotelId} after ${
+              minsChanged ? "min rate" : "weak day pricing"
+            } change`,
           );
           await sentinelService.recalculateRates(hotelId, startDate, endDate);
         } catch (err) {
@@ -1336,9 +1359,12 @@ router.post("/config/:hotelId", async (req, res) => {
           );
         }
       });
-    } else if (updatedConfig.is_autopilot_enabled && req.body.monthly_min_rates) {
+    } else if (
+      updatedConfig.is_autopilot_enabled &&
+      (req.body.monthly_min_rates || req.body.weak_day_pricing)
+    ) {
       console.log(
-        `[Sentinel] Config save for ${hotelId}: monthly_min_rates unchanged — skipping recalc.`,
+        `[Sentinel] Config save for ${hotelId}: min rates + weak day pricing unchanged — skipping recalc.`,
       );
     }
 
@@ -2021,6 +2047,50 @@ router.get("/predictions/:hotelId", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * [NEW] GET /api/sentinel/rate-history/:hotelId/:roomTypeId?stayDate=YYYY-MM-DD&limit=10
+ * Read-only audit trail for one rate-calendar cell: the last N real price
+ * changes (no-op hourly rewrites excluded) from sentinel_price_history.
+ * Admin-only (basePath not in RATES_VIEW_PATHS). Display-only — touches no
+ * pricing, queue, or push logic. Served off the existing idx_price_history_lookup
+ * index (hotel_id, room_type_id, stay_date, created_at DESC).
+ */
+router.get("/rate-history/:hotelId/:roomTypeId", async (req, res) => {
+  const { hotelId, roomTypeId } = req.params;
+  const { stayDate } = req.query;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+  if (!stayDate) {
+    return res
+      .status(400)
+      .json({ success: false, error: "stayDate query param required" });
+  }
+  try {
+    const { rows } = await db.query(
+      `SELECT new_price, source, created_at
+         FROM sentinel_price_history
+        WHERE hotel_id = $1
+          AND room_type_id = $2
+          AND stay_date = $3::date
+          AND old_price IS DISTINCT FROM new_price
+        ORDER BY created_at DESC
+        LIMIT $4`,
+      [hotelId, roomTypeId, stayDate, limit],
+    );
+    res.status(200).json({
+      success: true,
+      data: rows.map((r) => ({
+        newPrice: Number(r.new_price),
+        source: r.source,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (error) {
+    console.error("[Sentinel Router] Fetch rate history failed:", error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 /**
  * [NEW] GET /api/sentinel/status/:hotelId
  * Fetches the last run timestamp and activity stats.

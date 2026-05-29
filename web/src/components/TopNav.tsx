@@ -291,6 +291,7 @@ export function TopNav({
       items: [
         { label: "MP Reports Hub", value: "mpReportsHub", icon: MonitorSmartphone, sectionLabel: "Market Pulse" },
         { label: "MP Demand Radar", value: "mpDemandRadar", icon: MonitorSmartphone },
+        { label: "MP Demand Radar v2", value: "mpDemandRadarV2", icon: MonitorSmartphone },
         { label: "MP Risk Overview", value: "mpRiskOverview", icon: MonitorSmartphone },
         { label: "MP Login", value: "mpLogin", icon: MonitorSmartphone },
         { label: "Email Signatures", value: "emailSignatures", icon: MonitorSmartphone },

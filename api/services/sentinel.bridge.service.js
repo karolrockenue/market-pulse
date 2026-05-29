@@ -266,6 +266,7 @@ class SentinelBridgeService {
           capacity: config.total_capacity || 0,
           base_room_type_id: config.base_room_type_id,
           last_minute_floor: config.last_minute_floor || {}, // [FIX] Pass LMF settings to AI
+          weak_day_pricing: config.weak_day_pricing || {}, // [NEW] Weak Day Pricing config for the engine
           rules: config.rules || {},
           strategy_mode: config.rules?.strategy_mode || "maintain",
           pricing_mode: config.rules?.pricing_mode || "maintain_profit", // [FIX] Expose Pricing Mode for Ruthless Decay

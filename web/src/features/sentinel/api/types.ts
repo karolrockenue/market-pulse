@@ -45,6 +45,18 @@ export interface SentinelConfig {
     strategy_mode?: "maintain" | "sell_every_room";
   };
 
+  // [NEW] Weak Day Pricing — per-DOW floor-default model. When a day is "weak"
+  // the engine holds its floor by default (any lead time) and only lifts off
+  // the floor when occupancy beats pace by `lift_margin_pts` AND there is live
+  // pickup. Floors are explicit £ per day (string for input parity with LMF).
+  weak_day_pricing?: {
+    enabled: boolean;
+    days: string[]; // e.g. ["sun", "mon"]
+    floors: Record<string, string>; // { sun: "50", mon: "55" }
+    lift_margin_pts: string;
+    lift_pickup_hours: string;
+  };
+
   // Stored Facts for UI rendering
   pms_room_types?: { data: PMSRoomType[] };
   pms_rate_plans?: { data: PMSRatePlan[] };
@@ -78,6 +90,13 @@ export interface RateCalendarDay {
   floorRateLMF: number | null;
   pickup?: number; // [NEW] Daily pickup (Live - Yesterday)
   roomsAvailable?: number; // [NEW] Capacity − rooms_sold from daily_metrics_snapshots; nightly-fresh
+}
+
+// [RATE HISTORY] One real price change for a calendar cell (no-op writes excluded).
+export interface RateHistoryEntry {
+  newPrice: number;
+  source: string;
+  createdAt: string; // ISO timestamp
 }
 
 // Overrides (legacy — calendar-level, retires after cutover)

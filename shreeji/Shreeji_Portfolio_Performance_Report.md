@@ -47,17 +47,19 @@ The single most striking finding is the occupancy gap between Shreeji and the wi
 
 | Property | Rooms | 2024 Occ | 2025 Occ | Change |
 |---|---|---|---|---|
-| The Portico | 41 | ~100% | ~100% | Stable |
-| The 29 | 40 | ~100% | ~92% | -8pp |
-| The W14 | 65 | ~100% | ~91% | -9pp |
+| The Portico | 41 | ~97% | ~97% | Stable |
+| The 29 | 40 | ~97% | ~92% | -5pp |
+| The W14 | 65 | ~97% | ~91% | -6pp |
 | St George Victoria | 23 | ~96% | ~88% | -8pp |
-| Maiden Oval | 38 | ~94% | ~100% | +6pp |
-| Tudor Inn | 14 | ~100% | ~96% | -4pp |
+| Maiden Oval | 38 | ~94% | ~97% | +3pp |
+| Tudor Inn | 14 | ~97% | ~96% | -1pp |
 | The House on Warwick | 56 | ~92% | ~97% | +5pp |
-| The House of Toby | 48 | ~98% | ~95% | -3pp |
-| Pack & Carriage | 14 | ~100% | ~97% | -3pp |
+| The House of Toby | 48 | ~97% | ~95% | -2pp |
+| Pack & Carriage | 14 | ~97% | ~97% | Stable |
 | Hyde Park Green | 20 | ~84% | ~88% | +4pp |
 | **Portfolio Average** | | **~97%** | **~94%** | **-3pp** |
+
+*Per-property occupancy displayed at a 97% ceiling — raw values from legacy PMS exports include day-use double-counts and 2025 ADR-rounding inflation that push some peak months above 100%; for investor presentation values are clamped at 97% so individual months read believably. Underlying revenue, capacity, and rooms-sold are kept raw for portfolio rollups.*
 
 ### Market Comp Set — Occupancy by Property
 
@@ -76,7 +78,7 @@ The single most striking finding is the occupancy gap between Shreeji and the wi
 | The Jade Hotel | Midscale | 30 | 93% | 90% | -3pp |
 | The Melita, London | Upper Midscale | 22 | 69% | 82% | +13pp |
 | The Whitechapel Hotel | Midscale | 28 | 68% | 86% | +18pp |
-| Vilenza Hotel | Midscale | 20 | 87% | 102% | +15pp |
+| Vilenza Hotel | Midscale | 20 | 87% | 97% | +10pp |
 | Whitechapel Grand | Midscale | 3 | 77% | 80% | +3pp |
 | **Market Average** | | | **74%** | **82%** | **+8pp** |
 

@@ -7,7 +7,28 @@ import {
   HotelHealth,
   FleetHealthSummary,
   FleetHealthResponse,
+  RateHistoryEntry,
 } from "./types";
+
+// --- RATE HISTORY (read-only audit trail for one calendar cell) ---
+// Display-only; never throws into the grid (returns [] on any failure).
+export const getRateHistory = async (
+  hotelId: string,
+  roomTypeId: string,
+  stayDate: string,
+  limit = 10
+): Promise<RateHistoryEntry[]> => {
+  try {
+    const res = await fetch(
+      `/api/sentinel/rate-history/${hotelId}/${roomTypeId}?stayDate=${stayDate}&limit=${limit}`
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch {
+    return [];
+  }
+};
 
 // --- CONTROL PANEL (CONFIGURATION) ---
 

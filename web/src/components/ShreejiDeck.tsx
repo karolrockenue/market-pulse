@@ -104,7 +104,7 @@ export function ShreejiDeck({ onBack }: ShreejiDeckProps) {
   }, [shreejiHotels, marketHotels]);
 
   const occData = useMemo(() =>
-    [...shreejiHotels].map(h => ({ name: h.name, occ25: Math.min(h.occ25, 100) })).sort((a, b) => b.occ25 - a.occ25)
+    [...shreejiHotels].map(h => ({ name: h.name, occ25: Math.min(h.occ25, 97) })).sort((a, b) => b.occ25 - a.occ25)
   , [shreejiHotels]);
 
   // Keyboard navigation

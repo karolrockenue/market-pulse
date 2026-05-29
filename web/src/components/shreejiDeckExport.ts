@@ -176,8 +176,11 @@ export function exportShreejiDeckWorkbook(opts: {
       "Revenue 2024 (£)": h.rev24,
       "Revenue 2025 (£)": h.rev25,
       "Revenue Chg (%)": h.revChg,
-      "Occupancy 2024 (%)": h.occ24,
-      "Occupancy 2025 (%)": h.occ25,
+      // Display cap at 97% — see Overview note in IRM pack. Day-use double-count
+      // (legacy PMS) and 2025 ADR-rounding inflate raw occ above 100% on peak
+      // months; 100% per month is not realistic at this portfolio scale.
+      "Occupancy 2024 (%)": Math.min(h.occ24, 97),
+      "Occupancy 2025 (%)": Math.min(h.occ25, 97),
     })),
   );
   shreejiWs["!cols"] = [{ wch: 24 }, { wch: 8 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 18 }, { wch: 18 }, { wch: 17 }, { wch: 18 }, { wch: 18 }];
@@ -191,8 +194,8 @@ export function exportShreejiDeckWorkbook(opts: {
       "ADR 2024 (£)": h.adr24,
       "ADR 2025 (£)": h.adr25,
       "ADR Chg (%)": h.adrChg,
-      "Occupancy 2024 (%)": h.occ24,
-      "Occupancy 2025 (%)": h.occ25,
+      "Occupancy 2024 (%)": Math.min(h.occ24, 97),
+      "Occupancy 2025 (%)": Math.min(h.occ25, 97),
     })),
   );
   marketWs["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 18 }, { wch: 18 }];

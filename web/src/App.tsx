@@ -984,6 +984,7 @@ export default function App() {
             activeView === "canvas" ||
             activeView === "mpReportsHub" ||
             activeView === "mpDemandRadar" ||
+            activeView === "mpDemandRadarV2" ||
             activeView === "mpRiskOverview" ||
             activeView === "mpLogin" ||
             activeView === "mpDashboard" ||
@@ -992,6 +993,8 @@ export default function App() {
             activeView === "masonSalesFlash" ||
             activeView === "masonPacingFlash" ||
             activeView === "masonGOPCalculator" ||
+            activeView === "masonOccStack" ||
+            activeView === "masonRateCharts" ||
             activeView === "reportsLab" ||
             activeView === "topnavPills" ||
             activeView === "salesCrmMockup" ||

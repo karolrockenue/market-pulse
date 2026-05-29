@@ -423,6 +423,14 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
     updateRule(hotelId, "last_minute_floor.dow", newDow);
   };
 
+  const toggleWeakDay = (hotelId: string, day: string) => {
+    const current = formState[hotelId]?.weak_day_pricing?.days || [];
+    const newDays = current.includes(day)
+      ? current.filter((d: string) => d !== day)
+      : [...current, day];
+    updateRule(hotelId, "weak_day_pricing.days", newDays);
+  };
+
   const handleDifferentialChange = (
     hotelId: string,
     roomTypeId: string,
@@ -2600,6 +2608,411 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                   </div>
                                 </div>
                               </div>
+                            )}
+                          </div>
+                          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
+                          {/* 2.4. Weak Day Pricing — per-DOW floor-default model */}
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.75rem",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <div>
+                                <h3
+                                  style={{
+                                    color: "#F3F5F7",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  Weak Day Pricing
+                                </h3>
+                                <p
+                                  style={{
+                                    color: "#7A8494",
+                                    fontSize: "10px",
+                                    marginTop: "0.125rem",
+                                  }}
+                                >
+                                  Treat quiet days (Sun/Mon) as low-demand: hold
+                                  the floor by default, lift only on real pickup
+                                </p>
+                              </div>
+                              <Switch
+                                checked={
+                                  formState[hotel.hotel_id]?.weak_day_pricing
+                                    ?.enabled || false
+                                }
+                                onCheckedChange={(c) =>
+                                  updateRule(
+                                    String(hotel.hotel_id),
+                                    "weak_day_pricing.enabled",
+                                    c,
+                                  )
+                                }
+                              />
+                            </div>
+
+                            {formState[hotel.hotel_id]?.weak_day_pricing
+                              ?.enabled && (
+                            <div
+                              style={{
+                                background: "#121519",
+                                border: "1px solid rgba(56,198,186,0.3)",
+                                borderRadius: "0.5rem",
+                                padding: "1rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "1rem",
+                              }}
+                            >
+                              {/* Weak days chip selector */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "0.5rem",
+                                }}
+                              >
+                                <Label
+                                  style={{
+                                    color: "#7A8494",
+                                    fontSize: "0.75rem",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                  }}
+                                >
+                                  Weak Days
+                                </Label>
+                                <div style={{ display: "flex", gap: "0.375rem" }}>
+                                  {[
+                                    { k: "mon", l: "Mon" },
+                                    { k: "tue", l: "Tue" },
+                                    { k: "wed", l: "Wed" },
+                                    { k: "thu", l: "Thu" },
+                                    { k: "fri", l: "Fri" },
+                                    { k: "sat", l: "Sat" },
+                                    { k: "sun", l: "Sun" },
+                                  ].map((day) => {
+                                    const isActive =
+                                      formState[
+                                        hotel.hotel_id
+                                      ]?.weak_day_pricing?.days?.includes(
+                                        day.k,
+                                      ) || false;
+                                    return (
+                                      <button
+                                        key={day.k}
+                                        onClick={() =>
+                                          toggleWeakDay(
+                                            String(hotel.hotel_id),
+                                            day.k,
+                                          )
+                                        }
+                                        style={{
+                                          flex: 1,
+                                          padding: "0.5rem",
+                                          borderRadius: "0.25rem",
+                                          fontSize: "0.75rem",
+                                          textAlign: "center",
+                                          cursor: "pointer",
+                                          border: isActive
+                                            ? "2px solid rgba(56,198,186,0.5)"
+                                            : "2px solid #1E2330",
+                                          background: isActive
+                                            ? "rgba(56,198,186,0.2)"
+                                            : "#121519",
+                                          color: isActive ? "#38C6BA" : "#7A8494",
+                                        }}
+                                      >
+                                        {day.l}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <span
+                                  style={{ color: "#7A8494", fontSize: "10px" }}
+                                >
+                                  Per-hotel. Defaults to Sun + Mon.
+                                </span>
+                              </div>
+
+                              <div
+                                style={{
+                                  borderTop: "1px solid rgba(255,255,255,0.04)",
+                                }}
+                              ></div>
+
+                              {/* Per-day explicit £ floor */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "0.5rem",
+                                }}
+                              >
+                                <Label
+                                  style={{
+                                    color: "#7A8494",
+                                    fontSize: "0.75rem",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                  }}
+                                >
+                                  Floor Rate per Weak Day
+                                </Label>
+                                {(() => {
+                                  const dowLabels: Record<string, string> = {
+                                    mon: "Monday",
+                                    tue: "Tuesday",
+                                    wed: "Wednesday",
+                                    thu: "Thursday",
+                                    fri: "Friday",
+                                    sat: "Saturday",
+                                    sun: "Sunday",
+                                  };
+                                  const selected = [
+                                    "mon",
+                                    "tue",
+                                    "wed",
+                                    "thu",
+                                    "fri",
+                                    "sat",
+                                    "sun",
+                                  ].filter((d) =>
+                                    formState[
+                                      hotel.hotel_id
+                                    ]?.weak_day_pricing?.days?.includes(d),
+                                  );
+                                  if (selected.length === 0) {
+                                    return (
+                                      <span
+                                        style={{
+                                          color: "#7A8494",
+                                          fontSize: "10px",
+                                        }}
+                                      >
+                                        No weak days selected.
+                                      </span>
+                                    );
+                                  }
+                                  return selected.map((d) => (
+                                    <div
+                                      key={d}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: "0.75rem",
+                                        padding: "0.625rem 0.75rem",
+                                        background: "#0E1116",
+                                        border: "1px solid #1E2330",
+                                        borderRadius: "0.375rem",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "0.85rem",
+                                          color: "#F3F5F7",
+                                        }}
+                                      >
+                                        {dowLabels[d]}
+                                      </span>
+                                      <div
+                                        style={{
+                                          position: "relative",
+                                          width: "130px",
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            left: "0.625rem",
+                                            top: "50%",
+                                            transform: "translateY(-50%)",
+                                            color: "#7A8494",
+                                            fontSize: "0.8rem",
+                                          }}
+                                        >
+                                          £
+                                        </span>
+                                        <Input
+                                          type="number"
+                                          placeholder="monthly min"
+                                          value={
+                                            formState[hotel.hotel_id]
+                                              ?.weak_day_pricing?.floors?.[d] ??
+                                            ""
+                                          }
+                                          onChange={(e) =>
+                                            updateRule(
+                                              String(hotel.hotel_id),
+                                              `weak_day_pricing.floors.${d}`,
+                                              e.target.value,
+                                            )
+                                          }
+                                          style={{
+                                            backgroundColor: "#0E1116",
+                                            paddingLeft: "1.375rem",
+                                          }}
+                                          className="border-[#1E2330] text-[#F3F5F7] h-9 text-sm"
+                                        />
+                                      </div>
+                                    </div>
+                                  ));
+                                })()}
+                                <span
+                                  style={{ color: "#7A8494", fontSize: "10px" }}
+                                >
+                                  Explicit £ — blank uses the monthly min.
+                                  Resolution: daily override → this → monthly min.
+                                </span>
+                              </div>
+
+                              <div
+                                style={{
+                                  borderTop: "1px solid rgba(255,255,255,0.04)",
+                                }}
+                              ></div>
+
+                              {/* Lift-off rule */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "0.5rem",
+                                }}
+                              >
+                                <Label
+                                  style={{
+                                    color: "#7A8494",
+                                    fontSize: "0.75rem",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                  }}
+                                >
+                                  Lift Off Floor When…
+                                </Label>
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(2, 1fr)",
+                                    gap: "1rem",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "0.375rem",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        color: "#7A8494",
+                                        fontSize: "10px",
+                                      }}
+                                    >
+                                      Occupancy beats pace target by
+                                    </span>
+                                    <div style={{ position: "relative" }}>
+                                      <Input
+                                        type="number"
+                                        value={
+                                          formState[hotel.hotel_id]
+                                            ?.weak_day_pricing
+                                            ?.lift_margin_pts ?? ""
+                                        }
+                                        onChange={(e) =>
+                                          updateRule(
+                                            String(hotel.hotel_id),
+                                            "weak_day_pricing.lift_margin_pts",
+                                            e.target.value,
+                                          )
+                                        }
+                                        style={{ backgroundColor: "#0E1116" }}
+                                        className="border-[#1E2330] text-[#F3F5F7] pr-12 h-9 text-sm"
+                                      />
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          right: "0.75rem",
+                                          top: "50%",
+                                          transform: "translateY(-50%)",
+                                          color: "#7A8494",
+                                          fontSize: "0.75rem",
+                                        }}
+                                      >
+                                        pts
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "0.375rem",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        color: "#7A8494",
+                                        fontSize: "10px",
+                                      }}
+                                    >
+                                      …and live pickup within
+                                    </span>
+                                    <div style={{ position: "relative" }}>
+                                      <Input
+                                        type="number"
+                                        value={
+                                          formState[hotel.hotel_id]
+                                            ?.weak_day_pricing
+                                            ?.lift_pickup_hours ?? ""
+                                        }
+                                        onChange={(e) =>
+                                          updateRule(
+                                            String(hotel.hotel_id),
+                                            "weak_day_pricing.lift_pickup_hours",
+                                            e.target.value,
+                                          )
+                                        }
+                                        style={{ backgroundColor: "#0E1116" }}
+                                        className="border-[#1E2330] text-[#F3F5F7] pr-12 h-9 text-sm"
+                                      />
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          right: "0.75rem",
+                                          top: "50%",
+                                          transform: "translateY(-50%)",
+                                          color: "#7A8494",
+                                          fontSize: "0.75rem",
+                                        }}
+                                      >
+                                        hrs
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <span
+                                  style={{ color: "#7A8494", fontSize: "10px" }}
+                                >
+                                  Both must be true — otherwise the day stays on
+                                  its floor regardless of lead time.
+                                </span>
+                              </div>
+                            </div>
                             )}
                           </div>
                           <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}></div>
