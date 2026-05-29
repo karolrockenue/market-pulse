@@ -201,14 +201,15 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
   const daysFromNow = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   const {
-    last_minute_floor = {},
-    monthly_min_rates = {},
     rate_freeze_period = "0",
     guardrail_max = "400",
   } = config;
-  // NB: a destructuring default only fills `undefined`, NOT `null`. The
-  // weak_day_pricing column is null for hotels that haven't enabled it, so
-  // coalesce explicitly or `weak_day_pricing.enabled` throws (broke rate load).
+  // NB: a destructuring default only fills `undefined`, NOT `null`. These JSONB
+  // columns can be null for under-configured hotels, so coalesce explicitly —
+  // otherwise `monthly_min_rates[month]` / `last_minute_floor.enabled` /
+  // `weak_day_pricing.enabled` throw and crash rate loading (Durrant / Archanes).
+  const last_minute_floor = config.last_minute_floor || {};
+  const monthly_min_rates = config.monthly_min_rates || {};
   const weak_day_pricing = config.weak_day_pricing || {};
 
   // A. MONTHLY MIN RATE (Calculated early for fallback usage)
@@ -230,7 +231,7 @@ function applyGuardrails(suggestedRate, livePmsRate, config, date) {
   const monthlyMin = parseFloat(monthly_min_rates[monthKey] || "0");
 
   // A2. DAILY MIN OVERRIDE (takes precedence over monthly)
-  const { daily_min_rates = {} } = config;
+  const daily_min_rates = config.daily_min_rates || {};
   const dateStrForMin = utcTarget.toISOString().split("T")[0];
   const dailyMinVal = daily_min_rates[dateStrForMin] !== undefined
     ? parseFloat(daily_min_rates[dateStrForMin])
