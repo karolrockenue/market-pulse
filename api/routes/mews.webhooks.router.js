@@ -26,6 +26,7 @@ const express = require("express");
 const router = express.Router();
 const pgPool = require("../utils/db");
 const mewsAdapter = require("../adapters/mewsAdapter");
+const mfRateSegment = require("../services/mfRateSegment");
 
 // States that represent "this reservation currently holds inventory".
 // services/getAvailability (the refresh-job truth source) counts all of
@@ -262,6 +263,15 @@ router.post("/", async (req, res) => {
       const rStatus = state.toLowerCase();
       const rSource = reservation.Origin || "Mews";
 
+      // Resolve M&F rate_segment at booking time (short|mid|long|exclude).
+      // Returns null for non-M&F hotels; never throws (mason-and-fifth.md §19.3).
+      const rateSegment = await mfRateSegment.classifyReservation(
+        hotel_id,
+        credentials,
+        reservation.RateId,
+        reservation.ServiceId,
+      );
+
       try {
         await pgPool.query(
           `INSERT INTO daily_bookings_record
@@ -287,8 +297,8 @@ router.post("/", async (req, res) => {
 
         await pgPool.query(
           `INSERT INTO reservations
-           (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date, mews_service_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date, mews_service_id, mews_rate_id, rate_segment)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            ON CONFLICT (id, hotel_id) DO UPDATE SET
              check_out = EXCLUDED.check_out,
              nights = EXCLUDED.nights,
@@ -296,6 +306,8 @@ router.post("/", async (req, res) => {
              total_rate = EXCLUDED.total_rate,
              status = EXCLUDED.status,
              mews_service_id = EXCLUDED.mews_service_id,
+             mews_rate_id = EXCLUDED.mews_rate_id,
+             rate_segment = EXCLUDED.rate_segment,
              updated_at = NOW()`,
           [
             reservationId,
@@ -311,6 +323,8 @@ router.post("/", async (req, res) => {
             rStatus,
             bookingDate,
             reservation.ServiceId || null,
+            reservation.RateId || null,
+            rateSegment,
           ],
         );
       } catch (ledgerErr) {

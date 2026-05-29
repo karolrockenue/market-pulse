@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useDashboardData } from "../../dashboard/hooks/useDashboardData";
 import { RecentBookings } from "../../dashboard/components/RecentBookings";
+import { type RecentActivityDay } from "../../dashboard/api/dashboard.api";
 import {
   ComposedChart,
   Bar,
@@ -1213,6 +1214,9 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
   const [accessibleHotels, setAccessibleHotels] = useState<MasonHotel[] | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
+  // Recent Bookings on the M&F dashboard is Short-Stay only (rate_segment),
+  // sourced from the Mason endpoint rather than the shared dashboard summary.
+  const [recentShort, setRecentShort] = useState<RecentActivityDay[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [vatMode, setVatMode] = useState<VatMode>("gross");
@@ -1282,6 +1286,18 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
       .catch((e) => setError(String(e?.message || e)))
       .finally(() => setLoading(false));
   }, [hotelKey, window.from, window.to, activeHotelId]);
+
+  // 2b. Recent Bookings (last 7 days), Short-Stay only — Mason-specific feed.
+  useEffect(() => {
+    if (activeHotelId == null) return;
+    setRecentShort(null);
+    fetch(`/api/mason/recent-activity?hotelId=${activeHotelId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
+      .then((d: { recentActivity: RecentActivityDay[] }) =>
+        setRecentShort(d.recentActivity || []),
+      )
+      .catch(() => setRecentShort([]));
+  }, [activeHotelId]);
 
   // 3. Fetch YoY data (full TY + full LY) for the single active hotel.
   useEffect(() => {
@@ -1783,7 +1799,7 @@ export function MasonDashboard({ scopedHotelId = null, onNavigate }: MasonDashbo
             }}
           >
             <RecentBookings
-              data={dashboardData?.recentActivity || []}
+              data={recentShort || []}
               currencySymbol="£"
               onViewFullReport={onNavigate ? () => onNavigate("reports:bookings-report") : undefined}
             />

@@ -1068,9 +1068,59 @@ async function getSegmentRevenueActuals(hotelId, monthKey) {
   }
 }
 
+/**
+ * Mason Dashboard: Recent Bookings (sales ledger, last 7 days) — SHORT STAY ONLY.
+ * Mirrors MetricsService.getRecentActivity but restricts the count/revenue/
+ * room-nights to reservations classified rate_segment='short' (the canonical
+ * M&F segmentation — see mason-and-fifth.md §19.3). daily_bookings_record.id
+ * IS the Mews reservation id, so we match reservations on (id, hotel_id).
+ *
+ * The short-stay restriction lives INSIDE the daily_bookings_record join (via
+ * EXISTS), not a top-level WHERE — a top-level filter on the right side of the
+ * LEFT JOIN would drop whole days that had only non-short bookings, instead of
+ * showing them as zero. Returns the identical row shape to the shared endpoint.
+ */
+async function getRecentActivity(hotelId) {
+  const query = `
+    WITH dates AS (
+      SELECT generate_series(
+        CURRENT_DATE - INTERVAL '6 days',
+        CURRENT_DATE,
+        '1 day'::interval
+      )::date AS date
+    )
+    SELECT
+      TO_CHAR(dates.date, 'Dy DD Mon') AS "dateStr",
+      CASE WHEN dates.date = CURRENT_DATE THEN true ELSE false END AS "isToday",
+      COALESCE(COUNT(dbr.id), 0) AS bookings,
+      COALESCE(SUM(dbr.room_nights), 0) AS "roomNights",
+      COALESCE(SUM(dbr.revenue), 0) AS revenue,
+      CASE
+        WHEN COALESCE(SUM(dbr.room_nights), 0) > 0
+        THEN COALESCE(SUM(dbr.revenue), 0) / SUM(dbr.room_nights)
+        ELSE 0
+      END AS adr
+    FROM dates
+    LEFT JOIN daily_bookings_record dbr
+      ON dates.date = dbr.booking_date::date
+      AND dbr.hotel_id = $1
+      AND EXISTS (
+        SELECT 1 FROM reservations r
+        WHERE r.id = dbr.id
+          AND r.hotel_id = dbr.hotel_id
+          AND r.rate_segment = 'short'
+      )
+    GROUP BY dates.date
+    ORDER BY dates.date ASC;
+  `;
+  const result = await pgPool.query(query, [hotelId]);
+  return result.rows;
+}
+
 module.exports = {
   ROLES,
   LEAD_TIME_TIERS,
+  getRecentActivity,
   getDailyOccupancyByService,
   getSegmentRevenueActuals,
   getAlosByService,

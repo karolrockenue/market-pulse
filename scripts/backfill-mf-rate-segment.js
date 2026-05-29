@@ -8,8 +8,12 @@
  * rate_segment ∈ { short, mid, long, exclude }. "exclude" = comp / management
  * (kept out of every metric except Weekly Unit Pacing, where it folds into Short).
  *
+ * Classification config + resolvers live in api/services/mfRateSegment.js (the
+ * single source of truth shared with the live webhook path).
+ *
  * Re-runnable. Re-run after Dom files new Mid rate plans (they auto-classify if
- * they land in a Mid group; otherwise add the group name to RATE_GROUP_SEGMENTS).
+ * they land in a Mid group; otherwise add the group name to RATE_GROUP_SEGMENTS
+ * in api/services/mfRateSegment.js).
  *
  *   node scripts/backfill-mf-rate-segment.js              # all 3 M&F hotels
  *   node scripts/backfill-mf-rate-segment.js 318341       # one hotel
@@ -18,39 +22,15 @@
 require('dotenv').config();
 const pool = require('../api/utils/db');
 const mewsAdapter = require('../api/adapters/mewsAdapter');
+// Classification config + resolvers now live in one place so this historical
+// backfill and the live webhook path (mews.webhooks.router.js) can never drift.
+const {
+  MF_HOTEL_IDS,
+  buildRateSegmentMap,
+  segmentFor,
+} = require('../api/services/mfRateSegment');
 
-const MF_HOTELS = [318329, 318341, 318343];
-
-// Westbourne: rate-group → segment (by group NAME; anything not listed → short).
-// Confirmed from rate-group probe; sense-check the Mid/Long lists with Dom.
-const RATE_GROUP_SEGMENTS = {
-  318341: {
-    mid: ['OLD DIRECT Mid Stay'],
-    long: ['LongStay', 'OLD DIRECT LongStay', 'OLD'],
-    exclude: ['MANAGEMENT'],
-  },
-};
-
-// Service → role, used for non-rate-group hotels AND as the fallback when a
-// Westbourne reservation has no/unknown RateId.
-const SERVICE_ROLE = {
-  318341: {
-    'e810df20-baa7-4895-a964-b26b00b051b9': 'short',
-    '4d036740-d62c-41d8-bcb6-b2e400f348b3': 'mid',
-    'c65e3632-af72-4b7a-8f64-b26b00b23336': 'long',
-    '3990f059-4fd8-47b3-ad48-b37600b41a91': 'long',
-    '72b82965-e525-4001-90d7-b26b00b26959': 'long',
-    '38bdc698-2872-4b4f-9984-b37900af2d20': 'exclude', // Management
-  },
-  318343: {
-    'b518b662-2504-4092-aa6a-b13400ade71e': 'short',
-    'b17bc567-1252-4532-8399-b37e00aad8fd': 'mid',
-    '270856f0-7b69-4425-a558-b14c0090c12d': 'long',
-  },
-  318329: {
-    'c6267c3b-144c-40e2-baf3-b3e00110df1b': 'short',
-  },
-};
+const MF_HOTELS = MF_HOTEL_IDS;
 
 const argHotelId = process.argv[2] ? parseInt(process.argv[2], 10) : null;
 const argStart = process.argv[3] || '2024-01-01';
@@ -61,33 +41,6 @@ const addDays = (iso, n) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
-
-// Build rateId → segment for a rate-group-mode hotel.
-async function buildRateSegmentMap(hotelId, credentials) {
-  const cfg = RATE_GROUP_SEGMENTS[hotelId];
-  if (!cfg) return null;
-  const toSeg = {};
-  for (const seg of ['mid', 'long', 'exclude']) for (const g of cfg[seg] || []) toSeg[g] = seg;
-
-  const resp = await mewsAdapter._callMewsApi('rates/getAll', credentials, {
-    ServiceIds: Object.keys(SERVICE_ROLE[hotelId] || {}),
-    Extent: { Rates: true, RateGroups: true },
-  });
-  const groupName = {};
-  for (const g of resp.RateGroups || []) groupName[g.Id] = g.Name;
-  const rateSeg = {};
-  for (const r of resp.Rates || []) {
-    const seg = toSeg[groupName[r.GroupId]] || 'short';
-    rateSeg[r.Id] = seg;
-  }
-  return rateSeg;
-}
-
-function segmentFor(hotelId, rateId, serviceId, rateSegMap) {
-  if (rateSegMap && rateId && rateSegMap[rateId]) return rateSegMap[rateId];
-  // fallback: service → role (also the path for Primrose/Belsize)
-  return (SERVICE_ROLE[hotelId] || {})[serviceId] || null;
-}
 
 async function fetchReservations(credentials, fromIso, toIso) {
   const out = [];

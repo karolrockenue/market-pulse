@@ -510,6 +510,39 @@ router.get("/booking-pulse", async (req, res) => {
 });
 
 /**
+ * GET /api/mason/recent-activity?hotelId=318341
+ *
+ * Recent Bookings (last 7 days, sales ledger) restricted to Short-Stay
+ * reservations (rate_segment='short'). Powers the Mason main dashboard's
+ * Recent Bookings widget. Same row shape as /api/metrics/summary.recentActivity
+ * so the shared RecentBookings component renders it unchanged.
+ */
+router.get("/recent-activity", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({
+      error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}`,
+    });
+  }
+  try {
+    const rows = await masonService.getRecentActivity(hotelId);
+    const recentActivity = rows.map((row) => ({
+      date: row.date,
+      dateStr: row.dateStr,
+      bookings: parseInt(row.bookings || 0, 10),
+      roomNights: parseInt(row.roomNights || 0, 10),
+      revenue: parseFloat(row.revenue || 0),
+      adr: parseFloat(row.adr || 0),
+      isToday: row.isToday,
+    }));
+    res.json({ hotelId, recentActivity });
+  } catch (err) {
+    console.error("[Mason] /recent-activity failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/mason/cards?hotelId=318341&monthKey=YYYY-MM
  *
  * Lightweight 3-month KPI cards (prior / reporting / next of the dropdown
