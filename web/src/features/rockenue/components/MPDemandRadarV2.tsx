@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -276,6 +276,18 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
       .then((data) => { if (data?.totalBookings > 0) setBookingBehavior(data); })
       .catch(() => {});
   }, [hotelIdsParam]);
+
+  // Curated event list for the flag layer — each event keeps its own span
+  // (the per-day map below is lossy: overlapping events collapse to one/day).
+  const chartEvents = useMemo(() => {
+    const seen = new Set<string>();
+    return [...phqEvents]
+      .filter((ev) => ev.localRank >= 90)
+      .sort((a, b) => (b.attendance || 0) - (a.attendance || 0))
+      .filter((ev) => { if (seen.has(ev.title)) return false; seen.add(ev.title); return true; })
+      .slice(0, 10)
+      .map((ev) => ({ name: ev.title, tier: ev.tier, start: (ev.start || "").slice(0, 10), end: (ev.end || ev.start || "").slice(0, 10), category: ev.category, attendance: ev.attendance, accommodationSpend: ev.accommodationSpend, localRank: ev.localRank }));
+  }, [phqEvents]);
 
   // Merge events into day data — only top events by attendance get chart markers
   const days = useMemo(() => {
@@ -639,7 +651,7 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
             </div>
           </div>
           <div style={{ padding: "16px 20px 14px" }}>
-            <MultiLaneTimeline days={days} curr={curr} scoreKey="demandV2" />
+            <MultiLaneTimeline days={days} curr={curr} scoreKey="demandV2" events={chartEvents} />
             {/* Plain-language guide to the pace lane */}
             <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${MP.border}`, fontSize: "11px", color: MP.textSec, lineHeight: 1.5 }}>
               <span style={{ color: MP.text, fontWeight: 600 }}>Pace arrows (bottom lane):</span>{" "}
@@ -1184,10 +1196,21 @@ function Signal({ icon, color, title, detail }: { icon: React.ReactNode; color: 
 // ── CONCEPT A: synced multi-lane timeline ──
 // Demand / price / supply / pace on one shared 90-day x-axis. Left gutter holds
 // lane labels + axis ticks so gridlines and data lines never cross them.
-function MultiLaneTimeline({ days, curr, scoreKey = "absScore" }: { days: any[]; curr: string; scoreKey?: string }) {
+function MultiLaneTimeline({ days, curr, scoreKey = "absScore", events = [] }: { days: any[]; curr: string; scoreKey?: string; events?: any[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [hoverEv, setHoverEv] = useState<any>(null);
+  // Measure real render width so the SVG viewBox is 1:1 (no text distortion).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(1100);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const update = () => setW(el.clientWidth || 1100);
+    update();
+    const ro = new ResizeObserver(update); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   if (!days.length) return null;
-  const N = days.length, W = 1200, H = 348;
+  const N = days.length, H = 348;
   const PAD_L = 48, PAD_R = 30;
   const plotW = W - PAD_L - PAD_R, colW = plotW / N;
   const xAt = (i: number) => PAD_L + i * colW + colW / 2;
@@ -1214,18 +1237,62 @@ function MultiLaneTimeline({ days, curr, scoreKey = "absScore" }: { days: any[];
   const last = days[N - 1];
   const gutTick = (x: number, y: number, t: string) => <text x={x} y={y} fill={MP.textMuted} fontSize={8} textAnchor="end">{t}</text>;
   const laneName = (t: string, b: [number, number]) => <text x={6} y={mid(b) + 3} fill={MP.textSec} fontSize={9} fontWeight={600}>{t}</text>;
+  const fmtE = (ds: string) => new Date(ds + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
   const thresholdY = DEM[1] - (60 / 100) * (DEM[1] - DEM[0]);
   const peakY = DEM[1] - (80 / 100) * (DEM[1] - DEM[0]);
 
+  // ── EVENT FLAGS (Direction A): full names, stacked into rows, leader to date ──
+  const rowH = 21, CW = 5.3;
+  // Build flags from the event list directly so overlapping events each keep a flag.
+  const lo = days[0].dateStr, hiD = days[N - 1].dateStr;
+  const evFlags = events
+    .filter((e) => e.start && e.start <= hiD && e.end >= lo)
+    .map((e) => {
+      let a = days.findIndex((d) => d.dateStr >= e.start); if (a < 0) a = 0;
+      let b = N - 1; for (let i = N - 1; i >= 0; i--) { if (days[i].dateStr <= e.end) { b = i; break; } }
+      return { ...e, a, b, cx: xAt(Math.round((a + b) / 2)) };
+    })
+    .sort((a, b) => a.cx - b.cx);
+  const flagRows: { L: number; R: number }[][] = [];
+  evFlags.forEach((e) => {
+    const lw = e.name.length * CW + 18; let L = e.cx - lw / 2, R = e.cx + lw / 2;
+    if (L < PAD_L) { R += PAD_L - L; L = PAD_L; }
+    if (R > W - PAD_R) { L -= R - (W - PAD_R); R = W - PAD_R; }
+    let r = 0; while (flagRows[r] && flagRows[r].some((o) => !(R < o.L - 5 || L > o.R + 5))) r++;
+    (flagRows[r] = flagRows[r] || []).push({ L, R }); e.L = L; e.R = R; e.lw = lw; e.row = r;
+  });
+  const nrows = flagRows.length;
+  const topPad = nrows ? nrows * rowH + 8 : 0;
+  const TOTAL = topPad + H;
+
   return (
-    <div style={{ position: "relative" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: H }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${TOTAL}`} preserveAspectRatio="none" style={{ width: "100%", height: TOTAL }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
         <defs>
           <linearGradient id="v2price" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={MP.cream} stopOpacity={0.14} />
             <stop offset="100%" stopColor={MP.cream} stopOpacity={0.01} />
           </linearGradient>
         </defs>
+
+        {/* ── EVENT FLAGS (stacked, full names, leader to date) ── */}
+        {topPad > 0 && <text x={6} y={14} fill={MP.textSec} fontSize={9} fontWeight={600}>EVENTS</text>}
+        {evFlags.map((e, k) => {
+          const y = topPad - (nrows - e.row) * rowH;
+          const active = hoverEv && hoverEv.name === e.name;
+          const op = active ? 1 : e.tier === "Extreme" ? 0.95 : 0.62;
+          const cx = (e.L + e.R) / 2;
+          return (
+            <g key={"ef" + k} onMouseEnter={() => setHoverEv(e)} onMouseLeave={() => setHoverEv(null)} style={{ cursor: "default" }}>
+              <line x1={e.cx} y1={y + 14} x2={e.cx} y2={topPad + DEM[1]} stroke={MP.text} strokeOpacity={active ? 0.4 : 0.12} strokeWidth={0.75} />
+              <text x={cx} y={y + 9} fontSize={8.5} fontWeight={500} fill={MP.cream} fillOpacity={op} textAnchor="middle">{e.name}</text>
+              <line x1={e.L + 4} y1={y + 13} x2={e.R - 4} y2={y + 13} stroke={MP.cream} strokeOpacity={op * 0.5} strokeWidth={0.75} />
+              <rect x={e.L} y={y} width={e.lw} height={16} fill="transparent" />
+            </g>
+          );
+        })}
+
+        <g transform={`translate(0,${topPad})`}>
 
         {/* month gridlines (behind data, only across the plot area) */}
         {monthMarks.map((mm) => (
@@ -1278,15 +1345,32 @@ function MultiLaneTimeline({ days, curr, scoreKey = "absScore" }: { days: any[];
             <circle cx={xAt(hd.i)} cy={sy(hd.supply)} r={2.5} fill={MP.textSec} />
           </g>
         )}
+        </g>
       </svg>
-      {hd && (
-        <div style={{ position: "absolute", top: 0, left: `min(calc(${(hd.i / N) * 100}% + 12px), calc(100% - 210px))`, background: "rgba(18,21,25,0.97)", border: `1px solid ${MP.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "12px", minWidth: "198px", pointerEvents: "none" }}>
+      {hd && !hoverEv && (
+        <div style={{ position: "absolute", top: `${topPad}px`, left: `min(calc(${(hd.i / N) * 100}% + 12px), calc(100% - 210px))`, background: "rgba(18,21,25,0.97)", border: `1px solid ${MP.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "12px", minWidth: "198px", pointerEvents: "none" }}>
           <div style={{ fontWeight: 600, color: MP.text, marginBottom: "5px" }}>{hd.shortLabel}</div>
           {([["Demand", `${hd[scoreKey]}/100`, absColor(hd[scoreKey])], ["WAP", `${curr}${hd.segmentWap}`, MP.text], ["Supply", hd.supply.toLocaleString(), MP.text], ["Pace (7d)", hd.paceTighten >= 3 ? `▲ filling fast (${hd.paceTighten}%/wk)` : hd.paceTighten <= -3 ? `▼ cooling (${Math.abs(hd.paceTighten)}%/wk)` : "steady", hd.paceTighten >= 3 ? MP.paceUp : hd.paceTighten <= -3 ? MP.terracotta : MP.textSec]] as [string, string, string][]).map(([k, v, c]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "16px", margin: "2px 0", color: MP.textSec }}>
               <span>{k}</span><span style={{ color: c, fontWeight: 600 }}>{v}</span>
             </div>
           ))}
+        </div>
+      )}
+      {hoverEv && (
+        <div style={{ position: "absolute", top: `${topPad - (nrows - hoverEv.row) * rowH + 20}px`, left: `min(calc(${(hoverEv.cx / W) * 100}% + 8px), calc(100% - 230px))`, background: "rgba(18,21,25,0.97)", border: `1px solid ${MP.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "12px", minWidth: "210px", pointerEvents: "none", zIndex: 5 }}>
+          <div style={{ fontWeight: 600, color: MP.text, marginBottom: "3px" }}>{hoverEv.name}</div>
+          <div style={{ color: MP.textSec, fontSize: "11px" }}>{fmtE(hoverEv.start)}{hoverEv.end !== hoverEv.start ? ` – ${fmtE(hoverEv.end)}` : ""}</div>
+          <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
+            {hoverEv.category && <span style={{ fontSize: "10px", textTransform: "capitalize", background: "#0C0E12", border: `1px solid ${MP.border}`, borderRadius: "4px", padding: "1px 6px" }}>{hoverEv.category}</span>}
+            {hoverEv.tier && <span style={{ fontSize: "10px", border: `1px solid ${MP.border}`, borderRadius: "4px", padding: "1px 6px", color: hoverEv.tier === "Extreme" ? MP.gold : MP.textSec }}>{hoverEv.tier} impact</span>}
+          </div>
+          {(hoverEv.attendance || hoverEv.accommodationSpend) && (
+            <div style={{ marginTop: "6px", fontSize: "11px", color: MP.textSec }}>
+              {hoverEv.attendance ? `~${Number(hoverEv.attendance).toLocaleString()} attending` : ""}
+              {hoverEv.accommodationSpend ? `${hoverEv.attendance ? " · " : ""}${curr}${Math.round(hoverEv.accommodationSpend / 1000).toLocaleString()}k est. accom.` : ""}
+            </div>
+          )}
         </div>
       )}
     </div>

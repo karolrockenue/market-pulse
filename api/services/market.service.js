@@ -10,7 +10,10 @@ const {
 // Static PredictHQ exports per city. Trial expired April 2026; the lean events
 // snapshot is loaded once at boot and filtered on-demand by date.
 const STATIC_EVENTS_FILES = {
-  london: path.join(__dirname, "..", "data", "predicthq-london-2026.json"),
+  // Curated London events calendar (Jun–Dec 2026), replacing the expired
+  // PredictHQ machine feed. Source: claude/Main London Events Demand Calendar.
+  // Old feed kept on disk at predicthq-london-2026.json for rollback.
+  london: path.join(__dirname, "..", "data", "london-events-2026.json"),
 };
 const STATIC_EVENTS_CACHE = {};
 function loadStaticEvents(slug) {
