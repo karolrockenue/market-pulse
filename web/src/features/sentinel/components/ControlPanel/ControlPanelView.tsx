@@ -2848,7 +2848,7 @@ export function ControlPanelView({ allHotels }: ControlPanelViewProps) {
                                         </span>
                                         <Input
                                           type="number"
-                                          placeholder="monthly min"
+                                          placeholder="min rate"
                                           value={
                                             formState[hotel.hotel_id]
                                               ?.weak_day_pricing?.floors?.[d] ??
