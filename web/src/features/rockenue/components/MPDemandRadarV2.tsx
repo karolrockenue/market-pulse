@@ -49,6 +49,13 @@ const MP = {
   purple: "#8b5cf6",
   cyan: "#06b6d4",
   gold: R.gold,
+  emerald: "#0C8A43",
+  // rockenue.com brand ramp (Scheme A): steel → steel-teal → teal → gold
+  steel: "#3E4754",
+  steelTeal: "#5E7E86",
+  cream: "#F4F2EC",
+  terracotta: "#C77B62",
+  paceUp: "#34D068",
 };
 
 const gridStroke = { strokeDasharray: "0", stroke: MP.border, opacity: 0.5 };
@@ -86,6 +93,11 @@ function buildDaysFromApi(marketData: any[], paceData: any[]) {
     const wapDelta = pace ? Math.round(pace.wap_delta || 0) : 0;
     const supplyPctDelta = pace ? Math.round((pace.total_results_percent_delta || 0) * 10) / 10 : 0;
     const demandDelta = pace ? Math.round(pace.market_demand_score_delta || 0) : 0;
+    // Guard malformed-scrape artifacts: a >60% weekly swing means the 7-days-ago
+    // baseline was a broken row (e.g. supply 1,608 vs the usual ~3,900). Real
+    // weekly availability moves are small, so treat these as steady not a phantom.
+    const paceRaw = Math.round((-supplyPctDelta) * 10) / 10;
+    const paceTighten = Math.abs(paceRaw) > 60 ? 0 : paceRaw;
 
     return {
       i, d, dow, dateStr,
@@ -101,20 +113,34 @@ function buildDaysFromApi(marketData: any[], paceData: any[]) {
       // CONCEPT: absolute-anchored demand (C) + pace as supply tightening (B).
       // pace = supply down vs 7d ago = market filling; +ve means tighter.
       absScore: absDemandScore(wap, supply),
-      paceTighten: Math.round((-supplyPctDelta) * 10) / 10,
+      paceTighten,
       divergence: Math.max(0, (demand - 50) * 0.8 - Math.max(0, wapDelta)),
       event: null as any,
     };
   });
 
-  // Add 7d moving averages
+  // PROPOSED LOGIC (the version we kept): segment WAP for price, supply scored
+  // vs its own day-of-week norm, price-led 60/40. SEG anchors estimate segment-WAP
+  // P5/P95; production should derive these from history.
+  const SEG_LO = 140, SEG_HI = 260, cl = (x: number) => Math.max(0, Math.min(1, x));
+  const dowMed: Record<number, number> = {};
+  for (let dw = 0; dw < 7; dw++) {
+    const s = days.filter((d) => d.dow === dw).map((d) => d.supply).sort((a: number, b: number) => a - b);
+    dowMed[dw] = s.length ? s[Math.floor(s.length / 2)] : 0;
+  }
+
+  // Add 7d moving averages + the v2 demand score
   return days.map((day, i, arr) => {
     const win = arr.slice(Math.max(0, i - 6), i + 1);
     const demandMa = Math.round(win.reduce((s, d) => s + d.demand, 0) / win.length);
     const wapMa = Math.round(win.reduce((s, d) => s + d.wap, 0) / win.length);
     const segmentWapMa = Math.round(win.reduce((s, d) => s + d.segmentWap, 0) / win.length);
-    const absScoreMa = Math.round(win.reduce((s, d) => s + d.absScore, 0) / win.length);
-    return { ...day, demandMa, wapMa, segmentWapMa, absScoreMa };
+    const priceScore = cl((day.segmentWap - SEG_LO) / (SEG_HI - SEG_LO)) * 100;
+    const norm = dowMed[day.dow] || day.supply;
+    const rel = norm ? (norm - day.supply) / norm : 0;
+    const supplyScore = Math.max(0, Math.min(100, 50 + rel * 180));
+    const demandV2 = Math.round(0.6 * priceScore + 0.4 * supplyScore);
+    return { ...day, demandMa, wapMa, segmentWapMa, demandV2 };
   });
 }
 
@@ -138,7 +164,8 @@ const absDemandScore = (wap: number, supply: number) => {
   return Math.round(0.5 * scarce + 0.5 * price);
 };
 // Concept colour scale: Strong / Moderate / Weak
-const absColor = (d: number) => (d >= 60 ? MP.green : d >= 35 ? MP.gold : MP.red);
+// rockenue.com brand ramp (Scheme A): Peak ≥80 gold · Strong teal · Mod steel-teal · Weak steel.
+const absColor = (d: number) => (d >= 80 ? MP.gold : d >= 60 ? MP.accent : d >= 35 ? MP.steelTeal : MP.steel);
 
 // ── Booking window zone labels ──
 const ZONES = [
@@ -300,7 +327,7 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
   // ── Stats ──
   const stats = useMemo(() => {
     const avg = (key: string) => Math.round(days.reduce((s, d) => s + d[key], 0) / days.length);
-    const avgDemand = avg("absScore"); // CONCEPT: absolute-anchored level, not window score
+    const avgDemand = avg("demandV2"); // proposed-logic score (segment WAP + DOW-normed supply)
     const avgWap = avg("segmentWap");
     const avgSupply = avg("supply");
 
@@ -328,15 +355,15 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
       wapMomentum = validW.length > 0 ? Math.round(validW.reduce((s: number, p: any) => s + p.wap_delta, 0) / validW.length) : 0;
     }
 
-    // CONCEPT classification: LEVEL (absolute) vs TREND (pace), kept independent.
-    const strongDays = days.filter((d) => d.absScore >= 60).length;
-    const lowDemand = days.filter((d) => d.absScore < 35).length;
-    const pricingPowerDays = days.filter((d) => d.absScore >= 60 && d.paceTighten >= 3).length;
+    // CONCEPT classification: LEVEL (the demandV2 score) vs TREND (pace), kept independent.
+    const strongDays = days.filter((d) => d.demandV2 >= 60).length;
+    const lowDemand = days.filter((d) => d.demandV2 < 35).length;
+    const pricingPowerDays = days.filter((d) => d.demandV2 >= 60 && d.paceTighten >= 3).length;
 
     const risingDemandFlatPrice = days.filter((d) => d.demandDelta > 5 && d.wapDelta < 2).length;
-    const compressed = days.filter((d) => d.supplyPctDelta < -2 && d.absScore >= 55).length;
+    const compressed = days.filter((d) => d.supplyPctDelta < -2 && d.demandV2 >= 55).length;
 
-    const sorted = [...days].sort((a, b) => b.absScore - a.absScore);
+    const sorted = [...days].sort((a, b) => b.demandV2 - a.demandV2);
     const peak = sorted[0];
     const trough = sorted[sorted.length - 1];
 
@@ -410,10 +437,10 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
   const bannerCfg = (() => {
     const Icon = stats.trendDir === "up" ? TrendingUp : stats.trendDir === "down" ? TrendingDown : Minus;
     if (stats.level === "strong" || stats.level === "at peak strength")
-      return { bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.3)", icon: MP.green, text: "#86efac", Icon };
+      return { bg: "rgba(56,198,186,0.10)", border: "rgba(56,198,186,0.3)", icon: MP.accent, text: "#9fe0d8", Icon };
     if (stats.level === "soft" || stats.level === "weak")
-      return { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.3)", icon: MP.red, text: "#fca5a5", Icon };
-    return { bg: "rgba(234,179,8,0.08)", border: "rgba(234,179,8,0.3)", icon: MP.amber, text: "#fde047", Icon };
+      return { bg: "rgba(199,123,98,0.10)", border: "rgba(199,123,98,0.3)", icon: MP.terracotta, text: "#e3ad99", Icon };
+    return { bg: "rgba(200,166,110,0.10)", border: "rgba(200,166,110,0.3)", icon: MP.gold, text: "#ddc7a1", Icon };
   })();
 
   // CONCEPT (Idea 5): near-term (actionable) vs horizon (early-booking) split.
@@ -421,12 +448,12 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
   // because they haven't filled yet — split them so the headline stays honest.
   const split = useMemo(() => {
     const band = (v: number) => v >= 70 ? "peak" : v >= 58 ? "strong" : v >= 45 ? "steady" : v >= 30 ? "soft" : "weak";
-    const lvl = (arr: any[]) => arr.length ? Math.round(arr.reduce((s, d) => s + d.absScore, 0) / arr.length) : 0;
+    const lvl = (arr: any[]) => arr.length ? Math.round(arr.reduce((s, d) => s + d.demandV2, 0) / arr.length) : 0;
     const near = days.slice(0, 14), horizon = days.slice(14);
     const n = lvl(near), h = lvl(horizon);
     return { near: n, horizon: h, nearBand: band(n), horizonBand: band(h),
-      nearStrong: near.filter((d) => d.absScore >= 60).length,
-      horizonStrong: horizon.filter((d) => d.absScore >= 60).length };
+      nearStrong: near.filter((d) => d.demandV2 >= 60).length,
+      horizonStrong: horizon.filter((d) => d.demandV2 >= 60).length };
   }, [days]);
 
   if (isLoading) {
@@ -486,7 +513,7 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
           <Activity style={{ width: "24px", height: "24px", color: MP.accent }} />
           <h1 style={{ color: MP.text, fontSize: "24px", margin: 0, fontWeight: 600 }}>Demand Radar</h1>
-          <span style={{ fontSize: "10px", color: "#7BAFD4", backgroundColor: "rgba(123,175,212,0.08)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2 · calendar</span>
+          <span style={{ fontSize: "10px", color: "#7BAFD4", backgroundColor: "rgba(123,175,212,0.08)", padding: "2px 8px", borderRadius: "4px", fontWeight: 600, letterSpacing: "0.05em" }}>v2 · timeline</span>
         </div>
         <p style={{ color: MP.textSec, margin: "0 0 20px", fontSize: "13px" }}>
           90-day forward market intelligence for {cityName || citySlug} • Live {citySlug === "archanes" ? "Airbnb" : "Booking.com"} data
@@ -521,7 +548,7 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
           <div style={{ width: "1px", height: "40px", backgroundColor: MP.border, margin: "0 4px" }} />
           {/* TREND — pace vs 30 days ago (secondary; recomputed on absolute score) */}
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "28px", fontWeight: 600, color: stats.trendDir === "up" ? MP.green : stats.trendDir === "down" ? MP.red : MP.textSec, lineHeight: 1 }}>
+            <div style={{ fontSize: "28px", fontWeight: 600, color: stats.trendDir === "up" ? MP.paceUp : stats.trendDir === "down" ? MP.terracotta : MP.textSec, lineHeight: 1 }}>
               {stats.absMomentum > 0 ? "+" : ""}{stats.absMomentum} pts
             </div>
             <div style={{ fontSize: "12px", color: MP.textSec, marginTop: "4px" }}>
@@ -537,8 +564,8 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
             { label: "Avg WAP", value: `${curr}${stats.avgWap}`, color: MP.text },
             { label: "Avg Supply", value: stats.avgSupply.toLocaleString(), color: MP.accent },
             { label: "Strong Days", value: `${stats.strongDays}`, sub: `of 90 scoring 60+`, color: MP.green },
-            { label: "Peak Date", value: stats.peak?.label || "—", sub: `${stats.peak?.absScore} · ${curr}${stats.peak?.segmentWap}`, color: MP.green },
-            { label: "Quietest Date", value: stats.trough?.label || "—", sub: `${stats.trough?.absScore} · ${curr}${stats.trough?.segmentWap}`, color: MP.red },
+            { label: "Peak Date", value: stats.peak?.label || "—", sub: `${stats.peak?.demandV2} · ${curr}${stats.peak?.segmentWap}`, color: MP.gold },
+            { label: "Quietest Date", value: stats.trough?.label || "—", sub: `${stats.trough?.demandV2} · ${curr}${stats.trough?.segmentWap}`, color: MP.textSec },
           ].map((kpi, idx) => (
             <div key={kpi.label} style={{ padding: "14px 16px", textAlign: "center", borderRight: idx < 5 ? `1px solid ${MP.border}` : "none" }}>
               <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{kpi.label}</div>
@@ -587,136 +614,87 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
-            CENTREPIECE — DEMAND (Busy vs Quiet)
+            CENTREPIECE — DEMAND TIMELINE
             ══════════════════════════════════════════════════════════════════ */}
         <div style={{ backgroundColor: MP.card, borderRadius: "8px 8px 0 0", border: `1px solid ${MP.border}`, borderBottom: "none" }}>
           <div style={{ padding: "16px 20px", borderBottom: `1px solid ${MP.border}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "10px" }}>
               <div>
                 <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>90-DAY FORWARD VIEW</div>
-                <h3 style={{ color: MP.text, fontSize: "18px", fontWeight: 600, margin: 0 }}>Demand Calendar</h3>
+                <h3 style={{ color: MP.text, fontSize: "18px", fontWeight: 600, margin: 0 }}>Demand Timeline</h3>
                 <p style={{ color: MP.textSec, fontSize: "11px", margin: "2px 0 0" }}>
-                  Same absolute demand, laid out the way you read a month — colour = strength, number = score, {curr} = rate, ▲▼ = pace. The strong clusters jump out
+                  Demand, price, supply and pace on one shared 90-day axis — scrub across to read any date as a vertical slice
                 </p>
               </div>
-              <div style={{ display: "flex", gap: "14px", fontSize: "11px", alignItems: "center" }}>
-                <Leg color={MP.green} label="Strong 60+" />
-                <Leg color={MP.gold} label="Mod 35–59" />
-                <Leg color={MP.red} label="Weak <35" />
-                <span style={{ fontSize: "10px", color: MP.green }}>▲<span style={{ color: MP.red }}>▼</span> pace</span>
+              <div style={{ display: "flex", gap: "14px", fontSize: "11px", alignItems: "center", flexWrap: "wrap" }}>
+                <Leg color={MP.gold} label="Peak 80+" />
+                <Leg color={MP.accent} label="Strong 60–79" />
+                <Leg color={MP.steelTeal} label="Mod 35–59" />
+                <Leg color={MP.steel} label="Weak <35" />
+                <Leg color={MP.cream} label="Price" />
+                <Leg color={MP.textSec} label="Supply" dotted />
+                <span style={{ fontSize: "11px", color: MP.paceUp }}>▲ filling fast</span>
+                <span style={{ fontSize: "11px", color: MP.terracotta }}>▼ cooling</span>
               </div>
             </div>
           </div>
-          <div style={{ padding: "18px 20px 6px" }}>
-            <CalendarHeatmap days={days} curr={curr} />
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════════════════════════
-            CENTREPIECE — PRICING (2-4★ Segment WAP)
-            ══════════════════════════════════════════════════════════════════ */}
-        <div style={{ backgroundColor: MP.card, borderLeft: `1px solid ${MP.border}`, borderRight: `1px solid ${MP.border}`, borderBottom: `1px solid ${MP.border}`, borderTop: "none" }}>
-          <div style={{ padding: "12px 20px 4px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${MP.border}` }}>
-            <div>
-              <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>MARKET PRICING</div>
-              <h3 style={{ color: MP.text, fontSize: "15px", fontWeight: 600, margin: 0 }}>Weighted Average Price</h3>
-              <p style={{ color: MP.textSec, fontSize: "11px", margin: "2px 0 0" }}>2-4★ hotel segment — excludes luxury and unrated properties</p>
-            </div>
-            <div style={{ display: "flex", gap: "16px", fontSize: "11px", alignItems: "center" }}>
-              <Leg color={MP.text} label="WAP" />
-              <Leg color={MP.textMuted} label="7d trend" dotted />
-            </div>
-          </div>
-          <div style={{ padding: "0 20px 16px" }}>
-            <div style={{ position: "relative", height: 260 }}>
-              {/* Subtle spike tint columns behind the chart */}
-              <div style={{ position: "absolute", top: "6px", left: "20px", right: "10px", bottom: "20px", display: "flex", pointerEvents: "none", zIndex: 0 }}>
-                {days.map((d) => {
-                  const isSpike = d.segmentWap >= stats.segWapP90;
-                  const isWarm = !isSpike && d.segmentWap >= stats.segWapP75;
-                  return (
-                    <div key={d.i} style={{
-                      flex: 1,
-                      backgroundColor: isSpike ? MP.amber : isWarm ? MP.amber : "transparent",
-                      opacity: isSpike ? 0.08 : isWarm ? 0.04 : 0,
-                    }} />
-                  );
-                })}
-              </div>
-              <div style={{ position: "relative", zIndex: 1, height: "100%" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={days} margin={{ top: 6, right: 10, left: -15, bottom: 20 }} syncId="dr">
-                  <defs>
-                    <linearGradient id="wapFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={MP.text} stopOpacity={0.08} />
-                      <stop offset="100%" stopColor={MP.text} stopOpacity={0.01} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid {...gridStroke} vertical={false} />
-                  <XAxis dataKey="xLabel" {...axisStyle} interval={6} />
-                  <YAxis {...axisStyle} width={50} tickFormatter={(v) => `${curr}${v}`} domain={["dataMin - 15", "dataMax + 15"]} />
-                  <Tooltip {...tipStyle} cursor={{ stroke: MP.accent, strokeOpacity: 0.15, strokeWidth: 1 }}
-                    labelFormatter={(_l, p) => { const d = p?.[0]?.payload; return d ? d.shortLabel : _l; }}
-                    formatter={(v: number, name: string) => [`${curr}${v}`, name]} />
-                  <Area type="monotone" dataKey="segmentWap" name="WAP" stroke={MP.text} strokeWidth={2} fill="url(#wapFill)" fillOpacity={1} dot={false} activeDot={{ r: 3, fill: MP.text, stroke: MP.card, strokeWidth: 2 }} />
-                  <Line type="monotone" dataKey="segmentWapMa" name="7d trend" stroke={MP.textMuted} strokeWidth={1.5} strokeDasharray="4 3" dot={false} strokeOpacity={0.6} />
-                </ComposedChart>
-              </ResponsiveContainer>
-              </div>
+          <div style={{ padding: "16px 20px 14px" }}>
+            <MultiLaneTimeline days={days} curr={curr} scoreKey="demandV2" />
+            {/* Plain-language guide to the pace lane */}
+            <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${MP.border}`, fontSize: "11px", color: MP.textSec, lineHeight: 1.5 }}>
+              <span style={{ color: MP.text, fontWeight: 600 }}>Pace arrows (bottom lane):</span>{" "}
+              <span style={{ color: MP.paceUp }}>▲</span> the date is <b style={{ color: MP.text }}>filling fast</b> — selling through quicker than a week ago, momentum building.{" "}
+              <span style={{ color: MP.terracotta }}>▼</span> it's <b style={{ color: MP.text }}>cooling</b> — losing pace. Bar colour = how strong the date is today; arrow = which way it's moving this week. A tall bar with <span style={{ color: MP.paceUp }}>▲</span> is the best case — strong and still accelerating.
             </div>
           </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════
-            CENTREPIECE — 7-DAY CHANGE (attached to WAP above)
+            CENTREPIECE — 7-DAY CHANGE (attached to the timeline above)
             ══════════════════════════════════════════════════════════════════ */}
         <div style={{ backgroundColor: MP.card, borderRadius: "0 0 8px 8px", border: `1px solid ${MP.border}`, borderTop: "none", marginBottom: "24px" }}>
           <div style={{ padding: "12px 20px 4px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${MP.border}` }}>
             <div>
-              <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>7-DAY CHANGE</div>
+              <div style={{ fontSize: "10px", color: MP.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>7-DAY PICKUP</div>
               <h3 style={{ color: MP.text, fontSize: "15px", fontWeight: 600, margin: 0 }}>Recent Pickup</h3>
-              <p style={{ color: MP.textSec, fontSize: "11px", margin: "2px 0 0" }}>How demand and price shifted vs the same dates 7 days ago</p>
+              <p style={{ color: MP.textSec, fontSize: "11px", margin: "2px 0 0" }}>How fast each date is filling vs 7 days ago — change in availability (price is in the timeline above)</p>
             </div>
             <div style={{ display: "flex", gap: "16px", fontSize: "11px", alignItems: "center" }}>
-              <Leg color={MP.green} label="Demand up" />
-              <Leg color={MP.red} label="Demand down" />
-              <Leg color={MP.amber} label="Price change" dashed />
+              <Leg color={MP.paceUp} label="Filling fast" />
+              <Leg color={MP.terracotta} label="Cooling" />
             </div>
           </div>
           <div style={{ padding: "0 20px 16px" }}>
-            <div style={{ height: 260 }}>
+            <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={days} margin={{ top: 6, right: 10, left: -15, bottom: 20 }} syncId="dr">
                   <CartesianGrid {...gridStroke} vertical={false} />
                   <XAxis dataKey="xLabel" {...axisStyle} interval={6} />
-                  <YAxis {...axisStyle} width={50} />
-                  <ReferenceLine y={0} stroke={MP.textMuted} strokeOpacity={0.4} strokeWidth={1} />
+                  <YAxis {...axisStyle} width={50} tickFormatter={(v) => `${v}%`} />
+                  <ReferenceLine y={0} stroke={MP.border} strokeWidth={1} />
                   <Tooltip {...tipStyle} cursor={{ stroke: MP.accent, strokeOpacity: 0.15, strokeWidth: 1 }}
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0]?.payload;
                       if (!d) return null;
-                      const dd = d.demandDelta || 0;
-                      const wd = d.wapDelta || 0;
-                      const sd = d.supplyPctDelta || 0;
+                      const p = d.paceTighten || 0;
                       return (
                         <div style={{ ...tipStyle.contentStyle, padding: "10px 14px" }}>
                           <div style={{ ...tipStyle.labelStyle as any, fontWeight: 600 }}>{d.shortLabel}</div>
-                          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px", fontSize: "12px" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 12px", fontSize: "12px" }}>
+                            <span style={{ color: MP.textMuted }}>Pace</span>
+                            <span style={{ color: p >= 3 ? MP.paceUp : p <= -3 ? MP.terracotta : MP.textMuted, textAlign: "right" }}>{p >= 3 ? `▲ filling fast ${p}%/wk` : p <= -3 ? `▼ cooling ${Math.abs(p)}%/wk` : "steady"}</span>
                             <span style={{ color: MP.textMuted }}>Demand</span>
-                            <span style={{ color: dd >= 0 ? MP.green : MP.red, textAlign: "right" }}>{dd > 0 ? "+" : ""}{dd}pp</span>
-                            <span style={{ color: MP.textMuted }}>Price</span>
-                            <span style={{ color: wd >= 0 ? MP.green : MP.red, textAlign: "right" }}>{wd > 0 ? "+" : ""}{curr}{wd}</span>
-                            <span style={{ color: MP.textMuted }}>Supply</span>
-                            <span style={{ color: sd > 0 ? MP.accent : sd < 0 ? MP.purple : MP.textMuted, textAlign: "right" }}>{sd > 0 ? "+" : ""}{sd}%</span>
+                            <span style={{ color: absColor(d.demandV2), textAlign: "right" }}>{d.demandV2}/100</span>
+                            <span style={{ color: MP.textMuted }}>WAP</span>
+                            <span style={{ color: MP.text, textAlign: "right" }}>{curr}{d.segmentWap}</span>
                           </div>
                         </div>
                       );
                     }} />
-                  <Bar dataKey="demandDelta" name="Demand change" radius={[3, 3, 0, 0]} maxBarSize={10}>
-                    {days.map((d, i) => <Cell key={i} fill={d.demandDelta >= 0 ? MP.green : MP.red} fillOpacity={0.6} />)}
+                  <Bar dataKey="paceTighten" name="Pickup" radius={[3, 3, 0, 0]} maxBarSize={10}>
+                    {days.map((d, i) => <Cell key={i} fill={d.paceTighten >= 0 ? MP.paceUp : MP.terracotta} fillOpacity={0.75} />)}
                   </Bar>
-                  <Line type="monotone" dataKey="wapDelta" name="Price change" stroke={MP.amber} strokeWidth={2} dot={false} strokeDasharray="5 3" strokeOpacity={0.8} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -732,7 +710,7 @@ export function MPDemandRadarV2(_props: DemandRadarProps) {
             {[
               {
                 icon: <TrendingUp className="w-4 h-4" />,
-                color: stats.level === "strong" || stats.level === "at peak strength" ? MP.green : stats.level === "soft" || stats.level === "weak" ? MP.red : MP.amber,
+                color: stats.level === "strong" || stats.level === "at peak strength" ? MP.accent : stats.level === "soft" || stats.level === "weak" ? MP.terracotta : MP.gold,
                 title: `Next 90 days: ${stats.level}`,
                 body: `Absolute demand averages ${stats.avgDemand}/100 with ${stats.strongDays} strong days. Trend is ${stats.absMomentum > 0 ? "+" : ""}${stats.absMomentum} pts vs 30 days ago (rates ${stats.wapMomentum > 0 ? "+" : ""}${curr}${stats.wapMomentum}). ${stats.trendDir === "up" ? "Firming — rates have room to follow." : stats.trendDir === "down" ? "Softening — defend occupancy on the weak days." : "Holding — keep current positioning."}`,
               },
@@ -1203,76 +1181,114 @@ function Signal({ icon, color, title, detail }: { icon: React.ReactNode; color: 
   );
 }
 
-// ── CONCEPT: alternative display — demand as a month calendar heatmap ──
-function hexToRgba(hex: string, a: number) {
-  const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${a})`;
-}
+// ── CONCEPT A: synced multi-lane timeline ──
+// Demand / price / supply / pace on one shared 90-day x-axis. Left gutter holds
+// lane labels + axis ticks so gridlines and data lines never cross them.
+function MultiLaneTimeline({ days, curr, scoreKey = "absScore" }: { days: any[]; curr: string; scoreKey?: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  if (!days.length) return null;
+  const N = days.length, W = 1200, H = 348;
+  const PAD_L = 48, PAD_R = 30;
+  const plotW = W - PAD_L - PAD_R, colW = plotW / N;
+  const xAt = (i: number) => PAD_L + i * colW + colW / 2;
+  // lane bands [top, bottom]
+  const DEM: [number, number] = [14, 130], PRI: [number, number] = [158, 224], SUP: [number, number] = [248, 306];
+  const PACE_Y = 328, MONTH_Y = 344;
+  const segWaps = days.map((d) => d.segmentWap), sup = days.map((d) => d.supply);
+  const wMin = Math.min(...segWaps), wMax = Math.max(...segWaps);
+  const sMin = Math.min(...sup), sMax = Math.max(...sup);
+  const py = (v: number) => PRI[1] - ((v - wMin) / (wMax - wMin || 1)) * (PRI[1] - PRI[0]);
+  const sy = (v: number) => SUP[1] - ((v - sMin) / (sMax - sMin || 1)) * (SUP[1] - SUP[0]);
+  const mid = (b: [number, number]) => (b[0] + b[1]) / 2;
 
-function CalendarHeatmap({ days, curr }: { days: any[]; curr: string }) {
-  const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  // Group forward days by calendar month (UTC, matching the rest of the page)
-  const months = new Map<string, any[]>();
-  days.forEach((d) => {
-    const key = `${d.d.getUTCFullYear()}-${d.d.getUTCMonth()}`;
-    if (!months.has(key)) months.set(key, []);
-    months.get(key)!.push(d);
-  });
-  const monthName = (y: number, m: number) =>
-    new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthMarks: { i: number; label: string }[] = [];
+  let lastM = "";
+  days.forEach((d, i) => { const m = d.dateStr.slice(0, 7); if (m !== lastM) { lastM = m; monthMarks.push({ i, label: d.monthLabel }); } });
+
+  const onMove = (e: any) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const idx = Math.max(0, Math.min(N - 1, Math.floor((((e.clientX - r.left) / r.width) * W - PAD_L) / colW)));
+    setHover(Math.max(0, Math.min(N - 1, idx)));
+  };
+  const hd = hover != null ? days[hover] : null;
+  const last = days[N - 1];
+  const gutTick = (x: number, y: number, t: string) => <text x={x} y={y} fill={MP.textMuted} fontSize={8} textAnchor="end">{t}</text>;
+  const laneName = (t: string, b: [number, number]) => <text x={6} y={mid(b) + 3} fill={MP.textSec} fontSize={9} fontWeight={600}>{t}</text>;
+  const thresholdY = DEM[1] - (60 / 100) * (DEM[1] - DEM[0]);
+  const peakY = DEM[1] - (80 / 100) * (DEM[1] - DEM[0]);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "22px" }}>
-      {[...months.values()].map((mdays) => {
-        const y = mdays[0].d.getUTCFullYear();
-        const m = mdays[0].d.getUTCMonth();
-        const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-        const firstWd = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7; // Mon=0
-        const lookup = new Map(mdays.map((d) => [d.d.getUTCDate(), d]));
-        const cells: any[] = [];
-        for (let i = 0; i < firstWd; i++) cells.push(null);
-        for (let dn = 1; dn <= daysInMonth; dn++) cells.push(lookup.get(dn) || { empty: true, dayNum: dn });
-        return (
-          <div key={`${y}-${m}`}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: MP.text, marginBottom: "8px" }}>{monthName(y, m)}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
-              {WD.map((w) => (
-                <div key={w} style={{ fontSize: "9px", color: MP.textMuted, textAlign: "center", paddingBottom: "2px" }}>{w}</div>
-              ))}
-              {cells.map((c, idx) => {
-                if (c === null) return <div key={idx} />;
-                if (c.empty)
-                  return <div key={idx} style={{ height: "46px", borderRadius: "4px", border: `1px dashed ${MP.border}`, opacity: 0.4, display: "flex", alignItems: "flex-start", padding: "3px 5px" }}>
-                    <span style={{ fontSize: "9px", color: MP.textMuted }}>{c.dayNum}</span>
-                  </div>;
-                const col = absColor(c.absScore);
-                const up = c.paceTighten >= 3, down = c.paceTighten <= -3;
-                const isWeekend = c.dow === 0 || c.dow === 6;
-                return (
-                  <div key={idx}
-                    title={`${c.shortLabel} — demand ${c.absScore}/100 · ${curr}${c.segmentWap} · supply ${c.supply.toLocaleString()}`}
-                    style={{
-                      height: "46px", borderRadius: "4px", padding: "3px 5px",
-                      background: hexToRgba(col, 0.16 + (c.absScore / 100) * 0.6),
-                      border: isWeekend ? `1px solid ${hexToRgba(col, 0.55)}` : "1px solid transparent",
-                      display: "flex", flexDirection: "column", justifyContent: "space-between", cursor: "default",
-                    }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "10px", color: MP.text, fontWeight: 600 }}>{c.dayNum}</span>
-                      {(up || down) && <span style={{ fontSize: "8px", fontWeight: 700, color: up ? MP.green : MP.red }}>{up ? "▲" : "▼"}</span>}
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: MP.accent }}>{c.absScore}</span>
-                      <span style={{ fontSize: "8px", color: MP.textSec }}>{curr}{c.segmentWap}</span>
-                    </div>
-                  </div>
-                );
-              })}
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: H }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+        <defs>
+          <linearGradient id="v2price" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={MP.cream} stopOpacity={0.14} />
+            <stop offset="100%" stopColor={MP.cream} stopOpacity={0.01} />
+          </linearGradient>
+        </defs>
+
+        {/* month gridlines (behind data, only across the plot area) */}
+        {monthMarks.map((mm) => (
+          <g key={mm.i}>
+            <line x1={xAt(mm.i) - colW / 2} y1={DEM[0]} x2={xAt(mm.i) - colW / 2} y2={SUP[1]} stroke={MP.border} strokeWidth={1} strokeOpacity={0.6} />
+            <text x={xAt(mm.i) - colW / 2 + 3} y={MONTH_Y} fill={MP.textMuted} fontSize={9}>{mm.label}</text>
+          </g>
+        ))}
+
+        {/* lane baselines */}
+        {[DEM, PRI, SUP].map((L, k) => (<line key={k} x1={PAD_L} y1={L[1]} x2={W - PAD_R} y2={L[1]} stroke={MP.border} strokeWidth={1} />))}
+
+        {/* DEMAND: 60 threshold guide + bars */}
+        <line x1={PAD_L} y1={thresholdY} x2={W - PAD_R} y2={thresholdY} stroke={MP.accent} strokeOpacity={0.3} strokeWidth={1} strokeDasharray="3 3" />
+        <line x1={PAD_L} y1={peakY} x2={W - PAD_R} y2={peakY} stroke={MP.gold} strokeOpacity={0.5} strokeWidth={1} strokeDasharray="3 3" />
+        {days.map((d, i) => {
+          const h = (d[scoreKey] / 100) * (DEM[1] - DEM[0]);
+          return <rect key={i} x={PAD_L + i * colW + colW * 0.12} y={DEM[1] - h} width={Math.max(0.6, colW * 0.76)} height={h} fill={absColor(d[scoreKey])} fillOpacity={0.9} rx={1} />;
+        })}
+
+        {/* PRICE: soft area + line + end value */}
+        <polygon points={`${PAD_L},${PRI[1]} ${days.map((d, i) => `${xAt(i)},${py(d.segmentWap)}`).join(" ")} ${xAt(N - 1)},${PRI[1]}`} fill="url(#v2price)" />
+        <polyline points={days.map((d, i) => `${xAt(i)},${py(d.segmentWap)}`).join(" ")} fill="none" stroke={MP.cream} strokeWidth={1.75} />
+
+        {/* SUPPLY: line + end value */}
+        <polyline points={days.map((d, i) => `${xAt(i)},${sy(d.supply)}`).join(" ")} fill="none" stroke={MP.textSec} strokeWidth={1.5} strokeDasharray="3 2" />
+
+        {/* PACE lane (own row only) */}
+        {days.map((d, i) => Math.abs(d.paceTighten) >= 3 ? (
+          <text key={"pl" + i} x={xAt(i)} y={PACE_Y + 3} fill={d.paceTighten > 0 ? MP.paceUp : MP.terracotta} fontSize={8} textAnchor="middle">{d.paceTighten > 0 ? "▲" : "▼"}</text>
+        ) : null)}
+
+        {/* left gutter: lane names + axis ticks (drawn last so nothing overlaps) */}
+        <rect x={0} y={0} width={PAD_L - 2} height={H} fill={MP.card} />
+        {laneName("DEMAND", DEM)}{laneName("PRICE", PRI)}{laneName("SUPPLY", SUP)}
+        <text x={6} y={PACE_Y + 3} fill={MP.textSec} fontSize={9} fontWeight={600}>PACE</text>
+        {gutTick(PAD_L - 5, DEM[0] + 6, "100")}{gutTick(PAD_L - 5, peakY + 3, "80")}{gutTick(PAD_L - 5, thresholdY + 3, "60")}{gutTick(PAD_L - 5, DEM[1], "0")}
+        {gutTick(PAD_L - 5, PRI[0] + 6, `${curr}${wMax}`)}{gutTick(PAD_L - 5, PRI[1], `${curr}${wMin}`)}
+        {gutTick(PAD_L - 5, SUP[0] + 6, (sMax / 1000).toFixed(1) + "k")}{gutTick(PAD_L - 5, SUP[1], (sMin / 1000).toFixed(1) + "k")}
+
+        {/* right end values */}
+        <text x={W - PAD_R + 4} y={py(last.segmentWap) + 3} fill={MP.cream} fontSize={9} fontWeight={600}>{curr}{last.segmentWap}</text>
+        <text x={W - PAD_R + 4} y={sy(last.supply) + 3} fill={MP.textSec} fontSize={9}>{(last.supply / 1000).toFixed(1)}k</text>
+
+        {/* hover guide */}
+        {hd && (
+          <g>
+            <line x1={xAt(hd.i)} y1={DEM[0]} x2={xAt(hd.i)} y2={SUP[1]} stroke={MP.text} strokeOpacity={0.25} strokeWidth={1} />
+            <circle cx={xAt(hd.i)} cy={py(hd.segmentWap)} r={2.5} fill={MP.cream} />
+            <circle cx={xAt(hd.i)} cy={sy(hd.supply)} r={2.5} fill={MP.textSec} />
+          </g>
+        )}
+      </svg>
+      {hd && (
+        <div style={{ position: "absolute", top: 0, left: `min(calc(${(hd.i / N) * 100}% + 12px), calc(100% - 210px))`, background: "rgba(18,21,25,0.97)", border: `1px solid ${MP.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "12px", minWidth: "198px", pointerEvents: "none" }}>
+          <div style={{ fontWeight: 600, color: MP.text, marginBottom: "5px" }}>{hd.shortLabel}</div>
+          {([["Demand", `${hd[scoreKey]}/100`, absColor(hd[scoreKey])], ["WAP", `${curr}${hd.segmentWap}`, MP.text], ["Supply", hd.supply.toLocaleString(), MP.text], ["Pace (7d)", hd.paceTighten >= 3 ? `▲ filling fast (${hd.paceTighten}%/wk)` : hd.paceTighten <= -3 ? `▼ cooling (${Math.abs(hd.paceTighten)}%/wk)` : "steady", hd.paceTighten >= 3 ? MP.paceUp : hd.paceTighten <= -3 ? MP.terracotta : MP.textSec]] as [string, string, string][]).map(([k, v, c]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "16px", margin: "2px 0", color: MP.textSec }}>
+              <span>{k}</span><span style={{ color: c, fontWeight: 600 }}>{v}</span>
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
