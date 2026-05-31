@@ -992,6 +992,7 @@ async function getRevenueByAccountingCategoryByMonth(
   startDate,
   endDate,
   accountingCategoryIds = null,
+  opts = {},
 ) {
   const credentials = await getCredentials(hotelId);
 
@@ -1068,6 +1069,15 @@ async function getRevenueByAccountingCategoryByMonth(
 
   const byAccountingCategoryMonth = {};
   const monthSet = new Set();
+  // When opts.bySpaceOrder is set, also roll up each reservation's
+  // accommodation revenue (SpaceOrder net) per month — bucketed by
+  // ServiceOrderId (= reservations.id) and consumed month, from this SAME
+  // order-item pull (zero extra Mews calls). Consumers join it to
+  // reservations.rate_segment to build a per-night ADR whose numerator and
+  // denominator come from the SAME bookings — so a guest's whole-month/upfront
+  // charge can't inflate the per-night rate. Only counts SpaceOrders in the
+  // requested accommodation AccCats; the AccCat-net revenue line is unchanged.
+  const bySpaceOrderMonth = opts.bySpaceOrder ? {} : null;
 
   for (const it of items) {
     // Mews's Order Items Report Revenue section excludes Type=Deposit items
@@ -1100,6 +1110,12 @@ async function getRevenueByAccountingCategoryByMonth(
     byAccountingCategoryMonth[accCatId][monthKey].items += 1;
     if (it.Type === "SpaceOrder") {
       byAccountingCategoryMonth[accCatId][monthKey].nights += 1;
+      if (bySpaceOrderMonth && it.ServiceOrderId) {
+        const rid = it.ServiceOrderId;
+        if (!bySpaceOrderMonth[rid]) bySpaceOrderMonth[rid] = {};
+        bySpaceOrderMonth[rid][monthKey] =
+          (bySpaceOrderMonth[rid][monthKey] || 0) + (it.Amount?.NetValue || 0);
+      }
     }
   }
 
@@ -1107,6 +1123,7 @@ async function getRevenueByAccountingCategoryByMonth(
 
   return {
     byAccountingCategoryMonth,
+    bySpaceOrderMonth,
     months,
     itemsScanned: items.length,
     timezone: tz,

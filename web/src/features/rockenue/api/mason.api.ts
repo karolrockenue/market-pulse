@@ -125,6 +125,16 @@ export interface UnitPacingRow {
   capacity: number;
 }
 
+export interface UnitPacingMonth {
+  monthKey: string;
+  shortStay: { rooms: number; pct: number };
+  midStay: { rooms: number; pct: number };
+  longStay: { rooms: number; pct: number };
+  offline: { rooms: number; pct: number };
+  vacant: { rooms: number; pct: number };
+  capacity: number;
+}
+
 export interface SsWeeklyRow {
   weekStart: string;
   bookings: number;
@@ -172,6 +182,9 @@ export interface SalesFlashResponse {
   fytdOccupancy: number | null;
   inHouseFY: Array<{ monthKey: string; short: number; mid: number; long: number }>;
   unitPacing: UnitPacingRow[];
+  unitPacingMonth: UnitPacingMonth | null;
+  msWeekly: SsWeeklyRow[];
+  lsWeekly: SsWeeklyRow[];
   ssWeekly: SsWeeklyRow[];
   allWeekly: SsWeeklyRow[];
   lsTierWeekly: LsTierRow[];

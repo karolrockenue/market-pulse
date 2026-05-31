@@ -130,7 +130,56 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
     startDate,
     endDate,
     allowedAccCatIds,
+    { bySpaceOrder: true },
   );
+
+  // Per-role ADR numerator/denominator from the SAME bookings (rate-group
+  // classified), so a whole-month or upfront charge can't inflate the per-night
+  // rate. Numerator = each booking's accommodation revenue consumed in the
+  // month (from result.bySpaceOrderMonth, same order-item pull above);
+  // denominator = those same bookings' nights that fall in the month. The
+  // displayed per-role `revenue` stays AccCat-net (penny-perfect to Mews
+  // finance) — only `adr` uses this basis. See Park/Mid ADR note: Mid read
+  // £1,077 (£35.5k AccCat ÷ 33 nights) when only ~£5k was consumed in-month;
+  // this yields ~£151. mason-and-fifth.md §19.4.
+  const resInfo = new Map(); // reservationId → { seg, ci, co }
+  {
+    const { rows: resRows } = await pgPool.query(
+      `SELECT id, rate_segment AS seg, check_in::text AS ci, check_out::text AS co
+         FROM reservations
+        WHERE hotel_id = $1 AND status NOT ILIKE '%cancel%'
+          AND rate_segment IN ('short', 'mid', 'long') AND nights > 0
+          AND check_in <= $3::date AND check_out > $2::date`,
+      [hotelId, startDate, endDate],
+    );
+    for (const r of resRows) resInfo.set(r.id, r);
+  }
+  // adrAcc[monthKey][role] = { net, nights }
+  const adrAcc = {};
+  const nightsInMonthFor = (mk, ci, co) => {
+    const mStart = `${mk}-01`;
+    const [y, m] = mk.split("-").map(Number);
+    const mEndExcl = new Date(Date.UTC(y, m, 1)); // first of next month
+    const a = new Date(((ci > mStart ? ci : mStart)) + "T00:00:00Z");
+    let b = new Date(co + "T00:00:00Z");
+    if (b > mEndExcl) b = mEndExcl;
+    return Math.max(0, Math.round((b - a) / 86400000));
+  };
+  if (result.bySpaceOrderMonth) {
+    for (const [rid, byMonth] of Object.entries(result.bySpaceOrderMonth)) {
+      const info = resInfo.get(rid);
+      if (!info) continue;
+      for (const [mk, net] of Object.entries(byMonth)) {
+        if (!(net > 0)) continue;
+        const nim = nightsInMonthFor(mk, info.ci, info.co);
+        if (nim <= 0) continue;
+        if (!adrAcc[mk]) adrAcc[mk] = {};
+        if (!adrAcc[mk][info.seg]) adrAcc[mk][info.seg] = { net: 0, nights: 0 };
+        adrAcc[mk][info.seg].net += net;
+        adrAcc[mk][info.seg].nights += nim;
+      }
+    }
+  }
 
   // Property-wide occupancy + room nights from daily_metrics_snapshots
   // (property-wide rooms_sold per Blueprint §10 — already accounts for
@@ -170,6 +219,17 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
     const byRole = {};
     let totalRev = 0;
     let totalServiceNights = 0;
+    // Headline ADR = paying-nights weighted average of the per-segment ADRs.
+    // Weight = each segment's occupied room-nights (rate_segment short/mid/long,
+    // which excludes comp/management). This keeps comp/freebie rooms OUT of the
+    // headline rate (per the locked rule: comp excluded from ADR everywhere bar
+    // Weekly Unit Pacing; also the industry ADR convention) — otherwise the
+    // headline divides revenue by ALL occupied rooms and reads far below the
+    // segment ADRs (Belsize: £54 headline vs £98 short, the £44 gap = freebie
+    // rooms). Occupancy + RevPAR still use property-wide rooms_sold (comp is
+    // genuinely in-house). Dom Comments.md.
+    let blendedAdrWeighted = 0;
+    let blendedAdrWeight = 0;
     for (const role of ROLES) {
       const accCatIds = accountingCategories[role] || [];
       let net = 0;
@@ -180,25 +240,47 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
         net += bucket.net;
         itemCount += bucket.nights; // SpaceOrder item count (legacy fallback)
       }
-      // Denominator = ACTUAL occupied room-nights from reservation dates (per
-      // Mews service), not the SpaceOrder item count — so per-service ADR ties
-      // to the rate-by-category charts. Revenue numerator stays AccCat-net.
+      // Occupancy denominator = ACTUAL occupied room-nights from reservation
+      // dates (per rate_segment). Revenue (displayed) stays AccCat-net.
       const roomNights = rnMap ? (rnMap.get(mk)?.[role] ?? 0) : itemCount;
+      // ADR = consumed-in-month accommodation revenue ÷ those same bookings'
+      // in-month nights (same-bookings basis built above). Falls back to the
+      // legacy AccCat-net ÷ room-nights only if the per-booking rollup is
+      // unavailable (e.g. a caller that didn't request bySpaceOrder).
+      const adrCell = adrAcc[mk]?.[role];
+      const adr =
+        adrCell && adrCell.nights > 0
+          ? adrCell.net / adrCell.nights
+          : roomNights > 0
+            ? net / roomNights
+            : null;
       byRole[role] = {
         revenue: net,
         nights: roomNights,
-        adr: roomNights > 0 ? net / roomNights : null,
+        adr,
         configured: accCatIds.length > 0,
       };
       totalRev += net;
       totalServiceNights += roomNights;
+      if (adr != null && roomNights > 0) {
+        blendedAdrWeighted += adr * roomNights;
+        blendedAdrWeight += roomNights;
+      }
     }
 
     const occRow = occByMonth.get(mk);
     const totalRoomNights = occRow ? Number(occRow.total_room_nights) : 0;
     const totalCapacity = occRow ? Number(occRow.total_capacity) : 0;
     const occupancy = totalCapacity > 0 ? (totalRoomNights / totalCapacity) * 100 : null;
-    const blendedAdr = totalRoomNights > 0 ? totalRev / totalRoomNights : null;
+    // Paying-nights weighted average of segment ADRs (comp/management excluded).
+    // Falls back to the legacy AccCat-net ÷ property-room-nights only when the
+    // per-segment ADR basis is unavailable.
+    const blendedAdr =
+      blendedAdrWeight > 0
+        ? blendedAdrWeighted / blendedAdrWeight
+        : totalRoomNights > 0
+          ? totalRev / totalRoomNights
+          : null;
     const revpar = totalCapacity > 0 ? totalRev / totalCapacity : null;
 
     return {
@@ -440,6 +522,8 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
 
   // Bucket each booking by tier and service classification
   const ssWeekly = new Map();   // weekStart -> { bookings, roomNights, revenue }
+  const msWeekly = new Map();   // mid-stay per-segment weekly (same shape as ss)
+  const lsWeekly = new Map();   // long-stay per-segment weekly (same shape as ss)
   const allWeekly = new Map();  // weekStart -> all-segments created-week aggregate
   const lsTierWeekly = new Map(); // tierKey -> weekStart -> count
   const tierTotals = {}; // tierKey -> { bookings, revenue, nights }
@@ -471,9 +555,13 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
     // service. Classification mirrors Mews exactly (ties to Mews Reservation
     // Report for any given created-window). Cancelled reservations excluded.
     // Verified 2026-05-11 against Mews's Apr 13-19 export.
-    if (seg === "short" && !isCancelled) {
-      if (!ssWeekly.has(week)) ssWeekly.set(week, { bookings: 0, roomNights: 0, revenue: 0, adrSum: 0, adrCount: 0 });
-      const slot = ssWeekly.get(week);
+    // Per-segment weekly bookings (Short / Mid / Long each their own table —
+    // Dom's "split Accommodation Bookings per segment"). Same created-week,
+    // rate-group classification, cancellations excluded — identical to ss.
+    const segWeekly = seg === "short" ? ssWeekly : seg === "mid" ? msWeekly : seg === "long" ? lsWeekly : null;
+    if (segWeekly && !isCancelled) {
+      if (!segWeekly.has(week)) segWeekly.set(week, { bookings: 0, roomNights: 0, revenue: 0, adrSum: 0, adrCount: 0 });
+      const slot = segWeekly.get(week);
       slot.bookings += 1;
       slot.roomNights += nights;
       slot.revenue += totalRate;
@@ -514,6 +602,8 @@ async function getLeadTimeTiers(hotelId, weeksBack = 8, serviceIds = null) {
 
   return {
     ssWeekly: weeklyShape(ssWeekly),
+    msWeekly: weeklyShape(msWeekly),
+    lsWeekly: weeklyShape(lsWeekly),
     allWeekly: weeklyShape(allWeekly),
     lsTierWeekly: LEAD_TIME_TIERS.map((t) => ({
       tier: t.key,
@@ -575,53 +665,91 @@ async function getWeeklyUnitPacing(hotelId, weekStarts) {
   const snapByDate = new Map(snaps.map((s) => [s.stay_date, s]));
 
   const result = weekStarts.map((ws) => {
-    const wsDate = new Date(ws + "T00:00:00Z");
-    const weDate = new Date(wsDate);
-    weDate.setUTCDate(wsDate.getUTCDate() + 6);
-
-    let ssDays = 0, msDays = 0, lsDays = 0, offlineDays = 0, capacityDays = 0;
-    for (let d = new Date(wsDate); d <= weDate; d.setUTCDate(d.getUTCDate() + 1)) {
-      const ds = d.toISOString().slice(0, 10);
-      const snap = snapByDate.get(ds);
-      if (snap) {
-        offlineDays += (snap.blocked_rooms_count || 0) + (snap.out_of_service_rooms_count || 0);
-        capacityDays += (snap.capacity_count || 0);
-      }
-    }
-
-    for (const r of rows) {
-      const ci = new Date(r.check_in + "T00:00:00Z");
-      const co = new Date(r.check_out + "T00:00:00Z");
-      const overlapStart = ci > wsDate ? ci : wsDate;
-      const overlapEnd = co < new Date(weDate.getTime() + 86400000) ? co : new Date(weDate.getTime() + 86400000);
-      const overlapDays = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
-      if (overlapDays === 0) continue;
-      // Rate-group segment. Management/comp ('exclude') + anything unclassified
-      // fold into Short here only (Dom's rule: comp rooms appear nowhere else,
-      // but Weekly Unit Pacing must still reconcile occupied vs vacant rooms).
-      if (r.rate_segment === "mid") msDays += overlapDays;
-      else if (r.rate_segment === "long") lsDays += overlapDays;
-      else ssDays += overlapDays;
-    }
-
-    const sub = ssDays + msDays + lsDays;
-    const vacant = Math.max(0, capacityDays - sub - offlineDays);
-
-    // Convert "room-days" to "average rooms over the week" by dividing by 7
-    const div = (x) => x / 7;
-    const total = capacityDays / 7 || 1;
-    return {
-      weekStart: ws,
-      shortStay: { rooms: div(ssDays), pct: ssDays / (capacityDays || 1) },
-      midStay: { rooms: div(msDays), pct: msDays / (capacityDays || 1) },
-      longStay: { rooms: div(lsDays), pct: lsDays / (capacityDays || 1) },
-      offline: { rooms: div(offlineDays), pct: offlineDays / (capacityDays || 1) },
-      vacant: { rooms: div(vacant), pct: vacant / (capacityDays || 1) },
-      capacity: total,
-    };
+    const weDate = new Date(ws + "T00:00:00Z");
+    weDate.setUTCDate(weDate.getUTCDate() + 6);
+    const weStr = weDate.toISOString().slice(0, 10);
+    return { weekStart: ws, ..._unitPacingBreakdown(rows, snapByDate, ws, weStr, 7) };
   });
 
   return result;
+}
+
+/**
+ * Shared unit-pacing math for an arbitrary inclusive date range [startStr,
+ * endInclStr]. Sums occupied room-days per rate-group segment (comp/'exclude'
+ * + unclassified fold into Short — Dom's rule), offline + capacity room-days
+ * from snapshots, then divides by `numDays` to express "average rooms per day"
+ * so a week (÷7) and a full month (÷days-in-month) read on the same scale.
+ * Used by BOTH getWeeklyUnitPacing and getMonthlyUnitPacing so they can never
+ * drift apart.
+ */
+function _unitPacingBreakdown(rows, snapByDate, startStr, endInclStr, numDays) {
+  const startDate = new Date(startStr + "T00:00:00Z");
+  const endDate = new Date(endInclStr + "T00:00:00Z");
+  const endExcl = new Date(endDate.getTime() + 86400000);
+
+  let ssDays = 0, msDays = 0, lsDays = 0, offlineDays = 0, capacityDays = 0;
+  for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+    const ds = d.toISOString().slice(0, 10);
+    const snap = snapByDate.get(ds);
+    if (snap) {
+      offlineDays += (snap.blocked_rooms_count || 0) + (snap.out_of_service_rooms_count || 0);
+      capacityDays += (snap.capacity_count || 0);
+    }
+  }
+
+  for (const r of rows) {
+    const ci = new Date(r.check_in + "T00:00:00Z");
+    const co = new Date(r.check_out + "T00:00:00Z");
+    const overlapStart = ci > startDate ? ci : startDate;
+    const overlapEnd = co < endExcl ? co : endExcl;
+    const overlapDays = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
+    if (overlapDays === 0) continue;
+    if (r.rate_segment === "mid") msDays += overlapDays;
+    else if (r.rate_segment === "long") lsDays += overlapDays;
+    else ssDays += overlapDays;
+  }
+
+  const vacant = Math.max(0, capacityDays - (ssDays + msDays + lsDays) - offlineDays);
+  const div = (x) => x / numDays;
+  return {
+    shortStay: { rooms: div(ssDays), pct: ssDays / (capacityDays || 1) },
+    midStay: { rooms: div(msDays), pct: msDays / (capacityDays || 1) },
+    longStay: { rooms: div(lsDays), pct: lsDays / (capacityDays || 1) },
+    offline: { rooms: div(offlineDays), pct: offlineDays / (capacityDays || 1) },
+    vacant: { rooms: div(vacant), pct: vacant / (capacityDays || 1) },
+    capacity: capacityDays / numDays || 1,
+  };
+}
+
+/**
+ * Full-month Unit Pacing summary for the selected reporting month — the same
+ * breakdown as a weekly column but averaged across the whole month (Dom's
+ * request: a "full-month summary for the selected month"). Returns the weekly
+ * cell shape plus `monthKey`, or null when no snapshots exist for the month.
+ */
+async function getMonthlyUnitPacing(hotelId, monthKey) {
+  const start = startOfMonth(monthKey);
+  const end = endOfMonth(monthKey);
+  const numDays = Math.round((new Date(end + "T00:00:00Z") - new Date(start + "T00:00:00Z")) / 86400000) + 1;
+
+  const { rows } = await pgPool.query(
+    `SELECT check_in::text AS check_in, check_out::text AS check_out, nights, status, rate_segment
+       FROM reservations
+      WHERE hotel_id = $1 AND check_in <= $3::date AND check_out >= $2::date
+        AND status NOT ILIKE '%cancel%'`,
+    [hotelId, start, end],
+  );
+  const { rows: snaps } = await pgPool.query(
+    `SELECT stay_date::text AS stay_date, blocked_rooms_count, out_of_service_rooms_count, capacity_count
+       FROM daily_metrics_snapshots
+      WHERE hotel_id = $1 AND stay_date BETWEEN $2 AND $3`,
+    [hotelId, start, end],
+  );
+  if (snaps.length === 0) return null;
+  const snapByDate = new Map(snaps.map((s) => [s.stay_date, s]));
+
+  return { monthKey, ..._unitPacingBreakdown(rows, snapByDate, start, end, numDays) };
 }
 
 /**
@@ -1069,6 +1197,33 @@ async function getSegmentRevenueActuals(hotelId, monthKey) {
 }
 
 /**
+ * Prior-year KPI actuals + SS Direct/Indirect split, hardcoded from Dom's
+ * "Monthly Summary Hardcode.xlsx" (Dom's V3 decision — PY columns come from his
+ * analyst file, not Mews; see scripts/load-mf-kpi-history.js). Returns a flat
+ * map keyed by metric_key (occupancy, adr_blended, revpar_blended, ss_adr,
+ * ms_adr, ls_adr, ss_direct_pct, ss_indirect_pct) on the same scale as the live
+ * `actual` cells, or null when the month/hotel isn't in the file (e.g. Belsize,
+ * pre-history) — caller then falls back to the snapshot LY or leaves it blank.
+ */
+async function getKpiHistory(hotelId, monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  try {
+    const { rows } = await pgPool.query(
+      `SELECT metric_key, value
+         FROM mf_monthly_kpi_history
+        WHERE hotel_id = $1 AND year = $2 AND month = $3`,
+      [hotelId, year, month],
+    );
+    if (!rows.length) return null;
+    const out = {};
+    for (const r of rows) out[r.metric_key] = Number(r.value);
+    return out;
+  } catch (_e) {
+    return null; // table absent / query error → degrade to no hardcoded PY
+  }
+}
+
+/**
  * Mason Dashboard: Recent Bookings (sales ledger, last 7 days) — SHORT STAY ONLY.
  * Mirrors MetricsService.getRecentActivity but restricts the count/revenue/
  * room-nights to reservations classified rate_segment='short' (the canonical
@@ -1123,6 +1278,7 @@ module.exports = {
   getRecentActivity,
   getDailyOccupancyByService,
   getSegmentRevenueActuals,
+  getKpiHistory,
   getAlosByService,
   getLeadTimeByService,
   getRoomNightsByMonthRole,
@@ -1140,6 +1296,7 @@ module.exports = {
   getBookingPulse,
   getLeadTimeTiers,
   getWeeklyUnitPacing,
+  getMonthlyUnitPacing,
   getInHouseAtMonthEnd,
   getServiceBudgets,
   getDirectShareForMonth,

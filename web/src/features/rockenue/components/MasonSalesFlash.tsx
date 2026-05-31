@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, createContext, useContext, type ChangeEvent } from "react";
 import { Download, ChevronDown, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { R } from "../../../styles/tokens";
 import {
   fetchMasonSalesFlash,
@@ -8,10 +9,11 @@ import {
   type SalesFlashMonthCard,
   type RevenueCell,
   type KpiCell,
+  type SsWeeklyRow,
 } from "../api/mason.api";
 import { MasonOccupancyByService } from "./MasonOccupancyByService";
 import { MasonRateCharts } from "./MasonRateCharts";
-import { MasonWeeklyBookingsChart } from "./MasonWeeklyBookingsChart";
+import { SegmentWeeklyChart } from "./MasonWeeklyBookingsChart";
 import {
   MonthCardView,
   MonthCardSkeleton,
@@ -397,23 +399,39 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isExcel = /\.xlsx?$/i.test(file.name);
     const reader = new FileReader();
     reader.onload = () => {
-      const parsed = parseAmenityCsv(String(reader.result || ""));
-      if (!parsed) { setErr("Couldn't read that file — expected the Ancillary Upload CSV."); return; }
-      setErr(null);
-      setData(parsed);
-      try { localStorage.setItem(storeKey, JSON.stringify(parsed)); } catch { /* quota — display only */ }
+      try {
+        // Excel (.xlsx/.xls): convert the first sheet to CSV text via SheetJS,
+        // then feed the existing CSV parser (num() tolerates raw or £-formatted
+        // values). CSV: parse the text directly.
+        let csv: string;
+        if (isExcel) {
+          const wb = XLSX.read(new Uint8Array(reader.result as ArrayBuffer), { type: "array" });
+          csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+        } else {
+          csv = String(reader.result || "");
+        }
+        const parsed = parseAmenityCsv(csv);
+        if (!parsed) { setErr("Couldn't read that file — expected the Ancillary Upload sheet (Canal / Meadow / Grounding Revenue & Budget rows)."); return; }
+        setErr(null);
+        setData(parsed);
+        try { localStorage.setItem(storeKey, JSON.stringify(parsed)); } catch { /* quota — display only */ }
+      } catch {
+        setErr("Couldn't read that file — please upload the Ancillary Upload CSV or Excel sheet.");
+      }
     };
-    reader.readAsText(file);
+    if (isExcel) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
     e.target.value = "";
   };
 
   const grid = data ? `minmax(150px, 1.4fr) repeat(${data.months.length}, minmax(58px, 1fr)) 96px` : "";
 
   return (
-    <Section title="Amenity & Building Revenue" subtitle="Westbourne Park — Canal / Meadow / Grounding (uploaded from Dom's Ancillary CSV)">
-      <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} style={{ display: "none" }} />
+    <Section title="Amenity & Building Revenue" subtitle="Westbourne Park — Canal / Meadow / Grounding (upload Dom's Ancillary sheet — CSV or Excel)">
+      <input ref={fileRef} type="file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={onFile} style={{ display: "none" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <button
           onClick={() => fileRef.current?.click()}
@@ -423,7 +441,7 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
             borderRadius: 999, cursor: "pointer",
           }}
         >
-          {data ? "Replace Ancillary CSV" : "Upload Ancillary CSV"}
+          {data ? "Replace Ancillary file" : "Upload Ancillary file"}
         </button>
         {data && <span style={{ fontSize: 11, color: R.textDim }}>{data.rows.length} amenities · uploaded {new Date(data.uploadedAt).toLocaleString()}</span>}
         {err && <span style={{ fontSize: 11, color: R.red }}>{err}</span>}
@@ -431,7 +449,7 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
       {!data ? (
         <div style={{ border: `1px dashed ${R.gold}55`, borderRadius: 10, background: "rgba(200,166,110,0.04)", padding: "22px 20px", textAlign: "center", fontSize: 12, color: R.textMid, lineHeight: 1.55 }}>
           Amenity revenue runs on external systems (Toast etc.), not Mews. Upload Dom's
-          "Ancillary Upload" CSV to show Canal / Meadow / Grounding revenue vs budget here.
+          "Ancillary Upload" sheet (CSV or Excel) to show Canal / Meadow / Grounding revenue vs budget here.
         </div>
       ) : (
         <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
@@ -863,95 +881,131 @@ function PacingByService({ data, hasBudgetData }: { data: SalesFlashResponse; ha
 function WeeklyUnitPacing({ data }: { data: SalesFlashResponse }) {
   const weeks = data.unitPacing;
   if (!weeks || weeks.length === 0) return null;
-  const grid = `minmax(160px, 1fr) ${weeks.map(() => "minmax(110px, 1fr)").join(" ")}`;
-  const renderRow = (label: string, color: string, get: (w: typeof weeks[number]) => { rooms: number; pct: number }) => (
+  const month = data.unitPacingMonth;
+  const monthLabel = month
+    ? new Date(month.monthKey + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" })
+    : null;
+  type Cell = { rooms: number; pct: number };
+  type PacingCols = { shortStay: Cell; midStay: Cell; longStay: Cell; offline: Cell; vacant: Cell };
+  const grid = [
+    "minmax(160px, 1fr)",
+    ...(month ? ["minmax(120px, 1fr)"] : []),
+    ...weeks.map(() => "minmax(110px, 1fr)"),
+  ].join(" ");
+  // Month-summary column reads as a distinct "total": faint tint + right divider.
+  const monthCell: React.CSSProperties = { ...cellBase, background: "rgba(56,198,186,0.06)", borderRight: `2px solid ${R.border}` };
+  const renderCell = (v: Cell, key: string, style: React.CSSProperties) => (
+    <div key={key} style={style}>
+      <span style={{ color: R.text, fontWeight: 600 }}>{fmtNum(v.rooms, 0)}</span>
+      <span style={{ color: R.textDim, marginLeft: 4, fontSize: 10 }}> rms</span>
+      <span style={{ color: R.textDim, marginLeft: 8, fontSize: 10 }}>· {fmtPct(v.pct * 100, 0)}</span>
+    </div>
+  );
+  const renderRow = (label: string, color: string, get: (r: PacingCols) => Cell) => (
     <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}`, alignItems: "center" }}>
       <div style={{ ...labelCell, color }}>{label}</div>
-      {weeks.map((w) => {
-        const v = get(w);
-        return (
-          <div key={w.weekStart} style={cellBase}>
-            <span style={{ color: R.text, fontWeight: 600 }}>{fmtNum(v.rooms, 0)}</span>
-            <span style={{ color: R.textDim, marginLeft: 4, fontSize: 10 }}> rms</span>
-            <span style={{ color: R.textDim, marginLeft: 8, fontSize: 10 }}>· {fmtPct(v.pct * 100, 0)}</span>
-          </div>
-        );
-      })}
+      {month && renderCell(get(month), "__month", monthCell)}
+      {weeks.map((w) => renderCell(get(w), w.weekStart, cellBase))}
     </div>
   );
   return (
-    <Section title="Weekly Unit Pacing" subtitle="Average rooms occupied per service across the next 5 weeks">
+    <Section title="Weekly Unit Pacing" subtitle="Full-month summary for the selected month + the next 5 weeks">
       <div style={{ background: "rgba(56,198,186,0.04)", border: `1px solid rgba(56,198,186,0.18)`, borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: R.text, lineHeight: 1.5 }}>
         <strong style={{ color: R.warmTeal }}>How Weekly Unit Pacing is counted:</strong>{" "}
-        average <strong>rooms occupied per day</strong> across the 7-day week, broken out by Mews service
-        (Short / Mid / Long Stay). "Offline" = blocked + out-of-service rooms. "Vacant" = remaining capacity.
-        Rows sum to total room inventory (e.g. Westbourne = 332). Each cell reads "rooms · % of capacity".
-        Reservation capture began 2026-04-13, plus historical backfill of all Mews reservations from
-        2024-01-01 — so forward weeks reflect every active reservation in Mews.
+        average <strong>rooms occupied per day</strong>, broken out by Mews service
+        (Short / Mid / Long Stay). The first column averages across the whole selected month; each
+        weekly column averages across that 7-day week. "Offline" = blocked + out-of-service rooms.
+        "Vacant" = remaining capacity. Rows sum to total room inventory (e.g. Westbourne = 332). Each
+        cell reads "rooms · % of capacity". Reservation capture began 2026-04-13, plus historical
+        backfill of all Mews reservations from 2024-01-01 — so forward weeks reflect every active reservation in Mews.
       </div>
       <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto" }}>
         <div style={{ minWidth: 800 }}>
           <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
             <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week beginning</div>
+            {month && <div style={{ ...headerCell, background: "rgba(56,198,186,0.06)", borderRight: `2px solid ${R.border}`, color: R.warmTeal }}>{monthLabel} · month</div>}
             {weeks.map((w) => {
               const d = new Date(w.weekStart + "T00:00:00Z");
               const lbl = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
               return <div key={w.weekStart} style={headerCell}>{lbl}</div>;
             })}
           </div>
-          {renderRow("Short Stay", R.text, (w) => w.shortStay)}
-          {renderRow("Mid Stay", R.text, (w) => w.midStay)}
-          {renderRow("Long Stay", R.text, (w) => w.longStay)}
-          {renderRow("Offline", R.textDim, (w) => w.offline)}
-          {renderRow("Vacant", R.textDim, (w) => w.vacant)}
+          {renderRow("Short Stay", R.text, (r) => r.shortStay)}
+          {renderRow("Mid Stay", R.text, (r) => r.midStay)}
+          {renderRow("Long Stay", R.text, (r) => r.longStay)}
+          {renderRow("Offline", R.textDim, (r) => r.offline)}
+          {renderRow("Vacant", R.textDim, (r) => r.vacant)}
         </div>
       </div>
     </Section>
   );
 }
 
-function SsLsBookings({ data }: { data: SalesFlashResponse }) {
-  const ss = data.ssWeekly;
-  const grid = ss.length
-    ? `minmax(180px, 1.5fr) ${ss.map(() => "minmax(76px, 1fr)").join(" ")}`
-    : `minmax(180px, 1.5fr)`;
-
+function WeeklyBookingsTable({ rows, title, emptyLabel }: { rows: SsWeeklyRow[]; title: string; emptyLabel: string }) {
+  const grid = rows.length
+    ? `minmax(120px, 1.2fr) ${rows.map(() => "minmax(70px, 1fr)").join(" ")}`
+    : `minmax(120px, 1.2fr)`;
   return (
-    <Section title="Accommodation Bookings" subtitle="By booking-created week — Short Stay + all-segment Reservations Created" done>
-      <div style={{ background: "rgba(56,198,186,0.04)", border: `1px solid rgba(56,198,186,0.18)`, borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: R.text, lineHeight: 1.5 }}>
-        <strong style={{ color: R.warmTeal }}>How Short Stay is counted:</strong>{" "}
-        reservations classified as Short Stay by rate group, excluding cancellations. Mid Stay is now split out via its own rate groups. Capture began 2026-04-13.
-      </div>
-      <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto", marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: R.warmTeal, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 12px 8px" }}>Short Stay — weekly bookings</div>
-        {ss.length === 0 ? (
-          <div style={{ color: R.textDim, fontSize: 11, padding: 12 }}>No short-stay bookings captured yet.</div>
-        ) : (
-          <div style={{ minWidth: 800 }}>
-            <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
-              <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week ending</div>
-              {ss.map((w) => {
-                const d = new Date(w.weekStart + "T00:00:00Z");
-                const lbl = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
-                return <div key={w.weekStart} style={headerCell}>{lbl}</div>;
-              })}
-            </div>
-            {[
-              { label: "Bookings", get: (w: typeof ss[number]) => w.bookings, fmt: (v: number) => fmtNum(v, 0) },
-              { label: "Room nights", get: (w: typeof ss[number]) => w.roomNights, fmt: (v: number) => fmtNum(v, 0) },
-              { label: "Revenue (gross)", get: (w: typeof ss[number]) => w.revenue, fmt: (v: number) => fmtGbp(v, 0) },
-              { label: "Avg ADR", get: (w: typeof ss[number]) => w.avgAdr, fmt: (v: number | null | undefined) => fmtGbp(v, 0) },
-            ].map((r) => (
-              <div key={r.label} style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
-                <div style={labelCell}>{r.label}</div>
-                {ss.map((w) => <div key={w.weekStart} style={cellBase}>{r.fmt(r.get(w) as any)}</div>)}
-              </div>
-            ))}
+    <div style={{ background: R.darkBand, border: `1px solid ${R.border}`, borderRadius: 10, padding: 14, overflowX: "auto", height: "100%" }}>
+      <div style={{ fontSize: 10, color: R.warmTeal, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 12px 8px" }}>{title}</div>
+      {rows.length === 0 ? (
+        <div style={{ color: R.textDim, fontSize: 11, padding: 12 }}>{emptyLabel}</div>
+      ) : (
+        <div style={{ minWidth: 420 }}>
+          <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
+            <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week ending</div>
+            {rows.map((w) => {
+              const d = new Date(w.weekStart + "T00:00:00Z");
+              const lbl = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
+              return <div key={w.weekStart} style={headerCell}>{lbl}</div>;
+            })}
           </div>
-        )}
+          {[
+            { label: "Bookings", get: (w: SsWeeklyRow) => w.bookings, fmt: (v: number) => fmtNum(v, 0) },
+            { label: "Room nights", get: (w: SsWeeklyRow) => w.roomNights, fmt: (v: number) => fmtNum(v, 0) },
+            { label: "Revenue (gross)", get: (w: SsWeeklyRow) => w.revenue, fmt: (v: number) => fmtGbp(v, 0) },
+            { label: "Avg ADR", get: (w: SsWeeklyRow) => w.avgAdr, fmt: (v: number | null | undefined) => fmtGbp(v, 0) },
+          ].map((r) => (
+            <div key={r.label} style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.sep}` }}>
+              <div style={labelCell}>{r.label}</div>
+              {rows.map((w) => <div key={w.weekStart} style={cellBase}>{r.fmt(r.get(w) as any)}</div>)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One segment row: table on the left, its chart on the right. Flex-wrap so the
+// chart drops below the table on narrow screens (Dom: "if there is enough space").
+function SegmentBookingsRow({ rows, segment }: { rows: SsWeeklyRow[]; segment: string }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 16, alignItems: "stretch" }}>
+      <div style={{ flex: "1 1 460px", minWidth: 0 }}>
+        <WeeklyBookingsTable rows={rows} title={`${segment} — weekly bookings`} emptyLabel={`No ${segment.toLowerCase()} bookings captured yet.`} />
+      </div>
+      <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex" }}>
+        <div style={{ width: "100%" }}>
+          <SegmentWeeklyChart rows={rows} title={`${segment} — bookings · nights · revenue`} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SsLsBookings({ data }: { data: SalesFlashResponse }) {
+  return (
+    <Section title="Accommodation Bookings" subtitle="By booking-created week — split by Short / Mid / Long Stay, with all-segment Reservations Created" done>
+      <div style={{ background: "rgba(56,198,186,0.04)", border: `1px solid rgba(56,198,186,0.18)`, borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: R.text, lineHeight: 1.5 }}>
+        <strong style={{ color: R.warmTeal }}>How this is counted:</strong>{" "}
+        reservations classified by rate group, by the week the booking was created, excluding cancellations.
+        Each segment (Short / Mid / Long) has its own table and chart. Capture began 2026-04-13.
       </div>
 
-      <MasonWeeklyBookingsChart ssWeekly={data.ssWeekly} lsTiers={data.lsTierWeekly} />
+      <SegmentBookingsRow rows={data.ssWeekly} segment="Short Stay" />
+      <SegmentBookingsRow rows={data.msWeekly} segment="Mid Stay" />
+      <SegmentBookingsRow rows={data.lsWeekly} segment="Long Stay" />
 
       {(() => {
         const all = data.allWeekly;

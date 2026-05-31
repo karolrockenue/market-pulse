@@ -713,6 +713,9 @@ router.get("/sales-flash", async (req, res) => {
       weekStarts.push(w.toISOString().slice(0, 10));
     }
     const unitPacing = await masonService.getWeeklyUnitPacing(hotelId, weekStarts);
+    // Full-month summary column for the selected reporting month (Dom's
+    // request) — same breakdown averaged across the whole month.
+    const unitPacingMonth = await masonService.getMonthlyUnitPacing(hotelId, currentMK);
 
     // ─── Current Month Summary block ───────────────────────────────
     const cur = otbByMonth.get(currentMK);
@@ -721,6 +724,11 @@ router.get("/sales-flash", async (req, res) => {
     // Prior-year revenue split by service (Mason monthly-summary basis). null
     // when unavailable (Belsize / pre-history) → segment PY renders "—".
     const pySeg = await masonService.getSegmentRevenueActuals(hotelId, priorYearMK);
+    // Prior-year KPI actuals + SS Direct/Indirect, hardcoded from Dom's file
+    // (V3 decision). Authoritative for the PY columns; falls back to the
+    // snapshot LY (`py`) for blended occ/ADR/RevPAR when the file lacks a
+    // month/hotel, and leaves per-segment / source PY blank when absent.
+    const pyKpi = await masonService.getKpiHistory(hotelId, priorYearMK);
     const budgetCur = budgets[currentMK];
 
     // Average Length of Stay (days) per service — reservations staying in the
@@ -750,12 +758,18 @@ router.get("/sales-flash", async (req, res) => {
       long: { actual: ltCur.long, priorMonth: ltPM.long, priorYear: ltPY.long },
     };
 
-    // Rate-by-studio-category + AMR-by-segment charts (current month). Pass the
-    // card's SS/LS {net, nights} so the chart "All" bars tie to the KPI card
-    // ADRs (finance-grade AccCat scope) instead of the chart's raw service scope.
+    // Rate-by-studio-category + AMR-by-segment charts (current month). Anchor
+    // the chart "All" bars to the KPI card ADRs. The card ADR is now the
+    // per-booking consumed-in-month basis (getMonthlyKpis), so feed that ADR
+    // through as the anchor ratio (net = adr × nights) rather than the AccCat
+    // revenue line — otherwise the chart "All" bar drifts off the card again.
+    const anchorFor = (b) => ({
+      net: (b?.adr ?? 0) * (b?.nights ?? 0),
+      nights: b?.nights ?? 0,
+    });
     const rateCharts = await masonService.getRateBreakdowns(hotelId, currentMK, hotel.serviceIds, {
-      short: { net: cur?.byRole?.short?.revenue ?? 0, nights: cur?.byRole?.short?.nights ?? 0 },
-      long: { net: cur?.byRole?.long?.revenue ?? 0, nights: cur?.byRole?.long?.nights ?? 0 },
+      short: anchorFor(cur?.byRole?.short),
+      long: anchorFor(cur?.byRole?.long),
     });
 
     // Budget KPI derivations for the current month. Budget revenue is loaded;
@@ -812,31 +826,31 @@ router.get("/sales-flash", async (req, res) => {
         occupancy: {
           actual: cur?.total.occupancy ?? null,
           priorMonth: pm?.total.occupancy ?? null,
-          priorYear: py ? py.occupancy : null,
+          priorYear: pyKpi?.occupancy ?? (py ? py.occupancy : null),
           budget: budgetOccPct,
         },
         adrBlended: {
           actual: cur?.total.adr ?? null,
           priorMonth: pm?.total.adr ?? null,
-          priorYear: py ? py.adr : null,
+          priorYear: pyKpi?.adr_blended ?? (py ? py.adr : null),
           budget: budgetAdrBlended,
         },
         revpar: {
           actual: cur?.total.revpar ?? null,
           priorMonth: pm?.total.revpar ?? null,
-          priorYear: py ? py.revpar : null,
+          priorYear: pyKpi?.revpar_blended ?? (py ? py.revpar : null),
           budget: budgetRevpar,
         },
         adrShort: {
           actual: cur?.byRole.short.adr ?? null,
           priorMonth: pm?.byRole.short.adr ?? null,
-          priorYear: null, // no per-service LY scope from snapshots
+          priorYear: pyKpi?.ss_adr ?? null, // hardcoded from Dom's file
           budget: budgetAdrShort,
         },
         adrMid: {
           actual: cur?.byRole.mid.adr ?? null,
           priorMonth: pm?.byRole.mid.adr ?? null,
-          priorYear: null,
+          priorYear: pyKpi?.ms_adr ?? null,
           budget: budgetAdrMid,
         },
         // Long Stay ADR — now a true nightly ADR (net ÷ actual occupied
@@ -845,21 +859,21 @@ router.get("/sales-flash", async (req, res) => {
         amrLong: {
           actual: cur?.byRole.long.adr ?? null,
           priorMonth: pm?.byRole.long.adr ?? null,
-          priorYear: null,
+          priorYear: pyKpi?.ls_adr ?? null,
           budget: null,
         },
-        // Direct vs Indirect, Short Stays only (Dom V3). Prior-year comes from
-        // Dom's hardcoded file (not wired yet) → priorYear stays null.
+        // Direct vs Indirect, Short Stays only (Dom V3). Prior-year hardcoded
+        // from Dom's file (SS Direct/Indirect Booking %).
         direct: {
           actual: directShare ? directShare.directPct : null,
           priorMonth: directSharePM ? directSharePM.directPct : null,
-          priorYear: null,
+          priorYear: pyKpi?.ss_direct_pct ?? null,
           budget: null,
         },
         indirect: {
           actual: directShare ? directShare.indirectPct : null,
           priorMonth: directSharePM ? directSharePM.indirectPct : null,
-          priorYear: null,
+          priorYear: pyKpi?.ss_indirect_pct ?? null,
           budget: null,
         },
       },
@@ -954,7 +968,10 @@ router.get("/sales-flash", async (req, res) => {
       fytdOccupancy,
       inHouseFY,
       unitPacing,
+      unitPacingMonth,
       ssWeekly: tiers.ssWeekly,
+      msWeekly: tiers.msWeekly,
+      lsWeekly: tiers.lsWeekly,
       allWeekly: tiers.allWeekly,
       lsTierWeekly: tiers.lsTierWeekly,
       notes: {
