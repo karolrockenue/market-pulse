@@ -17,6 +17,7 @@ const { requireUserApi } = require("../utils/middleware");
 const masonService = require("../services/mason.service");
 const { buildSalesFlashPdfData } = require("../services/masonPdf.service");
 const { generatePdfFromHtml } = require("../utils/pdf.utils");
+const { buildSalesFlashXlsx } = require("../utils/masonXlsx");
 
 // Mason & Fifth hotel IDs that grant access to this dashboard.
 // Includes Belsize Park (318329) even though its service UUIDs aren't
@@ -1024,6 +1025,32 @@ router.get("/sales-flash/pdf", async (req, res) => {
   } catch (err) {
     console.error("[Mason] /sales-flash/pdf failed:", err.message);
     res.status(500).json({ error: "PDF generation failed" });
+  }
+});
+
+/**
+ * GET /api/mason/sales-flash/xlsx?hotelId=&monthKey=YYYY-MM
+ * Excel workbook of the Sales Flash (same data as the PDF), built with ExcelJS.
+ */
+router.get("/sales-flash/xlsx", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  const hotel = MF_HOTELS[hotelId];
+  if (!FLASH_HOTEL_IDS.has(hotelId) || !hotel) {
+    return res.status(400).json({ error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}` });
+  }
+  const monthKey = req.query.monthKey || shiftMonth(thisMonthKey(), -1);
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    return res.status(400).json({ error: "monthKey must be YYYY-MM" });
+  }
+  try {
+    const data = await buildSalesFlashPdfData(hotelId, monthKey, hotel);
+    const xlsx = await buildSalesFlashXlsx(data);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="Sales-Flash-${hotel.shortName.replace(/\s+/g, "-")}-${monthKey}.xlsx"`);
+    res.send(Buffer.from(xlsx));
+  } catch (err) {
+    console.error("[Mason] /sales-flash/xlsx failed:", err.message);
+    res.status(500).json({ error: "Excel generation failed" });
   }
 });
 

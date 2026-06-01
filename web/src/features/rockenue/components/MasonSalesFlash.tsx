@@ -142,29 +142,30 @@ function TopBar({
 }) {
   const [open, setOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const downloadPdf = async () => {
-    setPdfLoading(true);
+  const [exporting, setExporting] = useState<null | "pdf" | "xlsx">(null);
+  const downloadExport = async (kind: "pdf" | "xlsx") => {
+    setExporting(kind);
     try {
-      const res = await fetch(`/api/mason/sales-flash/pdf?hotelId=${property.hotelId}&monthKey=${monthKey}`, { credentials: "include" });
+      const res = await fetch(`/api/mason/sales-flash/${kind}?hotelId=${property.hotelId}&monthKey=${monthKey}`, { credentials: "include" });
       const ct = res.headers.get("content-type") || "";
-      if (!res.ok || !ct.includes("application/pdf")) {
-        throw new Error(`Unexpected response (status ${res.status}, type ${ct || "unknown"}) — the PDF route may not be deployed yet.`);
+      const ok = kind === "pdf" ? ct.includes("application/pdf") : ct.includes("spreadsheetml");
+      if (!res.ok || !ok) {
+        throw new Error(`Unexpected response (status ${res.status}, type ${ct || "unknown"}) — the export route may not be deployed yet.`);
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Sales-Flash-${property.name.replace(/\s+/g, "-")}-${monthKey}.pdf`;
+      a.download = `Sales-Flash-${property.name.replace(/\s+/g, "-")}-${monthKey}.${kind}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("[Mason] PDF export:", e);
-      alert("PDF export failed — " + (e instanceof Error ? e.message : "please try again."));
+      console.error("[Mason] export:", e);
+      alert("Export failed — " + (e instanceof Error ? e.message : "please try again."));
     } finally {
-      setPdfLoading(false);
+      setExporting(null);
     }
   };
   return (
@@ -295,28 +296,30 @@ function TopBar({
           {presenting ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {presenting ? "Exit" : "Present"}
         </button>
         <button
-          onClick={downloadPdf}
-          disabled={pdfLoading}
+          onClick={() => downloadExport("pdf")}
+          disabled={!!exporting}
           title="Download the Sales Flash as a PDF"
           style={{
             display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
             background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6,
-            color: pdfLoading ? R.textDim : R.warmTeal, fontSize: 12, fontWeight: 600,
-            cursor: pdfLoading ? "wait" : "pointer",
+            color: exporting ? R.textDim : R.warmTeal, fontSize: 12, fontWeight: 600,
+            cursor: exporting ? "wait" : "pointer",
           }}
         >
-          <Download size={14} /> {pdfLoading ? "Generating…" : "Export PDF"}
+          <Download size={14} /> {exporting === "pdf" ? "Generating…" : "Export PDF"}
         </button>
         <button
-          disabled
-          title="Excel export — coming soon"
+          onClick={() => downloadExport("xlsx")}
+          disabled={!!exporting}
+          title="Download the Sales Flash as an Excel workbook"
           style={{
             display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
             background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6,
-            color: R.textDim, fontSize: 12, fontWeight: 600, cursor: "not-allowed", opacity: 0.6,
+            color: exporting ? R.textDim : R.warmTeal, fontSize: 12, fontWeight: 600,
+            cursor: exporting ? "wait" : "pointer",
           }}
         >
-          <Download size={14} /> Export Excel
+          <Download size={14} /> {exporting === "xlsx" ? "Generating…" : "Export Excel"}
         </button>
       </div>
     </div>
