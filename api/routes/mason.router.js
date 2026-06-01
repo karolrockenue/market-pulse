@@ -15,6 +15,8 @@ const mewsAdapter = require("../adapters/mewsAdapter");
 const pgPool = require("../utils/db");
 const { requireUserApi } = require("../utils/middleware");
 const masonService = require("../services/mason.service");
+const { buildSalesFlashPdfData } = require("../services/masonPdf.service");
+const { generatePdfFromHtml } = require("../utils/pdf.utils");
 
 // Mason & Fifth hotel IDs that grant access to this dashboard.
 // Includes Belsize Park (318329) even though its service UUIDs aren't
@@ -991,6 +993,37 @@ router.get("/sales-flash", async (req, res) => {
   } catch (err) {
     console.error("[Mason] /sales-flash failed:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/mason/sales-flash/pdf?hotelId=&monthKey=YYYY-MM
+ * Landscape-A4 PDF of the Sales Flash (light theme, M&F branded), rendered
+ * server-side via Playwright from the same data the dashboard uses
+ * (api/services/masonPdf.service.js → mason-sales-flash.template.html).
+ */
+router.get("/sales-flash/pdf", async (req, res) => {
+  const hotelId = parseInt(req.query.hotelId, 10);
+  const hotel = MF_HOTELS[hotelId];
+  if (!FLASH_HOTEL_IDS.has(hotelId) || !hotel) {
+    return res.status(400).json({ error: `hotelId must be one of: ${[...FLASH_HOTEL_IDS].join(", ")}` });
+  }
+  const monthKey = req.query.monthKey || shiftMonth(thisMonthKey(), -1);
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    return res.status(400).json({ error: "monthKey must be YYYY-MM" });
+  }
+  try {
+    const data = await buildSalesFlashPdfData(hotelId, monthKey, hotel);
+    const pdf = await generatePdfFromHtml("mason-sales-flash.template.html", data, {
+      format: "A4", landscape: true, printBackground: true, scale: 1,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Sales-Flash-${hotel.shortName.replace(/\s+/g, "-")}-${monthKey}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error("[Mason] /sales-flash/pdf failed:", err.message);
+    res.status(500).json({ error: "PDF generation failed" });
   }
 });
 

@@ -142,6 +142,31 @@ function TopBar({
 }) {
   const [open, setOpen] = useState(false);
   const [monthOpen, setMonthOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const downloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      const res = await fetch(`/api/mason/sales-flash/pdf?hotelId=${property.hotelId}&monthKey=${monthKey}`, { credentials: "include" });
+      const ct = res.headers.get("content-type") || "";
+      if (!res.ok || !ct.includes("application/pdf")) {
+        throw new Error(`Unexpected response (status ${res.status}, type ${ct || "unknown"}) — the PDF route may not be deployed yet.`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Sales-Flash-${property.name.replace(/\s+/g, "-")}-${monthKey}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("[Mason] PDF export:", e);
+      alert("PDF export failed — " + (e instanceof Error ? e.message : "please try again."));
+    } finally {
+      setPdfLoading(false);
+    }
+  };
   return (
     <div style={{ padding: "14px 28px", borderBottom: `1px solid ${R.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: R.darkBand }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -268,6 +293,19 @@ function TopBar({
           }}
         >
           {presenting ? <Minimize2 size={14} /> : <Maximize2 size={14} />} {presenting ? "Exit" : "Present"}
+        </button>
+        <button
+          onClick={downloadPdf}
+          disabled={pdfLoading}
+          title="Download the Sales Flash as a PDF"
+          style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+            background: R.cardRaised, border: `1px solid ${R.border}`, borderRadius: 6,
+            color: pdfLoading ? R.textDim : R.warmTeal, fontSize: 12, fontWeight: 600,
+            cursor: pdfLoading ? "wait" : "pointer",
+          }}
+        >
+          <Download size={14} /> {pdfLoading ? "Generating…" : "Export PDF"}
         </button>
         <button
           disabled
