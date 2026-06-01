@@ -1134,6 +1134,72 @@ async function getRevenueByAccountingCategoryByMonth(
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Out-of-order rooms per local night for a hotel, from Mews resourceBlocks/getAll.
+ * Counts ONLY Type='OutOfOrder' (genuine maintenance/ops blocks). InternalUse is
+ * deliberately EXCLUDED — on M&F it is segment-allocation ("SS Only", "LS Block"),
+ * not unsellable inventory, and overlaps live reservations (folding it in would
+ * double-count). Each block covers the local nights [StartUtc, EndUtc); we count
+ * DISTINCT rooms per night. Returns Map<'YYYY-MM-DD', roomCount>. Never throws —
+ * on any error returns an empty map so the caller degrades to 0 offline.
+ *
+ * @param {number} hotelId
+ * @param {string} startDate - 'YYYY-MM-DD' inclusive
+ * @param {string} endDate   - 'YYYY-MM-DD' inclusive (its night is included)
+ * @returns {Promise<Map<string, number>>}
+ */
+async function getOfflineRoomsByDate(hotelId, startDate, endDate) {
+  const byDate = new Map();
+  const addDays = (iso, n) => {
+    const d = new Date(iso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  try {
+    const credentials = await getCredentials(hotelId);
+    const hotelRow = await pgPool.query(
+      `SELECT pms_credentials FROM hotels WHERE hotel_id = $1`,
+      [hotelId],
+    );
+    const tz = hotelRow.rows[0]?.pms_credentials?.timezone || "Europe/London";
+
+    const windowEndExcl = addDays(endDate, 1); // include endDate's night
+    const StartUtc = toMewsUtc(startDate, tz);
+    const EndUtc = toMewsUtc(windowEndExcl, tz);
+
+    const roomsByDate = new Map(); // dateStr -> Set(resourceId)
+    let cursor = null, pages = 0;
+    do {
+      const body = {
+        Limitation: { Count: 1000, ...(cursor ? { Cursor: cursor } : {}) },
+        CollidingUtc: { StartUtc, EndUtc },
+        ActivityStates: ["Active"],
+      };
+      const res = await _callMewsApi("resourceBlocks/getAll", credentials, body);
+      for (const b of res.ResourceBlocks || []) {
+        if (b.Type !== "OutOfOrder") continue;
+        const sLocal = utcToLocalDate(b.StartUtc, tz);
+        let eLocal = utcToLocalDate(b.EndUtc, tz);
+        if (eLocal <= sLocal) eLocal = addDays(sLocal, 1); // same-day block = 1 night
+        const from = sLocal < startDate ? startDate : sLocal;
+        const toExcl = eLocal > windowEndExcl ? windowEndExcl : eLocal;
+        for (let ds = from; ds < toExcl; ds = addDays(ds, 1)) {
+          if (!roomsByDate.has(ds)) roomsByDate.set(ds, new Set());
+          roomsByDate.get(ds).add(b.AssignedResourceId || b.Id);
+        }
+      }
+      cursor = res.Cursor || null;
+    } while (cursor && ++pages < 20);
+
+    for (const [ds, set] of roomsByDate) byDate.set(ds, set.size);
+  } catch (e) {
+    console.warn(
+      `[Mews] getOfflineRoomsByDate failed for hotel ${hotelId}: ${e.message} — falling back to 0 offline`,
+    );
+  }
+  return byDate;
+}
+
 module.exports = {
   // Internal helpers (exposed for onboarding router + other adapters)
   getCredentials,
@@ -1158,4 +1224,5 @@ module.exports = {
   getServiceRevenueByMonth,
   getRevenueByAccountingCategoryByMonth,
   getSpaceOrderRevenueByReservation,
+  getOfflineRoomsByDate,
 };

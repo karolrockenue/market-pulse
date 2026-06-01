@@ -664,11 +664,14 @@ async function getWeeklyUnitPacing(hotelId, weekStarts) {
   );
   const snapByDate = new Map(snaps.map((s) => [s.stay_date, s]));
 
+  // Live OutOfOrder rooms per night (Mews resourceBlocks). Empty map on failure.
+  const offlineByDate = await mewsAdapter.getOfflineRoomsByDate(hotelId, earliest, latestEndStr);
+
   const result = weekStarts.map((ws) => {
     const weDate = new Date(ws + "T00:00:00Z");
     weDate.setUTCDate(weDate.getUTCDate() + 6);
     const weStr = weDate.toISOString().slice(0, 10);
-    return { weekStart: ws, ..._unitPacingBreakdown(rows, snapByDate, ws, weStr, 7) };
+    return { weekStart: ws, ..._unitPacingBreakdown(rows, snapByDate, ws, weStr, 7, offlineByDate) };
   });
 
   return result;
@@ -683,7 +686,7 @@ async function getWeeklyUnitPacing(hotelId, weekStarts) {
  * Used by BOTH getWeeklyUnitPacing and getMonthlyUnitPacing so they can never
  * drift apart.
  */
-function _unitPacingBreakdown(rows, snapByDate, startStr, endInclStr, numDays) {
+function _unitPacingBreakdown(rows, snapByDate, startStr, endInclStr, numDays, offlineByDate) {
   const startDate = new Date(startStr + "T00:00:00Z");
   const endDate = new Date(endInclStr + "T00:00:00Z");
   const endExcl = new Date(endDate.getTime() + 86400000);
@@ -692,10 +695,14 @@ function _unitPacingBreakdown(rows, snapByDate, startStr, endInclStr, numDays) {
   for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
     const ds = d.toISOString().slice(0, 10);
     const snap = snapByDate.get(ds);
-    if (snap) {
-      offlineDays += (snap.blocked_rooms_count || 0) + (snap.out_of_service_rooms_count || 0);
-      capacityDays += (snap.capacity_count || 0);
-    }
+    if (snap) capacityDays += (snap.capacity_count || 0);
+    // Offline = live Mews OutOfOrder rooms (resourceBlocks/getAll). When
+    // offlineByDate is supplied we trust it (0 when no block that night);
+    // otherwise fall back to the legacy snapshot columns (always 0 — nothing
+    // writes them, the §18.8 gap).
+    offlineDays += offlineByDate
+      ? (offlineByDate.get(ds) || 0)
+      : ((snap?.blocked_rooms_count || 0) + (snap?.out_of_service_rooms_count || 0));
   }
 
   for (const r of rows) {
@@ -749,7 +756,9 @@ async function getMonthlyUnitPacing(hotelId, monthKey) {
   if (snaps.length === 0) return null;
   const snapByDate = new Map(snaps.map((s) => [s.stay_date, s]));
 
-  return { monthKey, ..._unitPacingBreakdown(rows, snapByDate, start, end, numDays) };
+  const offlineByDate = await mewsAdapter.getOfflineRoomsByDate(hotelId, start, end);
+
+  return { monthKey, ..._unitPacingBreakdown(rows, snapByDate, start, end, numDays, offlineByDate) };
 }
 
 /**
