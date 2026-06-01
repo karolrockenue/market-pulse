@@ -604,11 +604,11 @@ function CurrentMonthSummary({ data, hasBudgetData }: { data: SalesFlashResponse
             <div style={{ ...labelCell, color: R.text }}>LS ADR</div>
             <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(k.amrLong.priorMonth)}</div>
             <div style={{ ...cellBase, color: R.textMid }}>{fmtGbp(k.amrLong.priorYear)}</div>
-            <div style={{ ...cellBase, color: R.textDim }}>—</div>
+            <div style={{ ...cellBase, color: R.textMid }}>{hasBudgetData ? fmtGbp(k.amrLong.budget) : <span style={{ color: R.textDim }}>—</span>}</div>
             <div style={{ ...cellBase, color: R.text, fontWeight: 600 }}>{fmtGbp(k.amrLong.actual)}</div>
             <div style={cellBase}><DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.priorMonth)} /></div>
             <div style={cellBase}><DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.priorYear)} /></div>
-            <div style={{ ...cellBase, color: R.textDim }}>—</div>
+            <div style={cellBase}>{hasBudgetData ? <DeltaText pct={pctDelta(k.amrLong.actual, k.amrLong.budget)} /> : <span style={{ color: R.textDim }}>—</span>}</div>
           </div>
           {(k.direct.actual !== null || k.indirect.actual !== null) && (
             <>
