@@ -789,10 +789,21 @@ function KanbanBoard({
   dueDateTier: (task: CrmTask) => string;
   compact?: boolean;
 }) {
+  const [doneExpanded, setDoneExpanded] = useState(false);
+  const DONE_COLLAPSED_LIMIT = 10;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, alignItems: "start" }}>
       {STATUS_COLUMNS.map((col) => {
-        const colTasks = tasks.filter((t) => t.status === col.key);
+        const allColTasks = tasks.filter((t) => t.status === col.key);
+        // Done piles up indefinitely — show only the most recently completed unless expanded.
+        const colTasks =
+          col.key === "done"
+            ? [...allColTasks].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))
+            : allColTasks;
+        const hiddenDoneCount =
+          col.key === "done" && !doneExpanded ? Math.max(0, colTasks.length - DONE_COLLAPSED_LIMIT) : 0;
+        const visibleColTasks =
+          col.key === "done" && !doneExpanded ? colTasks.slice(0, DONE_COLLAPSED_LIMIT) : colTasks;
         const isDropTarget = dragTaskId !== null && dragOverCol === col.key;
         const draggedTask = dragTaskId ? allTasks.find((t) => t.id === dragTaskId) : null;
         const isDragSource = draggedTask?.status === col.key;
@@ -844,7 +855,7 @@ function KanbanBoard({
               </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {colTasks.map((task) => (
+              {visibleColTasks.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -859,6 +870,21 @@ function KanbanBoard({
                   dueTier={dueDateTier(task)}
                 />
               ))}
+              {col.key === "done" && (hiddenDoneCount > 0 || doneExpanded) && colTasks.length > DONE_COLLAPSED_LIMIT && (
+                <button
+                  onClick={() => setDoneExpanded((v) => !v)}
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: 8,
+                    border: `1px dashed ${BORDER}`, background: "transparent",
+                    color: TEXT_DIM, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    textTransform: "uppercase", letterSpacing: "0.5px",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = col.color; e.currentTarget.style.borderColor = `${col.color}40`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_DIM; e.currentTarget.style.borderColor = BORDER; }}
+                >
+                  {doneExpanded ? "Show less" : `Show ${hiddenDoneCount} more`}
+                </button>
+              )}
               {colTasks.length === 0 && (
                 <div style={{
                   padding: isDropTarget && !isDragSource ? "28px 16px" : "40px 16px",
