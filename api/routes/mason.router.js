@@ -729,6 +729,10 @@ router.get("/sales-flash", async (req, res) => {
     // snapshot LY (`py`) for blended occ/ADR/RevPAR when the file lacks a
     // month/hotel, and leaves per-segment / source PY blank when absent.
     const pyKpi = await masonService.getKpiHistory(hotelId, priorYearMK);
+    // Budget extras loaded from Dom's budget workbook (LS ADR + Direct/Indirect %
+    // budget) — keyed by the CURRENT reporting month. WB/Primrose only; null for
+    // Belsize (short-stay-only). See scripts/load-mf-budget-extras.js.
+    const budgetKpi = await masonService.getKpiHistory(hotelId, currentMK);
     const budgetCur = budgets[currentMK];
 
     // Average Length of Stay (days) per service — reservations staying in the
@@ -860,7 +864,7 @@ router.get("/sales-flash", async (req, res) => {
           actual: cur?.byRole.long.adr ?? null,
           priorMonth: pm?.byRole.long.adr ?? null,
           priorYear: pyKpi?.ls_adr ?? null,
-          budget: null,
+          budget: budgetKpi?.ls_adr_budget ?? null,
         },
         // Direct vs Indirect, Short Stays only (Dom V3). Prior-year hardcoded
         // from Dom's file (SS Direct/Indirect Booking %).
@@ -868,13 +872,13 @@ router.get("/sales-flash", async (req, res) => {
           actual: directShare ? directShare.directPct : null,
           priorMonth: directSharePM ? directSharePM.directPct : null,
           priorYear: pyKpi?.ss_direct_pct ?? null,
-          budget: null,
+          budget: budgetKpi?.ss_direct_pct_budget ?? null,
         },
         indirect: {
           actual: directShare ? directShare.indirectPct : null,
           priorMonth: directSharePM ? directSharePM.indirectPct : null,
           priorYear: pyKpi?.ss_indirect_pct ?? null,
-          budget: null,
+          budget: budgetKpi?.ss_indirect_pct_budget ?? null,
         },
       },
     };
