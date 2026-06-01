@@ -1,24 +1,20 @@
 /**
  * @file load-mf-budget-extras.js
- * @brief Loads the three budget figures Dom asked for that aren't derivable
- *        from hotel_service_budgets — LS ADR budget + SS Direct/Indirect %
- *        budget — from "M&F Budget Summary 26_27.xlsx" into mf_monthly_kpi_history.
+ * @brief Loads the budget figures Dom asked for that aren't in hotel_service_budgets —
+ *        LS ADR budget + SS Direct/Indirect % budget — into mf_monthly_kpi_history.
  *
- * Why: the live Sales Flash already shows Budget for Occupancy/ADR/RevPAR/SS+MS
- * ADR/Revenue (from hotel_service_budgets). Missing: LS ADR budget (never wired)
- * and the Direct/Indirect split (no source in the budget table). Both live in
- * Dom's budget workbook, so we snapshot them the same way as the PY hardcode.
+ * SS Direct/Indirect % budget: taken from Dom's explicit Direct-Booking-% table
+ * (provided 2026-06-01) for ALL THREE sites — it's the source of truth and is NOT
+ * fully in the workbook (Belsize's tab has no Direct/Indirect rows). Stored as a
+ * 0..1 fraction (matches live direct scale + UI fmtPct(v*100)).
  *
- * Sheets: WESTBOURNE PARK (318341), PRIMROSE HILL (318343). BELSIZE excluded —
- * short-stay-only, has no LS / Direct-Indirect rows.
+ * LS ADR budget: read from the "LS ADR £ net" row of "M&F Budget Summary 26_27.xlsx".
+ * Westbourne + Primrose only — Belsize is short-stay-only (no long stay → LS ADR N/A).
  *
- * Stored metric_keys (mf_monthly_kpi_history, source='Budget Summary 26-27'):
- *   ls_adr_budget          → £ net nightly
- *   ss_direct_pct_budget   → 0..1 fraction (matches live direct scale + UI fmtPct(v*100))
- *   ss_indirect_pct_budget → 0..1 fraction
+ * metric_keys (mf_monthly_kpi_history, source='Budget 26-27'):
+ *   ls_adr_budget · ss_direct_pct_budget · ss_indirect_pct_budget
  *
- * Usage:  node scripts/load-mf-budget-extras.js           (dry run)
- *         node scripts/load-mf-budget-extras.js --apply    (writes)
+ * Usage:  node scripts/load-mf-budget-extras.js [--apply]
  */
 require("dotenv").config();
 const path = require("path");
@@ -27,71 +23,65 @@ const pgPool = require("../api/utils/db");
 
 const FILE = path.join(__dirname, "..", "claude", "M&F Budget Summary 26_27.xlsx");
 const APPLY = process.argv.includes("--apply");
-const FY_START = 2026; // Apr 2026 → Mar 2027 (months in columns 3..14)
+const FY_START = 2026; // Apr 2026 → Mar 2027
 
-const SHEET_HOTEL = {
-  "WESTBOURNE PARK": 318341,
-  "PRIMROSE HILL": 318343,
+// Dom's Direct Booking % by FY month (Apr..Mar). Indirect = 1 − Direct.
+// null = month with no trading (Belsize opens May 2026).
+const DIRECT_PCT = {
+  318341: [0.40, 0.40, 0.40, 0.40, 0.40, 0.40, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50], // Westbourne
+  318343: [0.40, 0.40, 0.40, 0.42, 0.42, 0.42, 0.45, 0.45, 0.45, 0.50, 0.50, 0.50], // Primrose
+  318329: [null, 0.20, 0.25, 0.25, 0.30, 0.30, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50], // Belsize
 };
-const ROW_LABELS = {
-  lsAdr: "LS ADR £ net",
-  ssNights: "SS Room Nights Sold",
-  ssDirect: "SS Direct Room Nights Sold",
-  ssIndirect: "SS Indirect Room Nights Sold",
-};
+// LS ADR — workbook sheet name → hotel (Belsize excluded: no long stay)
+const LS_SHEET_HOTEL = { "WESTBOURNE PARK": 318341, "PRIMROSE HILL": 318343 };
+const LS_ADR_LABEL = "LS ADR £ net";
 
 function cellVal(cell) {
   const v = cell && cell.value;
   if (v == null) return null;
-  if (typeof v === "object") {
-    if ("result" in v) return v.result;
-    if ("text" in v) return v.text;
-    return null;
-  }
+  if (typeof v === "object") return "result" in v ? v.result : v.text || null;
   return v;
 }
 const num = (v) => { const n = Number(v); return isFinite(n) ? n : null; };
 const pad2 = (n) => String(n).padStart(2, "0");
 const fyMonthKey = (i) => { const mn = ((3 + i) % 12) + 1, yr = i < 9 ? FY_START : FY_START + 1; return `${yr}-${pad2(mn)}`; };
+const r2 = (v) => Math.round(v * 100) / 100;
 
 (async () => {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(FILE);
   const out = [];
 
-  for (const [sheetName, hotelId] of Object.entries(SHEET_HOTEL)) {
+  // 1. SS Direct / Indirect % budget — all three sites, from Dom's explicit table.
+  for (const [hid, arr] of Object.entries(DIRECT_PCT)) {
+    for (let i = 0; i < 12; i++) {
+      const d = arr[i];
+      if (d == null) continue;
+      const [year, month] = fyMonthKey(i).split("-").map(Number);
+      out.push({ hotelId: +hid, year, month, metric_key: "ss_direct_pct_budget", value: r2(d) });
+      out.push({ hotelId: +hid, year, month, metric_key: "ss_indirect_pct_budget", value: r2(1 - d) });
+    }
+  }
+
+  // 2. LS ADR £ net budget — from the workbook (Westbourne + Primrose).
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(FILE);
+  for (const [sheetName, hotelId] of Object.entries(LS_SHEET_HOTEL)) {
     const ws = wb.getWorksheet(sheetName);
     if (!ws) { console.log(`(sheet not found: ${sheetName})`); continue; }
-    const rowFor = {};
-    ws.eachRow((r, rn) => {
-      const lbl = cellVal(r.getCell(2));
-      if (lbl == null) return;
-      const s = String(lbl).trim();
-      for (const [k, label] of Object.entries(ROW_LABELS)) if (s === label && rowFor[k] == null) rowFor[k] = rn;
-    });
-    const missing = Object.keys(ROW_LABELS).filter((k) => rowFor[k] == null);
-    if (missing.length) { console.log(`[${sheetName}] missing rows: ${missing.join(", ")} — skipping`); continue; }
-
+    let lsRow = null;
+    ws.eachRow((r, rn) => { if (lsRow == null && String(cellVal(r.getCell(2)) || "").trim() === LS_ADR_LABEL) lsRow = rn; });
+    if (!lsRow) { console.log(`[${sheetName}] no "${LS_ADR_LABEL}" row — skipping LS ADR`); continue; }
     for (let i = 0; i < 12; i++) {
-      const col = 3 + i;
-      const lsAdr = num(cellVal(ws.getRow(rowFor.lsAdr).getCell(col)));
-      const ssN = num(cellVal(ws.getRow(rowFor.ssNights).getCell(col)));
-      const dN = num(cellVal(ws.getRow(rowFor.ssDirect).getCell(col)));
-      const iN = num(cellVal(ws.getRow(rowFor.ssIndirect).getCell(col)));
+      const v = num(cellVal(ws.getRow(lsRow).getCell(3 + i)));
+      if (v == null) continue;
       const [year, month] = fyMonthKey(i).split("-").map(Number);
-      const push = (key, val) => { if (val != null) out.push({ hotelId, year, month, metric_key: key, value: Math.round(val * 10000) / 10000 }); };
-      push("ls_adr_budget", lsAdr);
-      if (ssN && ssN > 0) {
-        if (dN != null) push("ss_direct_pct_budget", dN / ssN);
-        if (iN != null) push("ss_indirect_pct_budget", iN / ssN);
-      }
+      out.push({ hotelId, year, month, metric_key: "ls_adr_budget", value: r2(v) });
     }
   }
 
   console.log(`Parsed ${out.length} budget rows.`);
-  for (const [name, hid] of [["Westbourne", 318341], ["Primrose", 318343]]) {
-    const apr = out.filter((r) => r.hotelId === hid && r.year === FY_START && r.month === 4);
-    console.log(`  ${name} Apr-${FY_START}: ` + apr.map((r) => `${r.metric_key}=${r.value}`).join("  "));
+  for (const [name, hid] of [["Westbourne", 318341], ["Primrose", 318343], ["Belsize", 318329]]) {
+    const may = out.filter((r) => r.hotelId === hid && r.year === 2026 && r.month === 5);
+    console.log(`  ${name} May-26: ` + (may.map((r) => `${r.metric_key}=${r.value}`).join("  ") || "(none)"));
   }
 
   if (!APPLY) { console.log("\nDry run — re-run with --apply to write."); process.exit(0); }
@@ -107,7 +97,7 @@ const fyMonthKey = (i) => { const mn = ((3 + i) % 12) + 1, yr = i < 9 ? FY_START
   for (const r of out) {
     await pgPool.query(
       `INSERT INTO mf_monthly_kpi_history (hotel_id, year, month, metric_key, value, source, updated_at)
-       VALUES ($1,$2,$3,$4,$5,'Budget Summary 26-27', NOW())
+       VALUES ($1,$2,$3,$4,$5,'Budget 26-27', NOW())
        ON CONFLICT (hotel_id, year, month, metric_key)
        DO UPDATE SET value = EXCLUDED.value, source = EXCLUDED.source, updated_at = NOW()`,
       [r.hotelId, r.year, r.month, r.metric_key, r.value]);
