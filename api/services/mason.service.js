@@ -1217,6 +1217,12 @@ async function getKpiHistory(hotelId, monthKey) {
     if (!rows.length) return null;
     const out = {};
     for (const r of rows) out[r.metric_key] = Number(r.value);
+    // SS Direct/Indirect are stored 0-100, but the live `actual`
+    // (getDirectShareForMonth) and the frontend formatter (fmtPct(v * 100)) both
+    // expect a 0..1 fraction — convert so PY matches. Occupancy stays 0-100
+    // (its live actual + formatter are both 0-100).
+    if (out.ss_direct_pct != null) out.ss_direct_pct /= 100;
+    if (out.ss_indirect_pct != null) out.ss_indirect_pct /= 100;
     return out;
   } catch (_e) {
     return null; // table absent / query error → degrade to no hardcoded PY
