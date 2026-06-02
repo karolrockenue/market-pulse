@@ -202,7 +202,7 @@ function occStack(days){
   [0,.25,.5,.75,1].forEach(g=>{ const y=padT+plotH-g*plotH; s+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="${g===0?'#9AA0A6':'#EDEDEA'}" stroke-width="1"/>`; s+=`<text x="${padL-4}" y="${y+2}" text-anchor="end" font-size="6" fill="#9AA0A6">${Math.round(g*100)}%</text>`; });
   let prevMo=null;
   days.forEach((d,i)=>{ const x=padL+i*colW; let y=padT+plotH;
-    [["other",d.other],["long",d.long],["mid",d.mid],["short",d.short]].forEach(([k,val])=>{ const hh=Math.min(val,CAP)/CAP*plotH; y-=hh; s+=`<rect x="${x}" y="${y}" width="${Math.max(0.6,colW-0.3)}" height="${hh}" fill="${cols[k]}"/>`; });
+    [["long",d.long],["mid",d.mid],["short",d.short],["other",d.other]].forEach(([k,val])=>{ const hh=Math.min(val,CAP)/CAP*plotH; y-=hh; s+=`<rect x="${x}" y="${y}" width="${Math.max(0.6,colW-0.3)}" height="${hh}" fill="${cols[k]}"/>`; });
     const mo=d.d?d.d.slice(5,7):null;
     if(mo&&mo!==prevMo){ if(prevMo!==null) s+=`<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT+plotH}" stroke="#C9C9C4" stroke-width="1" stroke-dasharray="2 2"/>`;
       s+=`<text x="${x+2}" y="${H-7}" text-anchor="start" font-size="7.5" fill="#6B7280" font-weight="600">${_MON[+mo-1]}</text>`; prevMo=mo; } });
