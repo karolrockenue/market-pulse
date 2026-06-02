@@ -13,13 +13,10 @@ import { R } from "../../../styles/tokens";
 import { fetchMasonOccByService, type OccByServiceResponse } from "../api/mason.api";
 
 // ── Mason & Fifth — 120-day Occupancy by Service ──
-// Stacked daily occupancy for the Sales Flash, replacing the old
-// occupancy+pickup chart. Long/Mid/Short come from Mews service_id;
-// Other = property occupancy − the three guest segments
+// Stacked daily occupancy (Long · Mid · Short · Other) for the Sales Flash,
+// replacing the old occupancy+pickup chart. Long/Mid/Short come from Mews
+// service_id; Other = property occupancy − the three guest segments
 // (Management/comp + house-use/OOO blocks). Values are % of capacity.
-// Stack order (bottom→top): Long · Mid · Short · Other. Long is anchored at
-// the 0% baseline and Other (offline) sits on top, so day-to-day swings in
-// offline rooms don't make Long Stay look like it's shrinking (Dom, Jun 2026).
 // Palette locked: A · muted-red Other.
 
 const DAYS = 120;
@@ -153,10 +150,10 @@ export function MasonOccupancyByService({ hotelId, monthKey }: { hotelId: number
                 <XAxis dataKey="date" stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={{ stroke: R.border, strokeOpacity: 0.3 }} interval={xInterval} />
                 <YAxis stroke={R.border} tick={{ fill: R.textDim, fontSize: 9 }} tickLine={false} axisLine={false} width={42} domain={[0, 110]} allowDataOverflow ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} />
                 <Tooltip cursor={{ fill: "rgba(123,175,212,0.05)" }} content={<ChartTooltip />} />
-                <Bar dataKey="other" stackId="o" name="Other" radius={[2, 2, 0, 0]} maxBarSize={8} fill={PALETTE.other} fillOpacity={0.9} />
-                <Bar dataKey="short" stackId="o" name="Short Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.short} fillOpacity={0.9} />
-                <Bar dataKey="mid" stackId="o" name="Mid Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.mid} fillOpacity={0.9} />
                 <Bar dataKey="long" stackId="o" name="Long Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.long} fillOpacity={0.9} />
+                <Bar dataKey="mid" stackId="o" name="Mid Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.mid} fillOpacity={0.9} />
+                <Bar dataKey="short" stackId="o" name="Short Stay" radius={[0, 0, 0, 0]} maxBarSize={8} fill={PALETTE.short} fillOpacity={0.9} />
+                <Bar dataKey="other" stackId="o" name="Other" radius={[2, 2, 0, 0]} maxBarSize={8} fill={PALETTE.other} fillOpacity={0.9} />
                 {/* Month-boundary dividers — rendered after the bars so they sit on top of tall spikes. */}
                 {monthMarks.map((m) => (
                   <ReferenceLine
