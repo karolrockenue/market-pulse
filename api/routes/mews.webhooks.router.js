@@ -272,6 +272,15 @@ router.post("/", async (req, res) => {
         reservation.ServiceId,
       );
 
+      // Resolve room category (studio type) at booking time so the rate-by-
+      // studio-category charts never go stale. Full Mews name (cleanCategory
+      // strips the "(...)" suffix on read). null for non-M&F / unresolved.
+      const roomCategory = await mfRateSegment.resolveRoomCategory(
+        hotel_id,
+        credentials,
+        reservation.RequestedResourceCategoryId,
+      );
+
       try {
         await pgPool.query(
           `INSERT INTO daily_bookings_record
@@ -300,6 +309,7 @@ router.post("/", async (req, res) => {
            (id, hotel_id, guest_name, room_type, check_in, check_out, nights, source, avg_nightly_rate, total_rate, status, booking_date, mews_service_id, mews_rate_id, rate_segment)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            ON CONFLICT (id, hotel_id) DO UPDATE SET
+             room_type = COALESCE(EXCLUDED.room_type, reservations.room_type),
              check_out = EXCLUDED.check_out,
              nights = EXCLUDED.nights,
              avg_nightly_rate = EXCLUDED.avg_nightly_rate,
@@ -313,7 +323,7 @@ router.post("/", async (req, res) => {
             reservationId,
             hotel_id,
             null,
-            null,
+            roomCategory,
             checkInDate,
             checkOutDate,
             numNights,

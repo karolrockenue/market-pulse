@@ -60,6 +60,7 @@ async function buildSalesFlashPdfData(hotelId, monthKey, cfg) {
 
   const card = (mk, tag, report) => { const r = byM.get(mk); return r && {
     mn: `${monName(mk)} ${mk.split("-")[0]}`, tag, report,
+    rev: r.total.revenue ?? 0,
     occ: (r.total.occupancy ?? 0) / 100, adrBlend: r.total.adr ?? 0, revpar: r.total.revpar ?? 0,
     ss: r.byRole.short.adr ?? 0, ms: r.byRole.mid.adr ?? 0, ls: r.byRole.long.adr ?? 0, lsMo: (r.byRole.long.adr ?? 0) * 30.44,
   }; };

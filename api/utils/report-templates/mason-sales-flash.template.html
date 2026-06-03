@@ -120,7 +120,8 @@
   .p-summary .cards{ margin-bottom:24px; }
   .p-summary .card .ch{ padding:8px 12px; }
   .p-summary .card .cb{ padding:9px 12px; }
-  .p-summary .card .big{ padding:4px 0 11px; }
+  .p-summary .card .big{ padding:4px 0 11px; gap:7px; }
+  .p-summary .card .big .bv{ font-size:14px; }
   .p-summary .kv{ padding:5px 0; }
   .p-summary table.rep th{ padding:4px 8px; }
   .p-summary table.rep td{ padding:4.5px 8px; }
@@ -166,6 +167,7 @@ const LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA5MAAACFCAYAAADGiKySAA
 
 const gbp0=v=>"£"+Math.round(v).toLocaleString("en-GB");
 const gbpK=v=>"£"+Math.round(v/1000).toLocaleString("en-GB")+"k";
+const gbpK1=v=>"£"+(v/1000).toLocaleString("en-GB",{minimumFractionDigits:1,maximumFractionDigits:1})+"k";
 const gbp2=v=>"£"+v.toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct1=v=>(v*100).toFixed(1)+"%";
 const pct0=v=>Math.round(v*100)+"%";
@@ -231,6 +233,7 @@ function cardsHTML(){ return M.cards.map(c=>`
     <div class="ch"><span class="mn">${c.mn}</span><span class="tag">${c.tag}</span></div>
     <div class="cb">
       <div class="big">
+        <div class="b"><div class="bl">Revenue</div><div class="bv">${gbpK1(c.rev)}</div></div>
         <div class="b"><div class="bl">Occupancy</div><div class="bv">${pct0(c.occ)}</div></div>
         <div class="b"><div class="bl">ADR</div><div class="bv">${gbp0(c.adrBlend)}</div></div>
         <div class="b"><div class="bl">RevPAR</div><div class="bv">${gbp0(c.revpar)}</div></div>

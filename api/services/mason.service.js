@@ -19,6 +19,17 @@ const pgPool = require("../utils/db");
 
 const ROLES = ["short", "mid", "long"];
 
+// Property launch (open-for-business) dates. For the launch month only, the
+// KPI computation window starts here instead of the 1st, so Occupancy / RevPAR
+// / ADR reflect actual trading days — the pre-launch days (inventory open in
+// Mews but no real business) otherwise roughly halve Occ + RevPAR. Per Dom's
+// 2026-06 ask: Belsize opened 18 May 2026. Full from-the-18th basis (revenue
+// included) — the launch month won't tie to a full-month Mews report; Dom
+// reconciles in the m/e P&L. Add an entry here when a new property launches.
+const LAUNCH_DATES = {
+  318329: "2026-05-18", // Mason & Fifth, Belsize Park
+};
+
 // Lead-time tiers used by the Sales Flash LS new-deals table and the booking
 // pulse breakdown. Matches Mason's spreadsheet bucketing exactly.
 const LEAD_TIME_TIERS = [
@@ -125,9 +136,23 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
   const startDate = startOfMonth(monthFrom);
   const endDate = endOfMonth(monthTo);
 
+  // Launch-month clamp: for a property's opening month, start the whole
+  // computation at the launch date (not the 1st) so Occ/RevPAR/ADR/revenue
+  // reflect trading days only. effStart only moves forward when the launch date
+  // falls after the window start; no effect for other hotels/months.
+  const launchDate = LAUNCH_DATES[hotelId] || null;
+  const effStart = launchDate && launchDate > startDate ? launchDate : startDate;
+  // Effective first day of a given month within this window (= launch date for
+  // the launch month, else the 1st) — keeps the ADR nights-in-month denominator
+  // aligned with the clamped consumed-revenue numerator.
+  const monthEffStart = (mk) =>
+    launchDate && launchDate.slice(0, 7) === mk && launchDate > `${mk}-01`
+      ? launchDate
+      : `${mk}-01`;
+
   const result = await mewsAdapter.getRevenueByAccountingCategoryByMonth(
     hotelId,
-    startDate,
+    effStart,
     endDate,
     allowedAccCatIds,
     { bySpaceOrder: true },
@@ -150,14 +175,14 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
         WHERE hotel_id = $1 AND status NOT ILIKE '%cancel%'
           AND rate_segment IN ('short', 'mid', 'long') AND nights > 0
           AND check_in <= $3::date AND check_out > $2::date`,
-      [hotelId, startDate, endDate],
+      [hotelId, effStart, endDate],
     );
     for (const r of resRows) resInfo.set(r.id, r);
   }
   // adrAcc[monthKey][role] = { net, nights }
   const adrAcc = {};
   const nightsInMonthFor = (mk, ci, co) => {
-    const mStart = `${mk}-01`;
+    const mStart = monthEffStart(mk);
     const [y, m] = mk.split("-").map(Number);
     const mEndExcl = new Date(Date.UTC(y, m, 1)); // first of next month
     const a = new Date(((ci > mStart ? ci : mStart)) + "T00:00:00Z");
@@ -195,7 +220,7 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
         AND stay_date BETWEEN $2 AND $3
       GROUP BY 1
       ORDER BY 1`,
-    [hotelId, startDate, endDate],
+    [hotelId, effStart, endDate],
   );
   const occByMonth = new Map(occRows.rows.map((r) => [r.month_key, r]));
 

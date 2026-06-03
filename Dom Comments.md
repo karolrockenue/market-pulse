@@ -11,6 +11,41 @@
 
 ---
 
+## Belsize launch month (May) now measured from the 18th, not the 1st
+
+**What you asked:** Belsize opened on 18 May, so could its Occupancy / ADR / RevPAR
+be measured from the 18th rather than across the whole month (the empty pre-opening
+days were dragging the numbers down).
+
+**What we did:** for Belsize's opening month only, every headline figure is now
+calculated over the trading period (18–31 May). Occupancy jumps from ~57% to ~89%,
+RevPAR from ~£30 to ~£61, and ADR rises a touch (to ~£113) because the handful of
+pre-opening comp nights no longer count.
+
+**Worth knowing:** to keep it all consistent, the **May revenue figure is also from
+the 18th** (~£48k), so it won't tie to a full-calendar-month Mews report for May —
+as you said, you'll reflect that in the month-end P&L. Every other month and every
+other property is unchanged; this only ever affects a property's opening month.
+
+---
+
+## "Best In House" (and other studio types) missing from June charts — fixed
+
+**What you'd see:** the Rate-by-Studio-Category charts dropped a studio type (e.g.
+Best In House) for recent months, even though there were clearly bookings in those
+rooms. Older months looked fine.
+
+**Why:** every booking records its studio type, but our live booking feed wasn't
+saving that detail — it relied on a periodic catch-up that had last run on 20 May.
+So any booking made after that had no studio type, and fell out of the per-studio
+charts (it still counted in the totals).
+
+**Fixed:** the live feed now saves the studio type on every booking automatically, so
+it can't go stale again, and we've filled in all the bookings that were missing it.
+June's Best In House (and the rest) are back.
+
+---
+
 ## Amenity upload wouldn't accept an Excel file — fixed
 
 **What you hit:** on the Amenity & Building Revenue upload, the file picker wouldn't let

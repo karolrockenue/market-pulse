@@ -119,6 +119,60 @@ async function classifyReservation(hotelId, credentials, rateId, serviceId) {
   return segmentFor(hotelId, rateId, serviceId, rateSegMap);
 }
 
+// ─── Room category (studio type) resolution ────────────────────────
+// Each Mews reservation carries a RequestedResourceCategoryId; this maps it to
+// the category NAME (e.g. "Best In House (Our Favourites)") that the studio /
+// category charts group by. Built from services/getAll (accommodation only) +
+// resourceCategories/getAll — slow and rarely changes, so cached per hotel.
+// Mirrors getRateSegmentMapCached. Same resolution the room-category backfill
+// uses (scripts/backfill-mf-room-category.js) so live + history can't drift.
+function _categoryName(c) {
+  const n = c.Names && (c.Names.en || c.Names["en-GB"] || Object.values(c.Names)[0]);
+  return (n || c.Name || "").trim();
+}
+
+async function buildRoomCategoryMap(hotelId, credentials) {
+  const svcResp = await mewsAdapter._callMewsApi("services/getAll", credentials, {});
+  const accomIds = (svcResp.Services || [])
+    .filter((s) => /accommodation/i.test(s.Name || ""))
+    .map((s) => s.Id);
+  if (accomIds.length === 0) return {};
+  const resp = await mewsAdapter._callMewsApi("resourceCategories/getAll", credentials, {
+    ServiceIds: accomIds,
+  });
+  const map = {};
+  for (const c of resp.ResourceCategories || []) map[c.Id] = _categoryName(c);
+  return map;
+}
+
+const CATEGORY_MAP_TTL_MS = 6 * 60 * 60 * 1000; // 6h — categories rarely change
+const _categoryMapCache = new Map(); // hotelId → { map, expiresAt }
+
+async function getRoomCategoryMapCached(hotelId, credentials) {
+  const hit = _categoryMapCache.get(hotelId);
+  if (hit && hit.expiresAt > Date.now()) return hit.map;
+  const map = await buildRoomCategoryMap(hotelId, credentials);
+  _categoryMapCache.set(hotelId, { map, expiresAt: Date.now() + CATEGORY_MAP_TTL_MS });
+  return map;
+}
+
+/**
+ * Resolve a reservation's room category (studio type) name at booking time from
+ * its RequestedResourceCategoryId. Returns the full category name (e.g.
+ * "Classic Studio (All You Need)") for M&F hotels, or null for non-M&F hotels /
+ * unresolved ids. NEVER throws — on a Mews error it returns null so the caller's
+ * ledger write is never blocked (the backfill can heal later).
+ */
+async function resolveRoomCategory(hotelId, credentials, requestedResourceCategoryId) {
+  if (!isMfHotel(hotelId) || !requestedResourceCategoryId) return null;
+  try {
+    const map = await getRoomCategoryMapCached(hotelId, credentials);
+    return map[requestedResourceCategoryId] || null;
+  } catch (err) {
+    return null;
+  }
+}
+
 module.exports = {
   MF_HOTEL_IDS,
   RATE_GROUP_SEGMENTS,
@@ -128,4 +182,7 @@ module.exports = {
   segmentFor,
   getRateSegmentMapCached,
   classifyReservation,
+  buildRoomCategoryMap,
+  getRoomCategoryMapCached,
+  resolveRoomCategory,
 };
