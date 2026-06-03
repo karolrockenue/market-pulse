@@ -19,13 +19,13 @@ const pgPool = require("../utils/db");
 
 const ROLES = ["short", "mid", "long"];
 
-// Property launch (open-for-business) dates. For the launch month only, the
-// KPI computation window starts here instead of the 1st, so Occupancy / RevPAR
-// / ADR reflect actual trading days — the pre-launch days (inventory open in
-// Mews but no real business) otherwise roughly halve Occ + RevPAR. Per Dom's
-// 2026-06 ask: Belsize opened 18 May 2026. Full from-the-18th basis (revenue
-// included) — the launch month won't tie to a full-month Mews report; Dom
-// reconciles in the m/e P&L. Add an entry here when a new property launches.
+// Property launch (open-for-business) dates. For the launch month only,
+// Occupancy / ADR / RevPAR are measured from the launch date instead of the
+// 1st, so they reflect actual trading days — the pre-launch days (inventory
+// open in Mews but no real business) otherwise roughly halve Occ + RevPAR.
+// DISPLAYED REVENUE stays full-month (penny-perfect; the launch month's revenue
+// and any prior month show in full) — Dom's 2026-06-03 refinement. Belsize
+// opened 18 May 2026. Add an entry here when a new property launches mid-month.
 const LAUNCH_DATES = {
   318329: "2026-05-18", // Mason & Fifth, Belsize Park
 };
@@ -150,6 +150,7 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
       ? launchDate
       : `${mk}-01`;
 
+  // Clamped pull (from the launch date) drives Occupancy / ADR / RevPAR.
   const result = await mewsAdapter.getRevenueByAccountingCategoryByMonth(
     hotelId,
     effStart,
@@ -157,6 +158,19 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
     allowedAccCatIds,
     { bySpaceOrder: true },
   );
+  // Displayed revenue stays FULL-month (penny-perfect; the launch month's revenue
+  // and April both show as before — Dom's 2026-06-03 ask). Only the performance
+  // ratios use the clamped window. When no launch clamp is active the windows are
+  // identical, so reuse the one pull instead of calling Mews twice.
+  const resultFull =
+    effStart > startDate
+      ? await mewsAdapter.getRevenueByAccountingCategoryByMonth(
+          hotelId,
+          startDate,
+          endDate,
+          allowedAccCatIds,
+        )
+      : result;
 
   // Per-role ADR numerator/denominator from the SAME bookings (rate-group
   // classified), so a whole-month or upfront charge can't inflate the per-night
@@ -242,7 +256,8 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
 
   const rows = months.map((mk) => {
     const byRole = {};
-    let totalRev = 0;
+    let totalRev = 0; // displayed (full-month) revenue
+    let totalRevClamped = 0; // launch-clamped revenue — RevPAR numerator
     let totalServiceNights = 0;
     // Headline ADR = paying-nights weighted average of the per-segment ADRs.
     // Weight = each segment's occupied room-nights (rate_segment short/mid/long,
@@ -257,27 +272,30 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
     let blendedAdrWeight = 0;
     for (const role of ROLES) {
       const accCatIds = accountingCategories[role] || [];
-      let net = 0;
+      let net = 0; // displayed revenue (full-month)
+      let netClamped = 0; // launch-clamped revenue (RevPAR)
       let itemCount = 0;
       for (const accCatId of accCatIds) {
-        const bucket = result.byAccountingCategoryMonth[accCatId]?.[mk];
-        if (!bucket) continue;
-        net += bucket.net;
-        itemCount += bucket.nights; // SpaceOrder item count (legacy fallback)
+        const bucket = resultFull.byAccountingCategoryMonth[accCatId]?.[mk];
+        if (bucket) {
+          net += bucket.net;
+          itemCount += bucket.nights || 0; // SpaceOrder item count (legacy fallback)
+        }
+        netClamped += result.byAccountingCategoryMonth[accCatId]?.[mk]?.net || 0;
       }
       // Occupancy denominator = ACTUAL occupied room-nights from reservation
-      // dates (per rate_segment). Revenue (displayed) stays AccCat-net.
+      // dates (per rate_segment). Revenue (displayed) stays AccCat-net, full-month.
       const roomNights = rnMap ? (rnMap.get(mk)?.[role] ?? 0) : itemCount;
       // ADR = consumed-in-month accommodation revenue ÷ those same bookings'
-      // in-month nights (same-bookings basis built above). Falls back to the
-      // legacy AccCat-net ÷ room-nights only if the per-booking rollup is
-      // unavailable (e.g. a caller that didn't request bySpaceOrder).
+      // in-month nights (same-bookings basis built above; launch-clamped). Falls
+      // back to the launch-clamped AccCat-net ÷ room-nights only if the per-booking
+      // rollup is unavailable (e.g. a caller that didn't request bySpaceOrder).
       const adrCell = adrAcc[mk]?.[role];
       const adr =
         adrCell && adrCell.nights > 0
           ? adrCell.net / adrCell.nights
           : roomNights > 0
-            ? net / roomNights
+            ? netClamped / roomNights
             : null;
       byRole[role] = {
         revenue: net,
@@ -286,6 +304,7 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
         configured: accCatIds.length > 0,
       };
       totalRev += net;
+      totalRevClamped += netClamped;
       totalServiceNights += roomNights;
       if (adr != null && roomNights > 0) {
         blendedAdrWeighted += adr * roomNights;
@@ -304,9 +323,11 @@ async function getMonthlyKpis(hotelId, monthFrom, monthTo, accountingCategories,
       blendedAdrWeight > 0
         ? blendedAdrWeighted / blendedAdrWeight
         : totalRoomNights > 0
-          ? totalRev / totalRoomNights
+          ? totalRevClamped / totalRoomNights
           : null;
-    const revpar = totalCapacity > 0 ? totalRev / totalCapacity : null;
+    // RevPAR uses the launch-clamped revenue over the launch-clamped capacity
+    // (both from the trading-days window) — displayed revenue stays full-month.
+    const revpar = totalCapacity > 0 ? totalRevClamped / totalCapacity : null;
 
     return {
       monthKey: mk,

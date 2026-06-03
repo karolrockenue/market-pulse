@@ -17,15 +17,15 @@
 be measured from the 18th rather than across the whole month (the empty pre-opening
 days were dragging the numbers down).
 
-**What we did:** for Belsize's opening month only, every headline figure is now
-calculated over the trading period (18–31 May). Occupancy jumps from ~57% to ~89%,
-RevPAR from ~£30 to ~£61, and ADR rises a touch (to ~£113) because the handful of
-pre-opening comp nights no longer count.
+**What we did:** for Belsize's opening month only, the three performance figures —
+Occupancy, ADR and RevPAR — are now calculated over the trading period (18–31 May).
+Occupancy jumps from ~57% to ~89%, RevPAR from ~£30 to ~£61, and ADR rises a touch
+(to ~£113) because the handful of pre-opening comp nights no longer count.
 
-**Worth knowing:** to keep it all consistent, the **May revenue figure is also from
-the 18th** (~£48k), so it won't tie to a full-calendar-month Mews report for May —
-as you said, you'll reflect that in the month-end P&L. Every other month and every
-other property is unchanged; this only ever affects a property's opening month.
+**Revenue is left exactly as before** — full month for April, May and every month —
+so it still ties to your Mews reports and nothing disappears. Only the three ratios
+above use the 18th start. Every other property is unaffected; this only ever touches
+a property's opening month.
 
 ---
 
