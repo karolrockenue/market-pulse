@@ -250,11 +250,8 @@ async function getHistoricalMetrics(
   pricingModel,
 ) {
   const columnsToRequest = [
-    "adr",
-    "revpar",
     "total_revenue",
     "room_revenue",
-    "occupancy",
     "rooms_sold",
     "capacity_count",
   ].map((column) => ({ cdf: { column }, metrics: ["sum", "mean"] }));
