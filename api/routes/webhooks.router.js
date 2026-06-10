@@ -21,11 +21,11 @@ async function getHotelContext(cloudbedsPropertyId) {
 
   // Try matching directly on the pms_property_id stored in hotels table first (most reliable)
   const result = await pgPool.query(
-    `SELECT h.hotel_id, up.pms_credentials 
+    `SELECT h.hotel_id, h.history_locked_until::text AS history_locked_until, up.pms_credentials
      FROM hotels h
      JOIN user_properties up ON h.hotel_id = up.property_id
-     WHERE h.pms_property_id = $1 
-     AND up.pms_credentials IS NOT NULL 
+     WHERE h.pms_property_id = $1
+     AND up.pms_credentials IS NOT NULL
      LIMIT 1`,
     [cloudbedsPropertyId.toString()]
   );
@@ -101,7 +101,7 @@ router.post("/", async (req, res) => {
       );
       return finish();
     }
-    const { hotel_id } = context;
+    const { hotel_id, history_locked_until } = context;
 
     // 4. Access Token
     let accessToken;
@@ -272,6 +272,14 @@ router.post("/", async (req, res) => {
         d.setDate(d.getDate() + 1)
       ) {
         const stayDateStr = d.toISOString().split("T")[0];
+
+        // History lock: never mutate metrics for stay_dates on or before the lock date.
+        if (history_locked_until && stayDateStr <= history_locked_until) {
+          console.log(
+            `[Webhook] History lock (${history_locked_until}): skipping locked stay_date ${stayDateStr} for hotel ${hotel_id}.`
+          );
+          continue;
+        }
 
         // SQL: Note the 0::numeric casting for safety
         const updateQuery = `

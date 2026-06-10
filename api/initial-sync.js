@@ -25,7 +25,7 @@ async function runSync(propertyId) {
   try {
     // [NEW] First, determine the PMS type AND locked_years for this property
     const hotelResult = await client.query(
-      "SELECT pms_type, locked_years FROM hotels WHERE hotel_id = $1",
+      "SELECT pms_type, locked_years, history_locked_until::text AS history_locked_until FROM hotels WHERE hotel_id = $1",
       [propertyId]
     );
 
@@ -45,9 +45,12 @@ async function runSync(propertyId) {
     const lockedYears = (hotelResult.rows[0].locked_years || []).map((y) =>
       parseInt(y, 10)
     );
+    // Date-level lock: stay_dates on or before this date are immutable
+    const historyLockedUntil = hotelResult.rows[0].history_locked_until || null;
 
     // Dynamically build a WHERE clause to exclude locked years from deletion
     let deleteQuery = "DELETE FROM daily_metrics_snapshots WHERE hotel_id = $1";
+    const deleteParams = [propertyId];
     if (lockedYears.length > 0) {
       // Append the condition to NOT delete records where the year is in our locked list
       deleteQuery += ` AND EXTRACT(YEAR FROM stay_date) NOT IN (${lockedYears.join(
@@ -59,9 +62,16 @@ async function runSync(propertyId) {
         )}`
       );
     }
+    if (historyLockedUntil) {
+      deleteParams.push(historyLockedUntil);
+      deleteQuery += ` AND stay_date > $${deleteParams.length}`;
+      console.log(
+        `History lock active. Will NOT delete data on or before: ${historyLockedUntil}`
+      );
+    }
 
     // Execute the safe, dynamic delete query
-    await client.query(deleteQuery, [propertyId]);
+    await client.query(deleteQuery, deleteParams);
     console.log("✅ Existing data cleared (respecting locks).");
 
     // /api/initial-sync.js
@@ -285,7 +295,8 @@ async function runSync(propertyId) {
       // We already have 'lockedYears' array defined from the delete step
       const filteredDatesToUpdate = datesToUpdate.filter((date) => {
         const metricYear = new Date(date).getUTCFullYear(); // Use UTCFullYear for date strings
-        // Return true (keep) if the year is NOT in the lockedYears array
+        // Keep only dates outside locked years AND after the history lock date
+        if (historyLockedUntil && date <= historyLockedUntil) return false;
         return !lockedYears.includes(metricYear);
       });
 
@@ -539,7 +550,8 @@ async function runSync(propertyId) {
       // We already have 'lockedYears' array defined from the delete step
       const filteredDatesToUpdate = datesToUpdate.filter((date) => {
         const metricYear = new Date(date).getUTCFullYear(); // Use UTCFullYear for date strings
-        // Return true (keep) if the year is NOT in the lockedYears array
+        // Keep only dates outside locked years AND after the history lock date
+        if (historyLockedUntil && date <= historyLockedUntil) return false;
         return !lockedYears.includes(metricYear);
       });
 

@@ -32,17 +32,17 @@ module.exports = async (request, response) => {
       let propertiesResult;
       if (singleHotelId) {
         propertiesResult = await propertiesClient.query(
-          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE hotel_id = $1 AND is_disconnected = false",
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms, history_locked_until::text AS history_locked_until FROM hotels WHERE hotel_id = $1 AND is_disconnected = false",
           [singleHotelId],
         );
       } else if (pmsTypeFilter) {
         propertiesResult = await propertiesClient.query(
-          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE pms_type = $1 AND is_disconnected = false",
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms, history_locked_until::text AS history_locked_until FROM hotels WHERE pms_type = $1 AND is_disconnected = false",
           [pmsTypeFilter],
         );
       } else {
         propertiesResult = await propertiesClient.query(
-          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms FROM hotels WHERE is_disconnected = false",
+          "SELECT hotel_id, pms_property_id, property_name, pms_type, timezone, tax_rate, tax_type, total_rooms, history_locked_until::text AS history_locked_until FROM hotels WHERE is_disconnected = false",
         );
       }
       console.log("...Initial property fetch query complete.");
@@ -198,7 +198,19 @@ module.exports = async (request, response) => {
         continue; // Skip unknown PMS types.
       }
 
-      const datesToUpdate = Object.keys(processedData);
+      // History lock: hotels.history_locked_until freezes all stay_dates on or
+      // before that date — refresh data for those dates is discarded, never upserted.
+      const historyLockedUntil = hotel.history_locked_until || null;
+      let datesToUpdate = Object.keys(processedData);
+      if (historyLockedUntil) {
+        const beforeCount = datesToUpdate.length;
+        datesToUpdate = datesToUpdate.filter((date) => date > historyLockedUntil);
+        if (datesToUpdate.length !== beforeCount) {
+          console.log(
+            `-- History lock (${historyLockedUntil}): skipped ${beforeCount - datesToUpdate.length} locked dates for ${property_name}. --`,
+          );
+        }
+      }
 
       if (datesToUpdate.length > 0) {
         const client = await pgPool.connect();
