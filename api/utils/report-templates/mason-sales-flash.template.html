@@ -234,13 +234,14 @@ function cardsHTML(){ return M.cards.map(c=>`
     <div class="cb">
       <div class="big">
         <div class="b"><div class="bl">Revenue</div><div class="bv">${gbpK1(c.rev)}</div></div>
+        ${c.mtdOcc!=null?`<div class="b"><div class="bl" style="color:#C8A66E">MTD Occ</div><div class="bv" style="color:#C8A66E">${pct0(c.mtdOcc)}</div></div>`:""}
         <div class="b"><div class="bl">Occupancy</div><div class="bv">${pct0(c.occ)}</div></div>
         <div class="b"><div class="bl">ADR</div><div class="bv">${gbp0(c.adrBlend)}</div></div>
         <div class="b"><div class="bl">RevPAR</div><div class="bv">${gbp0(c.revpar)}</div></div>
       </div>
       <div class="kv"><span class="k"><span class="seg-dot" style="background:${C.short}"></span>Short — implied AMR</span><span class="v">${gbp0(c.ss*30.44)}<small>${gbp0(c.ss)}/nt</small></span></div>
       <div class="kv"><span class="k"><span class="seg-dot" style="background:${C.mid}"></span>Mid — implied AMR</span><span class="v">${gbp0(c.ms*30.44)}<small>${gbp0(c.ms)}/nt</small></span></div>
-      <div class="kv"><span class="k"><span class="seg-dot" style="background:${C.long}"></span>Long — monthly</span><span class="v">${gbp0(c.lsMo)}<small>${gbp0(c.ls)}/nt</small></span></div>
+      <div class="kv"><span class="k"><span class="seg-dot" style="background:${C.long}"></span>Long — implied AMR</span><span class="v">${gbp0(c.lsMo)}<small>${gbp0(c.ls)}/nt</small></span></div>
     </div>
   </div>`).join(""); }
 

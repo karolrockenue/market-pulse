@@ -47,7 +47,7 @@ function SsTooltip({ active, payload, label }: any) {
   );
   return (
     <div style={{ backgroundColor: "rgba(18,21,25,0.95)", border: `1px solid ${R.border}`, borderRadius: 6, padding: "10px 14px" }}>
-      <div style={{ color: R.textMid, fontSize: 11, marginBottom: 6 }}>Week ending {label}</div>
+      <div style={{ color: R.textMid, fontSize: 11, marginBottom: 6 }}>Week beginning {label}</div>
       {row("Bookings", String(d.bookings), C.bookings)}
       {row("Room nights", d.nights.toLocaleString(), C.nights)}
       {row("Revenue (gross)", gbpCompact(d.revenue), C.revenue)}

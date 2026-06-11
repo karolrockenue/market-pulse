@@ -41,6 +41,10 @@ async function buildSalesFlashXlsx(M) {
     const r = s.addRow([k.k, k.a, k.pm, k.py, k.b]);
     for (let c = 2; c <= 5; c++) r.getCell(c).numFmt = kpiFmt(k);
   }
+  if (M.mtdOcc != null) {
+    const r = s.addRow([`MTD Occupancy — ${M.mtdLabel}`, M.mtdOcc]);
+    r.getCell(2).numFmt = PCT;
+  }
   s.addRow([]);
   titleRow(s, "Short-Stay Source");
   s.addRow(["Direct", M.source.direct]).getCell(2).numFmt = PCT;

@@ -45,6 +45,13 @@ async function buildSalesFlashPdfData(hotelId, monthKey, cfg) {
   const [ltC, ltP, ltY] = await Promise.all([S.getLeadTimeByService(hotelId, MK, SVC), S.getLeadTimeByService(hotelId, priorMK, SVC), S.getLeadTimeByService(hotelId, pyMK, SVC)]);
   const pySeg = await S.getSegmentRevenueActuals(hotelId, pyMK);
 
+  // Live MTD occupancy for whichever 3-month card is the real-life current
+  // month (launch-date clamped) — mirrors /api/mason/cards.
+  const currentMK = S.todayIso().slice(0, 7);
+  const mtdOcc = [priorMK, MK, nextMK].includes(currentMK)
+    ? await S.getMtdOccupancy(hotelId, currentMK)
+    : null;
+
   const cur = byM.get(MK), pm = byM.get(priorMK), py = lyMap.get(pyMK) || null;
   const bCur = budgets[MK] || {};
   const bN = bCur.nights || { short: 0, mid: 0, long: 0 };
@@ -60,6 +67,7 @@ async function buildSalesFlashPdfData(hotelId, monthKey, cfg) {
 
   const card = (mk, tag, report) => { const r = byM.get(mk); return r && {
     mn: `${monName(mk)} ${mk.split("-")[0]}`, tag, report,
+    mtdOcc: mk === currentMK && mtdOcc != null ? mtdOcc / 100 : null,
     rev: r.total.revenue ?? 0,
     occ: (r.total.occupancy ?? 0) / 100, adrBlend: r.total.adr ?? 0, revpar: r.total.revpar ?? 0,
     ss: r.byRole.short.adr ?? 0, ms: r.byRole.mid.adr ?? 0, ls: r.byRole.long.adr ?? 0, lsMo: (r.byRole.long.adr ?? 0) * 30.44,
@@ -100,6 +108,8 @@ async function buildSalesFlashPdfData(hotelId, monthKey, cfg) {
       roleRev: { short: r?.byRole.short.revenue ?? 0, mid: r?.byRole.mid.revenue ?? 0, long: r?.byRole.long.revenue ?? 0 },
       roleBud: { short: b?.short || 0, mid: b?.mid || 0, long: b?.long || 0 } });
   }
+  M.mtdOcc = mtdOcc != null ? mtdOcc / 100 : null;
+  M.mtdLabel = `${monName(currentMK)} ${currentMK.split("-")[0]}`;
   M.annual = ann.map((a) => ({ mo: a.mo, rev: a.rev, bud: a.bud, otb: a.otb, occ: a.occ }));
   const _fyN = ann.filter((a) => !a.otb).reduce((s, a) => s + a.nights, 0);
   const _fyC = ann.filter((a) => !a.otb).reduce((s, a) => s + a.cap, 0);

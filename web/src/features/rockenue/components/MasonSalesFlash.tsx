@@ -998,7 +998,7 @@ function WeeklyBookingsTable({ rows, title, emptyLabel }: { rows: SsWeeklyRow[];
       ) : (
         <div style={{ minWidth: 420 }}>
           <div style={{ display: "grid", gridTemplateColumns: grid, borderBottom: `1px solid ${R.border}` }}>
-            <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week ending</div>
+            <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week beginning</div>
             {rows.map((w) => {
               const d = new Date(w.weekStart + "T00:00:00Z");
               const lbl = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
@@ -1065,7 +1065,7 @@ function SsLsBookings({ data }: { data: SalesFlashResponse }) {
             ) : (
               <div style={{ minWidth: 800 }}>
                 <div style={{ display: "grid", gridTemplateColumns: agrid, borderBottom: `1px solid ${R.border}` }}>
-                  <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week ending</div>
+                  <div style={{ ...headerCell, textAlign: "left", paddingLeft: 12 }}>Week beginning</div>
                   {all.map((w) => {
                     const d = new Date(w.weekStart + "T00:00:00Z");
                     const lbl = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
