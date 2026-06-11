@@ -11,8 +11,11 @@
  * (`scripts/backfill-mf-rate-segment.js`); it now lives here so the historical
  * backfill and the live webhook path can never drift.
  *
- * Westbourne (318341): segment is resolved by rate GROUP name.
- * Primrose (318343) / Belsize (318329): still service-based (not migrated yet).
+ * All three hotels resolve by rate GROUP name (Primrose + Belsize flipped
+ * 2026-06-11 after Silvija aligned their Mews services/rates to the Westbourne
+ * setup — Mid rates inside the Short service, Long on a new nightly service).
+ * Rates whose group is not listed fall back to their SERVICE's role, so
+ * leftover bookings on the old "DO NOT USE" mid/long services stay correct.
  *
  * `rate_segment` ∈ { short, mid, long, exclude }. "exclude" = comp / management.
  */
@@ -21,13 +24,30 @@ const mewsAdapter = require("../adapters/mewsAdapter");
 // M&F hotel IDs (market-pulse hotels.hotel_id).
 const MF_HOTEL_IDS = [318329, 318341, 318343];
 
-// Westbourne: rate-group NAME → segment (anything not listed → short).
-// Confirmed via scripts/probe-wb-rates-segments.js; sense-check with Dom.
+// Rate-group NAME → segment. Anything not listed falls back to the owning
+// service's role (SERVICE_ROLE), then "short". Westbourne confirmed via
+// scripts/probe-wb-rates-segments.js; Primrose/Belsize via
+// scripts/probe-ph-bp-realign.js (2026-06-11, post-Silvija realignment).
 const RATE_GROUP_SEGMENTS = {
   318341: {
     mid: ["OLD DIRECT Mid Stay"],
     long: ["LongStay", "OLD DIRECT LongStay", "OLD"],
     exclude: ["MANAGEMENT"],
+  },
+  318343: {
+    mid: [
+      "Mid Stay",
+      "OLD DIRECT M&F Stay Awhile – Monthly Stays Made Simple",
+      "OLD DIRECT Monthly Stays Made Simple",
+      "OLD DIRECT Monthly Stay Made Simple 3",
+    ],
+    long: ["LongStay", "Extended Stay", "OLD DIRECT Direct Long Stay"],
+    exclude: ["Friends & Staff"],
+  },
+  318329: {
+    mid: ["Mid Stay"],
+    long: ["LongStay", "Extended Stay"],
+    exclude: ["Friends & Staff"],
   },
 };
 
@@ -44,11 +64,15 @@ const SERVICE_ROLE = {
   },
   318343: {
     "b518b662-2504-4092-aa6a-b13400ade71e": "short",
-    "b17bc567-1252-4532-8399-b37e00aad8fd": "mid",
-    "270856f0-7b69-4425-a558-b14c0090c12d": "long",
+    "b17bc567-1252-4532-8399-b37e00aad8fd": "mid", // Mid Stay Accommodation DO NOT USE
+    "1170a1a6-7130-4a1d-ab5d-b35b00f1692b": "mid", // ARCHIVE Mid Stay Accommodation
+    "270856f0-7b69-4425-a558-b14c0090c12d": "long", // LongStay Accommodation DO NOT USE
+    "3dc71b11-420c-48ed-a0b7-b46500df9f59": "long", // LongStay Accommodation (nightly, 2026-06)
+    "e5ad6c2e-58f3-4924-9e94-b38400c54e24": "exclude", // Management
   },
   318329: {
     "c6267c3b-144c-40e2-baf3-b3e00110df1b": "short",
+    "8e73ceb8-2725-43eb-95fa-b46500ac6dee": "long", // LongStay Accommodation (nightly, 2026-06)
   },
 };
 
@@ -71,9 +95,12 @@ async function buildRateSegmentMap(hotelId, credentials) {
   });
   const groupName = {};
   for (const g of resp.RateGroups || []) groupName[g.Id] = g.Name;
+  const svcRole = SERVICE_ROLE[hotelId] || {};
   const rateSeg = {};
   for (const r of resp.Rates || []) {
-    const seg = toSeg[groupName[r.GroupId]] || "short";
+    // Group mapping wins; otherwise the rate inherits its service's role
+    // (keeps leftover bookings on old mid/long services correct); else short.
+    const seg = toSeg[groupName[r.GroupId]] || svcRole[r.ServiceId] || "short";
     rateSeg[r.Id] = seg;
   }
   return rateSeg;
@@ -81,7 +108,7 @@ async function buildRateSegmentMap(hotelId, credentials) {
 
 function segmentFor(hotelId, rateId, serviceId, rateSegMap) {
   if (rateSegMap && rateId && rateSegMap[rateId]) return rateSegMap[rateId];
-  // fallback: service → role (also the path for Primrose/Belsize)
+  // fallback: service → role (reservations with no/unknown RateId)
   return (SERVICE_ROLE[hotelId] || {})[serviceId] || null;
 }
 
