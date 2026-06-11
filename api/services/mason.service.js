@@ -460,6 +460,29 @@ async function getDailyOccRows(hotelId, monthFrom, monthTo) {
 }
 
 /**
+ * Month-to-date occupancy for the live current month: realized room-nights ÷
+ * capacity from the 1st (or launch date in a launch month) through today,
+ * from daily_metrics_snapshots. Same elapsed convention as computeForecast
+ * (stay_date <= today). Returns a percentage, or null if no elapsed days yet.
+ */
+async function getMtdOccupancy(hotelId, monthKeyStr) {
+  let from = startOfMonth(monthKeyStr);
+  const launch = LAUNCH_DATES[hotelId] || null;
+  if (launch && launch > from && launch <= endOfMonth(monthKeyStr)) from = launch;
+  const to = todayIso() < endOfMonth(monthKeyStr) ? todayIso() : endOfMonth(monthKeyStr);
+  if (to < from) return null;
+  const { rows } = await pgPool.query(
+    `SELECT COALESCE(SUM(rooms_sold), 0)::float AS sold,
+            COALESCE(SUM(capacity_count), 0)::float AS capacity
+       FROM daily_metrics_snapshots
+      WHERE hotel_id = $1 AND stay_date BETWEEN $2 AND $3`,
+    [hotelId, from, to],
+  );
+  const { sold, capacity } = rows[0];
+  return capacity > 0 ? (sold / capacity) * 100 : null;
+}
+
+/**
  * 8-week (or N-week) booking pulse: bookings, cancellations, revenue picked
  * up, attributed to STAY MONTH (check-in month), bucketed by booking week
  * (created_at week, ISO Monday-anchored).
@@ -1354,6 +1377,7 @@ module.exports = {
   getFinalLyKpis,
   computeForecast,
   getDailyOccRows,
+  getMtdOccupancy,
   getBookingPulse,
   getLeadTimeTiers,
   getWeeklyUnitPacing,

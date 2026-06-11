@@ -67,11 +67,12 @@ function ChartTooltip({ active, payload }: any) {
   );
 }
 
-export function MasonOccupancyByService({ hotelId, monthKey }: { hotelId: number; monthKey?: string }) {
+export function MasonOccupancyByService({ hotelId, monthKey, tick = 0 }: { hotelId: number; monthKey?: string; tick?: number }) {
   const [resp, setResp] = useState<OccByServiceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // tick = Sales Flash refresh counter; no server cache here, refetch is enough
   useEffect(() => {
     let cancelled = false;
     setResp(null);
@@ -82,7 +83,7 @@ export function MasonOccupancyByService({ hotelId, monthKey }: { hotelId: number
       .catch((e) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [hotelId, monthKey]);
+  }, [hotelId, monthKey, tick]);
 
   const { data, monthMarks } = useMemo(() => {
     if (!resp) return { data: [], monthMarks: [] as { x: string; label: string }[] };

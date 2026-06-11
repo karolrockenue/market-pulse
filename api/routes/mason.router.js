@@ -578,6 +578,12 @@ router.get("/cards", async (req, res) => {
     const byMonth = new Map(otb.months.map((m) => [m.monthKey, m]));
     const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     const cardTitle = (mk) => { const [y, m] = mk.split("-").map(Number); return `${MONTH_ABBR[m - 1]} ${y}`; };
+    // The real-life current month (whichever of the 3 cards it lands on) gets
+    // a live month-to-date occupancy figure — investor ask, rendered in gold.
+    const currentMK = thisMonthKey();
+    const mtdOccupancy = [priorMK, monthKey, nextMK].includes(currentMK)
+      ? await masonService.getMtdOccupancy(hotelId, currentMK)
+      : null;
     const cards = [
       { mk: priorMK, label: "prior month" },
       { mk: monthKey, label: "reporting month" },
@@ -606,6 +612,8 @@ router.get("/cards", async (req, res) => {
           mid: occShare("mid"),
           long: occShare("long"),
         },
+        isCurrentMonth: mk === currentMK,
+        mtdOccupancy: mk === currentMK ? mtdOccupancy : null,
       };
     });
     const payload = { hotelId, monthKey, cards };

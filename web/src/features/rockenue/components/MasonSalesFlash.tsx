@@ -531,21 +531,25 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
   );
 }
 
-function ThreeMonthCards({ hotelId, monthKey }: { hotelId: number; monthKey: string }) {
+function ThreeMonthCards({ hotelId, monthKey, tick }: { hotelId: number; monthKey: string; tick: number }) {
   // Prior / reporting / next month, centred on the dropdown-selected reporting
   // month. Own lightweight fetch (/api/mason/cards — 3-month window, cached) so
   // the cards load fast and follow the month picker, independent of the heavy
   // /sales-flash call. Reporting-month card ties to the KPI rows + chart "All".
+  // A tick change = user clicked refresh → bypass the 10-min server cache.
   const [cards, setCards] = useState<SalesFlashMonthCard[] | null>(null);
+  const prevTick = useRef(tick);
 
   useEffect(() => {
+    const isRefresh = tick !== prevTick.current;
+    prevTick.current = tick;
     setCards(null);
     let cancelled = false;
-    fetchMasonCards(hotelId, monthKey)
+    fetchMasonCards(hotelId, monthKey, isRefresh)
       .then((d) => { if (!cancelled) setCards(d.cards); })
       .catch(() => { /* silent — cards stay in skeleton */ });
     return () => { cancelled = true; };
-  }, [hotelId, monthKey]);
+  }, [hotelId, monthKey, tick]);
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -1164,11 +1168,14 @@ export function MasonSalesFlash() {
     setData(null);
   }, [property.hotelId, monthKey]);
 
+  const prevTick = useRef(tick);
   useEffect(() => {
+    const isRefresh = tick !== prevTick.current;
+    prevTick.current = tick;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchMasonSalesFlash(property.hotelId, monthKey)
+    fetchMasonSalesFlash(property.hotelId, monthKey, isRefresh)
       .then((d) => { if (!cancelled) setData(d); })
       .catch((e) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -1215,9 +1222,9 @@ export function MasonSalesFlash() {
           </div>
         )}
 
-        <ThreeMonthCards hotelId={property.hotelId} monthKey={monthKey} />
+        <ThreeMonthCards hotelId={property.hotelId} monthKey={monthKey} tick={tick} />
 
-        <MasonOccupancyByService hotelId={property.hotelId} monthKey={monthKey} />
+        <MasonOccupancyByService hotelId={property.hotelId} monthKey={monthKey} tick={tick} />
 
         {loading && !data && <SalesFlashSkeleton />}
 

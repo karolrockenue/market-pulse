@@ -158,6 +158,8 @@ export interface SalesFlashMonthCard {
   adr: number;
   adrByService: { short: number; mid: number; long: number };
   occByService: { short: number; mid: number; long: number };
+  isCurrentMonth?: boolean;
+  mtdOccupancy?: number | null;
 }
 
 export interface SalesFlashResponse {
@@ -247,10 +249,9 @@ export function fetchMasonOccByService(
 export function fetchMasonSalesFlash(
   hotelId: number,
   monthKey?: string,
+  refresh = false,
 ): Promise<SalesFlashResponse> {
-  const qs = monthKey
-    ? `?hotelId=${hotelId}&monthKey=${monthKey}`
-    : `?hotelId=${hotelId}`;
+  const qs = `?hotelId=${hotelId}${monthKey ? `&monthKey=${monthKey}` : ""}${refresh ? "&refresh=1" : ""}`;
   return jsonFetch(`/api/mason/sales-flash${qs}`);
 }
 
@@ -263,9 +264,8 @@ export interface MasonCardsResponse {
 export function fetchMasonCards(
   hotelId: number,
   monthKey?: string,
+  refresh = false,
 ): Promise<MasonCardsResponse> {
-  const qs = monthKey
-    ? `?hotelId=${hotelId}&monthKey=${monthKey}`
-    : `?hotelId=${hotelId}`;
+  const qs = `?hotelId=${hotelId}${monthKey ? `&monthKey=${monthKey}` : ""}${refresh ? "&refresh=1" : ""}`;
   return jsonFetch(`/api/mason/cards${qs}`);
 }

@@ -49,6 +49,8 @@ export interface MonthCard {
   adr: number;
   adrByService: ServiceSplit;
   occByService: ServiceSplit;
+  isCurrentMonth?: boolean;
+  mtdOccupancy?: number | null;
 }
 
 const MONTH_LABELS = [
@@ -104,6 +106,10 @@ export function MonthCardView({ card, impliedAmr = false }: { card: MonthCard; i
     mid: card.adrByService.mid * AMR_DAYS,
     long: card.adrByService.long * AMR_DAYS,
   };
+
+  // The real-life current month carries a live MTD occupancy stat in the hero
+  // row (gold, left of Occupancy) — investor ask, wherever that month lands.
+  const showMtd = !!card.isCurrentMonth && card.mtdOccupancy != null;
 
   return (
     <div
@@ -175,7 +181,7 @@ export function MonthCardView({ card, impliedAmr = false }: { card: MonthCard; i
                 borderBottom: `1px solid ${R.sep}`,
               }}
             >
-              <div style={{ gridColumn: "1 / 4", minWidth: 0 }}>
+              <div style={{ gridColumn: showMtd ? "1 / 3" : "1 / 4", minWidth: 0 }}>
                 <div
                   style={{
                     fontSize: 28,
@@ -200,6 +206,12 @@ export function MonthCardView({ card, impliedAmr = false }: { card: MonthCard; i
                   Total Revenue · 3 services
                 </div>
               </div>
+              {showMtd && (
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ ...smallLabel, color: R.gold }}>MTD Occ</div>
+                  <div style={{ ...smallValue, color: R.gold }}>{card.mtdOccupancy!.toFixed(1)}%</div>
+                </div>
+              )}
               <div style={{ textAlign: "right" }}>
                 <div style={smallLabel}>Occupancy</div>
                 <div style={smallValue}>{card.occupancy.toFixed(1)}%</div>
