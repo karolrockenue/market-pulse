@@ -122,6 +122,29 @@ async function buildSalesFlashXlsx(M) {
   }
   bk.getColumn(1).width = 12; [2, 3, 4, 5].forEach((c) => (bk.getColumn(c).width = 13));
 
+  // ── Amenity & Building Revenue (only when an upload exists) ──────
+  if (M.amenityGrid && Array.isArray(M.amenityGrid.rows) && M.amenityGrid.rows.length) {
+    const g = M.amenityGrid;
+    const am = wb.addWorksheet("Amenity");
+    titleRow(am, "Amenity & Building Revenue — uploaded Ancillary sheet");
+    header(am, am.addRow(["Amenity / Metric", ...g.months, g.fyLabel || "Full Year"]));
+    const lastCol = g.months.length + 2;
+    for (const row of g.rows) {
+      const rev = am.addRow([`${row.name} — Revenue (net)`, ...row.revenue, row.revenueFY]);
+      const bud = am.addRow([`${row.name} — Budget`, ...row.budget, row.budgetFY]);
+      for (let c = 2; c <= lastCol; c++) { rev.getCell(c).numFmt = GBP; bud.getCell(c).numFmt = GBP; }
+      const pct = am.addRow([
+        `${row.name} — vs Budget %`,
+        ...row.revenue.map((v, i) => (row.budget[i] > 0 ? v / row.budget[i] : null)),
+        row.budgetFY > 0 ? row.revenueFY / row.budgetFY : null,
+      ]);
+      for (let c = 2; c <= lastCol; c++) pct.getCell(c).numFmt = PCT;
+      am.addRow([]);
+    }
+    am.getColumn(1).width = 30;
+    for (let c = 2; c <= lastCol; c++) am.getColumn(c).width = 12;
+  }
+
   return await wb.xlsx.writeBuffer();
 }
 

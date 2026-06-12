@@ -5,11 +5,12 @@
  *        calls the same mason.service functions the live dashboard uses, so the
  *        PDF and the dashboard never diverge.
  *
- * Amenity revenue is intentionally empty: in the live app it's a client-side
- * upload (localStorage) with no server source, so the PDF omits that page until
- * ancillary gets backend persistence.
+ * Amenity revenue reads the uploaded "Ancillary Upload" payload from
+ * mf_amenity_revenue (POST /api/mason/amenities/:hotelId). Properties with no
+ * upload get M.amenity = [] and the PDF omits that page (Dom's rule).
  */
 const S = require("./mason.service");
+const pgPool = require("../utils/db");
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const shiftMonth = (mk, n) => { let [y, m] = mk.split("-").map(Number); m += n; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return `${y}-${pad2(m)}`; };
@@ -175,8 +176,35 @@ async function buildSalesFlashPdfData(hotelId, monthKey, cfg) {
   const byWeek = (arr) => { const m = new Map((arr || []).map((w) => [w.weekStart, [w.bookings, w.roomNights, Math.round(w.revenue)]])); return weekList.map((ws) => m.get(ws) || [0, 0, 0]); };
   M.bookings = { short: byWeek(tiers.ssWeekly), mid: byWeek(tiers.msWeekly), long: byWeek(tiers.lsWeekly) };
 
-  // Amenity: no server source (client-side upload in the live app) → omit the page.
+  // Amenity & Building Revenue — from the uploaded payload (mf_amenity_revenue).
+  // M.amenity = reporting-month values for the PDF page (empty → page omitted);
+  // M.amenityGrid = full months grid for the Excel sheet.
   M.amenity = [];
+  M.amenityGrid = null;
+  try {
+    const aq = await pgPool.query(
+      `SELECT data, uploaded_at FROM mf_amenity_revenue WHERE hotel_id = $1`,
+      [hotelId],
+    );
+    const grid = aq.rows[0]?.data;
+    if (grid && Array.isArray(grid.rows) && grid.rows.length) {
+      // Column for the reporting month: match the month name in the label
+      // (e.g. "Apr-26", "April"); fall back to Mason-FY position (Apr = 0).
+      const monthIdx = (() => {
+        const want = MN[reportMonth].toLowerCase();
+        const i = (grid.months || []).findIndex((l) => String(l).toLowerCase().includes(want));
+        return i >= 0 ? i : (reportMonth - 4 + 12) % 12;
+      })();
+      M.amenity = grid.rows.map((r) => ({
+        a: r.name,
+        rev: Number(r.revenue?.[monthIdx]) || 0,
+        bud: Number(r.budget?.[monthIdx]) || 0,
+      }));
+      M.amenityGrid = { ...grid, uploadedAt: aq.rows[0].uploaded_at };
+    }
+  } catch (e) {
+    // Fail-safe: a broken amenity read must never kill the whole export.
+  }
   return M;
 }
 

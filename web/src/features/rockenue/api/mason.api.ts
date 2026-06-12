@@ -269,3 +269,42 @@ export function fetchMasonCards(
   const qs = `?hotelId=${hotelId}${monthKey ? `&monthKey=${monthKey}` : ""}${refresh ? "&refresh=1" : ""}`;
   return jsonFetch(`/api/mason/cards${qs}`);
 }
+
+// ── Amenity & Building Revenue (server-persisted Ancillary upload) ──
+export interface AmenityRow {
+  name: string;
+  revenue: number[];
+  budget: number[];
+  revenueFY: number;
+  budgetFY: number;
+}
+
+export interface AmenityPayload {
+  months: string[];
+  fyLabel: string;
+  rows: AmenityRow[];
+  uploadedAt: string;
+}
+
+export function fetchMasonAmenities(
+  hotelId: number,
+): Promise<{ hotelId: number; amenity: AmenityPayload | null }> {
+  return jsonFetch(`/api/mason/amenities/${hotelId}`);
+}
+
+export async function uploadMasonAmenities(
+  hotelId: number,
+  payload: { months: string[]; fyLabel: string; rows: AmenityRow[] },
+): Promise<{ ok: boolean; amenity: AmenityPayload }> {
+  const r = await fetch(`/api/mason/amenities/${hotelId}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    throw new Error(`${r.status}: ${body.slice(0, 200)}`);
+  }
+  return (await r.json()) as { ok: boolean; amenity: AmenityPayload };
+}

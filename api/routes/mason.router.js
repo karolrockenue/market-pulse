@@ -1145,4 +1145,74 @@ router.post("/budgets/:hotelId", async (req, res) => {
   }
 });
 
+/**
+ * GET  /api/mason/amenities/:hotelId — stored Amenity & Building Revenue payload
+ * POST /api/mason/amenities/:hotelId — replace it (Dom re-uploads the full
+ *   "Ancillary Upload" sheet every Monday). Body: { months, fyLabel, rows }.
+ *   Mason users upload this themselves, so no admin gate beyond
+ *   requireMasonAccess (router-level).
+ */
+router.get("/amenities/:hotelId", async (req, res) => {
+  const hotelId = parseInt(req.params.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({ error: "Hotel not in flash scope" });
+  }
+  try {
+    const q = await pgPool.query(
+      `SELECT data, uploaded_at FROM mf_amenity_revenue WHERE hotel_id = $1`,
+      [hotelId],
+    );
+    if (!q.rows.length) return res.json({ hotelId, amenity: null });
+    res.json({
+      hotelId,
+      amenity: { ...q.rows[0].data, uploadedAt: q.rows[0].uploaded_at },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/amenities/:hotelId", async (req, res) => {
+  const hotelId = parseInt(req.params.hotelId, 10);
+  if (!FLASH_HOTEL_IDS.has(hotelId)) {
+    return res.status(400).json({ error: "Hotel not in flash scope" });
+  }
+  const { months, fyLabel, rows } = req.body || {};
+  const validRow = (r) =>
+    r && typeof r.name === "string" && r.name.trim() &&
+    Array.isArray(r.revenue) && Array.isArray(r.budget) &&
+    r.revenue.every(Number.isFinite) && r.budget.every(Number.isFinite);
+  if (
+    !Array.isArray(months) || months.length === 0 || months.length > 13 ||
+    !Array.isArray(rows) || rows.length === 0 || rows.length > 25 ||
+    !rows.every(validRow)
+  ) {
+    return res.status(400).json({ error: "Body: { months[], fyLabel, rows: [{ name, revenue[], budget[], revenueFY, budgetFY }] }" });
+  }
+  const data = {
+    months: months.map(String),
+    fyLabel: String(fyLabel || "Full Year"),
+    rows: rows.map((r) => ({
+      name: r.name.trim(),
+      revenue: r.revenue.map(Number),
+      budget: r.budget.map(Number),
+      revenueFY: Number.isFinite(Number(r.revenueFY)) ? Number(r.revenueFY) : 0,
+      budgetFY: Number.isFinite(Number(r.budgetFY)) ? Number(r.budgetFY) : 0,
+    })),
+  };
+  try {
+    const q = await pgPool.query(
+      `INSERT INTO mf_amenity_revenue (hotel_id, data, uploaded_by, uploaded_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (hotel_id) DO UPDATE SET
+         data = EXCLUDED.data, uploaded_by = EXCLUDED.uploaded_by, uploaded_at = NOW()
+       RETURNING uploaded_at`,
+      [hotelId, JSON.stringify(data), req.session?.userId || null],
+    );
+    res.json({ ok: true, amenity: { ...data, uploadedAt: q.rows[0].uploaded_at } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

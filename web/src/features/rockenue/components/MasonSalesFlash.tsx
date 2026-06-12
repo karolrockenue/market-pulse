@@ -5,6 +5,8 @@ import { R } from "../../../styles/tokens";
 import {
   fetchMasonSalesFlash,
   fetchMasonCards,
+  fetchMasonAmenities,
+  uploadMasonAmenities,
   type SalesFlashResponse,
   type SalesFlashMonthCard,
   type RevenueCell,
@@ -362,14 +364,24 @@ function Section({ title, subtitle, done, children }: { title: string; subtitle?
 // and shows the awaiting-upload note so the section reads as "pending data"
 // rather than missing.
 // ── Amenity & Building Revenue (Westbourne) ──
-// Reads Dom's "Ancillary Upload" CSV client-side and renders Revenue / Budget /
-// vs Budget % per amenity. Persisted in localStorage so it survives reloads.
+// Reads Dom's "Ancillary Upload" CSV/Excel client-side, then persists the
+// parsed payload server-side (POST /api/mason/amenities/:hotelId) so it shows
+// for everyone and feeds the PDF/Excel exports. Dom re-uploads every Monday —
+// a warning shows when this week's upload is missing.
 // (Mews can't supply this — amenity revenue runs on Toast etc.)
 interface AmenityData {
   months: string[];
   fyLabel: string;
   rows: { name: string; revenue: number[]; budget: number[]; revenueFY: number; budgetFY: number }[];
   uploadedAt: string;
+}
+
+// Most recent Monday 00:00 (local) — the upload-cadence boundary.
+function lastMonday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
 }
 
 // Minimal CSV row parser — handles quoted fields with embedded commas (the £
@@ -430,19 +442,28 @@ function parseAmenityCsv(text: string): AmenityData | null {
 }
 
 function AmenityRevenue({ hotelId }: { hotelId: number }) {
-  const storeKey = `mf_amenity_${hotelId}`;
-  const [data, setData] = useState<AmenityData | null>(() => {
-    try { const s = localStorage.getItem(storeKey); return s ? JSON.parse(s) : null; } catch { return null; }
-  });
+  const [data, setData] = useState<AmenityData | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Server is the source of truth — load the stored upload for this hotel.
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setErr(null);
+    fetchMasonAmenities(hotelId)
+      .then((d) => { if (!cancelled) setData(d.amenity); })
+      .catch(() => { /* silent — section just shows the upload prompt */ });
+    return () => { cancelled = true; };
+  }, [hotelId]);
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const isExcel = /\.xlsx?$/i.test(file.name);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         // Excel (.xlsx/.xls): convert the first sheet to CSV text via SheetJS,
         // then feed the existing CSV parser (num() tolerates raw or £-formatted
@@ -457,8 +478,19 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
         const parsed = parseAmenityCsv(csv);
         if (!parsed) { setErr("Couldn't read that file — expected the Ancillary Upload sheet (Canal / Meadow / Grounding Revenue & Budget rows)."); return; }
         setErr(null);
-        setData(parsed);
-        try { localStorage.setItem(storeKey, JSON.stringify(parsed)); } catch { /* quota — display only */ }
+        setSaving(true);
+        try {
+          const saved = await uploadMasonAmenities(hotelId, {
+            months: parsed.months, fyLabel: parsed.fyLabel, rows: parsed.rows,
+          });
+          setData(saved.amenity);
+        } catch {
+          // Show what was parsed but be explicit that it didn't persist.
+          setData(parsed);
+          setErr("File read OK but saving to the server failed — the data below is NOT saved. Try again or refresh.");
+        } finally {
+          setSaving(false);
+        }
       } catch {
         setErr("Couldn't read that file — please upload the Ancillary Upload CSV or Excel sheet.");
       }
@@ -467,6 +499,8 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
     else reader.readAsText(file);
     e.target.value = "";
   };
+
+  const staleSinceMonday = data && new Date(data.uploadedAt) < lastMonday();
 
   const grid = data ? `minmax(150px, 1.4fr) repeat(${data.months.length}, minmax(58px, 1fr)) 96px` : "";
 
@@ -482,9 +516,14 @@ function AmenityRevenue({ hotelId }: { hotelId: number }) {
             borderRadius: 999, cursor: "pointer",
           }}
         >
-          {data ? "Replace Ancillary file" : "Upload Ancillary file"}
+          {saving ? "Saving…" : data ? "Replace Ancillary file" : "Upload Ancillary file"}
         </button>
         {data && <span style={{ fontSize: 11, color: R.textDim }}>{data.rows.length} amenities · uploaded {new Date(data.uploadedAt).toLocaleString()}</span>}
+        {staleSinceMonday && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: R.gold, background: "rgba(200,166,110,0.12)", border: `1px solid ${R.gold}55`, borderRadius: 999, padding: "3px 10px" }}>
+            No upload yet this week
+          </span>
+        )}
         {err && <span style={{ fontSize: 11, color: R.red }}>{err}</span>}
       </div>
       {!data ? (
