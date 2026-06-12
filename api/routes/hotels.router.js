@@ -458,6 +458,12 @@ router.get("/:hotelId/source-report", requireUserApi, async (req, res) => {
       return res.status(400).json({ error: "start must be <= end." });
     }
 
+    const coverageResult = await pool.query(
+      `SELECT MIN(booking_date)::text AS data_from FROM reservations WHERE hotel_id = $1`,
+      [hotelId],
+    );
+    const dataFrom = coverageResult.rows[0]?.data_from || null;
+
     const result = await pool.query(
       `WITH normalized AS (
          SELECT
@@ -566,7 +572,7 @@ router.get("/:hotelId/source-report", requireUserApi, async (req, res) => {
           : 0,
     };
 
-    res.json({ start, end, sources, totals });
+    res.json({ start, end, dataFrom, sources, totals });
   } catch (error) {
     console.error("Error fetching source report:", error);
     res.status(500).json({ error: "Internal server error." });

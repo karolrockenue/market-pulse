@@ -39,6 +39,7 @@ interface Totals {
 interface SourceReportResponse {
   start: string;
   end: string;
+  dataFrom: string | null;
   sources: SourceRow[];
   totals: Totals;
 }
@@ -356,6 +357,22 @@ export function SourceReport({
           </div>
 
           <div style={{ height: 1, background: R.sep }} />
+
+          {/* Coverage notice — picker start predates available reservation data */}
+          {data && data.dataFrom && data.start < data.dataFrom && (
+            <div
+              style={{
+                padding: "10px 24px",
+                borderBottom: `1px solid ${R.sep}`,
+                fontSize: 11,
+                color: R.gold,
+              }}
+            >
+              Reservation data for this property is available from{" "}
+              {formatDateLabel(data.dataFrom)}. Bookings made before that date
+              are not included in this report.
+            </div>
+          )}
 
           {/* Section header */}
           <div
