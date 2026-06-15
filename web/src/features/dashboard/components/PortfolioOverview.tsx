@@ -1102,7 +1102,7 @@ export function PortfolioOverview() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.2fr 0.8fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
+                      gridTemplateColumns: "1.2fr 0.8fr 0.8fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
                       gap: "0.5rem",
                       padding: "0.75rem 1rem",
                       borderBottom: `1px solid ${R.border}`,
@@ -1116,6 +1116,16 @@ export function PortfolioOverview() {
                       }}
                     >
                       Month
+                    </div>
+                    <div
+                      style={{
+                        color: R.textDim,
+                        fontSize: "10px",
+                        textTransform: "uppercase",
+                        textAlign: "right",
+                      }}
+                    >
+                      {currentYear - 1} Occ
                     </div>
                     <div
                       style={{
@@ -1201,6 +1211,11 @@ export function PortfolioOverview() {
                           parseInt(thisYearData.total_capacity as any)) *
                         100
                       : 0;
+                    const occLY = lastYearData
+                      ? (parseInt(lastYearData.rooms_sold as any) /
+                          parseInt(lastYearData.total_capacity as any)) *
+                        100
+                      : 0;
                     const adrTY = parseFloat((thisYearData?.adr as any) || 0);
                     const adrLY = parseFloat((lastYearData?.adr as any) || 0);
 
@@ -1219,7 +1234,7 @@ export function PortfolioOverview() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "1.2fr 0.8fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
+                            "1.2fr 0.8fr 0.8fr 1fr 1px 0.8fr 0.8fr 1fr 1fr",
                           gap: "0.5rem",
                           padding: "0.75rem 1rem",
                           borderBottom: `1px solid ${R.border}`,
@@ -1235,6 +1250,16 @@ export function PortfolioOverview() {
                           }}
                         >
                           {monthName}
+                        </div>
+                        <div
+                          style={{
+                            color: R.textDim,
+                            fontSize: "12px",
+                            textAlign: "right",
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          {lastYearData ? `${occLY.toFixed(0)}%` : "—"}
                         </div>
                         <div
                           style={{
