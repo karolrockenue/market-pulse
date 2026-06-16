@@ -366,6 +366,8 @@ async function getUpcomingMetrics(
   propertyId,
   taxRate,
   pricingModel,
+  overrideStartDate = null,
+  overrideEndDate = null,
 ) {
   // NEW: The start date is now set to 14 days in the past to recapture recent changes.
   const startDateObj = new Date();
@@ -378,8 +380,11 @@ async function getUpcomingMetrics(
   endDateObj.setDate(endDateObj.getDate() + 367);
 
   // Format the dates for the API request payload.
-  const startDate = startDateObj.toISOString().split("T")[0];
-  const endDate = endDateObj.toISOString().split("T")[0];
+  // Scoped callers (e.g. the live webhook resync) may override the window to a
+  // narrow stay-date range; defaults preserve the full -14..+367 fleet behaviour.
+  const startDate =
+    overrideStartDate || startDateObj.toISOString().split("T")[0];
+  const endDate = overrideEndDate || endDateObj.toISOString().split("T")[0];
 
   // NOTE (2026-05-20): adr/occupancy/revpar removed. Cloudbeds' Data Insights
   // API now rejects these as "dynamic CDFs" that don't support the `sum`

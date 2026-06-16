@@ -21,7 +21,8 @@ async function getHotelContext(cloudbedsPropertyId) {
 
   // Try matching directly on the pms_property_id stored in hotels table first (most reliable)
   const result = await pgPool.query(
-    `SELECT h.hotel_id, h.history_locked_until::text AS history_locked_until, up.pms_credentials
+    `SELECT h.hotel_id, h.history_locked_until::text AS history_locked_until,
+            h.tax_rate, h.pricing_model, h.total_rooms, up.pms_credentials
      FROM hotels h
      JOIN user_properties up ON h.hotel_id = up.property_id
      WHERE h.pms_property_id = $1
@@ -101,7 +102,13 @@ router.post("/", async (req, res) => {
       );
       return finish();
     }
-    const { hotel_id, history_locked_until } = context;
+    const {
+      hotel_id,
+      history_locked_until,
+      tax_rate,
+      pricing_model,
+      total_rooms,
+    } = context;
 
     // 4. Access Token
     let accessToken;
@@ -227,82 +234,110 @@ router.post("/", async (req, res) => {
     }
     // ---------------------------------------------------------
 
-    // 6. Determine Direction (Add or Subtract)
-    let multiplier = 0;
+    // 6. Authoritative metric resync (replaces the legacy ±1 incremental counter).
+    //
+    // The old counter nudged rooms_sold by +1/-1 per room-night on each event.
+    // With no idempotency and an asymmetric cancel decrement it drifted between
+    // nightly refreshes (over-counting sold -> under-reporting availability; the
+    // Park Hotel 2026-06-15 incident). We now re-read the affected stay-dates'
+    // metrics from the SAME authoritative source the nightly refresh uses
+    // (Cloudbeds Insights, scoped to this reservation's nights) and SET them.
+    // Because we SET rather than accumulate, the snapshot can never drift and
+    // duplicate webhook deliveries are naturally idempotent.
 
-    if (payload.event === "reservation/created") {
-      multiplier = 1;
-    } else if (payload.event === "reservation/status_changed") {
-      const status = resData.data.status || "";
-      console.log(`[Webhook] Status Changed to: ${status}`);
-
-      if (["canceled", "no_show"].includes(status)) {
-        multiplier = -1;
-      } else {
-        return finish(
-          `Status is '${status}' (not a cancellation). No metric change needed.`
-        );
-      }
-    }
-
-    // 7. Calculate & SQL Update
+    // Derive the affected stay-date window from the reservation's rooms,
+    // falling back to reservation-level dates if room-level dates are absent.
     const rooms = [
       ...(resData.data.assigned || []),
       ...(resData.data.unassigned || []),
     ];
-    console.log(
-      `[Webhook] Processing ${rooms.length} rooms for hotel ${hotel_id} (Multiplier: ${multiplier})`
-    );
-
+    const dateCandidates = [];
     for (const room of rooms) {
-      const checkIn = new Date(room.startDate);
-      const checkOut = new Date(room.endDate);
-      const totalRoomRevenue = parseFloat(room.roomTotal || room.total || 0);
+      if (room.startDate) dateCandidates.push(room.startDate.split("T")[0]);
+      if (room.endDate) dateCandidates.push(room.endDate.split("T")[0]);
+    }
+    if (resData.data.startDate)
+      dateCandidates.push(resData.data.startDate.split("T")[0]);
+    if (resData.data.endDate)
+      dateCandidates.push(resData.data.endDate.split("T")[0]);
 
-      const diffTime = Math.abs(checkOut - checkIn);
-      const numNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const dailyRevenue = numNights > 0 ? totalRoomRevenue / numNights : 0;
+    const validDates = dateCandidates.filter(Boolean).sort();
+    if (validDates.length === 0) {
+      return finish(
+        `No stay dates on reservation ${reservationId}; nothing to resync.`
+      );
+    }
+    const rangeStart = validDates[0];
+    const rangeEnd = validDates[validDates.length - 1];
 
-      const revenueDelta = dailyRevenue * multiplier;
-      const roomDelta = 1 * multiplier;
-
-      for (
-        let d = new Date(checkIn);
-        d < checkOut;
-        d.setDate(d.getDate() + 1)
-      ) {
-        const stayDateStr = d.toISOString().split("T")[0];
-
-        // History lock: never mutate metrics for stay_dates on or before the lock date.
-        if (history_locked_until && stayDateStr <= history_locked_until) {
-          console.log(
-            `[Webhook] History lock (${history_locked_until}): skipping locked stay_date ${stayDateStr} for hotel ${hotel_id}.`
-          );
-          continue;
-        }
-
-        // SQL: Note the 0::numeric casting for safety
-        const updateQuery = `
-                INSERT INTO daily_metrics_snapshots (hotel_id, stay_date, rooms_sold, gross_revenue)
-                VALUES ($1, $2, GREATEST(0::numeric, $3), GREATEST(0::numeric, $4))
-                ON CONFLICT (hotel_id, stay_date)
-                DO UPDATE SET 
-                    rooms_sold = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.rooms_sold, 0::numeric) + $5),
-                    gross_revenue = GREATEST(0::numeric, COALESCE(daily_metrics_snapshots.gross_revenue, 0::numeric) + $6);
-            `;
-
-        await pgPool.query(updateQuery, [
-          hotel_id,
-          stayDateStr,
-          Math.max(0, roomDelta),
-          Math.max(0, revenueDelta),
-          roomDelta,
-          revenueDelta,
-        ]);
-      }
+    // Fetch authoritative Insights metrics for ONLY this narrow window.
+    let freshMetrics;
+    try {
+      freshMetrics = await cloudbedsAdapter.getUpcomingMetrics(
+        accessToken,
+        cloudbedsPropertyId,
+        tax_rate || 0,
+        pricing_model || "inclusive",
+        rangeStart,
+        rangeEnd
+      );
+    } catch (insightsErr) {
+      // Never fall back to incremental math (that reintroduces drift). Skip the
+      // metric update and let the nightly refresh reconcile. Log loudly.
+      console.error(
+        `[Webhook] Insights resync FAILED for hotel ${hotel_id} (${rangeStart}..${rangeEnd}): ${insightsErr.message}. Skipping metric update; nightly refresh will reconcile.`
+      );
+      return finish(
+        `Ledger updated; metric resync deferred for ${reservationId}.`
+      );
     }
 
-    return finish(`Success. Metrics updated for Reservation ${reservationId}`);
+    // Authoritative SET for each affected stay-date. Capacity mirrors the nightly
+    // refresh (static total_rooms preferred); history-locked dates are skipped.
+    const resyncDates = Object.keys(freshMetrics).filter(
+      (d) => d >= rangeStart && d <= rangeEnd
+    );
+    let resyncedCount = 0;
+    for (const stayDateStr of resyncDates) {
+      if (history_locked_until && stayDateStr <= history_locked_until) {
+        continue;
+      }
+      const m = freshMetrics[stayDateStr];
+      const capacity = total_rooms || m.capacity_count || 0;
+
+      await pgPool.query(
+        `INSERT INTO daily_metrics_snapshots
+           (hotel_id, stay_date, rooms_sold, capacity_count,
+            net_revenue, gross_revenue, net_adr, gross_adr, net_revpar, gross_revpar)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (hotel_id, stay_date) DO UPDATE SET
+             rooms_sold = EXCLUDED.rooms_sold,
+             capacity_count = EXCLUDED.capacity_count,
+             net_revenue = EXCLUDED.net_revenue,
+             gross_revenue = EXCLUDED.gross_revenue,
+             net_adr = EXCLUDED.net_adr,
+             gross_adr = EXCLUDED.gross_adr,
+             net_revpar = EXCLUDED.net_revpar,
+             gross_revpar = EXCLUDED.gross_revpar;`,
+        [
+          hotel_id,
+          stayDateStr,
+          m.rooms_sold || 0,
+          capacity,
+          m.net_revenue || 0,
+          m.gross_revenue || 0,
+          m.net_adr || 0,
+          m.gross_adr || 0,
+          m.net_revpar || 0,
+          m.gross_revpar || 0,
+        ]
+      );
+      resyncedCount++;
+    }
+
+    return finish(
+      `Authoritative resync complete for ${reservationId}: ${resyncedCount} stay-date(s) ${rangeStart}..${rangeEnd}.`
+    );
   } catch (error) {
     console.error("[Webhook] FATAL Processing Error:", error);
     return finish(); // Always send 200 to stop retries, even on crash
