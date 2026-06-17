@@ -5,6 +5,10 @@ const pgPool = require("./utils/db.js");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+// A single Airbnb search page is 18 results. With the ~10 km bbox a healthy
+// date returns ~100+; any date at/under one page is a suspected pagination cap.
+const ONE_PAGE = 18;
+
 // ---------------------------------------------------------------------------
 // City configs
 // ---------------------------------------------------------------------------
@@ -128,6 +132,7 @@ async function fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, cursor) {
 function parseListings(pageData) {
   const listings = [];
   let nextCursor = null;
+  let pageCursors = [];
 
   try {
     const entries = pageData.niobeClientData || [];
@@ -138,8 +143,15 @@ function parseListings(pageData) {
       const results = value?.data?.presentation?.staysSearch?.results;
       if (!results) continue;
 
-      // Pagination
+      // Pagination. Airbnb removed the single `nextPageCursor` field in
+      // April 2026 and now ships the full list of page cursors up front in
+      // `pageCursors[]` (pageCursors[0] = current page). Reading the old field
+      // silently capped every scrape at one page (18 results). Prefer the
+      // array; keep nextPageCursor as a fallback if Airbnb reinstates it.
       const pag = results.paginationInfo;
+      if (Array.isArray(pag?.pageCursors) && pag.pageCursors.length) {
+        pageCursors = pag.pageCursors;
+      }
       if (pag?.nextPageCursor) {
         nextCursor = pag.nextPageCursor;
       }
@@ -229,7 +241,7 @@ function parseListings(pageData) {
     console.warn("Failed to parse listings:", error.message);
   }
 
-  return { listings, nextCursor };
+  return { listings, nextCursor, pageCursors };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,23 +250,54 @@ function parseListings(pageData) {
 
 async function scrapeDate(cityConfig, checkinDate, checkoutDate) {
   let allListings = [];
-  let cursor = null;
-  let page = 0;
   // 30 pages × ~18 results = enough to fully exhaust Airbnb's per-query
   // ceiling (~270). With a tight bbox the response is well under the cap.
   const MAX_PAGES = 30;
 
-  do {
-    page++;
-    console.log(`  Fetching ${checkinDate} (page ${page})...`);
+  // Page 1 (no cursor) also carries the full pageCursors[] list for this query.
+  console.log(`  Fetching ${checkinDate} (page 1)...`);
+  const firstPage = await fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, null);
+  const first = parseListings(firstPage);
+  allListings = allListings.concat(first.listings);
 
-    const pageData = await fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, cursor);
-    const { listings, nextCursor } = parseListings(pageData);
-    allListings = allListings.concat(listings);
-    cursor = nextCursor;
+  // Preferred path: walk the remaining pageCursors (index 0 is the page we just
+  // fetched). Fallback: chase the legacy nextPageCursor chain if pageCursors is
+  // absent. Either way we never exit after a single page unless there genuinely
+  // is only one.
+  const remainingCursors = (first.pageCursors || []).slice(1, MAX_PAGES);
+  if (remainingCursors.length) {
+    for (let i = 0; i < remainingCursors.length; i++) {
+      await delay(2000);
+      console.log(`  Fetching ${checkinDate} (page ${i + 2}/${remainingCursors.length + 1})...`);
+      const pageData = await fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, remainingCursors[i]);
+      const { listings } = parseListings(pageData);
+      allListings = allListings.concat(listings);
+    }
+  } else {
+    let cursor = first.nextCursor;
+    let page = 1;
+    while (cursor && page < MAX_PAGES) {
+      page++;
+      await delay(2000);
+      console.log(`  Fetching ${checkinDate} (page ${page}, legacy cursor)...`);
+      const pageData = await fetchAirbnbPage(cityConfig, checkinDate, checkoutDate, cursor);
+      const { listings, nextCursor } = parseListings(pageData);
+      allListings = allListings.concat(listings);
+      cursor = nextCursor;
+    }
+  }
 
-    if (cursor) await delay(2000);
-  } while (cursor && page < MAX_PAGES);
+  // Dedup within the date: page cursors overlap slightly, so the same listing
+  // can appear on two pages. Key by coordinate; keep coordinate-less listings
+  // (we can't tell them apart and dropping them loses data).
+  const seenCoords = new Set();
+  allListings = allListings.filter((l) => {
+    if (l.lat == null || l.lng == null) return true;
+    const k = `${l.lat},${l.lng}`;
+    if (seenCoords.has(k)) return false;
+    seenCoords.add(k);
+    return true;
+  });
 
   // Belt-and-braces distance filter: even with the bbox, Airbnb sometimes
   // returns properties slightly outside the box. Drop anything beyond the
@@ -394,7 +437,7 @@ async function withRetries(fn, attempts = 3, delayMs = 10000) {
   }
 }
 
-async function sendSummaryEmail(stats, startTime) {
+async function sendSummaryEmail(stats, startTime, uniqueCount) {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn("SENDGRID_API_KEY not found. Skipping summary email.");
     return;
@@ -402,16 +445,35 @@ async function sendSummaryEmail(stats, startTime) {
 
   const duration = ((new Date() - startTime) / 1000 / 60).toFixed(2);
 
+  // "Dates scraped" only proves the run executed — NOT that it captured the
+  // market. A broken paginator returns one page (18) per date and still reports
+  // 90/90. Gate health on real coverage: the cross-date union of unique
+  // properties and the best single-date count must clear sane floors, and most
+  // dates must return more than one page.
+  const UNIQUE_FLOOR = 80; // Archanes universe is ~200; <80 means truncation/regression
+  const reasons = [];
+  if (stats.failures > 0) reasons.push(`${stats.failures} date(s) failed`);
+  if (uniqueCount < UNIQUE_FLOOR) reasons.push(`union of unique properties ${uniqueCount} < ${UNIQUE_FLOOR}`);
+  if (stats.maxListingsPerDate <= ONE_PAGE) reasons.push(`best date only ${stats.maxListingsPerDate} listings (one-page cap)`);
+  if (stats.truncatedDates > stats.successes * 0.25) reasons.push(`${stats.truncatedDates}/${stats.successes} dates returned <=${ONE_PAGE} listings`);
+  const healthy = reasons.length === 0;
+  const flag = healthy ? "✅" : "⚠️";
+
   const msg = {
     to: "karol@rockenue.com",
     from: "codex@em4689.market-pulse.io",
-    subject: `Airbnb Codex: ${stats.city} - ${stats.successes}/${stats.totalDays} dates`,
+    subject: `${flag} Airbnb Codex: ${stats.city} — ${healthy ? "healthy" : "CHECK"} (${uniqueCount} unique, ${stats.successes}/${stats.totalDays} dates)`,
     html: `
       <h1>Airbnb Codex Scraper: ${stats.city}</h1>
+      <p style="font-size:16px"><strong>${flag} ${healthy ? "Healthy capture" : "Suspected truncation — investigate"}</strong></p>
+      ${healthy ? "" : `<ul style="color:#b00">${reasons.map((r) => `<li>${r}</li>`).join("")}</ul>`}
       <ul>
-        <li><strong>Dates Scraped:</strong> ${stats.successes} / ${stats.totalDays}</li>
+        <li><strong>Unique properties (union across dates):</strong> ${uniqueCount}</li>
+        <li><strong>Best single-date count:</strong> ${stats.maxListingsPerDate}</li>
+        <li><strong>Dates at/under one page (&le;${ONE_PAGE}):</strong> ${stats.truncatedDates} / ${stats.successes}</li>
+        <li><strong>Dates scraped:</strong> ${stats.successes} / ${stats.totalDays}</li>
         <li><strong>Failures:</strong> ${stats.failures}</li>
-        <li><strong>Total Listings Found:</strong> ${stats.totalListingsFound}</li>
+        <li><strong>Total listing-rows written:</strong> ${stats.totalListingsFound}</li>
         <li><strong>Duration:</strong> ${duration} minutes</li>
       </ul>
     `,
@@ -442,7 +504,9 @@ async function main() {
   const city = CITY_CONFIGS[targetCitySlug];
 
   const CONFIG = {
-    daysToScrape: 90,
+    // Default 90-day horizon. CODEX_MAX_DAYS lets a quick verification run scrape
+    // just the first N dates (e.g. CODEX_MAX_DAYS=3 node index.js archanes).
+    daysToScrape: Number(process.env.CODEX_MAX_DAYS) || 90,
     retries: 3,
     delayBetweenDates: 4000, // 4s between dates
     delayBetweenRetries: 15000,
@@ -455,6 +519,8 @@ async function main() {
     successes: 0,
     failures: 0,
     totalListingsFound: 0,
+    maxListingsPerDate: 0,
+    truncatedDates: 0, // dates that came back with <=18 listings (one-page cap signature)
   };
 
   const failedDates = [];
@@ -479,6 +545,8 @@ async function main() {
         const id = await saveSnapshot(city.slug, checkinStr, data);
         stats.successes++;
         stats.totalListingsFound += data.totalListings;
+        stats.maxListingsPerDate = Math.max(stats.maxListingsPerDate, data.totalListings);
+        if (data.totalListings <= ONE_PAGE) stats.truncatedDates++;
 
         console.log(
           `  ${checkinStr}: ${data.totalListings} listings, avg ${city.currency} ${data.avgPrice || "N/A"} (ID: ${id})`
@@ -515,6 +583,8 @@ async function main() {
           stats.successes++;
           stats.failures--;
           stats.totalListingsFound += data.totalListings;
+          stats.maxListingsPerDate = Math.max(stats.maxListingsPerDate, data.totalListings);
+          if (data.totalListings <= ONE_PAGE) stats.truncatedDates++;
           console.log(`  Retry OK: ${date.checkinStr} — ${data.totalListings} listings`);
         } catch (error) {
           console.error(
@@ -535,14 +605,15 @@ async function main() {
     );
     // Stamp scrape_unique_properties on every row from today's scrape now that
     // the full 90-day window is in the table. Powers the per-date occupancy proxy.
+    let uniqueCount = 0;
     try {
-      const uniqueCount = await setScrapeUniqueCount(city.slug);
+      uniqueCount = await setScrapeUniqueCount(city.slug);
       console.log(`Unique properties across full scrape: ${uniqueCount}`);
     } catch (e) {
       console.error("setScrapeUniqueCount error:", e.message);
     }
     try {
-      await sendSummaryEmail(stats, startTime);
+      await sendSummaryEmail(stats, startTime, uniqueCount);
     } catch (e) {
       console.error("Email error:", e.message);
     }
