@@ -45,13 +45,24 @@ async function getDailyMaxRatesIsoMap(hotelId, startDate, endDate) {
 
 /**
  * [FIXED] Fetch Daily Max Rates
- * Translates DB Date ('2025-01-01') -> Frontend Key ('0-1')
+ * Translates DB Date ('2026-01-01') -> Frontend Key ('0-1') for the Control Panel UI.
+ *
+ * Year-collision fix (2026-06-18): rows exist per actual stay-date across multiple
+ * years (the engine prices currentYear + currentYear+1 via getDailyMaxRatesIsoMap,
+ * and saveDailyMaxRates / updateConfiguration write both). Mapping every year to a
+ * year-blind "month-day" key collapsed them, so the read-back showed whichever year
+ * the DB returned last instead of the value just saved — manual edits "silently
+ * didn't stick". Read from a single canonical year (currentYear) so the dialog shows
+ * the value that is actually live in the engine.
  */
 async function getDailyMaxRates(hotelId, startDate, endDate) {
+  const canonicalYear = new Date().getFullYear();
+
   const query = `
-    SELECT stay_date, max_price 
-    FROM sentinel_daily_max_rates 
-    WHERE hotel_id = $1 
+    SELECT stay_date, max_price
+    FROM sentinel_daily_max_rates
+    WHERE hotel_id = $1
+    AND EXTRACT(YEAR FROM stay_date) = ${canonicalYear}
     ${startDate ? "AND stay_date >= $2" : ""}
     ${endDate ? "AND stay_date <= $3" : ""}
   `;
@@ -75,42 +86,55 @@ async function getDailyMaxRates(hotelId, startDate, endDate) {
 
 /**
  * [FIXED] Save Daily Max Rates
- * Translates Frontend Key ('0-1') -> DB Date ('2025-01-01')
+ * Translates Frontend Key ('0-1') -> DB Dates for currentYear AND currentYear+1.
+ *
+ * Year-collision fix (2026-06-18): previously wrote a hardcoded base year (2025),
+ * but the pricing engine reads caps by actual future ISO date (currentYear /
+ * currentYear+1 via getDailyMaxRatesIsoMap), so dialog-set overrides never reached
+ * it and the read-back collided across years. Now mirrors updateConfiguration's
+ * dynamic-year logic so a manual save lands on the same engine-active rows the bulk
+ * config save uses — full 365+ day coverage from today. Full-ISO keys (legacy) pass
+ * through unchanged.
  */
 async function saveDailyMaxRates(hotelId, ratesMap) {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
 
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear, currentYear + 1];
+
+    const upsert = `
+      INSERT INTO sentinel_daily_max_rates (hotel_id, stay_date, max_price, is_manual_override, updated_at)
+      VALUES ($1, $2, $3, TRUE, NOW())
+      ON CONFLICT (hotel_id, stay_date)
+      DO UPDATE SET
+        max_price = EXCLUDED.max_price,
+        is_manual_override = TRUE,
+        updated_at = NOW();
+    `;
+
     for (const [key, price] of Object.entries(ratesMap)) {
       if (!price) continue; // Skip empty values
 
       // 1. Parse the Frontend Key ("0-1" -> Month 0, Day 1)
       const parts = key.split("-");
-      // If it's already a full date (legacy data), handle gracefully, otherwise translate
-      let dateStr = key;
 
       if (parts.length === 2) {
+        // Month-day pattern key: write to every engine-priced year.
         const monthIdx = parseInt(parts[0], 10); // 0 = Jan
         const day = parseInt(parts[1], 10);
-        // Use 2025 as the base year to match the UI's day-of-week logic
-        const year = 2025;
-        dateStr = `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(
-          day,
-        ).padStart(2, "0")}`;
+        for (const year of years) {
+          const dateStr = `${year}-${String(monthIdx + 1).padStart(
+            2,
+            "0",
+          )}-${String(day).padStart(2, "0")}`;
+          await client.query(upsert, [hotelId, dateStr, price]);
+        }
+      } else {
+        // Full ISO date key (legacy / direct): write as-is.
+        await client.query(upsert, [hotelId, key, price]);
       }
-
-      // 2. Insert into DB
-      const query = `
-        INSERT INTO sentinel_daily_max_rates (hotel_id, stay_date, max_price, is_manual_override, updated_at)
-        VALUES ($1, $2, $3, TRUE, NOW())
-        ON CONFLICT (hotel_id, stay_date) 
-        DO UPDATE SET
-          max_price = EXCLUDED.max_price,
-          is_manual_override = TRUE,
-          updated_at = NOW();
-      `;
-      await client.query(query, [hotelId, dateStr, price]);
     }
 
     await client.query("COMMIT");
