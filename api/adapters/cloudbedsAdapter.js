@@ -361,6 +361,161 @@ async function getHistoricalMetrics(
  */
 // /api/adapters/cloudbedsAdapter.js
 
+// Cloudbeds Insights caps a single page at ~12,000 records and, when it hits the
+// cap, returns NO nextToken — silently truncating. With details:true the dataset 7
+// query emits many rows per stay-date (one per room_type), so a full -14..+367 day
+// window overflows the cap on any mid/large property and the far months get
+// zero-filled (16/36 Cloudbeds hotels affected, found 2026-06-18 — Wardonia, Park,
+// Durrant, etc.). See fetchInsightsRange: we pull the window in adaptive day-chunks
+// that stay under the cap, recursively halving any chunk that still truncates.
+const INSIGHTS_PAGE_CAP = 12000;
+
+// UTC-safe date-string helpers (avoid local-DST off-by-one — e.g. Oct 25 2026 is a
+// 25-hour day in Europe, which breaks naive .setDate() loops).
+function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr + "T00:00:00.000Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().split("T")[0];
+}
+function minDateStr(a, b) {
+  return a < b ? a : b;
+}
+// Calendar span (end - start) in days between two YYYY-MM-DD strings.
+function spanDaysStr(startStr, endStr) {
+  const a = new Date(startStr + "T00:00:00.000Z");
+  const b = new Date(endStr + "T00:00:00.000Z");
+  return Math.round((b - a) / 86400000);
+}
+
+/**
+ * Fetch all Insights pages for ONE stay-date sub-range [rangeStart, rangeEnd].
+ * Identical query/columns/grouping to the legacy single call — only the date
+ * window narrows. If a page hits the 12k cap with no nextToken (silent
+ * truncation), the chunk is split in half and each half fetched recursively,
+ * down to floorDays. Below the floor we throw loudly (guardrail #11) rather than
+ * zero-fill a truncated response (rooms_sold is SET downstream — guardrail #15).
+ * @returns {Promise<object[]>} array of raw pageData objects.
+ */
+async function fetchInsightsRange(
+  accessToken,
+  propertyId,
+  columnsToRequest,
+  rangeStart,
+  rangeEnd,
+  floorDays,
+) {
+  const payload = {
+    property_ids: [propertyId],
+    dataset_id: 7,
+    filters: {
+      and: [
+        {
+          cdf: { column: "stay_date" },
+          operator: "greater_than_or_equal",
+          value: `${rangeStart}T00:00:00.000Z`,
+        },
+        {
+          cdf: { column: "stay_date" },
+          operator: "less_than_or_equal",
+          value: `${rangeEnd}T00:00:00.000Z`,
+        },
+        // FILTER: Exclude non-room revenue (House Accounts, etc)
+        { cdf: { column: "room_type_id" }, operator: "is_not_null", value: "" },
+      ],
+    },
+    columns: columnsToRequest,
+    group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
+    settings: { details: true, totals: false },
+  };
+
+  const pages = [];
+  let nextToken = null;
+  let pageNum = 1;
+
+  try {
+    do {
+      const insightsPayload = { ...payload };
+      if (nextToken) insightsPayload.nextToken = nextToken;
+      console.log(
+        `[DEBUG] Forecast ${rangeStart}..${rangeEnd} page ${pageNum}${nextToken ? " (nextToken)" : ""}.`,
+      );
+
+      const apiResponse = await fetch(
+        "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "X-PROPERTY-ID": propertyId,
+          },
+          body: JSON.stringify(insightsPayload),
+        },
+      );
+
+      const responseText = await apiResponse.text();
+      if (!apiResponse.ok) {
+        console.error(
+          `[DEBUG] Forecast API Error ${rangeStart}..${rangeEnd} page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`,
+        );
+        throw new Error(
+          `Forecast API Error on page ${pageNum}: ${apiResponse.status}`,
+        );
+      }
+
+      const pageData = JSON.parse(responseText);
+      const pageRecordCount = pageData.records?.rooms_sold?.length || 0;
+      console.log(
+        `[DEBUG] Forecast ${rangeStart}..${rangeEnd} page ${pageNum} received. Records: ${pageRecordCount}. nextToken: ${!!pageData.nextToken}`,
+      );
+
+      // --- TRUNCATION GUARD (Park backfill 2026-06-18) ---
+      // A capped page with no nextToken means Cloudbeds silently truncated. Flag it
+      // so the catch below can split-and-retry instead of zero-filling missing days.
+      if (pageRecordCount >= INSIGHTS_PAGE_CAP && !pageData.nextToken) {
+        const err = new Error(
+          `Insights truncation: ${rangeStart}..${rangeEnd} page ${pageNum} returned ${pageRecordCount} records (cap) with no nextToken for property ${propertyId}.`,
+        );
+        err.isTruncation = true;
+        throw err;
+      }
+
+      pages.push(pageData);
+      nextToken = pageData.nextToken || null;
+      pageNum++;
+    } while (nextToken);
+  } catch (e) {
+    // Adaptive split: a truncated chunk wider than the floor is halved and retried.
+    if (e.isTruncation && spanDaysStr(rangeStart, rangeEnd) + 1 > floorDays) {
+      const span = spanDaysStr(rangeStart, rangeEnd);
+      const mid = addDaysStr(rangeStart, Math.floor(span / 2));
+      console.log(
+        `[DEBUG] Splitting truncated chunk ${rangeStart}..${rangeEnd} -> ${rangeStart}..${mid} + ${addDaysStr(mid, 1)}..${rangeEnd}`,
+      );
+      const left = await fetchInsightsRange(
+        accessToken,
+        propertyId,
+        columnsToRequest,
+        rangeStart,
+        mid,
+        floorDays,
+      );
+      const right = await fetchInsightsRange(
+        accessToken,
+        propertyId,
+        columnsToRequest,
+        addDaysStr(mid, 1),
+        rangeEnd,
+        floorDays,
+      );
+      return [...left, ...right];
+    }
+    throw e;
+  }
+
+  return pages;
+}
+
 async function getUpcomingMetrics(
   accessToken,
   propertyId,
@@ -399,84 +554,34 @@ async function getUpcomingMetrics(
     "room_revenue",
   ].map((col) => ({ cdf: { column: col }, metrics: ["sum"] }));
 
-  const initialInsightsPayload = {
-    property_ids: [propertyId],
-    dataset_id: 7,
-    filters: {
-      and: [
-        {
-          cdf: { column: "stay_date" },
-          operator: "greater_than_or_equal",
-          value: `${startDate}T00:00:00.000Z`,
-        },
-        {
-          cdf: { column: "stay_date" },
-          operator: "less_than_or_equal",
-          value: `${endDate}T00:00:00.000Z`,
-        },
-        // FILTER: Exclude non-room revenue (House Accounts, etc)
-        {
-          cdf: { column: "room_type_id" },
-          operator: "is_not_null",
-          value: "",
-        },
-      ],
-    },
-    columns: columnsToRequest,
-    group_rows: [{ cdf: { column: "stay_date" }, modifier: "day" }],
-    settings: { details: true, totals: false },
-  };
-
-  let allApiData = [];
-  let nextToken = null;
-  let pageNum = 1;
-
   console.log(`--- STARTING FORECAST SYNC for property ${propertyId} ---`);
 
-  // This loop will continue as long as the API provides a 'nextToken', ensuring all pages are fetched.
-  do {
-    const insightsPayload = { ...initialInsightsPayload };
-    if (nextToken) {
-      insightsPayload.nextToken = nextToken;
-      console.log(`[DEBUG] Fetching forecast page ${pageNum} using nextToken.`);
-    } else {
-      console.log(`[DEBUG] Fetching forecast page ${pageNum} (first page).`);
-    }
+  // Pull the full [startDate, endDate] window in day-chunks small enough to stay
+  // under the 12k-record cap. Start optimistic (120 days) so small hotels finish
+  // in ~4 calls; fetchInsightsRange recursively halves any chunk that still
+  // truncates (down to FLOOR_DAYS), so large hotels self-correct without manual
+  // tuning. Narrow override callers (webhook resync) collapse to a single chunk.
+  const CHUNK_DAYS_INITIAL = 120;
+  const FLOOR_DAYS = 15;
 
-    const apiResponse = await fetch(
-      "https://api.cloudbeds.com/datainsights/v1.1/reports/query/data?mode=Run",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          "X-PROPERTY-ID": propertyId,
-        },
-        body: JSON.stringify(insightsPayload),
-      },
+  const allApiData = [];
+  let cursor = startDate;
+  while (cursor <= endDate) {
+    const chunkEnd = minDateStr(
+      addDaysStr(cursor, CHUNK_DAYS_INITIAL - 1),
+      endDate,
     );
-
-    const responseText = await apiResponse.text();
-    if (!apiResponse.ok) {
-      console.error(
-        `[DEBUG] Forecast API Error on page ${pageNum}. Status: ${apiResponse.status}. Body: ${responseText}`,
-      );
-      throw new Error(
-        `Forecast API Error on page ${pageNum}: ${apiResponse.status}`,
-      );
-    }
-
-    const pageData = JSON.parse(responseText);
-    console.log(
-      `[DEBUG] Forecast page ${pageNum} received. Record count: ${
-        pageData.records?.rooms_sold?.length || 0
-      }. Has nextToken: ${!!pageData.nextToken}`,
+    const pages = await fetchInsightsRange(
+      accessToken,
+      propertyId,
+      columnsToRequest,
+      cursor,
+      chunkEnd,
+      FLOOR_DAYS,
     );
-
-    allApiData.push(pageData);
-    nextToken = pageData.nextToken || null; // Update the token for the next loop iteration.
-    pageNum++;
-  } while (nextToken);
+    for (const p of pages) allApiData.push(p);
+    cursor = addDaysStr(chunkEnd, 1);
+  }
 
   console.log("--- FORECAST SYNC COMPLETE ---");
   // Use the new helper function to process all the pages of raw forecast data.
